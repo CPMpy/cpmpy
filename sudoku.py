@@ -33,7 +33,7 @@ for index, v in np.ndenumerate(puzzle):
 
 # constraints on rows and columns
 c_row = [alldifferent(row) for row in puzzle]
-c_col = [alldifferent(col) for row in puzzle.T]
+c_col = [alldifferent(col) for col in puzzle.T]
 
 c_block = [] # constraint on blocks
 reg = numpy.sqrt(n)
