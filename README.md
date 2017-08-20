@@ -19,9 +19,9 @@ import numpy
 s,e,n,d,m,o,r,y = IntVar(0, 9, size=8)
 
 c_adiff = alldifferent([s,e,n,d,m,o,r,y])
-c_math = [ Sum(   numpy.flip([s,e,n,d]) * power(10, range(0,4)) ) +
-           Sum(   numpy.flip([m,o,r,e]) * power(10, range(0,4)) ) ==
-           Sum( numpy.flip([m,o,n,e,y]) * power(10, range(0,5)) )
+c_math = [ Sum(   numpy.flip([s,e,n,d]) * numpy.power(10, range(0,4)) ) +
+           Sum(   numpy.flip([m,o,r,e]) * numpy.power(10, range(0,4)) ) ==
+           Sum( numpy.flip([m,o,n,e,y]) * numpy.power(10, range(0,5)) )
          ]
 c_0 = [s > 0, m > 0]
 
