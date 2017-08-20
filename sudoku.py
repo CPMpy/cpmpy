@@ -36,9 +36,8 @@ c_row = [alldifferent(row) for row in puzzle]
 c_col = [alldifferent(col) for col in puzzle.T]
 
 c_block = [] # constraint on blocks
-reg = numpy.sqrt(n)
-for i in xrange(0,n,reg):
-    for j in xrange(0,n,reg):
+for i in xrange(0,n,3):
+    for j in xrange(0,n,3):
         c_block.append( alldifferent(puzzle[i:i+3, j:j+3]) )
 
 model = Model(c_val, c_row, c_col, c_block)
