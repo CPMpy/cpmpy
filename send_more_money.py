@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-Send more money in CPPY.
+Send more money in CPpy
 
    SEND
  + MORE
@@ -9,21 +9,22 @@ Send more money in CPPY.
 
 """
 from cppy import *
-import numpy
+import numpy as np
 
 # Construct the model.
-s,e,n,d,m,o,r,y = IntVar(0, 9, size=8)
+s,e,n,d,m,o,r,y = IntVar(0,9, 8)
 
-c_adiff = alldifferent([s,e,n,d,m,o,r,y])
-c_math = [ Sum(   numpy.flip([s,e,n,d]) * numpy.power(10, range(0,4)) ) +
-           Sum(   numpy.flip([m,o,r,e]) * numpy.power(10, range(0,4)) ) ==
-           Sum( numpy.flip([m,o,n,e,y]) * numpy.power(10, range(0,5)) )
-         ]
-c_0 = [s > 0, m > 0]
+constr_alldiff = alldifferent([s,e,n,d,m,o,r,y])
+constr_sum = [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
+                + sum(   [m,o,r,e] * np.flip(10**np.arange(4)) )
+               == sum( [m,o,n,e,y] * np.flip(10**np.arange(5)) )
+             ]
+constr_0 = [s > 0, m > 0]
 
-model = Model(c_adiff, c_math, c_0)
+model = Model(constr_alldiff, constr_sum, constr_0)
+print(model)
 
 stats = model.solve()
-print "  S,E,N,D =", [x.value for x in [s,e,n,d]]
-print "  M,O,R,E =", [x.value for x in [m,o,r,e]]
-print "M,O,N,E,Y =", [x.value for x in [m,o,n,e,y]]
+print("  S,E,N,D =  ", [x.value for x in [s,e,n,d]])
+print("  M,O,R,E =  ", [x.value for x in [m,o,r,e]])
+print("M,O,N,E,Y =", [x.value for x in [m,o,n,e,y]])

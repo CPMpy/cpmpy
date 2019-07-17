@@ -1,32 +1,30 @@
 #!/usr/bin/python
 """
-Knapsack problem in CPPY.
+Knapsack problem in CPpy
  
-Simple knapsack problem.
-
 Based on the Numberjack model of Hakan Kjellerstrand
-
 """
 from cppy import *
-import numpy
+import numpy as np
 
-# Problem data.
+# Problem data
 n = 10
-numpy.random.seed(1)
-values = numpy.random.randn(n)
-weights = numpy.random.randn(n)
-r = numpy.random.randint(sum(weights)*.3, sum(weights)*.6)
+np.random.seed(1)
+values = np.random.randint(0,10, n)
+weights = np.random.randint(1,5, n)
+capacity = np.random.randint(sum(weights)*.3, sum(weights)*.6)
 
 # Construct the model.
 x = BoolVar(n)
 
-objective = Maximise(Sum(x*values))
-constraint = [Sum(x*weights) <= r]
+constraint = [sum(x*weights) <= capacity]
+objective = Maximise(sum(x*values))
 
 model = Model(objective, constraint)
+print(model)
 
 # Statistics are returned after solving.
 stats = model.solve()
 # Variables can be asked for their value in the found solution
-print objective.value
-print x.value
+print("Value:", objective.value)
+print("Solution:", x.value)

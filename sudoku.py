@@ -1,46 +1,48 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
-Sudoku problem in CPPY.
-
-This is a straightforward implementation of Sudoku.
+Sudoku problem in CPpy
 
 Based on the Numberjack model of Hakan Kjellerstrand
-
 """
 from cppy import *
 import numpy
 
-# Problem data.
-n = 9
+x = 0 # cells whose value we seek
 puzzle = numpy.array([
-    [0, 0, 0, 2, 0, 5, 0, 0, 0],
-    [0, 9, 0, 0, 0, 0, 7, 3, 0],
-    [0, 0, 2, 0, 0, 9, 0, 6, 0],
-    [2, 0, 0, 0, 0, 0, 4, 0, 9],
-    [0, 0, 0, 0, 7, 0, 0, 0, 0],
-    [6, 0, 9, 0, 0, 0, 0, 0, 1],
-    [0, 8, 0, 4, 0, 0, 1, 0, 0],
-    [0, 6, 3, 0, 0, 0, 0, 8, 0],
-    [0, 0, 0, 6, 0, 8, 0, 0, 0]])
+    [x, x, x,  2, x, 5,  x, x, x],
+    [x, 9, x,  x, x, x,  7, 3, x], 
+    [x, x, 2,  x, x, 9,  x, 6, x],
+        
+    [2, x, x,  x, x, x,  4, x, 9],
+    [x, x, x,  x, 7, x,  x, x, x],
+    [6, x, 9,  x, x, x,  x, x, 1],
+        
+    [x, 8, x,  4, x, x,  1, x, x],
+    [x, 6, 3,  x, x, x,  x, 8, x],
+    [x, x, x,  6, x, 8,  x, x, x]])
 
-# Construct the model.
+
+# Variables
+(n,_) = puzzle.shape # get matrix dimensions
 x = IntVar(1, n, puzzle.shape)
 
-c_val = [] # constraint on values
-for index, v in np.ndenumerate(puzzle):
-    if v != 0:
-        c_val.append( x[index] != v )
+
+# constraints on values
+constr_values = ( x[puzzle>0] == puzzle[puzzle>0] )
 
 # constraints on rows and columns
-c_row = [alldifferent(row) for row in puzzle]
-c_col = [alldifferent(col) for col in puzzle.T]
+constr_row = [alldifferent(row) for row in x]
+constr_col = [alldifferent(col) for col in x.T]
 
-c_block = [] # constraint on blocks
-for i in xrange(0,n,3):
-    for j in xrange(0,n,3):
-        c_block.append( alldifferent(puzzle[i:i+3, j:j+3]) )
+# constraint on blocks
+constr_block = [] 
+for i in range(0,n,3):
+    for j in range(0,n,3):
+        constr_block.append( alldifferent(x[i:i+3, j:j+3]) )
 
-model = Model(c_val, c_row, c_col, c_block)
 
+model = Model(constr_values, constr_row, constr_col, constr_block)
 stats = model.solve()
-print x.value
+
+print(model)
+print(stats)
