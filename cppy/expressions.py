@@ -297,16 +297,19 @@ class GlobalConstraint(LogicalExpression):
         self.args = args
 
     def __repr__(self):
-        return "{}({})".format(self.name, self.args)
+        if len(self.args) == 1:
+            return "{}({})".format(self.name, self.args[0])
+        else:
+            return "{}({})".format(self.name, ",".join(map(str,self.args)))
 
 
 class Objective(Expression):
-    def __init__(self, name, expr):
+    def __init__(self, name, *args):
         self.name = name
-        self.expr = expr
+        self.args = args
     
     def __repr__(self):
-        return "{} {}".format(self.name, self.expr)
+        return "{} {}".format(self.name, self.args)
     
     def __getattr__(self, name):
         if name == 'value':

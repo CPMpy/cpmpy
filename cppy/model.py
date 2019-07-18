@@ -1,13 +1,6 @@
-from enum import Enum
 from .expressions import *
+from .solver_interfaces import *
 import numpy as np
-
-class ExitStatus(Enum):
-    NOT_RUN = 1
-    OPTIMAL = 2
-    FEASIBLE = 3
-    UNSATISFIABLE = 4
-    ERROR = 5
 
 
 class Model(object):
@@ -32,17 +25,19 @@ class Model(object):
     def __repr__(self):
         return "Constraints: {}\nObjective: {}".format(self.constraints, self.objective)
     
-    def solve(self):
-        return SolverStats()
+    # solver: name of supported solver or any SolverInterface object
+    def solve(self, solver=None):
+        # default solver?
+        if solver == None:
+            solver = SolverInterface()
+        elif not isinstance(solver, SolverInterface):
+            solverdict = get_supported_solvers()
+            if not solver in solverdict:
+                raise "'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver)
+            solver = solverdict[solver]
+                
+        return solver.solve(self)
 
-
-class SolverStats(object):
-    def __init__(self):
-        self.status = ExitStatus.NOT_RUN
-        self.runtime = None
-    
-    def __repr__(self):
-        return "{} ({} seconds)".format(self.status, self.runtime)
 
 # http://jugad2.blogspot.com/2014/10/flattening-arbitrarily-nested-list-in.html
 def flatten(iterable):

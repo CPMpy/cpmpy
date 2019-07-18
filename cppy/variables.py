@@ -8,6 +8,10 @@ class NumVarImpl(NumericExpression):
         self.ub = ub
         self.value = None
 
+    # for sets/dicts. Because IDs are unique, so is the str repr
+    def __hash__(self):
+        return hash(str(self))
+
 class BoolVarImpl(NumVarImpl,LogicalExpression):
     counter = 0
 
