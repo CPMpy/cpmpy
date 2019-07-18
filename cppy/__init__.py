@@ -29,3 +29,11 @@ def IntVar(lb, ub, shape=None):
     data = np.array([IntVarImpl(lb,ub) for _ in range(length)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
+
+# implication constraint: a -> b
+# Python does not offer relevant syntax...
+# for double implication, use equivalence a == b
+def implies(a, b):
+    assert isinstance(a, LogicalExpression), "First argument must be a logical expression"
+    assert isinstance(b, LogicalExpression), "Second argument must be a logical expression"
+    return BoolOperator('->', a, b)

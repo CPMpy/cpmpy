@@ -4,11 +4,10 @@ CPpy is a Python-embedded modeling language for constraint programming. It allow
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
-Currently, it is only a language generating a model tree. Here is a TODO list:
-- add element constraints
-- add more models (see Hakan K's page(s))
+Currently, it is just generating an expression tree. Here is a TODO list:
 - auto translate to numberjack, which is Python-based but not numpy-based
 - auto translate to minizinc and use pymzn
+- add more models (see Hakan K's page(s))
 
 The following examples show the elegance of building on Python/Numpy:
 ```python

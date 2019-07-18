@@ -6,10 +6,23 @@ def is_num(arg):
 
 
 class Expression(object):
-    pass
+    # preliminary choice not to expose <,<=,>,>= to LogicalExpr 
+    def __eq__(self, other):
+        return Comparison("==", self, other)
+    def __ne__(self, other):
+        return Comparison("!=", self, other)
 
 
 class NumericExpression(Expression):
+    def __lt__(self, other):
+        return Comparison("<", self, other)
+    def __le__(self, other):
+        return Comparison("<=", self, other)
+    def __gt__(self, other):
+        return Comparison(">", self, other)
+    def __ge__(self, other):
+        return Comparison(">=", self, other)
+
     # addition
     def __add__(self, other):
         if is_num(other) and other == 0:
@@ -38,19 +51,6 @@ class NumericExpression(Expression):
 
     # matrix multipliciation TODO?
     #object.__matmul__(self, other)
-    
-    def __lt__(self, other):
-        return Comparison("<", self, other)
-    def __le__(self, other):
-        return Comparison("<=", self, other)
-    def __gt__(self, other):
-        return Comparison(">", self, other)
-    def __ge__(self, other):
-        return Comparison(">=", self, other)
-    def __eq__(self, other):
-        return Comparison("==", self, other)
-    def __ne__(self, other):
-        return Comparison("!=", self, other)
     
     # Not implemented: (yet?)
     #object.__truediv__(self, other)
@@ -209,7 +209,8 @@ class WeightedSum(NumericExpression):
     
 
     
-
+# Implements bitwise operations & | ^ and ~ (and, or, xor, not)
+# Python's built-in 'and' 'or' and 'not' can not be overloaded
 class LogicalExpression(Expression):
     def __and__(self, other):
         return BoolOperator("and", self, other)
@@ -226,12 +227,22 @@ class LogicalExpression(Expression):
     def __rxor__(self, other):
         return BoolOperator("xor", other, self)
 
+    def __invert__(self):
+        return (self == 0)
+
 class BoolOperator(LogicalExpression):
-    allowed = {'and', 'or', 'xor'}
+    allowed = {'and', 'or', 'xor', '->'}
     def __init__(self, name, left, right):
         assert (name in self.allowed), "Operator not allowed"
-        self.name == name
+        self.name = name
         self.elems = [left, right]
+    
+    def __repr__(self):
+        if len(self.elems) == 2:
+            if all(isinstance(x, Expression) for x in self.elems):
+                return "({}) {} ({})".format(self.elems[0], self.name, self.elems[1]) 
+            return "{} {} {}".format(self.elems[0], self.name, self.elems[1])
+        return "{}({})".format(self.name, self.elems)
 
     def _compatible(self, other):
         return isinstance(other, BoolOperator) and other.name == self.name
@@ -275,16 +286,18 @@ class Comparison(LogicalExpression):
         self.right = right
     
     def __repr__(self):
+        if isinstance(self.left, Expression) and isinstance(self.right, Expression):
+            return "({}) {} ({})".format(self.left, self.symbol, self.right) 
         return "{} {} {}".format(self.left, self.symbol, self.right) 
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(LogicalExpression):
-    def __init__(self, name, variables):
+    def __init__(self, name, *args):
         self.name = name
-        self.variables = variables
+        self.args = args
 
     def __repr__(self):
-        return "{}({})".format(self.name, self.variables)
+        return "{}({})".format(self.name, self.args)
 
 
 class Objective(Expression):

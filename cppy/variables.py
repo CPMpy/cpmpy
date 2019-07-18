@@ -8,8 +8,7 @@ class NumVarImpl(NumericExpression):
         self.ub = ub
         self.value = None
 
-# Maybe should have an abstract VarImpl for both Bool and Int?
-class BoolVarImpl(NumVarImpl):
+class BoolVarImpl(NumVarImpl,LogicalExpression):
     counter = 0
 
     def __init__(self, lb=0, ub=1):
@@ -46,11 +45,25 @@ class NDVarArray(NumericExpression, np.ndarray):
         self.value = None
         # no need to return anything
     
-    #[index] 	  __getitem__(self, index) 	 Index operator
-    # TODO: element constraint...
-    #def __getitem__(self, index):
-    #    elem = super(NDVarArray, self).__getitem__(index)
-    #    return elem
+    def __getitem__(self, index):
+        def is_var(x):
+            return isinstance(x, IntVarImpl)
+
+        if is_var(index):
+            return GlobalConstraint("element", self, index)
+
+        if isinstance(index, tuple) and any(is_var(el) for el in index):
+            index_rest = list(index)
+            var = []
+            for i in range(len(index)):
+                if is_var(index[i]):
+                    index_rest[i] = None
+                    var.append(index[i])
+            array_rest = self[tuple(index_rest)]
+            assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
+            return GlobalConstraint("element", array_rest, var[0])
+            
+        return super().__getitem__(index)
 
     # TODO?
     #in	  __contains__(self, value) 	Check membership
