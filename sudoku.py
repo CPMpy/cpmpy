@@ -8,7 +8,8 @@ from cppy import *
 import numpy
 
 x = 0 # cells whose value we seek
-puzzle = numpy.array([
+n = 9 # matrix size
+given = numpy.array([
     [x, x, x,  2, x, 5,  x, x, x],
     [x, 9, x,  x, x, x,  7, 3, x], 
     [x, x, 2,  x, x, 9,  x, 6, x],
@@ -23,25 +24,22 @@ puzzle = numpy.array([
 
 
 # Variables
-(n,_) = puzzle.shape # get matrix dimensions
-x = IntVar(1, n, puzzle.shape)
+puzzle = IntVar(1, n, shape=given.shape)
 
-
-# constraints on values
-constr_values = ( x[puzzle>0] == puzzle[puzzle>0] )
-
+constraint = []
 # constraints on rows and columns
-constr_row = [alldifferent(row) for row in x]
-constr_col = [alldifferent(col) for col in x.T]
+constraint += [ alldifferent(row) for row in puzzle ]
+constraint += [ alldifferent(col) for col in puzzle.T ]
 
 # constraint on blocks
-constr_block = [] 
 for i in range(0,n,3):
     for j in range(0,n,3):
-        constr_block.append( alldifferent(x[i:i+3, j:j+3]) )
+        constraint += [ alldifferent(puzzle[i:i+3, j:j+3]) ]
 
+# constraints on values
+constraint += [ puzzle[given>0] == given[given>0] ]
 
-model = Model(constr_values, constr_row, constr_col, constr_block)
+model = Model(constraint)
 stats = model.solve()
 
 print(model)

@@ -17,8 +17,8 @@ capacity = np.random.randint(sum(weights)*.3, sum(weights)*.6)
 # Construct the model.
 x = BoolVar(n)
 
-constraint = [sum(x*weights) <= capacity]
-objective = Maximise(sum(x*values))
+constraint = [ sum(x*weights) <= capacity ]
+objective  = Maximise(sum(x*values))
 
 model = Model(objective, constraint)
 print(model)

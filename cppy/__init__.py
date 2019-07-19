@@ -30,6 +30,7 @@ def IntVar(lb, ub, shape=None):
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
+
 # implication constraint: a -> b
 # Python does not offer relevant syntax...
 # for double implication, use equivalence a == b
@@ -37,3 +38,29 @@ def implies(a, b):
     assert isinstance(a, LogicalExpression), "First argument must be a logical expression"
     assert isinstance(b, LogicalExpression), "Second argument must be a logical expression"
     return BoolOperator('->', a, b)
+
+
+# all: listwise 'and'
+def all(iterable):
+    collect = [] # logical expressions
+    for elem in iterable:
+        if isinstance(elem, LogicalExpression):
+            collect.append( elem )
+        elif not elem:
+            return False
+    if len(collect) > 0:
+        return BoolOperator("and", collect)
+    return True
+        
+# any: listwise 'or'
+def any(iterable):
+    collect = [] # logical expressions
+    for elem in iterable:
+        if isinstance(elem, LogicalExpression):
+            collect.append( elem )
+        elif elem:
+            return True
+    if len(collect) > 0:
+        return BoolOperator("or", collect)
+    return False
+        

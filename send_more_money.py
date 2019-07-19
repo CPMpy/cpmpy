@@ -14,14 +14,14 @@ import numpy as np
 # Construct the model.
 s,e,n,d,m,o,r,y = IntVar(0,9, 8)
 
-constr_alldiff = alldifferent([s,e,n,d,m,o,r,y])
-constr_sum = [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
-                + sum(   [m,o,r,e] * np.flip(10**np.arange(4)) )
-               == sum( [m,o,n,e,y] * np.flip(10**np.arange(5)) )
-             ]
-constr_0 = [s > 0, m > 0]
+constraint = []
+constraint += [ alldifferent([s,e,n,d,m,o,r,y]) ]
+constraint += [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
+                 + sum(   [m,o,r,e] * np.flip(10**np.arange(4)) )
+                == sum( [m,o,n,e,y] * np.flip(10**np.arange(5)) ) ]
+constraint += [ s > 0, m > 0 ]
 
-model = Model(constr_alldiff, constr_sum, constr_0)
+model = Model(constraint)
 print(model)
 
 stats = model.solve()

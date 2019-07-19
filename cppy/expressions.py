@@ -251,28 +251,34 @@ class BoolOperator(LogicalExpression):
     def __and__(self, other):
         if self._compatible(other):
             self.elems.append(other)
+            return self
         return super().__and__(other)
     def __rand__(self, other):
         if self._compatible(other):
             self.elems.insert(0, other)
+            return self
         return super().__rand__(other)
 
     def __or__(self, other):
         if self._compatible(other):
             self.elems.append(other)
+            return self
         return super().__or__(other)
     def __ror__(self, other):
         if self._compatible(other):
             self.elems.insert(0, other)
+            return self
         return super().__ror__(other)
 
     def __xor__(self, other):
         if self._compatible(other):
             self.elems.append(other)
+            return self
         return super().__xor__(other)
     def __rxor__(self, other):
         if self._compatible(other):
             self.elems.insert(0, other)
+            return self
         return super().__rxor__(other)
 
 class Comparison(LogicalExpression):
