@@ -38,7 +38,7 @@ def vars_expr(expr):
             return [expr]
 
         # classes storing left/right
-        if isinstance(expr, (Mul,Comparison)):
+        if isinstance(expr, (MathOperator,Comparison)):
             return vars_expr(expr.left) + vars_expr(expr.right)
 
         # classes storing elems

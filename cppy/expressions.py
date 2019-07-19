@@ -27,11 +27,11 @@ class NumericExpression(Expression):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-        return Sum(self, other)
+        return Sum([self, other])
     def __radd__(self, other): # for sum(), chaining happens in Sum()
         if is_num(other) and other == 0:
             return self
-        return Sum(other, self)
+        return Sum([other, self])
 
     # substraction
     def __sub__(self, other):
@@ -45,27 +45,45 @@ class NumericExpression(Expression):
     
     # multiplication
     def __mul__(self, other):
-        return Mul(self, other)
+        return MathOperator("*", self, other)
     def __rmul__(self, other):
-        return Mul(other, self)
+        return MathOperator("*", other, self)
+
+    def __truediv__(self, other):
+        return MathOperator("/", self, other)
+    def __rtruediv__(self, other):
+        return MathOperator("/", other, self)
+
+    def __mod__(self, other):
+        return MathOperator("mod", self, other)
+    def __rmod__(self, other):
+        return MathOperator("mod", other, self)
+
+    def __pow__(self, other, modulo=None):
+        assert (module == None), "Power operator: module not supported"
+        return MathOperator("pow", self, other)
+    def __rpow__(self, other, modulo=None):
+        assert (module == None), "Power operator: module not supported"
+        return MathOperator("pow", other, self)
 
     # matrix multipliciation TODO?
     #object.__matmul__(self, other)
     
     # Not implemented: (yet?)
-    #object.__truediv__(self, other)
     #object.__floordiv__(self, other)
-    #object.__mod__(self, other)
     #object.__divmod__(self, other)
-    #object.__pow__(self, other[, modulo])
 
     
 # convention: if one of the two is a constant, it is stored in 'left'
 # this eases weighted sum detection
-class Mul(NumericExpression):
-    def __init__(self, left, right):
+# + NOT allowed, use Sum([left, right]) instead!
+class MathOperator(NumericExpression):
+    allowed = {'*', '/', 'mod', 'pow'} # + is special cased to Sum
+    def __init__(self, name, left, right):
         if hasattr(left, '__len__'):
-            assert(len(left) == len(right))
+            assert (len(left) == len(right)), "MathOperator: left and right must have equal size"
+        assert (name in self.allowed), "MathOperator {} not allowed".format(name)
+        self.name = name
         self.left = left
         self.right = right
         # convention: swap if right is constant and left is not
@@ -73,11 +91,11 @@ class Mul(NumericExpression):
             self.left, self.right = self.right, self.left
     
     def __repr__(self):
-        return "{} * {}".format(self.left, self.right)
+        return "{} {} {}".format(self.left, self.name, self.right)
     
     # it could be a vectorized constraint
     def __iter__(self):
-        return (Mul(l,r) for l,r in zip(self.left, self.right))
+        return (MathOperator(self.name,l,r) for l,r in zip(self.left, self.right))
     
     # make sum or weighted sum
     def __add__(self, other):
@@ -92,17 +110,17 @@ class Mul(NumericExpression):
 
     def _do_add(_, a, b):
         # weighted sum detection
-        if isinstance(a, Mul) and is_num(a.left) and \
-           isinstance(b, Mul) and is_num(b.left):
+        if isinstance(a, MathOperator) and a.name == "*" and is_num(a.left) and \
+           isinstance(b, MathOperator) and b.name == "*" and is_num(b.left):
             return WeightedSum([a.left,b.left], [a.right,b.right])
         
-        return Sum(a, b)
+        return Sum([a, b])
         
 
 class Sum(NumericExpression):
-    def __init__(self, left, right):
-        # vectorizable
-        self.elems = [left, right]
+    def __init__(self, elems):
+        # vectorized
+        self.elems = elems
     
     def __repr__(self):
         return " + ".join(str(e) for e in self.elems)
@@ -112,7 +130,7 @@ class Sum(NumericExpression):
         if is_num(other) and other == 0:
             return self
 
-        if isinstance(other, Mul):
+        if isinstance(other, MathOperator) and other.name=="*":
             # offload to that weighted sum check
             return other.__radd__(self)
 
@@ -122,7 +140,7 @@ class Sum(NumericExpression):
         if is_num(other) and other == 0:
             return self
 
-        if isinstance(other, Mul):
+        if isinstance(other, MathOperator) and other.name=="*":
             # offload to that weighted sum check
             return other.__add__(self)
 
@@ -137,10 +155,10 @@ class Sum(NumericExpression):
         w = [1]*len(self.elems)
         return other - WeightedSum(w,self.elems)
 
-class WeightedSum(NumericExpression):
+class WeightedSum(Sum):
     def __init__(self, weights, elems):
+        super().__init__(elems)
         self.weights = weights
-        self.elems = elems
     
     def __repr__(self):
         return "sum( {} * {} )".format(self.weights, self.elems)
@@ -158,7 +176,7 @@ class WeightedSum(NumericExpression):
 
         w,e = 1,other
         # add a mult if possible
-        if isinstance(other, Mul) and is_num(other.left):
+        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
             w = other.left
             e = other.right
 
@@ -171,7 +189,7 @@ class WeightedSum(NumericExpression):
 
         w,e = 1,other
         # add a mult if possible
-        if isinstance(other, Mul) and is_num(other.left):
+        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
             w = other.left
             e = other.right
 
@@ -186,7 +204,7 @@ class WeightedSum(NumericExpression):
 
         w,e = -1,other
         # sub a mult if possible
-        if isinstance(other, Mul) and is_num(other.left):
+        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
             w = -other.left
             e = other.right
 
@@ -199,7 +217,7 @@ class WeightedSum(NumericExpression):
 
         w,e = -1,other
         # sub a mult if possible
-        if isinstance(other, Mul) and is_num(other.left):
+        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
             w = -other.left
             e = other.right
 
@@ -233,7 +251,7 @@ class LogicalExpression(Expression):
 class BoolOperator(LogicalExpression):
     allowed = {'and', 'or', 'xor', '->'}
     def __init__(self, name, left, right):
-        assert (name in self.allowed), "Operator not allowed"
+        assert (name in self.allowed), "BoolOperator {} not allowed".format(name)
         self.name = name
         self.elems = [left, right]
     
