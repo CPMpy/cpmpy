@@ -8,22 +8,53 @@ class Model(object):
         self.constraints = []
         self.objective = None
         
-        # flatten and group all constraints and objective(s?)
-        for arg in flatten(args):
-            if isinstance(arg, Objective):
-                # an objective function
-                if self.objective == None:
-                    self.objective = arg
-                elif isinstance(self.objective, list):
-                    self.objective.append(arg)
-                else:
-                    self.objective = [self.objective, arg]
-            else:
-                # a constraint
-                self.constraints.append(arg)
+        # filter out the objective instances
+        cons = self.filter_objectives(args)
+        # turn lists into 'AND' constraints
+        self.constraints = self.make_and_from_list(cons)
+
+    # take args, put objectives in self
+    # return same args but without objectives (to keep structure)
+    def filter_objectives(self, args):
+        lst = list(args) # make mutable copy of type list
+        for (i, expr) in enumerate(lst):
+            if isinstance(expr, Objective):
+                self.add_objective(expr)
+                del lst[i] # filter out from list
+            elif isinstance(expr, (list,tuple,np.ndarray)):
+                lst[i] = self.filter_objectives(expr) # recursive
+        return lst
+
+    def add_objective(self, arg):
+        # an objective function
+        if self.objective == None:
+            self.objective = arg
+        elif isinstance(self.objective, list):
+            self.objective.append(arg)
+        else:
+            self.objective = [self.objective, arg]
+
+    def make_and_from_list(self, lst):
+        # do recursive where needed, with overwrite
+        for (i, expr) in enumerate(lst):
+            if isinstance(expr, list):
+                lst[i] = self.make_and_from_list(expr)
+        if len(lst) == 1:
+            return lst[0]
+        return BoolOperator("and", lst)
+        
 
     def __repr__(self):
-        return "Constraints: {}\nObjective: {}".format(self.constraints, self.objective)
+        cons_str = ""
+        # pretty-printing of first-level grouping (if present):
+        if isinstance(self.constraints, BoolOperator) and self.constraints.name == "and":
+            cons_str += "\n"
+            for elem in self.constraints.elems:
+                cons_str += "    {}\n".format(elem)
+        else: # top level constraint is not an 'and'
+            cons_str += self.constraints.__repr__()
+            
+        return "Constraints: {}\nObjective: {}".format(cons_str, self.objective)
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):
@@ -38,11 +69,3 @@ class Model(object):
                 
         return solver.solve(self)
 
-
-# http://jugad2.blogspot.com/2014/10/flattening-arbitrarily-nested-list-in.html
-def flatten(iterable):
-    for elem in iterable:
-        if isinstance(elem, (list,tuple)):
-            yield from flatten(elem)
-        else:
-            yield elem

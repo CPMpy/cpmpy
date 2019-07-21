@@ -231,32 +231,35 @@ class WeightedSum(Sum):
 # Python's built-in 'and' 'or' and 'not' can not be overloaded
 class LogicalExpression(Expression):
     def __and__(self, other):
-        return BoolOperator("and", self, other)
+        return BoolOperator("and", [self, other])
     def __rand__(self, other):
-        return BoolOperator("and", other, self)
+        return BoolOperator("and", [other, self])
 
     def __or__(self, other):
-        return BoolOperator("or", self, other)
+        return BoolOperator("or", [self, other])
     def __ror__(self, other):
-        return BoolOperator("or", other, self)
+        return BoolOperator("or", [other, self])
 
     def __xor__(self, other):
-        return BoolOperator("xor", self, other)
+        return BoolOperator("xor", [self, other])
     def __rxor__(self, other):
-        return BoolOperator("xor", other, self)
+        return BoolOperator("xor", [other, self])
 
     def __invert__(self):
         return (self == 0)
 
 class BoolOperator(LogicalExpression):
     allowed = {'and', 'or', 'xor', '->'}
-    def __init__(self, name, left, right):
+    def __init__(self, name, elems):
         assert (name in self.allowed), "BoolOperator {} not allowed".format(name)
+        if name == '->':
+            assert (len(elems) == 2), "BoolOperator '->' requires exactly 2 arguments"
         self.name = name
-        self.elems = [left, right]
+        self.elems = elems
     
     def __repr__(self):
         if len(self.elems) == 2:
+            # bracketed printing if both not constant
             if all(isinstance(x, Expression) for x in self.elems):
                 return "({}) {} ({})".format(self.elems[0], self.name, self.elems[1]) 
             return "{} {} {}".format(self.elems[0], self.name, self.elems[1])
@@ -321,10 +324,12 @@ class GlobalConstraint(LogicalExpression):
         self.args = args
 
     def __repr__(self):
+        ret = ""
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])
+            ret = "{}({})".format(self.name, self.args[0])
         else:
-            return "{}({})".format(self.name, ",".join(map(str,self.args)))
+            ret = "{}({})".format(self.name, ",".join(map(str,self.args)))
+        return ret.replace("\n","") # numpy args add own linebreaks...
 
 
 class Objective(Expression):

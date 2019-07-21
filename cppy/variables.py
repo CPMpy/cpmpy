@@ -24,7 +24,8 @@ class BoolVarImpl(NumVarImpl,LogicalExpression):
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
         
     def __repr__(self):
-        return "BV{}[{},{}]".format(self.id, self.lb, self.ub)
+        #return "BV{}[{},{}]".format(self.id, self.lb, self.ub)
+        return "BV{}".format(self.id)
 
 
 class IntVarImpl(NumVarImpl):
@@ -39,7 +40,8 @@ class IntVarImpl(NumVarImpl):
         self.value = None
     
     def __repr__(self):
-        return "IV{}[{},{}]".format(self.id, self.lb, self.ub)
+        #return "IV{}[{},{}]".format(self.id, self.lb, self.ub)
+        return "IV{}".format(self.id)
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
