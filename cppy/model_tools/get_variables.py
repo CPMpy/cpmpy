@@ -6,11 +6,9 @@ def get_variables(model):
     # want an ordered set. Emulate with full list that is uniquified
     vars_ = []
     if model.constraints:
-        for expr in model.constraints:
-            vars_ += vars_expr(expr)
+        vars_ += vars_expr(model.constraints)
     if model.objective:
-        for expr in model.objective:
-            vars_ += vars_expr(expr)
+        vars_ += vars_expr(model.objective)
     # mimics an ordered set, manually...
     return uniquify(vars_)
 
@@ -47,6 +45,6 @@ def vars_expr(expr):
 
         # classes storing args (possibly nested)
         if isinstance(expr, (GlobalConstraint,Objective)):
-            return vars_expr(expr.args)
+            return vars_expr(expr.expr)
 
         raise Exception("Expression {} unknown to variable extractor".format(expr))

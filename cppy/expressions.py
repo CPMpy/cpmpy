@@ -304,18 +304,18 @@ class BoolOperator(LogicalExpression):
 
 class Comparison(LogicalExpression):
     allowed = {'<=', '<', '>=', '>', '==', '!='}
-    def __init__(self, symbol, left, right):
-        assert (symbol in self.allowed), "Symbol not allowed"
+    def __init__(self, name, left, right):
+        assert (name in self.allowed), "Symbol not allowed"
         if hasattr(left, '__len__'):
             assert(len(left) == len(right))
-        self.symbol = symbol
+        self.name = name
         self.left = left
         self.right = right
     
     def __repr__(self):
         if isinstance(self.left, Expression) and isinstance(self.right, Expression):
-            return "({}) {} ({})".format(self.left, self.symbol, self.right) 
-        return "{} {} {}".format(self.left, self.symbol, self.right) 
+            return "({}) {} ({})".format(self.left, self.name, self.right) 
+        return "{} {} {}".format(self.left, self.name, self.right) 
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(LogicalExpression):
@@ -333,26 +333,27 @@ class GlobalConstraint(LogicalExpression):
 
 
 class Objective(Expression):
-    def __init__(self, name, *args):
+    def __init__(self, name, expr):
         self.name = name
-        self.args = args
+        self.expr = expr
     
     def __repr__(self):
-        return "{} {}".format(self.name, self.args)
+        return "{} {}".format(self.name, self.expr)
     
     def __getattr__(self, name):
         if name == 'value':
+            # TODO: return actual (computed) value...
             return None
         else:
             # Default behaviour, which failed otherwise we would not be here
             return super().__getattribute__(name)
 
 def Maximise(expr):
-    return Objective("Maximise", expr)
+    return Objective("Maximize", expr)
 def Maximize(expr):
-    return Objective("Maximise", expr)
+    return Objective("Maximize", expr)
 
 def Minimise(expr):
-    return Objective("Minimise", expr)
+    return Objective("Minimize", expr)
 def Minimize(expr):
-    return Objective("Minimise", expr)
+    return Objective("Minimize", expr)
