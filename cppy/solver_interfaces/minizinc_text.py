@@ -29,7 +29,7 @@ class MiniZincText(SolverInterface):
         return txt_vars+"\n"+txt_cons+txt_obj
 
     def convert_constraints(self, cons):
-        if cons == None:
+        if cons is None:
             return ""
         # stick to default outputs for now...
         out = ""
@@ -38,7 +38,7 @@ class MiniZincText(SolverInterface):
         return out+"\n"
 
     def convert_objective(self, obj):
-        if obj == None:
+        if obj is None:
             return "solve satisfy;"
         if not isinstance(obj, Objective):
             raise Exception("Only single objective supported by minizinc_text")

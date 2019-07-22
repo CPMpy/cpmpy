@@ -27,7 +27,7 @@ class Model(object):
 
     def add_objective(self, arg):
         # an objective function
-        if self.objective == None:
+        if self.objective is None:
             self.objective = arg
         elif isinstance(self.objective, list):
             self.objective.append(arg)
@@ -59,7 +59,7 @@ class Model(object):
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):
         # default solver?
-        if solver == None:
+        if solver is None:
             solver = SolverInterface()
         elif not isinstance(solver, SolverInterface):
             solverdict = get_supported_solvers()

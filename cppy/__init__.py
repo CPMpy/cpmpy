@@ -10,7 +10,7 @@ from .model import *
 
 # N-dimensional array of Boolean Decision Variables
 def BoolVar(shape=None):
-    if shape == None or shape == 1:
+    if shape is None or shape == 1:
         return BoolVarImpl()
     length = np.prod(shape)
     
@@ -21,7 +21,7 @@ def BoolVar(shape=None):
 
 # N-dimensional array of Integer Decision Variables with lower-bound and upper-bound
 def IntVar(lb, ub, shape=None):
-    if shape == None or shape == 1:
+    if shape is None or shape == 1:
         return IntVarImpl(lb,ub)
     length = np.prod(shape)
     

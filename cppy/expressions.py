@@ -60,10 +60,10 @@ class NumericExpression(Expression):
         return MathOperator("mod", other, self)
 
     def __pow__(self, other, modulo=None):
-        assert (module == None), "Power operator: module not supported"
+        assert (module is None), "Power operator: module not supported"
         return MathOperator("pow", self, other)
     def __rpow__(self, other, modulo=None):
-        assert (module == None), "Power operator: module not supported"
+        assert (module is None), "Power operator: module not supported"
         return MathOperator("pow", other, self)
 
     # matrix multipliciation TODO?
