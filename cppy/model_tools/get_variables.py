@@ -40,11 +40,11 @@ def vars_expr(expr):
             return vars_expr(expr.left) + vars_expr(expr.right)
 
         # classes storing elems
-        if isinstance(expr, (Sum,WeightedSum,BoolOperator)):
+        if isinstance(expr, (Sum,WeightedSum,BoolOperator,GlobalConstraint)):
             return vars_expr(expr.elems)
 
         # classes storing args (possibly nested)
-        if isinstance(expr, (GlobalConstraint,Objective)):
+        if isinstance(expr, Objective):
             return vars_expr(expr.expr)
 
         raise Exception("Expression {} unknown to variable extractor".format(expr))

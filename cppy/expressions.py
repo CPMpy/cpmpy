@@ -321,14 +321,14 @@ class Comparison(LogicalExpression):
 class GlobalConstraint(LogicalExpression):
     def __init__(self, name, *args):
         self.name = name
-        self.args = args
+        self.elems = args
 
     def __repr__(self):
         ret = ""
-        if len(self.args) == 1:
-            ret = "{}({})".format(self.name, self.args[0])
+        if len(self.elems) == 1:
+            ret = "{}({})".format(self.name, self.elems[0])
         else:
-            ret = "{}({})".format(self.name, ",".join(map(str,self.args)))
+            ret = "{}({})".format(self.name, ",".join(map(str,self.elems)))
         return ret.replace("\n","") # numpy args add own linebreaks...
 
 

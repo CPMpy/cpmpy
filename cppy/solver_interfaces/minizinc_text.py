@@ -16,7 +16,7 @@ class MiniZincText(SolverInterface):
 
     def convert(self, model):
         modelvars = get_variables(model)
-        txt_vars = "\n"
+        txt_vars = "include \"globals.mzn\";\n\n"
         for var in modelvars:
             if isinstance(var, BoolVarImpl):
                 txt_vars += "var bool: BV{};\n".format(var.id)
@@ -47,7 +47,10 @@ class MiniZincText(SolverInterface):
         return out+"\n"
 
     def convert_expression(self, expr):
-        if isinstance(expr, (NDVarArray,NumVarImpl)):
+        if isinstance(expr, np.ndarray):
+            return list(expr.flat)
+
+        if isinstance(expr, NumVarImpl):
             return expr # default
 
         if isinstance(expr, (MathOperator,Comparison)):
@@ -78,10 +81,14 @@ class MiniZincText(SolverInterface):
             if name == 'and': name = 'forall'
             if name == 'xor': name = 'xorall'
             if name == 'or': name = 'exists'
-            return "({}({})".format(name, elems)
+            return "{}({})".format(name, elems)
 
         if isinstance(expr, GlobalConstraint):
-            return expr # default
+            name = expr.name
+            elems = [self.convert_expression(e) for e in expr.elems]
+            if len(elems) == 1:
+                elems = elems[0]
+            return "{}({})".format(name, elems)
 
         # default
         return expr # default
