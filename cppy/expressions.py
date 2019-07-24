@@ -229,7 +229,7 @@ class WeightedSum(Sum):
     
 # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
 # Python's built-in 'and' 'or' and 'not' can not be overloaded
-class LogicalExpression(Expression):
+class LogicalExpression(NumericExpression):
     def __and__(self, other):
         return BoolOperator("and", [self, other])
     def __rand__(self, other):
@@ -316,6 +316,11 @@ class Comparison(LogicalExpression):
         if isinstance(self.left, Expression) and isinstance(self.right, Expression):
             return "({}) {} ({})".format(self.left, self.name, self.right) 
         return "{} {} {}".format(self.left, self.name, self.right) 
+
+    # it could be a vectorized constraint
+    def __iter__(self):
+        return (Comparison(self.name,l,r) for l,r in zip(self.left, self.right))
+    
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(LogicalExpression):

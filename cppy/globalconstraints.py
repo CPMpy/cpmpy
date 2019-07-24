@@ -5,3 +5,5 @@ from .expressions import *
 def alldifferent(variables):
     return GlobalConstraint("alldifferent", [variables])
 
+def circuit(variables):
+    return GlobalConstraint("circuit", [variables])

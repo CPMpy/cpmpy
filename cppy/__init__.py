@@ -30,6 +30,14 @@ def IntVar(lb, ub, shape=None):
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
+# N-dimensional wrapper, wrap a standard array (e.g. [1,2,3,4] whatever)
+# so that we can do [1,2,3,4][var1] == var2, e.g. element([1,2,3,4],var1,var2)
+# needed because standard arrays can not be indexed by non-constants
+def cparray(arr):
+    if not isinstance(arr, np.ndarray):
+        arr = np.array(arr)
+    return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
+
 
 # implication constraint: a -> b
 # Python does not offer relevant syntax...
@@ -64,3 +72,13 @@ def any(iterable):
         return BoolOperator("or", collect)
     return False
         
+
+# min: listwise 'min'
+def min(iterable):
+    if not any(isinstance(elem, MathExpression) for elem in iterable):
+        return np.min(iterable)
+    return GlobalConstraint("min", list(iterable))
+def max(iterable):
+    if not any(isinstance(elem, MathExpression) for elem in iterable):
+        return np.max(iterable)
+    return GlobalConstraint("max", list(iterable))

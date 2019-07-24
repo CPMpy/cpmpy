@@ -65,10 +65,11 @@ class MiniZincText(SolverInterface):
 
         if isinstance(expr, WeightedSum):
             elems = [self.convert_expression(e) for e in expr.elems]
-            # TODO, may be var bool, may be subexpressions...
-            # TODO is there a 'catchall' type in minizinc?
-            #      or do we need to do type-checking... and bool2int'ing?
-            txt  = "let {{\n      array[int] of int: w={},\n      array[int] of var int: v={}\n    }} in\n".format(expr.weights, elems)
+            elems_str = "[{}]".format(",".join(map(str,elems)))
+            subtype = "int"
+            if all(isinstance(v, LogicalExpression) for v in iter(expr.elems)):
+                subtype = "bool"
+            txt  = "let {{\n      array[int] of int: w={},\n      array[int] of var {}: v={}\n    }} in\n".format(expr.weights, subtype, elems_str)
             txt += "      sum(i in 1..{}) (w[i]*v[i])".format(len(elems))
             return txt
         elif isinstance(expr, Sum):
@@ -100,8 +101,12 @@ class MiniZincText(SolverInterface):
                 subtype = "int"
                 if all(isinstance(v, LogicalExpression) for v in expr.elems[0].flat):
                     subtype = "bool"
+                # minizinc is offset 1, which can be problematic for element...
+                idx = "{}".format(elems[1])
+                if isinstance(elems[1], IntVarImpl) and elems[1].lb == 0:
+                    idx = "{}+1".format(idx)
                 txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, elems[0])
-                txt += "      arr[{}] = {}".format(elems[1],elems[2])
+                txt += "      arr[{}] = {}".format(idx,elems[2])
                 return txt
 
             args_str = ", ".join(map(str,elems)) # elems are individual args
