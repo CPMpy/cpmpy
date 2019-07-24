@@ -37,7 +37,7 @@ def IntVar(lb, ub, shape=None):
 def implies(a, b):
     assert isinstance(a, LogicalExpression), "First argument must be a logical expression"
     assert isinstance(b, LogicalExpression), "Second argument must be a logical expression"
-    return BoolOperator('->', a, b)
+    return BoolOperator('->', [a, b])
 
 
 # all: listwise 'and'

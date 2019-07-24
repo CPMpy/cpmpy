@@ -319,9 +319,13 @@ class Comparison(LogicalExpression):
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(LogicalExpression):
-    def __init__(self, name, *args):
+    # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
+    # and add them to the 'elems' argument list (e.g. for element: X[var] == 1)
+    def __init__(self, name, arg_list, add_equality_as_arg=False):
+        assert (isinstance(arg_list, list)), "GlobalConstraint requires list of arguments, even if of length one e.g. [arg]"
         self.name = name
-        self.elems = args
+        self.elems = arg_list
+        self.add_equality_as_arg = add_equality_as_arg
 
     def __repr__(self):
         ret = ""
@@ -330,6 +334,15 @@ class GlobalConstraint(LogicalExpression):
         else:
             ret = "{}({})".format(self.name, ",".join(map(str,self.elems)))
         return ret.replace("\n","") # numpy args add own linebreaks...
+
+    def __eq__(self, other):
+        if self.add_equality_as_arg:
+            self.elems.append(other)
+            return self
+        
+        # default
+        return super().__eq__(other)
+            
 
 
 class Objective(Expression):

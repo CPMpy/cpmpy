@@ -56,7 +56,7 @@ class NDVarArray(NumericExpression, np.ndarray):
             return isinstance(x, IntVarImpl)
 
         if is_var(index):
-            return GlobalConstraint("element", self, index)
+            return GlobalConstraint("element", [self, index], add_equality_as_arg=True)
 
         if isinstance(index, tuple) and any(is_var(el) for el in index):
             index_rest = list(index)
@@ -67,7 +67,7 @@ class NDVarArray(NumericExpression, np.ndarray):
                     var.append(index[i])
             array_rest = self[tuple(index_rest)]
             assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
-            return GlobalConstraint("element", array_rest, var[0])
+            return GlobalConstraint("element", [array_rest, var[0]], add_equality_as_arg=True)
             
         return super().__getitem__(index)
 

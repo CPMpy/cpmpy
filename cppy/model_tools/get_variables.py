@@ -2,6 +2,10 @@ from ..model import *
 from ..expressions import *
 from ..variables import *
 
+"""
+ Model transformation, read-only
+ Returns an (ordered by appearance) list of all variables in the model
+"""
 def get_variables(model):
     # want an ordered set. Emulate with full list that is uniquified
     vars_ = []
