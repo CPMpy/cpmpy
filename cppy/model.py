@@ -4,37 +4,23 @@ import numpy as np
 
 
 class Model(object):
-    def __init__(self, *args):
-        self.constraints = []
+    def __init__(self, *args, minimize=None, maximize=None):
+        assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
+        # list of constraints
+        self.constraints = [self.make_and_from_list(c) for c in args]
+        # an expresion or None
         self.objective = None
-        
-        # filter out the objective instances
-        cons = self.filter_objectives(args)
-        # turn lists into 'AND' constraints
-        self.constraints = self.make_and_from_list(cons)
+        self.objective_max = None
 
-    # take args, put objectives in self
-    # return same args but without objectives (to keep structure)
-    def filter_objectives(self, args):
+        if not maximize is None:
+            self.objective = maximize
+            self.objective_max = True
+        if not minimize is None:
+            self.objective = minimize
+            self.objective_max = False
+
+    def make_and_from_list(self, args):
         lst = list(args) # make mutable copy of type list
-        for (i, expr) in enumerate(lst):
-            if isinstance(expr, Objective):
-                self.add_objective(expr)
-                del lst[i] # filter out from list
-            elif isinstance(expr, (list,tuple,np.ndarray)):
-                lst[i] = self.filter_objectives(expr) # recursive
-        return lst
-
-    def add_objective(self, arg):
-        # an objective function
-        if self.objective is None:
-            self.objective = arg
-        elif isinstance(self.objective, list):
-            self.objective.append(arg)
-        else:
-            self.objective = [self.objective, arg]
-
-    def make_and_from_list(self, lst):
         # do recursive where needed, with overwrite
         for (i, expr) in enumerate(lst):
             if isinstance(expr, list):
@@ -46,15 +32,18 @@ class Model(object):
 
     def __repr__(self):
         cons_str = ""
-        # pretty-printing of first-level grouping (if present):
-        if isinstance(self.constraints, BoolOperator) and self.constraints.name == "and":
-            cons_str += "\n"
-            for elem in self.constraints.elems:
-                cons_str += "    {}\n".format(elem)
-        else: # top level constraint is not an 'and'
-            cons_str += self.constraints.__repr__()
+        for c in self.constraints:
+            cons_str += "    {}\n".format(c)
+
+        obj_str = ""
+        if not self.objective is None:
+            if self.objective_max:
+                obj_str = "maximize "
+            else:
+                obj_str = "minimize "
+        obj_str += str(self.objective)
             
-        return "Constraints: {}\nObjective: {}".format(cons_str, self.objective)
+        return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):

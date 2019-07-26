@@ -4,16 +4,16 @@ import numpy as np
 def is_num(arg):
     return isinstance(arg, (int, np.integer, float, np.float))
 
-
 class Expression(object):
-    # preliminary choice not to expose <,<=,>,>= to LogicalExpr 
+    # return the value of the expression
+    # optional, default: None
+    def value(self):
+        return None
+
     def __eq__(self, other):
         return Comparison("==", self, other)
     def __ne__(self, other):
         return Comparison("!=", self, other)
-
-
-class NumericExpression(Expression):
     def __lt__(self, other):
         return Comparison("<", self, other)
     def __le__(self, other):
@@ -73,6 +73,9 @@ class NumericExpression(Expression):
     #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
 
+# TODO Old dummy
+class NumericExpression(Expression):
+    pass
     
 # convention: if one of the two is a constant, it is stored in 'left'
 # this eases weighted sum detection
@@ -357,14 +360,6 @@ class Objective(Expression):
     
     def __repr__(self):
         return "{} {}".format(self.name, self.expr)
-    
-    def __getattr__(self, name):
-        if name == 'value':
-            # TODO: return actual (computed) value...
-            return None
-        else:
-            # Default behaviour, which failed otherwise we would not be here
-            return super().__getattribute__(name)
 
 def Maximise(expr):
     return Objective("Maximize", expr)

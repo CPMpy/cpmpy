@@ -18,13 +18,13 @@ capacity = np.random.randint(sum(weights)*.3, sum(weights)*.6)
 x = BoolVar(n)
 
 constraint = [ sum(x*weights) <= capacity ]
-objective  = Maximise(sum(x*values))
+objective  = sum(x*values)
 
-model = Model(objective, constraint)
+model = Model(constraint, maximize=objective)
 print(model)
 
 # Statistics are returned after solving.
 stats = model.solve()
 # Variables can be asked for their value in the found solution
-print("Value:", objective.value)
-print("Solution:", x.value)
+print("Value:", objective.value())
+print("Solution:", x.value())
