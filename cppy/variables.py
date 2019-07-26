@@ -1,8 +1,13 @@
 import numpy as np
 from .expressions import *
 
+# Helpers for type checking
+def is_int(arg):
+    return isinstance(arg, (int, np.integer))
+
 class NumVarImpl(Expression):
     def __init__(self, lb, ub):
+        assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
         self.lb = lb
         self.ub = ub
@@ -19,8 +24,8 @@ class IntVarImpl(NumVarImpl):
     counter = 0
 
     def __init__(self, lb, ub, setid=True):
+        assert (is_int(lb) and is_int(ub))
         assert (lb >= 0 and ub >= 0)
-        assert (isinstance(lb, int) and isinstance(ub, int))
         super().__init__(lb, ub)
         
         self.id = IntVarImpl.counter
@@ -43,10 +48,22 @@ class BoolVarImpl(IntVarImpl):
     def __repr__(self):
         return "BV{}".format(self.id)
 
+    def __eq__(self, other):
+        # (BV == 1) <-> BV
+        if other == 1:
+            return self
+        return super().__eq__(other)
+
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):
+    def __init__(self, shape, **kwargs):
+        # TODO: global name?
+        # this is nice and sneaky, 'self' is the list_of_arguments!
+        Expression.__init__(self, "NDVarArray", self)
+        # somehow, no need to call ndarray constructor
+
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)
     

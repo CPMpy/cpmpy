@@ -1,15 +1,45 @@
 import numpy as np
 
-# Helper: check if numeric, for weighted sum
+# Helpers for type checking
 def is_num(arg):
     return isinstance(arg, (int, np.integer, float, np.float))
+def is_any_list(arg):
+    return isinstance(arg, (list, tuple, np.ndarray))
+def is_pure_list(arg):
+    return isinstance(arg, (list, tuple))
 
 class Expression(object):
+    """
+    each Expression is a function with a self.name and self.args (arguments)
+    each Expression is considered to be a function whose value can be used
+      in other expressions
+    each Expression may implement:
+    - boolexpr(): the Boolean form of the expression
+        default: (expr == 1)
+        override for Boolean expressions (preferably through __eq__, see Comparison)
+    - value(): the value of the expression, default None
+    """
+
+    def __init__(self, name, arg_list):
+        assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
+        self.name = name
+        self.args = arg_list
+
+    def __repr__(self):
+        ret = "{}({})".format(self.name, ",".join(map(str,self.args)))
+        return ret.replace("\n","") # numpy args add own linebreaks...
+
+    # booleanised expression
+    # optional, default: (self == 1)
+    def boolexpr(self):
+        return (self == 1)
+
     # return the value of the expression
     # optional, default: None
     def value(self):
         return None
 
+    # Comparisons
     def __eq__(self, other):
         return Comparison("==", self, other)
     def __ne__(self, other):
@@ -23,310 +53,324 @@ class Expression(object):
     def __ge__(self, other):
         return Comparison(">=", self, other)
 
-    # addition
+    # Boolean Operators
+    # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
+    def __and__(self, other):
+        return Operator("and", [self, other])
+    def __rand__(self, other):
+        return Operator("and", [other, self])
+
+    def __or__(self, other):
+        return Operator("or", [self, other])
+    def __ror__(self, other):
+        return Operator("or", [other, self])
+
+    def __xor__(self, other):
+        return Operator("xor", [self, other])
+    def __rxor__(self, other):
+        return Operator("xor", [other, self])
+
+    
+    # Mathematical Operators, including 'r'everse if it exists
+    # Addition
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-        return Sum([self, other])
-    def __radd__(self, other): # for sum(), chaining happens in Sum()
+        return Operator("sum", [self, other])
+    def __radd__(self, other):
         if is_num(other) and other == 0:
             return self
-        return Sum([other, self])
+        return Operator("sum", [other, self])
 
     # substraction
     def __sub__(self, other):
         if is_num(other) and other == 0:
             return self
-        return WeightedSum([1,-1], [self,other])
+        return Operator("sub", [self, other])
     def __rsub__(self, other):
         if is_num(other) and other == 0:
-            return self
-        return WeightedSum([-1,1], [other,self])
+            return -self
+        return Operator("sub", [other, self])
     
     # multiplication
     def __mul__(self, other):
-        return MathOperator("*", self, other)
+        if is_num(other) and other == 1:
+            return self
+        return Operator("mul", [self, other])
     def __rmul__(self, other):
-        return MathOperator("*", other, self)
-
-    def __truediv__(self, other):
-        return MathOperator("/", self, other)
-    def __rtruediv__(self, other):
-        return MathOperator("/", other, self)
-
-    def __mod__(self, other):
-        return MathOperator("mod", self, other)
-    def __rmod__(self, other):
-        return MathOperator("mod", other, self)
-
-    def __pow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
-        return MathOperator("pow", self, other)
-    def __rpow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
-        return MathOperator("pow", other, self)
+        if is_num(other) and other == 1:
+            return self
+        return Operator("mul", [other, self])
 
     # matrix multipliciation TODO?
     #object.__matmul__(self, other)
+
+    # other mathematical ones
+    def __truediv__(self, other):
+        if is_num(other) and other == 1:
+            return self
+        return Operator("div", [self, other])
+    def __rtruediv__(self, other):
+        return Operator("div", [other, self])
+
+    def __mod__(self, other):
+        if is_num(other) and other == 1:
+            return self
+        return Operator("mod", [self, other])
+    def __rmod__(self, other):
+        return Operator("mod", [other, self])
+
+    def __pow__(self, other, modulo=None):
+        assert (module is None), "Power operator: module not supported"
+        return Operator("pow", [self, other])
+    def __rpow__(self, other, modulo=None):
+        assert (module is None), "Power operator: module not supported"
+        return Operator("pow", [other, self])
     
     # Not implemented: (yet?)
     #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
 
-# TODO Old dummy
-class NumericExpression(Expression):
-    pass
-    
-# convention: if one of the two is a constant, it is stored in 'left'
-# this eases weighted sum detection
-# + NOT allowed, use Sum([left, right]) instead!
-class MathOperator(NumericExpression):
-    allowed = {'*', '/', 'mod', 'pow'} # + is special cased to Sum
-    def __init__(self, name, left, right):
-        if hasattr(left, '__len__'):
-            assert (len(left) == len(right)), "MathOperator: left and right must have equal size"
-        assert (name in self.allowed), "MathOperator {} not allowed".format(name)
-        self.name = name
-        self.left = left
-        self.right = right
-        # convention: swap if right is constant and left is not
-        if is_num(self.right) and not is_num(self.left):
-            self.left, self.right = self.right, self.left
-    
-    def __repr__(self):
-        return "{} {} {}".format(self.left, self.name, self.right)
-    
-    # it could be a vectorized constraint
-    def __iter__(self):
-        return (MathOperator(self.name,l,r) for l,r in zip(self.left, self.right))
-    
-    # make sum or weighted sum
-    def __add__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        return self._do_add(self, other)
-    def __radd__(self, other):
-        if is_num(other) and other == 0:
-            return self
-        return self._do_add(other, self)
-
-    def _do_add(_, a, b):
-        # weighted sum detection
-        if isinstance(a, MathOperator) and a.name == "*" and is_num(a.left) and \
-           isinstance(b, MathOperator) and b.name == "*" and is_num(b.left):
-            return WeightedSum([a.left,b.left], [a.right,b.right])
-        
-        return Sum([a, b])
-        
-
-class Sum(NumericExpression):
-    def __init__(self, elems):
-        # vectorized
-        self.elems = elems
-    
-    def __repr__(self):
-        return " + ".join(str(e) for e in self.elems)
-    
-    # make sum or weighted sum
-    def __add__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        if isinstance(other, MathOperator) and other.name=="*":
-            # offload to that weighted sum check
-            return other.__radd__(self)
-
-        self.elems.append(other)
+    # unary mathematical operators
+    def __neg__(self):
+        return Operator("-", [self])
+    def __pos__(self):
         return self
-    def __radd__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        if isinstance(other, MathOperator) and other.name=="*":
-            # offload to that weighted sum check
-            return other.__add__(self)
-
-        self.elems.insert(0, other)
-        return self
-
-    # substraction, turn into weighted sum
-    def __sub__(self, other):
-        w = [1]*len(self.elems)
-        return WeightedSum(w,self.elems) - other
-    def __rsub__(self, other):
-        w = [1]*len(self.elems)
-        return other - WeightedSum(w,self.elems)
-
-class WeightedSum(Sum):
-    def __init__(self, weights, elems):
-        super().__init__(elems)
-        self.weights = weights
-    
-    def __repr__(self):
-        return "sum( {} * {} )".format(self.weights, self.elems)
-    
-    # chain into the weighted sum (should we?)
-    def __add__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        # merge the two
-        if isinstance(other, WeightedSum):
-            self.weights.extend(other.weights)
-            self.elems.extend(other.elems)
-            return self
-
-        w,e = 1,other
-        # add a mult if possible
-        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
-            w = other.left
-            e = other.right
-
-        self.weights.append(w)
-        self.elems.append(e)
-        return self
-    def __radd__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        w,e = 1,other
-        # add a mult if possible
-        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
-            w = other.left
-            e = other.right
-
-        self.weights.insert(0, w)
-        self.elems.insert(0, e)
-        return self
-
-    # substraction
-    def __sub__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        w,e = -1,other
-        # sub a mult if possible
-        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
-            w = -other.left
-            e = other.right
-
-        self.weights.append(w)
-        self.elems.append(e)
-        return self
-    def __rsub__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        w,e = -1,other
-        # sub a mult if possible
-        if isinstance(other, MathOperator) and other.name=="*" and is_num(other.left):
-            w = -other.left
-            e = other.right
-
-        self.weights.insert(0, w)
-        self.elems.insert(0, e)
-        return self
-    
-
-    
-# Implements bitwise operations & | ^ and ~ (and, or, xor, not)
-# Python's built-in 'and' 'or' and 'not' can not be overloaded
-class LogicalExpression(NumericExpression):
-    def __and__(self, other):
-        return BoolOperator("and", [self, other])
-    def __rand__(self, other):
-        return BoolOperator("and", [other, self])
-
-    def __or__(self, other):
-        return BoolOperator("or", [self, other])
-    def __ror__(self, other):
-        return BoolOperator("or", [other, self])
-
-    def __xor__(self, other):
-        return BoolOperator("xor", [self, other])
-    def __rxor__(self, other):
-        return BoolOperator("xor", [other, self])
-
+    def __abs__(self):
+        return Operator("abs", [self])
+    # 'not' for now, no unary constraint for it but like boolexpr()
     def __invert__(self):
         return (self == 0)
 
-class BoolOperator(LogicalExpression):
-    allowed = {'and', 'or', 'xor', '->'}
-    def __init__(self, name, elems):
-        assert (name in self.allowed), "BoolOperator {} not allowed".format(name)
-        if name == '->':
-            assert (len(elems) == 2), "BoolOperator '->' requires exactly 2 arguments"
-        self.name = name
-        self.elems = elems
+
+class Comparison(Expression):
+    allowed = {'==', '!=', '<=', '<', '>=', '>'}
+
+    def __init__(self, name, left, right):
+        assert (name in Comparison.allowed), "Symbol not allowed"
+        # if vectorized, must match
+        if hasattr(left, '__len__'): 
+            assert (len(left) == len(right)), "Comparison: arguments must have equal length"
+        super().__init__(name, [left, right])
     
     def __repr__(self):
-        if len(self.elems) == 2:
+        if all(isinstance(x, Expression) for x in self.args):
+            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
+        # if not: prettier printing without braces
+        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+
+    # it could be a vectorized constraint
+    def __iter__(self):
+        return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
+    
+    # is bool, check special case
+    def __eq__(self, other):
+        if is_num(other) and other == 1:
+            return self
+        return super().__eq__(other)
+
+class Operator(Expression):
+    """
+    All kinds of operators on expressions,
+    including mathematical and logical
+    # convention for 2-ary operators: if one of the two is a constant,
+    # it is stored first (as expr[0]), this eases weighted sum detection
+    """
+    allowed = {
+        #name: (arity, is_bool)       arity 0 = n-ary, min 2
+        'and': (0, True),
+        'or':  (0, True),
+        'xor': (0, True),
+        '->':  (2, True),
+        'sum': (0, False),
+        'sub': (2, False), # x - y
+        'mul': (2, False),
+        'div': (2, False),
+        'mod': (2, False),
+        'pow': (2, False),
+        '-':   (1, False), # -x
+        'abs': (1, False),
+        'wsum': (2, False), # weighted sum, special case! sum( X * Y )
+    }
+
+    def __init__(self, name, arg_list):
+        # sanity checks
+        assert (name in Operator.allowed), "Operator {} not allowed".format(name)
+        arity, is_bool = Operator.allowed[name]
+        if arity == 0:
+            assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
+        else:
+            assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
+        if arity == 2 and hasattr(arg_list[0], '__len__'):
+            # special case: can be two lists
+            assert (len(arg_list[0]) == len(arg_list[1])), "Operator: the two arguments must have equal size"
+
+        # convention for commutative binary operators:
+        # swap if right is constant and left is not
+        if len(arg_list) == 2 and all(is_num(x) for x in arg_list) and \
+           name in {'sum', 'mul', 'and', 'or', 'xor'}:
+            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+
+        super().__init__(name, arg_list)
+    
+    def __repr__(self):
+        printname = self.name
+        printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
+        if printname in printmap:
+            printname = printmap[printname]
+
+        # special cases
+        if self.name == '-': # unary -
+            return "-{}".format(expr[0])
+        if self.name == 'wsum': # binary weighted sum
+            return "sum( {} * {} )".format(self.args[0], self.args[1])
+
+        # infix printing of two arguments
+        if len(self.args) == 2:
             # bracketed printing if both not constant
-            if all(isinstance(x, Expression) for x in self.elems):
-                return "({}) {} ({})".format(self.elems[0], self.name, self.elems[1]) 
-            return "{} {} {}".format(self.elems[0], self.name, self.elems[1])
-        return "{}({})".format(self.name, self.elems)
+            if all(isinstance(x, Expression) for x in self.args):
+                return "({}) {} ({})".format(self.args[0], printname, self.args[1]) 
+            return "{} {} {}".format(self.args[0], printname, self.args[1])
 
-    def _compatible(self, other):
-        return isinstance(other, BoolOperator) and other.name == self.name
+        return "{}({})".format(self.name, self.args)
+    
+    # it could be a vectorized constraint
+    def __iter__(self):
+        if len(self.args) == 2:
+            return (Operator(self.name, list(args)) for args in zip(self.args[0], self.args[1]))
+        return super().__iter__(self)
 
-    # override to check same operator
+    # for wsum detection: check of w*expr with w a constant
+    def _is_wmul(self, a):
+        return isinstance(a, Operator) and a.name == "mul" and len(a.args) == 2 and is_num(a.args[0])
+
+    # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
+    # + special case for weighted sum (sum of mul)
+
     def __and__(self, other):
-        if self._compatible(other):
-            self.elems.append(other)
+        if self.name == 'and':
+            self.args.append(other)
             return self
         return super().__and__(other)
     def __rand__(self, other):
-        if self._compatible(other):
-            self.elems.insert(0, other)
+        if self.name == 'and':
+            self.args.insert(0,other)
             return self
         return super().__rand__(other)
 
     def __or__(self, other):
-        if self._compatible(other):
-            self.elems.append(other)
+        if self.name == 'or':
+            self.args.append(other)
             return self
         return super().__or__(other)
     def __ror__(self, other):
-        if self._compatible(other):
-            self.elems.insert(0, other)
+        if self.name == 'or':
+            self.args.insert(0,other)
             return self
         return super().__ror__(other)
 
     def __xor__(self, other):
-        if self._compatible(other):
-            self.elems.append(other)
+        if self.name == 'xor':
+            self.args.append(other)
             return self
         return super().__xor__(other)
     def __rxor__(self, other):
-        if self._compatible(other):
-            self.elems.insert(0, other)
+        if self.name == 'xor':
+            self.args.insert(0,other)
             return self
         return super().__rxor__(other)
 
-class Comparison(LogicalExpression):
-    allowed = {'<=', '<', '>=', '>', '==', '!='}
-    def __init__(self, name, left, right):
-        assert (name in self.allowed), "Symbol not allowed"
-        if hasattr(left, '__len__'):
-            assert(len(left) == len(right))
-        self.name = name
-        self.left = left
-        self.right = right
-    
-    def __repr__(self):
-        if isinstance(self.left, Expression) and isinstance(self.right, Expression):
-            return "({}) {} ({})".format(self.left, self.name, self.right) 
-        return "{} {} {}".format(self.left, self.name, self.right) 
+    def __add__(self, other):
+        if is_num(other) and other == 0:
+            return self
 
-    # it could be a vectorized constraint
-    def __iter__(self):
-        return (Comparison(self.name,l,r) for l,r in zip(self.left, self.right))
-    
+        # sum([...]) + (w*expr) or sum([...]) + expr
+        if self.name == 'sum':
+            if self._is_wmul(other):
+                w = [1]*len(self.args) + [ other.expr[0] ]
+                v = self.args + [ other.expr[1] ]
+                return Operator('wsum', [w,v])
+            self.args.append(other)
+            return self
+
+        # sum([]*[]) + (w*expr) or wsum([]*[]) + expr
+        if self.name == 'wsum':
+            if self._is_wmul(other):
+                self.expr[0].append(other.expr[0])
+                self.expr[1].append(other.expr[1])
+            else:
+                self.expr[0].append(1)
+                self.expr[1].append(other.expr[0])
+            return self
+
+        return super().__add__(other)
+    def __radd__(self, other):
+        # only for constants
+        if is_num(other) and other == 0:
+            return self
+        if self.name == 'sum':
+            self.expr.insert(0, other)
+            return self
+        if self.name == 'wsum':
+            self.expr[0].insert(0, 1)
+            self.expr[1].insert(0, other)
+            return self
+        return super().__radd__(other)
+
+    # substraction; in case of sum or wsum, add
+    def __sub__(self, other):
+        if is_num(other) and other == 0:
+            return self
+        if self.name == 'sum':
+            self.expr.append(-other)
+            return self
+        if self.name == 'wsum':
+            self.expr[0].append(-1)
+            self.expr[1].append(other.expr[0])
+            return self
+        return super().__sub__(other)
+    def __rsub__(self, other):
+        if is_num(other) and other == 0:
+            return -self
+        if self.name == 'sum':
+            self.expr.insert(0,-other)
+            return self
+        if self.name == 'wsum':
+            self.expr[0].append(-1)
+            self.expr[1].append(other.expr[0])
+            return self
+        return super().__sub__(other)
+
+class Element(Expression):
+    """
+        constraint Arr[X] = Y
+        'Y' here is optional, can use as function: Arr[X] + 3 <= Y
+    """
+    def __init__(self, name, arg_list):
+        assert (len(arg_list) >= 2 and len(arg_list <= 3)), "Element takes 2 or three arguments"
+        super().__init__(name, arg_list)
+
+
+    def __repr__(self):
+        out = "{}[{}]".format(self.args[0], self.args[1])
+        if len(self.args) == 2:
+            return out
+        return "{} == {}".format(out, self.args[2])
+
+    def __eq__(self, other):
+        if len(self.args) == 2:
+            # add as third argument
+            self.args.append(other)
+            return self
+
+        # else: 3 arguments, reified variant, is bool
+        if is_num(other) and other == 1:
+            return self
+        
+
 
 # see globalconstraints.py for concrete instantiations
-class GlobalConstraint(LogicalExpression):
+class GlobalConstraint(Expression):
     # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
     # and add them to the 'elems' argument list (e.g. for element: X[var] == 1)
     def __init__(self, name, arg_list, add_equality_as_arg=False):
@@ -350,23 +394,3 @@ class GlobalConstraint(LogicalExpression):
         
         # default
         return super().__eq__(other)
-            
-
-
-class Objective(Expression):
-    def __init__(self, name, expr):
-        self.name = name
-        self.expr = expr
-    
-    def __repr__(self):
-        return "{} {}".format(self.name, self.expr)
-
-def Maximise(expr):
-    return Objective("Maximize", expr)
-def Maximize(expr):
-    return Objective("Maximize", expr)
-
-def Minimise(expr):
-    return Objective("Minimize", expr)
-def Minimize(expr):
-    return Objective("Minimize", expr)
