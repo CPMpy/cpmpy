@@ -105,9 +105,16 @@ class MiniZincText(SolverInterface):
                 idx = "{}".format(elems[1])
                 if isinstance(elems[1], IntVarImpl) and elems[1].lb == 0:
                     idx = "{}+1".format(idx)
+                # almost there
                 txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, elems[0])
                 txt += "      arr[{}] = {}".format(idx,elems[2])
                 return txt
+
+            if name.endswith('circuit'): # circuit, subcircuit
+                # minizinc is offset 1, which can be problematic here...
+                if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.elems[0]):
+                    elems[0] = ["{}+1".format(e) for e in elems[0]]
+                    elems[0] = "[{}]".format(",".join(map(str,elems[0])))
 
             args_str = ", ".join(map(str,elems)) # elems are individual args
             return "{}({})".format(name, args_str)
