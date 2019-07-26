@@ -341,6 +341,7 @@ class Operator(Expression):
             return self
         return super().__sub__(other)
 
+
 class Element(Expression):
     """
         constraint Arr[X] = Y
@@ -373,23 +374,17 @@ class Element(Expression):
 class GlobalConstraint(Expression):
     # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
     # and add them to the 'elems' argument list (e.g. for element: X[var] == 1)
-    def __init__(self, name, arg_list, add_equality_as_arg=False):
-        assert (isinstance(arg_list, list)), "GlobalConstraint requires list of arguments, even if of length one e.g. [arg]"
-        self.name = name
-        self.elems = arg_list
+    def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
+        super().__init__(name, arg_list)
         self.add_equality_as_arg = add_equality_as_arg
-
-    def __repr__(self):
-        ret = ""
-        if len(self.elems) == 1:
-            ret = "{}({})".format(self.name, self.elems[0])
-        else:
-            ret = "{}({})".format(self.name, ",".join(map(str,self.elems)))
-        return ret.replace("\n","") # numpy args add own linebreaks...
+        self.is_bool = is_bool
 
     def __eq__(self, other):
         if self.add_equality_as_arg:
             self.elems.append(other)
+            return self
+
+        if self.is_bool and is_num(other) and other == 1:
             return self
         
         # default
