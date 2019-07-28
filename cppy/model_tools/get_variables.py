@@ -8,11 +8,8 @@ from ..variables import *
 """
 def get_variables(model):
     # want an ordered set. Emulate with full list that is uniquified
-    vars_ = []
-    if model.constraints:
-        vars_ += vars_expr(model.constraints)
-    if model.objective:
-        vars_ += vars_expr(model.objective)
+    vars_ = vars_expr(model.constraints)
+
     # mimics an ordered set, manually...
     return uniquify(vars_)
 
@@ -23,32 +20,17 @@ def uniquify(seq):
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 def vars_expr(expr):
-    # check if iterable, if so, do
-    try:
-        vars_ = []
-        for subexpr in iter(expr):
+    # a var, do our thing
+    if isinstance(expr, NumVarImpl):
+        return [expr]
+
+    vars_ = []
+    # if list or Expr: recurse
+    if is_any_list(expr):
+        for subexpr in expr:
             vars_ += vars_expr(subexpr)
-        return vars_
-    except TypeError:
-        # not iterable, base element
-        if not isinstance(expr, Expression):
-            # no expr, no vars for sure
-            return []
-
-        # a var
-        if isinstance(expr, NumVarImpl):
-            return [expr]
-
-        # classes storing left/right
-        if isinstance(expr, (MathOperator,Comparison)):
-            return vars_expr(expr.left) + vars_expr(expr.right)
-
-        # classes storing elems
-        if isinstance(expr, (Sum,WeightedSum,BoolOperator,GlobalConstraint)):
-            return vars_expr(expr.elems)
-
-        # classes storing args (possibly nested)
-        if isinstance(expr, Objective):
-            return vars_expr(expr.expr)
-
-        raise Exception("Expression {} unknown to variable extractor".format(expr))
+    if isinstance(expr, Expression):
+        for subexpr in expr.args:
+            vars_ += vars_expr(subexpr)
+    # else: every non-list, non-expression
+    return vars_

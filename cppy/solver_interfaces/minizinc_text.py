@@ -20,114 +20,106 @@ class MiniZincText(SolverInterface):
         for var in modelvars:
             if isinstance(var, BoolVarImpl):
                 txt_vars += "var bool: BV{};\n".format(var.id)
-            if isinstance(var, IntVarImpl):
+            elif isinstance(var, IntVarImpl):
                 txt_vars += "var {}..{}: IV{};\n".format(var.lb, var.ub, var.id)
 
-        txt_cons = self.convert_constraints(model.constraints)
-        txt_obj  = self.convert_objective(model.objective)
+        txt_cons = ""
+        for con in model.constraints:
+            txt_cons += "constraint {};\n".format(self.convert_expression(con))
+
+        txt_obj = "solve "
+        if model.objective is None:
+            txt_obj += "satisfy;"
+        else:
+            if model.objective_max:
+                txt_obj += "maximize "
+            else:
+                txt_obj += "minimize "
+            txt_obj += "{};\n".format(self.convert_expression(model.objective))
                 
         return txt_vars+"\n"+txt_cons+txt_obj
 
-    def convert_constraints(self, cons):
-        if cons is None:
-            return ""
-
-        # pretty-printing of first-level grouping (if present):
-        cons_list = []
-        if isinstance(cons, BoolOperator) and cons.name == "and":
-            cons_list = cons.elems
-        else:
-            cons_list = [cons]
-        
-        # special case for top-level and
-        # stick to default outputs for now...
-        out = ""
-        for con in cons_list:
-            out += "constraint {};\n".format(self.convert_expression(con))
-        return out+"\n"
-
+    # expected to return a string
     def convert_expression(self, expr):
-        if isinstance(expr, np.ndarray):
-            return list(expr.flat)
+        if is_any_list(expr):
+            expr_str = [self.convert_expression(e) for e in expr]
+            return "[{}]".format(",".join(expr_str))
 
-        if isinstance(expr, NumVarImpl):
-            return expr # default
+        if not isinstance(expr, Expression) or \
+           isinstance(expr, NumVarImpl):
+            # default
+            return str(expr)
+        
+        args_str = [self.convert_expression(e) for e in expr.args]
 
-        if isinstance(expr, (MathOperator,Comparison)):
-            # pretty printing: add () if math or comp
-            left_str = self.convert_expression(expr.left)
-            if isinstance(expr.left, (MathOperator,Comparison)):
-                left_str = "({})".format(left_str)
-            right_str = self.convert_expression(expr.right)
-            if isinstance(expr.right, (MathOperator,Comparison)):
-                right_str = "({})".format(right_str)
-            return "{} {} {}".format(left_str, expr.name, right_str)
+        # standard expressions: comparison, operator, element
+        if isinstance(expr, Comparison):
+            # pretty printing: add () if both comp/op
+            if all(isinstance(e, (Comparison,Operator)) for e in expr.args):
+                for i in [0,1]:
+                    args_str[i] = "({})".format(args_str[i])
+            # infix notation
+            return "{} {} {}".format(args_str[0], expr.name, args_str[1])
 
-        if isinstance(expr, WeightedSum):
-            elems = [self.convert_expression(e) for e in expr.elems]
-            elems_str = "[{}]".format(",".join(map(str,elems)))
+        if isinstance(expr, Operator):
+            # some names differently (the infix names!)
+            printmap = {'and': '/\\', 'or': '\\/',
+                        'sum': '+', 'sub': '-',
+                        'mul': '*', 'div': '/', 'pow': '^'}
+            op_str = expr.name
+            if op_str in printmap:
+                op_str = printmap[op_str]
+
+            # TODO: pretty printing of () as in Operator?
+
+            # special case: unary -
+            if self.name == '-':
+                return "-{}".format(args_str[0])
+
+            # special case, infix: two args
+            if len(args_str) == 2:
+                return "{} {} {}".format(args_str[0], op_str, args_str[1])
+
+            # special case: n-ary (non-binary): rename operator
+            printnary = {'and': 'forall', 'or': 'exists', 'xor': 'xorall', 'sum': 'sum'}
+            if expr.name in printnary:
+                op_str = printnary[expr.name]
+                return "{}([{}])".format(op_str, ",".join(args_str))
+
+            # default: prefix printing
+            return "{}({})".format(op_str, ",".join(args_str))
+
+        if isinstance(expr, Element):
             subtype = "int"
-            if all(isinstance(v, LogicalExpression) for v in iter(expr.elems)):
+            # TODO: need better bool check... is_bool() or type()?
+            if all((v == 1) is v for v in iter(expr.args[0])):
                 subtype = "bool"
-            txt  = "let {{\n      array[int] of int: w={},\n      array[int] of var {}: v={}\n    }} in\n".format(expr.weights, subtype, elems_str)
-            txt += "      sum(i in 1..{}) (w[i]*v[i])".format(len(elems))
-            return txt
-        elif isinstance(expr, Sum):
-            elems = [self.convert_expression(e) for e in expr.elems]
-            return "sum({})".format(elems)
-
-        if isinstance(expr, BoolOperator):
-            name = expr.name
-            elems = [self.convert_expression(e) for e in expr.elems]
-            if len(elems) == 2:
-                if name == 'and': name = "/\\"
-                if name == 'or': name = "\\/"
-                # xor is xor
-                return "{} {} {}".format(elems[0], name, elems[1])
-
-            # n-ary
-            if name == 'and': name = 'forall'
-            if name == 'xor': name = 'xorall'
-            if name == 'or': name = 'exists'
-            return "{}({})".format(name, elems)
-
-        if isinstance(expr, GlobalConstraint):
-            name = expr.name
-            elems = [self.convert_expression(e) for e in expr.elems]
-
-            # special cases:
-            # element to array form
-            if name == 'element':
-                subtype = "int"
-                if all(isinstance(v, LogicalExpression) for v in expr.elems[0].flat):
-                    subtype = "bool"
                 # minizinc is offset 1, which can be problematic for element...
-                idx = "{}".format(elems[1])
-                if isinstance(elems[1], IntVarImpl) and elems[1].lb == 0:
+                idx = args_str[1]
+                if isinstance(expr.args[1], IntVarImpl) and expr.args[1].lb == 0:
                     idx = "{}+1".format(idx)
-                # almost there
-                txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, elems[0])
-                txt += "      arr[{}] = {}".format(idx,elems[2])
-                return txt
+            # almost there
+            txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, args_str[0])
+            txt += "      arr[{}] = {}".format(idx,args_str[2])
+            return txt
+        
+        # rest: global constraints
+        if name.endswith('circuit'): # circuit, subcircuit
+            # minizinc is offset 1, which can be problematic here...
+            if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.args[0]):
+                # redo args_str[0]
+                expr0_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args[0]]
+                args_str[0] = "[{}]".format(",".join(expr0_str))
+        
 
-            if name.endswith('circuit'): # circuit, subcircuit
-                # minizinc is offset 1, which can be problematic here...
-                if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.elems[0]):
-                    elems[0] = ["{}+1".format(e) for e in elems[0]]
-                    elems[0] = "[{}]".format(",".join(map(str,elems[0])))
-
-            args_str = ", ".join(map(str,elems)) # elems are individual args
-            return "{}({})".format(name, args_str)
+        #if isinstance(expr, WeightedSum):
+        #    elems_str = "[{}]".format(",".join(map(str,elems)))
+        #    subtype = "int"
+        #    if all(isinstance(v, LogicalExpression) for v in iter(expr.elems)):
+        #        subtype = "bool"
+        #    txt  = "let {{\n      array[int] of int: w={},\n      array[int] of var {}: v={}\n    }} in\n".format(expr.weights, subtype, elems_str)
+        #    txt += "      sum(i in 1..{}) (w[i]*v[i])".format(len(elems))
+        #    return txt
 
         # default
-        return expr # default
-
-    def convert_objective(self, obj):
-        if obj is None:
-            return "solve satisfy;"
-        if not isinstance(obj, Objective):
-            raise Exception("Only single objective supported by minizinc_text")
-
-        return "solve {} {};".format(obj.name.lower(),
-                                     self.convert_expression(obj.expr))
-
+        return "{}({})".format(name, args_str)

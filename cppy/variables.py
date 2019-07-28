@@ -54,6 +54,9 @@ class BoolVarImpl(IntVarImpl):
             return self
         return super().__eq__(other)
 
+    # when redefining __eq__, must redefine custom__hash__
+    # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
+    def __hash__(self): return super().__hash__()
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
