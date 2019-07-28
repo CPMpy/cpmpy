@@ -190,7 +190,6 @@ class Operator(Expression):
         'pow': (2, False),
         '-':   (1, False), # -x
         'abs': (1, False),
-        'wsum': (2, False), # weighted sum, special case! sum( X * Y )
     }
 
     def __init__(self, name, arg_list):
@@ -222,8 +221,6 @@ class Operator(Expression):
         # special cases
         if self.name == '-': # unary -
             return "-{}".format(expr[0])
-        if self.name == 'wsum': # binary weighted sum
-            return "sum( {} * {} )".format(self.args[0], self.args[1])
 
         # infix printing of two arguments
         if len(self.args) == 2:
@@ -239,10 +236,6 @@ class Operator(Expression):
         if len(self.args) == 2:
             return (Operator(self.name, list(args)) for args in zip(self.args[0], self.args[1]))
         return super().__iter__(self)
-
-    # for wsum detection: check of w*expr with w a constant
-    def _is_wmul(self, a):
-        return isinstance(a, Operator) and a.name == "mul" and len(a.args) == 2 and is_num(a.args[0])
 
     # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
     # + special case for weighted sum (sum of mul)
@@ -283,37 +276,17 @@ class Operator(Expression):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-
-        # sum([...]) + (w*expr) or sum([...]) + expr
         if self.name == 'sum':
-            if self._is_wmul(other):
-                w = [1]*len(self.args) + [ other.expr[0] ]
-                v = self.args + [ other.expr[1] ]
-                return Operator('wsum', [w,v])
             self.args.append(other)
             return self
-
-        # sum([]*[]) + (w*expr) or wsum([]*[]) + expr
-        if self.name == 'wsum':
-            if self._is_wmul(other):
-                self.expr[0].append(other.expr[0])
-                self.expr[1].append(other.expr[1])
-            else:
-                self.expr[0].append(1)
-                self.expr[1].append(other.expr[0])
-            return self
-
         return super().__add__(other)
+
     def __radd__(self, other):
         # only for constants
         if is_num(other) and other == 0:
             return self
         if self.name == 'sum':
             self.expr.insert(0, other)
-            return self
-        if self.name == 'wsum':
-            self.expr[0].insert(0, 1)
-            self.expr[1].insert(0, other)
             return self
         return super().__radd__(other)
 
@@ -324,20 +297,12 @@ class Operator(Expression):
         if self.name == 'sum':
             self.expr.append(-other)
             return self
-        if self.name == 'wsum':
-            self.expr[0].append(-1)
-            self.expr[1].append(other.expr[0])
-            return self
         return super().__sub__(other)
     def __rsub__(self, other):
         if is_num(other) and other == 0:
             return -self
         if self.name == 'sum':
             self.expr.insert(0,-other)
-            return self
-        if self.name == 'wsum':
-            self.expr[0].append(-1)
-            self.expr[1].append(other.expr[0])
             return self
         return super().__sub__(other)
 
