@@ -43,42 +43,43 @@ def cparray(arr):
 # Python does not offer relevant syntax...
 # for double implication, use equivalence a == b
 def implies(a, b):
-    assert isinstance(a, LogicalExpression), "First argument must be a logical expression"
-    assert isinstance(b, LogicalExpression), "Second argument must be a logical expression"
-    return BoolOperator('->', [a, b])
+    # TODO: catch constant a/b?
+    return Operator('->', [a.boolexpr(), b.boolexpr()])
 
 
 # all: listwise 'and'
 def all(iterable):
     collect = [] # logical expressions
     for elem in iterable:
-        if isinstance(elem, LogicalExpression):
-            collect.append( elem )
-        elif not elem:
-            return False
+        if elem == False:
+            return False # no need to create constraint
+        else:
+            collect.append( elem.boolexpr() )
     if len(collect) > 0:
-        return BoolOperator("and", collect)
+        return Operator("and", collect)
     return True
         
 # any: listwise 'or'
 def any(iterable):
     collect = [] # logical expressions
     for elem in iterable:
-        if isinstance(elem, LogicalExpression):
-            collect.append( elem )
-        elif elem:
-            return True
+        if elem == True:
+            return True # no need to create constraint
+        else:
+            collect.append( elem.boolexpr() )
     if len(collect) > 0:
-        return BoolOperator("or", collect)
+        return Operator("or", collect)
     return False
         
 
 # min: listwise 'min'
 def min(iterable):
-    if not any(isinstance(elem, MathExpression) for elem in iterable):
+    # constants only?
+    if not any(isinstance(elem, Expression) for elem in iterable):
         return np.min(iterable)
     return GlobalConstraint("min", list(iterable))
 def max(iterable):
-    if not any(isinstance(elem, MathExpression) for elem in iterable):
+    # constants only?
+    if not any(isinstance(elem, Expression) for elem in iterable):
         return np.max(iterable)
     return GlobalConstraint("max", list(iterable))

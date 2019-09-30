@@ -104,7 +104,7 @@ class MiniZincText(SolverInterface):
             return txt
         
         # rest: global constraints
-        if name.endswith('circuit'): # circuit, subcircuit
+        if expr.name.endswith('circuit'): # circuit, subcircuit
             # minizinc is offset 1, which can be problematic here...
             if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.args[0]):
                 # redo args_str[0]
@@ -122,4 +122,4 @@ class MiniZincText(SolverInterface):
         #    return txt
 
         # default
-        return "{}({})".format(name, args_str)
+        return "{}({})".format(expr.name, args_str)

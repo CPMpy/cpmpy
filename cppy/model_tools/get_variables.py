@@ -29,7 +29,7 @@ def vars_expr(expr):
     if is_any_list(expr):
         for subexpr in expr:
             vars_ += vars_expr(subexpr)
-    if isinstance(expr, Expression):
+    elif isinstance(expr, Expression):
         for subexpr in expr.args:
             vars_ += vars_expr(subexpr)
     # else: every non-list, non-expression

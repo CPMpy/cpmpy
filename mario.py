@@ -44,7 +44,7 @@ cons += [ sum(node_fuel) < fuelLimit ]
 # amount of gold earned, only for stops visited, s[i] != i
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
 
-model = Model(cons, Maximize(gold))
+model = Model(cons, maximize=gold)
 
 # Statistics are returned after solving.
 stats = model.solve("minizinc_text")

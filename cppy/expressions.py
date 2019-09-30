@@ -338,7 +338,7 @@ class Element(Expression):
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(Expression):
     # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
-    # and add them to the 'elems' argument list (e.g. for element: X[var] == 1)
+    # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
     def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
         super().__init__(name, arg_list)
         self.add_equality_as_arg = add_equality_as_arg
@@ -346,7 +346,7 @@ class GlobalConstraint(Expression):
 
     def __eq__(self, other):
         if self.add_equality_as_arg:
-            self.elems.append(other)
+            self.args.append(other)
             return self
 
         if self.is_bool and is_num(other) and other == 1:

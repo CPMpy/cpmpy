@@ -27,7 +27,7 @@ class Model(object):
                 lst[i] = self.make_and_from_list(expr)
         if len(lst) == 1:
             return lst[0]
-        return BoolOperator("and", lst)
+        return Operator("and", lst)
         
 
     def __repr__(self):
