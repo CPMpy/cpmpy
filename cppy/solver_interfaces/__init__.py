@@ -11,19 +11,8 @@ class SolverInterface:
     def solve(self, model):
         return SolverStats()
 
-
-# builtin solvers implementing SolverInterface
-from .minizinc_text import *
-
-builtin_solvers=[MiniZincText()]
-
 def get_supported_solvers():
-    solverdict = dict()
-    for solver in builtin_solvers:
-        if solver.supported():
-            solverdict[solver.name] = solver
-    return solverdict
-
+    return [sv for sv in builtin_solvers if sv.supported()]
 
 class ExitStatus(Enum):
     NOT_RUN = 1
@@ -39,3 +28,11 @@ class SolverStats(object):
     
     def __repr__(self):
         return "{} ({} seconds)".format(self.status, self.runtime)
+
+# builtin solvers implementing SolverInterface
+from .minizinc_text import *
+from .minizinc_python import *
+
+# the order matters: default will be first supported one
+builtin_solvers=[MiniZincPython(),MiniZincText()]
+

@@ -16,23 +16,23 @@ class NumVarImpl(Expression):
     def value(self):
         return self._value
 
-    # for sets/dicts. Because IDs are unique, so is the str repr
+    # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
         return hash(str(self))
 
 class IntVarImpl(NumVarImpl):
     counter = 0
 
-    def __init__(self, lb, ub, setid=True):
+    def __init__(self, lb, ub, setname=True):
         assert (is_int(lb) and is_int(ub))
         assert (lb >= 0 and ub >= 0)
         super().__init__(lb, ub)
         
-        self.id = IntVarImpl.counter
+        self.name = IntVarImpl.counter
         IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
     
     def __repr__(self):
-        return "IV{}".format(self.id)
+        return "IV{}".format(self.name)
 
 class BoolVarImpl(IntVarImpl):
     counter = 0
@@ -40,13 +40,13 @@ class BoolVarImpl(IntVarImpl):
     def __init__(self, lb=0, ub=1):
         assert(lb == 0 or lb == 1)
         assert(ub == 0 or ub == 1)
-        super().__init__(lb, ub, setid=False)
+        super().__init__(lb, ub, setname=False)
         
-        self.id = BoolVarImpl.counter
+        self.name = BoolVarImpl.counter
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
         
     def __repr__(self):
-        return "BV{}".format(self.id)
+        return "BV{}".format(self.name)
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
