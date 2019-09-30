@@ -28,9 +28,9 @@ model = Model(constraint)
 print(model)
 
 stats = model.solve()
-print("  S,E,N,D =  ", [x.value for x in [s,e,n,d]])
-print("  M,O,R,E =  ", [x.value for x in [m,o,r,e]])
-print("M,O,N,E,Y =", [x.value for x in [m,o,n,e,y]])
+print("  S,E,N,D =  ", [x.value() for x in [s,e,n,d]])
+print("  M,O,R,E =  ", [x.value() for x in [m,o,r,e]])
+print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
 ```
 
 sudoku and others need matrix indexing, which numpy supports extensively:
@@ -89,8 +89,8 @@ x = IntVar(0,sum(demands), slots)
 constraint  = [x[i] + x[i+1] >= demands[i] for i in range(0,slots-1)]
 constraint += [x[-1] + x[0] == demands[-1]] # 'around the clock' constraint
 
-objective = Minimise(sum(x)) # number of buses
+objective = sum(x) # number of buses
 
-model = Model(constraint, objective)
+model = Model(constraint, minimize=objective)
 stats = model.solve()
 ```
