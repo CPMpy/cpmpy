@@ -23,5 +23,6 @@ objective = sum(x) # number of buses
 
 model = Model(constraint, minimize=objective)
 stats = model.solve()
-print("Value:", objective.value())
 print("Solution:", x.value())
+print("Value:", sum(x.value()))
+# TODO, should we support objective.value() to compute this sum? e.g. that each operator knows how to compute its value?
