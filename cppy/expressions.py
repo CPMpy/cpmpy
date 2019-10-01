@@ -224,10 +224,14 @@ class Operator(Expression):
 
         # infix printing of two arguments
         if len(self.args) == 2:
-            # bracketed printing if both not constant
-            if all(isinstance(x, Expression) for x in self.args):
-                return "({}) {} ({})".format(self.args[0], printname, self.args[1]) 
-            return "{} {} {}".format(self.args[0], printname, self.args[1])
+            # bracketed printing of non-constants
+            def wrap_bracket(arg):
+                if isinstance(arg, Expression):
+                    return f"({arg})"
+                return arg
+            return "{} {} {}".format(wrap_bracket(self.args[0]),
+                                     printname,
+                                     wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
     
@@ -312,9 +316,10 @@ class Element(Expression):
         constraint Arr[X] = Y
         'Y' here is optional, can use as function: Arr[X] + 3 <= Y
     """
-    def __init__(self, name, arg_list):
-        assert (len(arg_list) >= 2 and len(arg_list <= 3)), "Element takes 2 or three arguments"
-        super().__init__(name, arg_list)
+
+    def __init__(self, arg_list):
+        assert (len(arg_list) >= 2 and len(arg_list) <= 3), "Element takes 2 or three arguments"
+        super().__init__("element", arg_list)
 
 
     def __repr__(self):

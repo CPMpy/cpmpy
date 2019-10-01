@@ -81,6 +81,9 @@ class MiniZincText(SolverInterface):
 
             # special case, infix: two args
             if len(args_str) == 2:
+                for i,arg_str in enumerate(args_str):
+                    if isinstance(expr.args[i], Expression):
+                        args_str[i] = "("+args_str[i]+")"
                 return "{} {} {}".format(args_str[0], op_str, args_str[1])
 
             # special case: n-ary (non-binary): rename operator
@@ -97,10 +100,10 @@ class MiniZincText(SolverInterface):
             # TODO: need better bool check... is_bool() or type()?
             if all((v == 1) is v for v in iter(expr.args[0])):
                 subtype = "bool"
-                # minizinc is offset 1, which can be problematic for element...
-                idx = args_str[1]
-                if isinstance(expr.args[1], IntVarImpl) and expr.args[1].lb == 0:
-                    idx = "{}+1".format(idx)
+            # minizinc is offset 1, which can be problematic for element...
+            idx = args_str[1]
+            if isinstance(expr.args[1], IntVarImpl) and expr.args[1].lb == 0:
+                idx = "{}+1".format(idx)
             # almost there
             txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, args_str[0])
             txt += "      arr[{}] = {}".format(idx,args_str[2])
@@ -115,14 +118,5 @@ class MiniZincText(SolverInterface):
                 args_str[0] = "[{}]".format(",".join(expr0_str))
         
 
-        #if isinstance(expr, WeightedSum):
-        #    elems_str = "[{}]".format(",".join(map(str,elems)))
-        #    subtype = "int"
-        #    if all(isinstance(v, LogicalExpression) for v in iter(expr.elems)):
-        #        subtype = "bool"
-        #    txt  = "let {{\n      array[int] of int: w={},\n      array[int] of var {}: v={}\n    }} in\n".format(expr.weights, subtype, elems_str)
-        #    txt += "      sum(i in 1..{}) (w[i]*v[i])".format(len(elems))
-        #    return txt
-
         # default
-        return "{}({})".format(expr.name, args_str)
+        return "{}({})".format(expr.name, ",".join(args_str))

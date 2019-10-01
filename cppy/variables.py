@@ -5,6 +5,9 @@ from .expressions import *
 def is_int(arg):
     return isinstance(arg, (int, np.integer))
 
+def is_var(x):
+    return isinstance(x, IntVarImpl)
+
 class NumVarImpl(Expression):
     def __init__(self, lb, ub):
         assert (is_num(lb) and is_num(ub))
@@ -71,22 +74,25 @@ class NDVarArray(Expression, np.ndarray):
         return np.reshape([x.value() for x in self], self.shape)
     
     def __getitem__(self, index):
-        def is_var(x):
-            return isinstance(x, IntVarImpl)
+        # array access, check if variables are used in the indexing
 
+        # index is single variable: direct element
         if is_var(index):
-            return GlobalConstraint("element", [self, index], add_equality_as_arg=True)
+            return Element([self, index])
 
+        # index is array/tuple with at least one var in it:
+        # index non-var part, and create element on var part
         if isinstance(index, tuple) and any(is_var(el) for el in index):
-            index_rest = list(index)
-            var = []
+            index_rest = list(index) # mutable view
+            var = [] # collector of variables
             for i in range(len(index)):
                 if is_var(index[i]):
-                    index_rest[i] = None
+                    index_rest[i] = Ellipsis # selects all remaining dimensions
                     var.append(index[i])
-            array_rest = self[tuple(index_rest)]
+            array_rest = self[tuple(index_rest)] # non-var array selection
             assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
-            return GlobalConstraint("element", [array_rest, var[0]], add_equality_as_arg=True)
+            # single var, so flatten rest array
+            return Element([array_rest, var[0]])
             
         return super().__getitem__(index)
 
