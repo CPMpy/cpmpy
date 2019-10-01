@@ -45,6 +45,7 @@ cons += [ sum(node_fuel) < fuelLimit ]
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
 
 model = Model(cons, maximize=gold)
+print(model)
 
 # Statistics are returned after solving.
 stats = model.solve("minizinc_text")

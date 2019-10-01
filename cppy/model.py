@@ -6,8 +6,15 @@ import numpy as np
 class Model(object):
     def __init__(self, *args, minimize=None, maximize=None):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
-        # list of constraints
-        self.constraints = [self.make_and_from_list(c) for c in args]
+        # list of constraints (arguments of top-level conjunction)
+        root_constr = self.make_and_from_list(args)
+        if root_constr.name == 'and':
+            # unpack top-level conjuction
+            self.constraints = root_constr.args
+        else:
+            # wrap in list
+            self.constraints = [root_constr]
+
         # an expresion or None
         self.objective = None
         self.objective_max = None
