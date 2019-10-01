@@ -26,8 +26,15 @@ class Expression(object):
         self.args = arg_list
 
     def __repr__(self):
-        ret = "{}({})".format(self.name, ",".join(map(str,self.args)))
-        return ret.replace("\n","") # numpy args add own linebreaks...
+        strargs = []
+        for arg in self.args:
+            if isinstance(arg, np.ndarray):
+                # flatten
+                strarg = ",".join(map(str,arg.flat))
+                strargs.append( f"[{strarg}]" )
+            else:
+                strargs.append( f"{arg}" )
+        return "{}({})".format(self.name, ",".join(strargs))
 
     # booleanised expression
     # optional, default: (self == 1)

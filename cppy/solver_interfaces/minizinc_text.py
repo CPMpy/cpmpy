@@ -45,7 +45,11 @@ class MiniZincText(SolverInterface):
     # expected to return a string
     def convert_expression(self, expr):
         if is_any_list(expr):
-            expr_str = [self.convert_expression(e) for e in expr]
+            if isinstance(expr, np.ndarray):
+                # must flatten
+                expr_str = [self.convert_expression(e) for e in expr.flat]
+            else:
+                expr_str = [self.convert_expression(e) for e in expr]
             return "[{}]".format(",".join(expr_str))
 
         if not isinstance(expr, Expression) or \
