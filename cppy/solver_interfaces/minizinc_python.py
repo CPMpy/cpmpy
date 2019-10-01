@@ -1,38 +1,63 @@
-# interface to https://pypi.org/project/minizinc/
-# TODO
-
 from . import *
 from ..expressions import *
 from ..variables import *
 from .minizinc_text import *
 
 class MiniZincPython(MiniZincText):
-    # needs the python package 'minizinc' installed
+    """
+    Interface to the python 'minizinc' package
+
+    Requires that the 'minizinc' python package is installed:
+    $ pip install minizinc
+    as well as the MiniZinc bundled binary packages, downloadable from:
+    https://www.minizinc.org/software.html
+
+    Creates the following attributes:
+    mzn_inst: the minizinc.Instance created by model()
+    mzn_result: the minizinc.Result used in solve()
+    """
+
     def __init__(self):
         self.name = "minizinc_python"
 
     def supported(self):
-        return True # always possible
+        try:
+            import minizinc
+            return True
+        except ImportError as e:
+            return False
 
-    def solve(self, model):
+    def _model(self, model, solvername=None):
+        import minizinc
+        if solvername is None:
+            # default solver
+            solvername = "gecode"
+
         # from superclass
         mzn_txt = self.convert(model)
 
         # minizinc-python API
-        import minizinc # TODO, catch if not installed
-
         # Create a MiniZinc model
         mznmodel = minizinc.Model()
         mznmodel.add_string(mzn_txt)
 
         # Transform Model into a instance
-        cbc = minizinc.Solver.lookup("gecode")
-        inst = minizinc.Instance(cbc, mznmodel)
-        #inst["a"] = 1
+        slv = minizinc.Solver.lookup(solvername)
+        return minizinc.Instance(slv, mznmodel)
+
+    def solve(self, model, solvername=None):
+        if not self.supported():
+            raise "Install the python 'minizinc' package to use this '{}' solver interface".format(self.name)
+        import minizinc
+
+        # create self.mzn_inst
+        self.mzn_inst = self._model(model, solvername=solvername)
+
         # Solve the instance
-        mznresult = inst.solve()#all_solutions=True)
+        self.mzn_result = self.mzn_inst.solve()#all_solutions=True)
 
         # translate status
+        mznresult = self.mzn_result
         solstats = SolverStats()
         if mznresult.status == minizinc.result.Status.SATISFIED:
             solstats.status = ExitStatus.FEASIBLE
