@@ -48,10 +48,15 @@ class Model(object):
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):
         # get supported solvers
+        supsolvers = get_supported_solvers()
         if solver is None: # default is first
-            supsolvers = get_supported_solvers()
             solver = supsolvers[0]
-        elif not isinstance(solver, si.SolverInterface):
+        elif not isinstance(solver, SolverInterface):
+            solvername = solver
+            for solver in supsolvers:
+                if solver.name == solvername:
+                    break # break and hence 'solver' is correct object
+
             if not solver.supported():
                 raise "'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver)
                 
