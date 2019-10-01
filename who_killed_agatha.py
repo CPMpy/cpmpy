@@ -53,4 +53,4 @@ model = Model(constraint)
 stats = model.solve()
 
 #print(model)
-print(killer)
+print("killer ID:",killer.value())

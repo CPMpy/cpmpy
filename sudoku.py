@@ -42,4 +42,4 @@ constraint += [ puzzle[given>0] == given[given>0] ]
 model = Model(constraint)
 stats = model.solve()
 print(stats)
-print(puzzle)
+print(puzzle.value())
