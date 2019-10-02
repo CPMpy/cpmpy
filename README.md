@@ -1,13 +1,16 @@
 Welcome to CPpy
 
-CPpy is a Python-embedded modeling language for constraint programming. It allows you to model your problems in a natural way that follows the math.
+CPpy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
-Currently, it is just generating an expression tree. Here is a TODO list:
-- auto translate to minizinc (partly done) and use pymzn
+The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
+
+Some TODOs:
+- auto translate to or-tools
 - auto translate to numberjack, which is Python-based but not numpy-based
 - add more models (see Hakan K's page(s))
+- publish on pypi, with proper docs
 
 The following examples show the elegance of building on Python/Numpy:
 ```python
