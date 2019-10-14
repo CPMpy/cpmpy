@@ -13,7 +13,7 @@ class MiniZincPython(MiniZincText):
     https://www.minizinc.org/software.html
 
     Creates the following attributes:
-    mzn_inst: the minizinc.Instance created by model()
+    mzn_inst: the minizinc.Instance created by _model()
     mzn_result: the minizinc.Result used in solve()
     """
 
@@ -54,7 +54,7 @@ class MiniZincPython(MiniZincText):
         self.mzn_inst = self._model(model, solvername=solvername)
 
         # Solve the instance
-        self.mzn_result = self.mzn_inst.solve()#all_solutions=True)
+        self.mzn_result = self.mzn_inst.solve(output_time=True)#all_solutions=True)
 
         # translate status
         mznresult = self.mzn_result
@@ -73,11 +73,13 @@ class MiniZincPython(MiniZincText):
             solstats.status = ExitStatus.ERROR
 
         # get solution (and runtime)
+        if 'time' in mznresult.statistics:
+            solstats.runtime = mznresult.statistics['time'] # --output-time
+
         if mznresult.status.has_solution():
             # runtime
-            mznsol = mznresult._solutions[-1]
+            mznsol = mznresult.solutions
             solstats.runtime = mznsol.statistics['time'].total_seconds()
-            #print(mznsol)
             
             # fill in variables
             modelvars = get_variables(model)
