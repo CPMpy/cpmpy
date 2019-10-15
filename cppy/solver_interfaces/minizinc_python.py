@@ -54,7 +54,7 @@ class MiniZincPython(MiniZincText):
         self.mzn_inst = self._model(model, solvername=solvername)
 
         # Solve the instance
-        self.mzn_result = self.mzn_inst.solve(output_time=True)#all_solutions=True)
+        self.mzn_result = self.mzn_inst.solve(**{'output-time':True})#all_solutions=True)
 
         # translate status
         mznresult = self.mzn_result
@@ -78,15 +78,15 @@ class MiniZincPython(MiniZincText):
 
         if mznresult.status.has_solution():
             # runtime
-            mznsol = mznresult.solutions
-            solstats.runtime = mznsol.statistics['time'].total_seconds()
+            mznsol = mznresult.solution
+            solstats.runtime = mznresult.statistics['time'].total_seconds()
             
             # fill in variables
             modelvars = get_variables(model)
             for var in modelvars:
                 varname = str(var)
-                if varname in mznsol.assignments:
-                    var._value = mznsol[varname]
+                if hasattr(mznsol, varname):
+                    var._value = getattr(mznsol, varname)
                 else:
                     print("Warning, no value for ",varname)
 
