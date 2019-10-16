@@ -38,6 +38,7 @@ for i in range(0,n,3):
 
 # constraints on values
 constraint += [ puzzle[given>0] == given[given>0] ]
+constraint += [ given[1,puzzle[1,1]] == 5 ]
 
 model = Model(constraint)
 stats = model.solve()

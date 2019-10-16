@@ -96,4 +96,8 @@ objective = sum(x) # number of buses
 
 model = Model(constraint, minimize=objective)
 stats = model.solve()
+
+FAQ
+Problem: I get the following error: "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
+Solution: indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cppy-numpy arrays. First convert your numpy array to a cppy-numpy array with the 'cparray()' wrapper: m = cparray(m); m[X] == True
 ```
