@@ -4,6 +4,16 @@ import numpy as np
 
 
 class Model(object):
+    """
+    CPpy Model object, contains the constraint and objective expression trees
+
+    Arguments of constructor:
+    *args: Expression object(s) or list(s) of Expression objects
+    minimize: Expression object representing the objective to minimize
+    maximize: Expression object representing the objective to maximize
+
+    At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
+    """
     def __init__(self, *args, minimize=None, maximize=None):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         # list of constraints (arguments of top-level conjunction)
@@ -27,6 +37,7 @@ class Model(object):
             self.objective_max = False
 
     def make_and_from_list(self, args):
+        """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """
         lst = list(args) # make mutable copy of type list
         # do recursive where needed, with overwrite
         for (i, expr) in enumerate(lst):
@@ -54,6 +65,11 @@ class Model(object):
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):
+        """ Send the model to a solver and get the result
+
+        'solver': None (default) or a SolverInterface object
+        verifies that the solver is supported on the current system
+        """
         # get supported solvers
         supsolvers = get_supported_solvers()
         if solver is None: # default is first
