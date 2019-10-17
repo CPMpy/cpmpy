@@ -110,7 +110,9 @@ class MiniZincText(SolverInterface):
                 idx = "{}+1".format(idx)
             # almost there
             txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, args_str[0])
-            txt += "      arr[{}] = {}".format(idx,args_str[2])
+            txt += f"      arr[{idx}]"
+            if len(args_str)>2:
+                txt += "= {}".format(args_str[2])
             return txt
         
         # rest: global constraints
