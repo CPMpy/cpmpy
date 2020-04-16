@@ -63,18 +63,54 @@ class Expression(object):
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+        # some simple constant removal
+        if other is True:
+            return self
+        if other is False:
+            return False
+
         return Operator("and", [self, other])
     def __rand__(self, other):
+        # some simple constant removal
+        if other is True:
+            return self
+        if other is False:
+            return False
+
         return Operator("and", [other, self])
 
     def __or__(self, other):
+        # some simple constant removal
+        if other is True:
+            return True
+        if other is False:
+            return self
+
         return Operator("or", [self, other])
     def __ror__(self, other):
+        # some simple constant removal
+        if other is True:
+            return True
+        if other is False:
+            return self
+
         return Operator("or", [other, self])
 
     def __xor__(self, other):
+        # some simple constant removal
+        if other is True:
+            return ~self
+        if other is False:
+            return self
+
         return Operator("xor", [self, other])
     def __rxor__(self, other):
+        # some simple constant removal
+        if other is True:
+            return ~self
+        if other is False:
+            return self
+
         return Operator("xor", [other, self])
 
     
@@ -175,6 +211,7 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
+
 
 class Operator(Expression):
     """
@@ -287,6 +324,7 @@ class Operator(Expression):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
+
         if self.name == 'sum':
             self.args.append(other)
             return self
@@ -296,6 +334,7 @@ class Operator(Expression):
         # only for constants
         if is_num(other) and other == 0:
             return self
+
         if self.name == 'sum':
             self.expr.insert(0, other)
             return self
@@ -305,6 +344,7 @@ class Operator(Expression):
     def __sub__(self, other):
         if is_num(other) and other == 0:
             return self
+
         if self.name == 'sum':
             self.expr.append(-other)
             return self
@@ -312,11 +352,21 @@ class Operator(Expression):
     def __rsub__(self, other):
         if is_num(other) and other == 0:
             return -self
+
         if self.name == 'sum':
             self.expr.insert(0,-other)
             return self
         return super().__sub__(other)
 
+    # is bool, check special case
+    def __eq__(self, other):
+        if is_num(other) and other == 1:
+            # check if bool operator, do not add == 1
+            arity, is_bool = Operator.allowed[self.name]
+            if is_bool:
+                return self
+        return super().__eq__(other)
+    
 
 class Element(Expression):
     """

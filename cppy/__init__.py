@@ -41,9 +41,22 @@ def cparray(arr):
 
 # implication constraint: a -> b
 # Python does not offer relevant syntax...
+# I am considering overloading bitshift >>
 # for double implication, use equivalence a == b
 def implies(a, b):
-    # TODO: catch constant a/b?
+    # both constant
+    if type(a) == bool and type(b) == bool:
+        return (~a | b)
+    # one constant
+    if a is True:
+        return b
+    if a is False:
+        return True
+    if b is True:
+        return True
+    if b is False:
+        return ~a
+
     return Operator('->', [a.boolexpr(), b.boolexpr()])
 
 
@@ -51,11 +64,17 @@ def implies(a, b):
 def all(iterable):
     collect = [] # logical expressions
     for elem in iterable:
-        if elem == False:
+        if elem is False:
             return False # no need to create constraint
+        elif elem is True:
+            pass
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
-    if len(collect) > 0:
+        else:
+            raise "unknown argument to 'all'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
         return Operator("and", collect)
     return True
         
@@ -63,14 +82,19 @@ def all(iterable):
 def any(iterable):
     collect = [] # logical expressions
     for elem in iterable:
-        if elem == True:
+        if elem is True:
             return True # no need to create constraint
+        elif elem is False:
+            pass
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
-    if len(collect) > 0:
+        else:
+            raise "unknown argument to 'any'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
         return Operator("or", collect)
     return False
-        
 
 # min: listwise 'min'
 def min(iterable):

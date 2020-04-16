@@ -54,6 +54,10 @@ class MiniZincText(SolverInterface):
 
         if not isinstance(expr, Expression) or \
            isinstance(expr, NumVarImpl):
+            if expr is True:
+                return "true"
+            if expr is False:
+                return "false"
             # default
             return str(expr)
         
