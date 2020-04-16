@@ -32,7 +32,8 @@ class SolverStats(object):
 # builtin solvers implementing SolverInterface
 from .minizinc_text import *
 from .minizinc_python import *
+from .ortools_python import *
 
 # the order matters: default will be first supported one
-builtin_solvers=[MiniZincPython(),MiniZincText()]
+builtin_solvers=[MiniZincPython(),MiniZincText(),ORToolsPython()]
 

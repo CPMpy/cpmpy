@@ -62,7 +62,7 @@ class ORToolsPython(SolverInterface):
             solstats.status = ExitStatus.FEASIBLE
         elif status == ort.OPTIMAL:
             solstats.status = ExitStatus.OPTIMAL
-        else
+        else:
             raise NotImplementedError
         # TODO, runtime?
 

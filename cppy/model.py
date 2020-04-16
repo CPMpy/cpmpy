@@ -67,7 +67,7 @@ class Model(object):
     def solve(self, solver=None):
         """ Send the model to a solver and get the result
 
-        'solver': None (default) or a SolverInterface object
+        'solver': None (default) or in [s.name in get_supported_solvers()] or a SolverInterface object
         verifies that the solver is supported on the current system
         """
         # get supported solvers
@@ -76,12 +76,13 @@ class Model(object):
             solver = supsolvers[0]
         elif not isinstance(solver, SolverInterface):
             solvername = solver
-            for solver in supsolvers:
-                if solver.name == solvername:
+            for s in supsolvers:
+                if s.name == solvername:
+                    solver = s
                     break # break and hence 'solver' is correct object
 
-            if not solver.supported():
-                raise "'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver)
+            if not isinstance(solver, SolverInterface) or not solver.supported():
+                raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver))
                 
         return solver.solve(self)
 
