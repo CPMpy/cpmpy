@@ -53,7 +53,7 @@ def all(iterable):
     for elem in iterable:
         if elem == False:
             return False # no need to create constraint
-        else:
+        elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
     if len(collect) > 0:
         return Operator("and", collect)
@@ -65,7 +65,7 @@ def any(iterable):
     for elem in iterable:
         if elem == True:
             return True # no need to create constraint
-        else:
+        elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
     if len(collect) > 0:
         return Operator("or", collect)
