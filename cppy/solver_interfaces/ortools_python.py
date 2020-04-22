@@ -40,6 +40,7 @@ class ORToolsPython(SolverInterface):
 
         # the objective
         # TODO
+        print(cppy_model.objective)
 
         return self._model
 
@@ -54,19 +55,19 @@ class ORToolsPython(SolverInterface):
         # solve the instance
         self._solver = ort.CpSolver()
         self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self._status = self._solver.Solver(self._model)
+        self._status = self._solver.Solve(self._model)
 
         # translate status
         solstats = SolverStats()
-        if status == ort.FEASIBLE:
+        if self._status == ort.FEASIBLE:
             solstats.status = ExitStatus.FEASIBLE
-        elif status == ort.OPTIMAL:
+        elif self._status == ort.OPTIMAL:
             solstats.status = ExitStatus.OPTIMAL
         else:
             raise NotImplementedError
         # TODO, runtime?
 
-        if status == ort.FEASIBLE or status == ort.OPTIMAL:
+        if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
             # TODO smth with enumerating the python vars and filling them
             # TODO, use a decorator for .value again so that can look like propety but is function
             # fill in variables
