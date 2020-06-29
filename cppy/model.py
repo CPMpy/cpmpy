@@ -1,6 +1,6 @@
 from .expressions import *
 from .solver_interfaces import *
-from . import IntVar, implies, BoolVar
+# from . import *
 
 import numpy as np
 # import os
@@ -108,7 +108,7 @@ class Model(object):
         new_formulas = []
 
         for formula in sub_formulas:
-            bi = BoolVarImpl()
+            bi = BoolVar()
             new_formulas.append(implies(formula, bi) & implies(bi, formula))
 
         cnf_formula = []
@@ -145,3 +145,30 @@ class Model(object):
             finally:
                 return pysat_clauses
         return pysat_clauses
+
+# TODO: HOTFIX should be corrected ....
+def implies(a, b):
+    # both constant
+    if type(a) == bool and type(b) == bool:
+        return (~a | b)
+    # one constant
+    if a is True:
+        return b
+    if a is False:
+        return True
+    if b is True:
+        return True
+    if b is False:
+        return ~a
+
+    return Operator('->', [a.boolexpr(), b.boolexpr()])
+
+def BoolVar(shape=None):
+    if shape is None or shape == 1:
+        return BoolVarImpl()
+    length = np.prod(shape)
+    
+    # create base data
+    data = np.array([BoolVarImpl() for _ in range(length)]) # repeat new instances
+    # insert into custom ndarray
+    return NDVarArray(shape, dtype=object, buffer=data)
