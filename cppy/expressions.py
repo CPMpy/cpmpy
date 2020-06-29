@@ -26,6 +26,7 @@ class Expression(object):
         self.args = arg_list
 
     def __repr__(self):
+
         strargs = []
         for arg in self.args:
             if isinstance(arg, np.ndarray):
@@ -113,7 +114,7 @@ class Expression(object):
 
         return Operator("xor", [other, self])
 
-    
+
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
     def __add__(self, other):
@@ -184,7 +185,21 @@ class Expression(object):
     # 'not' for now, no unary constraint for it but like boolexpr()
     def __invert__(self):
         return (self == 0)
-
+    
+    def subformula(self):
+        sub_formulas = [self]
+        for arg in self.args:
+            arg_sub_f = arg.subformula()
+            # if not isinstance(arg_sub_f, Comparison) and not isinstance(arg_sub_f, Operator):
+            #     sub_formulas.append(arg_sub_f)
+            if arg_sub_f != None and len(arg_sub_f) != 0:
+                for f in arg_sub_f:
+                    sub_formulas.append(f)
+        return sub_formulas
+    
+    def to_cnf(self):
+        # TODO: Transform formula to a disjuction of literals
+        return self.__repr__()
 
 class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
@@ -366,7 +381,7 @@ class Operator(Expression):
             if is_bool:
                 return self
         return super().__eq__(other)
-    
+
 
 class Element(Expression):
     """
@@ -394,7 +409,6 @@ class Element(Expression):
         # else: 3 arguments, reified variant, is bool
         if is_num(other) and other == 1:
             return self
-        
 
 
 # see globalconstraints.py for concrete instantiations

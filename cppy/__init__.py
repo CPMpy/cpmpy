@@ -5,7 +5,6 @@ from .expressions import *
 from .globalconstraints import *
 from .model import *
 
-
 ### variable creation, objects in .variables
 
 # N-dimensional array of Boolean Decision Variables

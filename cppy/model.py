@@ -1,7 +1,10 @@
 from .expressions import *
 from .solver_interfaces import *
-import numpy as np
+from . import IntVar, implies, BoolVar
 
+import numpy as np
+# import os
+from pathlib import Path
 
 class Model(object):
     """
@@ -46,7 +49,6 @@ class Model(object):
         if len(lst) == 1:
             return lst[0]
         return Operator("and", lst)
-        
 
     def __repr__(self):
         cons_str = ""
@@ -83,6 +85,63 @@ class Model(object):
 
             if not isinstance(solver, SolverInterface) or not solver.supported():
                 raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver))
-                
+
         return solver.solve(self)
 
+    def to_cnf(self):
+        # 1. consider all subformulas
+        sub_formulas = []
+        # sub_formulas = [self.constraints]
+        # print(self)
+        for c in self.constraints:
+            arg_sub_f = c.subformula()
+            # a. Subformulas
+            if arg_sub_f != None and len(arg_sub_f) != 0:
+                for f in arg_sub_f:
+                    sub_formulas.append(f)
+            # b. Just regular literal 
+            else:
+                sub_formulas.append(c)
+        # return sub_formulas
+        # 2. introduce new variable for each subformula
+        # TODO: add link to recognize original formula
+        new_formulas = []
+
+        for formula in sub_formulas:
+            bi = BoolVarImpl()
+            new_formulas.append(implies(formula, bi) & implies(bi, formula))
+
+        cnf_formula = []
+        # 3. conjunct all substituations and the substitution for phi
+        for formula in new_formulas:
+            # TODO: transform formula to cnf
+            cnf_formula.append(formula.to_cnf())
+        # all substitutions can be transformed into CNF
+        return cnf_formula
+
+    def cnf_to_pysat(self, cnf, output = None):
+        # TODO 1. use the boolvar counter => translate to number
+
+        pysat_clauses = []
+
+        for c in cnf:
+            clause = []
+            for lit in c:
+                # TODO: do something here with negations
+                clause.append(lit.name)
+            pysat_clauses.append(clause)
+
+        if(output != None):
+            try:
+                with(output, "w+") as f:
+                    # TODO write the clauses
+                    f.write(f"c {output}")
+                    f.write(f"p cnf {len(get_variables(self))} {len(pysat_clauses)}")
+                    for clause in pysat_clauses:
+                        f.write(" ".join(clause) + " 0")
+
+            except OSError as err:
+                print("OS Error: {0}".format(err))
+            finally:
+                return pysat_clauses
+        return pysat_clauses
