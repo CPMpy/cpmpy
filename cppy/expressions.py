@@ -1,4 +1,5 @@
 import numpy as np
+from .variables import *
 
 # Helpers for type checking
 def is_num(arg):
@@ -185,21 +186,30 @@ class Expression(object):
     # 'not' for now, no unary constraint for it but like boolexpr()
     def __invert__(self):
         return (self == 0)
-    
-    def subformula(self):
-        sub_formulas = [self]
-        for arg in self.args:
-            arg_sub_f = arg.subformula()
-            # if not isinstance(arg_sub_f, Comparison) and not isinstance(arg_sub_f, Operator):
-            #     sub_formulas.append(arg_sub_f)
-            if arg_sub_f != None and len(arg_sub_f) != 0:
-                for f in arg_sub_f:
-                    sub_formulas.append(f)
-        return sub_formulas
-    
+
     def to_cnf(self):
-        # TODO: Transform formula to a disjuction of literals
-        return self.__repr__()
+        # cnf = None
+        if len(self.args) == 2:
+            if self.name == "->":
+                return ~self.args[0].to_cnf() | self.args[1].to_cnf()
+            elif self.name == "|" or self.name == "or":
+                return self.args[0].to_cnf() | self.args[1].to_cnf()
+            elif self.name == "==":
+                if all(not(is_num(arg)) for arg in self.args):
+                    return self.args[0].to_cnf() == self.args[1].to_cnf()
+                elif all(is_num(arg) for arg in self.args):
+                    return self.args[0] == self.args[1]
+                elif is_num(self.args[0]) :
+                    return self.args[0] == self.args[1].to_cnf()
+                else:
+                    return self.args[0].to_cnf() == self.args[1]
+            elif self.name == "and":
+                return ~self.args[0].to_cnf() | ~self.args[1].to_cnf()
+            else:
+                print("heeere", self.name, self.args)
+        else:
+            raise "Not yet implemented"
+        # return self
 
 class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
@@ -226,7 +236,6 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
-
 
 class Operator(Expression):
     """

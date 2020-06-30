@@ -1,6 +1,7 @@
 from .expressions import *
 from .solver_interfaces import *
-# from . import *
+from . import *
+from copy import copy
 
 import numpy as np
 # import os
@@ -89,35 +90,95 @@ class Model(object):
         return solver.solve(self)
 
     def to_cnf(self):
+        # https://en.wikipedia.org/wiki/Tseytin_transformation
         # 1. consider all subformulas
         sub_formulas = []
-        # sub_formulas = [self.constraints]
-        # print(self)
-        for c in self.constraints:
-            arg_sub_f = c.subformula()
-            # a. Subformulas
-            if arg_sub_f != None and len(arg_sub_f) != 0:
-                for f in arg_sub_f:
-                    sub_formulas.append(f)
-            # b. Just regular literal 
-            else:
-                sub_formulas.append(c)
-        # return sub_formulas
-        # 2. introduce new variable for each subformula
-        # TODO: add link to recognize original formula
-        new_formulas = []
+        new_vars = []
 
-        for formula in sub_formulas:
-            bi = BoolVar()
-            new_formulas.append(implies(formula, bi) & implies(bi, formula))
+        print("Constraints:")
+        for i, c in enumerate(self.constraints):
+            # print(i, c)
 
-        cnf_formula = []
-        # 3. conjunct all substituations and the substitution for phi
-        for formula in new_formulas:
+            is_parent_formula = True
+
+            stack = [c]
+            added_vars = []
+            added_subformulas = []
+            while(len(stack) > 0):
+                formula = stack[0]
+                del stack[0]
+                # ignore the basic case
+
+                if is_int(formula) or is_var(formula):
+                    continue
+                    #  isinstance(formula, Comparison):
+                    # sub_f = formula.subformula()
+
+                # new_args = []
+                for arg in formula.args:
+                    if is_int(arg) or is_var(arg):
+                        continue
+                    else:
+                        stack.append(arg)
+
+                        # added_subformulas
+                        bi = BoolVar()
+                        added_subformulas.append((arg, bi ))
+                        added_vars.append(bi)
+
+                if is_parent_formula:
+                    # create substitution variable for original constraint
+                    bi = BoolVar()
+                    added_vars.append(bi)
+
+                    # add substitution variable as replacement for constraint
+                    sub_formulas.append(bi)
+                    added_subformulas.append((formula, bi ))
+
+                    is_parent_formula = False
+
+                    new_vars.append(bi)
+
+            # 3. conjunct all substituations and the substitution for phi
+            added_subformulas.sort(key=lambda x: len(str(x[0])))
+
+            for i, (formula, bi) in enumerate(added_subformulas):
+                new_formula = copy(formula)
+                new_args = []
+
+                for arg in new_formula.args:
+                    if is_int(arg) or is_var(arg):
+                        new_args.append(arg)
+                    else:
+                        found = False
+                        for j, (formula_j, bj) in enumerate(reversed(added_subformulas[:i])):
+                            # TODO replace equality by python "equals" 
+                            if formula_j == arg:
+                                new_args.append(bj)
+                                found= True
+                                break
+                        if not found:
+                            new_args.append(arg)
+
+                new_formula.args = new_args
+                new_f1 = implies(new_formula, bi)
+                # formula => bi
+                new_f2 = implies(bi, new_formula)
+                # add new substituted formulas
+                sub_formulas.append(new_f1)
+                sub_formulas.append(new_f2)
+            
+
+        cnf_formulas = []
+        for i, formula in enumerate(sub_formulas):
+            print(i, formula)
+
+            # all substitutions can be transformed into CNF
             # TODO: transform formula to cnf
-            cnf_formula.append(formula.to_cnf())
-        # all substitutions can be transformed into CNF
-        return cnf_formula
+            cnf_formula = formula.to_cnf()
+            cnf_formulas.append(cnf_formula)
+
+        return cnf_formulas, new_vars
 
     def cnf_to_pysat(self, cnf, output = None):
         # TODO 1. use the boolvar counter => translate to number
@@ -145,30 +206,3 @@ class Model(object):
             finally:
                 return pysat_clauses
         return pysat_clauses
-
-# TODO: HOTFIX should be corrected ....
-def implies(a, b):
-    # both constant
-    if type(a) == bool and type(b) == bool:
-        return (~a | b)
-    # one constant
-    if a is True:
-        return b
-    if a is False:
-        return True
-    if b is True:
-        return True
-    if b is False:
-        return ~a
-
-    return Operator('->', [a.boolexpr(), b.boolexpr()])
-
-def BoolVar(shape=None):
-    if shape is None or shape == 1:
-        return BoolVarImpl()
-    length = np.prod(shape)
-    
-    # create base data
-    data = np.array([BoolVarImpl() for _ in range(length)]) # repeat new instances
-    # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)

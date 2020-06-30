@@ -22,9 +22,9 @@ class NumVarImpl(Expression):
     # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
         return hash(str(self))
-
-    def subformula(self):
-        return None
+    
+    def to_cnf(self):
+        return self
 
 class IntVarImpl(NumVarImpl):
     counter = 0
@@ -39,6 +39,7 @@ class IntVarImpl(NumVarImpl):
     
     def __repr__(self):
         return "IV{}".format(self.name)
+
     
 class BoolVarImpl(IntVarImpl):
     counter = 0
@@ -63,7 +64,6 @@ class BoolVarImpl(IntVarImpl):
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
     def __hash__(self): return super().__hash__()
-
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
