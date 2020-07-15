@@ -17,6 +17,22 @@ def BoolVar(shape=None):
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
+# Relation between 'rows' and 'cols', Boolean Variables in a pandas dataframe
+class Relation(object):
+    # rows, cols: list of names
+    def __init__(self, rows, cols):
+        rel = BoolVar((len(rows),len(cols)))
+        self.df = pd.DataFrame(index=rows, columns=cols)
+        for i,r in enumerate(rows):
+            for j,c in enumerate(cols):
+                self.df.loc[r,c] = rel[i,j]
+    # use as: rel['a','b']
+    def __getitem__(self, key):
+        try:
+            return self.df.loc[key]
+        except KeyError:
+            return False
+
 # N-dimensional array of Integer Decision Variables with lower-bound and upper-bound
 def IntVar(lb, ub, shape=None):
     if shape is None or shape == 1:

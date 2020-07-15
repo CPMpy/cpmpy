@@ -5,7 +5,6 @@ from copy import copy
 
 import numpy as np
 # import os
-from pathlib import Path
 
 class Model(object):
     """
@@ -63,9 +62,9 @@ class Model(object):
             else:
                 obj_str = "minimize "
         obj_str += str(self.objective)
-            
+
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
-    
+
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None):
         """ Send the model to a solver and get the result
@@ -165,6 +164,8 @@ class Model(object):
                 # formula => bi
                 new_f2 = implies(bi, new_formula)
                 # add new substituted formulas
+                # print(len(sub_formulas)+1, new_formula)
+
                 sub_formulas.append(new_f1)
                 sub_formulas.append(new_f2)
             
@@ -206,3 +207,4 @@ class Model(object):
             finally:
                 return pysat_clauses
         return pysat_clauses
+
