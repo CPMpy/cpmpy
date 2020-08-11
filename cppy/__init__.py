@@ -3,6 +3,7 @@
 from .variables import *
 from .expressions import *
 from .globalconstraints import *
+from .model_tools.transforms import *
 
 ### variable creation, objects in .variables
 
@@ -121,7 +122,5 @@ def max(iterable):
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.max(iterable)
     return GlobalConstraint("max", list(iterable))
-
-
 
 from .model import *

@@ -185,6 +185,7 @@ class Expression(object):
         return Operator("abs", [self])
     # 'not' for now, no unary constraint for it but like boolexpr()
     def __invert__(self):
+        # return (~self)
         return (self == 0)
 
     def to_cnf(self):
