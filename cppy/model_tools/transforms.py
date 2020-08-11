@@ -2,63 +2,73 @@ from ..model import *
 from ..expressions import *
 from ..variables import *
 """
- Model transformation, read-only
- Returns an (ordered by appearance) list of all variables in the model
+ Do tseitin transform on list of constraints
 """
 def tseitin(constraints):
+    # 'constraints' should be list, but lets add two special cases
+    if isinstance(constraints, Model):
+        # transform model's constraints
+        return tseitin(constraints.constraints)
+    if isinstance(constraints, Expression):
+        # transform expression directly
+        return tseitin_transform(constraints)
+    
     transforms = []
-    for formula in constraints:
-        _, tr = tseitin_transform(formula)
-        transforms.append((formula, tr))
-
+    for expr in constraints:
+        if isinstance(expr, Operator) and expr.name == "or":
+            # special case: OR constraint, shortcut to disj of subexprs
+            subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
+            transforms.append( Operator("or", [v for (v,c) in subvarcnfs]) )
+            transforms += [c for (v,c) in subvarcnfs if len(c) > 0 ]
+        else:
+            var, cnf = tseitin_transform(expr)
+            transforms.append(var)
+            if len(cnf) > 0:
+                transforms += cnf
     return transforms
 
 def tseitin_transform(expr):
     # base cases
-    print(expr, type(expr), "\n")
+    print("inexpr:", expr, type(expr), "\n")
     if isinstance(expr, BoolVarImpl):
         return (expr, [])
 
     if not isinstance(expr, Expression) or isinstance(expr, NumVarImpl):
         return (None, [])
 
+    # can't be reached??
     if isinstance(expr, list):
         return (expr[0], [])
 
-    if isinstance(expr, Expression):
-        A, expr1 = tseitin_transform(expr.args[0])
+    # TODO: recursive call on expr.args now or later?
 
-        if len(expr.args) == 2:
-            # TODO add tseitin transformation recursion here too ? 
-            B, expr2 = tseitin_transform(expr.args[1])
-        elif len(expr.args) > 2:
-            if expr.name == "and" or expr.name == "&":
-                B, expr2 = tseitin_transform(expr.args[1] & expr.args[2:])
-            elif expr.name == "or" or expr.name == "|" :
-                B, expr2 = tseitin_transform(expr.args[1] | expr.args[2:])
-            else:
-                raise "Case not handled"
-        else:
-            raise "Case not handled"
+    if isinstance(expr, Operator):
+        # special case: unary -, keep as is
+        if expr.name == '-':
+            return expr
 
-        C = BoolVarImpl()
-        print(expr, A, B, C)
-        if expr.name == "and" or expr.name == "&":
-            cnf_expr =  [( ~A | ~B | C), (A | ~C), (B | ~C)]
+    implemented = ['and', 'or', '->']
+    if not expr.name in implemented:
+        raise "Tseitin: Operator '"+self.name+"' not implemented"
 
-        if expr.name == "or" or expr.name == "|" :
-            cnf_expr = [( ~A | ~B | ~C), (A | C), (B | C)]
+    Aux = BoolVarImpl()
+    if expr.name == "and":
+        cnf = [ Operator("or", [~var for var in expr.args]) | Aux ]
+        for var in expr.args:
+            cnf.append( ~Aux | var )
 
-        if expr.name  == "->":
-            # Implication is treated as if it were "or": A -> B <=> ~A or B
-            cnf_expr = [( A | ~B | ~C), (~A | C), (B | C)]
+    if expr.name == "or":
+        cnf = [ Operator("or", [var for var in expr.args]) | ~Aux ]
+        for var in expr.args:
+            cnf.append( Aux | ~var )
+
+    if expr.name  == "->":
+        # Implication is treated as if it were "or": A -> B <=> ~A or B
+        A = expr.args[0]
+        B = expr.args[1]
+        cnf = [(~A | B | ~Aux), (Aux | A), (Aux | ~B)]
         
-        if len(expr1) > 0:
-            cnf_expr += expr1
-        if len(expr2) > 0:
-            cnf_expr += expr2
-
-        return C, cnf_expr
+    return Aux, cnf
        
 def to_cnf(constraints):
     # https://en.wikipedia.org/wiki/Tseytin_transformation

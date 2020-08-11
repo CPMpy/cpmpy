@@ -95,6 +95,7 @@ def all(iterable):
         
 # any: listwise 'or'
 def any(iterable):
+    print("Doing the 'any'")
     collect = [] # logical expressions
     for elem in iterable:
         if elem is True:
