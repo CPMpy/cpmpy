@@ -9,6 +9,9 @@ def tseitin(constraints):
     if isinstance(constraints, Model):
         # transform model's constraints
         return tseitin(constraints.constraints)
+    if isinstance(constraints, Operator) and constraints.name == "and":
+        # same as a list of constraints
+        constraints = constraints.args
     if isinstance(constraints, Expression):
         # transform expression directly
         return tseitin_transform(constraints)
@@ -18,9 +21,16 @@ def tseitin(constraints):
         if isinstance(expr, Operator) and expr.name == "or":
             # special case: OR constraint, shortcut to disjunction of subexprs
             subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
-            cnf.append( Operator("or", [v for (v,cnf) in subvarcnfs]) )
-            cnf += [clause for (v,cnf) in subvarcnfs for clause in cnf]
-        # TODO: special case: AND constraint, flatten into toplevel conjunction
+            cnf.append( Operator("or", [subv for (subv,_) in subvarcnfs]) )
+            cnf += [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
+            # TODO: can do similar for implication,
+            # and probably flattening disjunctions of disjunctions
+
+        elif isinstance(expr, Operator) and expr.name == "and":
+            # special case: AND constraint, flatten into toplevel conjunction
+            subcnf = tseitin(expr.args)
+            cnf += subcnf
+            
         else:
             newvar, newcnf = tseitin_transform(expr)
             cnf.append(newvar)
@@ -39,9 +49,8 @@ def tseitin_transform(expr):
     if isinstance(expr, list):
         return (expr[0], [])
 
-    print("inexpr:", expr, type(expr), "\n")
+    # recursively transform the arguments first and merge their cnfs
     subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
-    # init cnf as the conjunction of cnf of its subexpressions
     cnf = [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
     subvars = [subvar for (subvar,_) in subvarcnfs]
 
