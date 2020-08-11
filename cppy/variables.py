@@ -23,8 +23,6 @@ class NumVarImpl(Expression):
     def __hash__(self):
         return hash(str(self))
     
-    # def to_cnf(self):
-    #     return self
 
 class IntVarImpl(NumVarImpl):
     counter = 0
@@ -43,7 +41,6 @@ class IntVarImpl(NumVarImpl):
     
 class BoolVarImpl(IntVarImpl):
     counter = 0
-    # counter = 0
 
     def __init__(self, lb=0, ub=1):
         assert(lb == 0 or lb == 1)
@@ -54,8 +51,7 @@ class BoolVarImpl(IntVarImpl):
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
         
     def __repr__(self):
-        # return "BV{}".format(self.name)
-        return "{}".format(self.name)
+        return "BV{}".format(self.name)
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
