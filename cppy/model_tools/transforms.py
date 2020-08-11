@@ -49,6 +49,14 @@ def tseitin_transform(expr):
     if isinstance(expr, list):
         return (expr[0], [])
 
+    if not isinstance(expr, Operator):
+        raise "Tseitin: Expression '"+str(expr)+" not supported yet"
+
+    # Operators:
+    implemented = ['-', 'and', 'or', '->']
+    if not expr.name in implemented:
+        raise "Tseitin: Operator '"+self.name+"' not implemented"
+
     # recursively transform the arguments first and merge their cnfs
     subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
     cnf = [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
@@ -58,10 +66,6 @@ def tseitin_transform(expr):
         # special case: unary -, negate single argument var
         if expr.name == '-':
             return (~subvars[0], cnf)
-
-    implemented = ['and', 'or', '->']
-    if not expr.name in implemented:
-        raise "Tseitin: Operator '"+self.name+"' not implemented"
 
     Aux = BoolVarImpl()
     if expr.name == "and":
