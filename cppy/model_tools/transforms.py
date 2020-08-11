@@ -13,23 +13,22 @@ def tseitin(constraints):
         # transform expression directly
         return tseitin_transform(constraints)
     
-    transforms = []
+    cnf = []
     for expr in constraints:
         if isinstance(expr, Operator) and expr.name == "or":
-            # special case: OR constraint, shortcut to disj of subexprs
+            # special case: OR constraint, shortcut to disjunction of subexprs
             subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
-            transforms.append( Operator("or", [v for (v,c) in subvarcnfs]) )
-            transforms += [c for (v,c) in subvarcnfs if len(c) > 0 ]
+            cnf.append( Operator("or", [v for (v,cnf) in subvarcnfs]) )
+            cnf += [clause for (v,cnf) in subvarcnfs for clause in cnf]
+        # TODO: special case: AND constraint, flatten into toplevel conjunction
         else:
-            var, cnf = tseitin_transform(expr)
-            transforms.append(var)
-            if len(cnf) > 0:
-                transforms += cnf
-    return transforms
+            newvar, newcnf = tseitin_transform(expr)
+            cnf.append(newvar)
+            cnf += newcnf
+    return cnf
 
 def tseitin_transform(expr):
     # base cases
-    print("inexpr:", expr, type(expr), "\n")
     if isinstance(expr, BoolVarImpl):
         return (expr, [])
 
@@ -40,12 +39,16 @@ def tseitin_transform(expr):
     if isinstance(expr, list):
         return (expr[0], [])
 
-    # TODO: recursive call on expr.args now or later?
+    print("inexpr:", expr, type(expr), "\n")
+    subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
+    # init cnf as the conjunction of cnf of its subexpressions
+    cnf = [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
+    subvars = [subvar for (subvar,_) in subvarcnfs]
 
     if isinstance(expr, Operator):
-        # special case: unary -, keep as is
+        # special case: unary -, negate single argument var
         if expr.name == '-':
-            return expr
+            return (~subvars[0], cnf)
 
     implemented = ['and', 'or', '->']
     if not expr.name in implemented:
@@ -53,23 +56,25 @@ def tseitin_transform(expr):
 
     Aux = BoolVarImpl()
     if expr.name == "and":
-        cnf = [ Operator("or", [~var for var in expr.args]) | Aux ]
-        for var in expr.args:
+        cnf.append( Operator("or", [Aux] + [~var for var in subvars]) )
+        for var in subvars:
             cnf.append( ~Aux | var )
 
     if expr.name == "or":
-        cnf = [ Operator("or", [var for var in expr.args]) | ~Aux ]
-        for var in expr.args:
+        cnf.append( Operator("or", [~Aux] + [var for var in expr.args]) )
+        for var in subvars:
             cnf.append( Aux | ~var )
 
     if expr.name  == "->":
         # Implication is treated as if it were "or": A -> B <=> ~A or B
-        A = expr.args[0]
-        B = expr.args[1]
-        cnf = [(~A | B | ~Aux), (Aux | A), (Aux | ~B)]
+        A = subvars[0]
+        B = subvars[1]
+        cnf = [(~Aux | ~A | B), (Aux | A), (Aux | ~B)]
         
     return Aux, cnf
+
        
+# OLD
 def to_cnf(constraints):
     # https://en.wikipedia.org/wiki/Tseytin_transformation
     # 1. consider all subformulas
