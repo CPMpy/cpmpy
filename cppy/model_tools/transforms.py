@@ -42,20 +42,23 @@ def tseitin_transform(expr):
     if isinstance(expr, BoolVarImpl):
         return (expr, [])
 
-    if not isinstance(expr, Expression) or isinstance(expr, NumVarImpl):
-        return (None, [])
-
-    # can't be reached??
-    if isinstance(expr, list):
-        return (expr[0], [])
+    # e == 0 and e == 1
+    if isinstance(expr, Comparison) and expr.name == '==' and isinstance(expr.args[1], int):
+        if expr.args[1] == 1:
+            return tseitin_transform(expr.args[0])
+        elif expr.args[1] == 0:
+            (var,cnf) = tseitin_transform(expr.args[0])
+            return (~var, cnf)
+        else:
+            raise Exception("Tseitin: e == '"+str(expr.args[1])+"' not supported yet")
 
     if not isinstance(expr, Operator):
-        raise "Tseitin: Expression '"+str(expr)+" not supported yet"
+        raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet")
 
     # Operators:
     implemented = ['-', 'and', 'or', '->']
     if not expr.name in implemented:
-        raise "Tseitin: Operator '"+self.name+"' not implemented"
+        raise Exception("Tseitin: Operator '"+self.name+"' not implemented")
 
     # recursively transform the arguments first and merge their cnfs
     subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
