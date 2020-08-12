@@ -1,5 +1,4 @@
 import numpy as np
-from .variables import *
 
 # Helpers for type checking
 def is_num(arg):
@@ -214,6 +213,27 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
+
+    # when bool, double negation dissapears
+    def __invert__(self):
+        # redo construction so Bool double negation is handled
+        if self.name == '==':
+            return (self.args[0] != self.args[1])
+        elif self.name == '!=':
+            return (self.args[0] == self.args[1])
+        elif self.name == '<=':
+            return (self.args[0] > self.args[1])
+        elif self.name == '<':
+            return (self.args[0] >= self.args[1])
+        elif self.name == '>=':
+            return (self.args[0] < self.args[1])
+        elif self.name == '>':
+            return (self.args[0] <= self.args[1])
+        else:
+            raise Exception("Inversion of Comparison '"+self.name+"' not allowed")
+
+        # standard behaviour
+        return (self == 0)
 
 class Operator(Expression):
     """
