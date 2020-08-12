@@ -188,29 +188,6 @@ class Expression(object):
         # return (~self)
         return (self == 0)
 
-    def to_cnf(self):
-        # cnf = None
-        if len(self.args) == 2:
-            if self.name == "->":
-                return ~self.args[0].to_cnf() | self.args[1].to_cnf()
-            elif self.name == "|" or self.name == "or":
-                return self.args[0].to_cnf() | self.args[1].to_cnf()
-            elif self.name == "==":
-                if all(not(is_num(arg)) for arg in self.args):
-                    return self.args[0].to_cnf() == self.args[1].to_cnf()
-                elif all(is_num(arg) for arg in self.args):
-                    return self.args[0] == self.args[1]
-                elif is_num(self.args[0]) :
-                    return self.args[0] == self.args[1].to_cnf()
-                else:
-                    return self.args[0].to_cnf() == self.args[1]
-            elif self.name == "and":
-                return ~self.args[0].to_cnf() | ~self.args[1].to_cnf()
-            else:
-                print("heeere", self.name, self.args)
-        else:
-            raise "Not yet implemented"
-        # return self
 
 class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
