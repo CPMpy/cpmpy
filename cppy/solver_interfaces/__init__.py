@@ -33,6 +33,7 @@ class SolverStats(object):
 from .minizinc_text import *
 from .minizinc_python import *
 from .ortools_python import *
+from .pysat_tools import *
 
 # the order matters: default will be first supported one
 builtin_solvers=[MiniZincPython(),MiniZincText(),ORToolsPython()]
