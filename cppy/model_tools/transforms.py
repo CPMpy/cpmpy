@@ -4,6 +4,31 @@ from ..variables import *
 """
  Do tseitin transform on list of constraints
 """
+def cnf_to_pysat(constraints, output=None):
+    py_cnf = []
+
+    for ci in constraints:
+        formula = []
+        # single lit
+        if isinstance(ci, Comparison):
+            formula.append(- (ci.args[0].name + 1))
+        elif isinstance(ci, BoolVarImpl):
+            formula.append(ci.args[0].name + 1)
+        elif isinstance(ci, Operator):
+            for lit in ci.args:
+                if isinstance(lit, Comparison):
+                    formula.append(-(lit.args[0].name + 1))
+                elif isinstance(lit, BoolVarImpl):
+                    formula.append(lit.name + 1)
+                else:
+                    raise f"lit: {lit} in {ci} not handled"
+        else:
+            raise f"ci: {ci} not handled"
+        py_cnf.append(formula)
+
+    return py_cnf
+
+
 def tseitin(constraints):
     # 'constraints' should be list, but lets add two special cases
     if isinstance(constraints, Model):
@@ -180,31 +205,3 @@ def to_cnf(constraints):
         cnf_formulas.append(cnf_formula)
 
     return cnf_formulas, new_vars
-
-def cnf_to_pysat(cnf, output = None):
-    # TODO 1. use the boolvar counter => translate to number
-
-    pysat_clauses = []
-
-    for c in cnf:
-        clause = []
-        for lit in c:
-            # TODO: do something here with negations
-            clause.append(lit.name)
-        pysat_clauses.append(clause)
-
-    if(output != None):
-        try:
-            with(output, "w+") as f:
-                # TODO write the clauses
-                f.write(f"c {output}")
-                f.write(f"p cnf {len(get_variables(self))} {len(pysat_clauses)}")
-                for clause in pysat_clauses:
-                    f.write(" ".join(clause) + " 0")
-
-        except OSError as err:
-            print("OS Error: {0}".format(err))
-        finally:
-            return pysat_clauses
-    return pysat_clauses
-
