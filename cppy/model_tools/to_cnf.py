@@ -66,7 +66,7 @@ def tseitin_transform(expr):
     # Operators:
     implemented = ['-', 'and', 'or', '->']
     if not expr.name in implemented:
-        raise Exception("Tseitin: Operator '"+self.name+"' not implemented")
+        raise Exception("Tseitin: Operator '"+expr.name+"' not implemented")
 
     # recursively transform the arguments first and merge their cnfs
     subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
