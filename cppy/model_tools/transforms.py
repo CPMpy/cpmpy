@@ -5,31 +5,39 @@ from ..variables import *
  Do tseitin transform on list of constraints
 """
 def tseitin(constraints):
-    # 'constraints' should be list, but lets add two special cases
+    # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
         # transform model's constraints
         return tseitin(constraints.constraints)
-    if isinstance(constraints, Operator) and constraints.name == "and":
-        # same as a list of constraints
-        constraints = constraints.args
+    if isinstance(constraints, Operator): 
+        if constraints.name == "and":
+            # and() is same as a list of its elements
+            constraints = constraints.args
+        elif constraints.name in ['or', '->']:
+            # make or() into [or()] as result will be cnf anyway
+            constraints = [constraints]
     if isinstance(constraints, Expression):
         # transform expression directly
         return tseitin_transform(constraints)
     
     cnf = []
     for expr in constraints:
-        if isinstance(expr, Operator) and expr.name == "or":
-            # special case: OR constraint, shortcut to disjunction of subexprs
-            subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
-            cnf.append( Operator("or", [subv for (subv,_) in subvarcnfs]) )
-            cnf += [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
-            # TODO: can do similar for implication,
-            # and probably flattening disjunctions of disjunctions
+        if isinstance(expr, Operator):
+            if expr.name == '->':
+                # turn into OR constraint, a -> b =:= ~a | b
+                expr.args[0] = ~expr.args[0]
+                expr.name = 'or'
+                # TODO: perhaps check whether any arg is a disjunction, flatten
 
-        elif isinstance(expr, Operator) and expr.name == "and":
-            # special case: AND constraint, flatten into toplevel conjunction
-            subcnf = tseitin(expr.args)
-            cnf += subcnf
+            if expr.name == "or":
+                # special case: OR constraint, shortcut to disjunction of subexprs
+                subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
+                cnf.append( Operator("or", [subv for (subv,_) in subvarcnfs]) )
+                cnf += [clause for (_,subcnf) in subvarcnfs for clause in subcnf]
+            elif expr.name == "and":
+                # special case: AND constraint, flatten into toplevel conjunction
+                subcnf = tseitin(expr.args)
+                cnf += subcnf
             
         else:
             newvar, newcnf = tseitin_transform(expr)

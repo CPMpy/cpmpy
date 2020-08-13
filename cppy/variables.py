@@ -55,13 +55,13 @@ class BoolVarImpl(IntVarImpl):
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
-        if other == 1:
+        if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
 
     def __ne__(self, other):
         # (BV != 0) <-> BV
-        if other == 0:
+        if is_num(other) and other == 0:
             return self
         return super().__ne__(other)
 
