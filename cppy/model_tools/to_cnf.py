@@ -47,6 +47,8 @@ def to_cnf(constraints):
 
 def tseitin_transform(expr):
     # base cases
+    if isinstance(expr, bool):
+        return (expr, [])
     if isinstance(expr, BoolVarImpl):
         return (expr, [])
 
