@@ -3,6 +3,7 @@ from ..expressions import *
 from ..variables import *
 """
  Do tseitin transform on list of constraints
+ Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
     # 'constraints' should be list, but lets add some special cases
@@ -38,6 +39,11 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
+
+        elif isinstance(expr, list):
+            # same special case as 'AND': flatten into top-level
+            subcnf = to_cnf(expr)
+            cnf += subcnf
             
         else:
             newvar, newcnf = tseitin_transform(expr)
@@ -87,7 +93,7 @@ def tseitin_transform(expr):
             cnf.append( ~Aux | var )
 
     if expr.name == "or":
-        cnf.append( Operator("or", [~Aux] + [var for var in expr.args]) )
+        cnf.append( Operator("or", [~Aux] + [var for var in subvars]) )
         for var in subvars:
             cnf.append( Aux | ~var )
 
