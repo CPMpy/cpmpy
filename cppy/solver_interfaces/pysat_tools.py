@@ -19,7 +19,7 @@ def cnf_to_pysat(constraints, output=None):
             formula.append(ci.name + 1)
         elif isinstance(ci, bool) and ci is True:
             # no need to create a clause for constant 'true'
-            pass
+            continue
         elif isinstance(ci, Operator) and ci.name == 'or':
             for lit in ci.args:
                 if isinstance(lit, Comparison) and isinstance(lit.args[0], BoolVarImpl) and isinstance(lit.args[1], int) and lit.args[1] == 0:
