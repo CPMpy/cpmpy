@@ -53,6 +53,7 @@ def to_cnf(constraints):
 
 def tseitin_transform(expr):
     # base cases
+    # print(expr)
     if isinstance(expr, bool):
         return (expr, [])
     if isinstance(expr, BoolVarImpl):
@@ -69,7 +70,7 @@ def tseitin_transform(expr):
             raise Exception("Tseitin: e == '"+str(expr.args[1])+"' not supported yet")
 
     if not isinstance(expr, Operator):
-        raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet")
+        raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
 
     # Operators:
     implemented = ['-', 'and', 'or', '->']

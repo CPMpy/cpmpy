@@ -6,7 +6,7 @@ def cnf_to_pysat(constraints, output=None):
     py_cnf = []
 
     for ci in constraints:
-        print("ci",ci)
+        # print("ci",ci)
         formula = []
         # single lit
         if isinstance(ci, Comparison):
@@ -28,6 +28,8 @@ def cnf_to_pysat(constraints, output=None):
                     formula.append(lit.name + 1)
                 else:
                     raise Exception(f"lit: {lit}, in '{ci}' not handled")
+        elif ci == []:
+            continue
         else:
             raise Exception(f"ci: '{ci}' not handled")
         py_cnf.append(formula)
