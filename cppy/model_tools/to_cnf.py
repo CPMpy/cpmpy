@@ -20,7 +20,10 @@ def to_cnf(constraints):
     if isinstance(constraints, Expression):
         # transform expression directly
         return tseitin_transform(constraints)
-    
+    # print(constraints, type(constraints))
+    if isinstance(constraints, bool):
+        return tseitin_transform(constraints)
+
     cnf = []
     for expr in constraints:
         if isinstance(expr, Operator):
@@ -39,7 +42,9 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
-
+        # TODO: check whether correct or not especially if expr == False
+        elif isinstance(expr, bool):
+            continue
         elif isinstance(expr, list):
             # same special case as 'AND': flatten into top-level
             subcnf = to_cnf(expr)
