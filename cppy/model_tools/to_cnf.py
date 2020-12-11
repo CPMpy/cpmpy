@@ -6,14 +6,11 @@ from ..variables import *
  Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
-    print(constraints, type(constraints))
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
-        print("Model")
         # transform model's constraints
         return to_cnf(constraints.constraints)
     if isinstance(constraints, Operator): 
-        print("Operator")
         if constraints.name == "and":
             # and() is same as a list of its elements
             constraints = constraints.args
@@ -21,19 +18,15 @@ def to_cnf(constraints):
             # make or() into [or()] as result will be cnf anyway
             constraints = [constraints]
     if isinstance(constraints, Expression):
-        print("Expression")
         # transform expression directly
         return tseitin_transform(constraints)
     # print(constraints, type(constraints))
     if isinstance(constraints, bool):
-        print("Bool")
         return tseitin_transform(constraints)
 
-    print("Step 2")
     cnf = []
     for expr in constraints:
         if isinstance(expr, Operator):
-            print("Operator")
             if expr.name == '->':
                 # turn into OR constraint, a -> b =:= ~a | b
                 expr.args[0] = ~expr.args[0]
@@ -51,16 +44,12 @@ def to_cnf(constraints):
                 cnf += subcnf
         # TODO: check whether correct or not especially if expr == False
         elif isinstance(expr, bool):
-            print("step2-bool")
             continue
         elif isinstance(expr, list):
-            print("step2-list")
             # same special case as 'AND': flatten into top-level
             subcnf = to_cnf(expr)
             cnf += subcnf
-            
         else:
-            print("step2-rest")
             newvar, newcnf = tseitin_transform(expr)
             cnf.append(newvar)
             cnf += newcnf
@@ -68,7 +57,6 @@ def to_cnf(constraints):
 
 def tseitin_transform(expr):
     # base cases
-    print(expr)
     if isinstance(expr, bool):
         return (expr, [])
     if isinstance(expr, BoolVarImpl):
