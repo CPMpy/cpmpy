@@ -6,7 +6,7 @@ from ..variables import *
  Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
-    # print(type(constraints))
+    print(constraints)
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
         # transform model's constraints
@@ -20,15 +20,20 @@ def to_cnf(constraints):
             constraints = [constraints]
     # print(constraints)
     if isinstance(constraints, Expression):
-        # print(constraints)
         # transform expression directly
         return tseitin_transform(constraints)
-    # print(constraints, type(constraints))
     if isinstance(constraints, bool):
         return tseitin_transform(constraints)
 
+    if isinstance(constraints, Comparison):
+        subcnf = to_cnf( implies(constraints.args[0], constraints.args[1]) & implies(constraints.args[1], constraints.args[0]))
+        return subcnf
+
     cnf = []
+    
     for expr in constraints:
+        print("Here")
+        print(expr)
         if isinstance(expr, Operator):
             if expr.name == '->':
                 # turn into OR constraint, a -> b =:= ~a | b
@@ -44,11 +49,15 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
-        elif isinstance(expr, Comparison) and expr.name == '==':
+        elif isinstance(expr, Comparison) and expr.name == '==' and not isinstance(expr.args[1], int):
             # XXX naive implemnetation
-            subcnf = to_cnf( implies(expr.args[0], expr.args[1]) & implies(expr.args[1], expr.args[0]))
-            cnf += subcnf
+            # print(expr)
+            # subcnf = to_cnf( implies(expr.args[0], expr.args[1]) & implies(expr.args[1], expr.args[0]))
+            # cnf += subcnf
             # XXX smarter one ?
+            new_var, new_cnf = tseitin_transform(expr)
+            cnf.append(new_var)
+            cnf += new_cnf
         # TODO: check whether correct or not especially if expr == False
         elif isinstance(expr, bool):
             continue
@@ -57,6 +66,7 @@ def to_cnf(constraints):
             subcnf = to_cnf(expr)
             cnf += subcnf
         else:
+            print(expr)
             newvar, newcnf = tseitin_transform(expr)
             cnf.append(newvar)
             cnf += newcnf
@@ -104,6 +114,7 @@ def tseitin_transform(expr):
             return (~subvars[0], cnf)
 
     Aux = BoolVarImpl()
+    print(Aux.name + 1)
     if expr.name == "and":
         cnf.append( Operator("or", [Aux] + [~var for var in subvars]) )
         for var in subvars:
@@ -120,17 +131,15 @@ def tseitin_transform(expr):
         B = subvars[1]
         cnf = [(~Aux | ~A | B), (Aux | A), (Aux | ~B)]
 
-
     # # XXX changed added ==
     if expr.name == '==':
         # print("here ?")
-    #     # (1) Aux => (A <=> B)
-    #     # (2) ~Aux => (A <=> ~B)
+        # (1) Aux => (A <=> B)
+        # (2) ~Aux => (A <=> ~B)
+        # cnf= [(~A | B), ( ~B | A)]
+        print(subvars)
         A = subvars[0]
         B = subvars[1]
-    #     # cnf= [(~A | B), ( ~B | A)]
-
-    #     # cnf.append( Operator("or", [~Aux] + [var for var in subvars]) )
         cnf = [(~Aux | ~A | B), (~Aux | ~B | A), (Aux | A | B), (Aux | ~A | ~B)]
 
     return Aux, cnf

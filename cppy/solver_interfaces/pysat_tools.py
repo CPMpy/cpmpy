@@ -31,9 +31,13 @@ def cnf_to_pysat(constraints, output=None):
         elif ci == []:
             continue
         else:
-            raise Exception(f"ci: '{ci}' not handled")
-        py_cnf.append(formula)
+            # hack for special case
+            subf = cnf_to_pysat(ci)
+            py_cnf+=subf
+            # raise Exception(f"ci: '{ci}' not handled")
+        if formula != []:
+            py_cnf.append(formula)
 
-    cnf_sets = [set(clause) for clause in py_cnf]
+    cnf_sets = [list(clause) for clause in py_cnf]
     return cnf_sets
 
