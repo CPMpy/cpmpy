@@ -6,6 +6,7 @@ from ..variables import *
  Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
+    # print(type(constraints))
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
         # transform model's constraints
@@ -17,7 +18,9 @@ def to_cnf(constraints):
         elif constraints.name in ['or', '->']:
             # make or() into [or()] as result will be cnf anyway
             constraints = [constraints]
+    # print(constraints)
     if isinstance(constraints, Expression):
+        # print(constraints)
         # transform expression directly
         return tseitin_transform(constraints)
     # print(constraints, type(constraints))
@@ -32,7 +35,6 @@ def to_cnf(constraints):
                 expr.args[0] = ~expr.args[0]
                 expr.name = 'or'
                 # TODO: perhaps check whether any arg is a disjunction, flatten
-
             if expr.name == "or":
                 # special case: OR constraint, shortcut to disjunction of subexprs
                 subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
@@ -42,6 +44,11 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
+        elif isinstance(expr, Comparison) and expr.name == '==':
+            # XXX naive implemnetation
+            subcnf = to_cnf( implies(expr.args[0], expr.args[1]) & implies(expr.args[1], expr.args[0]))
+            cnf += subcnf
+            # XXX smarter one ?
         # TODO: check whether correct or not especially if expr == False
         elif isinstance(expr, bool):
             continue
@@ -54,6 +61,7 @@ def to_cnf(constraints):
             cnf.append(newvar)
             cnf += newcnf
     return cnf
+
 
 def tseitin_transform(expr):
     # base cases
@@ -112,12 +120,17 @@ def tseitin_transform(expr):
         B = subvars[1]
         cnf = [(~Aux | ~A | B), (Aux | A), (Aux | ~B)]
 
-    # XXX changed added ==
+
+    # # XXX changed added ==
     if expr.name == '==':
-        # (1) Aux => (A <=> B)
-        # (2) ~Aux => (A <=> ~B)
+        # print("here ?")
+    #     # (1) Aux => (A <=> B)
+    #     # (2) ~Aux => (A <=> ~B)
         A = subvars[0]
         B = subvars[1]
+    #     # cnf= [(~A | B), ( ~B | A)]
+
+    #     # cnf.append( Operator("or", [~Aux] + [var for var in subvars]) )
         cnf = [(~Aux | ~A | B), (~Aux | ~B | A), (Aux | A | B), (Aux | ~A | ~B)]
 
     return Aux, cnf

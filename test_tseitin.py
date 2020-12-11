@@ -47,12 +47,13 @@ spot_game = Relation(spot, game)
 mat_game = Relation(material, game)
 
 
-# for m in material:
-#     for s in spot:
-#         for g in game:
-#             print("a->((b&c)->d)", to_cnf( implies( a, implies( mat_spot[m, s] & spot_game[s, g], mat_game[m, g] )) )    )
+for m in material:
+    for s in spot:
+        for g in game:
+            print("a->((b&c)->d)", to_cnf( implies( a, implies( mat_spot[m, s] & spot_game[s, g], mat_game[m, g] )) )    )
 
 
 print("a->((b&~c)->~d)", to_cnf( implies( a, implies( ~b & c, ~d) ))  )
 print("a->((~b&c)->~d)", to_cnf( implies( a, implies( b & ~c, ~d) )) )
-print("a <=> ~b", to_cnf(a == ~b))
+print("a <=> ~b", to_cnf([a == ( ~b | c)]))
+print(to_cnf(implies(a , ~b | c) & implies(~b | c, a)))
