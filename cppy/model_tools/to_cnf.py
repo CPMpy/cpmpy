@@ -6,11 +6,14 @@ from ..variables import *
  Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
+    print(constraints, type(constraints))
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
+        print("Model")
         # transform model's constraints
         return to_cnf(constraints.constraints)
     if isinstance(constraints, Operator): 
+        print("Operator")
         if constraints.name == "and":
             # and() is same as a list of its elements
             constraints = constraints.args
@@ -18,15 +21,19 @@ def to_cnf(constraints):
             # make or() into [or()] as result will be cnf anyway
             constraints = [constraints]
     if isinstance(constraints, Expression):
+        print("Expression")
         # transform expression directly
         return tseitin_transform(constraints)
     # print(constraints, type(constraints))
     if isinstance(constraints, bool):
+        print("Bool")
         return tseitin_transform(constraints)
 
+    print("Step 2")
     cnf = []
     for expr in constraints:
         if isinstance(expr, Operator):
+            print("Operator")
             if expr.name == '->':
                 # turn into OR constraint, a -> b =:= ~a | b
                 expr.args[0] = ~expr.args[0]
@@ -44,13 +51,16 @@ def to_cnf(constraints):
                 cnf += subcnf
         # TODO: check whether correct or not especially if expr == False
         elif isinstance(expr, bool):
+            print("step2-bool")
             continue
         elif isinstance(expr, list):
+            print("step2-list")
             # same special case as 'AND': flatten into top-level
             subcnf = to_cnf(expr)
             cnf += subcnf
             
         else:
+            print("step2-rest")
             newvar, newcnf = tseitin_transform(expr)
             cnf.append(newvar)
             cnf += newcnf
@@ -58,7 +68,7 @@ def to_cnf(constraints):
 
 def tseitin_transform(expr):
     # base cases
-    # print(expr)
+    print(expr)
     if isinstance(expr, bool):
         return (expr, [])
     if isinstance(expr, BoolVarImpl):
@@ -74,11 +84,16 @@ def tseitin_transform(expr):
         else:
             raise Exception("Tseitin: e == '"+str(expr.args[1])+"' not supported yet")
 
-    if not isinstance(expr, Operator):
+    # XXX changed here
+    if isinstance(expr, Comparison) and expr.name != '==':
         raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
 
+    # XXX changed here disabled 
+    # if not isinstance(expr, Operator):
+    #     raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
+
     # Operators:
-    implemented = ['-', 'and', 'or', '->']
+    implemented = ['-', 'and', 'or', '->', '==']
     if not expr.name in implemented:
         raise Exception("Tseitin: Operator '"+expr.name+"' not implemented")
 
@@ -108,6 +123,14 @@ def tseitin_transform(expr):
         A = subvars[0]
         B = subvars[1]
         cnf = [(~Aux | ~A | B), (Aux | A), (Aux | ~B)]
-        
+
+    # XXX changed added ==
+    if expr.name == '==':
+        # (1) Aux => (A <=> B)
+        # (2) ~Aux => (A <=> ~B)
+        A = subvars[0]
+        B = subvars[1]
+        cnf = [(~Aux | ~A | B), (~Aux | ~B | A), (Aux | A | B), (Aux | ~A | ~B)]
+
     return Aux, cnf
 
