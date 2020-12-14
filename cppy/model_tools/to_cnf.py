@@ -17,12 +17,11 @@ def to_cnf(constraints):
         elif constraints.name in ['or', '->']:
             # make or() into [or()] as result will be cnf anyway
             constraints = [constraints]
-    # print(constraints)
-    if isinstance(constraints, Expression):
-        # transform expression directly
-        return tseitin_transform(constraints)
-    if isinstance(constraints, bool):
-        return tseitin_transform(constraints)
+
+    if not isinstance(constraints, (list,tuple)):
+        # catch rest, single object to singleton object
+        constraints = [constraints]
+
 
     cnf = []
     
@@ -43,7 +42,14 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
-        elif isinstance(expr, bool):
+        elif isinstance(expr, Comparison) and expr.name == '==' and not isinstance(expr.args[1], (bool,int)):
+            # [..., a <-> b, ...] :: [..., a -> b, b -> a, ...]
+            # reuse variables, no global cache yet
+            a,cnf_a = tseitin_transform(expr.args[0])
+            b,cnf_b = tseitin_transform(expr.args[1])
+            cnf += [~a|b, ~b|a] # [a -> b, b -> a]
+            cnf += cnf_a + cnf_b
+        elif isinstance(expr, (bool,int)):
             continue
         elif isinstance(expr, list):
             # same special case as 'AND': flatten into top-level
@@ -61,14 +67,19 @@ def tseitin_transform(expr):
     # base cases
     if isinstance(expr, bool):
         return (expr, [])
+    if isinstance(expr, int):
+        # python convention: 1 is true, rest is false
+        if expr == 1:
+            return (True, [])
+        return (False, [])
     if isinstance(expr, BoolVarImpl):
         return (expr, [])
 
     # e == 0 and e == 1
-    if isinstance(expr, Comparison) and expr.name == '==' and isinstance(expr.args[1], int):
-        if expr.args[1] == 1:
+    if isinstance(expr, Comparison) and expr.name == '==' and isinstance(expr.args[1], (int,bool)):
+        if expr.args[1] == 1 or expr.args[1] is True:
             return tseitin_transform(expr.args[0])
-        elif expr.args[1] == 0:
+        elif expr.args[1] == 0 or expr.args[1] is False:
             (var,cnf) = tseitin_transform(expr.args[0])
             return (~var, cnf)
         else:
