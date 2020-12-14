@@ -6,7 +6,7 @@ from ..variables import *
  Only supports [], and, or, -, -> for now
 """
 def to_cnf(constraints):
-    print(constraints)
+    # print(constraints)
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
         # transform model's constraints
@@ -32,8 +32,8 @@ def to_cnf(constraints):
     cnf = []
     
     for expr in constraints:
-        print("Here")
-        print(expr)
+        # print("Here")
+        # print(expr)
         if isinstance(expr, Operator):
             if expr.name == '->':
                 # turn into OR constraint, a -> b =:= ~a | b
@@ -114,7 +114,7 @@ def tseitin_transform(expr):
             return (~subvars[0], cnf)
 
     Aux = BoolVarImpl()
-    print(Aux.name + 1)
+    # print(Aux.name + 1)
     if expr.name == "and":
         cnf.append( Operator("or", [Aux] + [~var for var in subvars]) )
         for var in subvars:
@@ -137,7 +137,7 @@ def tseitin_transform(expr):
         # (1) Aux => (A <=> B)
         # (2) ~Aux => (A <=> ~B)
         # cnf= [(~A | B), ( ~B | A)]
-        print(subvars)
+        # print(subvars)
         A = subvars[0]
         B = subvars[1]
         cnf = [(~Aux | ~A | B), (~Aux | ~B | A), (Aux | A | B), (Aux | ~A | ~B)]
