@@ -23,7 +23,7 @@ print("((a|b)&c -> ~d): (wikipedia)", to_cnf([ implies((a|b)&c, ~d) ]))
 print("a->~b, b|~c|d, c->((a&b)|d), a&(b|(c&(d|e)))", to_cnf([ implies(a, ~b), b|~c|d, implies(c, ((a&b)|d)), a&(b|(c&(d|e))) ]))
 print("a->((b&c)|(d&e))", to_cnf([ implies(a, ((b&c)|(d&e))) ]))
 
-
+# more advanced tseitin tests
 class Relation(object):
     # rows, cols: list of names
     def __init__(self, rows, cols):
@@ -46,14 +46,21 @@ mat_spot = Relation(material, spot)
 spot_game = Relation(spot, game)
 mat_game = Relation(material, game)
 
-
 for m in material:
     for s in spot:
         for g in game:
             print("a->((b&c)->d)", to_cnf( implies( a, implies( mat_spot[m, s] & spot_game[s, g], mat_game[m, g] )) )    )
 
 
+# implies implies tests
 print("a->((b&~c)->~d)", to_cnf( implies( a, implies( ~b & c, ~d) ))  )
 print("a->((~b&c)->~d)", to_cnf( implies( a, implies( b & ~c, ~d) )) )
-print("a <=> ~b", to_cnf([a == ( ~b | c)]))
-print(to_cnf(implies(a , ~b | c) & implies(~b | c, a)))
+
+# double impliciation tests (with '==')
+print("c | (a -> b & b -> a)", to_cnf(c | (implies(a,b) & implies(b,a))))
+print("c | (a <-> b)", to_cnf(c | (a == b)))
+print("a <-> ~b", to_cnf(a == ~b))
+print("a <-> True", to_cnf(a == True))
+print("False <-> a", to_cnf(False == a))
+print("a <-> ~b|c", to_cnf(a == (~b|c)))
+print("b|c|-d <-> a", to_cnf((b|c|-d) == a))

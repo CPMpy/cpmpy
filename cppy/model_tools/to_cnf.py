@@ -3,10 +3,9 @@ from ..expressions import *
 from ..variables import *
 """
  Do tseitin transform on list of constraints
- Only supports [], and, or, -, -> for now
+ Only supports [], and, or, -, ->, == for now
 """
 def to_cnf(constraints):
-    print(constraints)
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
         # transform model's constraints
@@ -25,15 +24,10 @@ def to_cnf(constraints):
     if isinstance(constraints, bool):
         return tseitin_transform(constraints)
 
-    if isinstance(constraints, Comparison):
-        subcnf = to_cnf( implies(constraints.args[0], constraints.args[1]) & implies(constraints.args[1], constraints.args[0]))
-        return subcnf
-
     cnf = []
     
     for expr in constraints:
-        print("Here")
-        print(expr)
+        # special cases first
         if isinstance(expr, Operator):
             if expr.name == '->':
                 # turn into OR constraint, a -> b =:= ~a | b
@@ -49,16 +43,6 @@ def to_cnf(constraints):
                 # special case: AND constraint, flatten into toplevel conjunction
                 subcnf = to_cnf(expr.args)
                 cnf += subcnf
-        elif isinstance(expr, Comparison) and expr.name == '==' and not isinstance(expr.args[1], int):
-            # XXX naive implemnetation
-            # print(expr)
-            # subcnf = to_cnf( implies(expr.args[0], expr.args[1]) & implies(expr.args[1], expr.args[0]))
-            # cnf += subcnf
-            # XXX smarter one ?
-            new_var, new_cnf = tseitin_transform(expr)
-            cnf.append(new_var)
-            cnf += new_cnf
-        # TODO: check whether correct or not especially if expr == False
         elif isinstance(expr, bool):
             continue
         elif isinstance(expr, list):
@@ -66,7 +50,7 @@ def to_cnf(constraints):
             subcnf = to_cnf(expr)
             cnf += subcnf
         else:
-            print(expr)
+            # generic case
             newvar, newcnf = tseitin_transform(expr)
             cnf.append(newvar)
             cnf += newcnf
@@ -90,13 +74,12 @@ def tseitin_transform(expr):
         else:
             raise Exception("Tseitin: e == '"+str(expr.args[1])+"' not supported yet")
 
-    # XXX changed here
     if isinstance(expr, Comparison) and expr.name != '==':
         raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
 
-    # XXX changed here disabled 
-    # if not isinstance(expr, Operator):
-    #     raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
+    # rest, with exception of '=='
+    if not isinstance(expr, Operator) and not (isinstance(expr, Comparison) and expr.name == '=='):
+        raise Exception("Tseitin: Expression '"+str(expr)+"' not supported yet:", type(expr))
 
     # Operators:
     implemented = ['-', 'and', 'or', '->', '==']
@@ -114,7 +97,6 @@ def tseitin_transform(expr):
             return (~subvars[0], cnf)
 
     Aux = BoolVarImpl()
-    print(Aux.name + 1)
     if expr.name == "and":
         cnf.append( Operator("or", [Aux] + [~var for var in subvars]) )
         for var in subvars:
@@ -131,16 +113,17 @@ def tseitin_transform(expr):
         B = subvars[1]
         cnf = [(~Aux | ~A | B), (Aux | A), (Aux | ~B)]
 
-    # # XXX changed added ==
     if expr.name == '==':
-        # print("here ?")
-        # (1) Aux => (A <=> B)
-        # (2) ~Aux => (A <=> ~B)
-        # cnf= [(~A | B), ( ~B | A)]
-        print(subvars)
+        # Aux :: A <-> B
+        # Aux A B
+        # 1   1 1
+        # 1   0 0
+        # 0   0 1
+        # 0   1 0
         A = subvars[0]
         B = subvars[1]
-        cnf = [(~Aux | ~A | B), (~Aux | ~B | A), (Aux | A | B), (Aux | ~A | ~B)]
+        
+        cnf = [(Aux | A | B), (Aux | ~A | ~B), (~Aux | ~A | B), (~Aux | A | ~B)]
 
     return Aux, cnf
 
