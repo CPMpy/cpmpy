@@ -65,3 +65,6 @@ print("a <-> True", to_cnf(a == True))
 print("a <-> 0", to_cnf(a == 0))
 print("a <-> ~b|c", to_cnf(a == (~b|c)))
 print("b|c|-d <-> a", to_cnf((b|c|-d) == a))
+
+# simpliciation test
+print("a -> b|c|d", to_cnf(implies(a, b|c|d)))

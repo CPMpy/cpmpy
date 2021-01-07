@@ -32,7 +32,12 @@ def to_cnf(constraints):
                 # turn into OR constraint, a -> b =:= ~a | b
                 expr.args[0] = ~expr.args[0]
                 expr.name = 'or'
-                # TODO: perhaps check whether any arg is a disjunction, flatten
+
+                # Optimisation: if RHS is an 'or', then merge it in:
+                # a -> or([b,c,...,d]) =:= or([~a,b,c,...,d])
+                if expr.args[1].name == 'or':
+                    expr.args = [expr.args[0]] + expr.args[1].args
+
             if expr.name == "or":
                 # special case: OR constraint, shortcut to disjunction of subexprs
                 subvarcnfs = [tseitin_transform(subexpr) for subexpr in expr.args]
