@@ -8,7 +8,7 @@ from cppy.model_tools.to_cnf import *
 import pandas as pd
 
 # Construct the model.
-(a,b,c,d,e) = BoolVar(5)
+(a,b,c,d,e,f) = BoolVar(6)
 
 print("empty:", to_cnf([]) )
 print("a|b:", to_cnf([a | b]) )
@@ -68,3 +68,12 @@ print("b|c|-d <-> a", to_cnf((b|c|-d) == a))
 
 # simpliciation test
 print("a -> b|c|d", to_cnf(implies(a, b|c|d)))
+
+# negation of expression test
+print("~(a|b|c)", to_cnf(~(a|b|c)))
+print("a -> ~(b|c|d)", to_cnf(implies(a, ~(b|c|d))))
+print("~(a&b&c)", to_cnf(~(a&b&c)))
+print("a -> ~(b&c&d)", to_cnf(implies(a, ~(b&c&d))))
+
+# a test
+print("a|(b&c&True)", to_cnf(a|(b&c&True)))

@@ -5,6 +5,7 @@ from ..variables import *
  Do tseitin transform on list of constraints
  Only supports [], and, or, -, ->, == for now
 """
+# TODO: pre-check for constants True/False... because ~True evals to '-2'
 def to_cnf(constraints):
     # 'constraints' should be list, but lets add some special cases
     if isinstance(constraints, Model):
