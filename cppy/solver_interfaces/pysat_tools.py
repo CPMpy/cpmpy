@@ -22,6 +22,12 @@ def cnf_to_pysat(constraints, output=None):
             continue
         elif isinstance(ci, Operator) and ci.name == 'or':
             for lit in ci.args:
+                # constant handling, value 'True' and 'False'
+                if lit is True:
+                    formula = [] # no need to translate entire disjunction
+                    break
+                if lit is False:
+                    continue # ignore this literal
                 if isinstance(lit, Comparison) and isinstance(lit.args[0], BoolVarImpl) and isinstance(lit.args[1], int) and lit.args[1] == 0:
                     formula.append(-(lit.args[0].name + 1))
                 elif isinstance(lit, BoolVarImpl):
