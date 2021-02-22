@@ -12,9 +12,9 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
+# sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../..'))
-import cppy
+# import cppy
 
 
 # -- Project information -----------------------------------------------------
@@ -24,12 +24,12 @@ copyright = '2021, Tias Guns, ..'
 author = 'Tias Guns, ..'
 
 # The full version, including alpha/beta/rc tags
-release = '2021.02.21'
+release = 'v0.1'
 
 # variables to be accessed from html
 html_context = {
     'release': release,
-    'webpage':  'https://cppy.github.io'
+    'webpage':  'https://cppyhq.github.io'
 }
 
 # -- General configuration ---------------------------------------------------
@@ -83,8 +83,12 @@ html_theme = 'alabaster'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# man_pages = [
+#     (master_doc, 'pysat', u'PySAT Documentation',
+#      [author], 1)
+# ]
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'CPPYdoc'
+htmlhelp_basename = 'CPPY'

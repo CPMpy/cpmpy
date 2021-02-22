@@ -7,18 +7,9 @@ Welcome to CPPY's documentation!
 ================================
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :caption: Contents:
 
    api/expressions
-   api/globalconstraints
    api/model
    api/variables
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
