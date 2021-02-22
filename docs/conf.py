@@ -19,9 +19,9 @@ import cppy
 
 # -- Project information -----------------------------------------------------
 
-project = 'CPPY'
-copyright = '2021, Tias Guns, ..'
-author = 'Tias Guns, ..'
+project = 'python-cp'
+copyright = '2021, Tias Guns'
+author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
 release = '1'
@@ -29,7 +29,7 @@ release = '1'
 # variables to be accessed from html
 html_context = {
     'release': release,
-    'webpage':  'https://cppyhq.github.io'
+    'webpage':  'https://python-cp.readthedocs.io/'
 }
 
 # -- General configuration ---------------------------------------------------
@@ -91,4 +91,4 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'CPPY'
+htmlhelp_basename = 'python-cp'
