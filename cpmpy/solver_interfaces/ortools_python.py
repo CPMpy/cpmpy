@@ -31,16 +31,36 @@ class ORToolsPython(SolverInterface):
         # Constraint programming engine
         self._model = ort.CpModel()
 
-        # will store the variables here
-        self.vardict = dict()
+        # Create corresponding solver variables
+        self.varmap = dict() # cppy var -> solver var
+        self.revarmap = dict() # reverse: solver var -> cppy var
+        modelvars = get_variables(cppy_model)
+        for var in modelvars:
+            if isinstance(var, BoolVarImpl):
+                revar = self._model.NewBoolVar(str(var.name))
+            elif isinstance(var, IntVarImpl):
+                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
+            self.varmap[var] = revar
+            self.revarmap[revar] = var
 
-        # make the constraint expressions (and create the vars)
-        for con in cpmpy_model.constraints:
+        # post the constraint expressions to the solver
+        # TODO: assumes 'flat' constraints (no subexpressions)
+        for con in cppy_model.constraints:
             self.post_expression(con)
 
         # the objective
-        # TODO
-        print(cpmpy_model.objective)
+        if cppy_model.objective is None:
+            pass # no objective, satisfaction problem
+        else:
+            # objective has to be an intvar or a linear expression
+            print(type(cppy_model.objective))
+            # TODO: convert objective to...?
+            ort_obj = cppy_model.objective
+            print(cppy_model.objective)
+            if cppy_model.objective_max:
+                self._model.Maximize(ort_obj)
+            else:
+                self._model.Minimize(ort_obj)
 
         return self._model
 
@@ -68,14 +88,10 @@ class ORToolsPython(SolverInterface):
         # TODO, runtime?
 
         if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
-            # TODO smth with enumerating the python vars and filling them
             # TODO, use a decorator for .value again so that can look like propety but is function
             # fill in variables
-            modelvars = get_variables(model)
-            #for name,var in self.vardict:
-            #    pass
-            for var in modelvars:
-                var.set_value(self._solver.Value(var)) # not sure this will work
+            for var in self.varmap:
+                var._value = self._solver.Value(self.varmap[var])
 
         return solstats
 
@@ -88,37 +104,46 @@ class ORToolsPython(SolverInterface):
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
-            pass
+            print(expr)
+            raise NotImplementedError
 
 
-        if isinstance(expr, Operator):
-            # some names differently (the infix names!)
+        elif isinstance(expr, Operator):
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
                         'mul': '*', 'div': '/', 'pow': '^'}
-            op_str = expr.name
-            if op_str in printmap:
-                op_str = printmap[op_str]
-            pass
+            args = [self.varmap[var] for var in expr.args]
+            if expr.name == 'or':
+                self._model.AddBoolOr(args)
+            elif expr.name == 'and':
+                self._model.AddBoolAnd(args)
+            else:
+                print(expr.name, type(expr), expr)
+                raise NotImplementedError
 
 
-        if isinstance(expr, Element):
+        elif isinstance(expr, Element):
             subtype = "int"
             # TODO: need better bool check... is_bool() or type()?
             if all((v == 1) is v for v in iter(expr.args[0])):
                 subtype = "bool"
-            pass
+            print(expr.name, type(expr), expr)
+            raise NotImplementedError
         
 
         # rest: global constraints
-        if expr.name == 'alldifferent':
+        elif expr.name == 'alldifferent':
            self._model.AddAllDifferent(expr) 
 
 
-        if expr.name.endswith('circuit'): # circuit, subcircuit
-            pass
+        elif expr.name.endswith('circuit'): # circuit, subcircuit
+            print(expr.name, type(expr), expr)
+            raise NotImplementedError
 
-        # TODO: what is default action? how to catch if not supported?
+        else:
+            # TODO: what is default action? how to catch if not supported?
+            print(expr.name, type(expr), expr)
+            raise NotImplementedError
         
         
 
