@@ -36,5 +36,5 @@ from .ortools_python import *
 from .pysat_tools import *
 
 # the order matters: default will be first supported one
-builtin_solvers=[MiniZincPython(),MiniZincText(),ORToolsPython()]
+builtin_solvers=[ORToolsPython(),MiniZincPython(),MiniZincText()]
 
