@@ -5,8 +5,8 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='CP_Test_PY',
-    version='0.0.2',
-    author='VUB-Data-Lab',
+    version='0.0.8',
+    author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
     description='A numpy-based light-weight Python library for conveniently modeling constraint problems in Python',
     long_description=long_description,
@@ -16,14 +16,13 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'minizinc==0.4.2',
-        'numpy==1.20.1',
-        'ortools==8.1.8487',
-        #Sub-dependencies
-        'absl-py==0.11.0',
-        'protobuf==3.15.1',
-        'six==1.15.0'
+        'ortools>=7.2',
+        'numpy>=1.9',
     ],
+    #extra dependency, only needed if minizinc is to be used.
+    extras_require={
+        "FULL":  ["minizinc"],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
