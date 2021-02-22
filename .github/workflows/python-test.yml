@@ -1,6 +1,10 @@
 name: Test-code
 # Triggers the workflow on push or pull request events
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - packaging_test_ahmed
 
 jobs:
   # Set the job key. The key is displayed as the job name
@@ -16,9 +20,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Runs the Super-Linter action
-      - name: Run Super-Linter
-        uses: github/super-linter@v3
-        env:
-          DEFAULT_BRANCH: packaging_test_ahmed
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Runs Setup python action
+      - name: Set up Python
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
+      - name: Install dependencies
+        run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -U pytest
+      - name: Run tests
+        run: |
+        pytest
