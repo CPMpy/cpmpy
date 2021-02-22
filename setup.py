@@ -5,7 +5,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='CP_Test_PY',
-    version='0.0.1',
+    version='0.0.2',
     author='VUB-Data-Lab',
     author_email="tias.guns@kuleuven.be",
     description='A numpy-based light-weight Python library for conveniently modeling constraint problems in Python',
