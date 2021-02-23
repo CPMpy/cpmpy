@@ -1,6 +1,3 @@
-.. role:: raw-latex(raw)
-    :format: latex
-    
 Constraint Programming
 ----------------------
 
@@ -30,10 +27,10 @@ SEND + MORE = MONEY
 
 is satisfied. This problem lies into the setting of **constraint satisfaction problem (CSP)**. Here the variables are each letter S,E,N,D,M,O,R,Y and their domain is {0,1,2,...,9}. The constraints represents the fact that
 
-The area of a circle is :raw-latex:`$\pi r^2$`
 
 
-The cpmpy implementation for this problem looks like:
+
+The cpmpy implementation for this CSP looks like:
 
 
 
@@ -52,6 +49,8 @@ Y=
 Note that we can find an slightly different version of this problem by optimizing an objective function, for example, optimizing the number formed by the word MONEY:
 
 max 10000*M + 1000*O + 100*N + 10*E + 1*Y.
+
+The cpmpy implementation for this COP looks like:
 
 But this is just a toy example. In the following we are going to consider more difficult problems and real-world applications.
 
