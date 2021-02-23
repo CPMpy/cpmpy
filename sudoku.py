@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 """
-Sudoku problem in CPpy
+Sudoku problem in CpMPy
 
 Based on the Numberjack model of Hakan Kjellerstrand
 """
-from cppy import *
+from cpmpy import *
 import numpy
 
 x = 0 # cells whose value we seek

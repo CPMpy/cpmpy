@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 """
-Mario problem in CPpy
+Mario problem in CpMPy
 
 Based on the MiniZinc model, same data
 """
-from cppy import *
+from cpmpy import *
 import numpy
 
 data = { # a dictionary, json style
