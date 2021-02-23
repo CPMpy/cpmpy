@@ -115,7 +115,7 @@ class ORToolsPython(SolverInterface):
     def post_expression(self, expr):
         # recursively convert arguments (subexpressions)
         args = [self.convert_expression(e) for e in expr.args]
-
+        
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
