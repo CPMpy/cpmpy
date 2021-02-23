@@ -7,6 +7,7 @@ class TestGlobal(unittest.TestCase):
         """Test all different constraint with a set of
         unit cases.
         """
+        supported_solvers= [cp.MiniZincPython()]
         lb = 1
         start = 2
         nTests = 10
@@ -21,12 +22,14 @@ class TestGlobal(unittest.TestCase):
             model = cp.Model(constraint)
 
             # SOLVE
+            # TODO: remove supported solvers and use cpmpy provided solver support
             # for solver in cp.get_supported_solvers():
-            #     _ = model.solve(solver=solver)
-            #     vals = [x.value() for x in vars]
+            for solver in supported_solvers:
+                _ = model.solve(solver=solver)
+                vals = [x.value() for x in vars]
 
-            #     # ensure all different values
-            #     self.assertEqual(len(vals),len(set(vals)), msg=f"{solver.name} does provide solution validating given constraints.")
+                # ensure all different values
+                self.assertEqual(len(vals),len(set(vals)), msg=f"{solver.name} does provide solution validating given constraints.")
 
     def test_circuit(self):
         """
@@ -41,9 +44,14 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
+        supported_solvers= [cp.MiniZincPython()]
+
         # TODO implement circuit unit test
         x = cp.IntVar(0, 5, 6)
         constraints = [cp.circuit(x)]
         model = cp.Model(constraints)
+
+        # TODO: remove supported solvers and use cpmpy provided solver support
         # for solver in cp.get_supported_solvers():
-        #     _ = model.solve(solver=solver)
+        for solver in supported_solvers:
+            _ = model.solve(solver=solver)

@@ -5,6 +5,7 @@ import numpy as np
 class TestExamples(unittest.TestCase):
 
     def test_send_more_money(self):
+        supported_solvers= [cp.MiniZincPython()]
         # Construct the model.
         s,e,n,d,m,o,r,y = cp.IntVar(0,9, 8)
 
@@ -16,13 +17,16 @@ class TestExamples(unittest.TestCase):
         constraint += [ s > 0, m > 0 ]
 
         model = cp.Model(constraint)
+        # TODO: remove supported solvers and use cpmpy provided solver support
+        for solver in supported_solvers:
         # for solver in cp.get_supported_solvers():
-        #     _ = model.solve(solver=solver)
-        #     self.assertEqual([x.value() for x in [s,e,n,d]], [9, 5, 6, 7])
-        #     self.assertEqual([x.value() for x in [m,o,r,e]], [1, 0, 8, 5])
-        #     self.assertEqual([x.value() for x in [m,o,n,e,y]], [1, 0, 6, 5, 2])
+            _ = model.solve(solver=solver)
+            self.assertEqual([x.value() for x in [s,e,n,d]], [9, 5, 6, 7])
+            self.assertEqual([x.value() for x in [m,o,r,e]], [1, 0, 8, 5])
+            self.assertEqual([x.value() for x in [m,o,n,e,y]], [1, 0, 6, 5, 2])
 
     def test_bus_schedule(self):
+        supported_solvers= [cp.MiniZincPython()]
         demands = [8, 10, 7, 12, 4, 4]
         slots = len(demands)
 
@@ -34,7 +38,9 @@ class TestExamples(unittest.TestCase):
 
         objective = sum(x) # number of buses
         model = cp.Model(constraint, minimize=objective)
+        # TODO: remove supported solvers and use cpmpy provided solver support
         # for solver in cp.get_supported_solvers():
-        #     _ = model.solve(solver=solver)
-        #     self.assertEqual(x.value(), [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
-        #     self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
+        for solver in supported_solvers:
+            _ = model.solve(solver=solver)
+            self.assertEqual([xi.value() for xi in x], [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
+            self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
