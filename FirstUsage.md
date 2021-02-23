@@ -36,11 +36,11 @@ setup(
     author='Tias Guns',
     author_email='',
     license='MIT',
-    # packages=find_packages(exclude=['sample_app.test']),
+    # packages=find_packages(exclude=['mccpy.test']),
     install_requires=['numpy'],
     # entry_points={
     #     'console_scripts': [
-    #         'sapp=sample_app.sample_app:main'
+    #         'sapp=cp_app.cp_app:main' #for creating executable
     #     ]
     # }
 )
