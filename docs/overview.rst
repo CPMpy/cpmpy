@@ -7,19 +7,12 @@ Many real-life decisions involve a large number of options. To decide if a probl
 A constraint satisfaction problem (CSP) consists of a set of variables and constraints stablishing relationships amongst them. Each variable has a finite of possible values (its domain). 
 
 
-Tutorial
-=============
-
-
-Let us consider a classic problem in Constraint Programming the N-queens.
-
-
 References
 =====
 
 .. Add some references
 
-To learn more about theory and practice of constraint programming check the following references:
+To learn more about theory and practice of constraint programming you may want to check some references:
 
 1. Rossi, F., Van Beek, P., & Walsh, T. (Eds.). (2006). Handbook of constraint programming. Elsevier.
 2. Apt, K. (2003). Principles of constraint programming. Cambridge university press.
