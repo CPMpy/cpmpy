@@ -19,7 +19,7 @@ import cppy
 
 # -- Project information -----------------------------------------------------
 
-project = 'python-cp'
+project = 'cpmpy'
 copyright = '2021, Tias Guns'
 author = 'Tias Guns'
 
@@ -29,7 +29,7 @@ release = '0.5'
 # variables to be accessed from html
 html_context = {
     'release': release,
-    'webpage':  'https://python-cp.readthedocs.io/'
+    'webpage':  f'https://{project}.readthedocs.io/'
 }
 
 # -- General configuration ---------------------------------------------------
@@ -58,7 +58,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
 html_theme_options = {
-    'logo': 'cppy.png',
+    'logo': 'cpmpy.png',
     'github_user': 'tias',
     'github_repo': 'cppy',
     'github_button': True,
@@ -91,4 +91,4 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'python-cp'
+htmlhelp_basename = 'cpmpy'
