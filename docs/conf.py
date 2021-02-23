@@ -19,7 +19,7 @@ import cpmpy
 
 # -- Project information -----------------------------------------------------
 
-project = 'cpmpy'
+project = 'CpMPy'
 copyright = '2021, Tias Guns'
 author = 'Tias Guns'
 

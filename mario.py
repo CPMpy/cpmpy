@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Mario problem in CPmpy
+Mario problem in CpMPy
 
 Based on the MiniZinc model, same data
 """

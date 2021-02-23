@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Who killed agatha? problem in CPmpy
+Who killed agatha? problem in CpMPy
 
 Based on the Numberjack model of Hakan Kjellerstrand
 see also: http://www.hakank.org/constraint_programming_blog/2014/11/decision_management_community_november_2014_challenge_who_killed_agath.html

@@ -1,6 +1,6 @@
-Welcome to CPmpy
+Welcome to CpMPy
 
-CPmpy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
@@ -101,5 +101,5 @@ stats = model.solve()
 
 FAQ
 Problem: I get the following error: "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
-Solution: indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper: m = cparray(m); m[X] == True
+Solution: indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CpMPy-numpy arrays. First convert your numpy array to a CpMPy-numpy array with the 'cparray()' wrapper: m = cparray(m); m[X] == True
 ```

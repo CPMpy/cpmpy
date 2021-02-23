@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Knapsack problem in CPmpy
+Knapsack problem in CpMPy
  
 Based on the Numberjack model of Hakan Kjellerstrand
 """

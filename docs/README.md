@@ -1,6 +1,6 @@
 # Deployment information
 
-The full **_enter_name_of_package_**  documentation is available at [cpmpy](https://cpmpy.readthedocs.io/en/latest/index.html).
+The full **_enter_name_of_package_**  documentation is available at [cpmpy](https://CpMPy.readthedocs.io/en/latest/index.html).
 
 The documentation is automatically generated using Sphinx and deployed using [readthedocs.io](readthedocs.io).
 

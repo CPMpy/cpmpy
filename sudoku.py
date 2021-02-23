@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Sudoku problem in CPmpy
+Sudoku problem in CpMPy
 
 Based on the Numberjack model of Hakan Kjellerstrand
 """
