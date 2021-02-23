@@ -1,5 +1,5 @@
 import unittest
-import cppy as cp
+import cpmpy as cp
 import numpy as np
 
 class TestExamples(unittest.TestCase):

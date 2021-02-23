@@ -1,8 +1,6 @@
 import unittest
-from cppy.solver_interfaces import get_supported_solvers
-from cppy.model import Model
-from cppy import IntVar
-from cppy.globalconstraints import alldifferent, circuit
+import cpmpy as cp
+
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
@@ -14,16 +12,16 @@ class TestGlobal(unittest.TestCase):
         nTests = 10
         for i in range(start, start + nTests):
             # construct the model vars = lb..i
-            vars = IntVar(lb, i, i)
+            vars = cp.IntVar(lb, i, i)
 
             # CONSTRAINTS
-            constraint = [ alldifferent(vars) ]
+            constraint = [ cp.alldifferent(vars) ]
 
             # MODEL Transformation to default solver specification
-            model = Model(constraint)
+            model = cp.Model(constraint)
 
             # SOLVE
-            for solver in get_supported_solvers():
+            for solver in cp.get_supported_solvers():
                 _ = model.solve(solver=solver)
                 vals = [x.value() for x in vars]
 
@@ -44,9 +42,8 @@ class TestGlobal(unittest.TestCase):
         means that there is a directed edge from 0 -> 3.
         """
         # TODO implement circuit unit test
-        vars = IntVar(0, 5, 6)
-        constraints = [circuit(vars)]
-        constraints += []
-        model = Model(constraints)
-        for solver in get_supported_solvers():
+        x = cp.IntVar(0, 5, 6)
+        constraints = [cp.circuit(x)]
+        model = cp.Model(constraints)
+        for solver in cp.get_supported_solvers():
             _ = model.solve(solver=solver)
