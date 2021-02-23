@@ -4,7 +4,7 @@ CpMPy is a numpy-based light-weight Python library for conveniently modeling con
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
-A longer description of its motivation and architecture is in [this short paper](modref19_cppy.pdf)
+A longer description of its motivation and architecture is in [this short paper](./docs/modref19_cppy.pdf)
 
 The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
