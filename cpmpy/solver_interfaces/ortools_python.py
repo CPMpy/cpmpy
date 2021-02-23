@@ -108,6 +108,11 @@ class ORToolsPython(SolverInterface):
         if isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
             return self.varmap[expr]
 
+        # ~B
+        if isinstance(expr, Comparison) and expr.name == '==' and \
+           isinstance(expr.args[0], BoolVarImpl) and expr.args[1] == 0:
+            return self.varmap[expr.args[0]].Not()
+
         print(type(expr),expr)
         raise NotImplementedError
 
