@@ -95,24 +95,41 @@ class ORToolsPython(SolverInterface):
 
         return solstats
 
+    # for subexpressions (variables, lists and linear expressions)
+    def convert_expression(self, expr):
+        # python constants
+        if is_num(expr):
+            return expr
+
+        # list
+        if is_any_list(expr):
+            return [self.convert_expression(e) for e in expr]
+
+        # decision variables, check in varmap
+        if isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+            return self.varmap[expr]
+
+        print(type(expr),expr)
+        raise NotImplementedError
+
     def post_expression(self, expr):
-        #if is_any_list(expr):
-
-        #if not isinstance(expr, Expression):
-
-        #args_str = [self.convert_expression(e) for e in expr.args]
+        # recursively convert arguments (subexpressions)
+        args = [self.convert_expression(e) for e in expr.args]
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
-            print(expr)
-            raise NotImplementedError
+            #allowed = {'==', '!=', '<=', '<', '>=', '>'}
+            if expr.name == '==':
+                self._model.Add( args[0] == args[1] )
+            else:
+                print(expr)
+                raise NotImplementedError
 
 
         elif isinstance(expr, Operator):
             #printmap = {'and': '/\\', 'or': '\\/',
             #            'sum': '+', 'sub': '-',
             #            'mul': '*', 'div': '/', 'pow': '^'}
-            args = [self.varmap[var] for var in expr.args]
             if expr.name == 'or':
                 self._model.AddBoolOr(args)
             elif expr.name == 'and':
@@ -132,7 +149,7 @@ class ORToolsPython(SolverInterface):
 
         # rest: global constraints
         elif expr.name == 'alldifferent':
-           self._model.AddAllDifferent(expr) 
+           self._model.AddAllDifferent(args) 
 
 
         elif expr.name.endswith('circuit'): # circuit, subcircuit

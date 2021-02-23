@@ -4,7 +4,7 @@ import numpy as np
 def is_num(arg):
     return isinstance(arg, (int, np.integer, float, np.float))
 def is_any_list(arg):
-    return isinstance(arg, (list, tuple, np.ndarray))
+    return isinstance(arg, (list, tuple, np.ndarray, np.flatiter))
 def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
@@ -21,6 +21,9 @@ class Expression(object):
     """
 
     def __init__(self, name, arg_list):
+        if isinstance(arg_list, np.ndarray):
+            # must flatten
+            arg_list = arg_list.flat
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.name = name
         self.args = arg_list
