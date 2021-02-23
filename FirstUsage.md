@@ -30,17 +30,17 @@ First create a `setup.py` file
 from setuptools import setup, find_packages
 
 setup(
-    name='mcppy',
+    name='cpmpy',
     version='0.0.1',
     description='Python module for CP',
     author='Tias Guns',
     author_email='',
     license='MIT',
-    # packages=find_packages(exclude=['mccpy.test']),
+    # packages=find_packages(exclude=['cpmpy.test']),
     install_requires=['numpy'],
     # entry_points={
     #     'console_scripts': [
-    #         'sapp=cp_app.cp_app:main' #for creating executable
+    #         'sapp=cpmpy.cpmpy:main' #for creating executable
     #     ]
     # }
 )
@@ -49,14 +49,14 @@ Specify the requirements in the requirements.txt file
 ```
 numpy>=1.20.0
 ```
-Create a folder named `CPModules` (or whatever) and write all the class and definition inside it within `model.py` (or whatever).
+Create a folder named `cpmodules` (or whatever) and write all the class and definition inside it within `model.py` (or whatever).
 Now to install in test mode, first create a virtual environment. and then run after going to directory containing the `setup.py`
 ```
 pip install -e .
 ```
 To check whether the installation is successful, open python
 ```python
-form CPModules.model import *
+form cpmodules.model import *
 ```
 This should work from anywhere, not only from that directory!
 
