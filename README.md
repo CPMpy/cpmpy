@@ -1,22 +1,28 @@
-Welcome to CpMPy
+## CpMPy: CP modeling made easy in Python
+
+Welcome to CpMPy. Licensed under... .
 
 CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
-A longer description of its motivation and architecture is in [this short paper](./docs/modref19_cppy.pdf)
+A longer description of its motivation and architecture is in [this short paper](modref19_cppy.pdf).
 
 The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
-Some TODOs:
-- auto translate to or-tools
-- auto translate to numberjack, which is Python-based but not numpy-based
-- add more models (see Hakan K's page(s))
-- publish on pypi, with proper docs
+Check the CP [tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
+
+### Install the library
+
+### Documentation
+
+Get the full CpMPy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
+
+### Examples
 
 The following examples show the elegance of building on Python/Numpy:
 ```python
-from cpmpy import *
+from cppy import *
 import numpy as np
 
 # Construct the model
@@ -40,7 +46,7 @@ print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
 
 sudoku and others need matrix indexing, which numpy supports extensively:
 ```python
-from cpmpy import *
+from cppy import *
 import numpy
 
 x = 0 # cells whose value we seek
@@ -81,7 +87,7 @@ stats = model.solve()
 
 and an OR problem for good faith:
 ```python
-from cpmpy import *
+from cppy import *
 import numpy
 
 # data
@@ -98,8 +104,27 @@ objective = sum(x) # number of buses
 
 model = Model(constraint, minimize=objective)
 stats = model.solve()
-
-FAQ
-Problem: I get the following error: "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
-Solution: indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CpMPy-numpy arrays. First convert your numpy array to a CpMPy-numpy array with the 'cparray()' wrapper: m = cparray(m); m[X] == True
 ```
+
+See more [examples](https://github.com/tias/cppy/tree/master/examples).
+
+### FAQ
+
+Problem: I get the following error:
+```python
+"IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
+```
+
+Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
+```python
+m = cparray(m); m[X] == True
+```
+
+### Roadmap
+
+TODOs:
+
+- auto translate to or-tools
+- auto translate to numberjack, which is Python-based but not numpy-based
+- add more models (see Hakan K's page(s))
+- publish on pypi, with proper docs
