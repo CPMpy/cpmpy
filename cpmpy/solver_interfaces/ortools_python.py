@@ -52,15 +52,11 @@ class ORToolsPython(SolverInterface):
         if cppy_model.objective is None:
             pass # no objective, satisfaction problem
         else:
-            # objective has to be an intvar or a linear expression
-            print(type(cppy_model.objective))
-            # TODO: convert objective to...?
-            ort_obj = cppy_model.objective
-            print(cppy_model.objective)
+            obj = self.convert_expression(cppy_model.objective)
             if cppy_model.objective_max:
-                self._model.Maximize(ort_obj)
+                self._model.Maximize(obj)
             else:
-                self._model.Minimize(ort_obj)
+                self._model.Minimize(obj)
 
         return self._model
 
@@ -109,9 +105,35 @@ class ORToolsPython(SolverInterface):
             return self.varmap[expr]
 
         # ~B
+        # XXX should we implement NegBoolView instead?
         if isinstance(expr, Comparison) and expr.name == '==' and \
            isinstance(expr.args[0], BoolVarImpl) and expr.args[1] == 0:
             return self.varmap[expr.args[0]].Not()
+
+        if isinstance(expr, Operator):
+            # TODO bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # TODO -> for non-bool input with .OnlyEnforceIf()...
+            # unary int: '-', 'abs'
+            # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
+            # nary int: 'sum'
+            args = [self.convert_expression(e) for e in expr.args]
+            if expr.name == '-':
+                return -args[0]
+            elif expr.name == 'abs':
+                return abs(args[0])
+            if expr.name == 'sub':
+                return args[0] - args[1]
+            elif expr.name == 'mul':
+                return args[0] * args[1]
+            elif expr.name == 'div':
+                return args[0] / args[1]
+            elif expr.name == 'mod':
+                return args[0] % args[1]
+            elif expr.name == 'pow':
+                return args[0] ** args[1]
+            elif expr.name == 'sum':
+                return sum(args)
+
 
         print(type(expr),expr)
         raise NotImplementedError
@@ -125,10 +147,16 @@ class ORToolsPython(SolverInterface):
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
             if expr.name == '==':
                 self._model.Add( args[0] == args[1] )
-            else:
-                print(expr)
-                raise NotImplementedError
-
+            elif expr.name == '!=':
+                self._model.Add( args[0] != args[1] )
+            elif expr.name == '<=':
+                self._model.Add( args[0] <= args[1] )
+            elif expr.name == '<':
+                self._model.Add( args[0] < args[1] )
+            elif expr.name == '>=':
+                self._model.Add( args[0] >= args[1] )
+            elif expr.name == '>':
+                self._model.Add( args[0] > args[1] )
 
         elif isinstance(expr, Operator):
             #printmap = {'and': '/\\', 'or': '\\/',
