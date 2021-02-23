@@ -137,7 +137,7 @@ class Expression(object):
             return -self
         return Operator("sub", [other, self])
     
-    # multiplication
+    # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
@@ -252,7 +252,7 @@ class Operator(Expression):
 
         # convention for commutative binary operators:
         # swap if right is constant and left is not
-        if len(arg_list) == 2 and all(is_num(x) for x in arg_list) and \
+        if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
 
