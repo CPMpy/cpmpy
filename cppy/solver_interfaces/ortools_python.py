@@ -109,9 +109,9 @@ class ORToolsPython(SolverInterface):
 
 
         elif isinstance(expr, Operator):
-            printmap = {'and': '/\\', 'or': '\\/',
-                        'sum': '+', 'sub': '-',
-                        'mul': '*', 'div': '/', 'pow': '^'}
+            #printmap = {'and': '/\\', 'or': '\\/',
+            #            'sum': '+', 'sub': '-',
+            #            'mul': '*', 'div': '/', 'pow': '^'}
             args = [self.varmap[var] for var in expr.args]
             if expr.name == 'or':
                 self._model.AddBoolOr(args)
@@ -120,7 +120,6 @@ class ORToolsPython(SolverInterface):
             else:
                 print(expr.name, type(expr), expr)
                 raise NotImplementedError
-
 
         elif isinstance(expr, Element):
             subtype = "int"

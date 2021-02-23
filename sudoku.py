@@ -26,20 +26,20 @@ given = numpy.array([
 # Variables
 puzzle = IntVar(1, n, shape=given.shape)
 
-constraint = []
+constraints = []
 # constraints on rows and columns
-constraint += [ alldifferent(row) for row in puzzle ]
-constraint += [ alldifferent(col) for col in puzzle.T ]
+constraints += [ alldifferent(row) for row in puzzle ]
+constraints += [ alldifferent(col) for col in puzzle.T ]
 
 # constraint on blocks
 for i in range(0,n,3):
     for j in range(0,n,3):
-        constraint += [ alldifferent(puzzle[i:i+3, j:j+3]) ]
+        constraints += [ alldifferent(puzzle[i:i+3, j:j+3]) ]
 
 # constraints on values
-constraint += [ puzzle[given>0] == given[given>0] ]
+constraints += [ puzzle[given!=x] == given[given!=x] ]
 
-model = Model(constraint)
+model = Model(constraints)
 stats = model.solve()
 print(stats)
 print(puzzle.value())
