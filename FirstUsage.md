@@ -12,7 +12,7 @@ Go to the docs folder and run sphinx
 sphinx-quickstart
 ```
 
-```
+
 ```sh
 make html
 ```
@@ -81,7 +81,7 @@ or
 ```
 tox -e py36
 ```
-to specify environment.
+to test on a specific environment.
 
 If you receive ` congratulations :)` your installation is successful.
 # Building Package for distribution
