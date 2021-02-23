@@ -44,3 +44,33 @@ class TestExamples(unittest.TestCase):
             _ = model.solve(solver=solver)
             self.assertEqual([xi.value() for xi in x], [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
             self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
+
+    def test_knapsack(self):
+        # Problem data
+        n = 10
+        np.random.seed(1)
+        values = np.random.randint(0,10, n)
+        weights = np.random.randint(1,5, n)
+        capacity = np.random.randint(sum(weights)*.2, sum(weights)*.5)
+
+        # Construct the model.
+        x = cp.BoolVar(n)
+
+        constraint = [ sum(x*weights) <= capacity ]
+        objective  = sum(x*values)
+
+        model = cp.Model(constraint, maximize=objective)
+
+        # Statistics are returned after solving.
+        stats = model.solve()
+
+        self.assertEqual(
+            objective.value(),
+            sum(xi.value() * vi for xi, vi in zip(x, values)), 
+            f"Objective value:\n\texpected {sum(xi.value() * vi for xi, vi in zip(x, values))} got {objective.value()}"
+        )
+        
+        # Variables can be asked for their value in the found solution
+        print("Value:", objective.value())
+        print("Solution:", x.value())
+        print("In items: ", [i+1 for i,val in enumerate(x.value()) if val])
