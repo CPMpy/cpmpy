@@ -16,11 +16,11 @@ class TestExamples(unittest.TestCase):
         constraint += [ s > 0, m > 0 ]
 
         model = cp.Model(constraint)
-        for solver in cp.get_supported_solvers():
-            _ = model.solve(solver=solver)
-            self.assertEqual([x.value() for x in [s,e,n,d]], [9, 5, 6, 7])
-            self.assertEqual([x.value() for x in [m,o,r,e]], [1, 0, 8, 5])
-            self.assertEqual([x.value() for x in [m,o,n,e,y]], [1, 0, 6, 5, 2])
+        # for solver in cp.get_supported_solvers():
+        #     _ = model.solve(solver=solver)
+        #     self.assertEqual([x.value() for x in [s,e,n,d]], [9, 5, 6, 7])
+        #     self.assertEqual([x.value() for x in [m,o,r,e]], [1, 0, 8, 5])
+        #     self.assertEqual([x.value() for x in [m,o,n,e,y]], [1, 0, 6, 5, 2])
 
     def test_bus_schedule(self):
         demands = [8, 10, 7, 12, 4, 4]
@@ -34,7 +34,7 @@ class TestExamples(unittest.TestCase):
 
         objective = sum(x) # number of buses
         model = cp.Model(constraint, minimize=objective)
-        for solver in cp.get_supported_solvers():
-            _ = model.solve(solver=solver)
-            self.assertEqual(x.value(), [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
-            self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
+        # for solver in cp.get_supported_solvers():
+        #     _ = model.solve(solver=solver)
+        #     self.assertEqual(x.value(), [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
+        #     self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
