@@ -85,10 +85,9 @@ class ORToolsPython(SolverInterface):
             solstats.status = ExitStatus.OPTIMAL
         else:
             raise NotImplementedError
-        # TODO, runtime?
+        solstats.runtime = self._solver.WallTime()
 
         if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
-            # TODO, use a decorator for .value again so that can look like propety but is function
             # fill in variables
             for var in self.varmap:
                 var._value = self._solver.Value(self.varmap[var])
