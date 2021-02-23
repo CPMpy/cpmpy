@@ -25,7 +25,7 @@ class ORToolsPython(SolverInterface):
         except ImportError as e:
             return False
 
-    def make_model(self, cppy_model):
+    def make_model(self, cpmpy_model):
         from ortools.sat.python import cp_model as ort
 
         # Constraint programming engine
@@ -35,22 +35,22 @@ class ORToolsPython(SolverInterface):
         self.vardict = dict()
 
         # make the constraint expressions (and create the vars)
-        for con in cppy_model.constraints:
+        for con in cpmpy_model.constraints:
             self.post_expression(con)
 
         # the objective
         # TODO
-        print(cppy_model.objective)
+        print(cpmpy_model.objective)
 
         return self._model
 
-    def solve(self, cppy_model, num_workers=1):
+    def solve(self, cpmpy_model, num_workers=1):
         if not self.supported():
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
         from ortools.sat.python import cp_model as ort
 
         # create model (TODO: how to start from other model?)
-        self._model = self.make_model(cppy_model)
+        self._model = self.make_model(cpmpy_model)
 
         # solve the instance
         self._solver = ort.CpSolver()

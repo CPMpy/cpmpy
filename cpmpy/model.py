@@ -5,7 +5,7 @@ import numpy as np
 
 class Model(object):
     """
-    CPpy Model object, contains the constraint and objective expression trees
+    cpmpy Model object, contains the constraint and objective expression trees
 
     Arguments of constructor:
     *args: Expression object(s) or list(s) of Expression objects

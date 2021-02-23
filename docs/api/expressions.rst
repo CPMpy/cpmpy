@@ -1,6 +1,6 @@
 Expressions
 ===========
 
-.. automodule:: cppy.expressions
+.. automodule:: cpmpy.expressions
     :inherited-members:
     :no-special-members:

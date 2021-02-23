@@ -1,4 +1,4 @@
-Welcome to python-cp's documentation!
+Welcome to Cpmpy's documentation!
 =====================================
 
 .. toctree::

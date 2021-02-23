@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 """
-Knapsack problem in CPpy
+Knapsack problem in CPmpy
  
 Based on the Numberjack model of Hakan Kjellerstrand
 """
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Problem data

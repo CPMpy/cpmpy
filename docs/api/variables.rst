@@ -1,6 +1,6 @@
 Variables
 =========
 
-.. automodule:: cppy.variables
+.. automodule:: cpmpy.variables
     :inherited-members:
     :no-special-members:

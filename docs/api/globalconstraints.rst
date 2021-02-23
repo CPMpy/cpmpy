@@ -1,6 +1,6 @@
 Global Constraints
 ==================
 
-.. automodule:: cppy.globalconstraints
+.. automodule:: cpmpy.globalconstraints
     :inherited-members:
     :no-special-members:

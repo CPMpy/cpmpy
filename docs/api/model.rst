@@ -1,6 +1,6 @@
 Model
 =====
 
-.. automodule:: cppy.model
+.. automodule:: cpmpy.model
     :inherited-members:
     :no-special-members:

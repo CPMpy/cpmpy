@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Send more money in CPpy
+Send more money in CPmpy
 
    SEND
  + MORE
@@ -8,7 +8,7 @@ Send more money in CPpy
   MONEY
 
 """
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Construct the model.

@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 """
-Bus scheduling in CPpy
+Bus scheduling in CPmpy
 
 Based on the Numberjack model of Hakan Kjellerstrand:
 Problem from Taha "Introduction to Operations Research", page 58.
 This is a slightly more general model than Taha's.
 """
-from cppy import *
+from cpmpy import *
 import numpy
 
 # data
