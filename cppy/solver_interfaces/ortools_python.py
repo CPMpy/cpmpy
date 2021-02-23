@@ -2,6 +2,10 @@ from . import *
 from ..expressions import *
 from ..variables import *
 from .minizinc_text import *
+from itertools import cycle
+
+def zipcycle(vars1, vars2):
+    return zip(vars1, cycle(vars2)) if len(vars2) < len(vars1) else zip(cycle(vars1), vars2)
 
 class ORToolsPython(SolverInterface):
     """
@@ -67,7 +71,7 @@ class ORToolsPython(SolverInterface):
 
         # create model (TODO: how to start from other model?)
         self._model = self.make_model(cppy_model)
-
+        self._model.ExportToFile('toast.txt')
         # solve the instance
         self._solver = ort.CpSolver()
         self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
@@ -145,18 +149,19 @@ class ORToolsPython(SolverInterface):
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
-            if expr.name == '==':
-                self._model.Add( args[0] == args[1] )
-            elif expr.name == '!=':
-                self._model.Add( args[0] != args[1] )
-            elif expr.name == '<=':
-                self._model.Add( args[0] <= args[1] )
-            elif expr.name == '<':
-                self._model.Add( args[0] < args[1] )
-            elif expr.name == '>=':
-                self._model.Add( args[0] >= args[1] )
-            elif expr.name == '>':
-                self._model.Add( args[0] > args[1] )
+            for lvar, rvar in zipcycle(args[0], args[1]):
+                if expr.name == '==':
+                    self._model.Add(lvar == rvar)
+                elif expr.name == '!=':
+                    self._model.Add( lvar != rvar )
+                elif expr.name == '<=':
+                    self._model.Add( lvar <= rvar )
+                elif expr.name == '<':
+                    self._model.Add( lvar < rvar )
+                elif expr.name == '>=':
+                    self._model.Add( lvar >= rvar )
+                elif expr.name == '>':
+                    self._model.Add( lvar > rvar )
 
         elif isinstance(expr, Operator):
             #printmap = {'and': '/\\', 'or': '\\/',
