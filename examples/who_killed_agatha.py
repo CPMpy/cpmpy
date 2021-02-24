@@ -13,7 +13,7 @@ import numpy
 # are the only ones to live there. 
 n = 3
 (agatha, butler, charles) = range(n) # enum constants
-    
+
 # Who killed agatha?
 victim = agatha
 killer = IntVar(0,2)
@@ -47,10 +47,8 @@ constraint += [ implies(hates[agatha,i] == 1, hates[butler,i] == 1) for i in ran
 
 # Noone hates everyone. 
 constraint += [ sum([hates[i,j] for j in range(n)]) <= 2 for i in range(n) ]
-     
 
 model = Model(constraint)
 stats = model.solve()
-
 #print(model)
 print("killer ID:",killer.value())

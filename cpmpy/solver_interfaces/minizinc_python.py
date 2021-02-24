@@ -80,7 +80,7 @@ class MiniZincPython(MiniZincText):
             # runtime
             mznsol = mznresult.solution
             solstats.runtime = mznresult.statistics['time'].total_seconds()
-            
+
             # fill in variables
             modelvars = get_variables(model)
             for var in modelvars:

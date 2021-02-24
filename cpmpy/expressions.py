@@ -113,7 +113,6 @@ class Expression(object):
 
         return Operator("xor", [other, self])
 
-    
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
     def __add__(self, other):
@@ -367,6 +366,25 @@ class Operator(Expression):
                 return self
         return super().__eq__(other)
     
+    def value(self):
+        if self.name == "pow":
+            raise NotImplementedError()
+
+        operator_obj = {
+            "sum": sum(self.args),
+            "mul": self.args[0] * self.args[1],
+            "sub": self.args[0] - self.args[1],
+            "div": self.args[0] / self.args[1],
+            "mod": self.args[0] % self.args[1],
+            # "pow": self.args[0] ** self.args[1],
+            "mul": self.args[0] * self.args[1],
+            "-": -self.args[0],
+            "abs": -self.args[0] if self.args[0].value() < 0 else self.args[0]
+        }
+        if self.name not in operator_obj:
+            return None
+
+        return operator_obj[self.name]
 
 class Element(Expression):
     """

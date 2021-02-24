@@ -1,5 +1,6 @@
 # Tias Guns, 2019
 
+from .utils.exceptions import NullShapeError
 from .variables import *
 from .expressions import *
 from .globalconstraints import *
@@ -12,6 +13,8 @@ from .model import *
 def BoolVar(shape=None):
     if shape is None or shape == 1:
         return BoolVarImpl()
+    elif shape == 0:
+        raise NullShapeError(shape)
     length = np.prod(shape)
     
     # create base data
@@ -23,6 +26,8 @@ def BoolVar(shape=None):
 def IntVar(lb, ub, shape=None):
     if shape is None or shape == 1:
         return IntVarImpl(lb,ub)
+    elif shape == 0:
+        raise NullShapeError(shape)
     length = np.prod(shape)
     
     # create base data
