@@ -38,22 +38,29 @@ x = IntVar(0, 1, shape=distance_matrix.shape)
 # y[i,j] is the number of cars, which the salesman has after leaving
 # node i and before entering node j; in terms of the network analysis,
 # y[i,j] is a flow through arc (i,j)
+# This will help in subtour elimination
 y = IntVar(0, n_city-1, shape=distance_matrix.shape)
 
+
 constraint  = []
+# # the salesman leaves and enter  each node i exactly once 
 constraint  += [sum(x[i,:])==1 for i in range(n_city)]
 constraint  += [sum(x[:,i])==1 for i in range(n_city)]
-constraint  += [sum(y[:,i])==sum(y[i,:])+1 for i in range(1,n_city)]
+## No self loop
 constraint += [sum(x[i,i] for i in range(n_city))==0]
+
+# flow into node i through all ingoing arcs  equal to 
+# flow out of node i through all outgoing arcs + 1
+constraint  += [sum(y[:,i])==sum(y[i,:])+1 for i in range(1,n_city)]
+#the salesman leaves with n-1 flows
 constraint  += [sum(y[0,:])==(n_city-1) ]
 
 objective =0 
+#the objective is to minimze  the travel distance 
 for i in range(n_city):
     for j in range(n_city):
         constraint  += [y[i,j] <= (n_city-1)*x[i,j]]
         objective += x[i,j]*distance_matrix[i,j] 
-
-
 # objective = sum(x*distance_matrix)
 
 model = Model(constraint, minimize=objective)
@@ -64,9 +71,6 @@ print(stats)
 print(x.value())
 
 solution = x.value()
-
-
-
 print("Solution")
 dest = 100
 source = 0
