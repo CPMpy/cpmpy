@@ -11,9 +11,9 @@ A **constraint satisfaction problem (CSP)** consists of a set of variables and c
 
 A typical CP is defined by the following elements:
 
-**Variables**: 
+**Variables**: define variables and domain. Types of domains for different types of variables.
 
-**Constraints**:
+**Constraints**: Short summary of constraints
 
 Moreover, if we want to model an optimization problem we also need an objective function.
 
@@ -30,7 +30,7 @@ is satisfied. This problem lies into the setting of **constraint satisfaction pr
 
 The cpmpy implementation for this CSP looks like:
 
-```python=
+```python
 from cppy import *
 import numpy as np
 
@@ -64,9 +64,22 @@ A possible feasible allocation/solution is
 
 Note that we can find an slightly different version of this problem by optimizing an objective function, for example, optimizing the number formed by the word MONEY:
 
-max 10000 M + 1000 O + 100 N + 10 E + 1 Y.
+<img src="https://render.githubusercontent.com/render/math?math=\max 10000 M %2B 1000 O %2B 100 N %2B 10 E %2B 1 Y">
+
 
 The cpmpy implementation for this COP looks like:
+
+```python
+coefs  = np.flip(10**np.arange(5))
+objective = np.dot([m,o,n,e,y],coefs)
+model = Model(constraint, maximize = objective)
+```
+And the result will be:
+```python
+  S,E,N,D =   [9, 5, 6, 7]
+  M,O,R,E =   [1, 0, 8, 5]
+  M,O,N,E,Y = [1, 0, 6, 5, 2]
+```
 
 But this is just a toy example. In the following we are going to consider more difficult problems and real-world applications.
 
