@@ -27,8 +27,7 @@ def flatten_model(orig_model):
     if cppy_model.objective is None:
         pass # no objective, satisfaction problem
     else:
-        # TODO, as last one... how to avoid duplicate code with constraint case?
-        (newobj, newcons) = self.flatten_subexpression(orig_model.objective)
+        (newobj, newcons) = flatten_numexpr(orig_model.objective)
         basecons += newcons
         if orig_model.objective_max:
             new_model.Maximize(obj)
@@ -72,7 +71,8 @@ def flatten_constraint(con):
         newargs = [check_or_make_variable(e) for e in expr.args]
         if any(x for (x,_,_) in newargs):
             # one of the args was changed
-            new_expr = ...
+            raise NotImplementedError()
+            new_expr = None # ...
             for i,arg in enumerate(expr.args):
                 (changed,newvar,newcons) = newargs[i]
                 if not changed:
@@ -103,16 +103,32 @@ def flatten_constraint(con):
             raise NotImplementedError()
         
 
-def check_or_make_variable(expr):
+def check_or_make_variable(subexpr):
     """
         input: expression
         output: (Boolean, None or a Numvar, None or a list of base constraints)
         does flattening of its base constraint itself
     """
-    if is_num...
+    raise NotImplementedError()
+    if False # is_num...
         return False, None, None
-    if numvar...
+    if False # numvar...
         return False, None, None
 
     # handle other cases... (incl. reifying expressions)
 
+def flatten_numexpr(subexpr):
+    """
+        input: expression of type:
+            * is_num()
+            * NumVarImpl
+            * Operator with is_type_num()
+        output: (base_expr, basecons) with:
+            base_expr one of:
+                * is_num()
+                * NumVarImpl
+                * Operator with is_type_num(), all args are: is_num() or NumVarImpl or sum([const*NumVarImpl])
+    """
+    raise NotImplementedError()
+
+                
