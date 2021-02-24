@@ -382,7 +382,7 @@ class Operator(Expression):
             # "pow": self.args[0] ** self.args[1],
             "mul": self.args[0] * self.args[1],
             "-": -self.args[0],
-            "abs": -self.args[0] if self.args[0].value() < 0 else self.args[0]
+            "abs": abs(self.args[0])
         }
         if self.name not in operator_obj:
             return None
