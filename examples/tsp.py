@@ -61,6 +61,8 @@ for i in range(n_city):
     for j in range(n_city):
         constraint  += [y[i,j] <= (n_city-1)*x[i,j]]
         objective += x[i,j]*distance_matrix[i,j] 
+
+## this is not working
 # objective = sum(x*distance_matrix)
 
 model = Model(constraint, minimize=objective)

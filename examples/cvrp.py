@@ -27,32 +27,31 @@ locations= [
         (236, 169), (228, 169), (228, 161), (220, 169)
 ]
 # Pickup Capacities of each location 
-# depot has no capcity
-capacities = [0,3,4,8,9,8,10,5,3,9]
+capacities = [0,3,4,8,9,8,10,5,3,9] # depot has no capcity
 
 
 n_city = len(locations)
 distance_matrix = compute_euclidean_distance_matrix(locations)
 n_vehicle = 3
-# capacity of each vehicle 15
+# 3 vehicles and capacity of each vehicle 25
 q =  25
 
 # x[i,j] = 1 means that a vehicle goes from node i to node j 
 x = IntVar(0, 1, shape=distance_matrix.shape) 
+# y[i,j] is a flow of load through arc (i,j)
 y = IntVar(0, q, shape=distance_matrix.shape)
 
 constraint  = []
-# # vehicle leaves and enter  each node i exactly once 
-
+# constarint on number of vehicles
 constraint  += [sum(x[0,:])<= n_vehicle ]
-constraint  += [sum(x[i,:])==1 for i in range(1,n_city)]
+# # vehicle leaves and enter  each node i exactly once 
+constraint  += [sum(x[i,:])==1 for i in range(1,n_city)] 
 constraint  += [sum(x[:,i])==1 for i in range(1,n_city)]
-## No self loop
-constraint += [sum(x[i,i] for i in range(n_city))==0]
+constraint += [sum(x[i,i] for i in range(n_city))==0] ## No self loop
 # the vehicle return at the depot with no load
 constraint  += [sum(y[:,0])==0 ]
 # flow into node i through all ingoing arcs  equal to 
-# flow out of node i through all outgoing arcs + load capcity  node i
+# flow out of node i through all outgoing arcs + load capcity @ node i
 constraint  += [sum(y[:,i])==sum(y[i,:])+capacities[i] for i in range(1,n_city)]
 
 objective =0 
@@ -61,6 +60,8 @@ for i in range(n_city):
     for j in range(n_city):
         constraint  += [y[i,j] <= q*x[i,j]]
         objective += x[i,j]*distance_matrix[i,j] 
+
+## this is not working
 # objective = sum(x*distance_matrix)
 
 model = Model(constraint, minimize=objective)

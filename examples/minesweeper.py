@@ -40,16 +40,15 @@ r_ , c_ = 8,8
 S = [-1,0,1] # for the neighbors of a cell
 # Variables
 mines = IntVar(0, 1, shape=default_game.shape) 
-
+# 1 represnts mine
+# 0 represnts no mine
 constraint = []
 
-# constraint += [ mines[default_game>X] == 0 ]
 for i in range(r_):
     for j in range(c_):
         if default_game[i,j] >=0:
-            constraint += [ np.sum( [mines[i+a,j+b] for a in S for b in S
-            if i+a >=0 and i+a <r_ and j+b >=0 and j+b<c_])==default_game[i][j] ]
-        # if default_game[i,j] >=0:
+            constraint += [ np.sum( [mines[i+a,j+b] for a in S for b in S \
+                if i+a >=0 and i+a <r_ and j+b >=0 and j+b<c_])==default_game[i][j] ]
             constraint += [ mines[i,j] == 0 ] # This cell cannot be a mine
 
 
