@@ -31,7 +31,7 @@ class ORToolsPython(SolverInterface):
         except ImportError as e:
             return False
 
-    def make_model(self, cpmpy_model):
+    def make_model(self, cpm_model):
         from ortools.sat.python import cp_model as ort
 
         # Constraint programming engine
@@ -40,7 +40,7 @@ class ORToolsPython(SolverInterface):
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
         self.revarmap = dict() # reverse: solver var -> cppy var
-        modelvars = get_variables(cppy_model)
+        modelvars = get_variables(cpm_model)
         for var in modelvars:
             if isinstance(var, BoolVarImpl):
                 revar = self._model.NewBoolVar(str(var.name))
@@ -51,28 +51,28 @@ class ORToolsPython(SolverInterface):
 
         # post the constraint expressions to the solver
         # TODO: assumes 'flat' constraints (no subexpressions)
-        for con in cppy_model.constraints:
+        for con in cpm_model.constraints:
             self.post_expression(con)
 
         # the objective
-        if cppy_model.objective is None:
+        if cpm_model.objective is None:
             pass # no objective, satisfaction problem
         else:
-            obj = self.convert_expression(cppy_model.objective)
-            if cppy_model.objective_max:
+            obj = self.convert_expression(cpm_model.objective)
+            if cpm_model.objective_max:
                 self._model.Maximize(obj)
             else:
                 self._model.Minimize(obj)
 
         return self._model
 
-    def solve(self, cpmpy_model, num_workers=1):
+    def solve(self, cpm_model, num_workers=1):
         if not self.supported():
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
         from ortools.sat.python import cp_model as ort
 
         # create model
-        self._model = self.make_model(cppy_model)
+        self._model = self.make_model(cpm_model)
         # solve the instance
         self._solver = ort.CpSolver()
         self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
