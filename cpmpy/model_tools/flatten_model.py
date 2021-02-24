@@ -40,8 +40,19 @@ def flatten_model(orig_model):
 
 def flatten_constraint(con):
     """
-        input is a possibly nested constraint
-        output is a list of base constraints
+        input is any expression; except is_num(), pure NumVarImpl, Operator with is_type_num() and Element with len(args)=2
+        output is a list of base constraints, each base constraint is one of:
+            * BoolVar
+            * Operator with is_type_bool(), all args are: BoolVar
+            * Operator '->' with args [boolexpr,BoolVar]
+            * Operator '->' with args [Comparison,BoolVar]
+            * Comparison, all args are is_num() or NumVar 
+            * Comparison '==' with args [boolexpr,BoolVar]
+            * Comparison '!=' with args [boolexpr,BoolVar]
+            * Comparison '==' with args [numexpr,NumVar]
+            * Comparison '!=' with args [numexpr,NumVar]
+            * Element with len(args)==3 and args = ([NumVar], NumVar, NumVar)
+            * Global, all args are: NumVar
 
         will return 'Error' if something is not supported
         TODO, what built-in python error is best?
@@ -68,7 +79,7 @@ def flatten_constraint(con):
         if expr.name not in allowed:
             raise Exception("Operator '{}' not allowed as base constraint".format(expr.name))
 
-        newargs = [check_or_make_variable(e) for e in expr.args]
+        newargs = [flatten_boolexpr(e) for e in expr.args]
         if any(x for (x,_,_) in newargs):
             # one of the args was changed
             raise NotImplementedError()
@@ -102,12 +113,14 @@ def flatten_constraint(con):
         else:
             raise NotImplementedError()
         
-
+# Should probably be typed, see 'flatten_numexpr' and 'flatten_boolexpr' below
 def check_or_make_variable(subexpr):
     """
         input: expression
-        output: (Boolean, None or a Numvar, None or a list of base constraints)
-        does flattening of its base constraint itself
+        output: tuple (is_new, new_expr, new_cons) with:
+            is_new: False or True
+            new_var: None or NumVar
+            new_cons: None or list of flattened constraints (with flatten_constraint(con))
     """
     raise NotImplementedError()
     if False # is_num...
@@ -123,12 +136,30 @@ def flatten_numexpr(subexpr):
             * is_num()
             * NumVarImpl
             * Operator with is_type_num()
-        output: (base_expr, basecons) with:
+            * Element with len(args)==2
+        output: tuple (base_expr, base_cons) with:
             base_expr one of:
                 * is_num()
                 * NumVarImpl
-                * Operator with is_type_num(), all args are: is_num() or NumVarImpl or sum([const*NumVarImpl])
+                * Operator with is_type_num(), all args are: is_num() or NumVarImpl
+                * Operator 'sum', all args are: is_num() or NumVarImpl or Operator '*'[is_num(), NumVarImpl]
+                * Element with len(args)==2 and args = ([NumVar], NumVar)
+            base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     raise NotImplementedError()
 
-                
+def flatten_boolexpr(subexpr):
+    """
+        input: expression of type:
+            * True/False
+            * BoolVar
+            * Operator with is_type_bool()
+            * Comparison
+        output: tuple (base_expr, base_cons) with:
+            base_expr one of:
+                * True/False
+                * BoolVar
+                * Operator with is_type_bool() EXCEPT '->', all args are: BoolVar
+            base_cons: list of flattened constraints (with flatten_constraint(con))
+    """
+    raise NotImplementedError()
