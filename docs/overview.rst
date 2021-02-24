@@ -36,15 +36,22 @@ The cpmpy implementation for this CSP looks like:
 
 
 A possible feasible allocation/solution is 
-S= 
-E=
-N=
-D=
-M=
-O=
-R=
-Y= 
 
+.. code:: python
+  S= 
+  E=
+  N=
+  D=
+  M=
+  O=
+  R=
+  Y= 
+  
+ .. code:: javascript
+
+    function whatever() {
+        return "such color"
+    }
 
 Note that we can find an slightly different version of this problem by optimizing an objective function, for example, optimizing the number formed by the word MONEY:
 
