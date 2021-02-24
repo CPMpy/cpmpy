@@ -1,6 +1,6 @@
 ## CpMPy: CP modeling made easy in Python
 
-Welcome to CpMPy. Licensed under... .
+Welcome to CpMPy. Licensed under the MIT License.
 
 CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
@@ -128,3 +128,7 @@ TODOs:
 - auto translate to numberjack, which is Python-based but not numpy-based
 - add more models (see Hakan K's page(s))
 - publish on pypi, with proper docs
+
+### License
+
+This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).
