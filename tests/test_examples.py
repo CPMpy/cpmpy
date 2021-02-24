@@ -142,14 +142,14 @@ class TestExamples(unittest.TestCase):
             [x, x, x,  6, x, 8,  x, x, x]])
 
         solution = np.array([
-            [3, 7, 8, 2, 6, 5, 9, 1, 4]
-            [5, 9, 6, 8, 1, 4, 7, 3, 2]
-            [1, 4, 2, 7, 3, 9, 5, 6, 8]
-            [2, 1, 7, 3, 8, 6, 4, 5, 9]
-            [8, 5, 4, 9, 7, 1, 6, 2, 3]
-            [6, 3, 9, 5, 4, 2, 8, 7, 1]
-            [7, 8, 5, 4, 2, 3, 1, 9, 6]
-            [4, 6, 3, 1, 9, 7, 2, 8, 5]
+            [3, 7, 8, 2, 6, 5, 9, 1, 4],
+            [5, 9, 6, 8, 1, 4, 7, 3, 2],
+            [1, 4, 2, 7, 3, 9, 5, 6, 8],
+            [2, 1, 7, 3, 8, 6, 4, 5, 9],
+            [8, 5, 4, 9, 7, 1, 6, 2, 3],
+            [6, 3, 9, 5, 4, 2, 8, 7, 1],
+            [7, 8, 5, 4, 2, 3, 1, 9, 6],
+            [4, 6, 3, 1, 9, 7, 2, 8, 5],
             [9, 2, 1, 6, 5, 8, 3, 4, 7]
         ])
 
@@ -174,7 +174,7 @@ class TestExamples(unittest.TestCase):
             _ = model.solve(solver=solver)
             for i in range(9):
                 for j in range(9):
-                    self.assertEqual(puzzle[i,j].value(), solution[i, j])
+                    self.assertEqual(puzzle[i,j].value(), solution[i][j])
     
     def test_mario(self):
         data = { # a dictionary, json style

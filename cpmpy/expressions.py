@@ -44,7 +44,18 @@ class Expression(object):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        return None
+        print(self.name, self.args)
+        obj = None
+        if self.name == 'sum':
+            obj = 0
+            for arg in self.args:
+                print("sum", arg, type(arg))
+                obj += arg.value()
+        elif self.name == "mul":
+            arg0 = self.args[0].value() if isinstance(self.args[0], Expression) else self.args[0]
+            arg1 = self.args[1].value() if isinstance(self.args[1], Expression) else self.args[1]
+            obj = arg0 * arg1
+        return obj
 
     # Comparisons
     def __eq__(self, other):
