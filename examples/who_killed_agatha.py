@@ -50,6 +50,5 @@ constraint += [ sum([hates[i,j] for j in range(n)]) <= 2 for i in range(n) ]
 
 model = Model(constraint)
 stats = model.solve()
-
 #print(model)
 print("killer ID:",killer.value())
