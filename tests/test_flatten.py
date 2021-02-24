@@ -28,6 +28,7 @@ class TestFlattenConstraint(unittest.TestCase):
     def setUp(self):
         a,b,c,d,e =  IntVar(1, 10, shape=(5,))
         f,g,h = BoolVar((3,))
+        x,y,z = BoolVar((3,))
         self.C = [
             a == b,
             h != f,
@@ -42,14 +43,38 @@ class TestFlattenConstraint(unittest.TestCase):
 
     def test_base_constraint(self):
         #TODO: very basic
-        model = cp.Model(self.c[:2])
+        model = cp.Model(self.C[:2])
         model2 = flatten_model(model)
         self.assertEqual(len(model2.constraints), 2)
     
     def test_flatten_reification(self):
         #TODO more complex test
-        model = cp.Model(self.c[1:3])
+        model = cp.Model(self.C[1:3])
         model2 = flatten_model(model)
         self.assertGreater(len(model2.constraints), len(model.constraints))
 
+    # alternative style
+    def test_eq():
+        e = (x == y) 
+        self.assertEqual( e, flatten_constraint(e) )
+        e = (x == ~y) 
+        self.assertEqual( e, flatten_constraint(e) )
+        e = (a == b) 
+        self.assertEqual( e, flatten_constraint(e) )
+
+    def test_nq():
+        e = (x != y) 
+        self.assertEqual( e, flatten_constraint(e) )
+        e = (x != ~y) 
+        self.assertEqual( e, flatten_constraint(e) )
+        e = (a != b) 
+        self.assertEqual( e, flatten_constraint(e) )
+
+    def test_eq_comp():
+        e = ((a > 5) == x)
+        self.assertEqual( e, flatten_constraint(e) )
+        e = (x == (b < 3))
+        self.assertEqual( e, flatten_constraint(e) )
+        e = ((a > 5) == (b < 3))
+        self.assertGreater(len(e), len(flatten_constraint(e)))
     
