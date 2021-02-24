@@ -2,9 +2,9 @@ import numpy as np
 import unittest
 import cpmpy as cp
 
+supported_solvers= [cp.MiniZincPython()]
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
-        supported_solvers= [cp.MiniZincPython()]
         # basic model
         x = cp.IntVar(0,2, 3)
 

@@ -1,6 +1,7 @@
 import unittest
 import cpmpy as cp
 
+
 class TestSolvers(unittest.TestCase):
     def test_zero_boolvar(self):
         with self.assertRaises(cp.NullShapeError):

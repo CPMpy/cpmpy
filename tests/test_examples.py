@@ -9,7 +9,7 @@ supported_solvers= [cp.MiniZincPython()]
 class TestExamples(unittest.TestCase):
 
     def test_send_more_money(self):
-        
+
         # Construct the model.
         s,e,n,d,m,o,r,y = cp.IntVar(0,9, 8)
 
@@ -141,7 +141,7 @@ class TestExamples(unittest.TestCase):
             [x, 6, 3,  x, x, x,  x, 8, x],
             [x, x, x,  6, x, 8,  x, x, x]])
 
-        solution = [
+        solution = np.array([
             [3, 7, 8, 2, 6, 5, 9, 1, 4]
             [5, 9, 6, 8, 1, 4, 7, 3, 2]
             [1, 4, 2, 7, 3, 9, 5, 6, 8]
@@ -151,7 +151,7 @@ class TestExamples(unittest.TestCase):
             [7, 8, 5, 4, 2, 3, 1, 9, 6]
             [4, 6, 3, 1, 9, 7, 2, 8, 5]
             [9, 2, 1, 6, 5, 8, 3, 4, 7]
-        ]
+        ])
 
         # Variables
         puzzle = cp.IntVar(1, n, shape=given.shape)
@@ -174,7 +174,7 @@ class TestExamples(unittest.TestCase):
             _ = model.solve(solver=solver)
             for i in range(9):
                 for j in range(9):
-                    self.assertEqual(puzzle[i,j].value(), solution[j][i])
+                    self.assertEqual(puzzle[i,j].value(), solution[i, j])
     
     def test_mario(self):
         data = { # a dictionary, json style

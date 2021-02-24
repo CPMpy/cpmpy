@@ -1,13 +1,13 @@
 import unittest
 import cpmpy as cp
 
+supported_solvers= [cp.MiniZincPython()]
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
         unit cases.
         """
-        supported_solvers= [cp.MiniZincPython()]
         lb = 1
         start = 2
         nTests = 10
@@ -44,8 +44,6 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
-        supported_solvers= [cp.MiniZincPython()]
-
         # TODO implement circuit unit test
         x = cp.IntVar(0, 5, 6)
         constraints = [cp.circuit(x)]
