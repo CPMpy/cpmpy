@@ -64,11 +64,11 @@ This can be used in a linear constraint, or in the objective function: ::
 
 A constraint that adds a comparison operator on a linear expression has two forms: ::
 
-   LinConsRel = ("==", (LinExpr, Var) | ("!=", (LinExpr, Var)
+   LinConsRel = ("==", (LinExpr, Var)) | ("!=", (LinExpr, Var))
 
 So (dis)equality can have a variable (or a constant) as its right-hand side. Inequality comparison operators will not: ::
 
-   Op = ">"|">="|"<"|"<="
+   Op = ">" | ">=" | "<" | "<="
    LinConsIne = (Op, (LinExpr, Num))
 
 Special case 2, reification:
