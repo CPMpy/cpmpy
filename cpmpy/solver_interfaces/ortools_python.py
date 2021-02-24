@@ -71,7 +71,7 @@ class ORToolsPython(SolverInterface):
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
         from ortools.sat.python import cp_model as ort
 
-        # create model (TODO: how to start from other model?)
+        # create model
         self._model = self.make_model(cppy_model)
         # solve the instance
         self._solver = ort.CpSolver()
@@ -116,13 +116,22 @@ class ORToolsPython(SolverInterface):
             return self.varmap[expr.args[0]].Not()
 
         if isinstance(expr, Operator):
-            # TODO bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
-            # TODO -> for non-bool input with .OnlyEnforceIf()...
+            # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
             # unary int: '-', 'abs'
             # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
             # nary int: 'sum'
             args = [self.convert_expression(e) for e in expr.args]
-            if expr.name == '-':
+            if expr.name == 'and':
+                return all(args)
+            elif expr.name == 'or':
+                return any(args)
+            elif expr.name == 'xor':
+                raise Exception("or-tools translation: XOR probably illegal as subexpression")
+            elif expr.name == '->':
+                # when part of subexpression: can not use .OnlyEnforceIf() (I think)
+                # so convert to -a | b
+                return args[0].Not() | args[1]
+            elif expr.name == '-':
                 return -args[0]
             elif expr.name == 'abs':
                 return abs(args[0])
@@ -139,20 +148,27 @@ class ORToolsPython(SolverInterface):
             elif expr.name == 'sum':
                 return sum(args)
 
-
-        print(type(expr),expr)
-        raise NotImplementedError
+        raise NotImplementedError # should not reach this... please report on github
+        # there might be an Element expression here... need to add flatten rule then?
 
     def post_expression(self, expr):
+        # base case
+        if isinstance(expr, BoolVarImpl):
+            print(type(expr), expr, self.varmap[expr])
+            self._model.AddBoolOr( [self.varmap[expr]] )
+
         # recursively convert arguments (subexpressions)
         args = [self.convert_expression(e) for e in expr.args]
         
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
-            #TODO refactor as rewrite rule?
+            #XXX refactor decomposition into constructor of Comparison()?
             for lvar, rvar in zipcycle(args[0], args[1]):
                 if expr.name == '==':
+                    # XXX this might break for 'reification' of constraints...
+                    # will have to add two-sided .OnlyEnforceIf() then?
+                    # if you get an error here, please report on github
                     self._model.Add(lvar == rvar)
                 elif expr.name == '!=':
                     self._model.Add( lvar != rvar )
@@ -166,39 +182,39 @@ class ORToolsPython(SolverInterface):
                     self._model.Add( lvar > rvar )
 
         elif isinstance(expr, Operator):
-            #printmap = {'and': '/\\', 'or': '\\/',
-            #            'sum': '+', 'sub': '-',
-            #            'mul': '*', 'div': '/', 'pow': '^'}
-            if expr.name == 'or':
-                self._model.AddBoolOr(args)
-            elif expr.name == 'and':
-                self._model.AddBoolAnd(args)
+            # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # unary int: '-', 'abs'
+            # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
+            # nary int: 'sum'
+
+            # two special cases:
+            #    '->' with .onlyEnforceIf()
+            #    'xor' does not have subexpression form
+            # all others: add( subexpression )
+            if expr.name == '->':
+                # XXX we might have to do some sort of flattening here if RHS is not BoolVar...
+                # or-tools will raise error if invalid LHS (or RHS)
+                args = [self.convert_expression(e) for e in expr.args]
+                self._model.Add( args[0] ).OnlyEnforceIf(args[1])
+            elif expr.name == 'xor':
+                args = [self.convert_expression(e) for e in expr.args]
+                self._model.AddBoolXor(args)
             else:
-                print(expr.name, type(expr), expr)
-                raise NotImplementedError
+                self._model.Add( self.convert_expression(expr) )
 
         elif isinstance(expr, Element):
-            subtype = "int"
-            # TODO: need better bool check... is_bool() or type()?
-            if all((v == 1) is v for v in iter(expr.args[0])):
-                subtype = "bool"
-            print(expr.name, type(expr), expr)
-            raise NotImplementedError
+            # A0[A1] == A2 --> AddElement(A1, A0, A2)
+            args = [self.convert_expression(e) for e in expr.args]
+            return self._model.AddElement(args[1], args[0], args[2])
         
 
         # rest: global constraints
         elif expr.name == 'alldifferent':
            self._model.AddAllDifferent(args) 
 
-
-        elif expr.name.endswith('circuit'): # circuit, subcircuit
-            print(expr.name, type(expr), expr)
-            raise NotImplementedError
-
         else:
-            # TODO: what is default action? how to catch if not supported?
+            # TODO no mapping to this global constraint, try decomposition?
             print(expr.name, type(expr), expr)
-            raise NotImplementedError
-        
+            raise NotImplementedError # if you reach this... please report on github
         
 
