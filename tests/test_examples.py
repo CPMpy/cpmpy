@@ -12,5 +12,4 @@ EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.
 def test_examples(example):
     loader = importlib.machinery.SourceFileLoader("example", example)
     mod = types.ModuleType(loader.name)
-    print(mod.__spec__.__dir__())
     loader.exec_module(mod)
