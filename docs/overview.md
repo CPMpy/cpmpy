@@ -64,7 +64,7 @@ A possible feasible allocation/solution is
 
 Note that we can find an slightly different version of this problem by optimizing an objective function, for example, optimizing the number formed by the word MONEY:
 
-<img src="https://render.githubusercontent.com/render/math?math=\max 10000 M %2B 1000 O %2B 100 N %2B 10 E %2B 1 Y">
+<img src="https://render.githubusercontent.com/render/math?math=\max%20\quad10000%20M%20%2B%201000%20O%20%2B%20100%20N%20%2B%2010%20E%20%2B%201%20Y">
 
 
 The cpmpy implementation for this COP looks like:
