@@ -1,6 +1,6 @@
 import numpy as np
 import unittest
-#from cpmpy.solver_interfaces.minizinc_python import MiniZincPython
+from cpmpy.solver_interfaces.minizinc_text import MiniZincText
 import cpmpy as cp
 
 #supported_solvers= [MiniZincPython()]
@@ -15,5 +15,8 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(constraints)
         #for solver in supported_solvers:
         for solver in cp.get_supported_solvers():
+            if isinstance(solver, MiniZincText):
+                continue # not an actual solver
+            print(solver)
             model.solve(solver=solver)
             self.assertEqual([xi.value() for xi in x], [0, 1, 2])

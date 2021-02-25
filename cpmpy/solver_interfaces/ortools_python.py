@@ -60,7 +60,7 @@ class ORToolsPython(SolverInterface):
         # solve the instance
         self.ort_solver = ort.CpSolver()
         self.ort_solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self.ort_status = self._solver.Solve(self._model)
+        self.ort_status = self.ort_solver.Solve(self._model)
 
         # translate status
         my_status = SolverStatus()
