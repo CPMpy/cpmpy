@@ -70,7 +70,14 @@ class Expression(object):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        return None
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
+        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
+        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
+        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
+        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
+        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        return None # default
 
     # Comparisons
     def __eq__(self, other):
@@ -403,8 +410,7 @@ class Operator(Expression):
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
-
-        return None
+        return None # default
 
 class Element(Expression):
     """
