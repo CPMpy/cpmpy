@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## minizinc_python.py
+## minizinc_text.py
 ##
 
 from ..model_tools.get_variables import get_variables
-from .solver_interface import SolverInterface, SolverStats
+from .solver_interface import SolverInterface
 from ..variables import BoolVarImpl, IntVarImpl, NumVarImpl
 from ..expressions import Expression, Operator, Comparison, Element, is_any_list
 import numpy as np

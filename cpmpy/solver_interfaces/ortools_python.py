@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## minizinc_python.py
+## ortools_python.py
 ##
 
-from .solver_interface import SolverInterface, SolverStats, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..model_tools.get_variables import get_variables
 from ..expressions import Comparison, Expression, Operator, Element
 
@@ -52,6 +52,8 @@ class ORToolsPython(SolverInterface):
     def solve(self, cpmpy_model, num_workers=1):
         if not self.supported():
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
+        self._status = SolverStatus()
+
         from ortools.sat.python import cp_model as ort
 
         # create model (TODO: how to start from other model?)
@@ -60,16 +62,17 @@ class ORToolsPython(SolverInterface):
         # solve the instance
         self._solver = ort.CpSolver()
         self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self._status = self._solver.Solve(self._model)
+        ort_status = self._solver.Solve(self._model)
 
         # translate status
-        solstats = SolverStats()
-        if self._status == ort.FEASIBLE:
-            solstats.status = ExitStatus.FEASIBLE
-        elif self._status == ort.OPTIMAL:
-            solstats.status = ExitStatus.OPTIMAL
+        if ort_status == ort.FEASIBLE:
+            self._status.status = ExitStatus.FEASIBLE
+        elif ort_status == ort.OPTIMAL:
+            self._status.status = ExitStatus.OPTIMAL
+        elif ort_status == ort.INFEASIBLE:
+            self._status.status = ExitStatus.UNSATISFIABLE
         else:
-            raise NotImplementedError
+            raise NotImplementedError # a new status type was introduced, please report on github
         # TODO, runtime?
 
         if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
@@ -82,7 +85,16 @@ class ORToolsPython(SolverInterface):
             for var in modelvars:
                 var.set_value(self._solver.Value(var)) # not sure this will work
 
-        return solstats
+        # return computed value
+        if not model.objective is None:
+            # optimisation problem
+            return model.objective.value()
+        else:
+            # satisfaction problem
+            if self._status.exitstatus == ExitStatus.FEASIBLE:
+                return True
+        return False
+
 
     def post_expression(self, expr):
         #if is_any_list(expr):
