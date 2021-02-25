@@ -4,7 +4,7 @@ Now let us take a look in detail how easy is to integrate cp programming through
 First we need to import all the tools that we will need to create our CP model:
 
 ```python
-from cppy import *
+from cpmpy import *
 import numpy as np
 ```
 
