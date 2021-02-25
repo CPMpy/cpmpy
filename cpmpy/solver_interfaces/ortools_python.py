@@ -3,28 +3,10 @@
 ##
 ## minizinc_python.py
 ##
-"""
-    ===============
-    List of classes
-    ===============
 
-    .. autosummary::
-        :nosignatures:
-
-        ORToolsPython
-
-    ==================
-    Module description
-    ==================
-
-    ==============
-    Module details
-    ==============
-"""
-from . import *
-from ..expressions import *
-from ..variables import *
-from .minizinc_text import *
+from .solver_interface import SolverInterface, SolverStats, ExitStatus
+from ..model_tools.get_variables import get_variables
+from ..expressions import Comparison, Expression, Operator, Element
 
 class ORToolsPython(SolverInterface):
     """

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Bus scheduling in CpMPy
+Bus scheduling in CPMpy
 
 Based on the Numberjack model of Hakan Kjellerstrand:
 Problem from Taha "Introduction to Operations Research", page 58.

@@ -3,28 +3,10 @@
 ##
 ## minizinc_python.py
 ##
-"""
-    ===============
-    List of classes
-    ===============
 
-    .. autosummary::
-        :nosignatures:
-
-        MiniZincPython
-
-    ==================
-    Module description
-    ==================
-
-    ==============
-    Module details
-    ==============
-"""
-from . import *
-from ..expressions import *
-from ..variables import *
-from .minizinc_text import *
+from .solver_interface import ExitStatus, SolverStats
+from .minizinc_text import MiniZincText
+from ..model_tools.get_variables import get_variables
 
 class MiniZincPython(MiniZincText):
     """

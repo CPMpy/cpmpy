@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Send more money in CpMPy
+Send more money in CPMpy
 
    SEND
  + MORE

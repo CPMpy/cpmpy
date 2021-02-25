@@ -1,11 +1,11 @@
-from .expressions import *
-from .solver_interfaces import *
 import numpy as np
-
+from .expressions import Operator
+from .solver_interfaces.__util import get_supported_solvers
+from .solver_interfaces.solver_interface import SolverInterface
 
 class Model(object):
     """
-    CpMPy Model object, contains the constraint and objective expression trees
+    CPMpy Model object, contains the constraint and objective expression trees
 
     Arguments of constructor:
     *args: Expression object(s) or list(s) of Expression objects

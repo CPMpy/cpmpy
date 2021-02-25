@@ -1,4 +1,4 @@
-## Send more money in detail
+## Send More Money
 
 Now let us take a look in detail how easy is to integrate cp programming through the Send More Money example. 
 First we need to import all the tools that we will need to create our CP model:
