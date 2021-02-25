@@ -146,7 +146,66 @@ def flatten_numexpr(subexpr):
                 * Element with len(args)==2 and args = ([NumVar], NumVar)
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
-    raise NotImplementedError()
+    #raise NotImplementedError()
+
+def convert_expression(expr):
+    # python constants
+    if is_num(expr):
+        return expr
+
+    # list
+    if is_any_list(expr):
+        return [self.convert_expression(e) for e in expr]
+
+    # decision variables, check in varmap
+    if isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        return self.varmap[expr]
+
+    # ~B
+    # XXX should we implement NegBoolView instead?
+    if isinstance(expr, Comparison) and expr.name == '==' and \
+        isinstance(expr.args[0], BoolVarImpl) and expr.args[1] == 0:
+        return self.varmap[expr.args[0]].Not()
+
+    if isinstance(expr, Operator):
+        # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
+        # unary int: '-', 'abs'
+        # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
+        # nary int: 'sum'
+        args = [convert_expression(e) for e in expr.args]
+        if expr.name == 'and':
+            return all(args)
+        elif expr.name == 'or':
+            return any(args)
+        elif expr.name == 'xor':
+            raise Exception("or-tools translation: XOR probably illegal as subexpression")
+        elif expr.name == '->':
+            # when part of subexpression: can not use .OnlyEnforceIf() (I think)
+            # so convert to -a | b
+            return args[0].Not() | args[1]
+        elif expr.name == '-':
+            return -args[0]
+        elif expr.name == 'abs':
+            return abs(args[0])
+        if expr.name == 'sub':
+            return args[0] - args[1]
+        elif expr.name == 'mul':
+            return args[0] * args[1]
+        elif expr.name == 'div':
+            return args[0] / args[1]
+        elif expr.name == 'mod':
+            return args[0] % args[1]
+        elif expr.name == 'pow':
+            return args[0] ** args[1]
+        elif expr.name == 'sum':
+            return sum(args) 
+
+
+def check_lincons(subexpr, opname):
+    pass 
+
+def check_base_AND_OR(subexpr):
+    pass 
 
 def flatten_boolexpr(subexpr):
     """
@@ -163,3 +222,27 @@ def flatten_boolexpr(subexpr):
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     raise NotImplementedError()
+    args = [convert_expression(e) for e in expr.args]
+
+    if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
+        # case Var
+        pass 
+
+    elif isinstance(subexpr, Operator):
+        if check_base_AND_OR(subexpr):
+            # case OR
+            # case AND
+            pass     
+    
+    elif isinstance(subexpr, Comparison)
+        # case LinConsRel
+        if check_lincons(subexpr, "=="):
+            # call to flatten_numexp
+            pass 
+
+        # case LinConsIne
+        elif check_ineq(subexpr, "<="):
+            # call to flatten_numexp
+            pass 
+    
+    

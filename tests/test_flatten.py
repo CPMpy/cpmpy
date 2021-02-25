@@ -26,9 +26,8 @@ class TestFlattenModel(unittest.TestCase):
 
 class TestFlattenConstraint(unittest.TestCase):
     def setUp(self):
-        a,b,c,d,e =  IntVar(1, 10, shape=(5,))
-        f,g,h = BoolVar((3,))
-        x,y,z = BoolVar((3,))
+        a,b,c,d,e =  cp.IntVar(1, 10, shape=(5,))
+        f,g,h = cp.BoolVar((3,))
         self.C = [
             a == b,
             h != f,
