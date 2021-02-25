@@ -1,10 +1,32 @@
-# translate expression tree to MiniZinc textual model
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## minizinc_python.py
+##
+"""
+    ===============
+    List of classes
+    ===============
 
+    .. autosummary::
+        :nosignatures:
+
+        MiniZincText
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 from ..expressions import *
 from ..variables import *
 from ..model_tools.get_variables import get_variables
 from . import *
 
+# translate expression tree to MiniZinc textual model
 class MiniZincText(SolverInterface):
     # does not do solving itself (you can subclass it)
     # does provide conversion to text model

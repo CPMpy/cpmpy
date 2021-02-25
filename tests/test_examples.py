@@ -10,6 +10,11 @@ EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples(example):
+    """Loads example files and executes with default solver
+
+    Args:
+        example ([string]): Loaded with parametrized example filename
+    """
     loader = importlib.machinery.SourceFileLoader("example", example)
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)

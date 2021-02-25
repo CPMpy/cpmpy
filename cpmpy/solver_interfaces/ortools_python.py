@@ -1,3 +1,26 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## minizinc_python.py
+##
+"""
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        ORToolsPython
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 from . import *
 from ..expressions import *
 from ..variables import *
