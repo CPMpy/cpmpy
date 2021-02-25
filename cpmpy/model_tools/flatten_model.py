@@ -148,64 +148,42 @@ def flatten_numexpr(subexpr):
     """
     #raise NotImplementedError()
 
-def convert_expression(expr):
-    # python constants
-    if is_num(expr):
-        return expr
 
-    # list
-    if is_any_list(expr):
-        return [self.convert_expression(e) for e in expr]
+def is_flatten_var(arg):
+    #TODO: extend definition to consider Arithmetic operator expression as valid,
+    # e.g. (2a+c-b)/d 
+    return is_num(arg) or isinstance(arg, NumVarImpl)
 
-    # decision variables, check in varmap
-    if isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
-        return self.varmap[expr]
-
-    # ~B
-    # XXX should we implement NegBoolView instead?
-    if isinstance(expr, Comparison) and expr.name == '==' and \
-        isinstance(expr.args[0], BoolVarImpl) and expr.args[1] == 0:
-        return self.varmap[expr.args[0]].Not()
-
-    if isinstance(expr, Operator):
-        # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
-        # unary int: '-', 'abs'
-        # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
-        # nary int: 'sum'
-        args = [convert_expression(e) for e in expr.args]
-        if expr.name == 'and':
-            return all(args)
-        elif expr.name == 'or':
-            return any(args)
-        elif expr.name == 'xor':
-            raise Exception("or-tools translation: XOR probably illegal as subexpression")
-        elif expr.name == '->':
-            # when part of subexpression: can not use .OnlyEnforceIf() (I think)
-            # so convert to -a | b
-            return args[0].Not() | args[1]
-        elif expr.name == '-':
-            return -args[0]
-        elif expr.name == 'abs':
-            return abs(args[0])
-        if expr.name == 'sub':
-            return args[0] - args[1]
-        elif expr.name == 'mul':
-            return args[0] * args[1]
-        elif expr.name == 'div':
-            return args[0] / args[1]
-        elif expr.name == 'mod':
-            return args[0] % args[1]
-        elif expr.name == 'pow':
-            return args[0] ** args[1]
-        elif expr.name == 'sum':
-            return sum(args) 
-
+def is_nested_expr(subexpr):
+    return not all([is_flatten_var(arg) for arg in subexpr.args])
 
 def check_lincons(subexpr, opname):
-    pass 
+    LHS, RHS = subexpr.args
+    # LHS or RHS is a Var (IntVar, BoolVar, Num)
+    if not (is_flatten_var(LHS) or is_flatten_var(RHS)):
+        return False 
+    
+    # LHS is a Var :: RHS does not have nested expr
+    elif is_flatten_var(LHS):
+        if is_flatten_var(RHS):
+            return True 
+        # RHS is an LinExp and that's ok
+        # as long as it does not have more nested expression 
+        if any([is_nested_expr(arg) for arg in RHS.args]):
+            return False
+        return True
 
-def check_base_AND_OR(subexpr):
-    pass 
+    # Same logic if RHS is a Var
+    #TODO: Refactor to avoid code dupcliation
+    elif is_flatten_var(RHS):
+        if is_flatten_var(LHS):
+            return True 
+        if any([is_nested_expr(arg) for arg in LHS.args]):
+            return False
+        return True
+
+    return False 
+
 
 def flatten_boolexpr(subexpr):
     """
@@ -222,27 +200,48 @@ def flatten_boolexpr(subexpr):
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     raise NotImplementedError()
-    args = [convert_expression(e) for e in expr.args]
+    args = expr.args
+    base_cons = []
 
     if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
         # case Var
-        pass 
+        return (subexpr, [subexpr])
+
+    elif isinstance(subexpr, Comparison)
+        allowed = {'>','<','<=','>=','==','!='}
+        if any([check_lincons(subexpr, opname) for opname in allowed]):
+            # this is already in base constraint form
+            bvar = BoolVarImpl()
+            base_cons += [subexpr == bvar]
+            return (bvar, base_cons)
+
+        else:
+            (var1, bco1) = flatten_boolexpr(args[0])
+            (var2, bco2) = flatten_boolexpr(args[1])
+            bvar = BoolVarImpl()
+            base_cons += [bco1, bco2]
+            base_cons += [Comparison(subexpr.name, [var1, var2]) == bvar]
+
 
     elif isinstance(subexpr, Operator):
-        if check_base_AND_OR(subexpr):
-            # case OR
-            # case AND
-            pass     
-    
-    elif isinstance(subexpr, Comparison)
-        # case LinConsRel
-        if check_lincons(subexpr, "=="):
-            # call to flatten_numexp
-            pass 
+        if isinstance(subexpr.args[0], BoolVarImpl) and isinstance(subexpr.args[1], BoolVarImpl):
+            bvar = BoolVarImpl()
+            base_cons += [subexpr == bvar]
+            return bvar, base_cons
+        
+        
 
-        # case LinConsIne
-        elif check_ineq(subexpr, "<="):
-            # call to flatten_numexp
-            pass 
+        # nested AND, OR
+        # recurisve function call to LHS and RHS
+        # XXX: merge nested AND at top level
+        (var1, bco1) = flatten_boolexpr(args[0])
+        (var2, bco2) = flatten_boolexpr(args[1])
+        bvar = BoolVarImpl()
+        base_cons += [bco1, bco2]
+        base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
+        
+        return bvar, base_cons
+
     
+
     
