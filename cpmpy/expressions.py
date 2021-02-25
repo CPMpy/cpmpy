@@ -1,4 +1,31 @@
-import numpy as np
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## expressions.py
+##
+##
+"""
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        Expression
+        Operator
+        Element
+        GlobalConstraint
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
+
+
 
 # Helpers for type checking
 def is_num(arg):
