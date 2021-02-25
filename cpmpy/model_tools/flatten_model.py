@@ -58,7 +58,7 @@ def flatten_constraint(con):
         TODO, what built-in python error is best?
     """
     # base cases
-    if isinstance(con, BoolVarImpl) or con === True or con === False:
+    if isinstance(con, BoolVarImpl) or con == True or con == False:
         # TODO: also NegBoolView, to create...
         return [con]
     elif is_num(expr) or isinstance(expr, NumVarImpl):
@@ -105,7 +105,7 @@ def flatten_constraint(con):
                 raise NotImplementedError()
 
 
-        elif isinstance(expr, Element):
+        if isinstance(expr, Element):
             # A0[A1] == A2
             raise NotImplementedError()
 
@@ -123,9 +123,9 @@ def check_or_make_variable(subexpr):
             new_cons: None or list of flattened constraints (with flatten_constraint(con))
     """
     raise NotImplementedError()
-    if False # is_num...
+    if False: # is_num...
         return False, None, None
-    if False # numvar...
+    if False: # numvar...
         return False, None, None
 
     # handle other cases... (incl. reifying expressions)
@@ -155,6 +155,8 @@ def is_flatten_var(arg):
     return is_num(arg) or isinstance(arg, NumVarImpl)
 
 def is_nested_expr(subexpr):
+    if is_flatten_var(subexpr):
+        return False
     return not all([is_flatten_var(arg) for arg in subexpr.args])
 
 def check_lincons(subexpr, opname):
@@ -200,19 +202,25 @@ def flatten_boolexpr(subexpr):
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     #raise NotImplementedError()
-    args = expr.args
-    base_cons = []
+    
 
     if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
         # base case: single boolVar
         return (subexpr, [subexpr])
 
-    elif isinstance(subexpr, Comparison)
+    args = subexpr.args
+    base_cons = []
+
+    if isinstance(subexpr, Comparison):
         allowed = {'>','<','<=','>=','==','!='}
         if any([check_lincons(subexpr, opname) for opname in allowed]):
             # Base case: already in base constraint form
-            bvar = BoolVarImpl()
-            base_cons += [subexpr == bvar]
+            if is_num(args[0]) or is_num(args[1]):
+                bvar = BoolVarImpl()
+                base_cons += [subexpr == bvar]
+            else:
+                bvar = args[0] if is_flatten_var(args[0]) else args[1]
+                base_cons += [subexpr]
             return bvar, base_cons
 
         # recursive calls to LHS, RHS
@@ -220,7 +228,7 @@ def flatten_boolexpr(subexpr):
         (var2, bco2) = flatten_boolexpr(args[1])
         bvar = BoolVarImpl()
         base_cons += [bco1, bco2]
-        base_cons += [Comparison(subexpr.name, [var1, var2]) == bvar]
+        base_cons += [Comparison(subexpr.name, var1, var2) == bvar]
         return bvar, base_cons
 
     elif isinstance(subexpr, Operator):

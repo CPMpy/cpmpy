@@ -53,7 +53,10 @@ class BoolVarImpl(IntVarImpl):
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
-        if other == 1:
+        # if other == 1:
+        # XXX: dangerous!
+        # "=="" is overloaded 
+        if other is 1 or other is True:
             return self
         return super().__eq__(other)
 
