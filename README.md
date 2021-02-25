@@ -52,8 +52,10 @@ constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
 
 
 # Solve and print
-Model(constraints).solve()
-print(puzzle.value())
+if Model(constraints).solve():
+    print(puzzle.value())
+else:
+    print("No solution found")
 ```
 
 You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/master/examples/quickstart_sudoku.ipynb).

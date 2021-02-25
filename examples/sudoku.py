@@ -41,6 +41,7 @@ constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
 
 # Solve and print
 model = Model(constraints)
-model.solve()
-
-print(puzzle.value())
+if model.solve():
+    print(puzzle.value())
+else:
+    print("No solution found")
