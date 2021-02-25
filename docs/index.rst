@@ -12,11 +12,13 @@ The software is in ALPHA state, and more of a proof-of-concept really. Do send s
 
 
 .. toctree::
+   :caption: Preface:
 
    preface/overview
    preface/behind_the_scenes
 
 .. toctree::
+   :caption: API documentation:
 
    api/expressions
    api/model

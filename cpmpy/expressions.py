@@ -24,8 +24,7 @@
     Module details
     ==============
 """
-
-
+import numpy as np
 
 # Helpers for type checking
 def is_num(arg):

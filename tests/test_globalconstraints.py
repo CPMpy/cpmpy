@@ -1,5 +1,6 @@
 import unittest
 from cpmpy.solver_interfaces.minizinc_python import MiniZincPython
+import cpmpy as cp
 
 supported_solvers= [MiniZincPython()]
 
