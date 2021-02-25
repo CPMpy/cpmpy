@@ -393,24 +393,18 @@ class Operator(Expression):
         return super().__eq__(other)
     
     def value(self):
-        if self.name == "pow":
-            raise NotImplementedError()
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "sum": return sum(arg_vals)
+        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
+        elif self.name == "sub": return arg_vals[0] - arg_vals[1]
+        elif self.name == "div": return arg_vals[0] / arg_vals[1]
+        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
+        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
+        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
+        elif self.name == "-":   return -arg_vals[0]
+        elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
 
-        operator_obj = {
-            "sum": sum(self.args),
-            "mul": self.args[0] * self.args[1],
-            "sub": self.args[0] - self.args[1],
-            "div": self.args[0] / self.args[1],
-            "mod": self.args[0] % self.args[1],
-            # "pow": self.args[0] ** self.args[1],
-            "mul": self.args[0] * self.args[1],
-            "-": -self.args[0],
-            "abs": -self.args[0] if self.args[0].value() < 0 else self.args[0]
-        }
-        if self.name not in operator_obj:
-            return None
-
-        return operator_obj[self.name]
+        return None
 
 class Element(Expression):
     """
