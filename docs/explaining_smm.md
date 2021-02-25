@@ -38,5 +38,11 @@ object with list of constraints as argument.
 ```
 model = Model(constraint)
 ```
+In the case that you may add an objective function, a second argument must be added. This can be a maximiiwation or a minimization. As we aim to maximize the value
+of the word MONEY 
 
-
+```python
+coefs  = np.flip(10**np.arange(5))
+objective = np.dot([m,o,n,e,y],coefs)
+model = Model(constraint, maximize = objective)
+```
