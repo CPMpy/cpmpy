@@ -233,3 +233,27 @@ class TestSolvers(unittest.TestCase):
         for solver in supported_solvers:
             _ = model.solve(solver=solver)
             self.assertEqual([si.value() for si in s], expected_solution)
+    
+    def test_tsp(self):
+        N = 6
+        b = np.random.randint(1,100, size=(N,N))
+        distance_matrix= (b + b.T)/2
+        x = cp.IntVar(0, 1, shape=distance_matrix.shape) 
+        constraint  = []
+        constraint  += [sum(x[i,:])==1 for i in range(N)]
+        constraint  += [sum(x[:,i])==1 for i in range(N)]
+        constraint += [sum(x[i,i] for i in range(N))==0]
+
+        objective =0 
+        for i in range(N):
+            for j in range(N):
+                objective += x[i,j]*distance_matrix[i,j] 
+        ## this is not working
+        # objective = sum(x*distance_matrix)
+
+        model = cp.Model(constraint, minimize=objective)
+        stats = model.solve()
+        solution = x.value()
+
+        objective_computed = np.sum(solution*distance_matrix)
+        assert objective.value() == objective_computed
