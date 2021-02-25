@@ -71,9 +71,12 @@ model = Model(constraint, minimize=objective)
 stats = model.solve()
 print(stats)
 print(x.value())
+print(objective.value())
 
 solution = x.value()
+objective = np.sum(solution*distance_matrix)
 print("Solution")
+print("Total Cost of solution",objective)
 dest = 100
 source = 0
 while dest !=0:

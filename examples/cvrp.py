@@ -72,6 +72,9 @@ print(stats)
 print(x.value())
 
 sol = x.value()
+objective = np.sum(sol*distance_matrix)
+print('Solution')
+print("Total Cost of solution",objective)
 firsts = np.where(sol[0]==1)[0]
 for f in range(len(firsts)):
     print("Vehicle {}".format(f+1))
