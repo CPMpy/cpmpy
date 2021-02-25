@@ -29,9 +29,9 @@ jobs:
         PYPI_REPO: https://upload.pypi.org/legacy/
       run: |
         python setup.py sdist bdist_wheel
-        twine upload -r $TESTPYPI_REPO -u $TWINE_USERNAME -p $TWINE_TEST_PASSWORD dist/*
-        twine upload -r $PYPI_REPO dist/*
-    - name: Install pypa/build
+        twine upload --repository-url $TESTPYPI_REPO -u $TWINE_USERNAME -p $TWINE_TEST_PASSWORD dist/*
+        twine upload --repository-url $PYPI_REPO dist/*
+    # - name: Install pypa/build
     #   run: >-
     #     python -m
     #     pip install
