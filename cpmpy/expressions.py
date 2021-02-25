@@ -79,6 +79,17 @@ class Expression(object):
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
+    # implication constraint: self -> other
+    # Python does not offer relevant syntax...
+    # for double implication, use equivalence self == other
+    def implies(self, other):
+        # other constant
+        if other is True:
+            return True
+        if other is False:
+            return ~self
+        return Operator('->', [self, other])
+
     # Comparisons
     def __eq__(self, other):
         return Comparison("==", self, other)

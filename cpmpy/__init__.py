@@ -44,27 +44,6 @@ def cparray(arr):
     return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
 
 
-# implication constraint: a -> b
-# Python does not offer relevant syntax...
-# I am considering overloading bitshift >>
-# for double implication, use equivalence a == b
-def implies(a, b):
-    # both constant
-    if type(a) == bool and type(b) == bool:
-        return (~a | b)
-    # one constant
-    if a is True:
-        return b
-    if a is False:
-        return True
-    if b is True:
-        return True
-    if b is False:
-        return ~a
-
-    return Operator('->', [a.boolexpr(), b.boolexpr()])
-
-
 # all: listwise 'and'
 def all(iterable):
     collect = [] # logical expressions
