@@ -1,11 +1,7 @@
 name: Test-code
 # Triggers the workflow on push or pull request events
-on:
-  push:
-    branches:
-      - master
-      - packaging_test_ahmed
-
+on: [push, pull_request]
+  
 jobs:
   # Set the job key. The key is displayed as the job name
   # when a job name is not provided
