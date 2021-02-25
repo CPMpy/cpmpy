@@ -1,8 +1,8 @@
-## CpMPy: CP modeling made easy in Python
+## CPMpy: CP modeling made easy in Python
 
-Welcome to CpMPy. Licensed under the MIT License.
+Welcome to CPMpy.
 
-CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+CPMpy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
@@ -16,13 +16,13 @@ Check the CP [tutorial](https://github.com/tias/cppy/blob/master/docs/overview.r
 
 ### Documentation
 
-Get the full CpMPy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
+Get the full CPMpy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
 
 ### Examples
 
 The following examples show the elegance of building on Python/Numpy:
 ```python
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Construct the model
@@ -46,7 +46,7 @@ print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
 
 sudoku and others need matrix indexing, which numpy supports extensively:
 ```python
-from cppy import *
+from cpmpy import *
 import numpy
 
 x = 0 # cells whose value we seek
@@ -87,7 +87,7 @@ stats = model.solve()
 
 and an OR problem for good faith:
 ```python
-from cppy import *
+from cpmpy import *
 import numpy
 
 # data
@@ -115,7 +115,7 @@ Problem: I get the following error:
 "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
 ```
 
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
+Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CPMpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
 ```python
 m = cparray(m); m[X] == True
 ```
@@ -131,4 +131,4 @@ TODOs:
 
 ### License
 
-This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).
+This library is delivered under the Apache-2.0 License (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)). This is the same license as used by or-tools.
