@@ -67,7 +67,7 @@ Note that we can find an slightly different version of this problem by optimizin
 <img src="https://render.githubusercontent.com/render/math?math=\max%20\quad10000%20M%20%2B%201000%20O%20%2B%20100%20N%20%2B%2010%20E%20%2B%201%20Y">
 
 
-The cpmpy implementation for this COP looks like:
+To implement this COP, we need only to modify the Model statement by adding an objective function:
 
 ```python
 coefs  = np.flip(10**np.arange(5))
@@ -81,7 +81,7 @@ And the result will be:
   M,O,N,E,Y = [1, 0, 6, 5, 2]
 ```
 
-But this is just a toy example. In the following we are going to consider more difficult problems and real-world applications.
+In the [next](https://github.com/tias/cppy/blob/master/docs/explaining_smm.md), we are going to look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
 
 
 ## References
