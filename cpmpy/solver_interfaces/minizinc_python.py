@@ -53,8 +53,6 @@ class MiniZincPython(MiniZincText):
     def solve(self, model, solvername=None):
         if not self.supported():
             raise "Install the python 'minizinc' package to use this '{}' solver interface".format(self.name)
-        self._status = SolverStatus()
-
         import minizinc
 
         # create self.mzn_inst
@@ -64,33 +62,34 @@ class MiniZincPython(MiniZincText):
         self.mzn_result = self.mzn_inst.solve(**{'output-time':True})#all_solutions=True)
 
         # translate status
-        mznresult = self.mzn_result
-        if mznresult.status == minizinc.result.Status.SATISFIED:
-            self._status.exitstatus = ExitStatus.FEASIBLE
-        elif mznresult.status == minizinc.result.Status.ALL_SOLUTIONS:
-            self._status.exitstatus = ExitStatus.FEASIBLE
-        elif mznresult.status == minizinc.result.Status.OPTIMAL_SOLUTION:
-            self._status.exitstatus = ExitStatus.OPTIMAL
-        elif mznresult.status == minizinc.result.Status.UNSATISFIABLE:
-            self._status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif mznresult.status == minizinc.result.Status.ERROR:
-            self._status.exitstatus = ExitStatus.ERROR
+        my_status = SolverStatus()
+        my_status.solver_name = self.name
+        if self.mzn_result.status == minizinc.result.Status.SATISFIED:
+            my_status.exitstatus = ExitStatus.FEASIBLE
+        elif self.mzn_result.status == minizinc.result.Status.ALL_SOLUTIONS:
+            my_status.exitstatus = ExitStatus.FEASIBLE
+        elif self.mzn_result.status == minizinc.result.Status.OPTIMAL_SOLUTION:
+            my_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.mzn_result.status == minizinc.result.Status.UNSATISFIABLE:
+            my_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif self.mzn_result.status == minizinc.result.Status.ERROR:
+            my_status.exitstatus = ExitStatus.ERROR
             raise Exception("MiniZinc solver returned with status 'Error'")
-        elif mznresult.status == minizinc.result.Status.UNKNOWN:
+        elif self.mzn_result.status == minizinc.result.Status.UNKNOWN:
             # means, no solution was found (e.g. within timeout?)...
-            self._status.exitstatus = ExitStatus.ERROR
+            my_status.exitstatus = ExitStatus.ERROR
         else:
             raise NotImplementedError # a new status type was introduced, please report on github
 
 
         # get runtime and solution
-        if 'time' in mznresult.statistics:
-            self._status.runtime = mznresult.statistics['time'] # --output-time
+        if 'time' in self.mzn_result.statistics:
+            my_status.runtime = self.mzn_result.statistics['time'] # --output-time
 
-        if mznresult.status.has_solution():
+        if self.mzn_result.status.has_solution():
             # runtime
-            mznsol = mznresult.solution
-            self._status.runtime = mznresult.statistics['time'].total_seconds()
+            mznsol = self.mzn_result.solution
+            my_status.runtime = self.mzn_result.statistics['time'].total_seconds()
 
             # fill in variables
             modelvars = get_variables(model)
@@ -101,12 +100,4 @@ class MiniZincPython(MiniZincText):
                 else:
                     print("Warning, no value for ",varname)
 
-        # return computed value
-        if not model.objective is None:
-            # optimisation problem
-            return model.objective.value()
-        else:
-            # satisfaction problem
-            if self._status.exitstatus == ExitStatus.FEASIBLE:
-                return True
-        return False
+        return my_status

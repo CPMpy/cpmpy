@@ -52,30 +52,30 @@ class ORToolsPython(SolverInterface):
     def solve(self, cpmpy_model, num_workers=1):
         if not self.supported():
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
-        self._status = SolverStatus()
-
         from ortools.sat.python import cp_model as ort
 
         # create model (TODO: how to start from other model?)
-        self._model = self.make_model(cpmpy_model)
+        self.ort_model = self.make_model(cpmpy_model)
 
         # solve the instance
-        self._solver = ort.CpSolver()
-        self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        ort_status = self._solver.Solve(self._model)
+        self.ort_solver = ort.CpSolver()
+        self.ort_solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
+        self.ort_status = self._solver.Solve(self._model)
 
         # translate status
-        if ort_status == ort.FEASIBLE:
-            self._status.status = ExitStatus.FEASIBLE
-        elif ort_status == ort.OPTIMAL:
-            self._status.status = ExitStatus.OPTIMAL
-        elif ort_status == ort.INFEASIBLE:
-            self._status.status = ExitStatus.UNSATISFIABLE
+        my_status = SolverStatus()
+        my_status.solver_name = self.name
+        if self.ort_status == ort.FEASIBLE:
+            my_status.status = ExitStatus.FEASIBLE
+        elif self.ort_status == ort.OPTIMAL:
+            my_status.status = ExitStatus.OPTIMAL
+        elif self.ort_status == ort.INFEASIBLE:
+            my_status.status = ExitStatus.UNSATISFIABLE
         else:
             raise NotImplementedError # a new status type was introduced, please report on github
         # TODO, runtime?
 
-        if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
+        if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # TODO smth with enumerating the python vars and filling them
             # TODO, use a decorator for .value again so that can look like propety but is function
             # fill in variables
@@ -83,17 +83,9 @@ class ORToolsPython(SolverInterface):
             #for name,var in self.vardict:
             #    pass
             for var in modelvars:
-                var.set_value(self._solver.Value(var)) # not sure this will work
+                var.set_value(self.ort_solver.Value(var)) # not sure this will work
 
-        # return computed value
-        if not model.objective is None:
-            # optimisation problem
-            return model.objective.value()
-        else:
-            # satisfaction problem
-            if self._status.exitstatus == ExitStatus.FEASIBLE:
-                return True
-        return False
+        return my_status
 
 
     def post_expression(self, expr):

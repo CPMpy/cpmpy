@@ -34,7 +34,6 @@ class SolverInterface:
     """
     def __init__(self):
         self.name = "dummy"
-        self._status = SolverStatus()
 
     def supported(self):
         """
@@ -54,23 +53,9 @@ class SolverInterface:
         :param model: CPMpy model to be parsed.
         :type model: Model
 
-        :return: the computed output:
-            - True      if it is a satisfaction problem and it is satisfiable
-            - False     if it is a satisfaction problem and not satisfiable
-            - [int]     if it is an optimisation problem
-        """
-        return False
-
-    def status(self):
-        """
-            Returns the latest status of the solver
-
-            Status information is automatically updated when calling solve(),
-            and includes exit status and runtime.
-
         :return: an object of :class:`SolverStatus`
         """
-        return self._status
+        return SolverStatus()
 
 
 #
@@ -107,6 +92,7 @@ class SolverStatus(object):
     def __init__(self):
         self.exitstatus = ExitStatus.NOT_RUN
         self.runtime = None
+        self.solver_name = None
 
     def __repr__(self):
         return "{} ({} seconds)".format(self.exitstatus, self.runtime)
