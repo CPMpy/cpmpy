@@ -1,8 +1,8 @@
 import numpy as np
 import unittest
-import cpmpy as cp
+from cpmpy.solver_interfaces.minizinc_python import MiniZincPython
 
-supported_solvers= [cp.MiniZincPython()]
+supported_solvers= [MiniZincPython()]
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
         # basic model

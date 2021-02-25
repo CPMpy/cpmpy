@@ -1,7 +1,7 @@
 import unittest
-import cpmpy as cp
+from cpmpy.solver_interfaces.minizinc_python import MiniZincPython
 
-supported_solvers= [cp.MiniZincPython()]
+supported_solvers= [MiniZincPython()]
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):

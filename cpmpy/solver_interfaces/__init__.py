@@ -1,1 +1,1 @@
-__all__ = ['minizinc_python', 'minizinc_text', 'ortools_python', 'solver_interface']
+__all__ = ['solver_interface','minizinc_python', 'minizinc_text', 'ortools_python']

@@ -11,16 +11,10 @@ A longer description of its motivation and architecture is in [this short paper]
 The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
 
-Preface
--------
-
 .. toctree::
 
    preface/overview
    preface/behind_the_scenes
-
-API documentation
------------------
 
 .. toctree::
 
