@@ -5,7 +5,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='cpmpy',
-    version='0.5.0',
+    version='0.5.1',
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
     description='A numpy-based light-weight Python library for conveniently modeling constraint problems in Python',
