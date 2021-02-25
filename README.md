@@ -1,20 +1,66 @@
-## CPMpy: CP modeling made easy in Python
+## Welcome to CPMpy.
 
-Welcome to CPMpy.
+CPMpy is a numpy-based library for conveniently modeling constraint programming problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as or-tools, as well as other CP modeling languages with a python API (python-MiniZinc, PyCSP3, NumberJack) that in turn support a wide range of solvers.
 
-CPMpy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
 
-It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
+### Quick start
 
-A longer description of its motivation and architecture is in [this short paper](modref19_cppy.pdf).
+CPMpy is available in the Python Package Index. 
+
+    pip install cpmpy
+
+Installing it this way automatically installs the dependencies (numpy and ortools), after which you are ready to go.
+
+You can then model and solve constraint programming problems using python and numpy, for example:
+```python
+import numpy as np
+from cpmpy import *
+
+e = 0 # value for empty cells
+given = np.array([
+    [e, e, e,  2, e, 5,  e, e, e],
+    [e, 9, e,  e, e, e,  7, 3, e],
+    [e, e, 2,  e, e, 9,  e, 6, e],
+
+    [2, e, e,  e, e, e,  4, e, 9],
+    [e, e, e,  e, 7, e,  e, e, e],
+    [6, e, 9,  e, e, e,  e, e, 1],
+
+    [e, 8, e,  4, e, e,  1, e, e],
+    [e, 6, 3,  e, e, e,  e, 8, e],
+    [e, e, e,  6, e, 8,  e, e, e]])
+
+
+# Variables
+puzzle = IntVar(1, 9, shape=given.shape)
+
+constraints = []
+# Constraints on rows and columns
+constraints += [ alldifferent(row) for row in puzzle ]
+constraints += [ alldifferent(col) for col in puzzle.T ] # numpy's Transpose
+
+# Constraints on blocks
+for i in range(0,9, 3):
+    for j in range(0,9, 3):
+        constraints += [ alldifferent(puzzle[i:i+3, j:j+3]) ] # python's indexing
+
+# Constraints on values (cells that are not empty)
+constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
+
+
+# Solve and print
+Model(constraints).solve()
+print(puzzle.value())
+```
+
+You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/master/examples/quickstart_sudoku.ipynb) 
+
+### Documentation
 
 The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
 Check the CP [tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
-
-### Install the library
-
-### Documentation
 
 Get the full CPMpy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
 

@@ -1,45 +1,46 @@
 #!/usr/bin/python3
 """
 Sudoku problem in CPMpy
-
-Based on the Numberjack model of Hakan Kjellerstrand
 """
-from cpmpy import *
-import numpy
 
-x = 0 # cells whose value we seek
-n = 9 # matrix size
-given = numpy.array([
-    [x, x, x,  2, x, 5,  x, x, x],
-    [x, 9, x,  x, x, x,  7, 3, x], 
-    [x, x, 2,  x, x, 9,  x, 6, x],
-        
-    [2, x, x,  x, x, x,  4, x, 9],
-    [x, x, x,  x, 7, x,  x, x, x],
-    [6, x, 9,  x, x, x,  x, x, 1],
-        
-    [x, 8, x,  4, x, x,  1, x, x],
-    [x, 6, 3,  x, x, x,  x, 8, x],
-    [x, x, x,  6, x, 8,  x, x, x]])
+# load the libraries
+import numpy as np
+from cpmpy import *
+
+e = 0 # value for empty cells
+given = np.array([
+    [e, e, e,  2, e, 5,  e, e, e],
+    [e, 9, e,  e, e, e,  7, 3, e],
+    [e, e, 2,  e, e, 9,  e, 6, e],
+
+    [2, e, e,  e, e, e,  4, e, 9],
+    [e, e, e,  e, 7, e,  e, e, e],
+    [6, e, 9,  e, e, e,  e, e, 1],
+
+    [e, 8, e,  4, e, e,  1, e, e],
+    [e, 6, 3,  e, e, e,  e, 8, e],
+    [e, e, e,  6, e, 8,  e, e, e]])
 
 
 # Variables
-puzzle = IntVar(1, n, shape=given.shape)
+puzzle = IntVar(1,9, shape=given.shape)
 
-constraint = []
-# constraints on rows and columns
-constraint += [ alldifferent(row) for row in puzzle ]
-constraint += [ alldifferent(col) for col in puzzle.T ]
+constraints = []
+# Constraints on rows and columns
+constraints += [ alldifferent(row) for row in puzzle ]
+constraints += [ alldifferent(col) for col in puzzle.T ] # numpy's Transpose
 
-# constraint on blocks
-for i in range(0,n,3):
-    for j in range(0,n,3):
-        constraint += [ alldifferent(puzzle[i:i+3, j:j+3]) ]
+# Constraints on blocks
+for i in range(0,9, 3):
+    for j in range(0,9, 3):
+        constraints += [ alldifferent(puzzle[i:i+3, j:j+3]) ] # python's indexing
 
-# constraints on values
-constraint += [ puzzle[given>0] == given[given>0] ]
+# Constraints on values (cells that are not empty)
+constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
 
-model = Model(constraint)
-stats = model.solve()
-print(stats)
+
+# Solve and print
+model = Model(constraints)
+model.solve()
+
 print(puzzle.value())
