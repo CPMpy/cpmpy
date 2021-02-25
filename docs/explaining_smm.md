@@ -21,3 +21,15 @@ n integer variables between a and b is
 ```python
 ListOfVariables = [IntVar(a,b,n)]
 ```
+
+
+Constraints are included in the model as a list. First, we create a list to add the constraints. Then, we append an 'all different constraint' in a straightforward fashion. Finally, we add the constraint saying SEND + MORE = MONEY. 
+
+```python
+constraint = []
+constraint += [ alldifferent([s,e,n,d,m,o,r,y]) ]
+constraint += [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
+                 + sum(   [m,o,r,e] * np.flip(10**np.arange(4)) )
+                == sum( [m,o,n,e,y] * np.flip(10**np.arange(5)) ) ]
+```             
+       
