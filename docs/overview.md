@@ -31,7 +31,7 @@ is satisfied. This problem lies into the setting of **constraint satisfaction pr
 The cpmpy implementation for this CSP looks like:
 
 ```python
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Construct the model
