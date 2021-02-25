@@ -32,4 +32,11 @@ constraint += [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
                  + sum(   [m,o,r,e] * np.flip(10**np.arange(4)) )
                 == sum( [m,o,n,e,y] * np.flip(10**np.arange(5)) ) ]
 ```             
-       
+Note that we can use numpy library to efficiently state the last constraint. As final modeling step we need to create a Model object. To do this, we need to state the model
+object with list of constraints as argument.
+
+```
+model = Model(constraint)
+```
+
+
