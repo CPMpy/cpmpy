@@ -199,37 +199,39 @@ def flatten_boolexpr(subexpr):
                 * Operator with is_type_bool() EXCEPT '->', all args are: BoolVar
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
-    raise NotImplementedError()
+    #raise NotImplementedError()
     args = expr.args
     base_cons = []
 
     if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
-        # case Var
+        # base case: single boolVar
         return (subexpr, [subexpr])
 
     elif isinstance(subexpr, Comparison)
         allowed = {'>','<','<=','>=','==','!='}
         if any([check_lincons(subexpr, opname) for opname in allowed]):
-            # this is already in base constraint form
+            # Base case: already in base constraint form
             bvar = BoolVarImpl()
             base_cons += [subexpr == bvar]
-            return (bvar, base_cons)
+            return bvar, base_cons
 
-        else:
-            (var1, bco1) = flatten_boolexpr(args[0])
-            (var2, bco2) = flatten_boolexpr(args[1])
-            bvar = BoolVarImpl()
-            base_cons += [bco1, bco2]
-            base_cons += [Comparison(subexpr.name, [var1, var2]) == bvar]
-
+        # recursive calls to LHS, RHS
+        (var1, bco1) = flatten_boolexpr(args[0])
+        (var2, bco2) = flatten_boolexpr(args[1])
+        bvar = BoolVarImpl()
+        base_cons += [bco1, bco2]
+        base_cons += [Comparison(subexpr.name, [var1, var2]) == bvar]
+        return bvar, base_cons
 
     elif isinstance(subexpr, Operator):
+        # apply De Morgan's transform for "implies"
+        if subexpr.name is '->':
+            return flatten_boolexpr(Operator('or', -args[0], args[1]))
+
         if isinstance(subexpr.args[0], BoolVarImpl) and isinstance(subexpr.args[1], BoolVarImpl):
             bvar = BoolVarImpl()
             base_cons += [subexpr == bvar]
             return bvar, base_cons
-        
-        
 
         # nested AND, OR
         # recurisve function call to LHS and RHS
@@ -239,7 +241,6 @@ def flatten_boolexpr(subexpr):
         bvar = BoolVarImpl()
         base_cons += [bco1, bco2]
         base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
-        
         return bvar, base_cons
 
     
