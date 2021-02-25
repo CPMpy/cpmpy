@@ -422,6 +422,16 @@ class Element(Expression):
         assert (len(arg_list) >= 2 and len(arg_list) <= 3), "Element takes 2 or three arguments"
         super().__init__("element", arg_list)
 
+    def value(self):
+        def argval(a):
+            return a.value() if isinstance(a, Expression) else a
+        idxval = argval(self.args[1])
+        arrval = argval(self.args[0][idxval])
+        if len(self.args) == 2:
+            return arrval
+        else:
+            return (arrval == argval(self.args[2]))
+        return None # default
 
     def __repr__(self):
         out = "{}[{}]".format(self.args[0], self.args[1])
