@@ -194,16 +194,17 @@ def flatten_numexpr(expr):
 
 
 def __is_flatten_var(arg):
-    #TODO: extend definition to consider Arithmetic operator expression as valid,
-    # e.g. (2a+c-b)/d 
     return is_num(arg) or isinstance(arg, NumVarImpl)
 
-def is_nested_expr(subexpr):
+def __is_nested_linexpr(subexpr):
     if __is_flatten_var(subexpr):
         return False
+    if isinstance(subexpr, Operator):
+        # extend definition to consider Arithmetic operator expression as valid
+        return subexpr.name is 'sum' and not all([__is_flatten_var(arg) for arg in subexpr.args])
     return not all([__is_flatten_var(arg) for arg in subexpr.args])
 
-def __check_lincons(subexpr, opname):
+def __check_lincons(subexpr):
     LHS, RHS = subexpr.args
     # LHS or RHS is a Var (IntVar, BoolVar, Num)
     if not (__is_flatten_var(LHS) or __is_flatten_var(RHS)):
@@ -215,7 +216,7 @@ def __check_lincons(subexpr, opname):
             return True 
         # RHS is an LinExp and that's ok
         # as long as it does not have more nested expression 
-        if any([is_nested_expr(arg) for arg in RHS.args]):
+        if any([__is_nested_linexpr(arg) for arg in RHS.args]):
             return False
         return True
 
@@ -224,14 +225,14 @@ def __check_lincons(subexpr, opname):
     elif __is_flatten_var(RHS):
         if __is_flatten_var(LHS):
             return True 
-        if any([is_nested_expr(arg) for arg in LHS.args]):
+        if any([__is_nested_linexpr(arg) for arg in LHS.args]):
             return False
         return True
 
     return False 
 
 def __check_or_flip_base_const(subexpr):
-    assert __check_lincons(subexpr, subexpr.name)
+    assert __check_lincons(subexpr)
     if __is_flatten_var(subexpr.args[1]):
         return subexpr
     # flip the base constraint to have 
@@ -258,12 +259,13 @@ def flatten_boolexpr(subexpr):
         # base case: single boolVar
         return (subexpr, [])
 
+    #TODO: call to flatten_numexp
     args = subexpr.args
     base_cons = []
 
     if isinstance(subexpr, Comparison):
         allowed = {'>','<','<=','>=','==','!='}
-        if any([__check_lincons(subexpr, opname) for opname in allowed]):
+        if subexpr.name in allowed and __check_lincons(subexpr):
             # Base case: already in base constraint form
             if is_num(args[0]) or is_num(args[1]):
                 bvar = BoolVarImpl()
