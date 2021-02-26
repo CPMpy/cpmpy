@@ -217,7 +217,12 @@ class ORToolsPython(SolverInterface):
 
         else:
             # TODO no mapping to this global constraint, try decomposition?
-            print(expr.name, type(expr), expr)
-            raise NotImplementedError # if you reach this... please report on github
+            if expr.name == 'circuit':
+                dec = flatten_constraint(decompose_circuit(expr))
+                for constr in dec:
+                    self.post_expression(constr)
+
+            else:
+                raise NotImplementedError # if you reach this... please report on github
         
 
