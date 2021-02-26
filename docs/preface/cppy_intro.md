@@ -46,9 +46,9 @@ constraint += [    sum(   [s,e,n,d] * np.flip(10**np.arange(4)) )
 model = Model(constraint)
 print(model)
 
-stats = model.solve()
-print("  S,E,N,D =  ", [x.value() for x in [s,e,n,d]])
-print("  M,O,R,E =  ", [x.value() for x in [m,o,r,e]])
+result = model.solve()
+print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
+print("  M,O,R,E =   ", [x.value() for x in [m,o,r,e]])
 print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
 ```
 
@@ -81,7 +81,7 @@ And the result will be:
   M,O,N,E,Y = [1, 0, 6, 5, 2]
 ```
 
-In the [next](https://github.com/tias/cppy/blob/master/docs/examples/explaining_smm.ipynb), we are going to look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
+In this [Jupyter notebook](https://github.com/tias/cppy/blob/master/docs/examples/explaining_smm.ipynb), we will look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
 
 
 ### References
