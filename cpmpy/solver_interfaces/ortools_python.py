@@ -6,7 +6,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions import Comparison, Expression, Operator, Element
-from ..globalconstraints import *
+from ..constraints import *
 from ..model_tools.get_variables import get_variables
 from ..model_tools.flatten_model import *
 
