@@ -25,7 +25,6 @@ from .expressions import Operator
 from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
-
 class Model(object):
     """
     CPMpy Model object, contains the constraint and objective expression trees

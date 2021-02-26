@@ -42,6 +42,7 @@ Supplementary :mod:`.examples` package
 --------------------------------------
 
 .. toctree::
+   :caption: Examples:
    examples/all_examples
 
 FAQ
