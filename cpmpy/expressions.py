@@ -3,7 +3,6 @@
 ##
 ## expressions.py
 ##
-##
 """
     ===============
     List of classes
@@ -33,6 +32,44 @@ def is_any_list(arg):
     return isinstance(arg, (list, tuple, np.ndarray))
 def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
+
+# Overwriting all/any python built-ins
+# all: listwise 'and'
+def all(iterable):
+    collect = [] # logical expressions
+    for elem in iterable:
+        if elem is False:
+            return False # no need to create constraint
+        elif elem is True:
+            pass
+        elif isinstance(elem, Expression):
+            collect.append( elem.boolexpr() )
+        else:
+            raise "unknown argument to 'all'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
+        return Operator("and", collect)
+    return True
+
+# any: listwise 'or'
+def any(iterable):
+    collect = [] # logical expressions
+    for elem in iterable:
+        if elem is True:
+            return True # no need to create constraint
+        elif elem is False:
+            pass
+        elif isinstance(elem, Expression):
+            collect.append( elem.boolexpr() )
+        else:
+            raise "unknown argument to 'any'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
+        return Operator("or", collect)
+    return False
+
 
 class Expression(object):
     """
@@ -210,12 +247,12 @@ class Expression(object):
         return Operator("mod", [other, self])
 
     def __pow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [other, self])
-    
+
     # Not implemented: (yet?)
     #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
@@ -241,7 +278,7 @@ class Comparison(Expression):
         if hasattr(left, '__len__'): 
             assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
-    
+
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
@@ -251,7 +288,7 @@ class Comparison(Expression):
     # it could be a vectorized constraint
     def __iter__(self):
         return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
-    
+
     # is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -329,7 +366,7 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-    
+
     # it could be a vectorized constraint
     def __iter__(self):
         if len(self.args) == 2:
@@ -417,7 +454,7 @@ class Operator(Expression):
             if is_bool:
                 return self
         return super().__eq__(other)
-    
+
     def value(self):
         arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
         if   self.name == "sum": return sum(arg_vals)
@@ -426,7 +463,6 @@ class Operator(Expression):
         elif self.name == "div": return arg_vals[0] / arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
-        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
         return None # default
@@ -467,7 +503,7 @@ class Element(Expression):
         # else: 3 arguments, reified variant, is bool
         if is_num(other) and other == 1:
             return self
-        
+
 
 
 # see globalconstraints.py for concrete instantiations
@@ -497,6 +533,6 @@ class GlobalConstraint(Expression):
 
         if self.is_bool and is_num(other) and other == 1:
             return self
-        
+
         # default
         return super().__eq__(other)

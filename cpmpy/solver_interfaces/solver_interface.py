@@ -24,10 +24,10 @@
 #==============================================================================
 from enum import Enum
 import time
+from abc import ABC, abstractmethod
 
-#
 #==============================================================================
-class SolverInterface:
+class SolverInterface(ABC):
     """
         Abstract class for defining solver interfaces. All classes implementing
         the ``SolverInterface``
@@ -35,6 +35,7 @@ class SolverInterface:
     def __init__(self):
         self.name = "dummy"
 
+    @abstractmethod
     def supported(self):
         """
             Check for support in current system setup. Return True if the system
@@ -45,6 +46,7 @@ class SolverInterface:
         """
         return False
 
+    @abstractmethod
     def solve(self, model):
         """
             Build the CPMpy model into solver-supported model ready for solving

@@ -87,17 +87,17 @@ class ORToolsPython(SolverInterface):
         # solve the instance
         self.ort_solver = ort.CpSolver()
         self.ort_solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self.ort_status = self.ort_solver.Solve(self._model)
+        self.ort_status = self.ort_solver.Solve(self.ort_model)
 
         # translate status
         my_status = SolverStatus()
         my_status.solver_name = self.name
         if self.ort_status == ort.FEASIBLE:
-            my_status.status = ExitStatus.FEASIBLE
+            my_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.OPTIMAL:
-            my_status.status = ExitStatus.OPTIMAL
+            my_status.exitstatus = ExitStatus.OPTIMAL
         elif self.ort_status == ort.INFEASIBLE:
-            my_status.status = ExitStatus.UNSATISFIABLE
+            my_status.exitstatus = ExitStatus.UNSATISFIABLE
         else:
             raise NotImplementedError # a new status type was introduced, please report on github
         my_status.runtime = self.ort_solver.WallTime()
@@ -108,7 +108,6 @@ class ORToolsPython(SolverInterface):
                 var._value = self.ort_solver.Value(self.varmap[var])
 
         return my_status
-
 
     # for subexpressions (variables, lists and linear expressions)
     def convert_expression(self, expr):

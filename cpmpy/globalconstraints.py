@@ -62,6 +62,25 @@ import types # for overloading decompose()
     natively support 'circuit'.
 """
 
+# min: listwise 'min'
+def min(iterable):
+    """
+        min() overwrites python built-in,
+        checks if all constants and computes np.min() in that case
+    """
+    if not any(isinstance(elem, Expression) for elem in iterable):
+        return np.min(iterable)
+    return GlobalConstraint("min", list(iterable))
+
+def max(iterable):
+    """
+        max() overwrites python built-in,
+        checks if all constants and computes np.map() in that case
+    """
+    if not any(isinstance(elem, Expression) for elem in iterable):
+        return np.max(iterable)
+    return GlobalConstraint("max", list(iterable))
+
 
 def alldifferent(variables):
     expr = GlobalConstraint("alldifferent", variables)

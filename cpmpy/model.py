@@ -1,7 +1,30 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## variables.py
+##
+"""
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        Model
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 import numpy as np
 from .expressions import Operator
-from .solver_interfaces.__util import get_supported_solvers
+from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
+
 
 """
     Class that contains the constraints and the objective function,
