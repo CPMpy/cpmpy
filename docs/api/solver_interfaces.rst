@@ -1,5 +1,8 @@
 Solver Interfaces (:mod:`cpmpy.solver_interface`)
 =================================================
+=========================
+List of Solver Interfaces
+=========================
 
 .. toctree::
     :titlesonly:
@@ -8,10 +11,6 @@ Solver Interfaces (:mod:`cpmpy.solver_interface`)
     all_solver_interfaces/minizinc_python
     all_solver_interfaces/minizinc_text
     all_solver_interfaces/ortools_python
-
-=========================
-List of Solver Interfaces
-=========================
 
 +-----------------------------+-------------------------------------------------------+
 | :mod:`MiniZincPython`       |   :ref:`all_solver_interfaces/minizinc_python`        |
