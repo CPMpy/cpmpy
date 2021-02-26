@@ -13,6 +13,7 @@ CPMpy is available in the Python Package Index, and hence can be installed as fo
     pip install cpmpy
 
 Installing it this way automatically installs the dependencies (numpy and ortools), after which you are ready to go.
+Note that CPMpy also supports other solvers (e.g. Minizinc) but the default solver is ortools, for the further detials please check the [documentation](https://cpmpy.readthedocs.io/en/latest/tutorial/how_to_install.html).  
 
 You can then model and solve constraint programming problems using python and numpy, for example:
 ```python

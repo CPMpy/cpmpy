@@ -27,7 +27,6 @@ If Or-Tools is not installed yet or is not yet upgraded to the latest version, r
 
 Minizinc Installation and Configuration (optional)
 --------------------------------------------------
-
 A complete installation guide for the installation of Minizinc is available at `Minizinc Install Guide <https://www.minizinc.org/doc-2.5.3/en/installation.html#installation>`_
 
 For **linux** users, if __snap__ is installed, Minizinc installation amounts to running
@@ -71,8 +70,12 @@ Minzinc-Python Installation and Configuration (optional)
 --------------------------------------------------------
 
 .. warning:: Make sure you first install Minizinc on your system before attempting to install MiniZinc-Python
+To make use of the Minizinc solver, you need to install the CPMpy with the Minizinc option. 
 
-The MiniZinc-Python install amounts to running the following command in a terminal window.
+.. code-block:: bash
+    
+    $ pip install -U cpmpy[minizinc] 
+Or just install Installation instructions from pip by running the following command.
 
 .. code-block:: bash
 
