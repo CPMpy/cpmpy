@@ -165,7 +165,7 @@ def flatten_numexpr(expr):
     """
     if is_num(expr) or isinstance(expr, NumVarImpl):
         return (expr, [])
-
+    args = expr.args
     basecons = []
     if isinstance(expr, Operator):
         # only Numeric operators allowed
@@ -176,12 +176,51 @@ def flatten_numexpr(expr):
             raise Exception("Operator '{}' not allowed as numexpr".format(expr.name))
 
         # TODO: actually need to flatten THIS expression (and recursively the arguments)
-        return (expr, []) # TODO
-        newargs = [flatten_numexpr(e) for e in expr.args]
+        
+        arity = Operator.allowed[expr.name][0]
+        # unary int op
+        if arity == 1:
+            var, bcon = flatten_numexpr(args[0])
+            basecons += [bcon]
+            if expr.name == 'abs':
+                ivar = IntVarImpl(0, var.ub)
+            else: # '-'
+                ivar = IntVarImpl(-var.ub, -var.lb)
 
+            basecons += [Operator(expr.name, [var]) == ivar]
+            return ivar, basecons
+
+        # binary int op 
+        elif arity == 2:
+            var1, bcon1 = flatten_numexpr(args[0])
+            var2, bcon2 = flatten_numexpr(args[1])
+            basecons += [bcon1, bcon2]
+            if expr.name == 'mul': 
+                ivar = IntVarImpl(var1.lb * var2.lb, var1.ub * var2.ub) 
+            elif expr.name == 'div':
+                ivar = IntVarImpl(var1.lb // var2.ub, var1.ub // var2.lb )
+            elif expr.name == 'mod': 
+                ivar = IntVarImpl(0, var1.ub)
+            elif expr.name == 'pow':
+                ivar = IntVarImpl(var1.lb ** var2.lb, var1.ub ** var2.lb)
+            
+            basecons += [Operator(expr.name, [var1, var2]) == ivar]
+            return ivar, basecons
+
+        else: # arity > 2 (sum)
+            varrs, bcons = zip(*[flatten_numexpr(arg) for arg in args])
+            basecons += [bcons] 
+            lb = sum([var.lb if isinstance(var, NumVarImpl) else var for var in varrs]) 
+            ub = sum([var.ub if isinstance(var, NumVarImpl) else var for var in varrs])
+            ivar = IntVarImpl(lb, ub) 
+
+            basecons += [Operator('sum', varrs) == ivar]
+            return ivar, basecons
+            
 
     elif isinstance(expr, Comparison):
         #allowed = {'==', '!=', '<=', '<', '>=', '>'}
+        raise Exception("Comparison not allowed as numexpr".format(expr.name))
         return (expr, []) # TODO
 
     elif isinstance(expr, Element):
