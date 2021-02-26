@@ -5,11 +5,8 @@ Solver Interfaces (:mod:`cpmpy.solver_interface`)
     :inherited-members:
     :no-special-members:
 
-.. automodule:: cpmpy.solver_interfaces.minizinc_python
-    :no-special-members:
+.. toctree::
+   :maxdepth: 1
+   :caption: All Solver interfaces:
 
-.. automodule:: cpmpy.solver_interfaces.minizinc_text
-    :no-special-members:
-
-.. automodule:: cpmpy.solver_interfaces.ortools_python
-    :no-special-members:
+   all_solver_interfaces/all_solver_interfaces
