@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Mario problem in CpMPy
+Mario problem in CPMpy
 
 Based on the MiniZinc model, same data
 """
@@ -45,7 +45,5 @@ cons += [ sum(node_fuel) < fuelLimit ]
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
 
 model = Model(cons, maximize=gold)
-
-# Statistics are returned after solving.
-stats = model.solve()
+print("Gold:", model.solve()) # solve returns objective value
 print("successor vars:",s.value())

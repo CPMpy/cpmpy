@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Who killed agatha? problem in CpMPy
+Who killed agatha? problem in CPMpy
 
 Based on the Numberjack model of Hakan Kjellerstrand
 see also: http://www.hakank.org/constraint_programming_blog/2014/11/decision_management_community_november_2014_challenge_who_killed_agath.html
@@ -31,7 +31,7 @@ constraint += [ richer[i,i] == 0 for i in range(n) ]
 constraint += [ (richer[i,j] == 1) == (richer[j,i] == 0) for i in range(n) for j in range(n) if i != j ]
 
 # Charles hates noone that Agatha hates. 
-constraint += [ implies(hates[agatha,i] == 1, hates[charles,i] == 0) for i in range(n) ]
+constraint += [ (hates[agatha,i] == 1).implies(hates[charles,i] == 0) for i in range(n) ]
 
 # Agatha hates everybody except the butler. 
 #cons_aga = (hates[agatha,(agatha,charles,butler] == [1,1,0])
@@ -40,15 +40,17 @@ constraint += [ hates[agatha,agatha]  == 1,
                 hates[agatha,butler]  == 0 ]
 
 # The butler hates everyone not richer than Aunt Agatha. 
-constraint += [ implies(richer[i,agatha] == 0, hates[butler,i] == 1) for i in range(n) ]
+constraint += [ (richer[i,agatha] == 0).implies(hates[butler,i] == 1) for i in range(n) ]
 
 # The butler hates everyone whom Agatha hates. 
-constraint += [ implies(hates[agatha,i] == 1, hates[butler,i] == 1) for i in range(n) ]
+constraint += [ (hates[agatha,i] == 1).implies(hates[butler,i] == 1) for i in range(n) ]
 
 # Noone hates everyone. 
 constraint += [ sum([hates[i,j] for j in range(n)]) <= 2 for i in range(n) ]
 
+# Solve and print
 model = Model(constraint)
-stats = model.solve()
-#print(model)
-print("killer ID:",killer.value())
+if model.solve():
+    print("killer ID:",killer.value())
+else:
+    print("No solution found")

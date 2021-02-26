@@ -1,3 +1,29 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## expressions.py
+##
+##
+"""
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        Expression
+        Operator
+        Element
+        GlobalConstraint
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 import numpy as np
 
 # Helpers for type checking
@@ -47,7 +73,25 @@ class Expression(object):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        return None
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
+        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
+        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
+        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
+        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
+        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        return None # default
+
+    # implication constraint: self -> other
+    # Python does not offer relevant syntax...
+    # for double implication, use equivalence self == other
+    def implies(self, other):
+        # other constant
+        if other is True:
+            return True
+        if other is False:
+            return ~self
+        return Operator('->', [self, other])
 
     # Comparisons
     def __eq__(self, other):
@@ -375,24 +419,17 @@ class Operator(Expression):
         return super().__eq__(other)
     
     def value(self):
-        if self.name == "pow":
-            raise NotImplementedError()
-
-        operator_obj = {
-            "sum": sum(self.args),
-            "mul": self.args[0] * self.args[1],
-            "sub": self.args[0] - self.args[1],
-            "div": self.args[0] / self.args[1],
-            "mod": self.args[0] % self.args[1],
-            # "pow": self.args[0] ** self.args[1],
-            "mul": self.args[0] * self.args[1],
-            "-": -self.args[0],
-            "abs": abs(self.args[0])
-        }
-        if self.name not in operator_obj:
-            return None
-
-        return operator_obj[self.name]
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "sum": return sum(arg_vals)
+        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
+        elif self.name == "sub": return arg_vals[0] - arg_vals[1]
+        elif self.name == "div": return arg_vals[0] / arg_vals[1]
+        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
+        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
+        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
+        elif self.name == "-":   return -arg_vals[0]
+        elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        return None # default
 
 class Element(Expression):
     """
@@ -404,6 +441,16 @@ class Element(Expression):
         assert (len(arg_list) >= 2 and len(arg_list) <= 3), "Element takes 2 or three arguments"
         super().__init__("element", arg_list)
 
+    def value(self):
+        def argval(a):
+            return a.value() if isinstance(a, Expression) else a
+        idxval = argval(self.args[1])
+        arrval = argval(self.args[0][idxval])
+        if len(self.args) == 2:
+            return arrval
+        else:
+            return (arrval == argval(self.args[2]))
+        return None # default
 
     def __repr__(self):
         out = "{}[{}]".format(self.args[0], self.args[1])

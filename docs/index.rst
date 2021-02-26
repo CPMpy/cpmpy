@@ -1,12 +1,8 @@
-.. CpMPy documentation master file, created by
-   sphinx-quickstart on Mon Feb 22 12:15:31 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-CpMPy: CP modeling made easy in Python
+CPMpy: CP modeling made easy in Python
 ==========================================
 
-CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+CPMpy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
 
@@ -16,7 +12,23 @@ The software is in ALPHA state, and more of a proof-of-concept really. Do send s
 
 
 .. toctree::
-   :maxdepth: 3
-   :caption: Contents:
+   :caption: Preface:
 
-   structure
+   preface/overview
+   preface/behind_the_scenes
+
+.. toctree::
+   :caption: API documentation:
+
+   api/expressions
+   api/model
+   api/variables
+   api/globalconstraints
+   api/solver_interfaces
+
+Supplementary :mod:`.examples` package
+--------------------------------------
+
+.. toctree::
+   examples/all_examples
+

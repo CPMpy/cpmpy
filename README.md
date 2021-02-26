@@ -1,28 +1,78 @@
-## CpMPy: CP modeling made easy in Python
+## Welcome to CPMpy
 
-Welcome to CpMPy. Licensed under the MIT License.
+CPMpy is a numpy-based library for conveniently modeling constraint programming problems in Python.
 
-CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+It aims to connect to common constraint solving systems that have a Python API, such as or-tools, as well as other CP modeling languages with a python API (python-MiniZinc, PyCSP3, NumberJack) that in turn support a wide range of solvers.
 
-It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
+It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
 
-A longer description of its motivation and architecture is in [this short paper](modref19_cppy.pdf).
+### Quick start
 
-The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
+CPMpy is available in the Python Package Index, and hence can be installed as follows:
 
-Check the CP [tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
+    pip install cpmpy
 
-### Install the library
+Installing it this way automatically installs the dependencies (numpy and ortools), after which you are ready to go.
+
+You can then model and solve constraint programming problems using python and numpy, for example:
+```python
+import numpy as np
+from cpmpy import *
+
+e = 0 # value for empty cells
+given = np.array([
+    [e, e, e,  2, e, 5,  e, e, e],
+    [e, 9, e,  e, e, e,  7, 3, e],
+    [e, e, 2,  e, e, 9,  e, 6, e],
+
+    [2, e, e,  e, e, e,  4, e, 9],
+    [e, e, e,  e, 7, e,  e, e, e],
+    [6, e, 9,  e, e, e,  e, e, 1],
+
+    [e, 8, e,  4, e, e,  1, e, e],
+    [e, 6, 3,  e, e, e,  e, 8, e],
+    [e, e, e,  6, e, 8,  e, e, e]])
+
+
+# Variables
+puzzle = IntVar(1,9, shape=given.shape)
+
+constraints = []
+# Constraints on rows and columns
+constraints += [ alldifferent(row) for row in puzzle ]
+constraints += [ alldifferent(col) for col in puzzle.T ] # numpy's Transpose
+
+# Constraints on blocks
+for i in range(0,9, 3):
+    for j in range(0,9, 3):
+        constraints += [ alldifferent(puzzle[i:i+3, j:j+3]) ] # python's indexing
+
+# Constraints on values (cells that are not empty)
+constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
+
+
+# Solve and print
+if Model(constraints).solve():
+    print(puzzle.value())
+else:
+    print("No solution found")
+```
+
+You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/master/examples/quickstart_sudoku.ipynb).
 
 ### Documentation
 
-Get the full CpMPy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
+New to constraint programming? Check our [CP basics tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
 
-### Examples
+See also the more extensive documentation on [ReadTheDocs](https://cpmpy.readthedocs.io/).
+
+Including the [API documentation](https://cpmpy.readthedocs.io/en/latest/api/model.html)
+
+### More examples
 
 The following examples show the elegance of building on Python/Numpy:
 ```python
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Construct the model
@@ -44,50 +94,9 @@ print("  M,O,R,E =  ", [x.value() for x in [m,o,r,e]])
 print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
 ```
 
-sudoku and others need matrix indexing, which numpy supports extensively:
-```python
-from cppy import *
-import numpy
-
-x = 0 # cells whose value we seek
-n = 9 # matrix size
-given = numpy.array([
-    [x, x, x,  2, x, 5,  x, x, x],
-    [x, 9, x,  x, x, x,  7, 3, x],
-    [x, x, 2,  x, x, 9,  x, 6, x],
-
-    [2, x, x,  x, x, x,  4, x, 9],
-    [x, x, x,  x, 7, x,  x, x, x],
-    [6, x, 9,  x, x, x,  x, x, 1],
-
-    [x, 8, x,  4, x, x,  1, x, x],
-    [x, 6, 3,  x, x, x,  x, 8, x],
-    [x, x, x,  6, x, 8,  x, x, x]])
-
-
-# Variables
-puzzle = IntVar(1, n, shape=given.shape)
-
-constraint = []
-# constraints on rows and columns
-constraint += [ alldifferent(row) for row in puzzle ]
-constraint += [ alldifferent(col) for col in puzzle.T ]
-
-# constraint on blocks
-for i in range(0,n,3):
-    for j in range(0,n,3):
-        constraint += [ alldifferent(puzzle[i:i+3, j:j+3]) ]
-
-# constraints on values
-constraint += [ puzzle[given>0] == given[given>0] ]
-
-model = Model(constraint)
-stats = model.solve()
-```
-
 and an OR problem for good faith:
 ```python
-from cppy import *
+from cpmpy import *
 import numpy
 
 # data
@@ -106,7 +115,27 @@ model = Model(constraint, minimize=objective)
 stats = model.solve()
 ```
 
-See more [examples](https://github.com/tias/cppy/tree/master/examples).
+See more examples in the [examples/](https://github.com/tias/cppy/tree/master/examples) directory, including notebooks.
+
+
+### Helping out
+We welcome any feedback, as well as hearing about how you are using it. You are also welcome to reuse any parts in your own project.
+
+A good starting point to help with the development, would be to write more CP problems in CPMpy, and add them to the examples folder.
+
+CPMpy is still in Beta stage, and bugs can still occur. If so, please report the issue on Github!
+
+Are you a solver developer? We are willing to integrate solvers that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
+
+### Roadmap
+
+If you are curious, some things we are working on, or considering:
+
+- more tests, better docs
+- more examples
+- showcases of how we use it in our research
+- (idea) a program analyzer that can detect whether a model is a native SAT or MIP problem
+- (idea) integration to PySAT when only Boolean variables are used
 
 ### FAQ
 
@@ -115,20 +144,7 @@ Problem: I get the following error:
 "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
 ```
 
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
+Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CPMpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
 ```python
 m = cparray(m); m[X] == True
 ```
-
-### Roadmap
-
-TODOs:
-
-- auto translate to or-tools
-- auto translate to numberjack, which is Python-based but not numpy-based
-- add more models (see Hakan K's page(s))
-- publish on pypi, with proper docs
-
-### License
-
-This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).

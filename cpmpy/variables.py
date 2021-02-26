@@ -43,13 +43,16 @@ class BoolVarImpl(IntVarImpl):
     def __init__(self, lb=0, ub=1):
         assert(lb == 0 or lb == 1)
         assert(ub == 0 or ub == 1)
-        super().__init__(lb, ub, setname=False)
+        IntVarImpl.__init__(self, lb, ub, setname=False)
         
         self.name = BoolVarImpl.counter
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
         
     def __repr__(self):
         return "BV{}".format(self.name)
+
+    def __invert__(self):
+        return NegBoolView(self)
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
@@ -63,6 +66,25 @@ class BoolVarImpl(IntVarImpl):
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
     def __hash__(self): return super().__hash__()
+
+class NegBoolView(BoolVarImpl):
+    """
+        Represents not(`var`), not an actual variable implementation!
+
+        It stores a link to `var`'s BoolVarImpl
+    """
+    def __init__(self, bv):
+        assert(isinstance(bv, BoolVarImpl))
+        self._bv = bv
+
+    def value(self):
+        return not self._bv.value()
+
+    def __repr__(self):
+        return "~BV{}".format(self._bv.name)
+
+    def __invert__(self):
+        return self._bv
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest

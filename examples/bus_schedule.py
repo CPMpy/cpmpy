@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """
-Bus scheduling in CpMPy
+Bus scheduling in CPMpy
 
 Based on the Numberjack model of Hakan Kjellerstrand:
 Problem from Taha "Introduction to Operations Research", page 58.
@@ -22,7 +22,5 @@ constraint += [x[-1] + x[0] == demands[-1]] # 'around the clock' constraint
 objective = sum(x) # number of buses
 
 model = Model(constraint, minimize=objective)
-stats = model.solve()
+print("Value:", model.solve()) # solve returns objective value
 print("Solution:", x.value())
-print("Value:", sum(x.value()))
-# TODO, should we support objective.value() to compute this sum? e.g. that each operator knows how to compute its value?

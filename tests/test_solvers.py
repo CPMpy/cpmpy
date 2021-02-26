@@ -14,4 +14,3 @@ class TestSolvers(unittest.TestCase):
         for solver in cp.get_supported_solvers():
             model.solve()
             self.assertEqual([xi.value() for xi in x], [0, 1, 2])
-

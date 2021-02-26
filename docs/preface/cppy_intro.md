@@ -1,13 +1,13 @@
-# Constraint Programming
+## Constraint Programming
 
+Many real-life decisions involve a large number of options. To decide if a problem is feasible or finding the best one amongst all the options is hard task to do by hand. In other words, to enumerate all the possible combinations of single decisions and evaluate them is infeasible in practice. To avoid this "*brute force*" approach, the paradigm of **constraint programming (CP)** allow us to:
 
-<!--- Basic concepts on Constraint programming -->
-Many real-life decisions involve a large number of options. To decide if a problem is feasible or finding the best one amongst all the options is hard task to do by hand. In other words, to enumerate all the possible combinations of single decisions and evaluate them is infeasible in practice. To avoid this "*brute force*" approach, the paradigm of **constraint programming (CP)** allow us: 1. to model relationships between single decisions smartly; and 2. give an answer efficiently.
+1. Model relationships between single decisions smartly
+2. Give an answer efficiently.
 
-A **constraint satisfaction problem (CSP)** consists of a set of variables and constraints stablishing relationships between them. Each variable has a finite of possible values (its domain). The goal is to assign values to the variables in its domains satisfying all the constraints. A more general version, called **constraint optimization programming (C0P)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'. 
+A **constraint satisfaction problem (CSP)** consists of a set of variables and constraints stablishing relationships between them. Each variable has a finite of possible values (its domain). The goal is to assign values to the variables in its domains satisfying all the constraints. A more general version, called **constraint optimization programming (C0P)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'.
 
-## What is necessary to model a CP?
-
+### What is necessary to model a CP?
 
 A typical CP is defined by the following elements:
 
@@ -17,7 +17,7 @@ A typical CP is defined by the following elements:
 
 Moreover, if we want to model an optimization problem we also need an objective function.
 
-## Example:
+### Example
 
 A cryptarithmetic puzzle is a mathematical exercise where the digits of some numbers are represented by letters (or symbols). Each letter represents a unique digit. The goal is to find the digits such that a given mathematical equation is verified. 
 
@@ -31,7 +31,7 @@ is satisfied. This problem lies into the setting of **constraint satisfaction pr
 The cpmpy implementation for this CSP looks like:
 
 ```python
-from cppy import *
+from cpmpy import *
 import numpy as np
 
 # Construct the model
@@ -67,7 +67,7 @@ Note that we can find an slightly different version of this problem by optimizin
 <img src="https://render.githubusercontent.com/render/math?math=\max%20\quad10000%20M%20%2B%201000%20O%20%2B%20100%20N%20%2B%2010%20E%20%2B%201%20Y">
 
 
-The cpmpy implementation for this COP looks like:
+To implement this COP, we need only to modify the Model statement by adding an objective function:
 
 ```python
 coefs  = np.flip(10**np.arange(5))
@@ -81,10 +81,10 @@ And the result will be:
   M,O,N,E,Y = [1, 0, 6, 5, 2]
 ```
 
-But this is just a toy example. In the following we are going to consider more difficult problems and real-world applications.
+In the [next](https://github.com/tias/cppy/blob/master/docs/explaining_smm.md), we are going to look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
 
 
-## References
+### References
 
 
 <!---Add more references -->

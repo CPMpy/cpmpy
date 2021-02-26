@@ -1,9 +1,12 @@
-from . import *
-from ..expressions import *
-from ..globalconstraints import *
-from ..variables import *
-from ..model_tools.flatten_model import *
-from itertools import cycle
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## ortools_python.py
+##
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..model_tools.get_variables import get_variables
+from ..expressions import Comparison, Expression, Operator, Element
 
 def zipcycle(vars1, vars2):
     v1 = [vars1] if not is_any_list(vars1) else vars1
@@ -76,28 +79,32 @@ class ORToolsPython(SolverInterface):
         original_vars = get_variables(cpm_model)
 
         # create model
-        self._model = self.make_model(cpm_model)
+        self.ort_model = self.make_model(cpm_model)
         # solve the instance
-        self._solver = ort.CpSolver()
-        self._solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self._status = self._solver.Solve(self._model)
+        self.ort_solver = ort.CpSolver()
+        self.ort_solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
+        self.ort_status = self.ort_solver.Solve(self._model)
 
         # translate status
-        solstats = SolverStats()
-        if self._status == ort.FEASIBLE:
-            solstats.status = ExitStatus.FEASIBLE
-        elif self._status == ort.OPTIMAL:
-            solstats.status = ExitStatus.OPTIMAL
+        my_status = SolverStatus()
+        my_status.solver_name = self.name
+        if self.ort_status == ort.FEASIBLE:
+            my_status.status = ExitStatus.FEASIBLE
+        elif self.ort_status == ort.OPTIMAL:
+            my_status.status = ExitStatus.OPTIMAL
+        elif self.ort_status == ort.INFEASIBLE:
+            my_status.status = ExitStatus.UNSATISFIABLE
         else:
-            raise NotImplementedError
+            raise NotImplementedError # a new status type was introduced, please report on github
         solstats.runtime = self._solver.WallTime()
 
-        if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
+        if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # fill in variables
             for var in original_vars:
                 var._value = self._solver.Value(self.varmap[var])
 
-        return solstats
+        return my_status
+
 
     # for subexpressions (variables, lists and linear expressions)
     def convert_expression(self, expr):

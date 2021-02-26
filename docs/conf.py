@@ -19,7 +19,7 @@ import cpmpy
 
 # -- Project information -----------------------------------------------------
 
-project = 'CpMPy'
+project = 'CPMpy'
 copyright = '2021, Tias Guns'
 author = 'Tias Guns'
 
@@ -40,10 +40,13 @@ html_context = {
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
-    'sphinx.ext.mathjax'
+    'sphinx.ext.mathjax',
+    'sphinx.ext.viewcode',
+    'm2r2'
 ]
 
-source_suffix = '.rst'
+source_suffix =  ['.rst', '.md']
+# source_suffix =  '.rst'
 
 # The master toctree document.
 master_doc = 'index'
