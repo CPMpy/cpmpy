@@ -583,11 +583,14 @@ class GlobalConstraint(Expression):
         """
         if a global constraint has a default decomposition,
         then it should monkey-patch this function, e.g.:
+        
+        .. code-block:: python
 
-        def my_decomp_function(self):
-            return []
-        g = GlobalConstraint("g", args)
-        g.decompose = my_decom_function
+            def my_decomp_function(self):
+                return []
+            g = GlobalConstraint("g", args)
+            g.decompose = my_decom_function
+
         """
         return None
 
