@@ -228,12 +228,10 @@ class ORToolsPython(SolverInterface):
            self._model.AddAllDifferent(args) 
 
         else:
-            # TODO no mapping to this global constraint, try decomposition?
-            if expr.name == 'circuit':
-                dec = flatten_constraint(decompose_circuit(expr))
-                for constr in dec:
-                    self.post_expression(constr)
-
+            # global constraint not known, try generic decomposition
+            dec = expr.decompose()
+            if not dec is None:
+                self.post_expression(flatten_constraint(dec))
             else:
                 raise NotImplementedError # if you reach this... please report on github
         

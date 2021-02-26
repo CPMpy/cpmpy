@@ -1,4 +1,5 @@
 from .expressions import *
+import types # for overloading decompose()
 
 # in one file for easy overview, does not include interpretation
 # TODO: docstrings, generic decomposition method
@@ -46,12 +47,13 @@ from .expressions import *
     simply overwrite the 'decompose' as above, e.g.:
 
     ```
+    import types
     def my_circuit_decomp(self):
         return any(self.args) # does not actually enforce circuit
 
     vars = IntVars(1,9, shape=(10,))
     constr = circuit(vars)
-    constr.decompose = my_circuit_decomp
+    constr.decompose = types.MethodType(my_circuit_decomp, constr) # attach it
 
     Model(constr).solve()
     ```
@@ -68,7 +70,7 @@ def alldifferent(variables):
     def decomp(self):
         raise NotImplementedError()
 
-    expr.decompose = decomp # attaches function to object
+    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
     return expr
 
 def circuit(variables):
@@ -78,5 +80,5 @@ def circuit(variables):
     def decomp(self):
         raise NotImplementedError()
 
-    expr.decompose = decomp # attaches function to object
+    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
     return expr

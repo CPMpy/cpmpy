@@ -479,6 +479,17 @@ class GlobalConstraint(Expression):
         self.add_equality_as_arg = add_equality_as_arg
         self.is_bool = is_bool
 
+    def decompose(self):
+        """
+            if a global constraint has a default decomposition,
+            then it should monkey-patch this function, e.g.:
+            def my_decomp_function(self):
+                return []
+            g = GlobalConstraint("g", args)
+            g.decompose = my_decom_function
+        """
+        return None
+
     def __eq__(self, other):
         if self.add_equality_as_arg:
             self.args.append(other)
