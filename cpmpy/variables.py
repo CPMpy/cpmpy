@@ -128,6 +128,9 @@ def is_var(x):
     return isinstance(x, IntVarImpl)
 
 class NumVarImpl(Expression):
+    """
+    **Continuous numerical** variable with given lowerbound and upperbound.
+    """
     def __init__(self, lb, ub):
         assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
@@ -143,6 +146,9 @@ class NumVarImpl(Expression):
         return hash(str(self))
 
 class IntVarImpl(NumVarImpl):
+    """
+    **Integer** constraint variable with given lowerbound and upperbound.
+    """
     counter = 0
 
     def __init__(self, lb, ub, setname=True):
@@ -157,6 +163,9 @@ class IntVarImpl(NumVarImpl):
         return "IV{}".format(self.name)
 
 class BoolVarImpl(IntVarImpl):
+    """
+    **Boolean** constraint variable with given lowerbound and upperbound.
+    """
     counter = 0
 
     def __init__(self, lb=0, ub=1):
@@ -208,6 +217,9 @@ class NegBoolView(BoolVarImpl):
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):
+    """
+    N-dimensional numpy array of variables.
+    """
     def __init__(self, shape, **kwargs):
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
@@ -259,6 +271,9 @@ class NDVarArray(Expression, np.ndarray):
 
 # N-dimensional array of Boolean Decision Variables
 def BoolVar(shape=None):
+    """
+    # N-dimensional array of Boolean Decision Variables
+    """
     if shape is None or shape == 1:
         return BoolVarImpl()
     elif shape == 0:
@@ -271,8 +286,10 @@ def BoolVar(shape=None):
     return NDVarArray(shape, dtype=object, buffer=data)
 
 
-# N-dimensional array of Integer Decision Variables with lower-bound and upper-bound
 def IntVar(lb, ub, shape=None):
+    """
+    N-dimensional array of Integer Decision Variables with lower-bound `lb` and upper-bound `ub`
+    """
     if shape is None or shape == 1:
         return IntVarImpl(lb,ub)
     elif shape == 0:
@@ -285,10 +302,13 @@ def IntVar(lb, ub, shape=None):
     return NDVarArray(shape, dtype=object, buffer=data)
 
 
-# N-dimensional wrapper, wrap a standard array (e.g. [1,2,3,4] whatever)
-# so that we can do [1,2,3,4][var1] == var2, e.g. element([1,2,3,4],var1,var2)
-# needed because standard arrays can not be indexed by non-constants
 def cparray(arr):
+    """
+    N-dimensional wrapper, wraps a standard array.
+
+    So that we can do [1,2,3,4][var1] == var2, e.g. element([1,2,3,4],var1,var2)
+    needed because standard arrays can not be indexed by non-constants
+    """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
     return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
