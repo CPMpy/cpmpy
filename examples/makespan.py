@@ -33,7 +33,7 @@ all_jobs = range(jobs_count)
 machines_count = 1 + max([task for job in jobs_data for task in job])
 all_machines = range(machines_count)
 max_duration = sum([job[task] for job in jobs_data for task in job])
-print(max_duration)
+
 
 makespan = IntVar(0,max_duration)
 start_time = IntVar(0, max_duration, shape=(machines_count,jobs_count))
@@ -54,7 +54,7 @@ for j in all_jobs:
 # No overlap constraint
 for m in all_machines:
     for j1,j2 in (combinations(all_jobs, 2)):
-        print(m,j1,j2)
+        # print(m,j1,j2)
         constraint += [any([start_time[m,j1] >= end_time[m,j2] , 
         start_time[m,j2] >= end_time[m,j1] ])]
 
@@ -64,7 +64,7 @@ for j in all_jobs:
 model = Model(constraint, minimize=makespan)
 stats = model.solve()
 print(stats)
-print(makespan.value())
+print("Optimal Schedule Length: ",makespan.value())
 start_solution = start_time.value()
 end_solution = end_time.value()
 print("Optimal Scheduling")
