@@ -133,7 +133,7 @@ class Model(object):
         # do recursive where needed, with overwrite
         for (i, expr) in enumerate(lst):
             if isinstance(expr, list):
-                lst[i] = self.make_and_from_list(expr)
+                lst[i] = self._make_and_from_list(expr)
         if len(lst) == 1:
             return lst[0]
         return Operator("and", lst)
