@@ -41,9 +41,9 @@ class Model(object):
 
     Arguments of constructor:
 
-    - *args: Expression object(s) or list(s) of Expression objects
-    - minimize: Expression object representing the objective to minimize
-    - maximize: Expression object representing the objective to maximize
+    - `*args`: Expression object(s) or list(s) of Expression objects
+    - `minimize`: Expression object representing the objective to minimize
+    - `maximize`: Expression object representing the objective to maximize
 
     At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
     """

@@ -56,20 +56,25 @@ class SolverInterface(object):
         """
         return SolverStatus()
 
-#
+
 #==============================================================================
 class ExitStatus(Enum):
     """
-        Exit status of the solver
+    Exit status of the solver
 
-        Attributes:
-            NOT_RUN: Has not been run
-            OPTIMAL: Optimal solution to an optimisation problem found
-            FEASIBLE: Feasible solution to a satisfaction problem found,
-                      or feasible (but not proven optimal) solution to an
-                      optimisation problem found
-            UNSATISFIABLE: No satisfying solution exists
-            ERROR: Some error occured (solver should have thrown Exception)
+    Attributes:
+
+        `NOT_RUN`: Has not been run
+
+        `OPTIMAL`: Optimal solution to an optimisation problem found
+
+        `FEASIBLE`: Feasible solution to a satisfaction problem found,
+                    or feasible (but not proven optimal) solution to an
+                    optimisation problem found
+
+        `UNSATISFIABLE`: No satisfying solution exists
+
+        `ERROR`: Some error occured (solver should have thrown Exception)
     """
     NOT_RUN = 1
     OPTIMAL = 2
@@ -77,8 +82,6 @@ class ExitStatus(Enum):
     UNSATISFIABLE = 4
     ERROR = 5
 
-
-#
 #==============================================================================
 class SolverStatus(object):
     """

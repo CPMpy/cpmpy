@@ -30,13 +30,15 @@
     Module description
     ==================
 
-    This module takes advantage of the Python operator overloading to easily create constraints i.e. (combinations of)expressions variables. Expressions are represented as an expression tree. All *types* of expression can be combined
-    to form complex constraints. 
+    This module takes advantage of the Python operator overloading to easily create
+    constraints i.e. (combinations of) expressions variables. Expressions are
+    represented as an expression tree. All *types* of expression can be combined
+    to form complex constraints.
 
     The list of expressions (constraints) supported are
-    
-    1. **Boolean expressions** : expressions with boolean operators (:math:`\\neg{} \\vee \\wedge \\implies`).
-    2. **Integer expressions** : expressions with standard math operators (+-*...) and even the sum()-function.
+
+    1. **Boolean expressions**: expressions with boolean operators (:math:`\\neg \\vee \\wedge \\implies`).
+    2. **Integer expressions**: expressions with standard math operators (+-*...) and even the sum()-function.
     3. **Comparison constraints** : expressions associated with equality (:math:`==`), and inequality (:math:`!=`) constraints and more (>=, <=, ..).
     4. **Element constraints** : 'element' expressions arr[x] = 3
     5. **Global constraints** : named expressions with decomposition features.
@@ -81,7 +83,7 @@ def is_pure_list(arg):
 def all(iterable):
     """
     Constraint ensuring all elements are True.
-    
+
     Overwrites the default python all built-in.
     """
     collect = [] # logical expressions
@@ -131,7 +133,7 @@ class Expression(object):
 
     Each Expression is considered to be a function whose value can be used
     in other expressions.
-    
+
     Each Expression may implement:
     - boolexpr(): the Boolean form of the expression
         default: (expr == 1)
@@ -565,7 +567,6 @@ class Element(Expression):
             return self
 
 
-
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(Expression):
     """
@@ -580,12 +581,13 @@ class GlobalConstraint(Expression):
 
     def decompose(self):
         """
-            if a global constraint has a default decomposition,
-            then it should monkey-patch this function, e.g.:
-            def my_decomp_function(self):
-                return []
-            g = GlobalConstraint("g", args)
-            g.decompose = my_decom_function
+        if a global constraint has a default decomposition,
+        then it should monkey-patch this function, e.g.:
+
+        def my_decomp_function(self):
+            return []
+        g = GlobalConstraint("g", args)
+        g.decompose = my_decom_function
         """
         return None
 

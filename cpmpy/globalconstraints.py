@@ -1,11 +1,13 @@
-from .variables import *
-from .expressions import *
-from itertools import chain, combinations
-
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## globalconstraints.py
+##
 """
     ===============
     List of classes
     ===============
+
     .. autosummary::
         :nosignatures:
 
@@ -17,6 +19,7 @@ from itertools import chain, combinations
     ================
     List of functions
     =================
+
     .. autosummary::
         :nosignatures:
 
@@ -35,10 +38,10 @@ from itertools import chain, combinations
 
     You can define a new global constraint as simply as:
 
-    ```
-    def my_global(args):
-        return GlobalConstraint("my_global", args)
-    ```
+    .. code-block:: python
+
+        def my_global(args):
+            return GlobalConstraint("my_global", args)
 
 
     Of course, solvers may not support a global constraint
@@ -48,37 +51,40 @@ from itertools import chain, combinations
     the decompose() function.
     To overwrite it, you should define your global constraint as a
     subclass of GlobalConstraint, rather then as a function above.
-    
+
     Your decomposition function can use any standard CPMpy expression.
     For example:
 
-    ```
-    class my_global(GlobalConstraint):
-        def __init__(self, args):
-            super().__init__("my_global", args)
-    
-        def decompose(self):
-            return [self.args[0] != self.args[1]] # your decomposition
-    ```
+    .. code-block:: python
 
+        class my_global(GlobalConstraint):
+            def __init__(self, args):
+                super().__init__("my_global", args)
+
+            def decompose(self):
+                return [self.args[0] != self.args[1]] # your decomposition
 
     If you are modeling a problem and you want to use another decomposition,
     simply overwrite the 'decompose' function of the class, e.g.:
 
-    ```
-    def my_circuit_decomp(self):
-        return [self.args[0] == 1] # does not actually enforce circuit
-    circuit.decompose = my_circuit_decomp # attach it, no brackets!
+    .. code-block:: python
 
-    vars = IntVars(1,9, shape=(10,))
-    constr = circuit(vars)
+        def my_circuit_decomp(self):
+            return [self.args[0] == 1] # does not actually enforce circuit
+        circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
-    Model(constr).solve()
-    ```
+        vars = IntVars(1,9, shape=(10,))
+        constr = circuit(vars)
+
+        Model(constr).solve()
 
     The above will use 'my_circuit_decomp', if the solver does not
     natively support 'circuit'.
 """
+from .variables import *
+from .expressions import *
+from itertools import chain, combinations
+
 
 # min: listwise 'min'
 def min(iterable):
@@ -102,29 +108,34 @@ def max(iterable):
 
 
 class alldifferent(GlobalConstraint):
-    """ all arguments have a different (distinct) value
+    """
+    all arguments have a different (distinct) value
     """
     def __init__(self, args):
         super().__init__("alldifferent", args)
-    
+
     def decompose(self):
         return [var1 != var2 for var1, var2 in _all_pairs(self.args)]
 
 
 class allequal(GlobalConstraint):
-    """ all arguments have the same value
+    """
+    all arguments have the same value
     """
     def __init__(self, args):
         super().__init__("allequal", args)
-    
+
     def decompose(self):
         return [var1 == var2 for var1, var2 in _all_pairs(self.args)]
 
 
 class circuit(GlobalConstraint):
+    """
+    Variables of the constraint form a circuit ex: 0 -> 3 -> 2 -> 0
+    """
     def __init__(self, args):
         super().__init__("circuit", args)
-    
+
     def decompose(self):
         """
             TODO needs explanation/reference

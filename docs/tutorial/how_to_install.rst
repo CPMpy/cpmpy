@@ -7,7 +7,7 @@ CPMpy requires Python ``3.6`` or newer and is also installed with OR-Tools as de
 
     $ pip install cpmpy
 
-If the previous command fails to execute, it may be due to the permission to install the package globally Python packages. 
+If the previous command fails to execute, it may be due to the permission to install the package globally Python packages.
 
 .. code-block:: bash
 
@@ -47,7 +47,7 @@ Otherwhise, the installation with the bundled Minizinc is straightforward (see h
 3. Add the following lines to your `.bashrc` file (or `.zshrc` when using zsh):
 
     .. code-block:: bash
-    
+
         export PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/bin:$PATH
         export LD_LIBRARY_PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/lib:$LD_LIBRARY_PATH
         export QT_PLUGIN_PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/plugins:$QT_PLUGIN_PATH
@@ -70,11 +70,12 @@ Minzinc-Python Installation and Configuration (optional)
 --------------------------------------------------------
 
 .. warning:: Make sure you first install Minizinc on your system before attempting to install MiniZinc-Python
-To make use of the Minizinc solver, you need to install the CPMpy with the Minizinc option. 
+
+To make use of the Minizinc solver, you need to install the CPMpy with the Minizinc option.
 
 .. code-block:: bash
-    
-    $ pip install -U cpmpy[minizinc] 
+
+    $ pip install -U cpmpy[minizinc]
 
 Or just install Installation instructions from pip by running the following command.
 
