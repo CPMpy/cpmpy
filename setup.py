@@ -5,7 +5,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='cpmpy',
-    version='0.5.2',
+    version='0.5.3',
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
     license='Apache 2.0',
@@ -25,7 +25,11 @@ setup(
         "FULL":  ["minizinc"],
     },
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9"
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
