@@ -5,7 +5,7 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='cpmpy',
-    version='0.5.1',
+    version='0.5.2',
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
     license='Apache 2.0',
