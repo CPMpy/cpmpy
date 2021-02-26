@@ -3,7 +3,7 @@
 
 # current version
 #==============================================================================
-VERSION = (0, 0, 5, "dev")
+VERSION = (0, 5, 1, "dev")
 
 from .constraints import *
 from .expressions import *
