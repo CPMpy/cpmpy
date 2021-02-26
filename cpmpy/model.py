@@ -3,14 +3,26 @@ from .expressions import Operator
 from .solver_interfaces.__util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
+"""
+    Class that contains the constraints and the objective function,
+    and that provides an easy solve() abstraction which will call a solver.
+
+    See the examples for basic usage, which involves:
+
+    - creation, e.g. m = Model(cons, minimize=obj)
+    - solving, e.g. m.solve()
+    - optionally, checking status/runtime, e.g. m.status()
+"""
+
 class Model(object):
     """
     CPMpy Model object, contains the constraint and objective expression trees
 
     Arguments of constructor:
-    *args: Expression object(s) or list(s) of Expression objects
-    minimize: Expression object representing the objective to minimize
-    maximize: Expression object representing the objective to maximize
+
+    - *args: Expression object(s) or list(s) of Expression objects
+    - minimize: Expression object representing the objective to minimize
+    - maximize: Expression object representing the objective to maximize
 
     At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
     """
@@ -22,7 +34,7 @@ class Model(object):
         if len(args) == 0 or (len(args) == 1 and isinstance(args[0], list) and len(args[0]) == 0): # None or empty list
             self.constraints = []
         else:
-            root_constr = self.make_and_from_list(args)
+            root_constr = self._make_and_from_list(args)
             if root_constr.name == 'and':
                 # unpack top-level conjuction
                 self.constraints = root_constr.args
@@ -40,17 +52,6 @@ class Model(object):
         if not minimize is None:
             self.objective = minimize
             self.objective_max = False
-
-    def make_and_from_list(self, args):
-        """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """
-        lst = list(args) # make mutable copy of type list
-        # do recursive where needed, with overwrite
-        for (i, expr) in enumerate(lst):
-            if isinstance(expr, list):
-                lst[i] = self.make_and_from_list(expr)
-        if len(lst) == 1:
-            return lst[0]
-        return Operator("and", lst)
         
     def __add__(self, cons):
         """
@@ -125,3 +126,14 @@ class Model(object):
         :return: an object of :class:`SolverStatus`
         """
         return self._solver_status
+
+    def _make_and_from_list(self, args):
+        """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """
+        lst = list(args) # make mutable copy of type list
+        # do recursive where needed, with overwrite
+        for (i, expr) in enumerate(lst):
+            if isinstance(expr, list):
+                lst[i] = self.make_and_from_list(expr)
+        if len(lst) == 1:
+            return lst[0]
+        return Operator("and", lst)
