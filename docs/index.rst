@@ -15,8 +15,8 @@ Install the library
 -------------------
 .. toctree::
    :maxdepth: 2
-   
-   tutorial/how_to_install:
+
+   tutorial/how_to_install
 
 Documentation
 -------------
