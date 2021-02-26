@@ -29,10 +29,10 @@ Install the library
    :maxdepth: 1
    :caption: API documentation:
 
-   api/expressions
-   api/model
    api/variables
+   api/expressions
    api/constraints
+   api/model
    api/solver_interfaces
 
 Supplementary :mod:`.examples` package

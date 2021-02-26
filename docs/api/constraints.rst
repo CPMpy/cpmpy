@@ -1,5 +1,5 @@
-Constraints   (:mod:`cpmpy.constraints`)
-=======================================
+Constraints   (:mod:`cpmpy.globalconstraints`)
+==============================================
 
 .. automodule:: cpmpy.globalconstraints
     :inherited-members:
