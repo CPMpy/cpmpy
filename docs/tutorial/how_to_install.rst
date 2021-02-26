@@ -59,7 +59,7 @@ Otherwhise, the installation with the bundled Minizinc is straightforward (see h
 
     $ minizinc
 
-The following information (or similar) should appear on your terminal 
+The following information (or similar) should appear on your terminal
 
 .. code-block:: bash
 
@@ -75,6 +75,7 @@ To make use of the Minizinc solver, you need to install the CPMpy with the Miniz
 .. code-block:: bash
     
     $ pip install -U cpmpy[minizinc] 
+
 Or just install Installation instructions from pip by running the following command.
 
 .. code-block:: bash

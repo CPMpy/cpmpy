@@ -13,11 +13,18 @@ Solver Interfaces (:mod:`cpmpy.solver_interfaces.solver_interface`)
 List of Solver Interfaces
 =========================
 
-+-----------------------------+-------------------------------------------------------+
-| :mod:`MiniZincPython`       |   Interface to the python 'minizinc' package          |
-| :mod:`MiniZincText`         |   Interface to the 'minizinc'-text package            |
-| :mod:`ORToolsPython`        |   Interface to the python 'ortools' API               |
-+-----------------------------+-------------------------------------------------------+
+.. list-table:: Solver Interfaces
+   :widths: 25 75
+   :header-rows: 1
+
+    * - Module
+      - Description
+    * - :mod:`MiniZincPython`
+      - Interface to the python 'minizinc' package
+    * - :mod:`MiniZincText`
+      - Interface to the 'minizinc'-text package
+    * - :mod:`ORToolsPython`
+      - Interface to the python 'ortools' API
 
 .. automodule:: cpmpy.solver_interfaces.solver_interface
     :inherited-members:
