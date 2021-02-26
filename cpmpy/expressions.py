@@ -79,6 +79,11 @@ def is_pure_list(arg):
 # Overwriting all/any python built-ins
 # all: listwise 'and'
 def all(iterable):
+    """
+    Constraint ensuring all elements are True.
+    
+    Overwrites the default python all built-in.
+    """
     collect = [] # logical expressions
     for elem in iterable:
         if elem is False:
@@ -95,8 +100,12 @@ def all(iterable):
         return Operator("and", collect)
     return True
 
-# any: listwise 'or'
 def any(iterable):
+    """
+    Constraint ensuring at least 1 or more of the elements composing the expression are True.
+
+    Overwrites the default python any built-in.
+    """
     collect = [] # logical expressions
     for elem in iterable:
         if elem is True:
