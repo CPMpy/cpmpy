@@ -184,12 +184,11 @@ class ORToolsPython(SolverInterface):
         if isinstance(expr, BoolVarImpl):
             print(type(expr), expr, self.varmap[expr])
             self._model.AddBoolOr( [self.varmap[expr]] )
-
-        # recursively convert arguments (subexpressions)
-        args = [self.convert_expression(e) for e in expr.args]
         
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
+            # recursively convert arguments (subexpressions)
+            args = [self.convert_expression(e) for e in expr.args]
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
             #XXX refactor decomposition into constructor of Comparison()?
             for lvar, rvar in zipcycle(args[0], args[1]):
@@ -238,7 +237,17 @@ class ORToolsPython(SolverInterface):
 
         # rest: global constraints
         elif expr.name == 'alldifferent':
-           self._model.AddAllDifferent(args) 
+            args = [self.convert_expression(e) for e in expr.args]
+            self._model.AddAllDifferent(args) 
+        elif expr.name == 'min' or expr.name == 'max':
+            args = [self.convert_expression(e) for e in expr.args]
+            lb = min(a.lb() if isinstance(arg, NumVarImpl) else a for a in args)
+            ub = max(a.ub() if isinstance(arg, NumVarImpl) else a for a in args)
+            aux = self._model.NewIntVar(lb, ub, "aux")
+            if expr.name == 'min':
+                self._model.AddMinEquality(aux, args) 
+            else:
+                self._model.AddMaxEquality(aux, args) 
 
         else:
             # global constraint not known, try generic decomposition
