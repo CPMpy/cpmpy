@@ -1,7 +1,30 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## variables.py
+##
+"""
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        Model
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 import numpy as np
 from .expressions import Operator
 from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
+
 
 class Model(object):
     """

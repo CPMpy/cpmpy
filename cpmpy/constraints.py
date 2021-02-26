@@ -1,3 +1,31 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## variables.py
+##
+"""
+    =================
+    List of Functions
+    =================
+    .. autosummary::
+        :nosignatures:
+
+        alldifferent
+        circuit
+        implies
+        all
+        any
+        min
+        max
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
 from .expressions import GlobalConstraint, Operator, Expression
 import numpy as np
 # in one file for easy overview, does not include interpretation

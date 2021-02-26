@@ -109,7 +109,6 @@ class ORToolsPython(SolverInterface):
 
         return my_status
 
-
     # for subexpressions (variables, lists and linear expressions)
     def convert_expression(self, expr):
         # python constants

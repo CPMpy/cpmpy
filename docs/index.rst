@@ -35,7 +35,7 @@ Documentation
    api/expressions
    api/model
    api/variables
-   api/globalconstraints
+   api/constraints
    api/solver_interfaces
 
 Supplementary :mod:`.examples` package
