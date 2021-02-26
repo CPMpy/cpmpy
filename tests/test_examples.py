@@ -4,8 +4,6 @@ import cpmpy as cp
 import numpy as np
 
 
-supported_solvers= [cp.MiniZincPython()]
-
 class TestExamples(unittest.TestCase):
 
     def test_send_more_money(self):
@@ -21,10 +19,8 @@ class TestExamples(unittest.TestCase):
         constraint += [ s > 0, m > 0 ]
 
         model = cp.Model(constraint)
-        # TODO: remove supported solvers and use cpmpy provided solver support
-        for solver in supported_solvers:
-        # for solver in cp.get_supported_solvers():
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
             self.assertEqual([x.value() for x in [s,e,n,d]], [9, 5, 6, 7])
             self.assertEqual([x.value() for x in [m,o,r,e]], [1, 0, 8, 5])
             self.assertEqual([x.value() for x in [m,o,n,e,y]], [1, 0, 6, 5, 2])
@@ -41,10 +37,8 @@ class TestExamples(unittest.TestCase):
 
         objective = sum(x) # number of buses
         model = cp.Model(constraint, minimize=objective)
-        # TODO: remove supported solvers and use cpmpy provided solver support
-        # for solver in cp.get_supported_solvers():
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
             self.assertEqual([xi.value() for xi in x], [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
             self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
 
@@ -65,8 +59,8 @@ class TestExamples(unittest.TestCase):
         model = cp.Model(constraint, maximize=objective)
 
         # Statistics are returned after solving.
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
 
             self.assertEqual(
                 objective.value(),
@@ -120,8 +114,8 @@ class TestExamples(unittest.TestCase):
         constraint += [ sum([hates[i,j] for j in range(n)]) <= 2 for i in range(n) ]
 
         model = cp.Model(constraint)
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
 
             self.assertEqual(killer.value(), 0)
 
@@ -170,8 +164,8 @@ class TestExamples(unittest.TestCase):
         constraint += [ puzzle[given>0] == given[given>0] ]
 
         model = cp.Model(constraint)
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
             for i in range(9):
                 for j in range(9):
                     self.assertEqual(puzzle[i,j].value(), solution[i][j])
@@ -218,7 +212,6 @@ class TestExamples(unittest.TestCase):
 
         expected_solution = [4, 0, 9, 1, 10, 8, 3, 5, 13, 6, 12, 7, 11, 14, 2]
 
-        # Statistics are returned after solving.
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        if True:
+            _ = model.solve()
             self.assertEqual([si.value() for si in s], expected_solution)

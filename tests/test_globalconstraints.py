@@ -1,8 +1,6 @@
 import unittest
 import cpmpy as cp
 
-supported_solvers= [cp.MiniZincPython()]
-
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -22,10 +20,8 @@ class TestGlobal(unittest.TestCase):
             model = cp.Model(constraint)
 
             # SOLVE
-            # TODO: remove supported solvers and use cpmpy provided solver support
-            # for solver in cp.get_supported_solvers():
-            for solver in supported_solvers:
-                _ = model.solve(solver=solver)
+            if True:
+                _ = model.solve()
                 vals = [x.value() for x in vars]
 
                 # ensure all different values
@@ -49,7 +45,4 @@ class TestGlobal(unittest.TestCase):
         constraints = [cp.circuit(x)]
         model = cp.Model(constraints)
 
-        # TODO: remove supported solvers and use cpmpy provided solver support
-        # for solver in cp.get_supported_solvers():
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        _ = model.solve()
