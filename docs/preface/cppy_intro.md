@@ -11,9 +11,9 @@ A **constraint satisfaction problem (CSP)** consists of a set of variables and c
 
 A typical CP is defined by the following elements:
 
-**Variables**: define variables and domain. Types of domains for different types of variables.
+**Variables**: Variables represents the decisions to be made. Depending on the decisions to be made variables can be *Boolean*, whenever a Yes or No decision is needed to be made, or *Integer*, whenever an integer number is necessary to represent a decision. In the first case, we say the **domain** of a Boolean variable is the set {True, False}. For integer variables we represent this as an interval of integer numbers, {a,b}.
 
-**Constraints**: Short summary of constraints
+**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution.
 
 Moreover, if we want to model an optimization problem we also need an objective function.
 
