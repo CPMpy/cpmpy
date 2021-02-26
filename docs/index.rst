@@ -18,9 +18,6 @@ Install the library
 
    tutorial/how_to_install
 
-Documentation
--------------
-
 .. toctree::
    :maxdepth: 1
    :caption: Preface:
