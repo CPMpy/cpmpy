@@ -12,15 +12,13 @@ A longer description of its motivation and architecture is in :download:`pdf <mo
 
 The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
-Check the CP [tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
-
-### Install the library
+Install the library
+-------------------
 
 .. tutorial/how_to_install:
 
-### Documentation
-
-Get the full CpMPy [documentation](https://cpmpy.readthedocs.io/en/latest/). 
+Documentation
+-------------
 
 .. toctree::
    :maxdepth: 1
@@ -71,4 +69,3 @@ License
 -------
 
 This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).
-   
