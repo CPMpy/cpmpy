@@ -7,6 +7,7 @@
     ===============
     List of classes
     ===============
+
     .. autosummary::
         :nosignatures:
 
@@ -15,9 +16,43 @@
         Element
         GlobalConstraint
 
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        all
+        any
+
     ==================
     Module description
     ==================
+
+
+    Boolean Expressions
+    -------------------
+
+    
+    how to create boolean expresions (&|~) and b1 == b2, b1.implies(b2)
+
+    Integer Expressions
+    -------------------
+    how to create integer expressions (+-*...) and sum() and
+
+    Comparison constraints
+    ----------------------
+    how to create comparison constraints (==,!=,inequalities)
+
+    Element constraints
+    -------------------
+    how to create 'element' expressions arr[x], see also cparray([1,2,3])[x] in FAQ on readme.md
+
+    Global constraints
+    ------------------
+    how to create global constraints (pointer to globalconstraints.py)
+
 
     ==============
     Module details
