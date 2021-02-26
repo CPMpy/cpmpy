@@ -1,8 +1,7 @@
+from .variables import *
 from .expressions import *
-import types # for overloading decompose()
+from itertools import chain, combinations
 
-# in one file for easy overview, does not include interpretation
-# TODO: docstrings, generic decomposition method
 """
     Global constraint definitions
 
@@ -12,8 +11,8 @@ import types # for overloading decompose()
     You can define a new global constraint as simply as:
 
     ```
-    def my_global(vars):
-        return GlobalConstraint("my_global", vars)
+    def my_global(args):
+        return GlobalConstraint("my_global", args)
     ```
 
 
@@ -21,39 +20,33 @@ import types # for overloading decompose()
     (if it does, it should be mapped to the API call in its SolverInterface)
 
     You can provide a decomposition for your global constraint through
-    a separate function. This function should then be 'monkey patched'
-    to the object, by overwriting the 'decompose' function.
-
+    the decompose() function.
+    To overwrite it, you should define your global constraint as a
+    subclass of GlobalConstraint, rather then as a function above.
+    
     Your decomposition function can use any standard CPMpy expression.
     For example:
 
     ```
-    def my_global_decomposition(self):
-        return any(self.args)
-    ```
-
-    Attaching it to the object (monkey patching) should be done just
-    after creating the GlobalConstraint object, e.g.:
+    class my_global(GlobalConstraint):
+        def __init__(self, args):
+            super().__init__("my_global", args)
     
-    ```
-    def my_global(vars):
-        expr = GlobalConstraint("my_global", vars)
-        expr.decompose = my_global_decomposition # no brackets!
-        return expr
+        def decompose(self):
+            return [self.args[0] != self.args[1]] # your decomposition
     ```
 
 
     If you are modeling a problem and you want to use another decomposition,
-    simply overwrite the 'decompose' as above, e.g.:
+    simply overwrite the 'decompose' function of the class, e.g.:
 
     ```
-    import types
     def my_circuit_decomp(self):
-        return any(self.args) # does not actually enforce circuit
+        return [self.args[0] == 1] # does not actually enforce circuit
+    circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
     vars = IntVars(1,9, shape=(10,))
     constr = circuit(vars)
-    constr.decompose = types.MethodType(my_circuit_decomp, constr) # attach it
 
     Model(constr).solve()
     ```
@@ -62,23 +55,47 @@ import types # for overloading decompose()
     natively support 'circuit'.
 """
 
+def _all_pairs(args):
+    """ internal helper function
+    """
+    pairs = list(combinations(args, 2))
+    return pairs
 
-def alldifferent(variables):
-    expr = GlobalConstraint("alldifferent", variables)
 
-    # a generic decomposition
-    def decomp(self):
-        raise NotImplementedError()
+class alldifferent(GlobalConstraint):
+    """ all arguments have a different (distinct) value
+    """
+    def __init__(self, args):
+        super().__init__("alldifferent", args)
+    
+    def decompose(self):
+        return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
-    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
-    return expr
 
-def circuit(variables):
-    expr = GlobalConstraint("circuit", variables)
+class allequal(GlobalConstraint):
+    """ all arguments have the same value
+    """
+    def __init__(self, args):
+        super().__init__("allequal", args)
+    
+    def decompose(self):
+        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
-    # a generic decomposition
-    def decomp(self):
-        raise NotImplementedError()
 
-    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
-    return expr
+class circuit(GlobalConstraint):
+    def __init__(self, args):
+        super().__init__("circuit", args)
+    
+    def decompose(self):
+        n = len(self.args)
+        z = IntVar(0, n-1, n)
+        constraints = []
+        constraints +=alldifferent.decompose(z)
+        constraints +=alldifferent.decompose(self.args)
+        constraints += [z[0]==self.args[0]]
+        constraints += [z[n-1]==self.args[0]]
+        for i in range(1,n-1):
+            constraints += [z[i] == self.args[z[i-1]]]
+            constraints += [z[i] != 0]
+        return constraints
+
