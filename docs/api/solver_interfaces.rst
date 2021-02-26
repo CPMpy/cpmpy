@@ -1,10 +1,6 @@
 Solver Interfaces (:mod:`cpmpy.solver_interfaces.solver_interface`)
 ===================================================================
 
-=========================
-List of Solver Interfaces
-=========================
-
 .. toctree::
     :titlesonly:
     :maxdepth: 1
@@ -13,10 +9,14 @@ List of Solver Interfaces
     all_solver_interfaces/minizinc_text
     all_solver_interfaces/ortools_python
 
+=========================
+List of Solver Interfaces
+=========================
+
 +-----------------------------+-------------------------------------------------------+
-| :mod:`MiniZincPython`       |   :ref:`all_solver_interfaces/minizinc_python`        |
-| :mod:`MiniZincText`         |   :ref:`all_solver_interfaces/minizinc_text`          |
-| :mod:`ORToolsPython`        |   :ref:`all_solver_interfaces/ortools_python`         |
+| :mod:`MiniZincPython`       |   Interface to the python 'minizinc' package          |
+| :mod:`MiniZincText`         |   Interface to the 'minizinc'-text package            |
+| :mod:`ORToolsPython`        |   Interface to the python 'ortools' API               |
 +-----------------------------+-------------------------------------------------------+
 
 .. automodule:: cpmpy.solver_interfaces.solver_interface
