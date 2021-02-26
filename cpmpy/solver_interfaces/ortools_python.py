@@ -16,8 +16,11 @@
     ==================
     Module description
     ==================
-"""
 
+    ==============
+    Module details
+    ==============
+"""
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions import Comparison, Expression, Operator, Element
 from ..globalconstraints import *

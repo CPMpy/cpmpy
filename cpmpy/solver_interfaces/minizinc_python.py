@@ -16,6 +16,10 @@
     ==================
     Module description
     ==================
+
+    ==============
+    Module details
+    ==============
 """
 
 from .solver_interface import ExitStatus, SolverStatus

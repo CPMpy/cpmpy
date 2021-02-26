@@ -3,14 +3,6 @@
 List of classes
 ===============
 
-.. autosummary::
-    :nosignatures:
-
-    MiniZincPython
-    MiniZincText
-    ORToolsPython
-
-
 .. automodule:: cpmpy.solver_interfaces.minizinc_python
     :no-special-members:
 

@@ -16,6 +16,10 @@
     ==================
     Module description
     ==================
+
+    ==============
+    Module details
+    ==============
 """
 
 from ..model_tools.get_variables import get_variables
