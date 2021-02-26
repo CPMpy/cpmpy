@@ -80,7 +80,6 @@ from itertools import chain, combinations
     natively support 'circuit'.
 """
 
-I'm still working on the API documentation
 # min: listwise 'min'
 def min(iterable):
     """
