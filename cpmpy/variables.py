@@ -10,14 +10,64 @@
     .. autosummary::
         :nosignatures:
 
-        NumVar
-        Operator
-        Element
-        GlobalConstraint
+        NumVarImpl
+        IntVarImpl
+        BoolVarImpl
+        NegBoolView
+        NDVarArray
+
+    =================
+    List of functions
+    =================
+    .. autosummary::
+
+        BoolVar
+        IntVar
+        cparray
 
     ==================
     Module description
     ==================
+
+    This module is used for defining single variables as well as numpy-arrays of variables. There are 2 different types of variables: boolean variables, integer variables.
+    
+    Boolean Variables
+    -----------------
+
+    Boolean variables a.k.a `BoolVar` are variables that have a very specific domain. They take either the value `True` or `False` (1 or 0 respectively).
+
+    The following examples show how to create a boolean variable with 3 use cases:
+    - the creation of a single (unit-sized or non-vector) boolean variable.
+        .. code-block:: python
+
+            # creation of a unit Boolean variable
+            x = BoolVar()
+
+    - the creation of a vector boolean variables. 
+
+        .. code-block:: python
+            # creation of a vector Boolean variables
+            x = BoolVar(3)
+
+            # note that using the python unpacking you can assign them
+            # to intermediate variables. THis allows for fine-grained use of variables when
+            # defining the constraints of the model
+            e,x,a,m,p,l = BoolVar(5)
+
+    - the creation of array/tensor of boolean variables. 
+
+        .. code-block:: python
+
+            # creation of an __array__ of Boolean variables where (3, 8, 7) reflects
+            # the dimensions of the tensor, a matrix of multiple-dimensions.
+            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
+            array_vars = BoolVar((3, 8, 7))
+
+    Integer Variables
+    -----------------
+
+    Integer variables are variables that are given a lower bound and an upper bound, correpsonding to the values that they can take.
+
 
     ==============
     Module details
