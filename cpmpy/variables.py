@@ -35,6 +35,13 @@
     -----------------
 
     Boolean variables a.k.a `BoolVar` are variables that have a very specific domain. They take either the value `True` or `False` (1 or 0 respectively).
+    The syntax is as follows:
+
+    .. code-block:: python
+
+        BoolVar([shape])
+
+    - *optional* **shape**: integer value larger than 0 or tuple of integer values.
 
     The following examples show how to create a boolean variable with 3 use cases:
 
@@ -45,7 +52,9 @@
             x = BoolVar()
 
     - the creation of a vector boolean variables. 
+
         .. code-block:: python
+
             # creation of a vector Boolean variables
             x = BoolVar(3)
 
@@ -66,10 +75,39 @@
     -----------------
 
     Integer variables are variables that are given a lower bound and an upper bound, correpsonding to the values that they can take.
-    The following examples showcase how to instiate integer variable with 3 use cases similar to `BoolVar`
+    The following examples showcase how to instantiate integer variable with 3 use cases similar to `BoolVar`.
+    The syntax is as follows:
 
-    - the creation of a single (unit-sized or non-vector) integer variable.
+    .. code-block:: python
 
+        IntVar(lb, ub [, shape])
+
+    - **lb**: lower bound
+    - **ub**: upper bound
+    - *optional* **shape**: integer value larger than 0 or tuple of integer values
+
+    - the creation of a single (unit-sized or non-vector) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable
+    `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+
+        .. code-block:: python
+
+            # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
+            x = IntVar(3, 8)
+
+    - the creation of a vector integer variables with all having the same given lower bound and upper bound:
+
+        .. code-block:: python
+
+            # creation of a vector Boolean of 5 variables with lowerbound of 3 and upperbound of 8 
+            vecx = IntVar(3, 8, 5)
+
+            # Similar `BoolVar`'s python unpacking can assign multiple intermediate variables at once
+            e,x,a,m,p,l = IntVar(3, 8, 5)
+
+    - the creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of boolean variables.
+        .. code-block:: python
+
+            arrx = IntVar(3, 8, (100, 100, 100, 100))
 
     ==============
     Module details
