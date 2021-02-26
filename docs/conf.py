@@ -42,6 +42,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'sphinx_automodapi.automodapi',
     'm2r2'
 ]
 
