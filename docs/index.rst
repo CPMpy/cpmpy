@@ -14,8 +14,10 @@ The software is in ALPHA state, and more of a proof-of-concept really. Do send s
 
 Install the library
 -------------------
-
-.. tutorial/how_to_install:
+.. toctree::
+   :maxdepth: 2
+   
+   .. tutorial/how_to_install:
 
 Documentation
 -------------

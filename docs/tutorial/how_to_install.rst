@@ -1,5 +1,5 @@
-Installation
-============
+Installation instructions
+=========================
 
 CPMpy requires Python ``3.6`` or newer and is also installed with OR-Tools as default solver. Since the package is available on `PYPI <https://pypi.org/>`_, the best way is to open up a new command line window and run 
 
