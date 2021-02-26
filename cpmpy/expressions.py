@@ -17,6 +17,7 @@
         GlobalConstraint
 
     =================
+    
     List of functions
     =================
 
@@ -30,11 +31,12 @@
     Module description
     ==================
 
+    This module takes advantage of the Python operator overloading to easily create constraints i.e. Expressions of 
+    variables.
 
     Boolean Expressions
     -------------------
 
-    
     how to create boolean expresions (&|~) and b1 == b2, b1.implies(b2)
 
     Integer Expressions
