@@ -88,15 +88,14 @@
 
     The following examples showcase how to instantiate integer variable with 3 use cases similar to `BoolVar`:
 
-    - the creation of a single (unit-sized or non-vector) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable
-    `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+    - Creation of a single (unit-sized or non-vector) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
 
         .. code-block:: python
 
             # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
             x = IntVar(3, 8)
 
-    - the creation of a vector integer variables with all having the same given lower bound and upper bound:
+    - Creation of a vector integer variables with all having the same given lower bound and upper bound:
 
         .. code-block:: python
 
@@ -106,7 +105,7 @@
             # Similar `BoolVar`'s python unpacking can assign multiple intermediate variables at once
             e,x,a,m,p,l = IntVar(3, 8, 5)
 
-    - the creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of boolean variables.
+    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of boolean variables.
         .. code-block:: python
 
             arrx = IntVar(3, 8, (100, 100, 100, 100))
