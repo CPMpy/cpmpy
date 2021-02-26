@@ -121,6 +121,18 @@ class NDVarArray(Expression, np.ndarray):
             
         return super().__getitem__(index)
 
+    def sum(self, axis=None, out=None):
+        """
+            overwrite np.sum(NDVarArray) as people might use it
+
+            does not actually support axis/out... todo?
+        """
+        if not axis is None or not out is None:
+            raise NotImplementedError() # please report on github with usecase
+
+        # return sum object
+        return Operator("sum", self)
+
     # TODO?
     #in	  __contains__(self, value) 	Check membership
     #object.__matmul__(self, other)
