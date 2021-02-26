@@ -20,6 +20,7 @@
     List of functions
     =================
     .. autosummary::
+        :nosignatures:
 
         BoolVar
         IntVar
@@ -75,16 +76,17 @@
     -----------------
 
     Integer variables are variables that are given a lower bound and an upper bound, correpsonding to the values that they can take.
-    The following examples showcase how to instantiate integer variable with 3 use cases similar to `BoolVar`.
     The syntax is as follows:
 
     .. code-block:: python
 
         IntVar(lb, ub [, shape])
-
+    
     - **lb**: lower bound
     - **ub**: upper bound
     - *optional* **shape**: integer value larger than 0 or tuple of integer values
+
+    The following examples showcase how to instantiate integer variable with 3 use cases similar to `BoolVar`:
 
     - the creation of a single (unit-sized or non-vector) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable
     `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
