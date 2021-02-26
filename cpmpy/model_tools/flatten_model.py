@@ -276,8 +276,14 @@ def flatten_boolexpr(subexpr):
             return (bvar, base_cons)
 
         # recursive calls to LHS, RHS
-        (var1, bco1) = flatten_boolexpr(args[0])
-        (var2, bco2) = flatten_boolexpr(args[1])
+        elif any([isinstance(arg, Operator) for arg in args]):
+            # we might have a numexp to flatten
+            (var1, bco1) = flatten_numexpr(args[0])
+            (var2, bco2) = flatten_numexpr(args[1])
+
+        else:
+            (var1, bco1) = flatten_boolexpr(args[0])
+            (var2, bco2) = flatten_boolexpr(args[1])
         bvar = BoolVarImpl()
         base_cons += [bco1, bco2]
         base_cons += [Comparison(subexpr.name, var1, var2) == bvar]
@@ -293,17 +299,28 @@ def flatten_boolexpr(subexpr):
             base_cons += [subexpr == bvar]
             return (bvar, base_cons)
 
-        #TODO: call to flatten_numexpr
+        
+        if subexpr.is_bool():
 
-        # nested AND, OR
-        # recurisve function call to LHS and RHS
-        # XXX: merge nested AND at top level
-        (var1, bco1) = flatten_boolexpr(args[0])
-        (var2, bco2) = flatten_boolexpr(args[1])
-        bvar = BoolVarImpl()
-        base_cons += [bco1, bco2]
-        base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
-        return (bvar, base_cons)
+            # nested AND, OR
+            # recurisve function call to LHS and RHS
+            # XXX: merge nested AND at top level
+            (var1, bco1) = flatten_boolexpr(args[0])
+            (var2, bco2) = flatten_boolexpr(args[1])
+            bvar = BoolVarImpl()
+            base_cons += [bco1, bco2]
+            base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
+            return (bvar, base_cons)
+        
+        else:
+            # we might have an numexp to flatten
+            (var1, bco1) = flatten_numexpr(args[0])
+            (var2, bco2) = flatten_numexpr(args[1])
+            ivar = BoolVarImpl()
+            base_cons += [bco1, bco2]
+            base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
+            return (bvar, base_cons)
+
 
     
 
