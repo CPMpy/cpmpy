@@ -3,6 +3,20 @@
 ##
 ## minizinc_python.py
 ##
+"""
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        MiniZincPython
+
+    ==================
+    Module description
+    ==================
+"""
 
 from .solver_interface import ExitStatus, SolverStatus
 from .minizinc_text import MiniZincText
@@ -13,7 +27,9 @@ class MiniZincPython(MiniZincText):
     Interface to the python 'minizinc' package
 
     Requires that the 'minizinc' python package is installed:
-    $ pip install minizinc
+
+        $ pip install minizinc
+    
     as well as the MiniZinc bundled binary packages, downloadable from:
     https://www.minizinc.org/software.html
 

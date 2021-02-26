@@ -3,6 +3,20 @@
 ##
 ## ortools_python.py
 ##
+"""
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        ORToolsPython
+
+    ==================
+    Module description
+    ==================
+"""
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions import Comparison, Expression, Operator, Element

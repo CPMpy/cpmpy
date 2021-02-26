@@ -3,6 +3,20 @@
 ##
 ## minizinc_text.py
 ##
+"""
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        MiniZincText
+
+    ==================
+    Module description
+    ==================
+"""
 
 from ..model_tools.get_variables import get_variables
 from .solver_interface import SolverInterface
