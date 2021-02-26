@@ -145,7 +145,7 @@ def flatten_objective(expr):
             new_cons = flat_idx[1] + [flati[1] for flati in flat_arr]
             return(new_expr, new_cons)
 
-    raise Exception("Expression '{}' not allowed in objective".format(expr.name)) # or bug
+    raise Exception("Expression '{}' not allowed in objective".format(expr)) # or bug
         
 def flatten_numexpr(expr):
     """

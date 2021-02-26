@@ -25,7 +25,7 @@ class TestGlobal(unittest.TestCase):
                 vals = [x.value() for x in vars]
 
                 # ensure all different values
-                self.assertEqual(len(vals),len(set(vals)), msg=f"{solver.name} does provide solution validating given constraints.")
+                self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
 
     def test_circuit(self):
         """

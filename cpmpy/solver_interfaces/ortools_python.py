@@ -1,5 +1,6 @@
 from . import *
 from ..expressions import *
+from ..globalconstraints import *
 from ..variables import *
 from ..model_tools.flatten_model import *
 from itertools import cycle

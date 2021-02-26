@@ -6,14 +6,14 @@ from .expressions import *
 def alldifferent(variables):
     return GlobalConstraint("alldifferent", variables)
 
-def decompose_alldifferent():
+def decompose_alldifferent(alldiff):
     # TODO
-    return NotImplementedError()
+    raise NotImplementedError()
 
 def circuit(variables):
     return GlobalConstraint("circuit", variables)
 
-def decompose_circuit():
+def decompose_circuit(circ):
     # TODO, see Hakan's or-tools one
-    return NotImplementedError()
+    raise NotImplementedError()
 

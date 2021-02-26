@@ -1,13 +1,13 @@
 import unittest
 import cpmpy as cp
-from cpmpy.model_tools import flatten_model
+from cpmpy.model_tools.flatten_model import *
 
 class TestFlattenModel(unittest.TestCase):
     def setUp(self):
         self.ivars = cp.IntVar(1, 10, (5,))
         self.bvars = cp.BoolVar((2,))
-        self.constraints = [self.ivars != 3]
-        #self.model = cp.Model()
+        #self.constraints = [self.ivars != 3] # should work in future (broadcasting)
+        self.constraints = [iv != 3 for iv in self.ivars]
 
     def test_constraints(self):
         model = cp.Model(self.constraints)
@@ -17,7 +17,8 @@ class TestFlattenModel(unittest.TestCase):
         self.assertTrue(len(model2.constraints) > 1)
 
     def test_objective(self):
-        obj = self.ivars.sum()
+        #obj = self.ivars.sum() # should work?
+        obj = np.sum(self.ivars)
         model = cp.Model(self.constraints, maximize=obj)
         model2 = flatten_model(model)
         self.assertTrue(model2.objective is not None)
@@ -53,7 +54,10 @@ class TestFlattenConstraint(unittest.TestCase):
         self.assertGreater(len(model2.constraints), len(model.constraints))
 
     # alternative style
-    def test_eq():
+    def test_eq(self):
+        (a,b,c,d,e) = self.ivars
+        (x,y,z) = self.bvars
+
         e = (x == y) 
         self.assertEqual( e, flatten_constraint(e) )
         e = (x == ~y) 
@@ -61,7 +65,10 @@ class TestFlattenConstraint(unittest.TestCase):
         e = (a == b) 
         self.assertEqual( e, flatten_constraint(e) )
 
-    def test_nq():
+    def test_nq(self):
+        (a,b,c,d,e) = self.ivars
+        (x,y,z) = self.bvars
+
         e = (x != y) 
         self.assertEqual( e, flatten_constraint(e) )
         e = (x != ~y) 
@@ -69,11 +76,14 @@ class TestFlattenConstraint(unittest.TestCase):
         e = (a != b) 
         self.assertEqual( e, flatten_constraint(e) )
 
-    def test_eq_comp():
+    def test_eq_comp(self):
+        (a,b,c,d,e) = self.ivars
+        (x,y,z) = self.bvars
+
         e = ((a > 5) == x)
         self.assertEqual( e, flatten_constraint(e) )
         e = (x == (b < 3))
         self.assertEqual( e, flatten_constraint(e) )
         e = ((a > 5) == (b < 3))
-        self.assertGreater(len(e), len(flatten_constraint(e)))
+        self.assertEqual(len(flatten_constraint(e)), 2)
     

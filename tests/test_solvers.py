@@ -11,10 +11,7 @@ class TestSolvers(unittest.TestCase):
             x[0] < x[1],
             x[1] < x[2]]
         model = cp.Model(constraints)
-        for solver in supported_solvers:
-            model.solve(solver=solver)
+        for solver in cp.get_supported_solvers():
+            model.solve()
             self.assertEqual([xi.value() for xi in x], [0, 1, 2])
-        # Checking all supported solvers
-        # for solver in cp.get_supported_solvers():
-        #     model.solve(solver=solver)
 

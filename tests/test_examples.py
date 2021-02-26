@@ -39,7 +39,8 @@ class TestExamples(unittest.TestCase):
         model = cp.Model(constraint, minimize=objective)
         if True:
             _ = model.solve()
-            self.assertEqual([xi.value() for xi in x], [4, 4, 6, 1, 11, 0], f"Expected schedule:\n\t[4, 4, 6, 1, 11, 0] got {x.value()}")
+            # model has multiple solutions...
+            self.assertEqual(x[0].value(), 4)
             self.assertEqual(sum(x.value()), 26, f"Expected value is 26, got {sum(x.value())}")
 
     def test_knapsack(self):
