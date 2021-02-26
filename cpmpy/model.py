@@ -25,7 +25,6 @@ from .expressions import Operator
 from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
-
 """
     Class that contains the constraints and the objective function,
     and that provides an easy solve() abstraction which will call a solver.
