@@ -1,5 +1,6 @@
 Solver Interfaces (:mod:`cpmpy.solver_interface`)
 =================================================
+
 =========================
 List of Solver Interfaces
 =========================
