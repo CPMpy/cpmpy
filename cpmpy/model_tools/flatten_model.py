@@ -1,4 +1,3 @@
-from ..model import *
 from ..expressions import *
 from ..variables import *
 
@@ -12,6 +11,8 @@ THIS IS ONLY A POTENTIAL STRUCTURE, not tested or run...
 """
 
 def flatten_model(orig_model):
+    from ..model import Model # otherwise circular dependency...
+
     """
         Receives model, returns new model where every constraint is a 'base' constraint
     """
@@ -20,17 +21,16 @@ def flatten_model(orig_model):
     for con in orig_model.constraints:
         basecons += flatten_constraint(con)
 
-    new_model = Model(basecons)
     # the objective
     if orig_model.objective is None:
-        pass # no objective, satisfaction problem
+        return Model(basecons) # no objective, satisfaction problem
     else:
         (newobj, newcons) = flatten_objective(orig_model.objective)
-        new_model += newcons
+        basecons += newcons
         if orig_model.objective_max:
-            new_model.Maximize(obj)
+            return Model(basecons, maximize=newobj)
         else:
-            new_model.Minimize(obj)
+            return Model(basecons, minimize=newobj)
 
     return new_model
 
@@ -57,7 +57,7 @@ def flatten_constraint(con):
     # base cases
     if isinstance(con, BoolVarImpl) or isinstance(con, bool):
         return [con]
-    elif is_num(expr) or isinstance(expr, NumVarImpl):
+    elif is_num(con) or isinstance(con, NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     basecons = []
@@ -68,17 +68,17 @@ def flatten_constraint(con):
             basecons += flatten_constraint(con_x)
         return basecons
 
-    if isinstance(expr, Operator):
+    if isinstance(con, Operator):
         # only Boolean operators allowed as top-level constraint
         # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
-        allowed = ['and', 'or', 'xor', '->']
-        if expr.name not in allowed:
+        if not con.is_bool():
             raise Exception("Operator '{}' not allowed as base constraint".format(expr.name))
 
         return [con] # TODO
 
-    elif isinstance(expr, Comparison):
+    elif isinstance(con, Comparison):
         #allowed = {'==', '!=', '<=', '<', '>=', '>'}
+        return [con] # TODO
         for lvar, rvar in zipcycle(args[0], args[1]):
             if expr.name == '==' or expr.name == '!=':
                 # special case... allows some nesting of LHS
@@ -89,7 +89,7 @@ def flatten_constraint(con):
                 # special case... allows some nesting of LHS
                 return [con] # TODO
 
-    elif isinstance(expr, Element):
+    elif isinstance(con, Element):
         return [con] # TODO
 
     # rest: global constraints

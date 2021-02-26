@@ -1,7 +1,7 @@
 from . import *
 from ..expressions import *
 from ..variables import *
-from .minizinc_text import *
+from ..model_tools.flatten_model import *
 from itertools import cycle
 
 def zipcycle(vars1, vars2):
@@ -37,29 +37,29 @@ class ORToolsPython(SolverInterface):
         # Constraint programming engine
         self._model = ort.CpModel()
 
+        # transform into flattened model
+        flat_model = flatten_model(cpm_model)
+
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
-        self.revarmap = dict() # reverse: solver var -> cppy var
-        modelvars = get_variables(cpm_model)
+        modelvars = get_variables(flat_model)
         for var in modelvars:
             if isinstance(var, BoolVarImpl):
                 revar = self._model.NewBoolVar(str(var.name))
             elif isinstance(var, IntVarImpl):
                 revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
             self.varmap[var] = revar
-            self.revarmap[revar] = var
 
-        # post the constraint expressions to the solver
-        # TODO: assumes 'flat' constraints (no subexpressions)
-        for con in cpm_model.constraints:
+        # post the (flat) constraint expressions to the solver
+        for con in flat_model.constraints:
             self.post_expression(con)
 
         # the objective
-        if cpm_model.objective is None:
+        if flat_model.objective is None:
             pass # no objective, satisfaction problem
         else:
-            obj = self.convert_expression(cpm_model.objective)
-            if cpm_model.objective_max:
+            obj = self.convert_expression(flat_model.objective)
+            if flat_model.objective_max:
                 self._model.Maximize(obj)
             else:
                 self._model.Minimize(obj)
@@ -70,6 +70,9 @@ class ORToolsPython(SolverInterface):
         if not self.supported():
             raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
         from ortools.sat.python import cp_model as ort
+
+        # store original vars (before flattening)
+        original_vars = get_variables(cpm_model)
 
         # create model
         self._model = self.make_model(cpm_model)
@@ -90,7 +93,7 @@ class ORToolsPython(SolverInterface):
 
         if self._status == ort.FEASIBLE or self._status == ort.OPTIMAL:
             # fill in variables
-            for var in self.varmap:
+            for var in original_vars:
                 var._value = self._solver.Value(self.varmap[var])
 
         return solstats

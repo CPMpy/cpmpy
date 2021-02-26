@@ -1,5 +1,5 @@
 from .expressions import *
-from .solver_interfaces import *
+from .solver_interfaces import get_supported_solvers, SolverInterface
 import numpy as np
 
 
