@@ -109,7 +109,6 @@ def flatten_objective(expr):
                 * NumVarImpl
                 * Operator with is_type_num(), all args are: is_num() or NumVarImpl
                 * Operator 'sum', all args are: is_num() or NumVarImpl or Operator '*'[is_num(), NumVarImpl]
-                * Element with len(args)==2 and args = ([NumVar], NumVar)
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     if is_num(expr) or isinstance(expr, NumVarImpl):
@@ -128,22 +127,12 @@ def flatten_objective(expr):
             # one of the args was changed
             newargs = [flatarg[0] for flatarg in flat_args]
             new_expr = Operator(expr.name, newargs)
-            return (new_expr, [flatarg[1] for flatarg in flat_args])
+            return (new_expr, [c for flatarg in flat_args for c in flatarg[1]])
 
     elif isinstance(expr, Element):
         if len(expr.args) != 2:
             raise Exception("Only Element expr of type Arr[Var] allowed in objective".format(expr.name))
-        flat_idx = flatten_numexpr(expr.args[1])
-        flat_arr = [flatten_numexpr(e) for e in expr.args[0]]
-        if flat_idx[0] is expr.args[1] and \
-           all(arri is flati[0] for (arri, flati) in zip(expr.args[0],flat_arr)):
-            return (expr, [])
-        else:
-            # one of the args was changed
-            new_arr = [flati[0] for flati in flat_arr]
-            new_expr = Element([new_arr, flat_idx[0]])
-            new_cons = flat_idx[1] + [flati[1] for flati in flat_arr]
-            return(new_expr, new_cons)
+        return flatten_numexpr(expr)
 
     raise Exception("Expression '{}' not allowed in objective".format(expr)) # or bug
         
@@ -160,13 +149,11 @@ def flatten_numexpr(expr):
                 * NumVarImpl
                 * Operator with is_type_num(), all args are: is_num() or NumVarImpl
                 * Operator 'sum', all args are: is_num() or NumVarImpl or Operator '*'[is_num(), NumVarImpl]
-                * Element with len(args)==2 and args = ([NumVar], NumVar)
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
     if is_num(expr) or isinstance(expr, NumVarImpl):
         return (expr, [])
     args = expr.args
-    basecons = []
     if isinstance(expr, Operator):
         # only Numeric operators allowed
         # unary int: '-', 'abs'
@@ -181,55 +168,66 @@ def flatten_numexpr(expr):
         # unary int op
         if arity == 1:
             var, bcon = flatten_numexpr(args[0])
-            basecons += [bcon]
+            basecons = [bcon]
             if expr.name == 'abs':
                 ivar = IntVarImpl(0, var.ub)
             else: # '-'
                 ivar = IntVarImpl(-var.ub, -var.lb)
 
-            basecons += [Operator(expr.name, [var]) == ivar]
+            basecons = [Operator(expr.name, [var]) == ivar]
             return ivar, basecons
 
         # binary int op 
         elif arity == 2:
             var1, bcon1 = flatten_numexpr(args[0])
             var2, bcon2 = flatten_numexpr(args[1])
-            basecons += [bcon1, bcon2]
+            basecons = bcon1 + bcon2
+            lb = ([var.lb if isinstance(var, NumVarImpl) else var for var in [var1,var2]]) 
+            ub = ([var.ub if isinstance(var, NumVarImpl) else var for var in [var1,var2]])
             if expr.name == 'mul': 
-                ivar = IntVarImpl(var1.lb * var2.lb, var1.ub * var2.ub) 
+                ivar = IntVarImpl(lb[0] * lb[1], ub[0] * ub[1]) 
             elif expr.name == 'div':
-                ivar = IntVarImpl(var1.lb // var2.ub, var1.ub // var2.lb )
+                ivar = IntVarImpl(lb[0] // ub[1], ub[0] // lb[1] )
             elif expr.name == 'mod': 
-                ivar = IntVarImpl(0, var1.ub)
+                ivar = IntVarImpl(0, ub[0])
             elif expr.name == 'pow':
-                ivar = IntVarImpl(var1.lb ** var2.lb, var1.ub ** var2.lb)
+                ivar = IntVarImpl(lb[0] ** lb[1], ub[0] ** lb[1])
             
             basecons += [Operator(expr.name, [var1, var2]) == ivar]
             return ivar, basecons
 
         else: # arity > 2 (sum)
             varrs, bcons = zip(*[flatten_numexpr(arg) for arg in args])
-            basecons += [bcons] 
+            basecons = [c for con in bcons for c in con] # flatten
             lb = sum([var.lb if isinstance(var, NumVarImpl) else var for var in varrs]) 
             ub = sum([var.ub if isinstance(var, NumVarImpl) else var for var in varrs])
             ivar = IntVarImpl(lb, ub) 
 
-            basecons += [Operator('sum', varrs) == ivar]
-            return ivar, basecons
-            
-
-    elif isinstance(expr, Comparison):
-        #allowed = {'==', '!=', '<=', '<', '>=', '>'}
-        raise Exception("Comparison not allowed as numexpr".format(expr.name))
-        return (expr, []) # TODO
+            return (ivar, [Operator('sum', varrs) == ivar]+basecons)
 
     elif isinstance(expr, Element):
-        # A0[A1] == A2
-        return (expr, []) # TODO
+        if len(expr.args) != 2:
+            raise Exception("Only Element expr of type Arr[Var] allowed in objective".format(expr.name))
+        arr = expr.args[0]
+        idx = expr.args[1]
+        if __is_flatten_var(idx) and \
+           all(__is_flatten_var(ai) for ai in arr):
+            # expression is flat
+            lb = min([var.lb if isinstance(var, NumVarImpl) else var for var in arr]) 
+            ub = max([var.ub if isinstance(var, NumVarImpl) else var for var in arr])
+            ivar = IntVarImpl(lb, ub)
+            return (ivar, [Element([arr, idx, ivar])]) # need to make new one as 'expr == ivar' would overwrite expr
+        else:
+            # one of the args was changed
+            new_idx, icons = flatten_numexpr(idx)
+            new_arr, acons = zip(*[flatten_numexpr(e) for e in arr])
 
-    # rest: global constraints
-    else:
-        return (expr, []) # TODO
+            lb = min([var.lb if isinstance(var, NumVarImpl) else var for var in new_arr]) 
+            ub = max([var.ub if isinstance(var, NumVarImpl) else var for var in new_arr])
+            ivar = IntVarImpl(lb, ub)
+            return (ivar, [Element([new_arr, new_idx, ivar])]+icons+[c for con in acons for c in con])
+
+    raise Exception("Operator '{}' not allowed as numexpr".format(expr.name)) # or bug
 
 
 def __is_flatten_var(arg):
