@@ -40,6 +40,7 @@ Supplementary :mod:`.examples` package
 
 .. toctree::
    :caption: Examples:
+
    examples/all_examples
 
 FAQ
@@ -49,12 +50,14 @@ FAQ
 
 
 .. code-block:: python
+
    "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
 
 Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cparray()` wrapper:
 
 .. code-block:: python
    :linenos:
+
    # x is a variable 
    X = IntVar(0, 3)
 
