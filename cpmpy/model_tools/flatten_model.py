@@ -273,6 +273,7 @@ def flatten_boolexpr(subexpr):
             (var1, bco1) = flatten_boolexpr(args[0])
             (var2, bco2) = flatten_boolexpr(args[1])
             newcomp = Comparison(subexpr.name, var1, var2)
+            bvar = BoolVarImpl()
             return (bvar, [newcomp == bvar]+bco1+bco2)
 
     elif isinstance(subexpr, Operator):
