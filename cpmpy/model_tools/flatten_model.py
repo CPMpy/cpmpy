@@ -193,25 +193,25 @@ def flatten_numexpr(expr):
         return (expr, []) # TODO
 
 
-def is_flatten_var(arg):
+def __is_flatten_var(arg):
     #TODO: extend definition to consider Arithmetic operator expression as valid,
     # e.g. (2a+c-b)/d 
     return is_num(arg) or isinstance(arg, NumVarImpl)
 
 def is_nested_expr(subexpr):
-    if is_flatten_var(subexpr):
+    if __is_flatten_var(subexpr):
         return False
-    return not all([is_flatten_var(arg) for arg in subexpr.args])
+    return not all([__is_flatten_var(arg) for arg in subexpr.args])
 
-def check_lincons(subexpr, opname):
+def __check_lincons(subexpr, opname):
     LHS, RHS = subexpr.args
     # LHS or RHS is a Var (IntVar, BoolVar, Num)
-    if not (is_flatten_var(LHS) or is_flatten_var(RHS)):
+    if not (__is_flatten_var(LHS) or __is_flatten_var(RHS)):
         return False 
     
     # LHS is a Var :: RHS does not have nested expr
-    elif is_flatten_var(LHS):
-        if is_flatten_var(RHS):
+    elif __is_flatten_var(LHS):
+        if __is_flatten_var(RHS):
             return True 
         # RHS is an LinExp and that's ok
         # as long as it does not have more nested expression 
@@ -221,14 +221,22 @@ def check_lincons(subexpr, opname):
 
     # Same logic if RHS is a Var
     #TODO: Refactor to avoid code dupcliation
-    elif is_flatten_var(RHS):
-        if is_flatten_var(LHS):
+    elif __is_flatten_var(RHS):
+        if __is_flatten_var(LHS):
             return True 
         if any([is_nested_expr(arg) for arg in LHS.args]):
             return False
         return True
 
     return False 
+
+def __check_or_flip_base_const(subexpr):
+    assert __check_lincons(subexpr, subexpr.name)
+    if __is_flatten_var(subexpr.args[1]):
+        return subexpr
+    # flip the base constraint to have 
+    # BoolExp == boolvar format only 
+    return Comparison(subexpr.name, subexpr.args[1], subexpr.args[0])
 
 
 def flatten_boolexpr(subexpr):
@@ -255,14 +263,14 @@ def flatten_boolexpr(subexpr):
 
     if isinstance(subexpr, Comparison):
         allowed = {'>','<','<=','>=','==','!='}
-        if any([check_lincons(subexpr, opname) for opname in allowed]):
+        if any([__check_lincons(subexpr, opname) for opname in allowed]):
             # Base case: already in base constraint form
             if is_num(args[0]) or is_num(args[1]):
                 bvar = BoolVarImpl()
                 base_cons += [subexpr == bvar]
             else:
-                bvar = args[0] if is_flatten_var(args[0]) else args[1]
-                base_cons += [subexpr]
+                bvar = args[0] if __is_flatten_var(args[0]) else args[1]
+                base_cons += [ __check_or_flip_base_const(subexpr)]
             return (bvar, base_cons)
 
         # recursive calls to LHS, RHS
@@ -282,6 +290,8 @@ def flatten_boolexpr(subexpr):
             bvar = BoolVarImpl()
             base_cons += [subexpr == bvar]
             return (bvar, base_cons)
+
+        #TODO: call to flatten_numexpr
 
         # nested AND, OR
         # recurisve function call to LHS and RHS
