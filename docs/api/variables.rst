@@ -1,5 +1,5 @@
-Variables
-=========
+Variables (:mod:`cpmpy.variables`)
+==================================
 
 .. automodule:: cpmpy.variables
     :inherited-members:
