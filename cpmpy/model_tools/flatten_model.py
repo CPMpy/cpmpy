@@ -10,6 +10,12 @@ Flattening a model (or individual constraints) into a normal form. See docs/behi
 THIS IS ONLY A POTENTIAL STRUCTURE, not tested or run...
 """
 
+from itertools import cycle
+def __zipcycle(vars1, vars2):
+    v1 = [vars1] if not is_any_list(vars1) else vars1
+    v2 = [vars2] if not is_any_list(vars2) else vars2
+    return zip(v1, cycle(v2)) if len(v2) < len(v1) else zip(cycle(v1), v2)
+
 def flatten_model(orig_model):
     from ..model import Model # otherwise circular dependency...
 
@@ -35,14 +41,13 @@ def flatten_model(orig_model):
     return new_model
 
 
-def flatten_constraint(con):
+def flatten_constraint(expr):
     """
         input is any expression; except is_num(), pure NumVarImpl, Operator with is_type_num() and Element with len(args)=2
         output is a list of base constraints, each base constraint is one of:
             * BoolVar
-            * Operator with is_type_bool(), all args are: BoolVar
+            * Operator with is_bool(), all args are: BoolVar
             * Operator '->' with args [boolexpr,BoolVar]
-            * Operator '->' with args [Comparison,BoolVar]
             * Comparison, all args are is_num() or NumVar 
             * Comparison '==' with args [boolexpr,BoolVar]
             * Comparison '!=' with args [boolexpr,BoolVar]
@@ -55,46 +60,59 @@ def flatten_constraint(con):
         TODO, what built-in python error is best?
     """
     # base cases
-    if isinstance(con, BoolVarImpl) or isinstance(con, bool):
-        return [con]
-    elif is_num(con) or isinstance(con, NumVarImpl):
+    if isinstance(expr, BoolVarImpl) or isinstance(expr, bool):
+        return [expr]
+    elif is_num(expr) or isinstance(expr, NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
-    basecons = []
-
     # recursively flatten list of constraints
-    if is_any_list(con):
-        for con_x in con:
-            basecons += flatten_constraint(con_x)
-        return basecons
+    if is_any_list(expr):
+        flatcons = [flatten_constraint(e) for e in expr]
+        return [c for con in flatcons for c in con]
 
-    if isinstance(con, Operator):
-        # only Boolean operators allowed as top-level constraint
-        # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
-        if not con.is_bool():
-            raise Exception("Operator '{}' not allowed as base constraint".format(expr.name))
+    if isinstance(expr, Operator):
+        assert(expr.is_bool()) # and, or, xor, ->
 
-        return [con] # TODO
+        # XXX does not type-check arguments...
+        if all(__is_flat_var(arg) for arg in expr.args):
+            return expr
+        else:
+            # recursively flatten all children, which are boolexpr
+            flatvars, flatcons = zip(*[flatten_boolexpr(arg) for arg in expr.args])
 
-    elif isinstance(con, Comparison):
+            newexpr = Operator(expr.name, flatvars)
+            return [newexpr]+[c for con in flatcons for c in con]
+
+    elif isinstance(expr, Comparison):
         #allowed = {'==', '!=', '<=', '<', '>=', '>'}
-        return [con] # TODO
-        for lvar, rvar in zipcycle(args[0], args[1]):
+        flatcons = []
+        for lexp, rexp in __zipcycle(expr.args[0], expr.args[1]):
             if expr.name == '==' or expr.name == '!=':
-                # special case... allows some nesting of LHS
-                # and a variable on RHS
-                # check whether needs swap on LHS...
-                return [con] # TODO
+                return expr # TODO, pick up here
+                # special case: LHS can be richer (like objective)
+                (lvar, lcons) = flatten_objective(lexp) # TODO fails on flatten_constraint((a > 10) == 0)
+                if not __is_flat_var(baseleft):
+                    # LHS is rich expression, RHS has to be var
+                    (rvar, rcons) = flatten_subexpr(rexp)
+
+                else:
+                    # LHS is var, RHS can be rich expr (do swap)
+                    (rvar, rcons) = flatten_objective(rexp)
+                    lvar,rvar = rvar,lvar # swap, variable at right
+
+                return [Comparison(expr.name, [lvar,rvar])]+[c for con in lcons+rcons for c in con]
+
             else: # inequalities '<=', '<', '>=', '>'
                 # special case... allows some nesting of LHS
-                return [con] # TODO
+                pass # TODO
+        return [expr] # TODO
 
-    elif isinstance(con, Element):
-        return [con] # TODO
+    elif isinstance(expr, Element):
+        return [expr] # TODO
 
     # rest: global constraints
     else:
-        return [con] # TODO
+        return [expr] # TODO
 
 
 def __is_flat_var(arg):
