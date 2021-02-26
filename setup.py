@@ -1,11 +1,26 @@
 from setuptools import find_packages, setup
+import codecs
+import os.path
+
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__))
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
 
 with open("README.md", "r") as readme_file:
     long_description = readme_file.read()
 
 setup(
     name='cpmpy',
-    version='0.5.3',
+    version=get_version("cpmpy/__init__.py"),
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
     license='Apache 2.0',
