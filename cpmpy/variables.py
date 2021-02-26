@@ -109,6 +109,9 @@
         .. code-block:: python
 
             arrx = IntVar(3, 8, (100, 100, 100, 100))
+    
+    Array of Variables
+    ------------------
 
     ==============
     Module details
