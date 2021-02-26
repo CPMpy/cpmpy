@@ -26,7 +26,7 @@
 
 from .utils.exceptions import NullShapeError
 import numpy as np
-from .expressions import Expression, is_num, Element
+from .expressions import Expression, Operator, is_num, Element
 
 # Helpers for type checking
 def is_int(arg):
@@ -70,7 +70,7 @@ class BoolVarImpl(IntVarImpl):
     def __init__(self, lb=0, ub=1):
         assert(lb == 0 or lb == 1)
         assert(ub == 0 or ub == 1)
-        super().__init__(lb, ub, setname=False)
+        IntVarImpl.__init__(self, lb, ub, setname=False)
         
         self.name = BoolVarImpl.counter
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
@@ -78,15 +78,40 @@ class BoolVarImpl(IntVarImpl):
     def __repr__(self):
         return "BV{}".format(self.name)
 
+    def __invert__(self):
+        return NegBoolView(self)
+
     def __eq__(self, other):
         # (BV == 1) <-> BV
-        if other == 1:
+        # if other == 1:
+        # XXX: dangerous!
+        # "=="" is overloaded 
+        if other is 1 or other is True:
             return self
         return super().__eq__(other)
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
     def __hash__(self): return super().__hash__()
+
+class NegBoolView(BoolVarImpl):
+    """
+        Represents not(`var`), not an actual variable implementation!
+
+        It stores a link to `var`'s BoolVarImpl
+    """
+    def __init__(self, bv):
+        assert(isinstance(bv, BoolVarImpl))
+        self._bv = bv
+
+    def value(self):
+        return not self._bv.value()
+
+    def __repr__(self):
+        return "~BV{}".format(self._bv.name)
+
+    def __invert__(self):
+        return self._bv
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
@@ -122,6 +147,18 @@ class NDVarArray(Expression, np.ndarray):
             return Element([array_rest, var[0]])
 
         return super().__getitem__(index)
+
+    def sum(self, axis=None, out=None):
+        """
+            overwrite np.sum(NDVarArray) as people might use it
+
+            does not actually support axis/out... todo?
+        """
+        if not axis is None or not out is None:
+            raise NotImplementedError() # please report on github with usecase
+
+        # return sum object
+        return Operator("sum", self)
 
     # TODO?
     #in	  __contains__(self, value) 	Check membership

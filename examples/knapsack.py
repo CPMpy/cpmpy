@@ -22,10 +22,8 @@ objective  = sum(x*values)
 
 model = Model(constraint, maximize=objective)
 print(model)
+print("") # blank line
 
-# Statistics are returned after solving.
-stats = model.solve()
-# Variables can be asked for their value in the found solution
-print("Value:", objective.value())
+print("Value:", model.solve()) # solve returns objective value
 print("Solution:", x.value())
-print("In items: ", [i+1 for i,val in enumerate(x.value()) if val])
+print("In items: ", [i+1 for i,val in enumerate(x.value()) if val]) # offset 0+1

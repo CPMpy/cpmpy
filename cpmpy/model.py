@@ -1,7 +1,7 @@
 import numpy as np
 from .expressions import Operator
 from .solver_interfaces.util import get_supported_solvers
-from .solver_interfaces.solver_interface import SolverInterface
+from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class Model(object):
     """
@@ -16,14 +16,19 @@ class Model(object):
     """
     def __init__(self, *args, minimize=None, maximize=None):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
+        self._solver_status = SolverStatus() # status of solving this model
+
         # list of constraints (arguments of top-level conjunction)
-        root_constr = self.make_and_from_list(args)
-        if root_constr.name == 'and':
-            # unpack top-level conjuction
-            self.constraints = root_constr.args
+        if len(args) == 0 or (len(args) == 1 and isinstance(args[0], list) and len(args[0]) == 0): # None or empty list
+            self.constraints = []
         else:
-            # wrap in list
-            self.constraints = [root_constr]
+            root_constr = self.make_and_from_list(args)
+            if root_constr.name == 'and':
+                # unpack top-level conjuction
+                self.constraints = root_constr.args
+            else:
+                # wrap in list
+                self.constraints = [root_constr]
 
         # an expresion or None
         self.objective = None
@@ -47,6 +52,15 @@ class Model(object):
             return lst[0]
         return Operator("and", lst)
         
+    def __add__(self, cons):
+        """
+            Add one or more constraints to the model
+
+            m = Model()
+            m += [x > 0]
+        """
+        self.constraints += cons
+        return self
 
     def __repr__(self):
         cons_str = ""
@@ -69,6 +83,11 @@ class Model(object):
 
         'solver': None (default) or in [s.name in get_supported_solvers()] or a SolverInterface object
         verifies that the solver is supported on the current system
+
+        :return: the computed output:
+            - True      if it is a satisfaction problem and it is satisfiable
+            - False     if it is a satisfaction problem and not satisfiable
+            - [int]     if it is an optimisation problem
         """
         # get supported solvers
         supsolvers = get_supported_solvers()
@@ -83,5 +102,26 @@ class Model(object):
 
             if not isinstance(solver, SolverInterface) or not solver.supported():
                 raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver))
-        return solver.solve(self)
+                
+        # call solver and store status
+        self._solver_status = solver.solve(self)
 
+        # return computed value
+        if not self.objective is None:
+            # optimisation problem
+            return self.objective.value()
+        else:
+            # satisfaction problem
+            if self._solver_status.exitstatus == ExitStatus.FEASIBLE:
+                return True
+        return False
+
+    def status(self):
+        """
+            Returns the status of the latest solver run on this model
+
+            Status information includes exit status (optimality) and runtime.
+
+        :return: an object of :class:`SolverStatus`
+        """
+        return self._solver_status

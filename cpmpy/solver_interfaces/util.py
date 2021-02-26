@@ -10,4 +10,5 @@ def get_supported_solvers():
     """
     return [sv for sv in builtin_solvers if sv.supported()]
 
-builtin_solvers=[MiniZincPython(),MiniZincText(),ORToolsPython()]
+# Order matters! first is default, then tries second, etc...
+builtin_solvers=[ORToolsPython(),MiniZincPython()]

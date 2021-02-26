@@ -5,10 +5,11 @@ with open("README.md", "r") as readme_file:
 
 setup(
     name='cpmpy',
-    version='0.5.1',
+    version='0.5.2',
     author='Tias Guns',
     author_email="tias.guns@kuleuven.be",
-    description='A numpy-based light-weight Python library for conveniently modeling constraint problems in Python',
+    license='Apache 2.0',
+    description='A numpy-based library for modeling constraint programming problems',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tias/cppy",
@@ -25,7 +26,7 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6'

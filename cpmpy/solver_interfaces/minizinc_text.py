@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## minizinc_python.py
+## minizinc_text.py
 ##
 
 from ..model_tools.get_variables import get_variables
-from .solver_interface import SolverInterface, SolverStats
+from .solver_interface import SolverInterface
 from ..variables import BoolVarImpl, IntVarImpl, NumVarImpl
 from ..expressions import Expression, Operator, Comparison, Element, is_any_list
 import numpy as np
@@ -71,10 +71,11 @@ class MiniZincText(SolverInterface):
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
-            # pretty printing: add () if both comp/op
-            if all(isinstance(e, (Comparison,Operator)) for e in expr.args):
-                for i in [0,1]:
-                    args_str[i] = "({})".format(args_str[i])
+            # pretty printing: add () if nested comp/op
+            for e in expr.args:
+                if isinstance(e, (Comparison,Operator)):
+                    for i in [0,1]:
+                        args_str[i] = "({})".format(args_str[i])
             # infix notation
             return "{} {} {}".format(args_str[0], expr.name, args_str[1])
 
@@ -128,11 +129,10 @@ class MiniZincText(SolverInterface):
         # rest: global constraints
         if expr.name.endswith('circuit'): # circuit, subcircuit
             # minizinc is offset 1, which can be problematic here...
-            if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.args[0]):
+            if any(isinstance(e, IntVarImpl) and e.lb == 0 for e in expr.args):
                 # redo args_str[0]
-                expr0_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args[0]]
-                args_str[0] = "[{}]".format(",".join(expr0_str))
+                args_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args]
         
 
         # default
-        return "{}({})".format(expr.name, ",".join(args_str))
+        return "{}([{}])".format(expr.name, ",".join(args_str))

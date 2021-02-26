@@ -10,6 +10,8 @@ class TestSolvers(unittest.TestCase):
     def test_unit_boolvar(self):
         bv = cp.BoolVar(1)
         self.assertIsInstance(bv, cp.BoolVarImpl, "BoolVar of shape 1 should be base class BoolVarImpl")
+        self.assertIsInstance(~bv, cp.NegBoolView)
+        self.assertIsInstance(~(~bv), cp.BoolVarImpl)
 
     def test_boolvar(self):
         for i in range(2, 10):

@@ -7,17 +7,17 @@
         :nosignatures:
 
         SolverInterface
-        SolverStats
+        SolverStatus
         ExitStatus
 
     ==================
     Module description
     ==================
-    bla blabla
+    Contains the abstract class `SolverInterface` for defining solver interfaces,
+    as well as a class `SolverStatus` that collects solver statistics,
+    and the `ExitStatus` class that represents possible exist statuses.
 
-    ==============
-    Module details
-    ==============
+    Each solver has its own class that inherits from `SolverInterface`.
 
 """
 #
@@ -39,12 +39,12 @@ class SolverInterface(ABC):
     def supported(self):
         """
             Check for support in current system setup. Return True if the system
-            has package installed or supports solver else returns False.
+            has package installed or supports solver, else returns False.
 
         Returns:
             [bool]: Solver support by current system setup.
         """
-        return True
+        return False
 
     @abstractmethod
     def solve(self, model):
@@ -55,31 +55,46 @@ class SolverInterface(ABC):
         :param model: CPMpy model to be parsed.
         :type model: Model
 
-        :return: an object of :class:`SolverStats`
+        :return: an object of :class:`SolverStatus`
         """
-        return SolverStats()
+        return SolverStatus()
+
 
 #
 #==============================================================================
 class ExitStatus(Enum):
+    """
+        Exit status of the solver
+
+        Attributes:
+            NOT_RUN: Has not been run
+            OPTIMAL: Optimal solution to an optimisation problem found
+            FEASIBLE: Feasible solution to a satisfaction problem found,
+                      or feasible (but not proven optimal) solution to an
+                      optimisation problem found
+            UNSATISFIABLE: No satisfying solution exists
+            ERROR: Some error occured (solver should have thrown Exception)
+    """
     NOT_RUN = 1
     OPTIMAL = 2
     FEASIBLE = 3
     UNSATISFIABLE = 4
     ERROR = 5
 
+
 #
 #==============================================================================
-class SolverStats(object):
+class SolverStatus(object):
     """
-        Statistics on the solved model
+        Status and statistics of a solver run
     """
-    status: ExitStatus
+    exitstatus: ExitStatus
     runtime: time
 
     def __init__(self):
-        self.status = ExitStatus.NOT_RUN
+        self.exitstatus = ExitStatus.NOT_RUN
         self.runtime = None
+        self.solver_name = None
 
     def __repr__(self):
-        return "{} ({} seconds)".format(self.status, self.runtime)
+        return "{} ({} seconds)".format(self.exitstatus, self.runtime)
