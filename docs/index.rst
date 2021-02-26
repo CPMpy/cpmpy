@@ -1,4 +1,3 @@
-
 CPMpy: CP modeling made easy in Python
 ==========================================
 
