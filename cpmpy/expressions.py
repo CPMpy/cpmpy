@@ -17,7 +17,7 @@
         GlobalConstraint
 
     =================
-    
+
     List of functions
     =================
 
@@ -31,8 +31,20 @@
     Module description
     ==================
 
-    This module takes advantage of the Python operator overloading to easily create constraints i.e. Expressions of 
-    variables.
+    This module takes advantage of the Python operator overloading to easily create constraints i.e. (combinations of)expressions variables. Expressions are represented as an expression tree. All *types* of expression can be combined
+    to form complex constraints. 
+
+    The list of expressions (constraints) supported are
+    
+    1. :ref:`Boolean expressions` : expressions with boolean operators (:math:`\\neg{} \\vee \\wedge \\implies`).
+
+    2. :ref:`Integer expressions` : expressions with standard math operators (+-*...) and even the sum()-function.
+
+    3. :ref:`Comparison constraints` : expressions associated with equality (:math:`==`), and inequality (:math:`!=`) constraints.
+
+    4. :ref:`Element constraints` : 
+
+    5. :ref:`Global constraints` :
 
     Boolean Expressions
     -------------------
