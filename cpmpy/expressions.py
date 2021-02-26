@@ -17,7 +17,6 @@
         GlobalConstraint
 
     =================
-
     List of functions
     =================
 
