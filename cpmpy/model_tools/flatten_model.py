@@ -15,26 +15,23 @@ def flatten_model(orig_model):
     """
         Receives model, returns new model where every constraint is a 'base' constraint
     """
-    # TODO: New cppy model
-    new_model = None
-    basecons = []
-
     # the top-level constraints
+    basecons = []
     for con in orig_model.constraints:
         basecons += flatten_constraint(con)
 
+    new_model = Model(basecons)
     # the objective
-    if cppy_model.objective is None:
+    if orig_model.objective is None:
         pass # no objective, satisfaction problem
     else:
-        (newobj, newcons) = flatten_numexpr(orig_model.objective)
-        basecons += newcons
+        (newobj, newcons) = flatten_objective(orig_model.objective)
+        new_model += newcons
         if orig_model.objective_max:
             new_model.Maximize(obj)
         else:
             new_model.Minimize(obj)
 
-    new_model.constraints = basecons
     return new_model
 
 
@@ -58,8 +55,7 @@ def flatten_constraint(con):
         TODO, what built-in python error is best?
     """
     # base cases
-    if isinstance(con, BoolVarImpl) or con == True or con == False:
-        # TODO: also NegBoolView, to create...
+    if isinstance(con, BoolVarImpl) or isinstance(con, bool):
         return [con]
     elif is_num(expr) or isinstance(expr, NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
@@ -79,18 +75,7 @@ def flatten_constraint(con):
         if expr.name not in allowed:
             raise Exception("Operator '{}' not allowed as base constraint".format(expr.name))
 
-        newargs = [flatten_boolexpr(e) for e in expr.args]
-        if any(x for (x,_,_) in newargs):
-            # one of the args was changed
-            raise NotImplementedError()
-            new_expr = None # ...
-            for i,arg in enumerate(expr.args):
-                (changed,newvar,newcons) = newargs[i]
-                if not changed:
-                    new_expr.args.append(arg)
-                else:
-                    new_expr.args.append(newvar)
-                    basecons += newcons
+        return [con] # TODO
 
     elif isinstance(expr, Comparison):
         #allowed = {'==', '!=', '<=', '<', '>=', '>'}
@@ -99,38 +84,19 @@ def flatten_constraint(con):
                 # special case... allows some nesting of LHS
                 # and a variable on RHS
                 # check whether needs swap on LHS...
-                raise NotImplementedError()
+                return [con] # TODO
             else: # inequalities '<=', '<', '>=', '>'
                 # special case... allows some nesting of LHS
-                raise NotImplementedError()
+                return [con] # TODO
 
+    elif isinstance(expr, Element):
+        return [con] # TODO
 
-        if isinstance(expr, Element):
-            # A0[A1] == A2
-            raise NotImplementedError()
+    # rest: global constraints
+    else:
+        return [con] # TODO
 
-        # rest: global constraints
-        else:
-            raise NotImplementedError()
-        
-# Should probably be typed, see 'flatten_numexpr' and 'flatten_boolexpr' below
-def check_or_make_variable(subexpr):
-    """
-        input: expression
-        output: tuple (is_new, new_expr, new_cons) with:
-            is_new: False or True
-            new_var: None or NumVar
-            new_cons: None or list of flattened constraints (with flatten_constraint(con))
-    """
-    raise NotImplementedError()
-    if False: # is_num...
-        return False, None, None
-    if False: # numvar...
-        return False, None, None
-
-    # handle other cases... (incl. reifying expressions)
-
-def flatten_numexpr(subexpr):
+def flatten_objective(expr):
     """
         input: expression of type:
             * is_num()
@@ -146,7 +112,85 @@ def flatten_numexpr(subexpr):
                 * Element with len(args)==2 and args = ([NumVar], NumVar)
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
-    #raise NotImplementedError()
+    if is_num(expr) or isinstance(expr, NumVarImpl):
+        return (expr, [])
+
+    basecons = []
+    if isinstance(expr, Operator):
+        # only Numeric operators allowed
+        if expr.is_bool():
+            raise Exception("Boolean operator '{}' not allowed in objective".format(expr.name)) # or bug
+
+        flat_args = [flatten_numexpr(e) for e in expr.args]
+        if all(arg is flatarg[0] for (arg,flatarg) in zip(expr.args, flat_args)):
+            return (expr, [])
+        else:
+            # one of the args was changed
+            newargs = [flatarg[0] for flatarg in flat_args]
+            new_expr = Operator(expr.name, newargs)
+            return (new_expr, [flatarg[1] for flatarg in flat_args])
+
+    elif isinstance(expr, Element):
+        if len(expr.args) != 2:
+            raise Exception("Only Element expr of type Arr[Var] allowed in objective".format(expr.name))
+        flat_idx = flatten_numexpr(expr.args[1])
+        flat_arr = [flatten_numexpr(e) for e in expr.args[0]]
+        if flat_idx[0] is expr.args[1] and \
+           all(arri is flati[0] for (arri, flati) in zip(expr.args[0],flat_arr)):
+            return (expr, [])
+        else:
+            # one of the args was changed
+            new_arr = [flati[0] for flati in flat_arr]
+            new_expr = Element([new_arr, flat_idx[0]])
+            new_cons = flat_idx[1] + [flati[1] for flati in flat_arr]
+            return(new_expr, new_cons)
+
+    raise Exception("Expression '{}' not allowed in objective".format(expr.name)) # or bug
+        
+def flatten_numexpr(expr):
+    """
+        input: expression of type:
+            * is_num()
+            * NumVarImpl
+            * Operator with is_type_num()
+            * Element with len(args)==2
+        output: tuple (base_expr, base_cons) with:
+            base_expr one of:
+                * is_num()
+                * NumVarImpl
+                * Operator with is_type_num(), all args are: is_num() or NumVarImpl
+                * Operator 'sum', all args are: is_num() or NumVarImpl or Operator '*'[is_num(), NumVarImpl]
+                * Element with len(args)==2 and args = ([NumVar], NumVar)
+            base_cons: list of flattened constraints (with flatten_constraint(con))
+    """
+    if is_num(expr) or isinstance(expr, NumVarImpl):
+        return (expr, [])
+
+    basecons = []
+    if isinstance(expr, Operator):
+        # only Numeric operators allowed
+        # unary int: '-', 'abs'
+        # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
+        # nary int: 'sum'
+        if expr.is_bool():
+            raise Exception("Operator '{}' not allowed as numexpr".format(expr.name))
+
+        # TODO: actually need to flatten THIS expression (and recursively the arguments)
+        return (expr, []) # TODO
+        newargs = [flatten_numexpr(e) for e in expr.args]
+
+
+    elif isinstance(expr, Comparison):
+        #allowed = {'==', '!=', '<=', '<', '>=', '>'}
+        return (expr, []) # TODO
+
+    elif isinstance(expr, Element):
+        # A0[A1] == A2
+        return (expr, []) # TODO
+
+    # rest: global constraints
+    else:
+        return (expr, []) # TODO
 
 
 def is_flatten_var(arg):
@@ -201,12 +245,10 @@ def flatten_boolexpr(subexpr):
                 * Operator with is_type_bool() EXCEPT '->', all args are: BoolVar
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
-    #raise NotImplementedError()
-    
 
     if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
         # base case: single boolVar
-        return (subexpr, [subexpr])
+        return (subexpr, [])
 
     args = subexpr.args
     base_cons = []
@@ -221,7 +263,7 @@ def flatten_boolexpr(subexpr):
             else:
                 bvar = args[0] if is_flatten_var(args[0]) else args[1]
                 base_cons += [subexpr]
-            return bvar, base_cons
+            return (bvar, base_cons)
 
         # recursive calls to LHS, RHS
         (var1, bco1) = flatten_boolexpr(args[0])
@@ -229,7 +271,7 @@ def flatten_boolexpr(subexpr):
         bvar = BoolVarImpl()
         base_cons += [bco1, bco2]
         base_cons += [Comparison(subexpr.name, var1, var2) == bvar]
-        return bvar, base_cons
+        return (bvar, base_cons)
 
     elif isinstance(subexpr, Operator):
         # apply De Morgan's transform for "implies"
@@ -239,7 +281,7 @@ def flatten_boolexpr(subexpr):
         if isinstance(subexpr.args[0], BoolVarImpl) and isinstance(subexpr.args[1], BoolVarImpl):
             bvar = BoolVarImpl()
             base_cons += [subexpr == bvar]
-            return bvar, base_cons
+            return (bvar, base_cons)
 
         # nested AND, OR
         # recurisve function call to LHS and RHS
@@ -249,7 +291,7 @@ def flatten_boolexpr(subexpr):
         bvar = BoolVarImpl()
         base_cons += [bco1, bco2]
         base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
-        return bvar, base_cons
+        return (bvar, base_cons)
 
     
 

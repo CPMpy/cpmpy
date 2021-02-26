@@ -237,6 +237,7 @@ class Operator(Expression):
         '-':   (1, False), # -x
         'abs': (1, False),
     }
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -257,12 +258,16 @@ class Operator(Expression):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
 
         super().__init__(name, arg_list)
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return Operator.allowed[self.name][1]
     
     def __repr__(self):
         printname = self.name
-        printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
-        if printname in printmap:
-            printname = printmap[printname]
+        if printname in Operator.printmap:
+            printname = Operator.printmap[printname]
 
         # special cases
         if self.name == '-': # unary -
