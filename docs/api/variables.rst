@@ -2,5 +2,5 @@ Variables
 =========
 
 .. automodule:: cpmpy.variables
-    :no-inherited-members:
-    :special-members:
+    :inherited-members:
+    :no-special-members:

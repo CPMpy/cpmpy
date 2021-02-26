@@ -45,6 +45,8 @@ extensions = [
     'm2r2'
 ]
 
+numpydoc_show_class_members = False
+
 source_suffix =  ['.rst', '.md']
 # source_suffix =  '.rst'
 
