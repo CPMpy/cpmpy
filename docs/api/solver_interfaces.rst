@@ -6,9 +6,9 @@ List of Solver Interfaces
 =========================
 
 +------------------------------+------------------------------------------------------+
-| :mod: `MiniZincPython`       |   .. all_solver_interfaces/minizinc_python:          |
-| :mod: `MiniZincText`         |   .. all_solver_interfaces/minizinc_text:            |
-| :mod: `ORToolsPython`        |   .. all_solver_interfaces/ortools_python:           |
+| :mod:`MiniZincPython`       |   .. _all_solver_interfaces/minizinc_python:          |
+| :mod:`MiniZincText`         |   .. _all_solver_interfaces/minizinc_text:            |
+| :mod:`ORToolsPython`        |   .. _all_solver_interfaces/ortools_python:           |
 +------------------------------+------------------------------------------------------+
 
 :mod: `MiniZincText` .. all_solver_interfaces/minizinc_text:
