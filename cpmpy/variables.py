@@ -1,5 +1,32 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## variables.py
+##
+"""
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        NumVar
+        Operator
+        Element
+        GlobalConstraint
+
+    ==================
+    Module description
+    ==================
+
+    ==============
+    Module details
+    ==============
+"""
+
+from .utils.exceptions import NullShapeError
 import numpy as np
-from .expressions import *
+from .expressions import Expression, is_num, Element
 
 # Helpers for type checking
 def is_int(arg):
@@ -93,9 +120,46 @@ class NDVarArray(Expression, np.ndarray):
             assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
             # single var, so flatten rest array
             return Element([array_rest, var[0]])
-            
+
         return super().__getitem__(index)
 
     # TODO?
     #in	  __contains__(self, value) 	Check membership
     #object.__matmul__(self, other)
+
+
+# N-dimensional array of Boolean Decision Variables
+def BoolVar(shape=None):
+    if shape is None or shape == 1:
+        return BoolVarImpl()
+    elif shape == 0:
+        raise NullShapeError(shape)
+    length = np.prod(shape)
+    
+    # create base data
+    data = np.array([BoolVarImpl() for _ in range(length)]) # repeat new instances
+    # insert into custom ndarray
+    return NDVarArray(shape, dtype=object, buffer=data)
+
+
+# N-dimensional array of Integer Decision Variables with lower-bound and upper-bound
+def IntVar(lb, ub, shape=None):
+    if shape is None or shape == 1:
+        return IntVarImpl(lb,ub)
+    elif shape == 0:
+        raise NullShapeError(shape)
+    length = np.prod(shape)
+    
+    # create base data
+    data = np.array([IntVarImpl(lb,ub) for _ in range(length)]) # repeat new instances
+    # insert into custom ndarray
+    return NDVarArray(shape, dtype=object, buffer=data)
+
+
+# N-dimensional wrapper, wrap a standard array (e.g. [1,2,3,4] whatever)
+# so that we can do [1,2,3,4][var1] == var2, e.g. element([1,2,3,4],var1,var2)
+# needed because standard arrays can not be indexed by non-constants
+def cparray(arr):
+    if not isinstance(arr, np.ndarray):
+        arr = np.array(arr)
+    return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)

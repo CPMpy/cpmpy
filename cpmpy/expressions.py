@@ -3,7 +3,6 @@
 ##
 ## expressions.py
 ##
-##
 """
     ===============
     List of classes
@@ -189,12 +188,12 @@ class Expression(object):
         return Operator("mod", [other, self])
 
     def __pow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [other, self])
-    
+
     # Not implemented: (yet?)
     #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
@@ -220,7 +219,7 @@ class Comparison(Expression):
         if hasattr(left, '__len__'): 
             assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
-    
+
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
@@ -230,7 +229,7 @@ class Comparison(Expression):
     # it could be a vectorized constraint
     def __iter__(self):
         return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
-    
+
     # is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -280,7 +279,7 @@ class Operator(Expression):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
 
         super().__init__(name, arg_list)
-    
+
     def __repr__(self):
         printname = self.name
         printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
@@ -303,7 +302,7 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-    
+
     # it could be a vectorized constraint
     def __iter__(self):
         if len(self.args) == 2:
@@ -391,7 +390,7 @@ class Operator(Expression):
             if is_bool:
                 return self
         return super().__eq__(other)
-    
+
     def value(self):
         if self.name == "pow":
             raise NotImplementedError()
@@ -438,7 +437,7 @@ class Element(Expression):
         # else: 3 arguments, reified variant, is bool
         if is_num(other) and other == 1:
             return self
-        
+
 
 
 # see globalconstraints.py for concrete instantiations
@@ -457,6 +456,6 @@ class GlobalConstraint(Expression):
 
         if self.is_bool and is_num(other) and other == 1:
             return self
-        
+
         # default
         return super().__eq__(other)

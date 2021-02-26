@@ -1,6 +1,6 @@
 import numpy as np
 from .expressions import Operator
-from .solver_interfaces.__util import get_supported_solvers
+from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface
 
 class Model(object):
@@ -83,6 +83,5 @@ class Model(object):
 
             if not isinstance(solver, SolverInterface) or not solver.supported():
                 raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver))
-                
         return solver.solve(self)
 
