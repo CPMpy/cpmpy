@@ -278,7 +278,6 @@ def __check_or_flip_base_const(subexpr):
     # BoolExp == boolvar format only 
     return Comparison(subexpr.name, subexpr.args[1], subexpr.args[0])
 
-
 def flatten_boolexpr(subexpr):
     """
         input: expression of type:
@@ -308,44 +307,52 @@ def flatten_boolexpr(subexpr):
             #bvar = args[0] if __is_flatten_var(args[0]) else args[1]
             #base_cons = [ __check_or_flip_base_const(subexpr)]
 
-            # recursively flatten children
-            (var1, bco1) = flatten_boolexpr(args[0])
-            (var2, bco2) = flatten_boolexpr(args[1])
-            newcomp = Comparison(subexpr.name, var1, var2)
+            # recursively flatten children, which may be boolexpr or numexpr
+            (var0, bco0) = check_or_flatten_subexpr(args[0])
+            (var1, bco1) = check_or_flatten_subexpr(args[1])
+            newcomp = Comparison(subexpr.name, var0, var1)
             bvar = BoolVarImpl()
-            return (bvar, [newcomp == bvar]+bco1+bco2)
+            return (bvar, [newcomp == bvar]+bco0+bco1)
 
     elif isinstance(subexpr, Operator):
+        assert(subexpr.is_bool()) # and, or, xor, ->
+
         # apply De Morgan's transform for "implies"
         if subexpr.name is '->':
             return flatten_boolexpr(~args[0] | args[1])
 
+        args = subexpr.args
         if isinstance(args[0], BoolVarImpl) and isinstance(args[1], BoolVarImpl):
             bvar = BoolVarImpl()
             return (bvar, [subexpr == bvar])
-
-        
-        if subexpr.is_bool():
-
-            # nested AND, OR
-            # recurisve function call to LHS and RHS
-            # XXX: merge nested AND at top level
-            (var1, bco1) = flatten_boolexpr(args[0])
-            (var2, bco2) = flatten_boolexpr(args[1])
-            bvar = BoolVarImpl()
-            base_cons += [bco1, bco2]
-            base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
-            return (bvar, base_cons)
-        
         else:
-            # we might have an numexp to flatten
-            (var1, bco1) = flatten_numexpr(args[0])
-            (var2, bco2) = flatten_numexpr(args[1])
-            ivar = BoolVarImpl()
-            base_cons += [bco1, bco2]
-            base_cons += [Operator(subexpr.name, [var1, var2]) == bvar]
-            return (bvar, base_cons)
+            # recursively flatten all children, which are boolexpr
+            flatres = [flatten_boolexpr(arg) for arg in args]
+            flat_vars = [v for (v,_) in flatres]
+            flat_cons = [c for (_,cons) in flatres for c in cons] # flatten
+            newop = Operator(subexpr.name, flat_vars)
+            bvar = BoolVarImpl()
+            return (bvar, [newop == bvar]+flat_cons)
 
+def check_or_flatten_subexpr(subexpr):
+    """
+        can be both nested boolexpr or linexpr
+    """
+    if isinstance(subexpr, BoolVarImpl) or isinstance(subexpr, bool):
+        # base case: single boolVar
+        return (subexpr, [])
+
+    if __is_numexpr(subexpr):
+        return flatten_numexpr(subexpr)
+    else:
+        return flatten_boolexpr(subexpr)
+
+def __is_numexpr(expr):
+    if isinstance(expr, Operator) and not expr.is_bool():
+        return True
+    if isinstance(expr, Element) and len(expr.args) == 2:
+        return True
+    return False
 
     
 
