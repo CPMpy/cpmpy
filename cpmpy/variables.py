@@ -109,11 +109,23 @@
         .. code-block:: python
 
             arrx = IntVar(3, 8, (100, 100, 100, 100))
-    
+
     Array of Variables
     ------------------
 
-    
+    N-dimensional array of cp-variables. Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. 
+    First convert your numpy array to a cpmpy-numpy array with the `cparray()` wrapper:
+
+    .. code-block:: python
+
+        # Transforming a given numpy-array **m** into a cparray
+
+        marr = np.array([
+            [1, 2, 3, 4],
+            [4, 8, 13, 15]
+        ])
+
+        m = cparray(marr)
 
     ==============
     Module details
