@@ -2,11 +2,12 @@ Solver Interfaces (:mod:`cpmpy.solver_interface`)
 =================================================
 
 .. toctree::
-   :maxdepth: 1
+    :titlesonly:
+    :maxdepth: 1
 
-   all_solver_interfaces/minizinc_python
-   all_solver_interfaces/minizinc_text
-   all_solver_interfaces/ortools_python
+    all_solver_interfaces/minizinc_python
+    all_solver_interfaces/minizinc_text
+    all_solver_interfaces/ortools_python
 
 =========================
 List of Solver Interfaces
