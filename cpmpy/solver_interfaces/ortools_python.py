@@ -5,8 +5,12 @@
 ##
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..model_tools.get_variables import get_variables
 from ..expressions import Comparison, Expression, Operator, Element
+from ..globalconstraints import *
+from ..model_tools.get_variables import get_variables
+from ..model_tools.flatten_model import *
+
+from itertools import cycle
 
 def zipcycle(vars1, vars2):
     v1 = [vars1] if not is_any_list(vars1) else vars1
@@ -96,12 +100,12 @@ class ORToolsPython(SolverInterface):
             my_status.status = ExitStatus.UNSATISFIABLE
         else:
             raise NotImplementedError # a new status type was introduced, please report on github
-        solstats.runtime = self._solver.WallTime()
+        my_status.runtime = self.ort_solver.WallTime()
 
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # fill in variables
             for var in original_vars:
-                var._value = self._solver.Value(self.varmap[var])
+                var._value = self.ort_solver.Value(self.varmap[var])
 
         return my_status
 
