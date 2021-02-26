@@ -4,21 +4,25 @@ Installation instructions
 CPMpy requires Python ``3.6`` or newer and is also installed with OR-Tools as default solver. Since the package is available on `PYPI <https://pypi.org/>`_, the best way is to open up a new command line window and run 
 
 .. code-block:: bash
+
     $ pip install cpmpy
 
 If the previous command fails to execute, it may be due to the permission to install the package globally Python packages. 
 
 .. code-block:: bash
+
     $ pip install cpmpy --user
 
 CPMpy can be later upgraded to the latest version using:
 
 .. code-block:: bash
+
     $ pip install -U cpmpy
 
 If Or-Tools is not installed yet or is not yet upgraded to the latest version, run the following command
 
 .. code-block:: bash
+
     $ python -m pip install --upgrade --user ortools
 
 Minizinc Installation and Configuration (optional)
@@ -29,6 +33,7 @@ A complete installation guide for the installation of Minizinc is available at `
 For **linux** users, if __snap__ is installed, Minizinc installation amounts to running
 
 .. code-block:: bash
+
     $ snap install minizinc --classic
 
 Otherwhise, the installation with the bundled Minizinc is straightforward (see https://www.minizinc.org/doc-2.5.3/en/installation.html#archive). The installation step boil down to:
@@ -64,6 +69,7 @@ Otherwhise, the installation with the bundled Minizinc is straightforward (see h
 The following information (or similar) should appear on your terminal 
 
 .. code-block:: bash
+
     minizinc: MiniZinc driver.
     Usage: minizinc  [<options>] [-I <include path>] <model>.mzn [<data>.dzn ...] or just <flat>.fzn
 
@@ -75,5 +81,6 @@ Minzinc-Python Installation and Configuration (optional)
 The MiniZinc-Python install amounts to running the following command in a terminal window.
 
 .. code-block:: bash
+
     $ pip install minizinc
 
