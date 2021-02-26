@@ -5,6 +5,9 @@ Solver Interfaces (:mod:`cpmpy.solver_interface`)
 List of Solver Interfaces
 =========================
 
+.. automodsumm:: cpmpy.solver_interfaces
+    :classes-only:
+
 .. automodule:: cpmpy.solver_interfaces.minizinc_text
     :no-special-members:
     :no-main-docstr:
