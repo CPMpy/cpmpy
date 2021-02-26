@@ -17,13 +17,16 @@ class Model(object):
     def __init__(self, *args, minimize=None, maximize=None):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         # list of constraints (arguments of top-level conjunction)
-        root_constr = self.make_and_from_list(args)
-        if root_constr.name == 'and':
-            # unpack top-level conjuction
-            self.constraints = root_constr.args
+        if len(args) == 0 or (len(args) == 1 and isinstance(args[0], list) and len(args[0]) == 0): # None or empty list
+            self.constraints = []
         else:
-            # wrap in list
-            self.constraints = [root_constr]
+            root_constr = self.make_and_from_list(args)
+            if root_constr.name == 'and':
+                # unpack top-level conjuction
+                self.constraints = root_constr.args
+            else:
+                # wrap in list
+                self.constraints = [root_constr]
 
         # an expresion or None
         self.objective = None
@@ -47,6 +50,15 @@ class Model(object):
             return lst[0]
         return Operator("and", lst)
         
+    def __add__(self, cons):
+        """
+            Add one or more constraints to the model
+
+            m = Model()
+            m += [x > 0]
+        """
+        self.constraints += cons
+        return self
 
     def __repr__(self):
         cons_str = ""
