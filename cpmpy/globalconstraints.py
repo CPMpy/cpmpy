@@ -3,6 +3,30 @@ from .expressions import *
 from itertools import chain, combinations
 
 """
+    ===============
+    List of classes
+    ===============
+    .. autosummary::
+        :nosignatures:
+
+        alldifferent
+        allequal
+        circuit
+        GlobalConstraint
+
+    ================
+    List of functions
+    =================
+    .. autosummary::
+        :nosignatures:
+
+        min
+        max
+
+    ==================
+    Module description
+    ==================
+
     Global constraint definitions
 
     A global constraint is nothing special in CPMpy. It is just an
