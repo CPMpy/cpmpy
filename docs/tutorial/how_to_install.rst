@@ -37,6 +37,7 @@ Otherwhise, the installation with the bundled Minizinc is straightforward (see h
 2. After downloading, *uncompress* the archive, for example in your home directory or any other location where you want to install it:
 
 .. code-block:: bash
+
     tar xf MiniZincIDE-__replace_by_version__-bundle-linux-x86_64.tgz
 
 3. Add the following lines to your `.bashrc` file (or `.zshrc` when using zsh):
