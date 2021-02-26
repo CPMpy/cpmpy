@@ -7,6 +7,10 @@ CPMpy requires Python ``3.6`` or newer and is also installed with OR-Tools as de
 
 If the previous command fails to execute, it may be due to the permission to install the package globally Python packages. 
 
+    $ pip install cpmpy --user
+
+CPMpy can be later upgraded to the latest version using:
+
     $ pip install -U cpmpy
 
 If Or-Tools is not installed yet or is not yet upgraded to the latest version, run the following command
@@ -45,4 +49,12 @@ The following information (or similar) should appear on your terminal
     minizinc: MiniZinc driver.
     Usage: minizinc  [<options>] [-I <include path>] <model>.mzn [<data>.dzn ...] or just <flat>.fzn
 
+Minzinc-Python Installation and Configuration (optional)
+--------------------------------------------------------
+
+.. warning:: Make sure you first install Minizinc on your system before attempting to install MiniZinc-Python
+
+The MiniZinc-Python install amounts to running the following command in a terminal window.
+
+    $ pip install minizinc
 

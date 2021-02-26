@@ -44,3 +44,31 @@ Supplementary :mod:`.examples` package
 
 .. toctree::
    examples/all_examples
+
+FAQ
+---
+
+**Problem**: I get the following error:
+
+
+.. code-block:: python
+   "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
+
+Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cparray()` wrapper:
+
+.. code-block:: python
+   :linenos:
+   # x is a variable 
+   X = IntVar(0, 3)
+
+   # Transforming a given numpy-array **m** into a cparray
+   m = cparray(m)
+   
+   # apply constraint
+   m[X] == 8
+
+License
+-------
+
+This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).
+   
