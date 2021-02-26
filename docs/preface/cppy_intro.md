@@ -81,7 +81,7 @@ And the result will be:
   M,O,N,E,Y = [1, 0, 6, 5, 2]
 ```
 
-In the [next](https://github.com/tias/cppy/blob/master/docs/explaining_smm.md), we are going to look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
+In the [next](https://github.com/tias/cppy/blob/master/docs/examples/explaining_smm.ipynb), we are going to look in detail this example. But first you may want to look some references for a global overview of Constraint Programming.
 
 
 ### References
