@@ -62,7 +62,7 @@ You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/mas
 
 ### Documentation
 
-New to constraint programming? Check our [CP basics tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
+New to constraint programming? Check our [CP basics tutorial](https://github.com/tias/cppy/blob/master/docs/preface/overview.rst).
 
 See also the more extensive documentation on [ReadTheDocs](https://cpmpy.readthedocs.io/).
 
