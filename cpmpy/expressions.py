@@ -35,15 +35,11 @@
 
     The list of expressions (constraints) supported are
     
-    1. :ref:`Boolean expressions` : expressions with boolean operators (:math:`\\neg{} \\vee \\wedge \\implies`).
-
-    2. :ref:`Integer expressions` : expressions with standard math operators (+-*...) and even the sum()-function.
-
-    3. :ref:`Comparison constraints` : expressions associated with equality (:math:`==`), and inequality (:math:`!=`) constraints.
-
-    4. :ref:`Element constraints` : 
-
-    5. :ref:`Global constraints` :
+    1. **Boolean expressions** : expressions with boolean operators (:math:`\\neg{} \\vee \\wedge \\implies`).
+    2. **Integer expressions** : expressions with standard math operators (+-*...) and even the sum()-function.
+    3. **Comparison constraints** : expressions associated with equality (:math:`==`), and inequality (:math:`!=`) constraints and more (>=, <=, ..).
+    4. **Element constraints** : 'element' expressions arr[x] = 3
+    5. **Global constraints** : named expressions with decomposition features.
 
     Boolean Expressions
     -------------------
@@ -64,8 +60,7 @@
 
     Global constraints
     ------------------
-    how to create global constraints (pointer to globalconstraints.py)
-
+    how to create global constraints (pointer to :mod:`cpmpy.globalconstraints`)
 
     ==============
     Module details
@@ -121,13 +116,18 @@ def any(iterable):
 
 class Expression(object):
     """
-    each Expression is a function with a self.name and self.args (arguments)
-    each Expression is considered to be a function whose value can be used
-      in other expressions
-    each Expression may implement:
+    Abstract class for representation of a generic constraint.
+
+    Each Expression is a function with a self.name and self.args (arguments).
+
+    Each Expression is considered to be a function whose value can be used
+    in other expressions.
+    
+    Each Expression may implement:
     - boolexpr(): the Boolean form of the expression
         default: (expr == 1)
         override for Boolean expressions (preferably through __eq__, see Comparison)
+
     - value(): the value of the expression, default None
     """
 
@@ -318,6 +318,9 @@ class Expression(object):
 
 
 class Comparison(Expression):
+    """
+    Class :class:`Comparison` represents a comparison expression between expressions or variables.
+    """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
@@ -346,10 +349,10 @@ class Comparison(Expression):
 
 class Operator(Expression):
     """
-    All kinds of operators on expressions,
-    including mathematical and logical
-    # convention for 2-ary operators: if one of the two is a constant,
-    # it is stored first (as expr[0]), this eases weighted sum detection
+    All kinds of operators on expressions, including mathematical and logical.
+
+    Convention for 2-ary operators: if one of the two is a constant,
+    it is stored first (as expr[0]), this eases weighted sum detection
     """
     allowed = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 2

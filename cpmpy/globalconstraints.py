@@ -32,6 +32,7 @@ from itertools import chain, combinations
     A global constraint is nothing special in CPMpy. It is just an
     expression of type `GlobalConstraint` with a name and arguments.
 
+
     You can define a new global constraint as simply as:
 
     ```
@@ -79,7 +80,7 @@ from itertools import chain, combinations
     natively support 'circuit'.
 """
 
-
+I'm still working on the API documentation
 # min: listwise 'min'
 def min(iterable):
     """
