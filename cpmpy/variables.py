@@ -83,11 +83,11 @@ class BoolVarImpl(IntVarImpl):
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
-        # if other == 1:
-        # XXX: dangerous!
-        # "=="" is overloaded 
+        # if other == 1: XXX: dangerous because "=="" is overloaded 
         if other is 1 or other is True:
             return self
+        if other is 0 or other is False:
+            return ~self
         return super().__eq__(other)
 
     # when redefining __eq__, must redefine custom__hash__
@@ -101,7 +101,7 @@ class NegBoolView(BoolVarImpl):
         It stores a link to `var`'s BoolVarImpl
     """
     def __init__(self, bv):
-        assert(isinstance(bv, BoolVarImpl))
+        #assert(isinstance(bv, BoolVarImpl))
         self._bv = bv
 
     def value(self):
