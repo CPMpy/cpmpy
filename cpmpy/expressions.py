@@ -559,6 +559,9 @@ class Element(Expression):
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(Expression):
+    """
+    Custom-named expressions for defining global constraints
+    """
     # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
     # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
     def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
