@@ -34,3 +34,15 @@ Otherwhise, the installation with the bundled Minizinc is straightforward (see h
     export PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/bin:$PATH
     export LD_LIBRARY_PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/lib:$LD_LIBRARY_PATH
     export QT_PLUGIN_PATH=MiniZincIDE-__replace_by_version__-bundle-linux-x86_64/plugins:$QT_PLUGIN_PATH
+
+4. Close the current terminal window or reload your `.bashrc` by running `source .bashrc`
+5. Check the minizinc install in a new terminal window and run
+
+    $ minizinc
+
+The following information (or similar) should appear on your terminal 
+
+    minizinc: MiniZinc driver.
+    Usage: minizinc  [<options>] [-I <include path>] <model>.mzn [<data>.dzn ...] or just <flat>.fzn
+
+
