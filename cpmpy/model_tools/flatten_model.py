@@ -17,11 +17,11 @@ def __zipcycle(vars1, vars2):
     return zip(v1, cycle(v2)) if len(v2) < len(v1) else zip(cycle(v1), v2)
 
 def flatten_model(orig_model):
-    from ..model import Model # otherwise circular dependency...
-
     """
         Receives model, returns new model where every constraint is a 'base' constraint
     """
+    from ..model import Model # otherwise circular dependency...
+
     # the top-level constraints
     basecons = []
     for con in orig_model.constraints:
@@ -51,6 +51,8 @@ def flatten_constraint(expr):
             * Comparison, all args are is_num() or NumVar 
             * Comparison '==' with args [boolexpr,BoolVar]
             * Comparison '!=' with args [boolexpr,BoolVar]
+            * Comparison '==' with args [comparisonexpr,BoolVar]
+            * Comparison '!=' with args [comparisonexpr,BoolVar]
             * Comparison '==' with args [numexpr,NumVar]
             * Comparison '!=' with args [numexpr,NumVar]
             * Element with len(args)==3 and args = ([NumVar], NumVar, NumVar)
@@ -70,10 +72,11 @@ def flatten_constraint(expr):
         flatcons = [flatten_constraint(e) for e in expr]
         return [c for con in flatcons for c in con]
 
+
     if isinstance(expr, Operator):
         assert(expr.is_bool()) # and, or, xor, ->
 
-        # XXX does not type-check arguments...
+        # does not type-check that arguments are bool...
         if all(__is_flat_var(arg) for arg in expr.args):
             return expr
         else:
@@ -83,32 +86,32 @@ def flatten_constraint(expr):
             newexpr = Operator(expr.name, flatvars)
             return [newexpr]+[c for con in flatcons for c in con]
 
+
     elif isinstance(expr, Comparison):
         #allowed = {'==', '!=', '<=', '<', '>=', '>'}
         flatcons = []
-        for lexp, rexp in __zipcycle(expr.args[0], expr.args[1]):
+        # zipcycle: unfolds 'arr1 == arr2' pairwise
+        for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
             if expr.name == '==' or expr.name == '!=':
-                return expr # TODO, pick up here
-                # special case: LHS can be richer (like objective)
-                (lvar, lcons) = flatten_objective(lexp) # TODO fails on flatten_constraint((a > 10) == 0)
-                if not __is_flat_var(baseleft):
-                    # LHS is rich expression, RHS has to be var
-                    (rvar, rcons) = flatten_subexpr(rexp)
+                # LHS can 'rich' expression: boolexpr, numexpr or comparison
+                if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                    # LHS is var and RHS not, swap for new expression
+                    lexpr, rexpr = rexpr, lexpr
 
-                else:
-                    # LHS is var, RHS can be rich expr (do swap)
-                    (rvar, rcons) = flatten_objective(rexp)
-                    lvar,rvar = rvar,lvar # swap, variable at right
-
-                return [Comparison(expr.name, [lvar,rvar])]+[c for con in lcons+rcons for c in con]
+                # make LHS rich, RHS var
+                (lrich, lcons) = reify_ready_boolexpr(lexpr)
+                (rvar, rcons) = flatten_subexpr(rexpr)
+                return [Comparison(expr.name, lrich, rvar)]+[c for con in lcons+rcons for c in con]
 
             else: # inequalities '<=', '<', '>=', '>'
                 # special case... allows some nesting of LHS
                 pass # TODO
         return [expr] # TODO
 
+
     elif isinstance(expr, Element):
         return [expr] # TODO
+
 
     # rest: global constraints
     else:
@@ -180,6 +183,7 @@ def flatten_numexpr(expr):
         lbs = [var.lb if isinstance(var, NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, NumVarImpl) else var for var in flatvars]
 
+        # TODO: weighted sum
         if expr.name == 'abs': # unary
             ivar = IntVarImpl(0, ubs[0])
         elif expr.name == '-': # unary
@@ -234,44 +238,65 @@ def flatten_boolexpr(expr):
                 * True/False
                 * BoolVar
             base_cons: list of flattened constraints (with flatten_constraint(con))
+
+        these are all the expression that can be 'reified'
     """
     if __is_flat_var(expr):
         return (expr, [])
+
+    # flatten expr into a LHS, return LHS == bvar
+    bvar = BoolVarImpl()
+    (newexpr, flatcons) = reify_ready_boolexpr(expr)
+    return (bvar, [newexpr == bvar]+flatcons)
+
+def reify_ready_boolexpr(expr):
+    """
+        alle expressions that can be 'reified', meaning that
+
+            - expr == BoolVar
+            - expr != BoolVar
+            - expr -> BoolVar
+
+        are valid expressions.
+
+        Currently, this is the case for:
+            * Operator with is_bool()
+            * Comparison
+
+        output: (base_expr, base_cons) with:
+            base_expr: same as 'expr', but all arguments are variables
+            base_cons: list of flattened constraints (with flatten_constraint(con))
+    """
+    assert(not __is_flat_var(expr))
 
     if isinstance(expr, Operator):
         assert(expr.is_bool()) # and, or, xor, ->
 
         # apply De Morgan's transform for "implies"
         if expr.name is '->':
-            return flatten_boolexpr(~args[0] | args[1])
+            return reify_ready_boolexpr(~args[0] | args[1])
 
-        bvar = BoolVarImpl()
         if all(__is_flat_var(arg) for arg in expr.args):
-            return (bvar, [expr == bvar])
+            return (expr, [])
         else:
             # recursively flatten all children, which are boolexpr
             flatvars, flatcons = zip(*[flatten_boolexpr(arg) for arg in expr.args])
-
-            newexpr = (Operator(expr.name, flatvars) == bvar)
-            return (bvar, [newexpr]+[c for con in flatcons for c in con])
+            return (Operator(expr.name, flatvars), [c for con in flatcons for c in con])
 
     if isinstance(expr, Comparison):
-        bvar = BoolVarImpl()
         if all(__is_flat_var(arg) for arg in expr.args):
-            return (bvar, [expr == bvar])
+            return (expr, [])
         else:
-            # TODO: special case of <expr> == 0
+            # TODO: special case of <reify_ready_expr> == 0, e.g. (a > 10) == 0 :: (a <= 10)
             #bvar = args[0] if __is_flat_var(args[0]) else args[1]
             #base_cons = [ __check_or_flip_base_const(subexpr)]
 
             # recursively flatten children, which may be boolexpr or numexpr
             # TODO: actually one side can be a linexpr, then sufficient to flatten_objective...
-            # e.g. flatten_boolexpr(a + b > c) does not need splitting a+b away
+            # e.g. flatten_boolexpr(a + b > 2) does not need splitting a+b away
             (var0, bco0) = flatten_subexpr(expr.args[0])
             (var1, bco1) = flatten_subexpr(expr.args[1])
-
-            newexpr = (Comparison(expr.name, var0, var1) == bvar)
-            return (bvar, [newexpr]+bco0+bco1)
+            return (Comparison(expr.name, var0, var1), bco0+bco1)
 
 
 def flatten_subexpr(expr):
