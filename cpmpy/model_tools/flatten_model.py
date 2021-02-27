@@ -128,20 +128,31 @@ def flatten_constraint(expr):
 
         return flatcons
 
-
-    elif isinstance(expr, Element):
-        return [expr] # TODO
-
-
-    # rest: global constraints
     else:
-        return [expr] # TODO
+        # everything else (Element, globals)
+        # just recursively flatten args, which can be lists
+        if all(__is_flat_var_or_list(arg) for arg in expr.args):
+            return expr
+        else:
+            # recursively flatten all children
+            flatvars, flatcons = zip(*[flatten_subexpr(arg) for arg in expr.args])
+
+            # little meta-trick to build object of same class
+            newexpr = type(expr)(expr.name, flatvars)
+            return [newexpr]+[c for con in flatcons for c in con]
 
 
 def __is_flat_var(arg):
     """ True if the variable is a numeric constant, or a NumVarImpl (incl subclasses)
     """
     return is_num(arg) or isinstance(arg, NumVarImpl)
+
+def __is_flat_var_or_list(arg):
+    """ True if the variable is a numeric constant, or a NumVarImpl (incl subclasses)
+        or a list of __is_flat_var
+    """
+    return is_num(arg) or isinstance(arg, NumVarImpl) or \
+           is_any_list(arg) and all(__is_flat_var(el) for el in arg)
 
 
 def flatten_objective(expr):
