@@ -58,8 +58,9 @@ class IntVarImpl(NumVarImpl):
         assert (lb >= 0 and ub >= 0)
         super().__init__(lb, ub)
         
-        self.name = IntVarImpl.counter
-        IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
+        if setname:
+            self.name = IntVarImpl.counter
+            IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
     
     def __repr__(self):
         return "IV{}".format(self.name)
