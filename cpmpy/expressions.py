@@ -499,6 +499,10 @@ class Element(Expression):
     def __eq__(self, other):
         if len(self.args) == 2:
             # add as third argument
+            # XXX, this is very eager,
+            # prohibits t = arr[x], t == 0, t == b
+            # as 't' will include ==0 after the second command
+            # make copy instead?
             self.args.append(other)
             return self
 
