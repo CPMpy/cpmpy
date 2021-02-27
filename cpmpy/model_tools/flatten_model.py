@@ -93,20 +93,35 @@ def flatten_constraint(expr):
         # zipcycle: unfolds 'arr1 == arr2' pairwise
         for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
             if expr.name == '==' or expr.name == '!=':
-                # LHS can 'rich' expression: boolexpr, numexpr or comparison
+                # TODO: numeric case...
+                # BOOLEAN CASE:
+                # LHS has to be reify_ready (see reify_ready_boolexpr), RHS var
                 if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
                     # LHS is var and RHS not, swap for new expression
                     lexpr, rexpr = rexpr, lexpr
 
-                # make LHS rich, RHS var
+                # make LHS reify_ready, RHS var
                 (lrich, lcons) = reify_ready_boolexpr(lexpr)
-                (rvar, rcons) = flatten_subexpr(rexpr)
-                return [Comparison(expr.name, lrich, rvar)]+[c for con in lcons+rcons for c in con]
+                (rvar, rcons) = flatten_boolexpr(rexpr)
+                flatcons += [Comparison(expr.name, lrich, rvar)]+lcons+rcons
 
             else: # inequalities '<=', '<', '>=', '>'
-                # special case... allows some nesting of LHS
-                pass # TODO
-        return [expr] # TODO
+                newname = expr.name
+                # LHS can be linexpr, RHS a var
+                if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                    # LHS is var and RHS not, swap for new expression (incl. operator name)
+                    lexpr, rexpr = rexpr, lexpr
+                    if   expr.name == "<=": newname = ">="
+                    elif expr.name == "<":  newname = ">"
+                    elif expr.name == ">=": newname = "<="
+                    elif expr.name == ">":  newname = "<"
+
+                # make LHS like objective, RHS var
+                (lrich, lcons) = flatten_objective(lexpr)
+                (rvar, rcons) = flatten_numexpr(rexpr)
+                flatcons += [Comparison(newname, lrich, rvar)]+lcons+rcons
+
+        return flatcons
 
 
     elif isinstance(expr, Element):
