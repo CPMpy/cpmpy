@@ -1,3 +1,73 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## expressions.py
+##
+"""
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        Expression
+        Operator
+        Element
+        GlobalConstraint
+
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        all
+        any
+
+    ==================
+    Module description
+    ==================
+
+    This module takes advantage of the Python operator overloading to easily create
+    constraints i.e. (combinations of) expressions variables. Expressions are
+    represented as an expression tree. All *types* of expression can be combined
+    to form complex constraints.
+
+    The list of expressions (constraints) supported are
+
+    1. **Boolean expressions**: expressions with boolean operators (:math:`\\neg \\vee \\wedge \\implies`).
+    2. **Integer expressions**: expressions with standard math operators (+-*...) and even the sum()-function.
+    3. **Comparison constraints** : expressions associated with equality (:math:`==`), and inequality (:math:`!=`) constraints and more (>=, <=, ..).
+    4. **Element constraints** : 'element' expressions arr[x] = 3
+    5. **Global constraints** : named expressions with decomposition features.
+
+    Boolean Expressions
+    -------------------
+
+    how to create boolean expresions (&|~) and b1 == b2, b1.implies(b2)
+
+    Integer Expressions
+    -------------------
+    how to create integer expressions (+-*...) and sum() and
+
+    Comparison constraints
+    ----------------------
+    how to create comparison constraints (==,!=,inequalities)
+
+    Element constraints
+    -------------------
+    how to create 'element' expressions arr[x], see also cparray([1,2,3])[x] in FAQ on readme.md
+
+    Global constraints
+    ------------------
+    how to create global constraints (pointer to :mod:`cpmpy.globalconstraints`)
+
+    ==============
+    Module details
+    ==============
+"""
 import numpy as np
 
 # Helpers for type checking
@@ -8,19 +78,74 @@ def is_any_list(arg):
 def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
+# Overwriting all/any python built-ins
+# all: listwise 'and'
+def all(iterable):
+    """
+    Constraint ensuring all elements are True.
+
+    Overwrites the default python all built-in.
+    """
+    collect = [] # logical expressions
+    for elem in iterable:
+        if elem is False:
+            return False # no need to create constraint
+        elif elem is True:
+            pass
+        elif isinstance(elem, Expression):
+            collect.append( elem.boolexpr() )
+        else:
+            raise "unknown argument to 'all'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
+        return Operator("and", collect)
+    return True
+
+def any(iterable):
+    """
+    Constraint ensuring at least 1 or more of the elements composing the expression are True.
+
+    Overwrites the default python any built-in.
+    """
+    collect = [] # logical expressions
+    for elem in iterable:
+        if elem is True:
+            return True # no need to create constraint
+        elif elem is False:
+            pass
+        elif isinstance(elem, Expression):
+            collect.append( elem.boolexpr() )
+        else:
+            raise "unknown argument to 'any'"
+    if len(collect) == 1:
+        return collect[0]
+    if len(collect) >= 2:
+        return Operator("or", collect)
+    return False
+
+
 class Expression(object):
     """
-    each Expression is a function with a self.name and self.args (arguments)
-    each Expression is considered to be a function whose value can be used
-      in other expressions
-    each Expression may implement:
+    Abstract class for representation of a generic constraint.
+
+    Each Expression is a function with a self.name and self.args (arguments).
+
+    Each Expression is considered to be a function whose value can be used
+    in other expressions.
+
+    Each Expression may implement:
     - boolexpr(): the Boolean form of the expression
         default: (expr == 1)
         override for Boolean expressions (preferably through __eq__, see Comparison)
+
     - value(): the value of the expression, default None
     """
 
     def __init__(self, name, arg_list):
+        if isinstance(arg_list, np.ndarray):
+            # must flatten
+            arg_list = arg_list.reshape(-1)
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.name = name
         self.args = arg_list
@@ -44,7 +169,25 @@ class Expression(object):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        return None
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
+        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
+        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
+        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
+        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
+        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        return None # default
+
+    # implication constraint: self -> other
+    # Python does not offer relevant syntax...
+    # for double implication, use equivalence self == other
+    def implies(self, other):
+        # other constant
+        if other is True:
+            return True
+        if other is False:
+            return ~self
+        return Operator('->', [self, other])
 
     # Comparisons
     def __eq__(self, other):
@@ -134,7 +277,7 @@ class Expression(object):
             return -self
         return Operator("sub", [other, self])
     
-    # multiplication
+    # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
@@ -163,12 +306,12 @@ class Expression(object):
         return Operator("mod", [other, self])
 
     def __pow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
-        assert (module is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: module not supported"
         return Operator("pow", [other, self])
-    
+
     # Not implemented: (yet?)
     #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
@@ -186,6 +329,9 @@ class Expression(object):
 
 
 class Comparison(Expression):
+    """
+    Class :class:`Comparison` represents a comparison expression between expressions or variables.
+    """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
@@ -194,7 +340,7 @@ class Comparison(Expression):
         if hasattr(left, '__len__'): 
             assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
-    
+
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
@@ -204,7 +350,7 @@ class Comparison(Expression):
     # it could be a vectorized constraint
     def __iter__(self):
         return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
-    
+
     # is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -214,10 +360,10 @@ class Comparison(Expression):
 
 class Operator(Expression):
     """
-    All kinds of operators on expressions,
-    including mathematical and logical
-    # convention for 2-ary operators: if one of the two is a constant,
-    # it is stored first (as expr[0]), this eases weighted sum detection
+    All kinds of operators on expressions, including mathematical and logical.
+
+    Convention for 2-ary operators: if one of the two is a constant,
+    it is stored first (as expr[0]), this eases weighted sum detection
     """
     allowed = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
@@ -234,6 +380,7 @@ class Operator(Expression):
         '-':   (1, False), # -x
         'abs': (1, False),
     }
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -249,17 +396,21 @@ class Operator(Expression):
 
         # convention for commutative binary operators:
         # swap if right is constant and left is not
-        if len(arg_list) == 2 and all(is_num(x) for x in arg_list) and \
+        if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
 
         super().__init__(name, arg_list)
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return Operator.allowed[self.name][1]
     
     def __repr__(self):
         printname = self.name
-        printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
-        if printname in printmap:
-            printname = printmap[printname]
+        if printname in Operator.printmap:
+            printname = Operator.printmap[printname]
 
         # special cases
         if self.name == '-': # unary -
@@ -277,7 +428,7 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-    
+
     # it could be a vectorized constraint
     def __iter__(self):
         if len(self.args) == 2:
@@ -365,26 +516,18 @@ class Operator(Expression):
             if is_bool:
                 return self
         return super().__eq__(other)
-    
+
     def value(self):
-        if self.name == "pow":
-            raise NotImplementedError()
-
-        operator_obj = {
-            "sum": sum(self.args),
-            "mul": self.args[0] * self.args[1],
-            "sub": self.args[0] - self.args[1],
-            "div": self.args[0] / self.args[1],
-            "mod": self.args[0] % self.args[1],
-            # "pow": self.args[0] ** self.args[1],
-            "mul": self.args[0] * self.args[1],
-            "-": -self.args[0],
-            "abs": -self.args[0] if self.args[0].value() < 0 else self.args[0]
-        }
-        if self.name not in operator_obj:
-            return None
-
-        return operator_obj[self.name]
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if   self.name == "sum": return sum(arg_vals)
+        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
+        elif self.name == "sub": return arg_vals[0] - arg_vals[1]
+        elif self.name == "div": return arg_vals[0] / arg_vals[1]
+        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
+        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
+        elif self.name == "-":   return -arg_vals[0]
+        elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        return None # default
 
 class Element(Expression):
     """
@@ -396,6 +539,16 @@ class Element(Expression):
         assert (len(arg_list) >= 2 and len(arg_list) <= 3), "Element takes 2 or three arguments"
         super().__init__("element", arg_list)
 
+    def value(self):
+        def argval(a):
+            return a.value() if isinstance(a, Expression) else a
+        idxval = argval(self.args[1])
+        arrval = argval(self.args[0][idxval])
+        if len(self.args) == 2:
+            return arrval
+        else:
+            return (arrval == argval(self.args[2]))
+        return None # default
 
     def __repr__(self):
         out = "{}[{}]".format(self.args[0], self.args[1])
@@ -412,17 +565,34 @@ class Element(Expression):
         # else: 3 arguments, reified variant, is bool
         if is_num(other) and other == 1:
             return self
-        
 
 
 # see globalconstraints.py for concrete instantiations
 class GlobalConstraint(Expression):
+    """
+    Custom-named expressions for defining global constraints
+    """
     # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
     # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
     def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
         super().__init__(name, arg_list)
         self.add_equality_as_arg = add_equality_as_arg
         self.is_bool = is_bool
+
+    def decompose(self):
+        """
+        if a global constraint has a default decomposition,
+        then it should monkey-patch this function, e.g.:
+        
+        .. code-block:: python
+
+            def my_decomp_function(self):
+                return []
+            g = GlobalConstraint("g", args)
+            g.decompose = my_decom_function
+
+        """
+        return None
 
     def __eq__(self, other):
         if self.add_equality_as_arg:
@@ -431,6 +601,6 @@ class GlobalConstraint(Expression):
 
         if self.is_bool and is_num(other) and other == 1:
             return self
-        
+
         # default
         return super().__eq__(other)

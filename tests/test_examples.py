@@ -12,6 +12,8 @@ EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.
 def test_examples(example):
     """Loads example files and executes with default solver
 
+class TestExamples(unittest.TestCase):
+
     Args:
         example ([string]): Loaded with parametrized example filename
     """

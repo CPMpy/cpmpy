@@ -1,8 +1,6 @@
 import unittest
 import cpmpy as cp
 
-supported_solvers= [cp.MiniZincPython()]
-
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -22,14 +20,12 @@ class TestGlobal(unittest.TestCase):
             model = cp.Model(constraint)
 
             # SOLVE
-            # TODO: remove supported solvers and use cpmpy provided solver support
-            # for solver in cp.get_supported_solvers():
-            for solver in supported_solvers:
-                _ = model.solve(solver=solver)
+            if True:
+                _ = model.solve()
                 vals = [x.value() for x in vars]
 
                 # ensure all different values
-                self.assertEqual(len(vals),len(set(vals)), msg=f"{solver.name} does provide solution validating given constraints.")
+                self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
 
     def test_circuit(self):
         """
@@ -49,7 +45,19 @@ class TestGlobal(unittest.TestCase):
         constraints = [cp.circuit(x)]
         model = cp.Model(constraints)
 
-        # TODO: remove supported solvers and use cpmpy provided solver support
-        # for solver in cp.get_supported_solvers():
-        for solver in supported_solvers:
-            _ = model.solve(solver=solver)
+        _ = model.solve()
+
+    def test_minimax_python(self):
+        iv = cp.IntVar(1,9, 10)
+        self.assertIsInstance(min(iv), cp.GlobalConstraint) 
+        self.assertIsInstance(max(iv), cp.GlobalConstraint) 
+
+    def test_minimax_cpm(self):
+        iv = cp.IntVar(1,9, 10)
+        mi = cp.min(iv)
+        ma = cp.max(iv)
+        self.assertIsInstance(mi, cp.GlobalConstraint) 
+        self.assertIsInstance(ma, cp.GlobalConstraint) 
+
+        self.assertEqual(cp.Model([], minimize=mi).solve() == 1)
+        self.assertEqual(cp.Model([], minimize=ma).solve() == 9)

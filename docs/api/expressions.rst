@@ -1,6 +1,6 @@
-Expressions
-===========
+Expressions  (:mod:`cpmpy.expressions`)
+=======================================
 
 .. automodule:: cpmpy.expressions
-    :inherited-members:
     :no-special-members:
+    :inherited-members:
