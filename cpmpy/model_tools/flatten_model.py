@@ -92,17 +92,22 @@ def flatten_constraint(expr):
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
         for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
+            # XXX somehow, this code feels like it should be in reify_ready_boolexpr?
             if expr.name == '==' or expr.name == '!=':
-                # TODO: numeric case...
-                # BOOLEAN CASE:
-                # LHS has to be reify_ready (see reify_ready_boolexpr), RHS var
+                # RHS has to be variable, LHS can be more
                 if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
                     # LHS is var and RHS not, swap for new expression
                     lexpr, rexpr = rexpr, lexpr
 
-                # make LHS reify_ready, RHS var
-                (lrich, lcons) = reify_ready_boolexpr(lexpr)
-                (rvar, rcons) = flatten_boolexpr(rexpr)
+                if __is_numexpr(lexpr) and __is_numexpr(rexpr):
+                    # numeric case
+                    (lrich, lcons) = flatten_objective(lexpr)
+                    (rvar, rcons) = flatten_numexpr(rexpr)
+                else:
+                    # Boolean case
+                    # make LHS reify_ready, RHS var
+                    (lrich, lcons) = reify_ready_boolexpr(lexpr)
+                    (rvar, rcons) = flatten_boolexpr(rexpr)
                 flatcons += [Comparison(expr.name, lrich, rvar)]+lcons+rcons
 
             else: # inequalities '<=', '<', '>=', '>'
