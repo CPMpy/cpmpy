@@ -15,7 +15,7 @@ class TestSolvers(unittest.TestCase):
             model.solve()
             self.assertEqual([xi.value() for xi in x], [0, 1, 2])
     
-    # should move elsewhere later
+    # should move this test elsewhere later
     def test_tsp(self):
         N = 6
         b = np.random.randint(1,100, size=(N,N))
@@ -30,8 +30,7 @@ class TestSolvers(unittest.TestCase):
         for i in range(N):
             for j in range(N):
                 objective += x[i,j]*distance_matrix[i,j] 
-        ## this is not working
-        # objective = sum(x*distance_matrix)
+        objective = sum(x*distance_matrix)
 
         model = cp.Model(constraint, minimize=objective)
         stats = model.solve()
