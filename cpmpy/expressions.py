@@ -354,7 +354,7 @@ class Operator(Expression):
 
         # special cases
         if self.name == '-': # unary -
-            return "-{}".format(expr[0])
+            return "-{}".format(self.args[0])
 
         # infix printing of two arguments
         if len(self.args) == 2:

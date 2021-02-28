@@ -207,6 +207,11 @@ def flatten_numexpr(expr):
     if __is_flat_var(expr):
         return (expr, [])
 
+    # special case, -var... 
+    # XXX until we do weighted sum, turn into -1*args[0]
+    if isinstance(expr, Operator) and expr.name == '-': # unary
+        return flatten_numexpr(-1*expr.args[0])
+
     if isinstance(expr, Operator):
         assert(not expr.is_bool()) # only non-logic operators allowed
 
@@ -217,12 +222,18 @@ def flatten_numexpr(expr):
         # TODO: weighted sum
         if expr.name == 'abs': # unary
             ivar = IntVarImpl(0, ubs[0])
-        elif expr.name == '-': # unary
-            ivar = IntVarImpl(-ubs[0], -lbs[0])
         elif expr.name == 'mul': # binary
-            ivar = IntVarImpl(lbs[0] * lbs[1], ubs[0] * ubs[1]) 
+            lb = lbs[0] * lbs[1]
+            ub = ubs[0] * ubs[1]
+            if lb > ub: # a negative nr
+                lb,ub = ub,lb
+            ivar = IntVarImpl(lb, ub) 
         elif expr.name == 'div': # binary
-            ivar = IntVarImpl(lbs[0] // ubs[1], ubs[0] // lbs[1] )
+            lb = lbs[0] // lbs[1]
+            ub = ubs[0] // ubs[1]
+            if lb > ub: # a negative nr
+                lb,ub = ub,lb
+            ivar = IntVarImpl(lb, ub) 
         elif expr.name == 'mod': # binary 
             ivar = IntVarImpl(0, ubs[0])
         elif expr.name == 'pow': # binary

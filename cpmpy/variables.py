@@ -55,7 +55,7 @@ class IntVarImpl(NumVarImpl):
 
     def __init__(self, lb, ub, setname=True):
         assert (is_int(lb) and is_int(ub))
-        assert (lb >= 0 and ub >= 0)
+        #assert (lb >= 0 and ub >= 0) # can be negative?
         super().__init__(lb, ub)
         
         if setname:

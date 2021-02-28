@@ -126,6 +126,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_objective( a/b+c )), "((IV7) + (IV2), [((IV0) / (IV1)) == (IV7)])" )
         self.assertEqual( str(flatten_objective( cparray([1,2,3])[a] )), "(IV8, [[1 2 3][IV0] == IV8])" )
         self.assertEqual( str(flatten_objective( cparray([1,2,3])[a]+b )), "((IV9) + (IV1), [[1 2 3][IV0] == IV9])" )
+        self.assertEqual( str(flatten_objective( a+b-c )), "(sum((IV0, IV1, IV10)), [(-1 * (IV2)) == (IV10)])" )
 
     def test_constraint(self):
         (a,b,c,d,e) = self.ivars[:5]
