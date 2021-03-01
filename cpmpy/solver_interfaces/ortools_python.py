@@ -24,7 +24,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions import Comparison, Expression, Operator, Element
 from ..globalconstraints import *
-from ..model_tools.get_variables import get_variables
+from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import *
 
 from itertools import cycle
@@ -127,6 +127,7 @@ class ORToolsPython(SolverInterface):
         return my_status
 
     # for subexpressions (variables, lists and linear expressions)
+    # TODO, namings more like in flatten
     def convert_expression(self, expr):
         # python constants
         if is_num(expr):
@@ -175,6 +176,24 @@ class ORToolsPython(SolverInterface):
             elif expr.name == 'sum':
                 return sum(args)
 
+        elif isinstance(expr, Comparison):
+            #allowed = {'==', '!=', '<=', '<', '>=', '>'}
+            # recursively convert arguments (subexpressions)
+            lvar = self.convert_expression(expr.args[0])
+            rvar = self.convert_expression(expr.args[1])
+            if expr.name == '==':
+                return (lvar == rvar)
+            elif expr.name == '!=':
+                return (lvar != rvar)
+            elif expr.name == '<=':
+                return (lvar <= rvar)
+            elif expr.name == '<':
+                return (lvar < rvar)
+            elif expr.name == '>=':
+                return (lvar >= rvar)
+            elif expr.name == '>':
+                return (lvar > rvar)
+
         raise NotImplementedError(expr) # should not reach this... please report on github
         # there might be an Element expression here... need to add flatten rule then?
 
@@ -196,6 +215,7 @@ class ORToolsPython(SolverInterface):
                     # XXX this might break for 'reification' of constraints...
                     # will have to add two-sided .OnlyEnforceIf() then?
                     # if you get an error here, please report on github
+                    # XXX it breaks on: (IntVar(1,9) != 0) == BoolVar()
                     self._model.Add(lvar == rvar)
                 elif expr.name == '!=':
                     self._model.Add( lvar != rvar )
@@ -257,7 +277,21 @@ class ORToolsPython(SolverInterface):
             # global constraint not known, try generic decomposition
             dec = expr.decompose()
             if not dec is None:
-                self.post_expression(flatten_constraint(dec))
+                flatdec = flatten_constraint(dec)
+
+                # collect and create new variables
+                flatvars = vars_expr(flatdec)
+                for var in flatvars:
+                    if not var in self.varmap:
+                        # new variable
+                        if isinstance(var, BoolVarImpl):
+                            revar = self._model.NewBoolVar(str(var.name))
+                        elif isinstance(var, IntVarImpl):
+                            revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
+                        self.varmap[var] = revar
+                # post decomposition
+                for con in flatdec:
+                    self.post_expression(con)
             else:
                 raise NotImplementedError(dec) # if you reach this... please report on github
         

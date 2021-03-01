@@ -206,6 +206,7 @@ def flatten_numexpr(expr):
                 * NumVarImpl
             base_cons: list of flattened constraints (with flatten_constraint(con))
     """
+    # XXX a boolexpr is also a valid numexpr? e.g. 30*(iv > 5) + ... see mario obj.
     if __is_flat_var(expr):
         return (expr, [])
 
@@ -217,7 +218,7 @@ def flatten_numexpr(expr):
     if isinstance(expr, Operator):
         assert(not expr.is_bool()) # only non-logic operators allowed
 
-        flatvars, flatcons = zip(*[flatten_numexpr(arg) for arg in expr.args])
+        flatvars, flatcons = zip(*[flatten_subexpr(arg) for arg in expr.args]) # also bool, reified...
         lbs = [var.lb if isinstance(var, NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, NumVarImpl) else var for var in flatvars]
 
