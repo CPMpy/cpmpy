@@ -20,8 +20,12 @@ def uniquify(seq):
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 def vars_expr(expr):
-    # a var, do our thing
+    if isinstance(expr, NegBoolView):
+        # this is just a view, return the actual variable
+        return [expr._bv]
+        
     if isinstance(expr, NumVarImpl):
+        # a real var, do our thing
         return [expr]
 
     vars_ = []
