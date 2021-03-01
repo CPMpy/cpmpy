@@ -186,7 +186,7 @@ class ORToolsPython(SolverInterface):
             self._model.AddBoolOr( [self.varmap[expr]] )
         
         # standard expressions: comparison, operator, element
-        if isinstance(expr, Comparison):
+        elif isinstance(expr, Comparison):
             # recursively convert arguments (subexpressions)
             args = [self.convert_expression(e) for e in expr.args]
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
