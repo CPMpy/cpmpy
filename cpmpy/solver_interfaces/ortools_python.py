@@ -137,14 +137,10 @@ class ORToolsPython(SolverInterface):
             return [self.convert_expression(e) for e in expr]
 
         # decision variables, check in varmap
-        if isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        if isinstance(expr, NegBoolView):
+            return self.varmap[expr._bv].Not()
+        elif isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
             return self.varmap[expr]
-
-        # ~B
-        # XXX should we implement NegBoolView instead?
-        if isinstance(expr, Comparison) and expr.name == '==' and \
-           isinstance(expr.args[0], BoolVarImpl) and expr.args[1] == 0:
-            return self.varmap[expr.args[0]].Not()
 
         if isinstance(expr, Operator):
             # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
@@ -183,9 +179,10 @@ class ORToolsPython(SolverInterface):
         # there might be an Element expression here... need to add flatten rule then?
 
     def post_expression(self, expr):
-        # base case
-        if isinstance(expr, BoolVarImpl):
-            print(type(expr), expr, self.varmap[expr])
+        # base cases
+        if isinstance(expr, NegBoolView):
+            self._model.AddBoolOr( [self.varmap[expr._bv].Not()] )
+        elif isinstance(expr, BoolVarImpl):
             self._model.AddBoolOr( [self.varmap[expr]] )
         
         # standard expressions: comparison, operator, element
