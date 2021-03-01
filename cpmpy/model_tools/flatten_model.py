@@ -1,3 +1,4 @@
+import copy
 from ..expressions import *
 from ..variables import *
 
@@ -137,8 +138,9 @@ def flatten_constraint(expr):
             # recursively flatten all children
             flatvars, flatcons = zip(*[flatten_subexpr(arg) for arg in expr.args])
 
-            # little meta-trick to build object of same class
-            newexpr = type(expr)(expr.name, flatvars)
+            # take copy, replace args
+            newexpr = copy.copy(expr) # shallow or deep? currently shallow
+            newexpr.args = flatvars
             return [newexpr]+[c for con in flatcons for c in con]
 
 
