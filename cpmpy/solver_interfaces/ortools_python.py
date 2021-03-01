@@ -93,7 +93,7 @@ class ORToolsPython(SolverInterface):
 
     def solve(self, cpm_model, num_workers=1):
         if not self.supported():
-            raise "Install the python 'ortools' package to use this '{}' solver interface".format(self.name)
+            raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(self.name))
         from ortools.sat.python import cp_model as ort
 
         # store original vars (before flattening)

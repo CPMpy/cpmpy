@@ -267,7 +267,7 @@ def flatten_numexpr(expr):
         newexpr = Element([arr, idx, ivar])
         return (ivar, [newexpr]+basecons)
 
-    raise Exception("Operator '{}' not allowed as numexpr".format(expr.name)) # or bug
+    raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug
 
 
 def flatten_boolexpr(expr):

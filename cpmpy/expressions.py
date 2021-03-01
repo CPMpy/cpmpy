@@ -45,7 +45,7 @@ def all(iterable):
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
         else:
-            raise "unknown argument to 'all'"
+            raise Exception("unknown argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
@@ -63,7 +63,7 @@ def any(iterable):
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
         else:
-            raise "unknown argument to 'any'"
+            raise Exception("unknown argument '{}' to 'any'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
