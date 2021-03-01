@@ -510,35 +510,3 @@ class Element(Expression):
         if is_num(other) and other == 1:
             return self
 
-
-
-# see globalconstraints.py for concrete instantiations
-class GlobalConstraint(Expression):
-    # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
-    # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
-    def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
-        super().__init__(name, arg_list)
-        self.add_equality_as_arg = add_equality_as_arg
-        self.is_bool = is_bool
-
-    def decompose(self):
-        """
-            if a global constraint has a default decomposition,
-            then it should monkey-patch this function, e.g.:
-            def my_decomp_function(self):
-                return []
-            g = GlobalConstraint("g", args)
-            g.decompose = my_decom_function
-        """
-        return None
-
-    def __eq__(self, other):
-        if self.add_equality_as_arg:
-            self.args.append(other)
-            return self
-
-        if self.is_bool and is_num(other) and other == 1:
-            return self
-
-        # default
-        return super().__eq__(other)
