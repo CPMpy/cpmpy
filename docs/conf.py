@@ -42,8 +42,12 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'sphinx_automodapi.automodapi',
     'm2r2'
 ]
+
+numpydoc_show_class_members = False
+numpydoc_show_inherited_class_members = False
 
 source_suffix =  ['.rst', '.md']
 # source_suffix =  '.rst'

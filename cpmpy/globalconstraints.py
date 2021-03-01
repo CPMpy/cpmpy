@@ -1,66 +1,90 @@
-from .expressions import *
-import types # for overloading decompose()
-
-# in one file for easy overview, does not include interpretation
-# TODO: docstrings, generic decomposition method
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## globalconstraints.py
+##
 """
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        alldifferent
+        allequal
+        circuit
+        GlobalConstraint
+
+    ================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        min
+        max
+
+    ==================
+    Module description
+    ==================
+
     Global constraint definitions
 
     A global constraint is nothing special in CPMpy. It is just an
     expression of type `GlobalConstraint` with a name and arguments.
 
+
     You can define a new global constraint as simply as:
 
-    ```
-    def my_global(vars):
-        return GlobalConstraint("my_global", vars)
-    ```
+    .. code-block:: python
+
+        def my_global(args):
+            return GlobalConstraint("my_global", args)
 
 
     Of course, solvers may not support a global constraint
     (if it does, it should be mapped to the API call in its SolverInterface)
 
     You can provide a decomposition for your global constraint through
-    a separate function. This function should then be 'monkey patched'
-    to the object, by overwriting the 'decompose' function.
+    the decompose() function.
+    To overwrite it, you should define your global constraint as a
+    subclass of GlobalConstraint, rather then as a function above.
 
     Your decomposition function can use any standard CPMpy expression.
     For example:
 
-    ```
-    def my_global_decomposition(self):
-        return any(self.args)
-    ```
+    .. code-block:: python
 
-    Attaching it to the object (monkey patching) should be done just
-    after creating the GlobalConstraint object, e.g.:
-    
-    ```
-    def my_global(vars):
-        expr = GlobalConstraint("my_global", vars)
-        expr.decompose = my_global_decomposition # no brackets!
-        return expr
-    ```
+        class my_global(GlobalConstraint):
+            def __init__(self, args):
+                super().__init__("my_global", args)
 
+            def decompose(self):
+                return [self.args[0] != self.args[1]] # your decomposition
 
     If you are modeling a problem and you want to use another decomposition,
-    simply overwrite the 'decompose' as above, e.g.:
+    simply overwrite the 'decompose' function of the class, e.g.:
 
-    ```
-    import types
-    def my_circuit_decomp(self):
-        return any(self.args) # does not actually enforce circuit
+    .. code-block:: python
 
-    vars = IntVars(1,9, shape=(10,))
-    constr = circuit(vars)
-    constr.decompose = types.MethodType(my_circuit_decomp, constr) # attach it
+        def my_circuit_decomp(self):
+            return [self.args[0] == 1] # does not actually enforce circuit
+        circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
-    Model(constr).solve()
-    ```
+        vars = IntVars(1,9, shape=(10,))
+        constr = circuit(vars)
+
+        Model(constr).solve()
 
     The above will use 'my_circuit_decomp', if the solver does not
     natively support 'circuit'.
 """
+from .variables import *
+from .expressions import *
+from itertools import chain, combinations
+
 
 # min: listwise 'min'
 def min(iterable):
@@ -82,22 +106,56 @@ def max(iterable):
     return GlobalConstraint("max", list(iterable))
 
 
-def alldifferent(variables):
-    expr = GlobalConstraint("alldifferent", variables)
 
-    # a generic decomposition
-    def decomp(self):
-        raise NotImplementedError()
+class alldifferent(GlobalConstraint):
+    """
+    all arguments have a different (distinct) value
+    """
+    def __init__(self, args):
+        super().__init__("alldifferent", args)
 
-    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
-    return expr
+    def decompose(self):
+        return [var1 != var2 for var1, var2 in _all_pairs(self.args)]
 
-def circuit(variables):
-    expr = GlobalConstraint("circuit", variables)
 
-    # a generic decomposition
-    def decomp(self):
-        raise NotImplementedError()
+class allequal(GlobalConstraint):
+    """
+    all arguments have the same value
+    """
+    def __init__(self, args):
+        super().__init__("allequal", args)
 
-    expr.decompose = types.MethodType(decomp, expr) # attaches function to object
-    return expr
+    def decompose(self):
+        return [var1 == var2 for var1, var2 in _all_pairs(self.args)]
+
+
+class circuit(GlobalConstraint):
+    """
+    Variables of the constraint form a circuit ex: 0 -> 3 -> 2 -> 0
+    """
+    def __init__(self, args):
+        super().__init__("circuit", args)
+
+    def decompose(self):
+        """
+            TODO needs explanation/reference
+        """
+        n = len(self.args)
+        a = self.args
+        z = IntVar(0, n-1, n)
+        constraints = [alldifferent(z),
+                       alldifferent(a),
+                       z[0]==a[0],
+                       z[n-1]==a[0]]
+        for i in range(1,n-1):
+            constraints += [z[i] != 0,
+                            z[i] == a[z[i-1]]]
+        return constraints
+
+
+def _all_pairs(args):
+    """ internal helper function
+    """
+    pairs = list(combinations(args, 2))
+    return pairs
+

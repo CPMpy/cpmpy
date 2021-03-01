@@ -16,6 +16,15 @@
     Module description
     ==================
 
+    Class that contains the constraints and the objective function,
+    and that provides an easy solve() abstraction which will call a solver.
+
+    See the examples for basic usage, which involves:
+
+    - creation, e.g. m = Model(cons, minimize=obj)
+    - solving, e.g. m.solve()
+    - optionally, checking status/runtime, e.g. m.status()
+
     ==============
     Module details
     ==============
@@ -25,16 +34,6 @@ from .expressions import Operator
 from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
-"""
-    Class that contains the constraints and the objective function,
-    and that provides an easy solve() abstraction which will call a solver.
-
-    See the examples for basic usage, which involves:
-
-    - creation, e.g. m = Model(cons, minimize=obj)
-    - solving, e.g. m.solve()
-    - optionally, checking status/runtime, e.g. m.status()
-"""
 
 class Model(object):
     """
@@ -42,9 +41,9 @@ class Model(object):
 
     Arguments of constructor:
 
-    - *args: Expression object(s) or list(s) of Expression objects
-    - minimize: Expression object representing the objective to minimize
-    - maximize: Expression object representing the objective to maximize
+    - `*args`: Expression object(s) or list(s) of Expression objects
+    - `minimize`: Expression object representing the objective to minimize
+    - `maximize`: Expression object representing the objective to maximize
 
     At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
     """

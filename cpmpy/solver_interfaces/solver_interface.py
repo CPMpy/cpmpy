@@ -24,10 +24,9 @@
 #==============================================================================
 from enum import Enum
 import time
-from abc import ABC, abstractmethod
 
 #==============================================================================
-class SolverInterface(ABC):
+class SolverInterface(object):
     """
         Abstract class for defining solver interfaces. All classes implementing
         the ``SolverInterface``
@@ -35,7 +34,6 @@ class SolverInterface(ABC):
     def __init__(self):
         self.name = "dummy"
 
-    @abstractmethod
     def supported(self):
         """
             Check for support in current system setup. Return True if the system
@@ -46,7 +44,6 @@ class SolverInterface(ABC):
         """
         return False
 
-    @abstractmethod
     def solve(self, model):
         """
             Build the CPMpy model into solver-supported model ready for solving
@@ -60,20 +57,24 @@ class SolverInterface(ABC):
         return SolverStatus()
 
 
-#
 #==============================================================================
 class ExitStatus(Enum):
     """
-        Exit status of the solver
+    Exit status of the solver
 
-        Attributes:
-            NOT_RUN: Has not been run
-            OPTIMAL: Optimal solution to an optimisation problem found
-            FEASIBLE: Feasible solution to a satisfaction problem found,
-                      or feasible (but not proven optimal) solution to an
-                      optimisation problem found
-            UNSATISFIABLE: No satisfying solution exists
-            ERROR: Some error occured (solver should have thrown Exception)
+    Attributes:
+
+        `NOT_RUN`: Has not been run
+
+        `OPTIMAL`: Optimal solution to an optimisation problem found
+
+        `FEASIBLE`: Feasible solution to a satisfaction problem found,
+                    or feasible (but not proven optimal) solution to an
+                    optimisation problem found
+
+        `UNSATISFIABLE`: No satisfying solution exists
+
+        `ERROR`: Some error occured (solver should have thrown Exception)
     """
     NOT_RUN = 1
     OPTIMAL = 2
@@ -81,8 +82,6 @@ class ExitStatus(Enum):
     UNSATISFIABLE = 4
     ERROR = 5
 
-
-#
 #==============================================================================
 class SolverStatus(object):
     """

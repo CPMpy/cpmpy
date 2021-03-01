@@ -6,6 +6,10 @@ It aims to connect to common constraint solving systems that have a Python API, 
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
 
+### ALPHA-stage software
+
+    The software is still in development. More specifically the mapping to or-tools is incomplete, meaning nested expressions will not work. Many bugs and missing pieces are known!!!
+
 ### Quick start
 
 CPMpy is available in the Python Package Index, and hence can be installed as follows:
@@ -13,8 +17,9 @@ CPMpy is available in the Python Package Index, and hence can be installed as fo
     pip install cpmpy
 
 Installing it this way automatically installs the dependencies (numpy and ortools), after which you are ready to go.
+Note that CPMpy also supports other solvers (e.g. Minizinc) but the default solver is ortools, for the further detials please check the [documentation](https://cpmpy.readthedocs.io/en/latest/tutorial/how_to_install.html).  
 
-You can then model and solve constraint programming problems using python and numpy, for example:
+In the future, you will be able to model and solve constraint programming problems using python and numpy, for example:
 ```python
 import numpy as np
 from cpmpy import *
@@ -62,7 +67,7 @@ You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/mas
 
 ### Documentation
 
-New to constraint programming? Check our [CP basics tutorial](https://github.com/tias/cppy/blob/master/docs/overview.rst).
+New to constraint programming? Check our [CP basics tutorial](https://github.com/tias/cppy/blob/master/docs/preface/cppy_intro.md).
 
 See also the more extensive documentation on [ReadTheDocs](https://cpmpy.readthedocs.io/).
 
