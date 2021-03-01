@@ -79,7 +79,7 @@ def flatten_constraint(expr):
 
         # does not type-check that arguments are bool...
         if all(__is_flat_var(arg) for arg in expr.args):
-            return expr
+            return [expr]
         else:
             # recursively flatten all children, which are boolexpr
             flatvars, flatcons = zip(*[flatten_boolexpr(arg) for arg in expr.args])
