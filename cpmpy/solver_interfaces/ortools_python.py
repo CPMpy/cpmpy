@@ -116,7 +116,7 @@ class ORToolsPython(SolverInterface):
         elif self.ort_status == ort.INFEASIBLE:
             my_status.exitstatus = ExitStatus.UNSATISFIABLE
         else:
-            raise NotImplementedError # a new status type was introduced, please report on github
+            raise NotImplementedError(my_status) # a new status type was introduced, please report on github
         my_status.runtime = self.ort_solver.WallTime()
 
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
@@ -179,7 +179,7 @@ class ORToolsPython(SolverInterface):
             elif expr.name == 'sum':
                 return sum(args)
 
-        raise NotImplementedError # should not reach this... please report on github
+        raise NotImplementedError(expr) # should not reach this... please report on github
         # there might be an Element expression here... need to add flatten rule then?
 
     def post_expression(self, expr):
@@ -258,6 +258,6 @@ class ORToolsPython(SolverInterface):
             if not dec is None:
                 self.post_expression(flatten_constraint(dec))
             else:
-                raise NotImplementedError # if you reach this... please report on github
+                raise NotImplementedError(dec) # if you reach this... please report on github
         
 
