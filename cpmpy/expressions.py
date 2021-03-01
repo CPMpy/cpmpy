@@ -210,15 +210,13 @@ class Expression(object):
 
     # substraction
     def __sub__(self, other):
-        # if is_num(other) and other == 0:
-        #     return self
-        # return Operator("sub", [self, other])
-        return self.__add__(-other)
+        if is_num(other) and other == 0:
+            return self
+        return Operator("sub", [self, other])
     def __rsub__(self, other):
-        # if is_num(other) and other == 0:
-        #     return -self
-        # return Operator("sub", [other, self])
-        return self.__radd__(-other)
+        if is_num(other) and other == 0:
+            return -self
+        return Operator("sub", [other, self])
     
     # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
@@ -354,7 +352,7 @@ class Operator(Expression):
 
         # special cases
         if self.name == '-': # unary -
-            return "-{}".format(self.args[0])
+            return "-({})".format(self.args[0])
 
         # infix printing of two arguments
         if len(self.args) == 2:
