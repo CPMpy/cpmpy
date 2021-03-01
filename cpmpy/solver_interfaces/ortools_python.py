@@ -219,10 +219,14 @@ class ORToolsPython(SolverInterface):
             #    'xor' does not have subexpression form
             # all others: add( subexpression )
             if expr.name == '->':
-                # XXX we might have to do some sort of flattening here if RHS is not BoolVar...
-                # or-tools will raise error if invalid LHS (or RHS)
                 args = [self.convert_expression(e) for e in expr.args]
-                self._model.Add( args[0] ).OnlyEnforceIf(args[1])
+                if isinstance(expr.args[0], BoolVarImpl):
+                    # regular implication
+                    self._model.AddImplication(args[0], args[1])
+                else:
+                    # XXX needs proper implementation of half-reification
+                    print("May not actually work")
+                    self._model.Add( args[0] ).OnlyEnforceIf(args[1])
             elif expr.name == 'xor':
                 args = [self.convert_expression(e) for e in expr.args]
                 self._model.AddBoolXor(args)
