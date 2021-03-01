@@ -168,9 +168,10 @@ class IntVarImpl(NumVarImpl):
     counter = 0
 
     def __init__(self, lb, ub, setname=True):
-        assert (is_int(lb) and is_int(ub))
+        assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb),lb)
+        assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub),ub)
         assert (lb >= 0 and ub >= 0)
-        super().__init__(lb, ub)
+        super().__init__(int(lb), int(ub)) # explicit cast: can be numpy
         
         self.name = IntVarImpl.counter
         IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
