@@ -254,9 +254,10 @@ class ORToolsPython(SolverInterface):
                 self._model.Add( self.convert_subexpr(expr) )
 
         elif isinstance(expr, Element):
-            # A0[A1] == A2 --> AddElement(A1, A0, A2)
+            # A0[A1] == Var --> AddElement(A1, A0, Var)
             args = [self.convert_subexpr(e) for e in expr.args]
-            return self._model.AddElement(args[1], args[0], args[2])
+            # TODO: make 'Var'...
+            return self._model.AddElement(args[1], args[0], None)
         
 
         # rest: global constraints

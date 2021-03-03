@@ -15,6 +15,7 @@
         allequal
         circuit
         GlobalConstraint
+        Element
 
     ================
     List of functions
@@ -87,11 +88,10 @@ from itertools import chain, combinations
 
 
 class GlobalConstraint(Expression):
-    # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
-    # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
-    def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
+    # is_bool: whether this is normal constraint (True or False)
+    #   not is_bool: it computes a numeric value (ex: Element)
+    def __init__(self, name, arg_list, is_bool=True):
         super().__init__(name, arg_list)
-        self.add_equality_as_arg = add_equality_as_arg
         self.is_bool = is_bool
 
     def decompose(self):
@@ -104,17 +104,6 @@ class GlobalConstraint(Expression):
             g.decompose = my_decom_function
         """
         return None
-
-    def __eq__(self, other):
-        if self.add_equality_as_arg:
-            self.args.append(other)
-            return self
-
-        if self.is_bool and is_num(other) and other == 1:
-            return self
-
-        # default
-        return super().__eq__(other)
 
 
 # min: listwise 'min'
@@ -182,6 +171,37 @@ class circuit(GlobalConstraint):
             constraints += [z[i] != 0,
                             z[i] == a[z[i-1]]]
         return constraints
+
+
+class Element(GlobalConstraint):
+    """
+        The 'Element' global constraint enforces that the result equals Arr[Idx]
+        with 'Arr' an array of constants of variables (the first argument)
+        and 'Idx' an integer decision variable, representing the index into the array.
+
+        Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
+        an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
+
+        Element is a CPMpy built-in global constraint, so the class implements a few more
+        extra things for convenience (.value() and .__repr__()). It is also an example of
+        a 'numeric' global constraint.
+    """
+
+    def __init__(self, arg_list):
+        assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
+        super().__init__("element", arg_list, is_bool=False)
+
+    def value(self):
+        # XXX, make argval shared util function?
+        def argval(a):
+            return a.value() if isinstance(a, Expression) else a
+        idxval = argval(self.args[1])
+        if not idxval is None:
+            return argval(self.args[0][idxval])
+        return None # default
+
+    def __repr__(self):
+        return "{}[{}]".format(self.args[0], self.args[1])
 
 
 def _all_pairs(args):
