@@ -27,13 +27,6 @@ from ..globalconstraints import *
 from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import *
 
-from itertools import cycle
-
-def zipcycle(vars1, vars2):
-    v1 = [vars1] if not is_any_list(vars1) else vars1
-    v2 = [vars2] if not is_any_list(vars2) else vars2
-    return zip(v1, cycle(v2)) if len(v2) < len(v1) else zip(cycle(v1), v2)
-
 class ORToolsPython(SolverInterface):
     """
     Interface to the python 'ortools' API
@@ -55,41 +48,6 @@ class ORToolsPython(SolverInterface):
             return True
         except ImportError as e:
             return False
-
-    def make_model(self, cpm_model):
-        from ortools.sat.python import cp_model as ort
-
-        # Constraint programming engine
-        self._model = ort.CpModel()
-
-        # transform into flattened model
-        flat_model = flatten_model(cpm_model)
-
-        # Create corresponding solver variables
-        self.varmap = dict() # cppy var -> solver var
-        modelvars = get_variables(flat_model)
-        for var in modelvars:
-            if isinstance(var, BoolVarImpl):
-                revar = self._model.NewBoolVar(str(var.name))
-            elif isinstance(var, IntVarImpl):
-                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
-            self.varmap[var] = revar
-
-        # post the (flat) constraint expressions to the solver
-        for con in flat_model.constraints:
-            self.post_expression(con)
-
-        # the objective
-        if flat_model.objective is None:
-            pass # no objective, satisfaction problem
-        else:
-            obj = self.convert_expression(flat_model.objective)
-            if flat_model.objective_max:
-                self._model.Maximize(obj)
-            else:
-                self._model.Minimize(obj)
-
-        return self._model
 
     def solve(self, cpm_model, num_workers=1):
         if not self.supported():
@@ -126,16 +84,58 @@ class ORToolsPython(SolverInterface):
 
         return my_status
 
+
+    def make_model(self, cpm_model):
+        """
+            Makes the ortools.sat.python.cp_model formulation out of 
+            a CPMpy model (will do flattening and other trnasformations)
+        """
+        from ortools.sat.python import cp_model as ort
+
+        # Constraint programming engine
+        self._model = ort.CpModel()
+
+        # Transform into flattened model
+        flat_model = flatten_model(cpm_model)
+
+        # Create corresponding solver variables
+        self.varmap = dict() # cppy var -> solver var
+        modelvars = get_variables(flat_model)
+        for var in modelvars:
+            if isinstance(var, BoolVarImpl):
+                revar = self._model.NewBoolVar(str(var.name))
+            elif isinstance(var, IntVarImpl):
+                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
+            self.varmap[var] = revar
+
+        # Post the (flat) constraint expressions to the solver
+        for con in flat_model.constraints:
+            self.post_constraint(con)
+
+        # Post the objective
+        if flat_model.objective is None:
+            pass # no objective, satisfaction problem
+        else:
+            obj = self.convert_subexpr(flat_model.objective)
+            if flat_model.objective_max:
+                self._model.Maximize(obj)
+            else:
+                self._model.Minimize(obj)
+
+        return self._model
+
+
+
     # for subexpressions (variables, lists and linear expressions)
     # TODO, namings more like in flatten
-    def convert_expression(self, expr):
+    def convert_subexpr(self, expr):
         # python constants
         if is_num(expr):
             return expr
 
         # list
         if is_any_list(expr):
-            return [self.convert_expression(e) for e in expr]
+            return [self.convert_subexpr(e) for e in expr]
 
         # decision variables, check in varmap
         if isinstance(expr, NegBoolView):
@@ -148,7 +148,7 @@ class ORToolsPython(SolverInterface):
             # unary int: '-', 'abs'
             # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
             # nary int: 'sum'
-            args = [self.convert_expression(e) for e in expr.args]
+            args = [self.convert_subexpr(e) for e in expr.args]
             if expr.name == 'and':
                 return all(args)
             elif expr.name == 'or':
@@ -179,8 +179,8 @@ class ORToolsPython(SolverInterface):
         elif isinstance(expr, Comparison):
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
             # recursively convert arguments (subexpressions)
-            lvar = self.convert_expression(expr.args[0])
-            rvar = self.convert_expression(expr.args[1])
+            lvar = self.convert_subexpr(expr.args[0])
+            rvar = self.convert_subexpr(expr.args[1])
             if expr.name == '==':
                 return (lvar == rvar)
             elif expr.name == '!=':
@@ -197,7 +197,7 @@ class ORToolsPython(SolverInterface):
         raise NotImplementedError(expr) # should not reach this... please report on github
         # there might be an Element expression here... need to add flatten rule then?
 
-    def post_expression(self, expr):
+    def post_constraint(self, expr):
         # base cases
         if isinstance(expr, NegBoolView):
             self._model.AddBoolOr( [self.varmap[expr._bv].Not()] )
@@ -207,7 +207,7 @@ class ORToolsPython(SolverInterface):
         # standard expressions: comparison, operator, element
         elif isinstance(expr, Comparison):
             # recursively convert arguments (subexpressions)
-            args = [self.convert_expression(e) for e in expr.args]
+            args = [self.convert_subexpr(e) for e in expr.args]
             #allowed = {'==', '!=', '<=', '<', '>=', '>'}
             #XXX refactor decomposition into constructor of Comparison()?
             for lvar, rvar in zipcycle(args[0], args[1]):
@@ -239,7 +239,7 @@ class ORToolsPython(SolverInterface):
             #    'xor' does not have subexpression form
             # all others: add( subexpression )
             if expr.name == '->':
-                args = [self.convert_expression(e) for e in expr.args]
+                args = [self.convert_subexpr(e) for e in expr.args]
                 if isinstance(expr.args[0], BoolVarImpl):
                     # regular implication
                     self._model.AddImplication(args[0], args[1])
@@ -248,23 +248,23 @@ class ORToolsPython(SolverInterface):
                     print("May not actually work")
                     self._model.Add( args[0] ).OnlyEnforceIf(args[1])
             elif expr.name == 'xor':
-                args = [self.convert_expression(e) for e in expr.args]
+                args = [self.convert_subexpr(e) for e in expr.args]
                 self._model.AddBoolXor(args)
             else:
-                self._model.Add( self.convert_expression(expr) )
+                self._model.Add( self.convert_subexpr(expr) )
 
         elif isinstance(expr, Element):
             # A0[A1] == A2 --> AddElement(A1, A0, A2)
-            args = [self.convert_expression(e) for e in expr.args]
+            args = [self.convert_subexpr(e) for e in expr.args]
             return self._model.AddElement(args[1], args[0], args[2])
         
 
         # rest: global constraints
         elif expr.name == 'alldifferent':
-            args = [self.convert_expression(e) for e in expr.args]
+            args = [self.convert_subexpr(e) for e in expr.args]
             self._model.AddAllDifferent(args) 
         elif expr.name == 'min' or expr.name == 'max':
-            args = [self.convert_expression(e) for e in expr.args]
+            args = [self.convert_subexpr(e) for e in expr.args]
             lb = min(a.lb() if isinstance(arg, NumVarImpl) else a for a in args)
             ub = max(a.ub() if isinstance(arg, NumVarImpl) else a for a in args)
             aux = self._model.NewIntVar(lb, ub, "aux")
@@ -291,7 +291,7 @@ class ORToolsPython(SolverInterface):
                         self.varmap[var] = revar
                 # post decomposition
                 for con in flatdec:
-                    self.post_expression(con)
+                    self.post_constraint(con)
             else:
                 raise NotImplementedError(dec) # if you reach this... please report on github
         
