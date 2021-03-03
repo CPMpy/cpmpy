@@ -3,12 +3,67 @@ from ..expressions import *
 from ..variables import *
 
 """
-Flattening a model (or individual constraints) into a normal form. See docs/behind_the_scenes.srt
+Flattening a model (or individual constraints) into 'flat normal form'.
 
-- flatten_model(model): flattens constraints and objective, returns new model
-- flatten_constraint(constraint): flattens the constraint, returns a list of base constraints
+In flat normal form, constraints belong to one of three families with all arguments
+either constants, variables, list of constants or list of variables, and
+some binary constraints have a canonical order of variables.
 
-THIS IS ONLY A POTENTIAL STRUCTURE, not tested or run...
+Furthermore, it is 'negated normal' meaning that the ~ (negation operator) only appears
+before a Boolean variable (in CPMpy, absorbed in a 'NegBoolView'),
+and it is 'negation normal' meaning that the - (negative operator) only appears before
+a constant, that is a - b :: a + -1*b :: wsum([1,-1],[a,b])
+
+The three families of possible constraints are:
+
+Base constraints: (no nesting)
+-----------------
+    - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+    - Boolean impliciation: Var -> Var                     (CPMpy class 'Operator', is_bool())
+    - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
+                        Var == Constant                    (CPMpy class 'Comparison')
+    - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+
+Comparison constraints: (up to one nesting on one side)
+-----------------------
+    - Numeric equality:  Var == Numexpr                    (CPMpy class 'Comparison')
+                         Numexpr == Constant               (CPMpy class 'Comparison')
+    - Numeric disequality: Var != Numexpr                  (CPMpy class 'Comparison')
+                           Numexpr != Constant             (CPMpy class 'Comparison')
+    - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
+
+    Numexpr:
+        - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
+                                                           (CPMpy class 'Operator', not is_bool())
+        - Global constraint (non-Boolean) (examples: Max,Min,Element)
+                                                           (CPMpy class 'GlobalConstraint', not is_bool()))
+    wsum: wsum([Const],[Var]) represents sum([Const]*[Var]) # TODO: not implemented yet
+
+Reify/imply constraint: (up to two nestings on one side)
+-----------------------
+    - Reification (double implication): Var == Boolexpr    (CPMpy class 'Comparison')
+    - Implication: Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
+                   Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
+
+    Boolexpr:
+        - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
+        - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+        - Comparison constraint (see above)                    (CPMpy class 'Comparison')
+    
+    Reification of a comparison is the most complex case as it can allow up to 3 levels of nesting in total, e.g.:
+        - BV == (wsum([1,2,3],[IV1,IV2,IV3]) > 5)
+        - BV == (IV1 == IV2)
+        - BV1 == (BV2 == BV3)
+
+The output after calling flatten_model() or flatten_constraint() will ONLY contain expressions
+of the form specified above.
+
+The flattening does not promise to do common subexpression elimination or to automatically group
+commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
+
+TODO: not entirely implemented yet : )
+TODO: clean up behind_the_scenes.rst which sketches the previous normal form
 """
 
 from itertools import cycle
