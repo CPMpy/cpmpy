@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## variables.py
+## model.py
 ##
 """
     ===============

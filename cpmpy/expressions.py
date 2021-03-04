@@ -11,17 +11,9 @@
         :nosignatures:
 
         Expression
+        Comparison
         Operator
-        Element
-        GlobalConstraint
 
-    ==================
-    Module description
-    ==================
-
-    ==============
-    Module details
-    ==============
 """
 import numpy as np
 
