@@ -22,7 +22,7 @@
     ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions import Comparison, Expression, Operator, Element
+from ..expressions import *
 from ..globalconstraints import *
 from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import *

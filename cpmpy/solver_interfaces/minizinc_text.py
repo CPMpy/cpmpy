@@ -24,8 +24,8 @@
 
 from ..model_tools.get_variables import get_variables
 from .solver_interface import SolverInterface
-from ..variables import BoolVarImpl, IntVarImpl, NumVarImpl
-from ..expressions import Expression, Operator, Comparison, Element, is_any_list
+from ..variables import *
+from ..expressions import *
 import numpy as np
 
 # translate expression tree to MiniZinc textual model

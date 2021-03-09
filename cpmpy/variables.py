@@ -134,7 +134,8 @@
 
 from .utils.exceptions import NullShapeError
 import numpy as np
-from .expressions import Expression, Operator, is_num, Element
+from .expressions import Expression, Operator, is_num
+from .globalconstraints import Element
 
 # Helpers for type checking
 def is_int(arg):
