@@ -161,7 +161,7 @@ class ORToolsPython(SolverInterface):
         # sum or (to be implemented: wsum)
         if isinstance(cpm_expr, Operator):
             args = [self.ort_var(v) for v in cpm_expr.args]
-            if expr.name == 'sum':
+            if cpm_expr.name == 'sum':
                 return sum(args)
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
@@ -193,20 +193,56 @@ class ORToolsPython(SolverInterface):
 
             else:
                 # numeric (non-reify) comparison case
-                # lhs can be numexpr
-                newlhs = self.ort_numexpr(lhs) 
                 rvar = self.ort_var(rhs)
-                if expr.name == '==':
+                # lhs can be numexpr
+                if isinstance(lhs, NumVarImpl):
+                    # simplest LHS case, a var
+                    newlhs = self.ort_var(lhs)
+                elif isinstance(lhs, Operator):
+                    if (lhs.name == 'sum' or lhs.name == 'wsum'):
+                        # a BoundedLinearExpression LHS, like in objective
+                        newlhs = self.ort_numexpr(lhs) 
+                    else:
+                        rvar_equality = rvar
+                        newlhs = None
+                        if cpm_expr.name != '==':
+                            # example: x*y > 10 :: x*y == aux, aux > 10
+                            #rvar_equality = ...
+                            #newlhs = rvar_equality
+                            raise NotImplementedError("have to introduce auxiliary")
+
+                        if lhs.name == 'abs':
+                            # target = abs(var)
+                            self._model.AddAbsEquality(rvar_equality, self.ort_var(lhs.args[0]))
+                        elif lhs.name == 'max':
+                            # target = max(vars)
+                            self._model.AddMaxEquality(rvar_equality, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'min':
+                            # target = min(vars)
+                            self._model.AddMinEquality(rvar_equality, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'mod':
+                            # target = var % mod
+                            #self._model.AddModuloEquality(rvar_equality, ...)
+                            raise NotImplementedError("modulo")
+                        elif lhs.name == '*':
+                            # target = prod(vars)
+                            self._model.AddMultiplicationEquality(rvar_equality, self.ort_var_or_list(lhs.args))
+                        else:
+                            raise NotImplementedError("Not a know supported ORTools LHS {}".format(lhs))
+
+                if newlhs is None:
+                    pass # is already posted directly, without 'rvar_equality'
+                elif cpm_expr.name == '==':
                     self._model.Add( newlhs == rvar)
-                elif expr.name == '!=':
+                elif cpm_expr.name == '!=':
                     self._model.Add( newlhs != rvar )
-                elif expr.name == '<=':
+                elif cpm_expr.name == '<=':
                     self._model.Add( newlhs <= rvar )
-                elif expr.name == '<':
+                elif cpm_expr.name == '<':
                     self._model.Add( newlhs < rvar )
-                elif expr.name == '>=':
+                elif cpm_expr.name == '>=':
                     self._model.Add( newlhs >= rvar )
-                elif expr.name == '>':
+                elif cpm_expr.name == '>':
                     self._model.Add( newlhs > rvar )
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
