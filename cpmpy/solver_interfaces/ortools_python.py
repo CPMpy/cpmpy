@@ -116,7 +116,7 @@ class ORToolsPython(SolverInterface):
         if flat_model.objective is None:
             pass # no objective, satisfaction problem
         else:
-            obj = self.convert_subexpr(flat_model.objective)
+            obj = self.ort_numexpr(flat_model.objective)
             if flat_model.objective_max:
                 self._model.Maximize(obj)
             else:
@@ -125,24 +125,207 @@ class ORToolsPython(SolverInterface):
         return self._model
 
 
-
-    # for subexpressions (variables, lists and linear expressions)
-    # TODO, namings more like in flatten
-    def convert_subexpr(self, expr):
-        # python constants
-        if is_num(expr):
-            return expr
-
-        # list
-        if is_any_list(expr):
-            return [self.convert_subexpr(e) for e in expr]
+    def ort_var(self, cpm_var):
+        if is_num(cpm_var):
+            return cpm_var
 
         # decision variables, check in varmap
-        if isinstance(expr, NegBoolView):
-            return self.varmap[expr._bv].Not()
-        elif isinstance(expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
-            return self.varmap[expr]
+        if isinstance(cpm_var, NegBoolView):
+            return self.varmap[cpm_var._bv].Not()
+        elif isinstance(cpm_var, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+            return self.varmap[cpm_var]
 
+        raise NotImplementedError("Not a know var {}".format(cpm_var))
+
+    def ort_var_or_list(self, cpm_expr):
+        if is_any_list(cpm_expr):
+            return [self.ort_var_or_list(sub) for sub in cpm_expr]
+        return self.ort_var(cpm_expr)
+
+
+    def ort_numexpr(self, cpm_expr):
+        """
+            ORTools subexpressions (for in objective function and comparisons)
+            Accepted by ORTools:
+            - Decision variable: Var
+            - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
+                      wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+        """
+        if is_num(cpm_expr):
+            return cpm_expr
+
+        # decision variables, check in varmap
+        if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+            return ort_var(cpm_expr)
+
+        # sum or (to be implemented: wsum)
+        if isinstance(cpm_expr, Operator):
+            args = [self.ort_var(v) for v in cpm_expr.args]
+            if expr.name == 'sum':
+                return sum(args)
+
+        raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
+
+
+    def post_constraint(self, cpm_expr):
+        """
+            Constraints are expected to be in 'flat normal form' (see flatten_model.py)
+
+            While the normal form is divided in 'base', 'comparison' and 'reified', we
+            here regroup it per CPMpy class
+        """
+        # Base case: Boolean variable
+        if isinstance(cpm_expr, BoolVarImpl):
+            self._model.AddBoolOr( [self.ort_var(cpm_expr)] )
+        
+        # Comparisons: including base (vars), numeric comparison and reify/imply comparison
+        elif isinstance(cpm_expr, Comparison):
+            lhs,rhs = cpm_expr.args
+
+            if isinstance(lhs, BoolVarImpl) and cpm_expr.name == '==':
+                # base: bvar == bvar|const
+                lvar,rvar = map(self.ort_var, (lhs,rhs))
+                self._model.Add(lvar == rvar)
+
+            elif lhs.is_bool() and cpm_expr.name == '==':
+                # reified case: boolexpr == var
+                raise NotImplementedError # TODO
+
+            else:
+                # numeric (non-reify) comparison case
+                # lhs can be numexpr
+                newlhs = self.ort_numexpr(lhs) 
+                rvar = self.ort_var(rhs)
+                if expr.name == '==':
+                    self._model.Add( newlhs == rvar)
+                elif expr.name == '!=':
+                    self._model.Add( newlhs != rvar )
+                elif expr.name == '<=':
+                    self._model.Add( newlhs <= rvar )
+                elif expr.name == '<':
+                    self._model.Add( newlhs < rvar )
+                elif expr.name == '>=':
+                    self._model.Add( newlhs >= rvar )
+                elif expr.name == '>':
+                    self._model.Add( newlhs > rvar )
+
+        # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
+        elif isinstance(cpm_expr, Operator):
+            if cpm_expr.name == '->' and \
+             (not isinstance(cpm_expr.args[0], BoolVarImpl) or \
+              not isinstance(cpm_expr.args[1], BoolVarImpl)):
+                # reified case: boolexpr -> var, var -> boolexpr
+                """
+            # two special cases:
+            #    '->' with .onlyEnforceIf()
+            #    'xor' does not have subexpression form
+            # all others: add( subexpression )
+            if expr.name == '->':
+                args = [self.convert_subexpr(e) for e in expr.args]
+                if isinstance(expr.args[0], BoolVarImpl):
+                    # regular implication
+                    self._model.AddImplication(args[0], args[1])
+                else:
+                    # XXX needs proper implementation of half-reification
+                    print("May not actually work")
+                    self._model.Add( args[0] ).OnlyEnforceIf(args[1])
+                """
+                raise NotImplementedError # TODO
+
+            else:
+                # base 'and'/n, 'or'/n, 'xor'/n, '->'/2
+                args = [self.ort_var(v) for v in cpm_expr.args]
+
+                if cpm_expr.name == 'and':
+                    self._model.AddBoolAnd(args)
+                elif cpm_expr.name == 'or':
+                    self._model.AddBoolOr(args)
+                elif cpm_expr.name == 'xor':
+                    self._model.AddBoolXor(args)
+                elif cpm_expr.name == '->':
+                    self._model.AddImplication(arg[0],args[1])
+
+            raise NotImplementedError("Not a know supported ORTools Operator {}".format(cpm_expr))
+
+        # rest: base (Boolean) global constraints
+        else:
+            # TODO: could be list of vars...
+            args = [self.ort_var_or_list(v) for v in cpm_expr.args]
+
+            if cpm_expr.name == 'alldifferent':
+                self._model.AddAllDifferent(args) 
+            # NOT YET MAPPED: AllowedAssignments, Automaton, Circuit, Cumulative,
+            #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
+            #    ReservoirConstraint, ReservoirConstraintWithActive
+            else:
+                # global constraint not known, try generic decomposition
+                raise NotImplementedError("Untested old code!")
+                dec = cpm_expr.decompose()
+                if not dec is None:
+                    flatdec = flatten_constraint(dec)
+
+                    # collect and create new variables
+                    flatvars = vars_expr(flatdec)
+                    for var in flatvars:
+                        if not var in self.varmap:
+                            # new variable
+                            if isinstance(var, BoolVarImpl):
+                                revar = self._model.NewBoolVar(str(var.name))
+                            elif isinstance(var, IntVarImpl):
+                                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
+                            self.varmap[var] = revar
+                    # post decomposition
+                    for con in flatdec:
+                        self.post_constraint(con)
+                else:
+                    raise NotImplementedError(cpm_expr) # if you reach this... please report on github
+
+
+    def also_old(self):
+        if True:
+            pass
+        elif isinstance(expr, Element):
+            # A0[A1] == Var --> AddElement(A1, A0, Var)
+            args = [self.convert_subexpr(e) for e in expr.args]
+            # TODO: make 'Var'...
+            return self._model.AddElement(args[1], args[0], None)
+
+        # rest: global constraints
+        elif expr.name == 'min' or expr.name == 'max':
+            args = [self.convert_subexpr(e) for e in expr.args]
+            lb = min(a.lb() if isinstance(arg, NumVarImpl) else a for a in args)
+            ub = max(a.ub() if isinstance(arg, NumVarImpl) else a for a in args)
+            aux = self._model.NewIntVar(lb, ub, "aux")
+            if expr.name == 'min':
+                self._model.AddMinEquality(aux, args) 
+            else:
+                self._model.AddMaxEquality(aux, args) 
+
+        else:
+            # global constraint not known, try generic decomposition
+            dec = expr.decompose()
+            if not dec is None:
+                flatdec = flatten_constraint(dec)
+
+                # collect and create new variables
+                flatvars = vars_expr(flatdec)
+                for var in flatvars:
+                    if not var in self.varmap:
+                        # new variable
+                        if isinstance(var, BoolVarImpl):
+                            revar = self._model.NewBoolVar(str(var.name))
+                        elif isinstance(var, IntVarImpl):
+                            revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
+                        self.varmap[var] = revar
+                # post decomposition
+                for con in flatdec:
+                    self.post_constraint(con)
+            else:
+                raise NotImplementedError(dec) # if you reach this... please report on github
+        
+
+
+    def old(self):
         if isinstance(expr, Operator):
             # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
             # unary int: '-', 'abs'
@@ -196,104 +379,3 @@ class ORToolsPython(SolverInterface):
 
         raise NotImplementedError(expr) # should not reach this... please report on github
         # there might be an Element expression here... need to add flatten rule then?
-
-    def post_constraint(self, expr):
-        # base cases
-        if isinstance(expr, NegBoolView):
-            self._model.AddBoolOr( [self.varmap[expr._bv].Not()] )
-        elif isinstance(expr, BoolVarImpl):
-            self._model.AddBoolOr( [self.varmap[expr]] )
-        
-        # standard expressions: comparison, operator, element
-        elif isinstance(expr, Comparison):
-            # recursively convert arguments (subexpressions)
-            args = [self.convert_subexpr(e) for e in expr.args]
-            #allowed = {'==', '!=', '<=', '<', '>=', '>'}
-            #XXX refactor decomposition into constructor of Comparison()?
-            for lvar, rvar in zipcycle(args[0], args[1]):
-                if expr.name == '==':
-                    # XXX this might break for 'reification' of constraints...
-                    # will have to add two-sided .OnlyEnforceIf() then?
-                    # if you get an error here, please report on github
-                    # XXX it breaks on: (IntVar(1,9) != 0) == BoolVar()
-                    self._model.Add(lvar == rvar)
-                elif expr.name == '!=':
-                    self._model.Add( lvar != rvar )
-                elif expr.name == '<=':
-                    self._model.Add( lvar <= rvar )
-                elif expr.name == '<':
-                    self._model.Add( lvar < rvar )
-                elif expr.name == '>=':
-                    self._model.Add( lvar >= rvar )
-                elif expr.name == '>':
-                    self._model.Add( lvar > rvar )
-
-        elif isinstance(expr, Operator):
-            # bool: 'and'/n, 'or'/n, 'xor'/n, '->'/2
-            # unary int: '-', 'abs'
-            # binary int: 'sub', 'mul', 'div', 'mod', 'pow'
-            # nary int: 'sum'
-
-            # two special cases:
-            #    '->' with .onlyEnforceIf()
-            #    'xor' does not have subexpression form
-            # all others: add( subexpression )
-            if expr.name == '->':
-                args = [self.convert_subexpr(e) for e in expr.args]
-                if isinstance(expr.args[0], BoolVarImpl):
-                    # regular implication
-                    self._model.AddImplication(args[0], args[1])
-                else:
-                    # XXX needs proper implementation of half-reification
-                    print("May not actually work")
-                    self._model.Add( args[0] ).OnlyEnforceIf(args[1])
-            elif expr.name == 'xor':
-                args = [self.convert_subexpr(e) for e in expr.args]
-                self._model.AddBoolXor(args)
-            else:
-                self._model.Add( self.convert_subexpr(expr) )
-
-        elif isinstance(expr, Element):
-            # A0[A1] == Var --> AddElement(A1, A0, Var)
-            args = [self.convert_subexpr(e) for e in expr.args]
-            # TODO: make 'Var'...
-            return self._model.AddElement(args[1], args[0], None)
-        
-
-        # rest: global constraints
-        elif expr.name == 'alldifferent':
-            args = [self.convert_subexpr(e) for e in expr.args]
-            self._model.AddAllDifferent(args) 
-        elif expr.name == 'min' or expr.name == 'max':
-            args = [self.convert_subexpr(e) for e in expr.args]
-            lb = min(a.lb() if isinstance(arg, NumVarImpl) else a for a in args)
-            ub = max(a.ub() if isinstance(arg, NumVarImpl) else a for a in args)
-            aux = self._model.NewIntVar(lb, ub, "aux")
-            if expr.name == 'min':
-                self._model.AddMinEquality(aux, args) 
-            else:
-                self._model.AddMaxEquality(aux, args) 
-
-        else:
-            # global constraint not known, try generic decomposition
-            dec = expr.decompose()
-            if not dec is None:
-                flatdec = flatten_constraint(dec)
-
-                # collect and create new variables
-                flatvars = vars_expr(flatdec)
-                for var in flatvars:
-                    if not var in self.varmap:
-                        # new variable
-                        if isinstance(var, BoolVarImpl):
-                            revar = self._model.NewBoolVar(str(var.name))
-                        elif isinstance(var, IntVarImpl):
-                            revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
-                        self.varmap[var] = revar
-                # post decomposition
-                for con in flatdec:
-                    self.post_constraint(con)
-            else:
-                raise NotImplementedError(dec) # if you reach this... please report on github
-        
-

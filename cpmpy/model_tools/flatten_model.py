@@ -19,6 +19,7 @@ The three families of possible constraints are:
 
 Base constraints: (no nesting)
 -----------------
+    - Boolean variable
     - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
     - Boolean impliciation: Var -> Var                     (CPMpy class 'Operator', is_bool())
     - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
@@ -31,7 +32,7 @@ Comparison constraints: (up to one nesting on one side)
                          Numexpr == Constant               (CPMpy class 'Comparison')
     - Numeric disequality: Numexpr != Var                  (CPMpy class 'Comparison')
                            Numexpr != Constant             (CPMpy class 'Comparison')
-    - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
+    - Numeric inequality (>=,>,<,<=): Numexpr >=< Var      (CPMpy class 'Comparison')
 
     Numexpr:
         - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
