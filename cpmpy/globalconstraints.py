@@ -94,6 +94,11 @@ class GlobalConstraint(Expression):
         super().__init__(name, arg_list)
         self.is_bool = is_bool
 
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return self.is_bool
+
     def decompose(self):
         """
             if a global constraint has a default decomposition,
@@ -114,7 +119,7 @@ def min(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.min(iterable)
-    return GlobalConstraint("min", list(iterable))
+    return GlobalConstraint("min", list(iterable), is_bool=False)
 
 def max(iterable):
     """
@@ -123,7 +128,7 @@ def max(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.max(iterable)
-    return GlobalConstraint("max", list(iterable))
+    return GlobalConstraint("max", list(iterable), is_bool=False)
 
 
 

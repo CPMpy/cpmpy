@@ -154,6 +154,11 @@ class NumVarImpl(Expression):
         self.ub = ub
         self._value = None
 
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return False
+
     def value(self):
         return self._value
 
@@ -193,6 +198,11 @@ class BoolVarImpl(IntVarImpl):
         
         self.name = BoolVarImpl.counter
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return True
         
     def __repr__(self):
         return "BV{}".format(self.name)
@@ -243,6 +253,11 @@ class NDVarArray(Expression, np.ndarray):
         # this is nice and sneaky, 'self' is the list_of_arguments!
         Expression.__init__(self, "NDVarArray", self)
         # somehow, no need to call ndarray constructor
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return False
 
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)

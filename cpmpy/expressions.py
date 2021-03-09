@@ -99,6 +99,12 @@ class Expression(object):
     def boolexpr(self):
         return (self == 1)
 
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+            Default: yes
+        """
+        return True
+
     # return the value of the expression
     # optional, default: None
     def value(self):
