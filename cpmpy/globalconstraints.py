@@ -92,12 +92,12 @@ class GlobalConstraint(Expression):
     #   not is_bool: it computes a numeric value (ex: Element)
     def __init__(self, name, arg_list, is_bool=True):
         super().__init__(name, arg_list)
-        self.is_bool = is_bool
+        self._is_bool = is_bool
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
-        return self.is_bool
+        return self._is_bool
 
     def decompose(self):
         """
