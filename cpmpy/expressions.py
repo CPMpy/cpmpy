@@ -216,7 +216,7 @@ class Expression(object):
         # if is_num(other) and other == 0:
         #     return -self
         # return Operator("sub", [other, self])
-        return self.__radd__(-other)
+        return (-self).__radd__(other)
     
     # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
@@ -441,10 +441,7 @@ class Operator(Expression):
         if is_num(other) and other == 0:
             return -self
 
-        if self.name == 'sum':
-            self.args.insert(0,-other)
-            return self
-        return super().__sub__(other)
+        return (-self).__radd__(other)
 
     # is bool, check special case
     def __eq__(self, other):
