@@ -154,9 +154,11 @@ class ORToolsPython(SolverInterface):
 
             elif lhs.is_bool() and cpm_expr.name == '==':
                 # reified case: boolexpr == var
-                # TODO: split in var -> boolexpr and ~var -> ~boolexpr
-                # use standard rewriting mechanism of flatten?
-                raise NotImplementedError(cpm_expr) # TODO
+                lexpr = cpm_expr.args[0]
+                rvar = cpm_expr.args[1]
+                # split in boolexpr -> var and var -> boolexpr
+                self.post_constraint(lexpr.implies(rvar))
+                self.post_constraint(rvar.implies(lexpr))
 
             else:
                 # numeric (non-reify) comparison case
