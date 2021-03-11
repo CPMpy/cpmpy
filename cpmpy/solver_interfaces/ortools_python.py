@@ -26,7 +26,7 @@ from ..expressions import *
 from ..globalconstraints import *
 from ..variables import *
 from ..model_tools.get_variables import get_variables, vars_expr
-from ..model_tools.flatten_model import flatten_model, get_or_make_var
+from ..model_tools.flatten_model import flatten_model, get_or_make_var, negated_normal
 
 class ORToolsPython(SolverInterface):
     """
@@ -225,22 +225,10 @@ class ORToolsPython(SolverInterface):
                     bvar = self.ort_var(cpm_expr.args[0])
                     return self.post_constraint(cpm_expr.args[1]).OnlyEnforceIf(bvar)
                 else:
-                    raise NotImplementedError # TODO
-                """
-            # two special cases:
-            #    '->' with .onlyEnforceIf()
-            #    'xor' does not have subexpression form
-            # all others: add( subexpression )
-            if expr.name == '->':
-                args = [self.convert_subexpr(e) for e in expr.args]
-                if isinstance(expr.args[0], BoolVarImpl):
-                    # regular implication
-                    self._model.AddImplication(args[0], args[1])
-                else:
-                    # XXX needs proper implementation of half-reification
-                    print("May not actually work")
-                    self._model.Add( args[0] ).OnlyEnforceIf(args[1])
-                """
+                    # boolexpr -> var, have to convert to ~var -> ~boolexpr
+                    negbvar = self.ort_var(cpm_expr.args[1]).Not()
+                    negleft = negated_normal(cpm_expr.args[0])
+                    return self.post_constraint(negleft).OnlyEnforceIf(negbvar)
 
             else:
                 # base 'and'/n, 'or'/n, 'xor'/n, '->'/2
@@ -281,6 +269,7 @@ class ORToolsPython(SolverInterface):
                     for con in flatdec:
                         self.post_constraint(con)
                     # XXX how to deal with reification of such a global??
+                    # TODO: we would have to catch this at the time of the reification... (outer call)
                     return None # will throw error if used in reification...
                 else:
                     raise NotImplementedError(cpm_expr) # if you reach this... please report on github

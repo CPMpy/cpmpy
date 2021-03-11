@@ -538,3 +538,40 @@ def normalized_numexpr(expr):
 
     raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug
 
+def negated_normal(expr):
+    """
+        WORK IN PROGRESS
+        Negate 'expr' by pushing the negation down into it and its args
+
+        Comparison: swap comparison sign
+        Operator.is_bool(): apply DeMorgan
+        Global: should call decompose and negate that?
+    """
+
+    if __is_flat_var(expr):
+        return ~expr
+
+    elif isinstance(expr, Comparison):
+        newexpr = copy.copy(expr)
+        if   expr.name == '==': newexpr.name = '!='
+        elif expr.name == '!=': newexpr.name = '=='
+        elif expr.name == '<=': newexpr.name = '>'
+        elif expr.name == '<':  newexpr.name = '>='
+        elif expr.name == '>=': newexpr.name = '<'
+        elif expr.name == '>':  newexpr.name = '<='
+        return newexpr
+
+    elif isinstance(expr, Operator):
+        assert(expr.is_bool())
+
+        if expr.name == 'and':
+            return Operator('or', [negated_normal(arg) for arg in expr.args])
+        elif expr.name == 'or':
+            return Operator('and', [negated_normal(arg) for arg in expr.args])
+        else:
+            raise NotImplementedError("negate_normal {}".format(expr))
+
+    else:
+        # global...
+        raise NotImplementedError("negate_normal {}".format(expr))
+
