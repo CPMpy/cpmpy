@@ -120,12 +120,14 @@ class ORToolsPython(SolverInterface):
 
         return self._model
 
+
     def add_to_varmap(self, cpm_var):
         if isinstance(cpm_var, BoolVarImpl):
-            revar = self._model.NewBoolVar(str(cpm_var.name))
+            revar = self._model.NewBoolVar(str(cpm_var))
         elif isinstance(cpm_var, IntVarImpl):
-            revar = self._model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var.name))
+            revar = self._model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
         self.varmap[cpm_var] = revar
+
 
     def post_constraint(self, cpm_expr):
         """
@@ -133,10 +135,13 @@ class ORToolsPython(SolverInterface):
 
             While the normal form is divided in 'base', 'comparison' and 'reified', we
             here regroup it per CPMpy class
+
+            Returns the posted ortools 'Constraint', so that it can be used in reification
+            e.g. self.post_constraint(smth).onlyEnforceIf(self.ort_var(bvar))
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, BoolVarImpl):
-            self._model.AddBoolOr( [self.ort_var(cpm_expr)] )
+            return self._model.AddBoolOr( [self.ort_var(cpm_expr)] )
         
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
@@ -145,7 +150,7 @@ class ORToolsPython(SolverInterface):
             if isinstance(lhs, BoolVarImpl) and cpm_expr.name == '==':
                 # base: bvar == bvar|const
                 lvar,rvar = map(self.ort_var, (lhs,rhs))
-                self._model.Add(lvar == rvar)
+                return self._model.Add(lvar == rvar)
 
             elif lhs.is_bool() and cpm_expr.name == '==':
                 # reified case: boolexpr == var
@@ -167,24 +172,19 @@ class ORToolsPython(SolverInterface):
                     elif cpm_expr.name == '==':
                         newlhs = None
                         if lhs.name == 'abs':
-                            # target = abs(var)
-                            self._model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
+                            return self._model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
                         elif lhs.name == 'mul':
-                            # target = prod(vars)
-                            self._model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self._model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'mod':
-                            # target = var % mod
                             #self._model.AddModuloEquality(rvar, ...)
                             raise NotImplementedError("modulo")
                         elif lhs.name == 'min':
-                            # target = min(vars)
-                            self._model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self._model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'max':
-                            # target = max(vars)
-                            self._model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self._model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'element':
                             # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                            self._model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
+                            return self._model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
                         else:
                             raise NotImplementedError("Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
                     else:
@@ -202,24 +202,30 @@ class ORToolsPython(SolverInterface):
                 if newlhs is None:
                     pass # is already posted directly, eg a '=='
                 elif cpm_expr.name == '==':
-                    self._model.Add( newlhs == rvar)
+                    return self._model.Add( newlhs == rvar)
                 elif cpm_expr.name == '!=':
-                    self._model.Add( newlhs != rvar )
+                    return self._model.Add( newlhs != rvar )
                 elif cpm_expr.name == '<=':
-                    self._model.Add( newlhs <= rvar )
+                    return self._model.Add( newlhs <= rvar )
                 elif cpm_expr.name == '<':
-                    self._model.Add( newlhs < rvar )
+                    return self._model.Add( newlhs < rvar )
                 elif cpm_expr.name == '>=':
-                    self._model.Add( newlhs >= rvar )
+                    return self._model.Add( newlhs >= rvar )
                 elif cpm_expr.name == '>':
-                    self._model.Add( newlhs > rvar )
+                    return self._model.Add( newlhs > rvar )
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == '->' and \
              (not isinstance(cpm_expr.args[0], BoolVarImpl) or \
               not isinstance(cpm_expr.args[1], BoolVarImpl)):
-                # reified case: boolexpr -> var, var -> boolexpr
+                # reified case: var -> boolexpr, boolexpr -> var
+                if isinstance(cpm_expr.args[0], BoolVarImpl):
+                    # var -> boolexpr, natively supported by or-tools
+                    bvar = self.ort_var(cpm_expr.args[0])
+                    return self.post_constraint(cpm_expr.args[1]).OnlyEnforceIf(bvar)
+                else:
+                    raise NotImplementedError # TODO
                 """
             # two special cases:
             #    '->' with .onlyEnforceIf()
@@ -235,20 +241,19 @@ class ORToolsPython(SolverInterface):
                     print("May not actually work")
                     self._model.Add( args[0] ).OnlyEnforceIf(args[1])
                 """
-                raise NotImplementedError # TODO
 
             else:
                 # base 'and'/n, 'or'/n, 'xor'/n, '->'/2
                 args = [self.ort_var(v) for v in cpm_expr.args]
 
                 if cpm_expr.name == 'and':
-                    self._model.AddBoolAnd(args)
+                    return self._model.AddBoolAnd(args)
                 elif cpm_expr.name == 'or':
-                    self._model.AddBoolOr(args)
+                    return self._model.AddBoolOr(args)
                 elif cpm_expr.name == 'xor':
-                    self._model.AddBoolXor(args)
+                    return self._model.AddBoolXor(args)
                 elif cpm_expr.name == '->':
-                    self._model.AddImplication(args[0],args[1])
+                    return self._model.AddImplication(args[0],args[1])
                 else:
                     raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
 
@@ -257,8 +262,8 @@ class ORToolsPython(SolverInterface):
             args = [self.ort_var_or_list(v) for v in cpm_expr.args]
 
             if cpm_expr.name == 'alldifferent':
-                self._model.AddAllDifferent(args) 
-            # NOT YET MAPPED: AllowedAssignments, Automaton, Circuit, Cumulative,
+                return self._model.AddAllDifferent(args) 
+            # TODO: NOT YET MAPPED: AllowedAssignments, Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             else:
@@ -269,18 +274,14 @@ class ORToolsPython(SolverInterface):
                     flatdec = flatten_constraint(dec)
 
                     # collect and create new variables
-                    flatvars = vars_expr(flatdec)
-                    for var in flatvars:
+                    for var in vars_expr(flatdec):
                         if not var in self.varmap:
-                            # new variable
-                            if isinstance(var, BoolVarImpl):
-                                revar = self._model.NewBoolVar(str(var.name))
-                            elif isinstance(var, IntVarImpl):
-                                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
-                            self.varmap[var] = revar
+                            self.add_to_varmap(var)
                     # post decomposition
                     for con in flatdec:
                         self.post_constraint(con)
+                    # XXX how to deal with reification of such a global??
+                    return None # will throw error if used in reification...
                 else:
                     raise NotImplementedError(cpm_expr) # if you reach this... please report on github
 
@@ -315,7 +316,7 @@ class ORToolsPython(SolverInterface):
 
         # decision variables, check in varmap
         if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
-            return ort_var(cpm_expr)
+            return self.ort_var(cpm_expr)
 
         # sum or (to be implemented: wsum)
         if isinstance(cpm_expr, Operator):
