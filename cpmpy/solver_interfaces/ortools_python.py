@@ -24,8 +24,9 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions import *
 from ..globalconstraints import *
+from ..variables import *
 from ..model_tools.get_variables import get_variables, vars_expr
-from ..model_tools.flatten_model import *
+from ..model_tools.flatten_model import flatten_model, get_or_make_var
 
 class ORToolsPython(SolverInterface):
     """
@@ -100,13 +101,8 @@ class ORToolsPython(SolverInterface):
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
-        modelvars = get_variables(flat_model)
-        for var in modelvars:
-            if isinstance(var, BoolVarImpl):
-                revar = self._model.NewBoolVar(str(var.name))
-            elif isinstance(var, IntVarImpl):
-                revar = self._model.NewIntVar(var.lb, var.ub, str(var.name))
-            self.varmap[var] = revar
+        for var in get_variables(flat_model):
+            self.add_to_varmap(var)
 
         # Post the (flat) constraint expressions to the solver
         for con in flat_model.constraints:
@@ -124,48 +120,12 @@ class ORToolsPython(SolverInterface):
 
         return self._model
 
-
-    def ort_var(self, cpm_var):
-        if is_num(cpm_var):
-            return cpm_var
-
-        # decision variables, check in varmap
-        if isinstance(cpm_var, NegBoolView):
-            return self.varmap[cpm_var._bv].Not()
-        elif isinstance(cpm_var, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
-            return self.varmap[cpm_var]
-
-        raise NotImplementedError("Not a know var {}".format(cpm_var))
-
-    def ort_var_or_list(self, cpm_expr):
-        if is_any_list(cpm_expr):
-            return [self.ort_var_or_list(sub) for sub in cpm_expr]
-        return self.ort_var(cpm_expr)
-
-
-    def ort_numexpr(self, cpm_expr):
-        """
-            ORTools subexpressions (for in objective function and comparisons)
-            Accepted by ORTools:
-            - Decision variable: Var
-            - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
-                      wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
-        """
-        if is_num(cpm_expr):
-            return cpm_expr
-
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
-            return ort_var(cpm_expr)
-
-        # sum or (to be implemented: wsum)
-        if isinstance(cpm_expr, Operator):
-            args = [self.ort_var(v) for v in cpm_expr.args]
-            if cpm_expr.name == 'sum':
-                return sum(args)
-
-        raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
-
+    def add_to_varmap(self, cpm_var):
+        if isinstance(cpm_var, BoolVarImpl):
+            revar = self._model.NewBoolVar(str(cpm_var.name))
+        elif isinstance(cpm_var, IntVarImpl):
+            revar = self._model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var.name))
+        self.varmap[cpm_var] = revar
 
     def post_constraint(self, cpm_expr):
         """
@@ -189,7 +149,9 @@ class ORToolsPython(SolverInterface):
 
             elif lhs.is_bool() and cpm_expr.name == '==':
                 # reified case: boolexpr == var
-                raise NotImplementedError # TODO
+                # TODO: split in var -> boolexpr and ~var -> ~boolexpr
+                # use standard rewriting mechanism of flatten?
+                raise NotImplementedError(cpm_expr) # TODO
 
             else:
                 # numeric (non-reify) comparison case
@@ -198,40 +160,47 @@ class ORToolsPython(SolverInterface):
                 if isinstance(lhs, NumVarImpl):
                     # simplest LHS case, a var
                     newlhs = self.ort_var(lhs)
-                elif isinstance(lhs, Operator):
-                    if (lhs.name == 'sum' or lhs.name == 'wsum'):
-                        # a BoundedLinearExpression LHS, like in objective
+                else:
+                    if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
+                        # a BoundedLinearExpression LHS, special case, like in objective
                         newlhs = self.ort_numexpr(lhs) 
-                    else:
-                        rvar_equality = rvar
+                    elif cpm_expr.name == '==':
                         newlhs = None
-                        if cpm_expr.name != '==':
-                            # example: x*y > 10 :: x*y == aux, aux > 10
-                            #rvar_equality = ...
-                            #newlhs = rvar_equality
-                            raise NotImplementedError("have to introduce auxiliary")
-
                         if lhs.name == 'abs':
                             # target = abs(var)
-                            self._model.AddAbsEquality(rvar_equality, self.ort_var(lhs.args[0]))
-                        elif lhs.name == 'max':
-                            # target = max(vars)
-                            self._model.AddMaxEquality(rvar_equality, self.ort_var_or_list(lhs.args))
-                        elif lhs.name == 'min':
-                            # target = min(vars)
-                            self._model.AddMinEquality(rvar_equality, self.ort_var_or_list(lhs.args))
+                            self._model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
+                        elif lhs.name == 'mul':
+                            # target = prod(vars)
+                            self._model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'mod':
                             # target = var % mod
-                            #self._model.AddModuloEquality(rvar_equality, ...)
+                            #self._model.AddModuloEquality(rvar, ...)
                             raise NotImplementedError("modulo")
-                        elif lhs.name == '*':
-                            # target = prod(vars)
-                            self._model.AddMultiplicationEquality(rvar_equality, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'min':
+                            # target = min(vars)
+                            self._model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'max':
+                            # target = max(vars)
+                            self._model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'element':
+                            # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
+                            self._model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
                         else:
-                            raise NotImplementedError("Not a know supported ORTools LHS {}".format(lhs))
+                            raise NotImplementedError("Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                    else:
+                        # other equality than == 
+                        # example: x*y > 10 :: x*y == aux, aux > 10
+                        # creat the equality (will handle appropriate bounds)
+                        (newvar, cons) = get_or_make_var(lhs)
+                        self.add_to_varmap(newvar)
+                        for con in cons:
+                            # post the flattened constraints, including the 'lhs == newvar' one
+                            # if this contains new auxiliary variables we will crash
+                            self.post_constraint(con)
+                        newlhs = newvar
 
                 if newlhs is None:
-                    pass # is already posted directly, without 'rvar_equality'
+                    pass # is already posted directly, eg a '=='
                 elif cpm_expr.name == '==':
                     self._model.Add( newlhs == rvar)
                 elif cpm_expr.name == '!=':
@@ -279,13 +248,12 @@ class ORToolsPython(SolverInterface):
                 elif cpm_expr.name == 'xor':
                     self._model.AddBoolXor(args)
                 elif cpm_expr.name == '->':
-                    self._model.AddImplication(arg[0],args[1])
-
-            raise NotImplementedError("Not a know supported ORTools Operator {}".format(cpm_expr))
+                    self._model.AddImplication(args[0],args[1])
+                else:
+                    raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
 
         # rest: base (Boolean) global constraints
         else:
-            # TODO: could be list of vars...
             args = [self.ort_var_or_list(v) for v in cpm_expr.args]
 
             if cpm_expr.name == 'alldifferent':
@@ -315,6 +283,49 @@ class ORToolsPython(SolverInterface):
                         self.post_constraint(con)
                 else:
                     raise NotImplementedError(cpm_expr) # if you reach this... please report on github
+
+    def ort_var(self, cpm_var):
+        if is_num(cpm_var):
+            return cpm_var
+
+        # decision variables, check in varmap
+        if isinstance(cpm_var, NegBoolView):
+            return self.varmap[cpm_var._bv].Not()
+        elif isinstance(cpm_var, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+            return self.varmap[cpm_var]
+
+        raise NotImplementedError("Not a know var {}".format(cpm_var))
+
+    def ort_var_or_list(self, cpm_expr):
+        if is_any_list(cpm_expr):
+            return [self.ort_var_or_list(sub) for sub in cpm_expr]
+        return self.ort_var(cpm_expr)
+
+
+    def ort_numexpr(self, cpm_expr):
+        """
+            ORTools subexpressions (for in objective function and comparisons)
+            Accepted by ORTools:
+            - Decision variable: Var
+            - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
+                      wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+        """
+        if is_num(cpm_expr):
+            return cpm_expr
+
+        # decision variables, check in varmap
+        if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+            return ort_var(cpm_expr)
+
+        # sum or (to be implemented: wsum)
+        if isinstance(cpm_expr, Operator):
+            args = [self.ort_var(v) for v in cpm_expr.args]
+            if cpm_expr.name == 'sum':
+                return sum(args) # OR-Tools supports this
+
+        raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
+
+
 
 
     def also_old(self):
