@@ -171,7 +171,7 @@ class circuit(GlobalConstraint):
         constraints = [alldifferent(z),
                        alldifferent(a),
                        z[0]==a[0],
-                       z[n-1]==a[0]]
+                       z[n-1]==0]
         for i in range(1,n-1):
             constraints += [z[i] != 0,
                             z[i] == a[z[i-1]]]

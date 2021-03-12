@@ -34,12 +34,8 @@ cons += [ circuit(s) ] # should be subcircuit?
 # consumption, knowing that always conso[i,i]=0 
 # node_fuel[i] = arc_fuel[i, successor-of-i]
 arc_fuel = cparray(arc_fuel) # needed to do arc_fuel[var1] == var2
-node_fuel = IntVar(0,fuelLimit, shape=nHouses)
-cons += [ arc_fuel[i, s[i]] == node_fuel[i] for i in range(nHouses) ]
+node_fuel = [arc_fuel[i, s[i]] for i in range(nHouses)]
 cons += [ sum(node_fuel) < fuelLimit ]
-# BETTER, not possible untill I create an Element expr
-#node_fuel = [arc_fuel[i, s[i]] for i in range(nHouses)]
-#cons += [ sum(node_fuel) < fuelLimit ]
 
 # amount of gold earned, only for stops visited, s[i] != i
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
