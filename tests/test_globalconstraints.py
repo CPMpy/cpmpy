@@ -48,6 +48,7 @@ class TestGlobal(unittest.TestCase):
         _ = model.solve()
 
     def test_minimax_python(self):
+        from cpmpy import min,max
         iv = cp.IntVar(1,9, 10)
         self.assertIsInstance(min(iv), cp.GlobalConstraint) 
         self.assertIsInstance(max(iv), cp.GlobalConstraint) 
@@ -59,5 +60,5 @@ class TestGlobal(unittest.TestCase):
         self.assertIsInstance(mi, cp.GlobalConstraint) 
         self.assertIsInstance(ma, cp.GlobalConstraint) 
 
-        self.assertEqual(cp.Model([], minimize=mi).solve() == 1)
-        self.assertEqual(cp.Model([], minimize=ma).solve() == 9)
+        self.assertEqual(cp.Model([], minimize=mi).solve(), 1)
+        self.assertEqual(cp.Model([], minimize=ma).solve(), 9)

@@ -19,19 +19,16 @@ class TestSolvers(unittest.TestCase):
     def test_tsp(self):
         N = 6
         b = np.random.randint(1,100, size=(N,N))
-        distance_matrix= (b + b.T)/2
+        distance_matrix= ((b + b.T)/2).astype(int)
         x = cp.IntVar(0, 1, shape=distance_matrix.shape) 
         constraint  = []
         constraint  += [sum(x[i,:])==1 for i in range(N)]
         constraint  += [sum(x[:,i])==1 for i in range(N)]
         constraint += [sum(x[i,i] for i in range(N))==0]
 
-        objective =0 
-        for i in range(N):
-            for j in range(N):
-                objective += x[i,j]*distance_matrix[i,j] 
         objective = sum(x*distance_matrix)
 
         model = cp.Model(constraint, minimize=objective)
-        stats = model.solve()
-        solution = x.value()
+        objval = model.solve()
+        self.assertEqual(objval, 0)
+        self.assertEqual(x.value(), [])

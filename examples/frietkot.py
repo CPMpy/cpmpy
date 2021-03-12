@@ -3,7 +3,7 @@
 The 'frietkot' problem; invented by Tias to explain SAT and SAT solving
 http://homepages.vub.ac.be/~tiasguns/frietkot/
 """
-from cppy import *
+from cpmpy import *
 
 # Construct the model.
 (mayo, ketchup, curry, andalouse, samurai) = BoolVar(5)
@@ -24,9 +24,11 @@ allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, 
 model = Model(allwishes)
 print(model)
 
-stats = model.solve()
-print("Mayonaise = ", mayo.value())
-print("Ketchup = ", ketchup.value())
-print("Curry Ketchup = ", curry.value())
-print("Andalouse = ", andalouse.value())
-print("Samurai = ", samurai.value())
+if model.solve():
+    print("Mayonaise = ", mayo.value())
+    print("Ketchup = ", ketchup.value())
+    print("Curry Ketchup = ", curry.value())
+    print("Andalouse = ", andalouse.value())
+    print("Samurai = ", samurai.value())
+else:
+    print("No solution found")
