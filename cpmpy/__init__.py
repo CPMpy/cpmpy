@@ -7,7 +7,7 @@
 #               "%d.%d.%d" % VERSION
 __version__ = "0.5.3"
 
-from .variables import *
 from .expressions import *
+from .variables import *
 from .globalconstraints import *
 from .model import *

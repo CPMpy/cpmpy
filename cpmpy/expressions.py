@@ -105,16 +105,7 @@ class Expression(object):
         """
         return True
 
-    # return the value of the expression
-    # optional, default: None
     def value(self):
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
-        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
-        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
-        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
-        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
-        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
-        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
     # implication constraint: self -> other
@@ -294,6 +285,19 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
+        
+    # return the value of the expression
+    # optional, default: None
+    def value(self):
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if any(a is None for a in arg_vals): return None
+        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
+        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
+        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
+        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
+        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
+        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        return None # default
 
 
 class Operator(Expression):
@@ -454,6 +458,7 @@ class Operator(Expression):
 
     def value(self):
         arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if any(a is None for a in arg_vals): return None
         if   self.name == "sum": return sum(arg_vals)
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]

@@ -338,7 +338,7 @@ def get_or_make_var(expr):
 
         # XXX Also, how to get the bounds on the new variable? have the solver handle it?
         # XXX Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
-        ivar = IntVarImpl(-sys.maxsize, sys.maxsize) # not ideal...
+        ivar = IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
         return (ivar, [newexpr == ivar]+[c for con in flatcons for c in con])
     

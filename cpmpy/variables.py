@@ -135,7 +135,6 @@
 from .utils.exceptions import NullShapeError
 import numpy as np
 from .expressions import Expression, Operator, is_num
-from .globalconstraints import Element
 
 # Helpers for type checking
 def is_int(arg):
@@ -264,6 +263,7 @@ class NDVarArray(Expression, np.ndarray):
         return np.reshape([x.value() for x in self], self.shape)
     
     def __getitem__(self, index):
+        from .globalconstraints import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single variable: direct element

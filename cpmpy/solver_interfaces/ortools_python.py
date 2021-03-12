@@ -26,7 +26,7 @@ from ..expressions import *
 from ..globalconstraints import *
 from ..variables import *
 from ..model_tools.get_variables import get_variables, vars_expr
-from ..model_tools.flatten_model import flatten_model, get_or_make_var, negated_normal
+from ..model_tools.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
 
 class ORToolsPython(SolverInterface):
     """
@@ -74,8 +74,10 @@ class ORToolsPython(SolverInterface):
             my_status.exitstatus = ExitStatus.OPTIMAL
         elif self.ort_status == ort.INFEASIBLE:
             my_status.exitstatus = ExitStatus.UNSATISFIABLE
-        else:
-            raise NotImplementedError(my_status) # a new status type was introduced, please report on github
+        elif self.ort_status == ort.MODEL_INVALID:
+            raise Exception("OR-Tools says: model invalid")
+        else: # ort.UNKNOWN or another
+            raise NotImplementedError(self.ort_status) # a new status type was introduced, please report on github
         my_status.runtime = self.ort_solver.WallTime()
 
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
@@ -258,7 +260,6 @@ class ORToolsPython(SolverInterface):
             #    ReservoirConstraint, ReservoirConstraintWithActive
             else:
                 # global constraint not known, try generic decomposition
-                raise NotImplementedError("Untested old code!")
                 dec = cpm_expr.decompose()
                 if not dec is None:
                     flatdec = flatten_constraint(dec)

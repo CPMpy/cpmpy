@@ -129,7 +129,9 @@ class Model(object):
         self._solver_status = solver.solve(self)
 
         # return computed value
-        if not self.objective is None:
+        if not self.objective is None and \
+            (self._solver_status.exitstatus == ExitStatus.OPTIMAL or \
+             self._solver_status.exitstatus == ExitStatus.FEASIBLE):
             # optimisation problem
             return self.objective.value()
         else:
