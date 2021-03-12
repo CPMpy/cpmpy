@@ -11,17 +11,9 @@
         :nosignatures:
 
         Expression
+        Comparison
         Operator
-        Element
-        GlobalConstraint
 
-    ==================
-    Module description
-    ==================
-
-    ==============
-    Module details
-    ==============
 """
 import numpy as np
 
@@ -45,7 +37,7 @@ def all(iterable):
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
         else:
-            raise "unknown argument to 'all'"
+            raise Exception("unknown argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
@@ -63,7 +55,7 @@ def any(iterable):
         elif isinstance(elem, Expression):
             collect.append( elem.boolexpr() )
         else:
-            raise "unknown argument to 'any'"
+            raise Exception("unknown argument '{}' to 'any'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
@@ -107,16 +99,13 @@ class Expression(object):
     def boolexpr(self):
         return (self == 1)
 
-    # return the value of the expression
-    # optional, default: None
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+            Default: yes
+        """
+        return True
+
     def value(self):
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
-        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
-        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
-        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
-        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
-        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
-        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
     # implication constraint: self -> other
@@ -218,7 +207,7 @@ class Expression(object):
         # if is_num(other) and other == 0:
         #     return -self
         # return Operator("sub", [other, self])
-        return self.__radd__(-other)
+        return (-self).__radd__(other)
     
     # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
@@ -296,6 +285,19 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
+        
+    # return the value of the expression
+    # optional, default: None
+    def value(self):
+        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if any(a is None for a in arg_vals): return None
+        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
+        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
+        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
+        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
+        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
+        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        return None # default
 
 
 class Operator(Expression):
@@ -443,10 +445,7 @@ class Operator(Expression):
         if is_num(other) and other == 0:
             return -self
 
-        if self.name == 'sum':
-            self.args.insert(0,-other)
-            return self
-        return super().__sub__(other)
+        return (-self).__radd__(other)
 
     # is bool, check special case
     def __eq__(self, other):
@@ -459,6 +458,7 @@ class Operator(Expression):
 
     def value(self):
         arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if any(a is None for a in arg_vals): return None
         if   self.name == "sum": return sum(arg_vals)
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
@@ -469,76 +469,3 @@ class Operator(Expression):
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
         return None # default
 
-class Element(Expression):
-    """
-        constraint Arr[X] = Y
-        'Y' here is optional, can use as function: Arr[X] + 3 <= Y
-    """
-
-    def __init__(self, arg_list):
-        assert (len(arg_list) >= 2 and len(arg_list) <= 3), "Element takes 2 or three arguments"
-        super().__init__("element", arg_list)
-
-    def value(self):
-        def argval(a):
-            return a.value() if isinstance(a, Expression) else a
-        idxval = argval(self.args[1])
-        arrval = argval(self.args[0][idxval])
-        if len(self.args) == 2:
-            return arrval
-        else:
-            return (arrval == argval(self.args[2]))
-        return None # default
-
-    def __repr__(self):
-        out = "{}[{}]".format(self.args[0], self.args[1])
-        if len(self.args) == 2:
-            return out
-        return "{} == {}".format(out, self.args[2])
-
-    def __eq__(self, other):
-        if len(self.args) == 2:
-            # add as third argument
-            # XXX, this is very eager,
-            # prohibits t = arr[x], t == 0, t == b
-            # as 't' will include ==0 after the second command
-            # make copy instead?
-            self.args.append(other)
-            return self
-
-        # else: 3 arguments, reified variant, is bool
-        if is_num(other) and other == 1:
-            return self
-
-
-
-# see globalconstraints.py for concrete instantiations
-class GlobalConstraint(Expression):
-    # add_equality_as_arg: bool, whether to catch 'self == expr' cases,
-    # and add them to the 'args' argument list (e.g. for element: X[var] == 1)
-    def __init__(self, name, arg_list, add_equality_as_arg=False, is_bool=True):
-        super().__init__(name, arg_list)
-        self.add_equality_as_arg = add_equality_as_arg
-        self.is_bool = is_bool
-
-    def decompose(self):
-        """
-            if a global constraint has a default decomposition,
-            then it should monkey-patch this function, e.g.:
-            def my_decomp_function(self):
-                return []
-            g = GlobalConstraint("g", args)
-            g.decompose = my_decom_function
-        """
-        return None
-
-    def __eq__(self, other):
-        if self.add_equality_as_arg:
-            self.args.append(other)
-            return self
-
-        if self.is_bool and is_num(other) and other == 1:
-            return self
-
-        # default
-        return super().__eq__(other)

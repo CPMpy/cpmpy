@@ -24,8 +24,8 @@
 
 from ..model_tools.get_variables import get_variables
 from .solver_interface import SolverInterface
-from ..variables import BoolVarImpl, IntVarImpl, NumVarImpl
-from ..expressions import Expression, Operator, Comparison, Element, is_any_list
+from ..variables import *
+from ..expressions import *
 import numpy as np
 
 # translate expression tree to MiniZinc textual model
@@ -140,8 +140,6 @@ class MiniZincText(SolverInterface):
             # almost there
             txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, args_str[0])
             txt += f"      arr[{idx}]"
-            if len(args_str)>2:
-                txt += "= {}".format(args_str[2])
             return txt
         
         # rest: global constraints

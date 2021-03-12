@@ -134,7 +134,7 @@
 
 from .utils.exceptions import NullShapeError
 import numpy as np
-from .expressions import Expression, Operator, is_num, Element
+from .expressions import Expression, Operator, is_num
 
 # Helpers for type checking
 def is_int(arg):
@@ -154,6 +154,11 @@ class NumVarImpl(Expression):
         self.ub = ub
         self._value = None
 
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return False
+
     def value(self):
         return self._value
 
@@ -170,11 +175,12 @@ class IntVarImpl(NumVarImpl):
     def __init__(self, lb, ub, setname=True):
         assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb),lb)
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub),ub)
-        assert (lb >= 0 and ub >= 0)
+        #assert (lb >= 0 and ub >= 0) # can be negative?
         super().__init__(int(lb), int(ub)) # explicit cast: can be numpy
         
-        self.name = IntVarImpl.counter
-        IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
+        if setname:
+            self.name = IntVarImpl.counter
+            IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
     
     def __repr__(self):
         return "IV{}".format(self.name)
@@ -192,6 +198,11 @@ class BoolVarImpl(IntVarImpl):
         
         self.name = BoolVarImpl.counter
         BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return True
         
     def __repr__(self):
         return "BV{}".format(self.name)
@@ -201,11 +212,11 @@ class BoolVarImpl(IntVarImpl):
 
     def __eq__(self, other):
         # (BV == 1) <-> BV
-        # if other == 1:
-        # XXX: dangerous!
-        # "=="" is overloaded 
+        # if other == 1: XXX: dangerous because "=="" is overloaded 
         if other is 1 or other is True:
             return self
+        if other is 0 or other is False:
+            return ~self
         return super().__eq__(other)
 
     # when redefining __eq__, must redefine custom__hash__
@@ -219,7 +230,7 @@ class NegBoolView(BoolVarImpl):
         It stores a link to `var`'s BoolVarImpl
     """
     def __init__(self, bv):
-        assert(isinstance(bv, BoolVarImpl))
+        #assert(isinstance(bv, BoolVarImpl))
         self._bv = bv
 
     def value(self):
@@ -243,10 +254,16 @@ class NDVarArray(Expression, np.ndarray):
         Expression.__init__(self, "NDVarArray", self)
         # somehow, no need to call ndarray constructor
 
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return False
+
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)
     
     def __getitem__(self, index):
+        from .globalconstraints import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single variable: direct element

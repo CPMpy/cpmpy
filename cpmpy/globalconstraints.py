@@ -15,6 +15,7 @@
         allequal
         circuit
         GlobalConstraint
+        Element
 
     ================
     List of functions
@@ -86,6 +87,30 @@ from .expressions import *
 from itertools import chain, combinations
 
 
+class GlobalConstraint(Expression):
+    # is_bool: whether this is normal constraint (True or False)
+    #   not is_bool: it computes a numeric value (ex: Element)
+    def __init__(self, name, arg_list, is_bool=True):
+        super().__init__(name, arg_list)
+        self._is_bool = is_bool
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return self._is_bool
+
+    def decompose(self):
+        """
+            if a global constraint has a default decomposition,
+            then it should monkey-patch this function, e.g.:
+            def my_decomp_function(self):
+                return []
+            g = GlobalConstraint("g", args)
+            g.decompose = my_decom_function
+        """
+        return None
+
+
 # min: listwise 'min'
 def min(iterable):
     """
@@ -94,7 +119,7 @@ def min(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.min(iterable)
-    return GlobalConstraint("min", list(iterable))
+    return GlobalConstraint("min", list(iterable), is_bool=False)
 
 def max(iterable):
     """
@@ -103,7 +128,7 @@ def max(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.max(iterable)
-    return GlobalConstraint("max", list(iterable))
+    return GlobalConstraint("max", list(iterable), is_bool=False)
 
 
 
@@ -146,11 +171,42 @@ class circuit(GlobalConstraint):
         constraints = [alldifferent(z),
                        alldifferent(a),
                        z[0]==a[0],
-                       z[n-1]==a[0]]
+                       z[n-1]==0]
         for i in range(1,n-1):
             constraints += [z[i] != 0,
                             z[i] == a[z[i-1]]]
         return constraints
+
+
+class Element(GlobalConstraint):
+    """
+        The 'Element' global constraint enforces that the result equals Arr[Idx]
+        with 'Arr' an array of constants of variables (the first argument)
+        and 'Idx' an integer decision variable, representing the index into the array.
+
+        Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
+        an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
+
+        Element is a CPMpy built-in global constraint, so the class implements a few more
+        extra things for convenience (.value() and .__repr__()). It is also an example of
+        a 'numeric' global constraint.
+    """
+
+    def __init__(self, arg_list):
+        assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
+        super().__init__("element", arg_list, is_bool=False)
+
+    def value(self):
+        # XXX, make argval shared util function?
+        def argval(a):
+            return a.value() if isinstance(a, Expression) else a
+        idxval = argval(self.args[1])
+        if not idxval is None:
+            return argval(self.args[0][idxval])
+        return None # default
+
+    def __repr__(self):
+        return "{}[{}]".format(self.args[0], self.args[1])
 
 
 def _all_pairs(args):

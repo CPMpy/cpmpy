@@ -72,7 +72,7 @@ class MiniZincPython(MiniZincText):
 
     def solve(self, model, solvername=None):
         if not self.supported():
-            raise "Install the python 'minizinc' package to use this '{}' solver interface".format(self.name)
+            raise Exception("Install the python 'minizinc' package to use this '{}' solver interface".format(self.name))
         import minizinc
 
         # create self.mzn_inst
