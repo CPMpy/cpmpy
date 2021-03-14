@@ -55,15 +55,11 @@ constraint  += [sum(y[:,i])==sum(y[i,:])+1 for i in range(1,n_city)]
 #the salesman leaves with n-1 flows
 constraint  += [sum(y[0,:])==(n_city-1) ]
 
-objective =0 
 #the objective is to minimze  the travel distance 
 for i in range(n_city):
     for j in range(n_city):
         constraint  += [y[i,j] <= (n_city-1)*x[i,j]]
-        objective += x[i,j]*distance_matrix[i,j] 
-
-## this is not working
-# objective = sum(x*distance_matrix)
+objective = sum(x*distance_matrix)
 
 model = Model(constraint, minimize=objective)
 # print(model)

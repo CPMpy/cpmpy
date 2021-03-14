@@ -54,15 +54,11 @@ constraint  += [sum(y[:,0])==0 ]
 # flow out of node i through all outgoing arcs + load capcity @ node i
 constraint  += [sum(y[:,i])==sum(y[i,:])+capacities[i] for i in range(1,n_city)]
 
-objective =0 
 #the objective is to minimze  the travel distance 
 for i in range(n_city):
     for j in range(n_city):
         constraint  += [y[i,j] <= q*x[i,j]]
-        objective += x[i,j]*distance_matrix[i,j] 
-
-## this is not working
-# objective = sum(x*distance_matrix)
+objective = sum(x*distance_matrix)
 
 model = Model(constraint, minimize=objective)
 # print(model)
