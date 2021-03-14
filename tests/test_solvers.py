@@ -18,6 +18,7 @@ class TestSolvers(unittest.TestCase):
     # should move this test elsewhere later
     def test_tsp(self):
         N = 6
+        np.random.seed(0)
         b = np.random.randint(1,100, size=(N,N))
         distance_matrix= ((b + b.T)/2).astype(int)
         x = cp.IntVar(0, 1, shape=distance_matrix.shape) 
@@ -30,5 +31,11 @@ class TestSolvers(unittest.TestCase):
 
         model = cp.Model(constraint, minimize=objective)
         objval = model.solve()
-        self.assertEqual(objval, 0)
-        self.assertEqual(x.value(), [])
+        self.assertEqual(objval, 214)
+        self.assertEqual(x.value().tolist(),
+        [[0, 0, 0, 0, 0, 1],
+         [0, 0, 1, 0, 0, 0],
+         [0, 1, 0, 0, 0, 0],
+         [0, 0, 0, 0, 1, 0],
+         [0, 0, 0, 1, 0, 0],
+         [1, 0, 0, 0, 0, 0]])

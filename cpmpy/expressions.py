@@ -79,6 +79,11 @@ class Expression(object):
         if isinstance(arg_list, np.ndarray):
             # must flatten
             arg_list = arg_list.reshape(-1)
+        for i in range(len(arg_list)):
+            if isinstance(arg_list[i], np.ndarray):
+                # must flatten
+                arg_list[i] = arg_list[i].reshape(-1)
+
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.name = name
         self.args = arg_list
