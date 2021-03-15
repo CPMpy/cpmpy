@@ -61,4 +61,6 @@ class TestGlobal(unittest.TestCase):
         self.assertIsInstance(ma, cp.GlobalConstraint) 
 
         self.assertEqual(cp.Model([], minimize=mi).solve(), 1)
-        self.assertEqual(cp.Model([], minimize=ma).solve(), 9)
+        self.assertEqual(cp.Model([], minimize=ma).solve(), 1)
+        self.assertEqual(cp.Model([], maximize=mi).solve(), 9)
+        self.assertEqual(cp.Model([], maximize=ma).solve(), 9)

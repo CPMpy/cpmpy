@@ -119,7 +119,7 @@ def min(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.min(iterable)
-    return GlobalConstraint("min", list(iterable), is_bool=False)
+    return Minimum(iterable)
 
 def max(iterable):
     """
@@ -128,7 +128,7 @@ def max(iterable):
     """
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.max(iterable)
-    return GlobalConstraint("max", list(iterable), is_bool=False)
+    return Maximum(iterable)
 
 
 
@@ -178,6 +178,30 @@ class circuit(GlobalConstraint):
         return constraints
 
 
+class Minimum(GlobalConstraint):
+    """
+        Computes the minimum value of the arguments
+
+        It is a 'functional' global constraint which implicitly returns a numeric variable
+    """
+    def __init__(self, arg_list):
+        super().__init__("min", arg_list, is_bool=False)
+
+    def value(self):
+        return min([_argval(a) for a in self.args])
+
+class Maximum(GlobalConstraint):
+    """
+        Computes the maximum value of the arguments
+
+        It is a 'functional' global constraint which implicitly returns a numeric variable
+    """
+    def __init__(self, arg_list):
+        super().__init__("max", arg_list, is_bool=False)
+
+    def value(self):
+        return max([_argval(a) for a in self.args])
+
 class Element(GlobalConstraint):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
@@ -197,16 +221,14 @@ class Element(GlobalConstraint):
         super().__init__("element", arg_list, is_bool=False)
 
     def value(self):
-        # XXX, make argval shared util function?
-        def argval(a):
-            return a.value() if isinstance(a, Expression) else a
-        idxval = argval(self.args[1])
+        idxval = _argval(self.args[1])
         if not idxval is None:
-            return argval(self.args[0][idxval])
+            return _argval(self.args[0][idxval])
         return None # default
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
+
 
 
 def _all_pairs(args):
@@ -215,3 +237,8 @@ def _all_pairs(args):
     pairs = list(combinations(args, 2))
     return pairs
 
+# XXX, make argval shared util function?
+def _argval(a):
+    """ returns .value() of Expression, otherwise the variable itself
+    """
+    return a.value() if isinstance(a, Expression) else a
