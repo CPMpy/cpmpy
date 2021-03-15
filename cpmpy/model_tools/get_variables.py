@@ -8,10 +8,11 @@ from ..variables import *
 """
 def get_variables(model):
     # want an ordered set. Emulate with full list that is uniquified
-    vars_ = vars_expr(model.constraints)
+    vars_cons = vars_expr(model.constraints)
+    vars_obj = vars_expr(model.objective)
 
     # mimics an ordered set, manually...
-    return uniquify(vars_)
+    return uniquify(vars_cons+vars_obj)
 
 # https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
 def uniquify(seq):
