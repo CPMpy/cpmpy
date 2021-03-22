@@ -136,7 +136,8 @@ class Model(object):
             return self.objective.value()
         else:
             # satisfaction problem
-            if self._solver_status.exitstatus == ExitStatus.FEASIBLE:
+            if self._solver_status.exitstatus == ExitStatus.FEASIBLE or \
+               self._solver_status.exitstatus == ExitStatus.OPTIMAL:
                 return True
         return False
 
