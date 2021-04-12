@@ -455,7 +455,7 @@ def normalized_boolexpr(expr):
             (rvar, rcons) = get_or_make_var(rexpr)
 
             # LHS: check if Boolexpr == smth:
-            if exprname == '==' or exprname == '!=' and lexpr.is_bool():
+            if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 # Reification (double implication): Boolexpr == Var
                 (lhs, lcons) = normalized_boolexpr(lexpr)
                 if expr.name == '!=':
