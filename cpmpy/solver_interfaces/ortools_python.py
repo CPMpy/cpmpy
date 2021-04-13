@@ -180,8 +180,9 @@ class ORToolsPython(SolverInterface):
                         elif lhs.name == 'mul':
                             return self._model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'mod':
-                            #self._model.AddModuloEquality(rvar, ...)
-                            raise NotImplementedError("modulo")
+                            return self._model.AddModuloEquality(rvar, self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'div':
+                            return self._model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'min':
                             return self._model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'max':
