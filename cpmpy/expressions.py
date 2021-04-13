@@ -271,7 +271,7 @@ class Comparison(Expression):
     def __init__(self, name, left, right):
         assert (name in Comparison.allowed), "Symbol not allowed"
         # if vectorized, must match
-        if hasattr(left, '__len__'): 
+        if hasattr(left, '__len__') and hasattr(right, '__len__'): 
             assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
 
