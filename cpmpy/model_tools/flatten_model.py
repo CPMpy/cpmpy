@@ -150,7 +150,6 @@ def flatten_constraint(expr):
             # ->, allows a boolexpr on one side
             if isinstance(expr.args[0], BoolVarImpl):
                 # LHS is var, ensure RHS is normalized 'Boolexpr'
-                print("-> lhs var")
                 lhs = expr.args[0]
                 (rhs,flatcons) = normalized_boolexpr(expr.args[1])
             else:
