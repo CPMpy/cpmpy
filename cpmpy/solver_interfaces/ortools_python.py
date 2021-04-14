@@ -203,7 +203,7 @@ class ORToolsPython(SolverInterface):
                             # post the flattened constraints, including the 'lhs == newvar' one
                             # if this contains new auxiliary variables we will crash
                             self.post_constraint(con)
-                        newlhs = newvar
+                        newlhs = self.ort_var(newvar)
 
                 if newlhs is None:
                     pass # is already posted directly, eg a '=='
