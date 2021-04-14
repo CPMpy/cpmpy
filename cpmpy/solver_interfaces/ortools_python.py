@@ -100,6 +100,7 @@ class ORToolsPython(SolverInterface):
 
         # Transform into flattened model
         flat_model = flatten_model(cpm_model)
+        print(flat_model)
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var

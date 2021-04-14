@@ -169,4 +169,6 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( cp.alldifferent([a+b,b+c,c+3]) )), "[alldifferent(IV9,IV10,IV11), ((IV0) + (IV1)) == (IV9), ((IV1) + (IV2)) == (IV10), (3 + (IV2)) == (IV11)]" )
 
         # issue #27
-        self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), ((IV1) == (IV12)) == (BV9), ((IV2) + (IV3)) == (IV12)]" )
+        self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), (((IV2) + (IV3)) == (IV1)) == (BV9)]" )
+        # different order should not create more tempvars
+        self.assertEqual( str(flatten_constraint( (a == 10).implies(c+d == b) )), "[(IV0 == 10) -> (BV10), (((IV2) + (IV3)) == (IV1)) == (BV10)]" )
