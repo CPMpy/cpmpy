@@ -42,6 +42,18 @@ constraints += [ puzzle[given!=e] == given[given!=e] ] # numpy's indexing
 # Solve and print
 model = Model(constraints)
 if model.solve():
-    print(puzzle.value())
+    #print(puzzle.value())
+    # pretty print, highlight givens
+    out = ""
+    for r in range(0,9):
+        for c in range(0,9):
+            out += str(puzzle[r,c].value())
+            out += '* ' if given[r,c] else '  '
+            if (c+1) % 3 == 0 and c != 8: # end of block
+                out += '| '
+        out += '\n'
+        if (r+1) % 3 == 0 and r != 8: # end of block
+            out += ('-'*9)+'+-'+('-'*9)+'+'+('-'*9)+'\n'
+    print(out)
 else:
     print("No solution found")
