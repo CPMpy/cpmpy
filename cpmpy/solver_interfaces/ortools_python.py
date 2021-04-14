@@ -100,7 +100,6 @@ class ORToolsPython(SolverInterface):
 
         # Transform into flattened model
         flat_model = flatten_model(cpm_model)
-        print(flat_model)
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
@@ -132,7 +131,7 @@ class ORToolsPython(SolverInterface):
         self.varmap[cpm_var] = revar
 
 
-    def post_constraint(self, cpm_expr):
+    def post_constraint(self, cpm_expr, reifiable=False):
         """
             Constraints are expected to be in 'flat normal form' (see flatten_model.py)
 
@@ -140,7 +139,9 @@ class ORToolsPython(SolverInterface):
             here regroup it per CPMpy class
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
-            e.g. self.post_constraint(smth).onlyEnforceIf(self.ort_var(bvar))
+            e.g. self.post_constraint(smth, reifiable=True).onlyEnforceIf(self.ort_var(bvar))
+            
+            - reifiable: ensures only constraints that support reification are returned
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, BoolVarImpl):
@@ -156,7 +157,8 @@ class ORToolsPython(SolverInterface):
                 return self._model.Add(lvar == rvar)
 
             elif lhs.is_bool() and cpm_expr.name == '==':
-                # reified case: boolexpr == var
+                assert (not reifiable), "can not reify a reification"
+                # reified case: boolexpr == var, split into two implications
                 lexpr = cpm_expr.args[0]
                 rvar = cpm_expr.args[1]
                 # split in boolexpr -> var and var -> boolexpr
@@ -174,7 +176,7 @@ class ORToolsPython(SolverInterface):
                     if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
                         # a BoundedLinearExpression LHS, special case, like in objective
                         newlhs = self.ort_numexpr(lhs) 
-                    elif cpm_expr.name == '==':
+                    elif cpm_expr.name == '==' and not reifiable:
                         newlhs = None
                         if lhs.name == 'abs':
                             return self._model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
@@ -229,12 +231,12 @@ class ORToolsPython(SolverInterface):
                 if isinstance(cpm_expr.args[0], BoolVarImpl):
                     # var -> boolexpr, natively supported by or-tools
                     bvar = self.ort_var(cpm_expr.args[0])
-                    return self.post_constraint(cpm_expr.args[1]).OnlyEnforceIf(bvar)
+                    return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
                 else:
                     # boolexpr -> var, have to convert to ~var -> ~boolexpr
                     negbvar = self.ort_var(cpm_expr.args[1]).Not()
                     negleft = negated_normal(cpm_expr.args[0])
-                    return self.post_constraint(negleft).OnlyEnforceIf(negbvar)
+                    return self.post_constraint(negleft, reifiable=True).OnlyEnforceIf(negbvar)
 
             else:
                 # base 'and'/n, 'or'/n, 'xor'/n, '->'/2

@@ -39,3 +39,14 @@ class TestSolvers(unittest.TestCase):
          [0, 0, 0, 0, 1, 0],
          [0, 0, 0, 1, 0, 0],
          [1, 0, 0, 0, 0, 0]])
+
+    def test_ortools(self):
+        b = cp.BoolVar()
+        x = cp.IntVar(1,13, shape=3)
+        # reifiability (automatic handling in case of !=)
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) == x[2])).solve() )
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) != x[2])).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]) == b).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]) == b).solve() )
