@@ -167,3 +167,6 @@ class TestFlattenExpr(unittest.TestCase):
         IntVar(0,2, 4) # increase counter
         self.assertEqual( str(flatten_constraint( cparray([1,2,3])[a] <= b )), "[([1 2 3][IV0]) <= (IV1)]" )
         self.assertEqual( str(flatten_constraint( cp.alldifferent([a+b,b+c,c+3]) )), "[alldifferent(IV9,IV10,IV11), ((IV0) + (IV1)) == (IV9), ((IV1) + (IV2)) == (IV10), (3 + (IV2)) == (IV11)]" )
+
+        # issue #27
+        self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), ((IV1) == (IV12)) == (BV9), ((IV2) + (IV3)) == (IV12)]" )
