@@ -172,3 +172,6 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), (((IV2) + (IV3)) == (IV1)) == (BV9)]" )
         # different order should not create more tempvars
         self.assertEqual( str(flatten_constraint( (a == 10).implies(c+d == b) )), "[(IV0 == 10) -> (BV10), (((IV2) + (IV3)) == (IV1)) == (BV10)]" )
+        self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) / (IV1)) == (IV2)]" )
+        self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) / (IV1)) == (IV2)]" )
+

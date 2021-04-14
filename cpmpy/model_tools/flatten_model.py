@@ -180,12 +180,18 @@ def flatten_constraint(expr):
                 flatcons += [Comparison(expr.name, lexpr, rexpr)]
             else:
                 # RHS must be var (or const)
+                lexpr,rexpr = expr.args
                 exprname = expr.name
+                # ==,!=: can swap if lhs is var and rhs is not
+                # TODO: this is very similar to (part of) normalize_boolexpr??
+                if (exprname == '==' or exprname == '!=') and \
+                    not __is_flat_var(rexpr) and __is_flat_var(lexpr):
+                    (lexpr,rexpr) = (rexpr,lexpr)
+                # ensure rhs is var
                 (rvar, rcons) = get_or_make_var(rexpr)
 
                 # LHS: check if Boolexpr == smth:
                 if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
-                    # TODO... we should 'swap' if LHS is boolvar and RHS is not...
                     # Reification (double implication): Boolexpr == Var
                     if __is_flat_var(lexpr):
                         (lhs, lcons) = (lexpr, [])
