@@ -266,22 +266,23 @@ class NDVarArray(Expression, np.ndarray):
         from .globalconstraints import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
-        # index is single variable: direct element
-        if is_var(index):
+        # index is single expression: direct element
+        if isinstance(index, Expression):
             return Element([self, index])
 
-        # index is array/tuple with at least one var in it:
-        # index non-var part, and create element on var part
-        if isinstance(index, tuple) and any(is_var(el) for el in index):
+        # index is array/tuple with at least one expr in it:
+        # index non-expr part, and create element on expr part
+        if isinstance(index, tuple) and \
+           any(isinstance(el, Expression) for el in index):
             index_rest = list(index) # mutable view
             var = [] # collector of variables
             for i in range(len(index)):
-                if is_var(index[i]):
+                if isinstance(index[i], Expression):
                     index_rest[i] = Ellipsis # selects all remaining dimensions
                     var.append(index[i])
-            array_rest = self[tuple(index_rest)] # non-var array selection
             assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
             # single var, so flatten rest array
+            array_rest = self[tuple(index_rest)] # non-var array selection
             return Element([array_rest, var[0]])
 
         return super().__getitem__(index)
