@@ -259,7 +259,10 @@ class ORToolsPython(SolverInterface):
 
             if cpm_expr.name == 'alldifferent':
                 return self._model.AddAllDifferent(args) 
-            # TODO: NOT YET MAPPED: AllowedAssignments, Automaton, Circuit, Cumulative,
+            elif cpm_expr.name == 'table':
+                assert(len(args) == 2) # args = [array, table]
+                return self._model.AddAllowedAssignments(args[0], args[1])
+            # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             else:

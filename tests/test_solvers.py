@@ -43,6 +43,7 @@ class TestSolvers(unittest.TestCase):
     def test_ortools(self):
         b = cp.BoolVar()
         x = cp.IntVar(1,13, shape=3)
+
         # reifiability (automatic handling in case of !=)
         self.assertTrue( cp.Model(b.implies((x[0]*x[1]) == x[2])).solve() )
         self.assertTrue( cp.Model(b.implies((x[0]*x[1]) != x[2])).solve() )
@@ -50,3 +51,9 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]).implies(b)).solve() )
         self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]) == b).solve() )
         self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]) == b).solve() )
+        
+        # table
+        t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
+        self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
+        self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
+

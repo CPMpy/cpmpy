@@ -4,6 +4,16 @@
 ## globalconstraints.py
 ##
 """
+    ================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        min
+        max
+
     ===============
     List of classes
     ===============
@@ -14,18 +24,11 @@
         alldifferent
         allequal
         circuit
-        GlobalConstraint
+        Table
+        Minimum
+        Maximum
         Element
-
-    ================
-    List of functions
-    =================
-
-    .. autosummary::
-        :nosignatures:
-
-        min
-        max
+        GlobalConstraint
 
     ==================
     Module description
@@ -153,7 +156,6 @@ class allequal(GlobalConstraint):
     def decompose(self):
         return [var1 == var2 for var1, var2 in _all_pairs(self.args)]
 
-
 class circuit(GlobalConstraint):
     """
     Variables of the constraint form a circuit ex: 0 -> 3 -> 2 -> 0
@@ -176,6 +178,17 @@ class circuit(GlobalConstraint):
             constraints += [z[i] != 0,
                             z[i] == a[z[i-1]]]
         return constraints
+
+class Table(GlobalConstraint):
+    """
+    the values of the variables in 'array'
+    correspond to a row in 'table'
+    """
+    def __init__(self, array, table):
+        super().__init__("table", [array, table])
+
+    def decompose(self):
+        raise NotImplementedError("TODO: table decomposition")
 
 
 class Minimum(GlobalConstraint):

@@ -218,7 +218,7 @@ def flatten_constraint(expr):
             return [expr]
         else:
             # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
@@ -258,10 +258,10 @@ def __is_flat_var(arg):
 
 def __is_flat_var_or_list(arg):
     """ True if the variable is a numeric constant, or a NumVarImpl (incl subclasses)
-        or a list of __is_flat_var
+        or a list of __is_flat_var_or_list
     """
     return is_num(arg) or isinstance(arg, NumVarImpl) or \
-           is_any_list(arg) and all(__is_flat_var(el) for el in arg)
+           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
 def get_or_make_var(expr):
