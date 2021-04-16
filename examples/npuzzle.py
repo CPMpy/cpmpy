@@ -18,35 +18,50 @@ from cpmpy import *
 puzzle_start = np.array([
     [0,3,6],
     [2,4,8],
-    [1,7,5]]).reshape(-1)
+    [1,7,5]]).reshape(-1) # 12 steps
+"""
+puzzle_start = np.array([
+    [3,7,5],
+    [1,6,4],
+    [8,2,0]]).reshape(-1) # 18 steps
+puzzle_start = np.array([
+    [8,3,4],
+    [1,7,6],
+    [2,5,0]]).reshape(-1) # 24 steps
+puzzle_start = np.array([
+    [8,1,0],
+    [3,4,7],
+    [2,5,6]]).reshape(-1) # 28 steps
+"""
 puzzle_end = np.array([
     [1,2,3],
     [4,5,6],
     [7,8,0]]).reshape(-1)
-t = puzzle_start.shape[0] # flat length
+n = puzzle_start.shape[0] # flat length
+dim = int(math.sqrt(n))
+assert (dim*dim == n), "non-square matrix??"
 
 # max nr steps to the solution
-num_sols = 20
+num_sols = 30
 
-# valid moves, INCLUDING staying at the same position
-valid_moves_sm = cparray([  # would be better of with table?
-   [1,1,0,1,0,0,0,0,0], # 0
-   [1,1,1,0,1,0,0,0,0], # 1
-   [0,1,1,0,0,1,0,0,0], # 2
-   [1,0,0,1,1,0,1,0,0], # 3
-   [0,1,0,1,1,1,0,1,0], # 4
-   [0,0,1,0,1,1,0,0,1], # 5
-   [0,0,0,1,0,0,1,1,0], # 6
-   [0,0,0,0,1,0,1,1,1], # 7
-   [0,0,0,0,0,1,0,1,1], # 8
-])
+# Generate the allowed moves (including to same position)
+# such that (move_from, move_to) in valid_table
+valid_table = []
+def pos(r,c):
+    return r*dim+c
+for r in range(dim):
+    for c in range(dim):
+        # same, up, down, left, right
+        for (rr, cc) in [(0,0),(-1,0),(1,0),(0,-1),(0,1)]: 
+            if 0 <= r+rr and r+rr < dim and 0 <= c+cc and c+cc < dim:
+                valid_table.append([pos(r,c), pos(r+rr,c+cc)])
 
 # Variables
-x = IntVar(0,t-1, shape=(num_sols,t))
+x = IntVar(0,n-1, shape=(num_sols,n))
 
 # the moves, index in puzzle
-move_from = IntVar(0,t-1, shape=(num_sols)) # is move_to[i-1]... could remove
-move_to = IntVar(0,t-1, shape=(num_sols))
+move_from = IntVar(0,n-1, shape=(num_sols)) # is move_to[i-1]...
+move_to = IntVar(0,n-1, shape=(num_sols))
 
 # is this row the solution?
 check = BoolVar(shape=num_sols)
@@ -55,10 +70,10 @@ check = BoolVar(shape=num_sols)
 check_ix = IntVar(0,num_sols)
 
 
+m = Model(minimize=check_ix)
+
 def same(x, y):
     return all(x == y)
-
-m = Model(minimize=check_ix)
 
 # start and end puzzle
 m += [
@@ -80,11 +95,12 @@ m += [ move_from[i] == move_to[i-1] for i in range(1,num_sols) ]
 # only move_from/move_to can have a change in x
 m += [
     ((move_from[i] != j) & (move_to[i] != j)).implies(x[i,j] == x[i-1,j])
-for i in range(1,num_sols) for j in range(t) ]
+    for i in range(1,num_sols) for j in range(n)
+]
 
 
-# require valid moves (including to same position)
-m += [ valid_moves_sm[ (t*move_from[i]+move_to[i]) ] == 1 for i in range(num_sols)]
+# require valid moves
+m += [ Table( (move_from[i],move_to[i]), valid_table) for i in range(num_sols)]
 
 
 # check whether this is the end solution
@@ -99,23 +115,21 @@ m += [ check[check_ix] == 1 ]
 
 # visualisation helper function
 def visu_npuzzle(xval, pos_from, pos_to):
-    dim = int(math.sqrt(t))
-    assert (dim*dim == t), "non-square matrix??"
     out = ""
     for r in range(dim):
         for c in range(dim):
-            pos = r*dim+c
-            if pos == pos_from or pos == pos_to:
-                out += f"{xval[pos]}* "
+            xpos = r*dim+c
+            if xpos == pos_from or xpos == pos_to:
+                out += f"{xval[xpos]}* "
             else:
-                out += f"{xval[pos]}  "
+                out += f"{xval[xpos]}  "
         out += '\n'
     print(out)
 
-if not m.solve() is False:
+if m.solve() is False:
+    print("UNSAT, try increasing nr of steps? or wrong input...")
+else:
     for i in range(check_ix.value()+1):
         visu_npuzzle(x[i,:].value(), move_from[i].value(), move_to[i].value())
     print(f"Found in {check_ix.value()} steps")
-else:
-    print("UNSAT, try increasing nr of steps? or wrong input...")
 print(m.status())
