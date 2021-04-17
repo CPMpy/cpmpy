@@ -57,3 +57,7 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
         self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
 
+        # modulo
+        self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
+
+
