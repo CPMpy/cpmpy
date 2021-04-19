@@ -18,7 +18,7 @@ The software is in ALPHA state, and near the end of its proof-of-concept stage. 
    tutorial/how_to_install
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Documentation:
 
    preface/overview

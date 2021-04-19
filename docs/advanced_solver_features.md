@@ -15,8 +15,7 @@ print(m.status())
 print(x.value())
 ```
 
-# Or-Tools examples
-In the following, we will use the or-tools CP-SAT Python interface. To use its advanced features, it is recommended to read the [corresponding documentation](https://developers.google.com/optimization/reference/python/sat/python/cp_model).
+In the following, we will use the __or-tools CP-SAT Python interface__. To use its advanced features, it is recommended to read the [corresponding documentation](https://developers.google.com/optimization/reference/python/sat/python/cp_model).
 
 ## Setting advanced solver parameters
 The CPMpy interface only exports some parameters of or-tools. It has MANY more, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto]).

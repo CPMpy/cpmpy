@@ -1,5 +1,5 @@
-CPMpy's pipeline
-================
+Behind the scenes: CPMpy's pipeline
+=====================================
 
 CPMpy has two key parts:
 
@@ -49,8 +49,8 @@ A 'base' constraint is simply a name, with a list of variables (no nested expres
 
 To support linear constraints and reification (equating the truth-value of a constraint to a Boolean variable), we allow a few cases where a comparison operator can have a base constraint as its left-hand side.
 
-Special case 1, linear constraints: 
------------------------------------
+
+### Special case 1, linear constraints: 
 
 We first define a linear expression as follows (weighted linear sum): ::
 
@@ -71,8 +71,8 @@ So (dis)equality can have a variable (or a constant) as its right-hand side. Ine
    Op = ">" | ">=" | "<" | "<="
    LinConsIne = (Op, (LinExpr, Num))
 
-Special case 2, reification:
-----------------------------
+
+### Special case 2, reification:
 
 We first define the Boolean expressions that allow reification: ::
 
