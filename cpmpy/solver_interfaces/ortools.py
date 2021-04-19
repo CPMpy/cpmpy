@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## ortools_python.py
+## ortools.py
 ##
 """
     ===============
@@ -28,7 +28,7 @@ from ..variables import *
 from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
 
-class ORToolsPython(SolverInterface):
+class CPMpyORTools(SolverInterface):
     """
     Interface to the python 'ortools' API
 
@@ -36,67 +36,107 @@ class ORToolsPython(SolverInterface):
     $ pip install ortools
 
     Creates the following attributes:
-    _model: the ortools.sat.python.cp_model.CpModel() created by _model()
-    _solver: the ortools cp_model.CpSolver() instance used in solve()
+    user_vars: variables in the original (unflattened) model, incl objective
+    ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
+    ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+    ort_status: the ortools 'status' instance returned by ort_solver.Solve()
+    cpm_status: the corresponding CPMpy status
     """
 
-    def __init__(self):
-        self.name = "ortools"
-
-    def supported(self):
+    @staticmethod
+    def supported():
         try:
             import ortools
             return True
         except ImportError as e:
             return False
 
-    def solve(self, cpm_model, num_workers=1):
+    def __init__(self, cpm_model):
+        """
+        Constructor of the solver object
+
+        Requires a CPMpy model as input, and will create the corresponding
+        or-tools model and solver object (ort_model and ort_solver)
+
+        ort_model and ort_solver can both be modified externally before
+        calling solve(), a prime way to use more advanced solver features
+        """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(self.name))
         from ortools.sat.python import cp_model as ort
 
-        # store original vars (before flattening)
-        original_vars = get_variables(cpm_model)
+        super().__init__()
+        self.name = "ortools"
 
-        # create model
+        # store original vars and objective (before flattening)
+        self.user_vars = get_variables(cpm_model)
+
+        # create model (includes conversion to flat normal form)
         self.ort_model = self.make_model(cpm_model)
-        # solve the instance
+        # create the solver instance
+        # (so its params can still be changed before calling solve)
         self.ort_solver = ort.CpSolver()
-        self.ort_solver.parameters.num_search_workers = num_workers # increase for more efficiency (parallel)
-        self.ort_status = self.ort_solver.Solve(self.ort_model)
 
-        # translate status
-        my_status = SolverStatus()
-        my_status.solver_name = self.name
+
+    def solve(self):
+        from ortools.sat.python import cp_model as ort
+
+        ort_status = self.ort_solver.Solve(self.ort_model)
+
+        return self._after_solve(ort_status)
+
+    def _after_solve(self, ort_status):
+        """
+            To be called immediately after calling or-tools Solve() or SolveWithSolutionCallBack() or SearchForAllSolutions()
+            Translate or-tools status, variable values and objective value to CPMpy corresponding things
+
+            - ort_status, an or-tools 'status' value
+        """
+        from ortools.sat.python import cp_model as ort
+
+        self.ort_status = ort_status
+
+        # translate exit status
+        self.cpm_status = SolverStatus(self.name)
         if self.ort_status == ort.FEASIBLE:
-            my_status.exitstatus = ExitStatus.FEASIBLE
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.OPTIMAL:
-            my_status.exitstatus = ExitStatus.OPTIMAL
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif self.ort_status == ort.INFEASIBLE:
-            my_status.exitstatus = ExitStatus.UNSATISFIABLE
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
             raise Exception("OR-Tools says: model invalid")
         else: # ort.UNKNOWN or another
             raise NotImplementedError(self.ort_status) # a new status type was introduced, please report on github
-        my_status.runtime = self.ort_solver.WallTime()
 
+        # translate runtime
+        self.cpm_status.runtime = self.ort_solver.WallTime()
+
+        # translate solution values (of original vars only)
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # fill in variables
-            for var in original_vars:
+            for var in self.user_vars:
                 var._value = self.ort_solver.Value(self.varmap[var])
 
-        return my_status
+        # translate objective
+        objective_value = None
+        if self.ort_model.HasObjective():
+            objective_value = self.ort_solver.ObjectiveValue()
+        
+        return self._solve_return(self.cpm_status, objective_value)
 
 
     def make_model(self, cpm_model):
         """
             Makes the ortools.sat.python.cp_model formulation out of 
-            a CPMpy model (will do flattening and other trnasformations)
+            a CPMpy model (will do flattening and other transformations)
+
+            Typically only needed for internal use
         """
         from ortools.sat.python import cp_model as ort
 
         # Constraint programming engine
-        self._model = ort.CpModel()
+        self.ort_model = ort.CpModel()
 
         # Transform into flattened model
         flat_model = flatten_model(cpm_model)
@@ -116,18 +156,24 @@ class ORToolsPython(SolverInterface):
         else:
             obj = self.ort_numexpr(flat_model.objective)
             if flat_model.objective_max:
-                self._model.Maximize(obj)
+                self.ort_model.Maximize(obj)
             else:
-                self._model.Minimize(obj)
+                self.ort_model.Minimize(obj)
 
-        return self._model
+        return self.ort_model
 
 
     def add_to_varmap(self, cpm_var):
+        """
+        Add the CPMpy variable to the 'varmap' mapping,
+        which maps CPMpy variables to or-tools variables
+
+        Typically only needed for internal use
+        """
         if isinstance(cpm_var, BoolVarImpl):
-            revar = self._model.NewBoolVar(str(cpm_var))
+            revar = self.ort_model.NewBoolVar(str(cpm_var))
         elif isinstance(cpm_var, IntVarImpl):
-            revar = self._model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+            revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
         self.varmap[cpm_var] = revar
 
 
@@ -142,10 +188,12 @@ class ORToolsPython(SolverInterface):
             e.g. self.post_constraint(smth, reifiable=True).onlyEnforceIf(self.ort_var(bvar))
             
             - reifiable: ensures only constraints that support reification are returned
+
+            Typically only needed for internal use
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, BoolVarImpl):
-            return self._model.AddBoolOr( [self.ort_var(cpm_expr)] )
+            return self.ort_model.AddBoolOr( [self.ort_var(cpm_expr)] )
         
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
@@ -154,7 +202,7 @@ class ORToolsPython(SolverInterface):
             if isinstance(lhs, BoolVarImpl) and cpm_expr.name == '==':
                 # base: bvar == bvar|const
                 lvar,rvar = map(self.ort_var, (lhs,rhs))
-                return self._model.Add(lvar == rvar)
+                return self.ort_model.Add(lvar == rvar)
 
             elif lhs.is_bool() and cpm_expr.name == '==':
                 assert (not reifiable), "can not reify a reification"
@@ -179,20 +227,20 @@ class ORToolsPython(SolverInterface):
                     elif cpm_expr.name == '==' and not reifiable:
                         newlhs = None
                         if lhs.name == 'abs':
-                            return self._model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
+                            return self.ort_model.AddAbsEquality(rvar, self.ort_var(lhs.args[0]))
                         elif lhs.name == 'mul':
-                            return self._model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'mod':
-                            return self._model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'div':
-                            return self._model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'min':
-                            return self._model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'max':
-                            return self._model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'element':
                             # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                            return self._model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
+                            return self.ort_model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
                         else:
                             raise NotImplementedError("Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
                     else:
@@ -210,17 +258,17 @@ class ORToolsPython(SolverInterface):
                 if newlhs is None:
                     pass # is already posted directly, eg a '=='
                 elif cpm_expr.name == '==':
-                    return self._model.Add( newlhs == rvar)
+                    return self.ort_model.Add( newlhs == rvar)
                 elif cpm_expr.name == '!=':
-                    return self._model.Add( newlhs != rvar )
+                    return self.ort_model.Add( newlhs != rvar )
                 elif cpm_expr.name == '<=':
-                    return self._model.Add( newlhs <= rvar )
+                    return self.ort_model.Add( newlhs <= rvar )
                 elif cpm_expr.name == '<':
-                    return self._model.Add( newlhs < rvar )
+                    return self.ort_model.Add( newlhs < rvar )
                 elif cpm_expr.name == '>=':
-                    return self._model.Add( newlhs >= rvar )
+                    return self.ort_model.Add( newlhs >= rvar )
                 elif cpm_expr.name == '>':
-                    return self._model.Add( newlhs > rvar )
+                    return self.ort_model.Add( newlhs > rvar )
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
@@ -243,13 +291,13 @@ class ORToolsPython(SolverInterface):
                 args = [self.ort_var(v) for v in cpm_expr.args]
 
                 if cpm_expr.name == 'and':
-                    return self._model.AddBoolAnd(args)
+                    return self.ort_model.AddBoolAnd(args)
                 elif cpm_expr.name == 'or':
-                    return self._model.AddBoolOr(args)
+                    return self.ort_model.AddBoolOr(args)
                 elif cpm_expr.name == 'xor':
-                    return self._model.AddBoolXor(args)
+                    return self.ort_model.AddBoolXor(args)
                 elif cpm_expr.name == '->':
-                    return self._model.AddImplication(args[0],args[1])
+                    return self.ort_model.AddImplication(args[0],args[1])
                 else:
                     raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
 
@@ -258,10 +306,10 @@ class ORToolsPython(SolverInterface):
             args = [self.ort_var_or_list(v) for v in cpm_expr.args]
 
             if cpm_expr.name == 'alldifferent':
-                return self._model.AddAllDifferent(args) 
+                return self.ort_model.AddAllDifferent(args) 
             elif cpm_expr.name == 'table':
                 assert(len(args) == 2) # args = [array, table]
-                return self._model.AddAllowedAssignments(args[0], args[1])
+                return self.ort_model.AddAllowedAssignments(args[0], args[1])
             # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
@@ -285,6 +333,12 @@ class ORToolsPython(SolverInterface):
                     raise NotImplementedError(cpm_expr) # if you reach this... please report on github
 
     def ort_var(self, cpm_var):
+        """
+            Uses 'varmap' to return the corresponding or-tools variable
+            (or a constant)
+
+            Typically only needed for internal use
+        """
         if is_num(cpm_var):
             return cpm_var
 
@@ -297,6 +351,11 @@ class ORToolsPython(SolverInterface):
         raise NotImplementedError("Not a know var {}".format(cpm_var))
 
     def ort_var_or_list(self, cpm_expr):
+        """
+            like ort_var() but also works on lists of variables
+
+            Typically only needed for internal use
+        """
         if is_any_list(cpm_expr):
             return [self.ort_var_or_list(sub) for sub in cpm_expr]
         return self.ort_var(cpm_expr)
@@ -304,11 +363,14 @@ class ORToolsPython(SolverInterface):
 
     def ort_numexpr(self, cpm_expr):
         """
+            converts CPMpy subexpression into corresponding
             ORTools subexpressions (for in objective function and comparisons)
             Accepted by ORTools:
             - Decision variable: Var
             - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
                       wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+
+            Typically only needed for internal use
         """
         if is_num(cpm_expr):
             return cpm_expr

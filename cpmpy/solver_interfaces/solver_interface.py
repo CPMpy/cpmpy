@@ -31,10 +31,9 @@ class SolverInterface(object):
         Abstract class for defining solver interfaces. All classes implementing
         the ``SolverInterface``
     """
-    def __init__(self):
-        self.name = "dummy"
 
-    def supported(self):
+    @staticmethod
+    def supported():
         """
             Check for support in current system setup. Return True if the system
             has package installed or supports solver, else returns False.
@@ -44,17 +43,50 @@ class SolverInterface(object):
         """
         return False
 
+    def __init__(self):
+        self.cpm_status = SolverStatus("dummy") # status of solving this model
+
+    def status(self):
+        return self.cpm_status
+
     def solve(self, model):
         """
             Build the CPMpy model into solver-supported model ready for solving
-            and returns the solver statistics generated during model solving.
+            and returns the answer (True/False/objective.value())
+
+            Overwrites self.cpm_status
 
         :param model: CPMpy model to be parsed.
         :type model: Model
 
-        :return: an object of :class:`SolverStatus`
+        :return: Bool or Int
         """
-        return SolverStatus()
+        return False
+
+    def _solve_return(self, cpm_status, objective_value):
+        """
+            Take a CPMpy Model and SolverStatus object and return
+            the proper answer (True/False/objective_value)
+
+        :param cpm_status: status extracted from the solver
+        :type cpm_status: SolverStatus
+
+        :param objective_value: None or Int, as computed by solver
+
+        :return: Bool or Int
+        """
+        # return computed value
+        if objective_value is not None and \
+            (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
+             cpm_status.exitstatus == ExitStatus.FEASIBLE):
+            # optimisation problem
+            return objective_value
+        else:
+            # satisfaction problem
+            if cpm_status.exitstatus == ExitStatus.FEASIBLE or \
+               cpm_status.exitstatus == ExitStatus.OPTIMAL:
+                return True
+        return False
 
 
 #==============================================================================
@@ -90,10 +122,10 @@ class SolverStatus(object):
     exitstatus: ExitStatus
     runtime: time
 
-    def __init__(self):
+    def __init__(self, name):
+        self.solver_name = name
         self.exitstatus = ExitStatus.NOT_RUN
         self.runtime = None
-        self.solver_name = None
 
     def __repr__(self):
         return "{} ({} seconds)".format(self.exitstatus, self.runtime)

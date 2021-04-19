@@ -60,4 +60,87 @@ class TestSolvers(unittest.TestCase):
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 
+    def test_ortools_direct_solver(self):
+        """
+        Test direct solver access.
 
+        If any of these tests break, update docs/advanced_solver_features.md accordingly
+        """
+        from cpmpy.solver_interfaces.ortools import CPMpyORTools
+        from ortools.sat.python import cp_model as ort
+
+        # standard use
+        x = cp.IntVar(0,3, shape=2)
+        m = cp.Model([x[0] > x[1]])
+        self.assertTrue(m.solve())
+        self.assertEqual(x[0].value(), 3)
+        self.assertEqual(x[1].value(), 0)
+
+
+        # advanced solver params
+        x = cp.IntVar(0,3, shape=2)
+        m = cp.Model([x[0] > x[1]])
+        s = CPMpyORTools(m)
+        s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
+        s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
+        self.assertTrue(s.solve())
+        self.assertEqual(x[0].value(), 3)
+        self.assertEqual(x[1].value(), 0)
+
+
+        # all solution counting
+        class ORT_solcount(ort.CpSolverSolutionCallback):
+            def __init__(self):
+                super().__init__()
+                self.solcount = 0
+
+            def on_solution_callback(self):
+                self.solcount += 1
+        cb = ORT_solcount()
+
+        x = cp.IntVar(0,3, shape=2)
+        m = cp.Model([x[0] > x[1]])
+        s = CPMpyORTools(m)
+        ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
+        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        self.assertEqual(x[0].value(), 3)
+        self.assertEqual(x[1].value(), 0)
+        self.assertEqual(cb.solcount, 6)
+
+
+        # all solution counting with printing
+        # (not actually testing the printing)
+        class ORT_myprint(ort.CpSolverSolutionCallback):
+            def __init__(self, varmap, x):
+                super().__init__()
+                self.solcount = 0
+                self.varmap = varmap
+                self.x = x
+
+            def on_solution_callback(self):
+                # populate values before printing
+                for cpm_var in self.x:
+                    cpm_var._value = self.Value(self.varmap[cpm_var])
+        
+                self.solcount += 1
+                print("x:",self.x.value())
+        cb = ORT_myprint(s.varmap, x)
+
+        x = cp.IntVar(0,3, shape=2)
+        m = cp.Model([x[0] > x[1]])
+        s = CPMpyORTools(m)
+        ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
+        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        self.assertEqual(x[0].value(), 3)
+        self.assertEqual(x[1].value(), 0)
+        self.assertEqual(cb.solcount, 6)
+
+
+        # intermediate solutions
+        m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
+        s = CPMpyORTools(m_opt)
+        ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
+        self.assertEqual(s._after_solve(ort_status), 5.0) # post-process after solve() call...
+        self.assertEqual(x[0].value(), 3)
+        self.assertEqual(x[1].value(), 2)
+        self.assertEqual(cb.solcount, 7)

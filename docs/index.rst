@@ -9,21 +9,22 @@ It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Pyt
 
 A longer description of its motivation and architecture is in :download:`pdf <modref19_cppy.pdf>`.
 
-The software is in ALPHA state, and more of a proof-of-concept really. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
+The software is in ALPHA state, and near the end of its proof-of-concept stage. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
 
-Install the library
--------------------
 .. toctree::
    :maxdepth: 2
+   :caption: Installing the library:
 
    tutorial/how_to_install
 
 .. toctree::
    :maxdepth: 1
-   :caption: Preface:
+   :caption: Documentation:
 
    preface/overview
+   advanced_solver_features
    preface/behind_the_scenes
+
 
 .. toctree::
    :maxdepth: 1

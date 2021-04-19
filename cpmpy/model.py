@@ -49,7 +49,7 @@ class Model(object):
     """
     def __init__(self, *args, minimize=None, maximize=None):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
-        self._solver_status = SolverStatus() # status of solving this model
+        self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # list of constraints (arguments of top-level conjunction)
         if len(args) == 0 or (len(args) == 1 and isinstance(args[0], list) and len(args[0]) == 0): # None or empty list
@@ -103,7 +103,7 @@ class Model(object):
     def solve(self, solver=None):
         """ Send the model to a solver and get the result
 
-        'solver': None (default) or in [s.name in get_supported_solvers()] or a SolverInterface object
+        'solver': None (default) or in [s.name in get_supported_solvers()] or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
         verifies that the solver is supported on the current system
 
         :return: the computed output:
@@ -111,35 +111,30 @@ class Model(object):
             - False     if it is a satisfaction problem and not satisfiable
             - [int]     if it is an optimisation problem
         """
+        solver_class = None
         # get supported solvers
         supsolvers = get_supported_solvers()
         if solver is None: # default is first
-            solver = supsolvers[0]
+            solver_class = supsolvers[0]
         elif not isinstance(solver, SolverInterface):
             solvername = solver
             for s in supsolvers:
                 if s.name == solvername:
-                    solver = s
+                    solver_class = s
                     break # break and hence 'solver' is correct object
-
-            if not isinstance(solver, SolverInterface) or not solver.supported():
-                raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface object".format(solver))
-                
-        # call solver and store status
-        self._solver_status = solver.solve(self)
-
-        # return computed value
-        if not self.objective is None and \
-            (self._solver_status.exitstatus == ExitStatus.OPTIMAL or \
-             self._solver_status.exitstatus == ExitStatus.FEASIBLE):
-            # optimisation problem
-            return self.objective.value()
+        elif isinstance(solver, SolverInterface) and solver.supported():
+            solver_class = solver
         else:
-            # satisfaction problem
-            if self._solver_status.exitstatus == ExitStatus.FEASIBLE or \
-               self._solver_status.exitstatus == ExitStatus.OPTIMAL:
-                return True
-        return False
+            raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface class".format(solver))
+        assert(solver_class is not None)
+                
+        # instatiate solver with this model
+        s = solver_class(self)
+        # call solver
+        ret = s.solve()
+        # store CPMpy status (s object has no further use)
+        self.cpm_status = s.status()
+        return ret
 
     def status(self):
         """
@@ -149,7 +144,7 @@ class Model(object):
 
         :return: an object of :class:`SolverStatus`
         """
-        return self._solver_status
+        return self.cpm_status
 
     def _make_and_from_list(self, args):
         """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """

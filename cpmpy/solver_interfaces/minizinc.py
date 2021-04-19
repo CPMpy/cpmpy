@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## minizinc_python.py
+## minizinc.py
 ##
 """
     ===============
@@ -26,7 +26,7 @@ from .solver_interface import ExitStatus, SolverStatus
 from .minizinc_text import MiniZincText
 from ..model_tools.get_variables import get_variables
 
-class MiniZincPython(MiniZincText):
+class CPMpyMiniZinc(MiniZincText):
     """
     Interface to the python 'minizinc' package
 
@@ -42,15 +42,17 @@ class MiniZincPython(MiniZincText):
     mzn_result: the minizinc.Result used in solve()
     """
 
-    def __init__(self):
-        self.name = "minizinc_python"
-
-    def supported(self):
+    @staticmethod
+    def supported():
         try:
             import minizinc
             return True
         except ImportError as e:
             return False
+
+    def __init__(self):
+        self.name = "minizinc_python"
+        raise NotImplementedError("Closed for maintenance, has _not yet_ caught up with CPMpy API changes; report in github if this disrupts your plans")
 
     def _model(self, model, solvername=None):
         import minizinc
