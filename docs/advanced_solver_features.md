@@ -94,9 +94,9 @@ class ORT_myprint(ort.CpSolverSolutionCallback):
 
         self.solcount += 1
         print("x:",self.x.value())
+cb = ORT_myprint(s.varmap, x)
 
 s = CPMpyORTools(m)
-cb = ORT_myprint(s.varmap, x)
 ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
 print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
@@ -129,12 +129,13 @@ class ORT_myprint(ort.CpSolverSolutionCallback):
 
         self.solcount += 1
         print("x:",self.x.value())
+cb = ORT_myprint(s.varmap, x)
 
 m_opt = Model([x[0] > x[1]], maximize=sum(x))
 s = CPMpyORTools(m_opt)
-cb = ORT_myprint(s.varmap, x)
 ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
 print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
 print(x.value())
 print("Nr intermediate solutions:", cb.solcount)
+```
