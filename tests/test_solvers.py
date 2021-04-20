@@ -146,6 +146,18 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(cb.solcount, 7)
 
 
+        # manually enumerating solutions
+        x = cp.IntVar(0,3, shape=2)
+        m = cp.Model([x[0] > x[1]])
+        s = CPMpyORTools(m)
+        solcount = 0
+        while(s.solve()):
+            solcount += 1
+            # add blocking clause, to CPMpy solver directly
+            s += [ cp.any(x != x.value()) ]
+        self.assertEqual(solcount, 6)
+
+
         # assumptions
         bv = cp.BoolVar(shape=3)
         iv = cp.IntVar(0,9, shape=3)

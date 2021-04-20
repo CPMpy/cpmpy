@@ -78,6 +78,30 @@ class CPMpyORTools(SolverInterface):
         self.ort_solver = ort.CpSolver()
 
 
+    def __add__(self, cons):
+        """
+        Direct solver access constraint addition,
+        avoids having to flatten the model of the constructor again
+        when calling s.solve() repeatedly.
+
+        Note that we don't store the resulting cpm_model, we translate
+        directly to the ort_model
+
+        :param cpm_cons list of CPMpy constraints
+        :type cpm_cons list of Expressions
+        """
+        flat_cons = flatten_constraint(cons)
+        # add new (auxiliary) variables
+        for var in vars_expr(flat_cons):
+            if not var in self.varmap:
+                self.add_to_varmap(var)
+        # add constraints
+        for cpm_con in flat_cons:
+            self.post_constraint(cpm_con)
+
+        return self
+
+
     def solution_hint(self, cpm_vars, vals):
         """
         or-tools supports warmstarting the solver with a feasible solution

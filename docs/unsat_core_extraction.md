@@ -28,6 +28,6 @@ print(bv.value())
 
 This opens the door to more advanced use cases, such as Minimal Unsatisfiable Subsets and QuickXplain-like tools to help debugging. We welcome any examples or additions that use CPMpy in this way!!
 
-One final caveat is that the or-tools Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!!
+One final caveat is that the or-tools Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!!
 
 A final-final note is that you can manually warm-start or-tools with a previously found solution. In CPMpy as follows: `s.solution_hint(iv, [0,1,2])` for example.

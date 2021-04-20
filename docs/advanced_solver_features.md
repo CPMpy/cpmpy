@@ -68,41 +68,6 @@ print(x.value()) # will be the last found one
 print("Nr solutions:", cb.solcount)
 ```
 
-## Printing all solutions
-It is also possible to print the value at the level of CPMpy variables in the callback. To do this, you need to pass the 'varmap' mapping from CPMpy variables to or-tools variables, and populate the var.\_value property first, as such:
-
-from ortools.sat.python import cp_model as ort
-
-```python
-from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
-from ortools.sat.python import cp_model as ort
-
-# native or-tools callback, with CPMpy variables and printing
-class ORT_myprint(ort.CpSolverSolutionCallback):
-    def __init__(self, varmap, x):
-        super().__init__()
-        self.solcount = 0
-        self.varmap = varmap
-        self.x = x
-
-    def on_solution_callback(self):
-        # populate values before printing
-        for cpm_var in self.x: 
-            cpm_var._value = self.Value(self.varmap[cpm_var])
-
-        self.solcount += 1
-        print("x:",self.x.value())
-cb = ORT_myprint(s.varmap, x)
-
-s = CPMpyORTools(m)
-ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
-print(s._after_solve(ort_status)) # post-process after solve() call...
-print(s.status())
-print(x.value()) # will be the last found one
-print("Nr solutions:", cb.solcount)
-```
-
 ## Displaying intermediate solutions during solving
 And a final example, where we show how to use or-tools' solve-with-solution-callback mechanism to display intermediate solutions during solving.
 
@@ -137,4 +102,62 @@ print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
 print(x.value())
 print("Nr intermediate solutions:", cb.solcount)
+```
+
+## Printing all solutions, the efficient way
+It is also possible to print the value at the level of CPMpy variables in the callback. To do this, you need to pass the 'varmap' mapping from CPMpy variables to or-tools variables, and populate the var.\_value property first, as such:
+
+from ortools.sat.python import cp_model as ort
+
+```python
+from cpmpy import *
+from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from ortools.sat.python import cp_model as ort
+
+# native or-tools callback, with CPMpy variables and printing
+class ORT_myprint(ort.CpSolverSolutionCallback):
+    def __init__(self, varmap, x):
+        super().__init__()
+        self.solcount = 0
+        self.varmap = varmap
+        self.x = x
+
+    def on_solution_callback(self):
+        # populate values before printing
+        for cpm_var in self.x: 
+            cpm_var._value = self.Value(self.varmap[cpm_var])
+
+        self.solcount += 1
+        print("x:",self.x.value())
+cb = ORT_myprint(s.varmap, x)
+
+s = CPMpyORTools(m)
+ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
+print(s._after_solve(ort_status)) # post-process after solve() call...
+print(s.status())
+print(x.value()) # will be the last found one
+print("Nr solutions:", cb.solcount)
+```
+
+## Solution enumeration with blocking clauses
+Another way to do solution enumeration is to manually add blocking clauses (clauses forbidding the current solution). In case you just want to enumerate all solutions, this will be less efficient then using or-tools callbacks.
+
+However, in case you have custom blocking clauses, or don't care too much by some additional overhead caused by the non-incrementality of or-tools, then you can do the following:
+
+```python
+from cpmpy import *
+from cpmpy.solver_interfaces.ortools import CPMpyORTools
+
+x = IntVar(0,3, shape=2)
+m = Model([x[0] > x[1]])
+s = CPMpyORTools(m)
+solcount = 0
+while(s.solve()):
+    solcount += 1
+    print("x:",x.value())
+    # add blocking clause, to CPMpy solver directly
+    s += [ any(x != x.value()) ]
+print(s.status())
+print(x.value()) # will be the last found one
+print("Nr solutions:", solcount)
 ```
