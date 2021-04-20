@@ -78,6 +78,21 @@ class CPMpyORTools(SolverInterface):
         self.ort_solver = ort.CpSolver()
 
 
+    def solution_hint(self, cpm_vars, vals):
+        """
+        or-tools supports warmstarting the solver with a feasible solution
+
+        More specifically, it will branch that variable on that value first if possible. This is known as 'phase saving' in the SAT literature, but then extended to integer variables.
+
+        The solution hint does NOT need to satisfy all constraints, it should just provide reasonable default values for the variables. It can decrease solving times substantially, especially when solving a similar model repeatedly
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        for (cpm_var, val) in zip(cpm_vars, vals):
+            self.ort_model.AddHint(self.ort_var(cpm_var), val)
+
+
     def solve(self, time_limit = None, assumptions=None):
         """
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
