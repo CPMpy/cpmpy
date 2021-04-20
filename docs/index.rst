@@ -23,6 +23,7 @@ The software is in ALPHA state, and near the end of its proof-of-concept stage. 
 
    preface/overview
    advanced_solver_features
+   unsat_core_extraction
    preface/behind_the_scenes
 
 
