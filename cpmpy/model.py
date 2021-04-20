@@ -100,11 +100,14 @@ class Model(object):
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
     
     # solver: name of supported solver or any SolverInterface object
-    def solve(self, solver=None):
+    def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
 
-        'solver': None (default) or in [s.name in get_supported_solvers()] or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
-        verifies that the solver is supported on the current system
+        :param solver: solver to use (verifies that the solver is supported on the current system)
+        :type solver: None (default) or in [s.name in get_supported_solvers()] or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
+
+        :param time_limit: optional, time limit in seconds
+        :type time_limit: int or float
 
         :return: the computed output:
             - True      if it is a satisfaction problem and it is satisfiable
@@ -131,7 +134,7 @@ class Model(object):
         # instatiate solver with this model
         s = solver_class(self)
         # call solver
-        ret = s.solve()
+        ret = s.solve(time_limit=time_limit)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret

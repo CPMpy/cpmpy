@@ -49,7 +49,7 @@ class SolverInterface(object):
     def status(self):
         return self.cpm_status
 
-    def solve(self, model):
+    def solve(self, model, time_limit=None):
         """
             Build the CPMpy model into solver-supported model ready for solving
             and returns the answer (True/False/objective.value())
@@ -58,6 +58,9 @@ class SolverInterface(object):
 
         :param model: CPMpy model to be parsed.
         :type model: Model
+
+        :param time_limit: optional, time limit in seconds
+        :type time_limit: int or float
 
         :return: Bool or Int
         """
@@ -107,12 +110,15 @@ class ExitStatus(Enum):
         `UNSATISFIABLE`: No satisfying solution exists
 
         `ERROR`: Some error occured (solver should have thrown Exception)
+
+        `UNKNOWN`: Outcome unknown, for example when timeout is reached
     """
     NOT_RUN = 1
     OPTIMAL = 2
     FEASIBLE = 3
     UNSATISFIABLE = 4
     ERROR = 5
+    UNKNOWN = 6
 
 #==============================================================================
 class SolverStatus(object):

@@ -78,8 +78,12 @@ class CPMpyORTools(SolverInterface):
         self.ort_solver = ort.CpSolver()
 
 
-    def solve(self):
+    def solve(self, time_limit = None):
         from ortools.sat.python import cp_model as ort
+
+        # set time limit?
+        if time_limit is not None:
+            self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         ort_status = self.ort_solver.Solve(self.ort_model)
 
@@ -106,7 +110,10 @@ class CPMpyORTools(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
             raise Exception("OR-Tools says: model invalid")
-        else: # ort.UNKNOWN or another
+        elif self.ort_status == ort.UNKNOWN:
+            # can happen when timeout is reached...
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        else: # another?
             raise NotImplementedError(self.ort_status) # a new status type was introduced, please report on github
 
         # translate runtime
