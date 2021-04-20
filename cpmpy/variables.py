@@ -285,7 +285,14 @@ class NDVarArray(Expression, np.ndarray):
             array_rest = self[tuple(index_rest)] # non-var array selection
             return Element([array_rest, var[0]])
 
-        return super().__getitem__(index)
+        ret = super().__getitem__(index)
+        # this is a bit ugly,
+        # but np.int and np.bool do not play well with > overloading
+        if isinstance(ret, np.integer):
+            return int(ret)
+        elif isinstance(ret, np.bool):
+            return bool(ret)
+        return ret
 
     def sum(self, axis=None, out=None):
         """
