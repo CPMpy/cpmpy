@@ -178,8 +178,73 @@ class CPMpyORTools(SolverInterface):
         objective_value = None
         if self.ort_model.HasObjective():
             objective_value = self.ort_solver.ObjectiveValue()
-        
+
         return self._solve_return(self.cpm_status, objective_value)
+
+
+    def _minHS(self, assumptions):
+        from ortools.linear_solver import pywraplp
+
+        # trivial case
+
+        # [START solver]
+        # Create the mip solver with the CBC backend.
+        self.hs_solver = pywraplp.Solver('OptimalHittingSet',
+                                pywraplp.Solver.BOP_INTEGER_PROGRAMMING)
+        # [END solver]
+
+        # [START variables]
+        #infinity = solver.infinity()
+        self.hs_vars = {}
+        for j in assumptions:
+            self.hs_vars[j] = self.hs_solver.BoolVar('x[%i]' % j.name)
+        # [END variables]
+
+        # [START constraints]
+        # first hitting set is not empty
+        self.hs_solver.Add(sum(self.hs_vars.values()) >= 1)
+        # [END constraints]
+
+        objective = self.hs_solver.Objective()
+        for xi in self.hs_vars.values():
+            objective.SetCoefficient(xi, 1)
+        objective.SetMinimization()
+        # [END objective]
+
+    def _get_hs(self):
+        from ortools.linear_solver import pywraplp
+
+        status = self.hs_solver.Solve()
+        if status == pywraplp.Solver.OPTIMAL:
+            return [ass for ass, bv in self.hs_vars.items() if bv.solution_value() == 1]
+        else:
+            print('The problem does not have an optimal solution.', status)
+            return []
+
+    def _hit(self, falsified):
+        hs_vars = [self.hs_vars[falsified_var] for falsified_var in falsified]
+        self.hs_solver.Add(sum(hs_vars) >= 1)
+
+    def _smus(self):
+
+        # take a copy of assumption variables
+        assumptions_vars = list(self.assumption_vars)
+        self.ort_model.ClearAssumptions()
+
+        self._minHS(assumptions=assumptions_vars)
+
+        while(True):
+        #     # hitting set solver
+            hs = self._get_hs()
+
+            if not self.solve(assumptions=hs):
+                return hs
+
+            self.ort_model.ClearAssumptions()
+            # get an assignment to the assumption variables and take complement
+            falsified = [bv for bv in assumptions_vars if not bv.value()]
+            # take the complement
+            self._hit(falsified)
 
 
     def get_core(self):
@@ -203,6 +268,7 @@ class CPMpyORTools(SolverInterface):
         ort_core_proto = [self.ort_model.VarIndexToVarProto(idx) for idx in ort_core_idx]
 
         # fill in variables, collect cpm_core
+        print(self._smus())
         cpm_core = []
         for cpm_var in self.assumption_vars:
             ort_var_proto = self.varmap[cpm_var].Proto()
