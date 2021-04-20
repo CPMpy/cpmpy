@@ -90,6 +90,11 @@ class CPMpyORTools(SolverInterface):
         :param cpm_cons list of CPMpy constraints
         :type cpm_cons list of Expressions
         """
+        # store new user vars
+        new_user_vars = vars_expr(cons)
+        for v in frozenset(new_user_vars)-frozenset(self.user_vars):
+            self.user_vars.append(v)
+
         flat_cons = flatten_constraint(cons)
         # add new (auxiliary) variables
         for var in vars_expr(flat_cons):
@@ -114,6 +119,7 @@ class CPMpyORTools(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         for (cpm_var, val) in zip(cpm_vars, vals):
+            self.ort_model.ClearHints() # because add just appends
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
@@ -130,9 +136,17 @@ class CPMpyORTools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
-            # store assumptions for reverse mapping in get_core()
-            self.assumption_vars = assumptions
-            self.ort_model.AddAssumptions([self.ort_var(v) for v in assumptions])           
+            ort_assum_vars = [self.ort_var(v) for v in assumptions]
+            # this is fucked up... the ort_var()'s index does not seem
+            # to match ort_model.VarIndexToVarProto(index)...
+            # yet, SufficientAssum... will return that index, so keep own map
+            #
+            # oh, actually... its a bug that I already reported earlier for
+            # VarIndexToVarProto(0) and that Laurent then fixed...
+            # Until version 8.3 is released, I'm sticking to own dict
+            self.assumption_dict = dict( (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars) )
+            self.ort_model.ClearAssumptions() # because add just appends
+            self.ort_model.AddAssumptions(ort_assum_vars)
 
         ort_status = self.ort_solver.Solve(self.ort_model)
 
@@ -187,7 +201,7 @@ class CPMpyORTools(SolverInterface):
         """
             For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
-            CPMpy will populate .value() of the assumption variables in the core, as well as returning only those variables that are False (in the UNSAT core)
+            CPMpy will return only those variables that are False (in the UNSAT core)
 
             Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
 
@@ -195,25 +209,12 @@ class CPMpyORTools(SolverInterface):
 
             Requires or-tools >= 8.2!!!
         """
-        assert (self.assumption_vars is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])" 
+        assert (self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
 
-        # unfortunately, it returns indices, from which we can get proto's, not IntVar()s... so some hoops
-        ort_core_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
-        ort_core_proto = [self.ort_model.VarIndexToVarProto(idx) for idx in ort_core_idx]
-
-        # fill in variables, collect cpm_core
-        cpm_core = []
-        for cpm_var in self.assumption_vars:
-            ort_var_proto = self.varmap[cpm_var].Proto()
-            if ort_var_proto in ort_core_proto: # linear time because proto is unhashable : /
-                cpm_core.append(cpm_var)
-                cpm_var._value = False
-            else:
-                cpm_var._value = True
-
-        return cpm_core
-
+        # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
+        assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
+        return [self.assumption_dict[i] for i in assum_idx]
 
     def make_model(self, cpm_model):
         """
