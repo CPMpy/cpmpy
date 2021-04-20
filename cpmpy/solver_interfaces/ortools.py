@@ -78,12 +78,22 @@ class CPMpyORTools(SolverInterface):
         self.ort_solver = ort.CpSolver()
 
 
-    def solve(self, time_limit = None):
+    def solve(self, time_limit = None, assumptions=None):
+        """
+            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
+                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
+                           Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+        """
         from ortools.sat.python import cp_model as ort
 
         # set time limit?
         if time_limit is not None:
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
+
+        if assumptions is not None:
+            # store assumptions for reverse mapping in get_core()
+            self.assumption_vars = assumptions
+            self.ort_model.AddAssumptions([self.ort_var(v) for v in assumptions])           
 
         ort_status = self.ort_solver.Solve(self.ort_model)
 
@@ -131,6 +141,39 @@ class CPMpyORTools(SolverInterface):
             objective_value = self.ort_solver.ObjectiveValue()
         
         return self._solve_return(self.cpm_status, objective_value)
+
+
+    def get_core(self):
+        from ortools.sat.python import cp_model as ort
+        """
+            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+
+            CPMpy will populate .value() of the assumption variables in the core, as well as returning only those variables that are False (in the UNSAT core)
+
+            Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+
+            For pure or-tools example, see http://github.com/google/or-tools/blob/master/ortools/sat/samples/assumptions_sample_sat.py
+
+            Requires or-tools >= 8.2!!!
+        """
+        assert (self.assumption_vars is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])" 
+        assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
+
+        # unfortunately, it returns indices, from which we can get proto's, not IntVar()s... so some hoops
+        ort_core_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
+        ort_core_proto = [self.ort_model.VarIndexToVarProto(idx) for idx in ort_core_idx]
+
+        # fill in variables, collect cpm_core
+        cpm_core = []
+        for cpm_var in self.assumption_vars:
+            ort_var_proto = self.varmap[cpm_var].Proto()
+            if ort_var_proto in ort_core_proto: # linear time because proto is unhashable : /
+                cpm_core.append(cpm_var)
+                cpm_var._value = False
+            else:
+                cpm_var._value = True
+
+        return cpm_core
 
 
     def make_model(self, cpm_model):

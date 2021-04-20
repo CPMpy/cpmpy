@@ -144,3 +144,20 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 2)
         self.assertEqual(cb.solcount, 7)
+
+
+        # assumptions
+        bv = cp.BoolVar(shape=3)
+        iv = cp.IntVar(0,9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = CPMpyORTools(m)
+        self.assertFalse(s.solve(assumptions=bv))
+        self.assertTrue(len(s.get_core()) > 0)
+        self.assertTrue(any(bv.value() == False))
+
+
