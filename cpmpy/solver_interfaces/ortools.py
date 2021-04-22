@@ -185,8 +185,6 @@ class CPMpyORTools(SolverInterface):
     def _minHS(self, assumptions):
         from ortools.linear_solver import pywraplp
 
-        # trivial case
-
         # [START solver]
         # Create the mip solver with the CBC backend.
         self.hs_solver = pywraplp.Solver('OptimalHittingSet',
@@ -226,10 +224,9 @@ class CPMpyORTools(SolverInterface):
         self.hs_solver.Add(sum(hs_vars) >= 1)
 
     def _smus(self):
-
         # take a copy of assumption variables
         assumptions_vars = list(self.assumption_vars)
-        self.ort_model.ClearAssumptions()
+        assert not self.solve(assumptions=assumptions_vars), "Ensuring this is unsat"
 
         self._minHS(assumptions=assumptions_vars)
 
@@ -237,12 +234,15 @@ class CPMpyORTools(SolverInterface):
         #     # hitting set solver
             hs = self._get_hs()
 
-            if not self.solve(assumptions=hs):
+            self.ort_model.ClearAssumptions()
+            sat = self.solve(assumptions=hs)
+            if not sat:
+                del self.hs_solver
                 return hs
 
-            self.ort_model.ClearAssumptions()
             # get an assignment to the assumption variables and take complement
             falsified = [bv for bv in assumptions_vars if not bv.value()]
+            print("falsified=", falsified)
             # take the complement
             self._hit(falsified)
 
@@ -268,7 +268,8 @@ class CPMpyORTools(SolverInterface):
         ort_core_proto = [self.ort_model.VarIndexToVarProto(idx) for idx in ort_core_idx]
 
         # fill in variables, collect cpm_core
-        print(self._smus())
+        smus = self._smus()
+        print("SMUS found=", smus)
         cpm_core = []
         for cpm_var in self.assumption_vars:
             ort_var_proto = self.varmap[cpm_var].Proto()
