@@ -195,8 +195,38 @@ class CPMpyORTools(SolverInterface):
 
         return self._solve_return(self.cpm_status, objective_value)
 
+    def _disjointMCS(self, assumption_vars):
+        """Basic implementation of disjoint Minimum Corrections subsets
+        based on [2].
 
-    def _minHS(self, assumptions):
+        returns a collection of subsets of the assumptions.
+        """
+        # take a copy
+        assumptions = set(assumption_vars)
+
+        # collection of correction subsets (don't need to be minium)
+        to_hit = []
+        # assumption variables blocked and cannot be used to compute 
+        # a new correction subset
+        blocked = set()
+
+        self.ort_model.ClearAssumptions()
+        while(len(assumptions-blocked) > 0):
+            # build satisfiable subset
+            mcs = assumptions - blocked
+            while(not self.solve(assumptions=mcs)):
+                mcs.remove(next(iter(mcs)))
+                self.ort_model.ClearAssumptions()
+
+            # # add satisfiable subset
+            to_hit.append(mcs)
+
+            # block mcs from being used
+            blocked |= (mcs)
+
+        return to_hit
+
+    def _minHS(self, assumptions, to_hit):
         from ortools.linear_solver import pywraplp
 
         # [START solver]
@@ -215,6 +245,10 @@ class CPMpyORTools(SolverInterface):
         # [START constraints]
         # first hitting set is not empty
         self.hs_solver.Add(sum(self.hs_vars.values()) >= 1)
+
+        # bootstrap with set of hitting sets
+        for hs in to_hit:
+            self._hit(hs)
         # [END constraints]
 
         objective = self.hs_solver.Objective()
@@ -238,24 +272,40 @@ class CPMpyORTools(SolverInterface):
         self.hs_solver.Add(sum(hs_vars) >= 1)
 
     def _smus(self):
+        """
+            Returns the smallest subset of unsatisfiable assumption literals
+            of the unsatisfiable formula.
+
+            [1] Ignatiev, Alexey, et al. "Smallest MUS extraction with minimal
+            hitting set dualization." International Conference on Principles
+            and Practice of Constraint Programming. Springer, Cham, 2015.
+        """
         # take a copy of assumption variables
         assumptions_vars = list(self.assumption_dict.values())
-        # 
-        self._minHS(assumptions=assumptions_vars)
+
+        # bootstrap with minimum correction subsets
+        to_hit = self._disjointMCS(assumptions_vars)
+        print(to_hit)
+        to_hit = []
+        # MIP minimum hitting set solver
+        self._minHS(assumptions=assumptions_vars, to_hit=to_hit)
 
         while(True):
-        #     # hitting set solver
+            # Get a hitting set
             hs = self._get_hs()
 
+            # clear previously used assumptions
             self.ort_model.ClearAssumptions()
+            # check for satisfiability
             sat = self.solve(assumptions=hs)
             if not sat:
+                # SMUS found
                 del self.hs_solver
                 return hs
 
             # get an assignment to the assumption variables and take complement
             falsified = [bv for bv in assumptions_vars if not bv.value()]
-            # take the complement
+            # hit complement
             self._hit(falsified)
 
 
