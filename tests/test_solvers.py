@@ -170,6 +170,5 @@ class TestSolvers(unittest.TestCase):
         s = CPMpyORTools(m)
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
-        self.assertTrue(any(bv.value() == False))
 
 
