@@ -486,7 +486,7 @@ def normalized_boolexpr(expr):
         # XXX literal copy from flatten_cons... (except return)
         # just recursively flatten args, which can be lists
         if all(__is_flat_var_or_list(arg) for arg in expr.args):
-            return [expr]
+            return (expr, [])
         else:
             # recursively flatten all children
             flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
