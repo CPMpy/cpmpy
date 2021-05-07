@@ -24,12 +24,9 @@ jobs:
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        TWINE_TEST_PASSWORD: ${{ secrets.PYPI_TEST_API_TOKEN }}
-        TESTPYPI_REPO: https://test.pypi.org/legacy/
         PYPI_REPO: https://upload.pypi.org/legacy/
       run: |
         python setup.py sdist bdist_wheel
-        twine upload --repository-url $TESTPYPI_REPO -u $TWINE_USERNAME -p $TWINE_TEST_PASSWORD dist/*
         twine upload --repository-url $PYPI_REPO dist/*
     # - name: Install pypa/build
     #   run: >-
@@ -44,12 +41,6 @@ jobs:
     #     --sdist
     #     --wheel
     #     --outdir dist/
-    #     .
-    # - name: Publish distribution to Test PyPI
-    #   uses: pypa/gh-action-pypi-publish@master
-    #   with:
-    #     password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-    #     repository_url: https://test.pypi.org/legacy/
     # - name: Publish distribution to PyPI
     #   uses: pypa/gh-action-pypi-publish@master
     #   with:
