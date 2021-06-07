@@ -195,119 +195,6 @@ class CPMpyORTools(SolverInterface):
 
         return self._solve_return(self.cpm_status, objective_value)
 
-    def _disjointMCS(self, assumption_vars):
-        """Basic implementation of disjoint Minimum Corrections subsets
-        based on [2].
-
-        returns a collection of subsets of the assumptions.
-        """
-        # take a copy
-        assumptions = set(assumption_vars)
-
-        # collection of correction subsets (don't need to be minium)
-        to_hit = []
-        # assumption variables blocked and cannot be used to compute 
-        # a new correction subset
-        blocked = set()
-
-        self.ort_model.ClearAssumptions()
-        while(len(assumptions-blocked) > 0):
-            # build satisfiable subset
-            mcs = assumptions - blocked
-            while(not self.solve(assumptions=mcs)):
-                mcs.remove(next(iter(mcs)))
-                self.ort_model.ClearAssumptions()
-
-            # # add satisfiable subset
-            to_hit.append(mcs)
-
-            # block mcs from being used
-            blocked |= (mcs)
-
-        return to_hit
-
-    def _minHS(self, assumptions, to_hit):
-        from ortools.linear_solver import pywraplp
-
-        # [START solver]
-        # Create the mip solver with the CBC backend.
-        self.hs_solver = pywraplp.Solver('OptimalHittingSet',
-                                pywraplp.Solver.BOP_INTEGER_PROGRAMMING)
-        # [END solver]
-
-        # [START variables]
-        #infinity = solver.infinity()
-        self.hs_vars = {}
-        for j in assumptions:
-            self.hs_vars[j] = self.hs_solver.BoolVar('x[%i]' % j.name)
-        # [END variables]
-
-        # [START constraints]
-        # first hitting set is not empty
-        self.hs_solver.Add(sum(self.hs_vars.values()) >= 1)
-
-        # bootstrap with set of hitting sets
-        for hs in to_hit:
-            self._hit(hs)
-        # [END constraints]
-
-        objective = self.hs_solver.Objective()
-        for xi in self.hs_vars.values():
-            objective.SetCoefficient(xi, 1)
-        objective.SetMinimization()
-        # [END objective]
-
-    def _get_hs(self):
-        from ortools.linear_solver import pywraplp
-
-        status = self.hs_solver.Solve()
-        if status == pywraplp.Solver.OPTIMAL:
-            return [ass for ass, bv in self.hs_vars.items() if bv.solution_value() == 1]
-        else:
-            print('The problem does not have an optimal solution.', status)
-            return []
-
-    def _hit(self, falsified):
-        hs_vars = [self.hs_vars[falsified_var] for falsified_var in falsified]
-        self.hs_solver.Add(sum(hs_vars) >= 1)
-
-    def _smus(self):
-        """
-            Returns the smallest subset of unsatisfiable assumption literals
-            of the unsatisfiable formula.
-
-            [1] Ignatiev, Alexey, et al. "Smallest MUS extraction with minimal
-            hitting set dualization." International Conference on Principles
-            and Practice of Constraint Programming. Springer, Cham, 2015.
-        """
-        # take a copy of assumption variables
-        assumptions_vars = list(self.assumption_dict.values())
-
-        # bootstrap with minimum correction subsets
-        to_hit = self._disjointMCS(assumptions_vars)
-        print(to_hit)
-        to_hit = []
-        # MIP minimum hitting set solver
-        self._minHS(assumptions=assumptions_vars, to_hit=to_hit)
-
-        while(True):
-            # Get a hitting set
-            hs = self._get_hs()
-
-            # clear previously used assumptions
-            self.ort_model.ClearAssumptions()
-            # check for satisfiability
-            sat = self.solve(assumptions=hs)
-            if not sat:
-                # SMUS found
-                del self.hs_solver
-                return hs
-
-            # get an assignment to the assumption variables and take complement
-            falsified = [bv for bv in assumptions_vars if not bv.value()]
-            # hit complement
-            self._hit(falsified)
-
 
     def get_core(self):
         from ortools.sat.python import cp_model as ort
@@ -325,14 +212,10 @@ class CPMpyORTools(SolverInterface):
         assert (self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
 
-        # take a copy of assumption variables (modified in _smus algorithm)
-        assumptions = dict(self.assumption_dict)
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
         assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
-        smus = self._smus()
-        print("SMUS found=", smus)
 
-        return [assumptions[i] for i in assum_idx]
+        return [self.assumption_dict[i] for i in assum_idx]
 
     def make_model(self, cpm_model):
         """
