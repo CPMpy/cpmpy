@@ -290,7 +290,7 @@ class NDVarArray(Expression, np.ndarray):
         # but np.int and np.bool do not play well with > overloading
         if isinstance(ret, np.integer):
             return int(ret)
-        elif isinstance(ret, np.bool):
+        elif isinstance(ret, np.bool_):
             return bool(ret)
         return ret
 

@@ -19,7 +19,7 @@ import numpy as np
 
 # Helpers for type checking
 def is_num(arg):
-    return isinstance(arg, (int, np.integer, float, np.float))
+    return isinstance(arg, (int, np.integer, float, np.float64))
 def is_any_list(arg):
     return isinstance(arg, (list, tuple, np.ndarray))
 def is_pure_list(arg):
