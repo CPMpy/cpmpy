@@ -145,13 +145,14 @@ def is_var(x):
 
 class NumVarImpl(Expression):
     """
-    **Continuous numerical** variable with given lowerbound and upperbound.
+    Abstract **continuous numerical** variable with given lowerbound and upperbound.
     """
-    def __init__(self, lb, ub):
+    def __init__(self, lb, ub, name):
         assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
         self.lb = lb
         self.ub = ub
+        self.name = name
         self._value = None
 
     def is_bool(self):
@@ -161,6 +162,9 @@ class NumVarImpl(Expression):
 
     def value(self):
         return self._value
+    
+    def __repr__(self):
+        return self.name
 
     # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
@@ -172,18 +176,15 @@ class IntVarImpl(NumVarImpl):
     """
     counter = 0
 
-    def __init__(self, lb, ub, setname=True):
+    def __init__(self, lb, ub, name=None):
         assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb),lb)
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub),ub)
-        #assert (lb >= 0 and ub >= 0) # can be negative?
-        super().__init__(int(lb), int(ub)) # explicit cast: can be numpy
-        
-        if setname:
-            self.name = IntVarImpl.counter
+
+        if name is None:
+            name = "IV{}".format(IntVarImpl.counter)
             IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
-    
-    def __repr__(self):
-        return "IV{}".format(self.name)
+
+        super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
 class BoolVarImpl(IntVarImpl):
     """
@@ -191,21 +192,20 @@ class BoolVarImpl(IntVarImpl):
     """
     counter = 0
 
-    def __init__(self, lb=0, ub=1):
+    def __init__(self, lb=0, ub=1, name=None):
         assert(lb == 0 or lb == 1)
         assert(ub == 0 or ub == 1)
-        IntVarImpl.__init__(self, lb, ub, setname=False)
+
+        if name is None:
+            name = "BV{}".format(BoolVarImpl.counter)
+            BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
+        IntVarImpl.__init__(self, lb, ub, name=name)
         
-        self.name = BoolVarImpl.counter
-        BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return True
-        
-    def __repr__(self):
-        return "BV{}".format(self.name)
 
     def __invert__(self):
         return NegBoolView(self)
@@ -237,7 +237,7 @@ class NegBoolView(BoolVarImpl):
         return not self._bv.value()
 
     def __repr__(self):
-        return "~BV{}".format(self._bv.name)
+        return "~{}".format(self._bv.name)
 
     def __invert__(self):
         return self._bv
@@ -312,34 +312,32 @@ class NDVarArray(Expression, np.ndarray):
 
 
 # N-dimensional array of Boolean Decision Variables
-def BoolVar(shape=None):
+def BoolVar(shape=None, name=None):
     """
     # N-dimensional array of Boolean Decision Variables
     """
     if shape is None or shape == 1:
-        return BoolVarImpl()
+        return BoolVarImpl(name=name)
     elif shape == 0:
         raise NullShapeError(shape)
-    length = np.prod(shape)
     
     # create base data
-    data = np.array([BoolVarImpl() for _ in range(length)]) # repeat new instances
+    data = np.array([BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
 
-def IntVar(lb, ub, shape=None):
+def IntVar(lb, ub, shape=None, name=None):
     """
     N-dimensional array of Integer Decision Variables with lower-bound `lb` and upper-bound `ub`
     """
     if shape is None or shape == 1:
-        return IntVarImpl(lb,ub)
+        return IntVarImpl(lb,ub, name=name)
     elif shape == 0:
         raise NullShapeError(shape)
-    length = np.prod(shape)
-    
+
     # create base data
-    data = np.array([IntVarImpl(lb,ub) for _ in range(length)]) # repeat new instances
+    data = np.array([IntVarImpl(lb,ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -354,3 +352,20 @@ def cparray(arr):
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
     return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
+
+
+def _genname(basename, idxs):
+    """
+    Helper function to 'name' array variables
+    - idxs: list of indices, one for every dimension of the array
+    - basename: base name to prepend
+
+    if basename is 'None', then it returns None
+
+    output: something like "basename[0,1]"
+    """
+    if basename == None:
+        return None
+    stridxs = ",".join(map(str,idxs))
+    return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
+    
