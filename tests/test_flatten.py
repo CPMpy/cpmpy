@@ -140,10 +140,11 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( x )), "[BV0]" )
         self.assertEqual( str(flatten_constraint( ~x )), "[~BV0]" )
         self.assertEqual( str(flatten_constraint( [x,y] )), "[BV0, BV1]" )
-        self.assertEqual( str(flatten_constraint( x&y )), "[(BV0) and (BV1)]" )
-        self.assertEqual( str(flatten_constraint( x&y&~z )), "[and([BV0, BV1, ~BV2])]" )
+        self.assertEqual( str(flatten_constraint( x&y )), "[BV0, BV1]" )
+        self.assertEqual( str(flatten_constraint( x&y&~z )), "[BV0, BV1, ~BV2]" )
         self.assertEqual( str(flatten_constraint( x.implies(y) )), "[(BV0) -> (BV1)]" )
-        self.assertEqual( str(flatten_constraint( (a > 10)&x )), "[(BV3) and (BV0), (IV0 > 10) == (BV3)]" )
+        self.assertEqual( str(flatten_constraint( (a > 10)&x )), "[IV0 > 10, BV0]" )
+        BoolVar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10).implies(x) )), "[(IV0 > 10) -> (BV0)]" )
         BoolVar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10) )), "[IV0 > 10]" )
