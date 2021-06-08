@@ -25,7 +25,7 @@ r,k = 3,3
 l = 1
 
 # Variables, incidence matrix
-block = BoolVar(shape=(v,b))
+block = BoolVar(shape=(v,b), name="block")
 
 # Constraints on incidence matrix
 m = Model([

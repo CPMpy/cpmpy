@@ -24,7 +24,7 @@ nHouses = data['nbHouses']
 arc_fuel = data['conso'] # arc_fuel[a,b] = fuel from a to b
 
 # s[i] is the house succeeding to the ith house (s[i]=i if not part of the route)
-s = IntVar(0,nHouses-1, shape=nHouses)
+s = IntVar(0,nHouses-1, shape=nHouses, name="s")
 
 cons = []
 # s should be a path, mimic (sub)circuit by connecting end-point back to start

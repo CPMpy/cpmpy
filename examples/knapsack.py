@@ -15,7 +15,7 @@ weights = np.random.randint(1,5, n)
 capacity = np.random.randint(sum(weights)*.2, sum(weights)*.5)
 
 # Construct the model.
-x = BoolVar(n)
+x = BoolVar(shape=n, name="x")
 
 constraint = [ sum(x*weights) <= capacity ]
 objective  = sum(x*values)

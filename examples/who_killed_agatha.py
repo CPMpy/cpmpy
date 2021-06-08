@@ -16,14 +16,14 @@ n = 3
 
 # Who killed agatha?
 victim = agatha
-killer = IntVar(0,2)
+killer = IntVar(0,2, name="killer")
 
 constraint = []
 # A killer always hates, and is no richer than his victim. 
-hates = BoolVar((n,n))
+hates = BoolVar((n,n), name="hates")
 constraint += [ hates[killer, victim] == 1 ]
 
-richer = BoolVar((n,n))
+richer = BoolVar((n,n), name="richer")
 constraint += [ richer[killer, victim] == 0 ]
 
 # implied richness: no one richer than himself, and anti-reflexive

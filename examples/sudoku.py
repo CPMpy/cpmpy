@@ -23,7 +23,7 @@ given = np.array([
 
 
 # Variables
-puzzle = IntVar(1,9, shape=given.shape)
+puzzle = IntVar(1,9, shape=given.shape, name="puzzle")
 
 constraints = []
 # Constraints on rows and columns

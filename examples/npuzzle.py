@@ -57,17 +57,17 @@ for r in range(dim):
                 valid_table.append([pos(r,c), pos(r+rr,c+cc)])
 
 # Variables
-x = IntVar(0,n-1, shape=(num_sols,n))
+x = IntVar(0,n-1, shape=(num_sols,n), name="x")
 
 # the moves, index in puzzle
-move_from = IntVar(0,n-1, shape=(num_sols)) # is move_to[i-1]...
-move_to = IntVar(0,n-1, shape=(num_sols))
+move_from = IntVar(0,n-1, shape=(num_sols), name="move_from") # is move_to[i-1]
+move_to = IntVar(0,n-1, shape=(num_sols), name="move_to")
 
 # is this row the solution?
-check = BoolVar(shape=num_sols)
+check = BoolVar(shape=num_sols, name="check")
 
 # index of first solution
-check_ix = IntVar(0,num_sols)
+check_ix = IntVar(0,num_sols, name="check_ix")
 
 
 m = Model(minimize=check_ix)

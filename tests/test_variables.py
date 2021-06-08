@@ -39,3 +39,13 @@ class TestSolvers(unittest.TestCase):
                 iv = cp.IntVar(0, i, shape=(i, j))
                 self.assertEqual(iv.shape, (i,j), "Shape should be equal size")
                 self.assertIsInstance(iv, cp.NDVarArray, f"Instance not {cp.NDVarArray} got {type(iv)}")
+
+    def test_namevar(self):
+        a = cp.BoolVar(name="a")
+        self.assertEqual(str(a), "a")
+
+        b = cp.BoolVar(shape=(3,), name="b")
+        self.assertEqual(str(b), "[b[0] b[1] b[2]]")
+
+        c = cp.BoolVar(shape=(2,3), name="c")
+        self.assertEqual(str(c), "[[c[0,0] c[0,1] c[0,2]]\n [c[1,0] c[1,1] c[1,2]]]")

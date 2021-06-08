@@ -40,7 +40,7 @@ given = np.array([
 
 
 # Variables
-puzzle = IntVar(1,9, shape=given.shape)
+puzzle = IntVar(1,9, shape=given.shape, name="puzzle")
 
 constraints = []
 # Constraints on rows and columns
@@ -81,7 +81,7 @@ from cpmpy import *
 import numpy as np
 
 # Construct the model
-s,e,n,d,m,o,r,y = IntVar(0,9, 8)
+s,e,n,d,m,o,r,y = IntVar(0,9, shape=8)
 
 constraint = []
 constraint += [ alldifferent([s,e,n,d,m,o,r,y]) ]
@@ -109,7 +109,7 @@ demands = [8, 10, 7, 12, 4, 4]
 slots = len(demands)
 
 # variables
-x = IntVar(0,sum(demands), slots)
+x = IntVar(0,sum(demands), shape=slots, name="x")
 
 constraint  = [x[i] + x[i+1] >= demands[i] for i in range(0,slots-1)]
 constraint += [x[-1] + x[0] == demands[-1]] # 'around the clock' constraint
