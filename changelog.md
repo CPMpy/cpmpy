@@ -1,5 +1,9 @@
 # Change log
 
+## 0.7.1
+
+* still learning the right release flow, this is a stable release
+
 ## 0.7.0b
 
 * still learning the right release flow
