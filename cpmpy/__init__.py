@@ -5,7 +5,7 @@
 
 # __version__ = "%d.%d.%d.%s" % VERSION if len(VERSION) == 4 else \
 #               "%d.%d.%d" % VERSION
-__version__ = "0.7.0"
+__version__ = "0.7.0b"
 
 from .expressions import *
 from .variables import *

@@ -1,5 +1,9 @@
 # Change log
 
+## 0.7.0b
+
+* still learning the right release flow
+
 ## 0.7.0
 
 ### Major
