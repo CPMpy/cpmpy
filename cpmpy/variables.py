@@ -132,7 +132,6 @@
     ==============
 """
 
-from .utils.exceptions import NullShapeError
 import numpy as np
 from .expressions import Expression, Operator, is_num
 
@@ -310,6 +309,14 @@ class NDVarArray(Expression, np.ndarray):
     #in	  __contains__(self, value) 	Check membership
     #object.__matmul__(self, other)
 
+class NullShapeError(Exception):
+    def __init__(self, shape, message="Shape should be non-zero"):
+        self.shape = shape
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return f'{self.shape}: {self.message}'
 
 # N-dimensional array of Boolean Decision Variables
 def BoolVar(shape=None, name=None):
