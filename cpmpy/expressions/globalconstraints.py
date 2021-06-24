@@ -4,16 +4,6 @@
 ## globalconstraints.py
 ##
 """
-    ================
-    List of functions
-    =================
-
-    .. autosummary::
-        :nosignatures:
-
-        min
-        max
-
     ===============
     List of classes
     ===============
@@ -85,8 +75,8 @@
     The above will use 'my_circuit_decomp', if the solver does not
     natively support 'circuit'.
 """
-from .variables import *
-from .expressions import *
+from .core import Expression
+from .variables import BoolVar, IntVar
 from itertools import chain, combinations
 
 
@@ -112,27 +102,6 @@ class GlobalConstraint(Expression):
             g.decompose = my_decom_function
         """
         return None
-
-
-# min: listwise 'min'
-def min(iterable):
-    """
-        min() overwrites python built-in,
-        checks if all constants and computes np.min() in that case
-    """
-    if not any(isinstance(elem, Expression) for elem in iterable):
-        return np.min(iterable)
-    return Minimum(iterable)
-
-def max(iterable):
-    """
-        max() overwrites python built-in,
-        checks if all constants and computes np.map() in that case
-    """
-    if not any(isinstance(elem, Expression) for elem in iterable):
-        return np.max(iterable)
-    return Maximum(iterable)
-
 
 
 class alldifferent(GlobalConstraint):

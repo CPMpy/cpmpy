@@ -11,20 +11,16 @@
     .. autosummary::
         :nosignatures:
 
-        ORToolsPython
-
-    ==================
-    Module description
-    ==================
+        CPMpyORTools
 
     ==============
     Module details
     ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions import *
-from ..globalconstraints import *
-from ..variables import *
+from ..expressions.core import *
+from ..expressions.variables import *
+from ..expressions.utils import is_num, is_any_list
 from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
 

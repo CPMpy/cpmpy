@@ -4,6 +4,8 @@
 ## expressions.py
 ##
 """
+    the `Expression` superclass and common subclasses. None of these objects need to be directly created, they are created through operator overloading on variables, or through helper functions (global constraints)
+
     ===============
     List of classes
     ===============
@@ -13,55 +15,9 @@
         Expression
         Comparison
         Operator
-
 """
 import numpy as np
-
-# Helpers for type checking
-def is_num(arg):
-    return isinstance(arg, (int, np.integer, float, np.float64))
-def is_any_list(arg):
-    return isinstance(arg, (list, tuple, np.ndarray))
-def is_pure_list(arg):
-    return isinstance(arg, (list, tuple))
-
-# Overwriting all/any python built-ins
-# all: listwise 'and'
-def all(iterable):
-    collect = [] # logical expressions
-    for elem in iterable:
-        if elem is False:
-            return False # no need to create constraint
-        elif elem is True:
-            pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
-        else:
-            raise Exception("unknown argument '{}' to 'all'".format(elem))
-    if len(collect) == 1:
-        return collect[0]
-    if len(collect) >= 2:
-        return Operator("and", collect)
-    return True
-
-# any: listwise 'or'
-def any(iterable):
-    collect = [] # logical expressions
-    for elem in iterable:
-        if elem is True:
-            return True # no need to create constraint
-        elif elem is False:
-            pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
-        else:
-            raise Exception("unknown argument '{}' to 'any'".format(elem))
-    if len(collect) == 1:
-        return collect[0]
-    if len(collect) >= 2:
-        return Operator("or", collect)
-    return False
-
+from .utils import is_num, is_any_list
 
 class Expression(object):
     """

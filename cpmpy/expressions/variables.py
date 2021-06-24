@@ -4,6 +4,15 @@
 ## variables.py
 ##
 """
+    =================
+    List of functions
+    =================
+    .. autosummary::
+        :nosignatures:
+
+        BoolVar
+        IntVar
+
     ===============
     List of classes
     ===============
@@ -15,6 +24,7 @@
         BoolVarImpl
         NegBoolView
         NDVarArray
+        NullShapeError
 
     =================
     List of functions
@@ -22,8 +32,6 @@
     .. autosummary::
         :nosignatures:
 
-        BoolVar
-        IntVar
         cparray
 
     ==================
@@ -133,14 +141,9 @@
 """
 
 import numpy as np
-from .expressions import Expression, Operator, is_num
+from .core import Expression, Operator
+from .utils import is_num, is_int
 
-# Helpers for type checking
-def is_int(arg):
-    return isinstance(arg, (int, np.integer))
-
-def is_var(x):
-    return isinstance(x, IntVarImpl)
 
 class NumVarImpl(Expression):
     """
@@ -348,7 +351,6 @@ def IntVar(lb, ub, shape=None, name=None):
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
-
 def cparray(arr):
     """
     N-dimensional wrapper, wraps a standard array.
@@ -359,7 +361,6 @@ def cparray(arr):
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
     return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
-
 
 def _genname(basename, idxs):
     """

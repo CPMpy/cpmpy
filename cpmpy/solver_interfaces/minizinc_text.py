@@ -24,7 +24,6 @@
 
 from ..model_tools.get_variables import get_variables
 from .solver_interface import SolverInterface
-from ..variables import *
 from ..expressions import *
 import numpy as np
 

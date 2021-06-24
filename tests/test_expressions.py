@@ -10,6 +10,9 @@ def test_value():
 import unittest
 import cpmpy as cp 
 from cpmpy.expressions import *
+from cpmpy.expressions.core import *
+from cpmpy.expressions.variables import *
+from cpmpy.expressions.utils import *
 
 class TestSum(unittest.TestCase):
 

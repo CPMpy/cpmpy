@@ -1,6 +1,6 @@
-from ..model import *
-from ..expressions import *
-from ..variables import *
+from ..expressions.core import Expression
+from ..expressions.variables import NumVarImpl,IntVarImpl,BoolVarImpl,NegBoolView
+from ..expressions.utils import is_any_list
 
 """
  Model transformation, read-only

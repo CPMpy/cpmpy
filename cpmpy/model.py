@@ -30,10 +30,11 @@
     ==============
 """
 import numpy as np
-from .expressions import Operator
+from .expressions.core import Operator
 from .solver_interfaces.util import get_supported_solvers
 from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
+# TODO: add minimize() maximize() remove _from_list (see solver constructor)
 
 class Model(object):
     """
@@ -150,6 +151,7 @@ class Model(object):
         return self.cpm_status
 
     def _make_and_from_list(self, args):
+        #TODO: eliminate this?
         """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """
         lst = list(args) # make mutable copy of type list
         # do recursive where needed, with overwrite

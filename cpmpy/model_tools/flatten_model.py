@@ -1,7 +1,8 @@
 import sys
 import copy
-from ..expressions import *
-from ..variables import *
+from ..expressions.core import *
+from ..expressions.variables import *
+from ..expressions.utils import is_num, is_any_list
 
 """
 Flattening a model (or individual constraints) into 'flat normal form'.

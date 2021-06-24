@@ -22,10 +22,10 @@ E.g.
 """
 
 from cpmpy import *
-import numpy
+import numpy as np
 
 X = -1
-default_game =  numpy.array([
+default_game =  np.array([
             [2,3,X,2,2,X,2,1],
             [X,X,4,X,X,4,X,2],
             [X,X,X,X,X,X,4,X],
