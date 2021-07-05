@@ -173,3 +173,52 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(len(s.get_core()) > 0)
 
 
+    def test_pysat(self):
+        from cpmpy.solver_interfaces.pysat import CPM_pysat
+        if not CPM_pysat.supported():
+            print("Skipping PySAT tests, not installed")
+            return
+
+        # Construct the model.
+        (mayo, ketchup, curry, andalouse, samurai) = cp.BoolVar(5)
+
+        Nora = mayo | ketchup
+        Leander = ~samurai | mayo
+        Benjamin = ~andalouse | ~curry | ~samurai
+        Behrouz = ketchup | curry | andalouse
+        Guy = ~ketchup | curry | andalouse
+        Daan = ~ketchup | ~curry | andalouse
+        Celine = ~samurai
+        Anton = mayo | ~curry | ~andalouse
+        Danny = ~mayo | ketchup | andalouse | samurai
+        Luc = ~mayo | samurai
+
+        allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
+
+        model = cp.Model(allwishes)
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pysat(model)
+        self.assertTrue(ps.solve())
+        self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
+
+        indmodel = cp.Model()
+        inds = cp.BoolVar(shape=len(model.constraints))
+        for i,c in enumerate(model.constraints):
+            indmodel += [c | ~inds[i]] # implication
+        ps2 = CPM_pysat(indmodel)
+
+        # check get core, simple
+        self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
+        self.assertEqual(ps2.get_core(), [mayo,~mayo])
+
+        # check get core, more realistic
+        self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
+        self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+
+
+
+
