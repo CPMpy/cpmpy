@@ -176,3 +176,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) / (IV1)) == (IV2)]" )
         self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) / (IV1)) == (IV2)]" )
 
+        # negated normal form? # TODO: fix this, should be ~IV0 or ~IV1
+        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(BV0) or (BV1) == 0]" )
+        self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((BV0) or (BV1) == 0)]" )
+
