@@ -149,7 +149,7 @@ class TestFlattenExpr(unittest.TestCase):
         BoolVar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10) )), "[IV0 > 10]" )
         self.assertEqual( str(flatten_constraint( (a > 10) == 1 )), "[IV0 > 10]" )
-        self.assertEqual( str(flatten_constraint( (a > 10) == 0 )), "[IV0 > 10 == 0]" )
+        self.assertEqual( str(flatten_constraint( (a > 10) == 0 )), "[IV0 <= 10]" )
         self.assertEqual( str(flatten_constraint( (a > 10) == x )), "[(IV0 > 10) == (BV0)]" )
         #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
         self.assertEqual( str(flatten_constraint( (a > 10) | (b + c > 2) )), "[(BV5) or (BV6), (IV0 > 10) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]" )
@@ -176,7 +176,11 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) / (IV1)) == (IV2)]" )
         self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) / (IV1)) == (IV2)]" )
 
-        # negated normal form? # TODO: fix this, should be ~IV0 or ~IV1
-        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(BV0) or (BV1) == 0]" )
-        self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((BV0) or (BV1) == 0)]" )
+        # negated normal form tests
+        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(~BV0) and (~BV1)]" )
+        self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((~BV0) and (~BV1))]" )
+        self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[(BV2) and (BV11), ((~BV0) and (~BV1)) == (BV11)]" ) # To optimize, BV11 not needed), "" )
+        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((~BV0) or (~BV1)) == (BV12)]" )
+        self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
+        self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((~BV2) or (BV1)) -> (BV13), ((~BV0) and (~BV1)) == (BV13)]" )
 

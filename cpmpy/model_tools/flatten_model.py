@@ -197,6 +197,13 @@ def flatten_constraint(expr):
 
                 # LHS: check if Boolexpr == smth:
                 if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
+                    if is_num(rexpr):
+                        # BoolExpr == 0|False
+                        # special case, handled in normalized_boolexpr()
+                        (con, subs) = normalized_boolexpr(expr)
+                        flatcons += [con] + subs
+                        continue # ready with this one
+
                     # Reification (double implication): Boolexpr == Var
                     if __is_flat_var(lexpr):
                         (lhs, lcons) = (lexpr, [])
@@ -415,11 +422,6 @@ def normalized_boolexpr(expr):
         else:
             # LHS can be numexpr, RHS has to be variable
 
-            # TODO: special case of <reify_ready_expr> == 0, e.g. (a > 10) == 0 :: (a <= 10)
-            # TODO: need to support negation of that expression...
-            #bvar = args[0] if __is_flat_var(args[0]) else args[1]
-            #base_cons = [ __check_or_flip_base_const(subexpr)]
-
             # TODO: optimisations that swap directions instead when it can avoid to create vars
             """
             if expr.name == '==' or expr.name == '!=':
@@ -472,6 +474,13 @@ def normalized_boolexpr(expr):
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
+                if is_num(rexpr):
+                    # BoolExpr == 0|False
+                    assert(not rexpr) # 'true' is preprocessed away
+
+                    nnexpr = negated_normal(lexpr)
+                    return normalized_boolexpr(nnexpr)
+
                 # Reification (double implication): Boolexpr == Var
                 (lhs, lcons) = normalized_boolexpr(lexpr)
                 if expr.name == '!=':
@@ -562,6 +571,10 @@ def negated_normal(expr):
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
         Global: should call decompose and negate that?
+
+        This function only ensures 'negated normal' for the top-level
+        constraint (negating arguments recursively as needed),
+        it does not ensure flatness (except if the input is flat)
     """
 
     if __is_flat_var(expr):
@@ -584,10 +597,14 @@ def negated_normal(expr):
             return Operator('or', [negated_normal(arg) for arg in expr.args])
         elif expr.name == 'or':
             return Operator('and', [negated_normal(arg) for arg in expr.args])
+        elif expr.name == '->':
+            return expr.args[0] & ~expr.args[1]
         else:
-            raise NotImplementedError("negate_normal {}".format(expr))
+            #raise NotImplementedError("negate_normal {}".format(expr))
+            return expr == 0 # can't do better than this...
 
     else:
         # global...
-        raise NotImplementedError("negate_normal {}".format(expr))
+        #raise NotImplementedError("negate_normal {}".format(expr))
+        return expr == 0 # can't do better than this...
 
