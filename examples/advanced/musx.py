@@ -1,0 +1,149 @@
+"""
+Deletion-based Minimum Unsatisfiable Subset (MUS) algorithm.
+
+Loosely based on PySat's MUSX:
+https://github.com/pysathq/pysat/blob/master/examples/musx.py
+
+"""
+
+import sys
+import copy
+from cpmpy import *
+from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.model_tools.get_variables import vars_expr
+from cpmpy.model_tools.flatten_model import flatten_constraint
+
+def main():
+    x, y = IntVar(-9,9, shape=2)
+    m = Model([
+        x < 0, 
+        x < 1,
+        x > 2,
+        (x + y > 0) | (y < 0),
+        (y >= 0) | (x >= 0),
+        (y < 0) | (x < 0),
+        (y > 0) | (x < 0),
+        #alldifferent([x,y]) # invalid for musx_assum
+    ])
+    assert (m.solve() is False)
+
+    mus = musx_pure(m.constraints, [], verbose=True)
+    print("MUS with naive pure CP deletion:", mus)
+
+    mus = musx_assum(m.constraints, [], verbose=True)
+    print("MUS with assumption-based CP deletion:", mus)
+
+def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
+    """
+        A naive pure-CP deletion-based MUS algorithm
+
+        Will repeatedly solve the problem with one less constraint
+        For normally-sized models, this will be terribly slow.
+
+        Each constraint is an arbitrary CPMpy expression, so it can
+        also be sublists of constraints (e.g. constraint groups),
+        contain aribtrary nested expressions, global constraints, etc.
+
+        Best is to use this only on constraints that do not support
+        reification/assumption variables (e.g. some global constraints
+        with expensive decompositions).
+        For those constraints that do support reification, see musx_assum()
+    """
+    # small optimisation:
+    # order so that constraints with many variables are tried first
+    # this will favor MUS with few variables per constraint,
+    # and will remove large constraints earlier which may speed it up
+    # TODO: count nr of subexpressions? (generalisation of nr of vars)
+    soft_constraints = sorted(soft_constraints, key=lambda c: -len(vars_expr(c)))
+
+    # small optimisation: pre-flatten all constraints once
+    # so it needs not be done over-and-over in solving
+    hard = flatten_constraint(hard_constraints) # batch flatten
+    soft = [flatten_constraint(c) for c in soft_constraints]
+
+    mus_idx = [] # index into 'soft_constraints' that belong to the MUS
+
+    # init solver with hard constraints
+    s_base = CPMpyORTools(Model(hard))
+    for i in range(len(soft_constraints)):
+        s_without_i = copy.deepcopy(s_base) # deep copy solver state
+        # add all other remaining (flattened) constraints
+        s_without_i += soft[i+1:] 
+
+        if s_without_i.solve():
+            # with all but 'i' it is SAT, so 'i' belongs to the MUS
+            if verbose:
+                print("\tSAT so in MUS:", soft_constraints[i])
+            mus_idx.append(i)
+            s_base += [soft[i]]
+        else:
+            # still UNSAT, 'i' does not belong to the MUS
+            if verbose:
+                print("\tUNSAT so not in MUS:", soft_constraints[i])
+
+    # return the list of original (non-flattened) constraints
+    return [soft_constraints[i] for i in mus_idx]
+
+
+def musx_assum(soft_constraints, hard_constraints=[], verbose=False):
+    """
+        An CP deletion-based MUS algorithm using assumption variables
+        and unsat core extraction
+
+        Will extract an unsat core and then shrink the core further
+        by repeatedly ommitting one assumption variable.
+
+        Each constraint is an arbitrary CPMpy expression, so it can
+        also be sublists of constraints (e.g. constraint groups),
+        contain aribtrary nested expressions, global constraints, etc.
+
+        This approach assumes that each soft_constraint supports
+        reification, that is that BoolVar().implies(constraint)
+        is supported by the solver or can be efficiently decomposed
+        (which may not be the case for certain global constraints)
+    """
+    # init with hard constraints
+    assum_model = Model(hard_constraints)
+
+    # make assumption indicators, add reified constraints
+    ind = BoolVar(shape=len(soft_constraints), name="ind")
+    for i,bv in enumerate(ind):
+        assum_model += [bv.implies(soft_constraints[i])]
+    # to map indicator variable back to soft_constraints
+    indmap = dict((v,i) for (i,v) in enumerate(ind))
+
+    # make solver once, check that it is unsat and start from core
+    assum_solver = CPMpyORTools(assum_model)
+    if assum_solver.solve(assumptions=ind):
+        if verbose:
+            print("Unexpectedly, the model is SAT")
+        return []
+    else:
+        # unsat core is an unsatisfiable subset
+        mus_vars = assum_solver.get_core()
+        
+    # now we shrink the unsatisfiable subset further
+    i = 0 # we wil dynamically shrink mus_vars
+    while i < len(mus_vars):
+        # add all other remaining literals
+        assum_lits = mus_vars[:i] + mus_vars[i+1:]
+
+        if assum_solver.solve(assumptions=assum_lits):
+            # with all but 'i' it is SAT, so 'i' belongs to the MUS
+            if verbose:
+                print("\tSAT so in MUS:", soft_constraints[indmap[mus_vars[i]]])
+        else:
+            # still UNSAT, 'i' does not belong to the MUS
+            if verbose:
+                print("\tUNSAT so not in MUS:", soft_constraints[indmap[mus_vars[i]]])
+            # continue without, or even a smaller core
+            mus_vars = assum_solver.get_core()
+
+        i += 1
+
+    # return the list of original (non-flattened) constraints
+    return [soft_constraints[indmap[v]] for v in mus_vars]
+
+
+if __name__ == '__main__':
+    main()
