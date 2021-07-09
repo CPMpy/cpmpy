@@ -48,7 +48,7 @@ def musx(soft_constraints, hard_constraints=[], verbose=False):
     for con in soft_constraints:
         # see if solver supports reification of 'con'
         try:
-            m = Model(BoolVar().implies(con))
+            m = Model([BoolVar().implies(con)])
             CPMpyORTools(m).solve()
             # it did
             soft_assum.append(con)
@@ -89,13 +89,20 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
     hard = flatten_constraint(hard_constraints) # batch flatten
     soft = [flatten_constraint(c) for c in soft_constraints]
 
+    if Model(hard+soft).solve():
+        if verbose:
+            print("Unexpectedly, the model is SAT")
+        return []
+
     mus_idx = [] # index into 'soft_constraints' that belong to the MUS
 
     # init solver with hard constraints
-    s_base = CPMpyORTools(Model(hard))
+    #s_base = CPMpyORTools(Model(hard))
+    m_base = Model(hard)
     for i in range(len(soft_constraints)):
-        s_without_i = copy.deepcopy(s_base) # deep copy solver state
+        #s_without_i = copy.deepcopy(s_base) # deep copy solver state
         # add all other remaining (flattened) constraints
+        s_without_i = CPMpyORTools(m_base)
         s_without_i += soft[i+1:] 
 
         if s_without_i.solve():
@@ -103,7 +110,7 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
             if verbose:
                 print("\tSAT so in MUS:", soft_constraints[i])
             mus_idx.append(i)
-            s_base += [soft[i]]
+            m_base += [soft[i]]
         else:
             # still UNSAT, 'i' does not belong to the MUS
             if verbose:
@@ -149,6 +156,8 @@ def musx_assum(soft_constraints, hard_constraints=[], verbose=False):
     else:
         # unsat core is an unsatisfiable subset
         mus_vars = assum_solver.get_core()
+        if verbose:
+            assert (not assum_solver.solve(assumptions=mus_vars)), "core is SAT!?"
         
     # now we shrink the unsatisfiable subset further
     i = 0 # we wil dynamically shrink mus_vars
