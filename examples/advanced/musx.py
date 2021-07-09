@@ -23,15 +23,47 @@ def main():
         (y >= 0) | (x >= 0),
         (y < 0) | (x < 0),
         (y > 0) | (x < 0),
-        #alldifferent([x,y]) # invalid for musx_assum
+        alldifferent([x,y]) # invalid for musx_assum
     ])
     assert (m.solve() is False)
 
-    mus = musx_pure(m.constraints, [], verbose=True)
-    print("MUS with naive pure CP deletion:", mus)
+    mus = musx(m.constraints, [], verbose=True)
+    print("MUS:", mus)
 
-    mus = musx_assum(m.constraints, [], verbose=True)
-    print("MUS with assumption-based CP deletion:", mus)
+
+def musx(soft_constraints, hard_constraints=[], verbose=False):
+    """
+        Deletion-based MUS for CP
+
+        Each constraint is an arbitrary CPMpy expression, so it can
+        also be sublists of constraints (e.g. constraint groups),
+        contain aribtrary nested expressions, global constraints, etc.
+
+        Will first check which soft contraints support reification,
+        and use musx_assum on those (with others as hard).
+        Then use musx_pure on the remaining (with current mus as hard)
+    """
+    soft_assum = []
+    soft_pure = []
+    for con in soft_constraints:
+        # see if solver supports reification of 'con'
+        try:
+            m = Model(BoolVar().implies(con))
+            CPMpyORTools(m).solve()
+            # it did
+            soft_assum.append(con)
+        except:
+            # it did not
+            soft_pure.append(con)
+
+    # find MUS of soft_assum with soft_pure as hard
+    mus_assum = musx_assum(soft_assum, hard_constraints=hard_constraints+soft_pure, verbose=verbose)
+
+    # find MUS of soft_pure with mus_assum as hard
+    mus_pure = musx_pure(soft_pure, hard_constraints=hard_constraints+mus_assum, verbose=verbose)
+
+    return mus_assum+mus_pure
+
 
 def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
     """
@@ -39,10 +71,6 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
 
         Will repeatedly solve the problem with one less constraint
         For normally-sized models, this will be terribly slow.
-
-        Each constraint is an arbitrary CPMpy expression, so it can
-        also be sublists of constraints (e.g. constraint groups),
-        contain aribtrary nested expressions, global constraints, etc.
 
         Best is to use this only on constraints that do not support
         reification/assumption variables (e.g. some global constraints

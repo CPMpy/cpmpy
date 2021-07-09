@@ -204,4 +204,5 @@ class MapSolver:
         self.solver += any(~self.indicators[i] for i in frompoint)
      
 
-main()
+if __name__ == '__main__':
+    main()
