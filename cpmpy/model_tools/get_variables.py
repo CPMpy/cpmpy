@@ -1,5 +1,5 @@
 from ..expressions.core import Expression
-from ..expressions.variables import NumVarImpl,IntVarImpl,BoolVarImpl,NegBoolView
+from ..expressions.variables import _NumVarImpl,NegBoolView
 from ..expressions.utils import is_any_list
 
 """
@@ -26,7 +26,7 @@ def vars_expr(expr):
         # this is just a view, return the actual variable
         return [expr._bv]
         
-    if isinstance(expr, NumVarImpl):
+    if isinstance(expr, _NumVarImpl):
         # a real var, do our thing
         return [expr]
 

@@ -19,7 +19,7 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import *
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 from ..model_tools.get_variables import get_variables, vars_expr
 from ..model_tools.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
@@ -257,9 +257,9 @@ class CPMpyORTools(SolverInterface):
 
         Typically only needed for internal use
         """
-        if isinstance(cpm_var, BoolVarImpl):
+        if isinstance(cpm_var, _BoolVarImpl):
             revar = self.ort_model.NewBoolVar(str(cpm_var))
-        elif isinstance(cpm_var, IntVarImpl):
+        elif isinstance(cpm_var, _IntVarImpl):
             revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
         self.varmap[cpm_var] = revar
 
@@ -279,14 +279,14 @@ class CPMpyORTools(SolverInterface):
             Typically only needed for internal use
         """
         # Base case: Boolean variable
-        if isinstance(cpm_expr, BoolVarImpl):
+        if isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr( [self.ort_var(cpm_expr)] )
         
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
             lhs,rhs = cpm_expr.args
 
-            if isinstance(lhs, BoolVarImpl) and cpm_expr.name == '==':
+            if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == '==':
                 # base: bvar == bvar|const
                 lvar,rvar = map(self.ort_var, (lhs,rhs))
                 return self.ort_model.Add(lvar == rvar)
@@ -304,7 +304,7 @@ class CPMpyORTools(SolverInterface):
                 # numeric (non-reify) comparison case
                 rvar = self.ort_var(rhs)
                 # lhs can be numexpr
-                if isinstance(lhs, NumVarImpl):
+                if isinstance(lhs, _NumVarImpl):
                     # simplest LHS case, a var
                     newlhs = self.ort_var(lhs)
                 else:
@@ -360,10 +360,10 @@ class CPMpyORTools(SolverInterface):
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == '->' and \
-             (not isinstance(cpm_expr.args[0], BoolVarImpl) or \
-              not isinstance(cpm_expr.args[1], BoolVarImpl)):
+             (not isinstance(cpm_expr.args[0], _BoolVarImpl) or \
+              not isinstance(cpm_expr.args[1], _BoolVarImpl)):
                 # reified case: var -> boolexpr, boolexpr -> var
-                if isinstance(cpm_expr.args[0], BoolVarImpl):
+                if isinstance(cpm_expr.args[0], _BoolVarImpl):
                     # var -> boolexpr, natively supported by or-tools
                     bvar = self.ort_var(cpm_expr.args[0])
                     return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
@@ -432,7 +432,7 @@ class CPMpyORTools(SolverInterface):
         # decision variables, check in varmap
         if isinstance(cpm_var, NegBoolView):
             return self.varmap[cpm_var._bv].Not()
-        elif isinstance(cpm_var, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        elif isinstance(cpm_var, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
             return self.varmap[cpm_var]
 
         raise NotImplementedError("Not a know var {}".format(cpm_var))
@@ -463,7 +463,7 @@ class CPMpyORTools(SolverInterface):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
             return self.ort_var(cpm_expr)
 
         # sum or (to be implemented: wsum)

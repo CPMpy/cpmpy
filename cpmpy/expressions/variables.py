@@ -10,8 +10,22 @@
     .. autosummary::
         :nosignatures:
 
-        BoolVar
-        IntVar
+        boolvar
+        intvar
+        cpm_array
+
+    ==================
+    Module description
+    ==================
+
+    A decision variable is a variable whose value will be determined by the solver.
+
+    Boolean and Integer decision variables are the key elements of a CP model.
+
+    All variables in CPMpy are n-dimensional array objects and have defined dimensions. Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors with more than 2 dimensions are all supported too. For the implementation of this, CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits (vectorized operators and advanced indexing).
+
+    This module contains the cornerstone `boolvar()` and `intvar()` functions, which create (numpy arrays of) variables. There is also a helper function `cpm_array` for wrapping standard numpy arrays so they can be indexed by a variable. Apart from these 3 functions, none of the classes in this module should be directly created; they are created by these 3 helper functions.
+
 
     ===============
     List of classes
@@ -19,135 +33,188 @@
     .. autosummary::
         :nosignatures:
 
-        NumVarImpl
-        IntVarImpl
-        BoolVarImpl
+        NullShapeError
+        _NumVarImpl
+        _IntVarImpl
+        _BoolVarImpl
         NegBoolView
         NDVarArray
-        NullShapeError
-
-    =================
-    List of functions
-    =================
-    .. autosummary::
-        :nosignatures:
-
-        cparray
-
-    ==================
-    Module description
-    ==================
-
-    This module is used for defining single variables as well as numpy-arrays of variables. There are 2 different types of variables: boolean variables, integer variables.
-    
-    Boolean Variables
-    -----------------
-
-    Boolean variables a.k.a `BoolVar` are variables that have a very specific domain. They take either the value `True` or `False` (1 or 0 respectively).
-    The syntax is as follows:
-
-    .. code-block:: python
-
-        BoolVar([shape])
-
-    - *optional* **shape**: integer value larger than 0 or tuple of integer values.
-
-    The following examples show how to create a boolean variable with 3 use cases:
-
-    - the creation of a single (unit-sized or non-vector) boolean variable.
-        .. code-block:: python
-
-            # creation of a unit Boolean variable
-            x = BoolVar()
-
-    - the creation of a vector boolean variables. 
-
-        .. code-block:: python
-
-            # creation of a vector Boolean variables
-            x = BoolVar(3)
-
-            # note that using the python unpacking you can assign them
-            # to intermediate variables. THis allows for fine-grained use of variables when
-            # defining the constraints of the model
-            e,x,a,m,p,l = BoolVar(5)
-
-    - the creation of array/tensor of boolean variables. 
-        .. code-block:: python
-
-            # creation of an __array__ of Boolean variables where (3, 8, 7) reflects
-            # the dimensions of the tensor, a matrix of multiple-dimensions.
-            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
-            array_vars = BoolVar((3, 8, 7))
-
-    Integer Variables
-    -----------------
-
-    Integer variables are variables that are given a lower bound and an upper bound, correpsonding to the values that they can take.
-    The syntax is as follows:
-
-    .. code-block:: python
-
-        IntVar(lb, ub [, shape])
-    
-    - **lb**: lower bound
-    - **ub**: upper bound
-    - *optional* **shape**: integer value larger than 0 or tuple of integer values
-
-    The following examples showcase how to instantiate integer variable with 3 use cases similar to `BoolVar`:
-
-    - Creation of a single (unit-sized or non-vector) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
-
-        .. code-block:: python
-
-            # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
-            x = IntVar(3, 8)
-
-    - Creation of a vector integer variables with all having the same given lower bound and upper bound:
-
-        .. code-block:: python
-
-            # creation of a vector Boolean of 5 variables with lowerbound of 3 and upperbound of 8 
-            vecx = IntVar(3, 8, 5)
-
-            # Similar `BoolVar`'s python unpacking can assign multiple intermediate variables at once
-            e,x,a,m,p,l = IntVar(3, 8, 5)
-
-    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of boolean variables.
-        .. code-block:: python
-
-            arrx = IntVar(3, 8, (100, 100, 100, 100))
-
-    Array of Variables
-    ------------------
-
-    N-dimensional array of cp-variables. Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. 
-    First convert your numpy array to a cpmpy-numpy array with the `cparray()` wrapper:
-
-    .. code-block:: python
-
-        # Transforming a given numpy-array **m** into a cparray
-
-        marr = np.array([
-            [1, 2, 3, 4],
-            [4, 8, 13, 15]
-        ])
-
-        m = cparray(marr)
 
     ==============
     Module details
     ==============
 """
 
+import warnings # for deprecation warning
 import numpy as np
 from .core import Expression, Operator
 from .utils import is_num, is_int
 
 
-class NumVarImpl(Expression):
+def BoolVar(shape=1, name=None):
+    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
+    return boolvar(shape=shape, name=name)
+def boolvar(shape=1, name=None):
+    """
+    Boolean decision variables will take either the value `True` or `False`.
+    
+    Arguments:
+    shape -- the shape of the n-dimensional array of variables (int, default: 1)
+    name -- name to give to the variables (string, default: None)
+
+    If name is None then a name 'BV<unique number>' will be assigned to it.
+
+    If shape is different from 1, then each element of the array will have the location
+    of this specific variable in the array append to its name.
+
+    For example, `print(boolvar(shape=3, name="x"))` will print `[x[0],x[1],x[2]]`
+
+
+    The following examples show how to create Boolean variables of different shapes:
+
+    - Creating a single (unit-sized or scalar) Boolean variable:
+        .. code-block:: python
+
+            # creation of a unit Boolean variable
+            x = boolvar(name="x")
+
+    - the creation of a vector boolean variables. 
+
+        .. code-block:: python
+
+            # creation of a vector of size 3 of Boolean variables
+            x = boolvar(shape=3, name="x")
+
+            # note that with Python's unpacking, you can assign them
+            # to intermediate variables. This allows for fine-grained use of variables when
+            # defining the constraints of the model
+            e,x,a,m,p,l = boolvar(shape=6)
+
+    - the creation of a matrix or higher-order tensor of Boolean variables. 
+        .. code-block:: python
+
+            # creation of a 9x9 matrix of Boolean variables:
+            matrix = boolvar(shape=(9,9), name="matrix")
+
+            # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
+            # the dimensions of the tensor, a matrix of multiple-dimensions.
+            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
+            tensor = BoolVar(shape=(3, 8, 7), name="tensor")
+    """
+    if shape == 0 or shape is None:
+        raise NullShapeError(shape)
+    if shape == 1:
+        return _BoolVarImpl(name=name)
+    
+    # create base data
+    data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
+    # insert into custom ndarray
+    return NDVarArray(shape, dtype=object, buffer=data)
+
+
+def IntVar(lb, ub, shape=1, name=None):
+    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
+    return intvar(lb, ub, shape=shape, name=name)
+def intvar(lb, ub, shape=1, name=None):
+    """
+    Integer decision variables are constructed by specifying the lowest (lb)
+    the decision variable can take, as well as the highest value (ub).
+
+    Arguments:
+    lb -- lower bound on the values the variable can take (int)
+    ub -- upper bound on the values the variable can take (int)
+    shape -- the shape of the n-dimensional array of variables (int, default: 1)
+    name -- name to give to the variables (string, default: None)
+
+    The range of values between lb..ub is called the __domain__ of the integer variable.
+    All variables in an array start from the same domain.
+    Specific values in the domain of individual variables can be forbidden with constraints.
+
+    If name is None then a name 'IV<unique number>' will be assigned to it.
+
+    If shape is different from 1, then each element of the array will have the location
+    of this specific variable in the array append to its name.
+
+    The following examples show how to create integer variables of different shapes:
+
+    - Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+
+        .. code-block:: python
+
+            # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
+            x = intvar(3, 8, name="x")
+
+    - Creation of a vector of integer variables with all having the same given lower bound and upper bound:
+
+        .. code-block:: python
+
+            # creation of a vector Boolean of 5 variables with lowerbound of 3 and upperbound of 8 
+            x = intvar(3, 8, shape=5, name="x")
+
+            # Python's unpacking can assign multiple intermediate variables at once
+            e,x,a,m,p,l = intvar(3, 8, shape=5)
+
+    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        .. code-block:: python
+
+            arrx = intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
+
+    """
+    if shape == 0 or shape is None:
+        raise NullShapeError(shape)
+    if shape == 1:
+        return _IntVarImpl(lb,ub, name=name)
+
+    # create base data
+    data = np.array([_IntVarImpl(lb,ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
+    # insert into custom ndarray
+    return NDVarArray(shape, dtype=object, buffer=data)
+
+def cparray(arr):
+    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
+    return cpm_array(arr)
+def cpm_array(arr):
+    """
+    N-dimensional wrapper, to wrap standard numpy arrays or lists.
+
+    In CP modeling languages, indexing an array by an integer variable is common, e.g. `[1,2,3,4][var1] == var2`.
+    This is called an __element__ constraint. Python does not allow expressing it on standard arrays,
+    but CPMpy-numpy arrays do allow it, so you first have to wrap the array.
+
+    Note that 'arr' will be transformed to vector and indexed as such, 2-dimensional indexing is not supported (yet?).
+
+    .. code-block:: python
+
+        # Transforming a given numpy-array **m** into a cparray
+
+        iv1,iv2 = intvar(0,9, shape=2)
+
+        data = [1,2,3,4]
+        data = cpm_array(data)
+
+        Model([ data[iv1] == iv2 ])
+
+    As an alternative, you can also write the `Element` constraint directly on `data`: `Element(data, iv1) == iv2`
+    """
+    if not isinstance(arr, np.ndarray):
+        arr = np.array(arr)
+    return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
+
+
+class NullShapeError(Exception):
+    def __init__(self, shape, message="Shape should be non-zero"):
+        self.shape = shape
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return f'{self.shape}: {self.message}'
+
+class _NumVarImpl(Expression):
     """
     Abstract **continuous numerical** variable with given lowerbound and upperbound.
+
+    Abstract class, only mean to be subclassed
     """
     def __init__(self, lb, ub, name):
         assert (is_num(lb) and is_num(ub))
@@ -172,9 +239,11 @@ class NumVarImpl(Expression):
     def __hash__(self):
         return hash(str(self))
 
-class IntVarImpl(NumVarImpl):
+class _IntVarImpl(_NumVarImpl):
     """
     **Integer** constraint variable with given lowerbound and upperbound.
+
+    Do not create this object directly, use `intvar()` instead
     """
     counter = 0
 
@@ -183,14 +252,16 @@ class IntVarImpl(NumVarImpl):
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub),ub)
 
         if name is None:
-            name = "IV{}".format(IntVarImpl.counter)
-            IntVarImpl.counter = IntVarImpl.counter + 1 # static counter
+            name = "IV{}".format(_IntVarImpl.counter)
+            _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
-class BoolVarImpl(IntVarImpl):
+class _BoolVarImpl(_IntVarImpl):
     """
     **Boolean** constraint variable with given lowerbound and upperbound.
+
+    Do not create this object directly, use `boolvar()` instead
     """
     counter = 0
 
@@ -199,9 +270,9 @@ class BoolVarImpl(IntVarImpl):
         assert(ub == 0 or ub == 1)
 
         if name is None:
-            name = "BV{}".format(BoolVarImpl.counter)
-            BoolVarImpl.counter = BoolVarImpl.counter + 1 # static counter
-        IntVarImpl.__init__(self, lb, ub, name=name)
+            name = "BV{}".format(_BoolVarImpl.counter)
+            _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
+        _IntVarImpl.__init__(self, lb, ub, name=name)
         
 
     def is_bool(self):
@@ -225,14 +296,16 @@ class BoolVarImpl(IntVarImpl):
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
     def __hash__(self): return super().__hash__()
 
-class NegBoolView(BoolVarImpl):
+class NegBoolView(_BoolVarImpl):
     """
         Represents not(`var`), not an actual variable implementation!
 
-        It stores a link to `var`'s BoolVarImpl
+        It stores a link to `var`'s _BoolVarImpl
+
+        Do not create this object directly, use the `~` operator instead: `~bv`
     """
     def __init__(self, bv):
-        #assert(isinstance(bv, BoolVarImpl))
+        #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
 
     def value(self):
@@ -249,6 +322,8 @@ class NegBoolView(BoolVarImpl):
 class NDVarArray(Expression, np.ndarray):
     """
     N-dimensional numpy array of variables.
+
+    Do not create this object directly, use one of the functions in this module
     """
     def __init__(self, shape, **kwargs):
         # TODO: global name?
@@ -312,55 +387,6 @@ class NDVarArray(Expression, np.ndarray):
     #in	  __contains__(self, value) 	Check membership
     #object.__matmul__(self, other)
 
-class NullShapeError(Exception):
-    def __init__(self, shape, message="Shape should be non-zero"):
-        self.shape = shape
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return f'{self.shape}: {self.message}'
-
-# N-dimensional array of Boolean Decision Variables
-def BoolVar(shape=None, name=None):
-    """
-    # N-dimensional array of Boolean Decision Variables
-    """
-    if shape is None or shape == 1:
-        return BoolVarImpl(name=name)
-    elif shape == 0:
-        raise NullShapeError(shape)
-    
-    # create base data
-    data = np.array([BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
-    # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
-
-def IntVar(lb, ub, shape=None, name=None):
-    """
-    N-dimensional array of Integer Decision Variables with lower-bound `lb` and upper-bound `ub`
-    """
-    if shape is None or shape == 1:
-        return IntVarImpl(lb,ub, name=name)
-    elif shape == 0:
-        raise NullShapeError(shape)
-
-    # create base data
-    data = np.array([IntVarImpl(lb,ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
-    # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
-def cparray(arr):
-    """
-    N-dimensional wrapper, wraps a standard array.
-
-    So that we can do [1,2,3,4][var1] == var2, e.g. element([1,2,3,4],var1,var2)
-    needed because standard arrays can not be indexed by non-constants
-    """
-    if not isinstance(arr, np.ndarray):
-        arr = np.array(arr)
-    return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
 
 def _genname(basename, idxs):
     """

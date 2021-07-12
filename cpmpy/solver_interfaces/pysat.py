@@ -19,9 +19,9 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import *
-from ..expressions.utils import is_num, is_any_list
-from ..model_tools.get_variables import get_variables, vars_expr
+from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.utils import is_any_list
+from ..model_tools.get_variables import get_variables
 
 class CPM_pysat(SolverInterface):
     """
@@ -93,7 +93,7 @@ class CPM_pysat(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             # just a view, get actual var identifier, return -id
             return -self.pysat_vpool.id(cpm_var._bv.name)
-        elif isinstance(cpm_var, BoolVarImpl):
+        elif isinstance(cpm_var, _BoolVarImpl):
             return self.pysat_vpool.id(cpm_var.name)
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
@@ -110,7 +110,7 @@ class CPM_pysat(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # base case, just var or ~var
-        if isinstance(cpm_con, BoolVarImpl):
+        if isinstance(cpm_con, _BoolVarImpl):
             self.pysat_solver.add_clause([ self.pysat_var(cpm_con) ])
         elif isinstance(cpm_con, Operator):
             if cpm_con.name == 'or':
@@ -238,7 +238,7 @@ class CPM_pysat(SolverInterface):
 
         # check only BoolVarImpl (incl. NegBoolView)
         for var in get_variables(cpm_model):
-            if not isinstance(var, BoolVarImpl):
+            if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 
         # CNF object
@@ -249,7 +249,7 @@ class CPM_pysat(SolverInterface):
         for con in cpm_model.constraints:
             # TODO, perhaps we should check for lists of lists, or top-level ands?
             # base case, just var or ~var
-            if isinstance(con, BoolVarImpl):
+            if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
             elif isinstance(con, Operator):
                 if con.name == 'or':
