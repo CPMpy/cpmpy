@@ -21,7 +21,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
-from ..model_tools.get_variables import get_variables
+from ..transformations.get_variables import get_variables
 
 class CPM_pysat(SolverInterface):
     """

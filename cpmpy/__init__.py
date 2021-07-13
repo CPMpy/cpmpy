@@ -10,7 +10,7 @@
     - `model`: a generic container for expressions (constraints and an objective), it can also search for an available solver and call it
     - `expressions`: all forms of expression objects that allow you to specify constraints and objectives over variables
     - `solvers` (currently called solver_interfaces): CPMpy classes that translate a model into approriate calls of a solver's API
-    - `transformations` (currently called model_tools): common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
+    - `transformations`: common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
 """
 # Tias Guns, 2019-2021
 

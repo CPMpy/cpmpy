@@ -22,7 +22,7 @@
     ==============
 """
 
-from ..model_tools.get_variables import get_variables
+from ..transformations.get_variables import get_variables
 from .solver_interface import SolverInterface
 from ..expressions import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView

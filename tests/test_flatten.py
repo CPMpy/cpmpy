@@ -1,6 +1,6 @@
 import unittest
 import cpmpy as cp
-from cpmpy.model_tools.flatten_model import *
+from cpmpy.transformations.flatten_model import *
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 class TestFlattenModel(unittest.TestCase):

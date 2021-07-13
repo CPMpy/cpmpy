@@ -54,7 +54,7 @@ between them:
 
 import sys
 from cpmpy import *
-from cpmpy.model_tools.get_variables import vars_expr
+from cpmpy.transformations.get_variables import vars_expr
 from cpmpy.solver_interfaces.ortools import CPMpyORTools
 
 def main():
