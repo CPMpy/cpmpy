@@ -72,8 +72,10 @@ of the form specified above.
 The flattening does not promise to do common subexpression elimination or to automatically group
 commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
 
-TODO: not entirely implemented yet : )
-TODO: clean up behind_the_scenes.rst which sketches the previous normal form
+TODO: remove zipcycle (no longer needed)
+TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
+TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
+TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
 
 from itertools import cycle
@@ -180,6 +182,7 @@ def flatten_constraint(expr):
 
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
+        # XXX: zipcycle no longer needed, vectorized now handled at creation level!
         for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
             if __is_flat_var(lexpr) and __is_flat_var(rexpr):
                 flatcons += [Comparison(expr.name, lexpr, rexpr)]
@@ -189,6 +192,8 @@ def flatten_constraint(expr):
                 exprname = expr.name
                 # ==,!=: can swap if lhs is var and rhs is not
                 # TODO: this is very similar to (part of) normalize_boolexpr??
+                # XXX indeed, every case that is not 'reification' can be
+                # delegated to normalize_boolexpr... TODO
                 if (exprname == '==' or exprname == '!=') and \
                     not __is_flat_var(rexpr) and __is_flat_var(lexpr):
                     (lexpr,rexpr) = (rexpr,lexpr)
