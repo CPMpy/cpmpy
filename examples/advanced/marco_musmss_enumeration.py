@@ -55,7 +55,7 @@ between them:
 import sys
 from cpmpy import *
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 
 def main():
     x, y = IntVar(-9,9, shape=2)

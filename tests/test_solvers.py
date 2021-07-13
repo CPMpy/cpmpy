@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 import cpmpy as cp
-from cpmpy.solver_interfaces.util import get_supported_solvers
+from cpmpy.solvers.util import get_supported_solvers
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -67,7 +67,7 @@ class TestSolvers(unittest.TestCase):
 
         If any of these tests break, update docs/advanced_solver_features.md accordingly
         """
-        from cpmpy.solver_interfaces.ortools import CPMpyORTools
+        from cpmpy.solvers.ortools import CPMpyORTools
         from ortools.sat.python import cp_model as ort
 
         # standard use
@@ -174,7 +174,7 @@ class TestSolvers(unittest.TestCase):
 
 
     def test_pysat(self):
-        from cpmpy.solver_interfaces.pysat import CPM_pysat
+        from cpmpy.solvers.pysat import CPM_pysat
         if not CPM_pysat.supported():
             print("Skipping PySAT tests, not installed")
             return

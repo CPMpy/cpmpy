@@ -31,8 +31,8 @@
 """
 import numpy as np
 from .expressions.core import Operator
-from .solver_interfaces.util import get_supported_solvers
-from .solver_interfaces.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.util import get_supported_solvers
+from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 # TODO: add minimize() maximize() remove _from_list (see solver constructor)
 

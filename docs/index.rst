@@ -31,11 +31,12 @@ The software is in ALPHA state, and near the end of its proof-of-concept stage. 
    :maxdepth: 1
    :caption: API documentation:
 
-   api/variables
-   api/expressions
-   api/constraints
+   api/expressions/variables
+   api/expressions/core
+   api/expressions/globalconstraints
+   api/expressions/python_builtins
    api/model
-   api/solver_interfaces
+   api/solvers
 
 Supplementary :mod:`.examples` package
 --------------------------------------

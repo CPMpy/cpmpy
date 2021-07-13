@@ -24,7 +24,7 @@ All that needs to change is that you should create a CPMpyOrTools instance with 
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 
 s = CPMpyORTools(m)
 # solver specific stuff:
@@ -46,7 +46,7 @@ We first demonstate this with a native or-tools callback that simply counts the 
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback
@@ -75,7 +75,7 @@ It uses the exact same solution callback as in the previous example where we pri
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback, with CPMpy variables and printing
@@ -111,7 +111,7 @@ from ortools.sat.python import cp_model as ort
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback, with CPMpy variables and printing
@@ -146,7 +146,7 @@ However, in case you have custom blocking clauses, or don't care too much by som
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers.ortools import CPMpyORTools
 
 x = IntVar(0,3, shape=2)
 m = Model([x[0] > x[1]])
