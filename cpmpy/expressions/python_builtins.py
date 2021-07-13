@@ -24,6 +24,11 @@ from .globalconstraints import Minimum, Maximum
 # Overwriting all/any python built-ins
 # all: listwise 'and'
 def all(iterable):
+    """
+        all() overwrites python built-in,
+        if iterable contains an `Expression`, then returns an Operator("and", iterable)
+        otherwise returns whether all of the arguments is true
+    """
     collect = [] # logical expressions
     for elem in iterable:
         if elem is False:
@@ -42,6 +47,11 @@ def all(iterable):
 
 # any: listwise 'or'
 def any(iterable):
+    """
+        any() overwrites python built-in,
+        if iterable contains an `Expression`, then returns an Operator("or", iterable)
+        otherwise returns whether any of the arguments is true
+    """
     collect = [] # logical expressions
     for elem in iterable:
         if elem is True:
