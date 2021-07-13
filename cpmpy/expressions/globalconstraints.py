@@ -44,7 +44,7 @@
 
     .. code-block:: python
         def alldifferent_except0(args):
-            return [ ((var1!= 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in _all_pairs(args)]
+            return [ ((var1!= 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(args)]
 
 
     Numeric global constraints
@@ -108,7 +108,7 @@
 """
 from .core import Expression
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist
+from .utils import flatlist, all_pairs, argval
 from itertools import chain, combinations
 import warnings # for deprecation warning
 
@@ -153,7 +153,7 @@ class AllDifferent(GlobalConstraint):
         super().__init__("alldifferent", flatlist(args))
 
     def decompose(self):
-        return [var1 != var2 for var1, var2 in _all_pairs(self.args)]
+        return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
 
 def allequal(args):
@@ -167,7 +167,7 @@ class AllEqual(GlobalConstraint):
         super().__init__("allequal", flatlist(args))
 
     def decompose(self):
-        return [var1 == var2 for var1, var2 in _all_pairs(self.args)]
+        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -220,7 +220,7 @@ class Minimum(GlobalConstraint):
         super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return min([_argval(a) for a in self.args])
+        return min([argval(a) for a in self.args])
 
 class Maximum(GlobalConstraint):
     """
@@ -232,7 +232,7 @@ class Maximum(GlobalConstraint):
         super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return max([_argval(a) for a in self.args])
+        return max([argval(a) for a in self.args])
 
 class Element(GlobalConstraint):
     """
@@ -253,26 +253,11 @@ class Element(GlobalConstraint):
         super().__init__("element", arg_list, is_bool=False)
 
     def value(self):
-        idxval = _argval(self.args[1])
+        idxval = argval(self.args[1])
         if not idxval is None:
-            return _argval(self.args[0][idxval])
+            return argval(self.args[0][idxval])
         return None # default
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
 
-
-
-
-
-
-def _all_pairs(args):
-    """ internal helper function
-    """
-    return list(combinations(args, 2))
-
-# XXX, make argval shared util function?
-def _argval(a):
-    """ returns .value() of Expression, otherwise the variable itself
-    """
-    return a.value() if isinstance(a, Expression) else a
