@@ -30,10 +30,10 @@ def all(iterable):
             return False # no need to create constraint
         elif elem is True:
             pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
+        elif isinstance(elem, Expression) and elem.is_bool():
+            collect.append( elem )
         else:
-            raise Exception("unknown argument '{}' to 'all'".format(elem))
+            raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
@@ -48,10 +48,10 @@ def any(iterable):
             return True # no need to create constraint
         elif elem is False:
             pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
+        elif isinstance(elem, Expression) and elem.is_bool():
+            collect.append( elem )
         else:
-            raise Exception("unknown argument '{}' to 'any'".format(elem))
+            raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:

@@ -4,8 +4,59 @@
 ## expressions.py
 ##
 """
-    the `Expression` superclass and common subclasses. None of these objects need to be directly created, they are created through operator overloading on variables, or through helper functions (global constraints)
+    The `Expression` superclass and common subclasses `Expression` and `Operator`.
+    
+    None of these objects should be directly created, they are automatically created through operator
+    overloading on variables and expressions.
 
+    Here is a list of standard python operators and what object (with what expr.name) it creates:
+
+    Comparisons:
+    - x == y        Comparison("==", x, y)
+    - x != y        Comparison("!=", x, y)
+    - x < y         Comparison("<", x, y)
+    - x <= y        Comparison("<=", x, y)
+    - x > y         Comparison(">", x, y)
+    - x >= y        Comparison(">=", x, y)
+
+    Mathematical operators:
+    - -x            Operator("-", [x])
+    - abs(x)        Operator("abs", [x])
+    - x + y         Operator("sum", [x,y])
+    - sum([x,y,z])  Operator("sum", [x,y,z])
+    - x - y         Operator("sum", [x,-y])
+    - x * y         Operator("mul", [x,y])
+    - x / y         Operator("div", [x,y])
+    - x % y         Operator("mod", [x,y])
+    - x ** y        Operator("pow", [x,y])
+
+    Logical operators:
+    - x & y         Operator("and", [x,y])
+    - x | y         Operator("or", [x,y])
+    - x ^ y         Operator("xor", [x,y])
+
+    Finally there are two special cases for logical operators 'implies' and '~/not'.
+    
+    Python has no built-in operator for __implication__ that can be overloaded.
+    CPMpy hence has a function 'implies()' that can be called:
+    - x.implies(y)  Operator("->", [x,y])
+
+    For negation, we rewrite this to the more generic expression `x == 0`.
+    (which in turn creates a `NegBoolView()` in case x is a Boolean variable)
+    - ~x            x == 0
+
+
+    Apart from operator overleading, expressions implement two important functions:
+
+    - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
+                    If it does, the expression can be used as top-level constraint
+                    or in logical operators.
+
+    - `value()`     computes the value of this expression, by calling .value() on its
+                    subexpressions and doing the appropriate computation
+                    this is used to conveniently print variable values, objective values
+                    and any other expression value (e.g. during debugging).
+    
     ===============
     List of classes
     ===============
@@ -21,14 +72,18 @@ from .utils import is_num, is_any_list
 
 class Expression(object):
     """
-    each Expression is a function with a self.name and self.args (arguments)
-    each Expression is considered to be a function whose value can be used
+    An Expression is a function with a self.name and self.args (arguments)
+
+    Each Expression is considered to be a function whose value can be used
       in other expressions
-    each Expression may implement:
-    - boolexpr(): the Boolean form of the expression
-        default: (expr == 1)
-        override for Boolean expressions (preferably through __eq__, see Comparison)
-    - value(): the value of the expression, default None
+
+    Expressions may implement:
+    - is_bool():    whether its return type is Boolean
+    - value():      the value of the expression, default None
+    - implies(x):   logical implication of this expression towards x
+    - __repr__():   for pretty printing the expression
+    - __iter__():   in case the expression can be seen as a list that can be iterated over
+    - any __op__ python operator overloading
     """
 
     def __init__(self, name, arg_list):
@@ -54,11 +109,6 @@ class Expression(object):
             else:
                 strargs.append( f"{arg}" )
         return "{}({})".format(self.name, ",".join(strargs))
-
-    # booleanised expression
-    # optional, default: (self == 1)
-    def boolexpr(self):
-        return (self == 1)
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -199,10 +249,10 @@ class Expression(object):
         return Operator("mod", [other, self])
 
     def __pow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [other, self])
 
     # Not implemented: (yet?)
@@ -216,7 +266,7 @@ class Expression(object):
         return self
     def __abs__(self):
         return Operator("abs", [self])
-    # 'not' for now, no unary constraint for it but like boolexpr()
+    # 'not' for now, no unary constraint for it
     def __invert__(self):
         return (self == 0)
 
