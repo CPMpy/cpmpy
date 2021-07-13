@@ -339,6 +339,17 @@ class NDVarArray(Expression, np.ndarray):
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)
     
+    def __repr__(self):
+        """
+            some ways in which np creates this object does not call
+            the constructor, so the Expression does not have 'args'
+            set..
+        """
+        if not hasattr(self, "args"):
+            self.name = "NDVarArray"
+            self.args = self
+        return super().__repr__()
+
     def __getitem__(self, index):
         from .globalconstraints import Element # here to avoid circular
         # array access, check if variables are used in the indexing
