@@ -67,8 +67,10 @@
         Comparison
         Operator
 """
+from types import GeneratorType
+from collections.abc import Iterable
 import numpy as np
-from .utils import is_num, is_any_list
+from .utils import is_num, is_any_list, flatlist
 
 class Expression(object):
     """
@@ -82,12 +84,15 @@ class Expression(object):
     - value():      the value of the expression, default None
     - implies(x):   logical implication of this expression towards x
     - __repr__():   for pretty printing the expression
-    - __iter__():   in case the expression can be seen as a list that can be iterated over
     - any __op__ python operator overloading
     """
 
     def __init__(self, name, arg_list):
-        if isinstance(arg_list, np.ndarray):
+        self.name = name
+
+        if isinstance(arg_list, (tuple,GeneratorType)):
+            arg_list = list(arg_list)
+        elif isinstance(arg_list, np.ndarray):
             # must flatten
             arg_list = arg_list.reshape(-1)
         for i in range(len(arg_list)):
@@ -96,8 +101,8 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.name = name
         self.args = arg_list
+
 
     def __repr__(self):
         strargs = []
@@ -276,9 +281,6 @@ class Comparison(Expression):
 
     def __init__(self, name, left, right):
         assert (name in Comparison.allowed), "Symbol not allowed"
-        # if vectorized, must match
-        if hasattr(left, '__len__') and hasattr(right, '__len__'): 
-            assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
 
     def __repr__(self):
@@ -286,10 +288,6 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
-
-    # it could be a vectorized constraint
-    def __iter__(self):
-        return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
 
     # is bool, check special case
     def __eq__(self, other):
@@ -341,11 +339,9 @@ class Operator(Expression):
         arity, is_bool = Operator.allowed[name]
         if arity == 0:
             assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
+            arg_list = flatlist(arg_list)
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
-        if arity == 2 and hasattr(arg_list[0], '__len__'):
-            # special case: can be two lists
-            assert (len(arg_list[0]) == len(arg_list[1])), "Operator: the two arguments must have equal size"
 
         # convention for commutative binary operators:
         # swap if right is constant and left is not
@@ -381,12 +377,6 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-
-    # it could be a vectorized constraint
-    def __iter__(self):
-        if len(self.args) == 2:
-            return (Operator(self.name, list(args)) for args in zip(self.args[0], self.args[1]))
-        return super().__iter__(self)
 
     # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
     # + special case for weighted sum (sum of mul)
@@ -429,7 +419,10 @@ class Operator(Expression):
             return self
 
         if self.name == 'sum':
-            self.args.append(other)
+            if not isinstance(other, Iterable):
+                self.args.append(other)
+            else: # vector
+                self.args.extend(other)
             return self
         return super().__add__(other)
 
@@ -439,7 +432,10 @@ class Operator(Expression):
             return self
 
         if self.name == 'sum':
-            self.args.insert(0, other)
+            if not isinstance(other, Iterable):
+                self.args.insert(0, other)
+            else: # vector
+                self.args[:0] = other # prepend an array
             return self
         return super().__radd__(other)
 

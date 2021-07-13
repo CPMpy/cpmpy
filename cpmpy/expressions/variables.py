@@ -45,10 +45,11 @@
     ==============
 """
 
+from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int
+from .utils import is_num, is_int, flatlist
 
 
 def BoolVar(shape=1, name=None):
@@ -393,6 +394,48 @@ class NDVarArray(Expression, np.ndarray):
 
         # return sum object
         return Operator("sum", self)
+
+    # VECTORIZED master function (delegate)
+    def _vectorized(self, other, attr):
+        if not isinstance(other, Iterable):
+            other = [other]*len(self)
+        # this is a bit cryptic, but it calls 'attr' on s with o as arg
+        # s.__eq__(o) <-> getattr(s, '__eq__')(o)
+        return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
+        
+    # VECTORIZED comparisons
+    def __eq__(self, other):
+        return self._vectorized(other, '__eq__') 
+    def __ne__(self, other):
+        return self._vectorized(other, '__ne__') 
+    def __lt__(self, other):
+        return self._vectorized(other, '__lt__') 
+    def __le__(self, other):
+        return self._vectorized(other, '__le__') 
+    def __gt__(self, other):
+        return self._vectorized(other, '__gt__') 
+    def __ge__(self, other):
+        return self._vectorized(other, '__ge__') 
+
+    # VECTORIZED operators (only binary ones, and not - either)
+    def __mul__(self, other):
+        return self._vectorized(other, '__mul__') 
+    def __rmul__(self, other):
+        return self._vectorized(other, '__rmul__') 
+    def __truediv__(self, other):
+        return self._vectorized(other, '__truediv__') 
+    def __rtruediv__(self, other):
+        return self._vectorized(other, '__rtruediv__') 
+    def __mod__(self, other):
+        return self._vectorized(other, '__mod__') 
+    def __rmod__(self, other):
+        return self._vectorized(other, '__rmod__') 
+    def __pow__(self, other, modulo=None):
+        assert (modulo is None), "Power operator: modulo not supported"
+        return self._vectorized(other, '__pow__') 
+    def __rpow__(self, other, modulo=None):
+        assert (modulo is None), "Power operator: modulo not supported"
+        return self._vectorized(other, '__rpow__') 
 
     # TODO?
     #in	  __contains__(self, value) 	Check membership

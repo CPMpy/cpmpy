@@ -38,6 +38,9 @@ node_fuel = [arc_fuel[i, s[i]] for i in range(nHouses)]
 cons += [ sum(node_fuel) < fuelLimit ]
 
 # amount of gold earned, only for stops visited, s[i] != i
+e = (s != range(nHouses))
+print(type(s), type(e), e)
+gold = sum( e*data['goldInHouse'] )
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
 
 model = Model(cons, maximize=gold)

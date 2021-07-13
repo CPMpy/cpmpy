@@ -11,9 +11,9 @@
     .. autosummary::
         :nosignatures:
 
-        alldifferent
-        allequal
-        circuit
+        AllDifferent
+        AllEqual
+        Circuit
         Table
         Minimum
         Maximum
@@ -21,33 +21,56 @@
         GlobalConstraint
 
     ==================
-    Module description
+    Module Description
     ==================
 
-    Global constraint definitions
-
-    A global constraint is nothing special in CPMpy. It is just an
-    expression of type `GlobalConstraint` with a name and arguments.
+    Global constraints conveniently express non-primitive constraints.
 
 
-    You can define a new global constraint as simply as:
+    Using global constraints
+    ------------------------
+
+    Solvers can have specialised implementations for global constraints. CPMpy has GlobalConstraint
+    expressions so that they can be passed to the solver as is when supported.
+
+    If a solver does not support a global constraint (see solvers/) then it will be automatically
+    decomposed by calling its `.decompose()` function.
+
+    As a user you **should almost never subclass GlobalConstraint** unless you know of a solver that
+    supports that specific global constraint, and that you will update its solver interface to support it.
+
+    For all other use cases, it sufficies to write your own helper function that immediately returns the
+    decomposition, e.g.:
 
     .. code-block:: python
+        def alldifferent_except0(args):
+            return [ ((var1!= 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in _all_pairs(args)]
 
-        def my_global(args):
-            return GlobalConstraint("my_global", args)
+
+    Numeric global constraints
+    --------------------------
+
+    CPMpy also implements __Numeric Global Constraints__. For these, the CPMpy GlobalConstraint does not
+    exactly match what is implemented in the solver, but for good reason!!
+
+    For example solvers may implement the global constraint `Minimum(iv1, iv2, iv3) == iv4` through an API
+    call `addMinimumEquals([iv1,iv2,iv3], iv4)`.
+
+    However, CPMpy also wishes to support the expressions `Minimum(iv1, iv2, iv3) > iv4` as well as
+    `iv4 + Minimum(iv1, iv2, iv3)`. 
+
+    Hence, the CPMpy global constraint only captures the `Minimum(iv1, iv2, iv3)` part, whose return type
+    is numeric and can be used in any other CPMpy expression. Only at the time of transforming the CPMpy
+    model to the solver API, will the expressions be decomposed and auxiliary variables introduced as needed
+    such that the solver only receives `Minimum(iv1, iv2, iv3) == ivX` expressions.
+    This is the burden of the CPMpy framework, not of the user who wants to express a problem formulation.
 
 
-    Of course, solvers may not support a global constraint
-    (if it does, it should be mapped to the API call in its SolverInterface)
-
-    You can provide a decomposition for your global constraint through
-    the decompose() function.
-    To overwrite it, you should define your global constraint as a
-    subclass of GlobalConstraint, rather then as a function above.
-
-    Your decomposition function can use any standard CPMpy expression.
-    For example:
+    Subclassing GlobalConstraint
+    ----------------------------
+    
+    If you do wish to add a GlobalConstraint, because it is supported by solvers or because you will do
+    advanced analysis and rewriting on it, then preferably define it with a standard decomposition, e.g.:
 
     .. code-block:: python
 
@@ -58,8 +81,15 @@
             def decompose(self):
                 return [self.args[0] != self.args[1]] # your decomposition
 
-    If you are modeling a problem and you want to use another decomposition,
-    simply overwrite the 'decompose' function of the class, e.g.:
+    If it is a __numeric global constraint__ meaning that its return type is numeric (see `Minimum` and `Element`)
+    then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
+
+
+    Alternative decompositions
+    --------------------------
+    
+    For advanced use cases where you want to use another decomposition than the standard decomposition
+    of a GlobalConstraint expression, you can overwrite the 'decompose' function of the class, e.g.:
 
     .. code-block:: python
 
@@ -67,22 +97,27 @@
             return [self.args[0] == 1] # does not actually enforce circuit
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
-        vars = IntVars(1,9, shape=(10,))
+        vars = intvar(1,9, shape=10)
         constr = circuit(vars)
 
         Model(constr).solve()
 
     The above will use 'my_circuit_decomp', if the solver does not
     natively support 'circuit'.
+
 """
 from .core import Expression
-from .variables import BoolVar, IntVar
+from .variables import boolvar, intvar, cpm_array
+from .utils import flatlist
 from itertools import chain, combinations
+import warnings # for deprecation warning
 
+
+# Base class GlobalConstraint
 
 class GlobalConstraint(Expression):
     # is_bool: whether this is normal constraint (True or False)
-    #   not is_bool: it computes a numeric value (ex: Element)
+    #   not is_bool: it computes a numeric value (ex: Minimum, Element)
     def __init__(self, name, arg_list, is_bool=True):
         super().__init__(name, arg_list)
         self._is_bool = is_bool
@@ -104,41 +139,53 @@ class GlobalConstraint(Expression):
         return None
 
 
-class alldifferent(GlobalConstraint):
+# Global Constraints (with Boolean return type)
+
+
+def alldifferent(args):
+    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    return AllDifferent(*args) # unfold list as individual arguments
+class AllDifferent(GlobalConstraint):
     """
-    all arguments have a different (distinct) value
+    All arguments have a different (distinct) value
     """
-    def __init__(self, args):
-        super().__init__("alldifferent", args)
+    def __init__(self, *args):
+        super().__init__("alldifferent", flatlist(args))
 
     def decompose(self):
         return [var1 != var2 for var1, var2 in _all_pairs(self.args)]
 
 
-class allequal(GlobalConstraint):
+def allequal(args):
+    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    return AllEqual(*args) # unfold list as individual arguments
+class AllEqual(GlobalConstraint):
     """
-    all arguments have the same value
+    All arguments have the same value
     """
-    def __init__(self, args):
-        super().__init__("allequal", args)
+    def __init__(self, *args):
+        super().__init__("allequal", flatlist(args))
 
     def decompose(self):
         return [var1 == var2 for var1, var2 in _all_pairs(self.args)]
 
-class circuit(GlobalConstraint):
+def circuit(args):
+    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    return Circuit(*args) # unfold list as individual arguments
+class Circuit(GlobalConstraint):
     """
-    Variables of the constraint form a circuit ex: 0 -> 3 -> 2 -> 0
+    The sequence of variables form a circuit ex: 0 -> 3 -> 2 -> 0
     """
-    def __init__(self, args):
-        super().__init__("circuit", args)
+    def __init__(self, *args):
+        super().__init__("circuit", flatlist(args))
 
     def decompose(self):
         """
             TODO needs explanation/reference
         """
         n = len(self.args)
-        a = self.args
-        z = IntVar(0, n-1, n)
+        a = cpm_array(self.args)
+        z = intvar(0, n-1, n)
         constraints = [alldifferent(z),
                        alldifferent(a),
                        z[0]==a[0],
@@ -160,6 +207,9 @@ class Table(GlobalConstraint):
         raise NotImplementedError("TODO: table decomposition")
 
 
+# Numeric Global Constraints (with integer-valued return type)
+
+
 class Minimum(GlobalConstraint):
     """
         Computes the minimum value of the arguments
@@ -167,7 +217,7 @@ class Minimum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        super().__init__("min", arg_list, is_bool=False)
+        super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
         return min([_argval(a) for a in self.args])
@@ -179,7 +229,7 @@ class Maximum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        super().__init__("max", arg_list, is_bool=False)
+        super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
         return max([_argval(a) for a in self.args])
@@ -213,11 +263,13 @@ class Element(GlobalConstraint):
 
 
 
+
+
+
 def _all_pairs(args):
     """ internal helper function
     """
-    pairs = list(combinations(args, 2))
-    return pairs
+    return list(combinations(args, 2))
 
 # XXX, make argval shared util function?
 def _argval(a):
