@@ -23,6 +23,7 @@ Internal utilities for expression handling.
 
 import numpy as np
 from collections.abc import Iterable # for _flatten
+from itertools import chain, combinations
 
 def is_int(arg):
     """ is it an integer? (incl numpy variants)

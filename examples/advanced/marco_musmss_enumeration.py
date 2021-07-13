@@ -54,7 +54,7 @@ between them:
 
 import sys
 from cpmpy import *
-from cpmpy.transformations.get_variables import vars_expr
+from cpmpy.transformations.get_variables import get_variables
 from cpmpy.solver_interfaces.ortools import CPMpyORTools
 
 def main():
@@ -124,7 +124,7 @@ class SubsetSolver:
         if warmstart:
             self.warmstart = warmstart
             # for warmstarting from a previous solution
-            self.user_vars = vars_expr(constraints)
+            self.user_vars = get_variables(constraints)
             self.user_vars_sol = None
 
     def check_subset(self, seed):

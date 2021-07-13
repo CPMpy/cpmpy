@@ -106,11 +106,10 @@
     natively support 'circuit'.
 
 """
+import warnings # for deprecation warning
 from .core import Expression
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval
-from itertools import chain, combinations
-import warnings # for deprecation warning
 
 
 # Base class GlobalConstraint

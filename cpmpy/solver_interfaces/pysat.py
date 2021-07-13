@@ -21,7 +21,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables
+from ..transformations.get_variables import get_variables_model
 
 class CPM_pysat(SolverInterface):
     """
@@ -74,7 +74,7 @@ class CPM_pysat(SolverInterface):
         self.name = "pysat"
 
         # store original vars
-        self.user_vars = get_variables(cpm_model)
+        self.user_vars = get_variables_model(cpm_model)
 
         # ID pool of variables
         self.pysat_vpool = IDPool()
@@ -237,7 +237,7 @@ class CPM_pysat(SolverInterface):
         from pysat.formula import CNF
 
         # check only BoolVarImpl (incl. NegBoolView)
-        for var in get_variables(cpm_model):
+        for var in get_variables_model(cpm_model):
             if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 

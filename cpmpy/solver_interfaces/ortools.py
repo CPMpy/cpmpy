@@ -21,7 +21,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
-from ..transformations.get_variables import get_variables, vars_expr
+from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
 
 class CPMpyORTools(SolverInterface):
@@ -65,7 +65,7 @@ class CPMpyORTools(SolverInterface):
         self.name = "ortools"
 
         # store original vars and objective (before flattening)
-        self.user_vars = get_variables(cpm_model)
+        self.user_vars = get_variables_model(cpm_model)
 
         # create model (includes conversion to flat normal form)
         self.ort_model = self.make_model(cpm_model)
@@ -87,13 +87,13 @@ class CPMpyORTools(SolverInterface):
         :type cpm_cons list of Expressions
         """
         # store new user vars
-        new_user_vars = vars_expr(cons)
+        new_user_vars = get_variables(cons)
         for v in frozenset(new_user_vars)-frozenset(self.user_vars):
             self.user_vars.append(v)
 
         flat_cons = flatten_constraint(cons)
         # add new (auxiliary) variables
-        for var in vars_expr(flat_cons):
+        for var in get_variables(flat_cons):
             if not var in self.varmap:
                 self.add_to_varmap(var)
         # add constraints
@@ -230,7 +230,7 @@ class CPMpyORTools(SolverInterface):
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
-        for var in get_variables(flat_model):
+        for var in get_variables_model(flat_model):
             self.add_to_varmap(var)
 
         # Post the (flat) constraint expressions to the solver
@@ -407,7 +407,7 @@ class CPMpyORTools(SolverInterface):
                     flatdec = flatten_constraint(dec)
 
                     # collect and create new variables
-                    for var in vars_expr(flatdec):
+                    for var in get_variables(flatdec):
                         if not var in self.varmap:
                             self.add_to_varmap(var)
                     # post decomposition
