@@ -19,7 +19,7 @@ m = Model([
     bv[2].implies(iv[2] > iv[0])
 ])
 
-s = CPMpyORTools(m)
+s = CPM_ortools(m)
 print(s.solve(assumptions=bv))
 print(s.status())
 print("core:", s.get_core())

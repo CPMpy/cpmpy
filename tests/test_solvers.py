@@ -67,7 +67,7 @@ class TestSolvers(unittest.TestCase):
 
         If any of these tests break, update docs/advanced_solver_features.md accordingly
         """
-        from cpmpy.solvers.ortools import CPMpyORTools
+        from cpmpy.solvers.ortools import CPM_ortools
         from ortools.sat.python import cp_model as ort
 
         # standard use
@@ -81,7 +81,7 @@ class TestSolvers(unittest.TestCase):
         # advanced solver params
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
         s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
         self.assertTrue(s.solve())
@@ -101,7 +101,7 @@ class TestSolvers(unittest.TestCase):
 
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -129,7 +129,7 @@ class TestSolvers(unittest.TestCase):
 
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -139,7 +139,7 @@ class TestSolvers(unittest.TestCase):
 
         # intermediate solutions
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
-        s = CPMpyORTools(m_opt)
+        s = CPM_ortools(m_opt)
         ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
         self.assertEqual(s._after_solve(ort_status), 5.0) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -150,7 +150,7 @@ class TestSolvers(unittest.TestCase):
         # manually enumerating solutions
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         solcount = 0
         while(s.solve()):
             solcount += 1
@@ -168,7 +168,7 @@ class TestSolvers(unittest.TestCase):
             bv[1].implies(iv[1] > iv[2]),
             bv[2].implies(iv[2] > iv[0])
         ])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 

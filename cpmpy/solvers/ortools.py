@@ -11,20 +11,20 @@
     .. autosummary::
         :nosignatures:
 
-        CPMpyORTools
+        CPM_ortools
 
     ==============
     Module details
     ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
 
-class CPMpyORTools(SolverInterface):
+class CPM_ortools(SolverInterface):
     """
     Interface to the python 'ortools' API
 
