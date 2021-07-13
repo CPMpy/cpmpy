@@ -121,7 +121,7 @@ class CPM_ortools(SolverInterface):
 
     def solve(self, time_limit = None, assumptions=None):
         """
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
+            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
         """
