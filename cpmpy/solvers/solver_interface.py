@@ -45,8 +45,32 @@ class SolverInterface(object):
         """
         return False
 
+    # REQUIRED functions to mimic `Model` interface:
+
     def __init__(self):
         self.cpm_status = SolverStatus("dummy") # status of solving this model
+
+    def __add__(self):
+        """
+            Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
+        """
+        raise NotImplementedError("Solver does not support eagerly adding constraints")
+
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("Solver does not support objective functions")
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("Solver does not support objective functions")
 
     def status(self):
         return self.cpm_status
@@ -69,12 +93,6 @@ class SolverInterface(object):
         return False
 
     # OPTIONAL functions
-
-    def __add__(self):
-        """
-            Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
-        """
-        raise NotImplementedError("Solver does not support eagerly adding constraints")
 
     def solution_hint(self, cpm_vars, vals):
         """

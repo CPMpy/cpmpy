@@ -102,6 +102,38 @@ class CPM_ortools(SolverInterface):
 
         return self
 
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        # flatten
+        (flat_obj, flat_cons) = flatten_constraint(expr)
+
+        # add constraints if needed
+        if len(flat_cons) != 0:
+            self += flat_cons
+
+        obj = self.ort_numexpr(flat_obj)
+        self.ort_model.Minimize(obj)
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        # flatten
+        (flat_obj, flat_cons) = flatten_constraint(expr)
+
+        # add constraints if needed
+        if len(flat_cons) != 0:
+            self += flat_cons
+
+        obj = self.ort_numexpr(flat_obj)
+        self.ort_model.Maximize(obj)
+
 
     def solution_hint(self, cpm_vars, vals):
         """
