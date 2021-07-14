@@ -157,11 +157,33 @@ class CPM_ortools(SolverInterface):
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
-    def solve(self, time_limit = None, assumptions=None):
+    def solve(self, time_limit=None, assumptions=None, **kwargs):
         """
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+
+            Additional keyword arguments:
+            The ortools solver parameters are defined in its 'sat_parameters.proto' description:
+            https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
+
+            You can use any of these parameters as keyword argument to `solve()` and they will
+            be forwarded to the solver. Examples include:
+                - num_search_workers=8          number of parallel workers (default: 1)
+                - log_search_progress=True      to log the search process to stdout (default: False)
+                - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
+                - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
+                - linearization_level=0         to disable linearisation (default: 1, can also set to 2)
+                - optimize_with_core=True       to do max-sat like lowerbound optimisation (default: False)
+                - use_branching_in_lp=True      to generate more info in lp propagator (default: False)
+                - polish_lp_solution=True       to spend time in lp propagator searching integer values (default: False)
+                - symmetry_level=1              only do symmetry breaking in presolve (default: 2, also possible: 0)
+
+            example:
+            o.solve(num_search_workers=8, log_search_progress=True)
+
         """
         from ortools.sat.python import cp_model as ort
 
@@ -181,6 +203,10 @@ class CPM_ortools(SolverInterface):
             self.assumption_dict = dict( (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars) )
             self.ort_model.ClearAssumptions() # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
+
+        # set additional keyword arguments in sat_parameters.proto
+        for (kw, val) in kwargs.items():
+            setattr(self.ort_solver.parameters, kw, val)
 
         ort_status = self.ort_solver.Solve(self.ort_model)
 
