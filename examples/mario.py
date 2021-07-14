@@ -4,8 +4,8 @@ Mario problem in CPMpy
 
 Based on the MiniZinc model, same data
 """
-from cpmpy import *
 import numpy
+from cpmpy import *
 
 data = { # a dictionary, json style
   'nbHouses': 15,
@@ -22,27 +22,26 @@ marioHouse, luigiHouse = data['MarioHouse']-1, data['LuigiHouse']-1
 fuelLimit = data['fuelMax']
 nHouses = data['nbHouses']
 arc_fuel = data['conso'] # arc_fuel[a,b] = fuel from a to b
+arc_fuel = cpm_array(arc_fuel) # needed to do arc_fuel[var1] == var2
 
 # s[i] is the house succeeding to the ith house (s[i]=i if not part of the route)
-s = IntVar(0,nHouses-1, shape=nHouses, name="s")
+s = intvar(0,nHouses-1, shape=nHouses, name="s")
 
-cons = []
-# s should be a path, mimic (sub)circuit by connecting end-point back to start
-cons += [ s[luigiHouse] == marioHouse ]
-cons += [ circuit(s) ] # should be subcircuit?
+model = Model(
+    #s should be a path, mimic (sub)circuit by connecting end-point back to start
+    s[luigiHouse] == marioHouse,
+    circuit(s),  # should be subcircuit?
+)
 
 # consumption, knowing that always conso[i,i]=0 
 # node_fuel[i] = arc_fuel[i, successor-of-i]
-arc_fuel = cparray(arc_fuel) # needed to do arc_fuel[var1] == var2
+# observe how we do NOT create auxiliary CP variables here, just a list of expressions...
 node_fuel = [arc_fuel[i, s[i]] for i in range(nHouses)]
-cons += [ sum(node_fuel) < fuelLimit ]
+model += sum(node_fuel) < fuelLimit
 
 # amount of gold earned, only for stops visited, s[i] != i
-e = (s != range(nHouses))
-print(type(s), type(e), e)
-gold = sum( e*data['goldInHouse'] )
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
+model.maximize(gold)
 
-model = Model(cons, maximize=gold)
 print("Gold:", model.solve()) # solve returns objective value
 print("successor vars:",s.value())
