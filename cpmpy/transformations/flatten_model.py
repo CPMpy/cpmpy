@@ -255,7 +255,6 @@ def flatten_objective(expr):
             if all(__is_flat_var(arg) for arg in expr.args):
                 return (expr, [])
             else:
-                print("recursive sum:", expr)
                 # one of the arguments is not flat, flatten all
                 flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
                 newexpr = Operator(expr.name, flatvars)

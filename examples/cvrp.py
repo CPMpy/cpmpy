@@ -3,15 +3,14 @@ from cpmpy import *
 import numpy as np
 import math
 """
-  Taken from Google Ortools example https://developers.google.com/optimization/routing/tsp
-  
 In the Vehicle Routing Problem (VRP), the goal is to find 
 a closed path of minimal length
 for a fleet of vehicles visiting a set of locations.
 If there's only 1 vehicle it reduces to the TSP.
 """
+
 def compute_euclidean_distance_matrix(locations):
-    """Creates callback to return distance between points."""
+    """Computes distances between all points (from ortools docs)."""
     n_city = len(locations)
     distances = np.zeros((n_city,n_city))
     for from_counter, from_node in enumerate(locations):
@@ -21,73 +20,70 @@ def compute_euclidean_distance_matrix(locations):
                     math.hypot((from_node[0] - to_node[0]),
                                (from_node[1] - to_node[1]))))
     return distances.astype(int)
+
+# data
 depot = 0
 locations= [
         (288, 149), (288, 129), (270, 133), (256, 141), (256, 157), (246, 157),
         (236, 169), (228, 169), (228, 161), (220, 169)
 ]
-# Pickup Capacities of each location 
-capacities = [0,3,4,8,9,8,10,5,3,9] # depot has no capcity
-
+# Pickup demand of each location 
+demand = [0,3,4,8,9,8,10,5,3,9] # depot has no demand
+distance_matrix = compute_euclidean_distance_matrix(locations)
 
 n_city = len(locations)
-distance_matrix = compute_euclidean_distance_matrix(locations)
-n_vehicle = 3
 # 3 vehicles and capacity of each vehicle 25
-q =  25
+n_vehicle, q = 3, 25
+
 
 # x[i,j] = 1 means that a vehicle goes from node i to node j 
-x = IntVar(0, 1, shape=distance_matrix.shape) 
+x = intvar(0, 1, shape=distance_matrix.shape) 
 # y[i,j] is a flow of load through arc (i,j)
-y = IntVar(0, q, shape=distance_matrix.shape)
+y = intvar(0, q, shape=distance_matrix.shape)
 
-constraint  = []
-# constarint on number of vehicles
-constraint  += [sum(x[0,:])<= n_vehicle ]
-# # vehicle leaves and enter  each node i exactly once 
-constraint  += [sum(x[i,:])==1 for i in range(1,n_city)] 
-constraint  += [sum(x[:,i])==1 for i in range(1,n_city)]
-constraint += [sum(x[i,i] for i in range(n_city))==0] ## No self loop
-# the vehicle return at the depot with no load
-constraint  += [sum(y[:,0])==0 ]
-# flow into node i through all ingoing arcs  equal to 
-# flow out of node i through all outgoing arcs + load capcity @ node i
-constraint  += [sum(y[:,i])==sum(y[i,:])+capacities[i] for i in range(1,n_city)]
+model = Model(
+    # constraint on number of vehicles (from depot)
+    sum(x[0,:]) <= n_vehicle,
+    # vehicle leaves and enter each node i exactly once 
+    [sum(x[i,:])==1 for i in range(1,n_city)],
+    [sum(x[:,i])==1 for i in range(1,n_city)],
+    # no self visits
+    [sum(x[i,i] for i in range(n_city))==0],
 
-#the objective is to minimze  the travel distance 
+    # from depot takes no load
+    sum(y[0,:]) == 0,
+    # flow out of node i through all outgoing arcs is equal to 
+    # flow into node i through all ingoing arcs + load capacity @ node i
+    [sum(y[i,:])==sum(y[:,i])+demand[i] for i in range(1,n_city)],
+)
+
+# capacity constraint at each node (conditional on visit)
 for i in range(n_city):
     for j in range(n_city):
-        constraint  += [y[i,j] <= q*x[i,j]]
-objective = sum(x*distance_matrix)
+        model += y[i,j] <= q*x[i,j]
 
-model = Model(constraint, minimize=objective)
+#the objective is to minimze  the travel distance 
+model.minimize(sum(x*distance_matrix))
+
 # print(model)
 
-stats = model.solve()
-print(stats)
-print(x.value())
+val = model.solve()
+print(model.status())
 
+print("Total Cost of solution",val)
 sol = x.value()
-objective = np.sum(sol*distance_matrix)
-print('Solution')
-print("Total Cost of solution",objective)
 firsts = np.where(sol[0]==1)[0]
-for f in range(len(firsts)):
-    print("Vehicle {}".format(f+1))
-    
-    dest = 100
-    source = firsts[f]
-    print("Vehicle {} goes from Depot to Stop Index {}".format(f+1,source))
-    
-    while dest !=0:
+for i, dest in enumerate(firsts):
+    msg = f"Vehicle {i}: 0"
+
+    source = 0
+    dist = 0
+    while dest != 0:
+        dist += distance_matrix[source,dest]
+        msg += f" --{y[source,dest].value()}--> {dest}[{demand[dest]}]"
+        source = dest
         dest = np.argmax(sol[source])
 
-
-        if source==0:
-            print("Vehicle {} goes from Stop index {} to Stop Index {}".format(f+1,source,dest))
-        elif dest==0:
-            print("And finally, Vehicle {} goes from Stop index {} to Depot".format(f+1,source))
-        else:
-            print("Then, Vehicle {} goes  from Stop index {} to Stop Index {} ".format(f+1, source,dest))
-        source = dest
-    print("______________________")
+    dist += distance_matrix[source,dest]
+    msg += f" --{y[source,dest].value()}--> {dest} :: total km={dist}"
+    print(msg)
