@@ -22,7 +22,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
-from ..transformations.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
+from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
 
 class CPM_ortools(SolverInterface):
     """
@@ -47,7 +47,7 @@ class CPM_ortools(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model):
+    def __init__(self, cpm_model=None):
         """
         Constructor of the solver object
 
@@ -64,11 +64,17 @@ class CPM_ortools(SolverInterface):
         super().__init__()
         self.name = "ortools"
 
-        # store original vars and objective (before flattening)
-        self.user_vars = get_variables_model(cpm_model)
+        if cpm_model is None:
+            self.user_vars = []
+            self.ort_model = ort.CpModel()
+            self.varmap = dict() # cppy var -> solver var
+        else:
+            # store original vars and objective (before flattening)
+            self.user_vars = get_variables_model(cpm_model)
 
-        # create model (includes conversion to flat normal form)
-        self.ort_model = self.make_model(cpm_model)
+            # create model (includes conversion to flat normal form)
+            self.ort_model = self.make_model(cpm_model)
+
         # create the solver instance
         # (so its params can still be changed before calling solve)
         self.ort_solver = ort.CpSolver()
@@ -109,7 +115,7 @@ class CPM_ortools(SolverInterface):
             `minimize()` can be called multiple times, only the last one is stored
         """
         # flatten
-        (flat_obj, flat_cons) = flatten_constraint(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr)
 
         # add constraints if needed
         if len(flat_cons) != 0:
@@ -125,7 +131,7 @@ class CPM_ortools(SolverInterface):
             `maximize()` can be called multiple times, only the last one is stored
         """
         # flatten
-        (flat_obj, flat_cons) = flatten_constraint(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr)
 
         # add constraints if needed
         if len(flat_cons) != 0:

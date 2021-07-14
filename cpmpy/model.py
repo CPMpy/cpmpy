@@ -37,8 +37,6 @@ from .expressions.utils import is_any_list
 from .solvers.util import get_supported_solvers
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
-# TODO: add minimize() maximize() remove _from_list (see solver constructor)
-
 class Model(object):
     """
     CPMpy Model object, contains the constraint and objective expressions

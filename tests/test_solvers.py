@@ -77,6 +77,18 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 0)
 
+        # direct use
+        o = CPM_ortools()
+        o += x[0] > x[1]
+        self.assertTrue(o.solve())
+        o.minimize(x[0])
+        o.solve()
+        self.assertEquals(x[0].value(), 1)
+        o.maximize(x[1])
+        o.solve()
+        self.assertEquals(x[1].value(), 2)
+
+
 
         # advanced solver params
         x = cp.IntVar(0,3, shape=2)
