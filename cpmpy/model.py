@@ -4,6 +4,21 @@
 ## model.py
 ##
 """
+    The `Model` class is a lazy container for constraints and an objective function.
+
+    It is lazy in that it only stores the constraints and objective that are added
+    to it. Processing only starts when solve() is called, and this does not modify
+    the constraints or objective stored in the model.
+
+    A model can be solved multiple times, and constraints can be added to it inbetween
+    solve calls.
+
+    See the examples for basic usage, which involves:
+
+    - creation, e.g. m = Model(cons, minimize=obj)
+    - solving, e.g. m.solve()
+    - optionally, checking status/runtime, e.g. m.status()
+
     ===============
     List of classes
     ===============
@@ -12,25 +27,13 @@
 
         Model
 
-    ==================
-    Module description
-    ==================
-
-    Class that contains the constraints and the objective function,
-    and that provides an easy solve() abstraction which will call a solver.
-
-    See the examples for basic usage, which involves:
-
-    - creation, e.g. m = Model(cons, minimize=obj)
-    - solving, e.g. m.solve()
-    - optionally, checking status/runtime, e.g. m.status()
-
     ==============
     Module details
     ==============
 """
 import numpy as np
 from .expressions.core import Operator
+from .expressions.utils import is_any_list
 from .solvers.util import get_supported_solvers
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
@@ -38,67 +41,69 @@ from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class Model(object):
     """
-    CPMpy Model object, contains the constraint and objective expression trees
-
-    Arguments of constructor:
-
-    - `*args`: Expression object(s) or list(s) of Expression objects
-    - `minimize`: Expression object representing the objective to minimize
-    - `maximize`: Expression object representing the objective to maximize
-
-    At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
+    CPMpy Model object, contains the constraint and objective expressions
     """
+
     def __init__(self, *args, minimize=None, maximize=None):
+        """
+            Arguments of constructor:
+
+            - `*args`: Expression object(s) or list(s) of Expression objects
+            - `minimize`: Expression object representing the objective to minimize
+            - `maximize`: Expression object representing the objective to maximize
+
+            At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
+        """
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
-        # list of constraints (arguments of top-level conjunction)
-        if len(args) == 0 or (len(args) == 1 and isinstance(args[0], list) and len(args[0]) == 0): # None or empty list
+        # list of constraints
+        if len(args) == 0:
             self.constraints = []
+        elif len(args) == 1 and is_any_list(args[0]):
+            # top level list of constraints
+            self.constraints = args[0]
         else:
-            root_constr = self._make_and_from_list(args)
-            if root_constr.name == 'and':
-                # unpack top-level conjuction
-                self.constraints = root_constr.args
-            else:
-                # wrap in list
-                self.constraints = [root_constr]
+            self.constraints = list(args) # instead of tuple
 
-        # an expresion or None
+        # objective: an expresion or None
         self.objective = None
         self.objective_max = None
-
-        if not maximize is None:
-            self.objective = maximize
-            self.objective_max = True
-        if not minimize is None:
-            self.objective = minimize
-            self.objective_max = False
+        if maximize is not None:
+            self.maximize(maximize)
+        if minimize is not None:
+            self.minimize(minimize)
         
-    def __add__(self, cons):
+    def __add__(self, con):
         """
             Add one or more constraints to the model
 
             m = Model()
             m += [x > 0]
         """
-        self.constraints += cons
+        if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
+            # top level list of constraints
+            con = con[0]
+        self.constraints.append(con)
         return self
 
-    def __repr__(self):
-        cons_str = ""
-        for c in self.constraints:
-            cons_str += "    {}\n".format(c)
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
 
-        obj_str = ""
-        if not self.objective is None:
-            if self.objective_max:
-                obj_str = "maximize "
-            else:
-                obj_str = "minimize "
-        obj_str += str(self.objective)
-            
-        return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        self.objective = expr
+        self.objective_max = False
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        self.objective = expr
+        self.objective_max = True
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
@@ -150,14 +155,17 @@ class Model(object):
         """
         return self.cpm_status
 
-    def _make_and_from_list(self, args):
-        #TODO: eliminate this?
-        """ recursively reads a list of Expression and returns the 'And' conjunctive of the elements in the list """
-        lst = list(args) # make mutable copy of type list
-        # do recursive where needed, with overwrite
-        for (i, expr) in enumerate(lst):
-            if isinstance(expr, list):
-                lst[i] = self._make_and_from_list(expr)
-        if len(lst) == 1:
-            return lst[0]
-        return Operator("and", lst)
+    def __repr__(self):
+        cons_str = ""
+        for c in self.constraints:
+            cons_str += "    {}\n".format(c)
+
+        obj_str = ""
+        if not self.objective is None:
+            if self.objective_max:
+                obj_str = "maximize "
+            else:
+                obj_str = "minimize "
+        obj_str += str(self.objective)
+            
+        return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)

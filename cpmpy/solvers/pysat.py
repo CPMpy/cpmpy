@@ -22,6 +22,7 @@ from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables_model
+from ..transformations.flatten_model import flatten_constraint
 
 class CPM_pysat(SolverInterface):
     """
@@ -246,7 +247,7 @@ class CPM_pysat(SolverInterface):
 
         # Post the constraint expressions to the solver
         # only CNF (list of disjunctions) supported for now
-        for con in cpm_model.constraints:
+        for con in flatten_constraint(cpm_model.constraints):
             # TODO, perhaps we should check for lists of lists, or top-level ands?
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
