@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 import cpmpy as cp
-from cpmpy.solvers.util import get_supported_solvers
+from cpmpy.solvers.utils import get_supported_solvers
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):

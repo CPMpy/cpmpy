@@ -34,7 +34,7 @@
 import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
-from .solvers.util import get_supported_solvers
+from .solvers.utils import get_supported_solvers
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class Model(object):
