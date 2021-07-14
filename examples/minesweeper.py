@@ -25,7 +25,7 @@ from cpmpy import *
 import numpy as np
 
 X = -1
-default_game =  np.array([
+game = np.array([
             [2,3,X,2,2,X,2,1],
             [X,X,4,X,X,4,X,2],
             [X,X,X,X,X,X,4,X],
@@ -36,23 +36,35 @@ default_game =  np.array([
             [0,1,2,X,2,3,X,2]
             ])
 
-r_ , c_ = 8,8
+rows, cols = game.shape
 S = [-1,0,1] # for the neighbors of a cell
-# Variables
-mines = IntVar(0, 1, shape=default_game.shape) 
-# 1 represnts mine
-# 0 represnts no mine
-constraint = []
 
-for i in range(r_):
-    for j in range(c_):
-        if default_game[i,j] >=0:
-            constraint += [ np.sum( [mines[i+a,j+b] for a in S for b in S \
-                if i+a >=0 and i+a <r_ and j+b >=0 and j+b<c_])==default_game[i][j] ]
-            constraint += [ mines[i,j] == 0 ] # This cell cannot be a mine
+# Variables (mine or not)
+mines = boolvar(shape=game.shape) 
+
+model = Model()
+for (r,c), val in np.ndenumerate(game):
+    if val != X:
+        # This cell cannot be a mine
+        model += mines[r,c] == 0 
+        # Count neighbors
+        model += (sum(mines[r+a,c+b] for a in S for b in S \
+                                     if r+a >= 0 and r+a < rows \
+                                     and c+b >= 0 and c+b < cols) \
+                  == val)
 
 
-model = Model(constraint)
-stats = model.solve()
-print(stats)
-print(mines.value())
+if model.solve():
+    msg = "\n"
+    for r,row in enumerate(game):
+        for c,val in enumerate(row):
+            if val != X:
+                msg += str(val)
+            elif mines[r,c].value():
+                msg += "*"
+            else:
+                msg += " "
+        msg += "\n"
+    print(msg)
+else:
+    print("No solution.")
