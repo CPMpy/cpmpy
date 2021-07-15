@@ -132,7 +132,7 @@ def flatten_constraint(expr):
         flatcons = [flatten_constraint(e) for e in expr.args]
         return [c for con in flatcons for c in con]
 
-    assert expr.is_bool(), "Boolean expressions only in flatten_constraint"
+    assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
 
     if isinstance(expr, Operator):
         """

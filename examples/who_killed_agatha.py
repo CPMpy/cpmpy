@@ -13,44 +13,43 @@ import numpy
 # are the only ones to live there. 
 n = 3
 (agatha, butler, charles) = range(n) # enum constants
+names = ["Agatha herself", "the butler", "Charles"] # reverse mapping
 
 # Who killed agatha?
 victim = agatha
-killer = IntVar(0,2, name="killer")
+killer = intvar(0,2, name="killer")
 
-constraint = []
-# A killer always hates, and is no richer than his victim. 
-hates = BoolVar((n,n), name="hates")
-constraint += [ hates[killer, victim] == 1 ]
+hates  = boolvar(shape=(n,n), name="hates")
+richer = boolvar(shape=(n,n), name="richer")
 
-richer = BoolVar((n,n), name="richer")
-constraint += [ richer[killer, victim] == 0 ]
+model = Model(
+    # A killer always hates, and is no richer than, his victim. 
+    # note; 'killer' is a variable, so must write ==1/==0 explicitly
+    hates[killer, victim] == 1,
+    richer[killer, victim] == 0,
 
-# implied richness: no one richer than himself, and anti-reflexive
-constraint += [ richer[i,i] == 0 for i in range(n) ]
-constraint += [ (richer[i,j] == 1) == (richer[j,i] == 0) for i in range(n) for j in range(n) if i != j ]
+    # implied richness: no one richer than himself, and anti-reflexive
+    [~richer[i,i] for i in range(n)],
+    [(richer[i,j]) == (~richer[j,i]) for i in range(n) for j in range(i+1,n)],
 
-# Charles hates noone that Agatha hates. 
-constraint += [ (hates[agatha,i] == 1).implies(hates[charles,i] == 0) for i in range(n) ]
+    # Charles hates noone that Agatha hates. 
+    [(hates[agatha,i]).implies(~hates[charles,i]) for i in range(n)],
 
-# Agatha hates everybody except the butler. 
-#cons_aga = (hates[agatha,(agatha,charles,butler] == [1,1,0])
-constraint += [ hates[agatha,agatha]  == 1,
-                hates[agatha,charles] == 1,
-                hates[agatha,butler]  == 0 ]
+    # Agatha hates everybody except the butler. 
+    hates[agatha,(agatha,charles,butler)] == [1,1,0],
 
-# The butler hates everyone not richer than Aunt Agatha. 
-constraint += [ (richer[i,agatha] == 0).implies(hates[butler,i] == 1) for i in range(n) ]
+    # The butler hates everyone not richer than Aunt Agatha. 
+    [(~richer[i,agatha]).implies(hates[butler,i]) for i in range(n)],
 
-# The butler hates everyone whom Agatha hates. 
-constraint += [ (hates[agatha,i] == 1).implies(hates[butler,i] == 1) for i in range(n) ]
+    # The butler hates everyone whom Agatha hates. 
+    [(hates[agatha,i]).implies(hates[butler,i]) for i in range(n) ],
 
-# Noone hates everyone. 
-constraint += [ sum([hates[i,j] for j in range(n)]) <= 2 for i in range(n) ]
+    # Noone hates everyone. 
+    [sum(hates[i,:]) <= 2 for i in range(n)],
+)
 
 # Solve and print
-model = Model(constraint)
 if model.solve():
-    print("killer ID:",killer.value())
+    print("Who killed Agatha? It was...", names[killer.value()])
 else:
     print("No solution found")
