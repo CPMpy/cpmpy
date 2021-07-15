@@ -21,7 +21,7 @@ def main():
     print()
     best = configs[0]
     print("Best config:", best[1])
-    print("\t with runtime:", round(best[0],2))
+    print("    with runtime:", round(best[0],2))
     print("Comparing best -- worst:", round(configs[0][0],2), "--", round(configs[-1][0],2))
 
     s = CPM_ortools(model); s.solve()
@@ -75,9 +75,11 @@ def _do_gridsearch(model, solverc, all_params, remaining_keys, cur_params, verbo
         s = solverc(model)
         if verbose:
             print("Running",s.name,"with",cur_params)
+
         s.solve(**cur_params)
         if verbose:
             print(s.status())
+
         return [(s.status().runtime, dict(cur_params))] # copies the params
     
     cur_key = remaining_keys[0]
