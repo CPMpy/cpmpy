@@ -357,7 +357,7 @@ class NDVarArray(Expression, np.ndarray):
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return Element([self, index])
+            return Element(self, index)
 
         # index is array/tuple with at least one expr in it:
         # index non-expr part, and create element on expr part
@@ -372,7 +372,7 @@ class NDVarArray(Expression, np.ndarray):
             assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
             # single var, so flatten rest array
             array_rest = self[tuple(index_rest)] # non-var array selection
-            return Element([array_rest, var[0]])
+            return Element(array_rest, var[0])
 
         ret = super().__getitem__(index)
         # this is a bit ugly,

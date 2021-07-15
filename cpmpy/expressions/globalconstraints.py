@@ -233,6 +233,10 @@ class Maximum(GlobalConstraint):
     def value(self):
         return max([argval(a) for a in self.args])
 
+def element(arg_list):
+    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
+    return Element(arg_list[0], arg_list[1])
 class Element(GlobalConstraint):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
@@ -247,9 +251,8 @@ class Element(GlobalConstraint):
         a 'numeric' global constraint.
     """
 
-    def __init__(self, arg_list):
-        assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
-        super().__init__("element", arg_list, is_bool=False)
+    def __init__(self, arr, idx):
+        super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
         idxval = argval(self.args[1])
