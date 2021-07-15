@@ -25,44 +25,26 @@ def compute_euclidean_distance_matrix(locations):
     return distances.astype(int)
 
 locations= [
-        (288, 149), (288, 129), (270, 133), (256, 141), (256, 157), (246, 157),
-        (236, 169), (228, 169), (228, 161), (220, 169), (212, 169), (204, 169)
+    (288, 149), (288, 129), (270, 133), (256, 141), (256, 163), (246, 157),
+    (236, 169), (228, 169), (228, 148), (220, 164), (212, 172), (204, 159)
 ]
 distance_matrix = compute_euclidean_distance_matrix(locations)
 n_city = len(locations)
 
 
-# x[i,j] = 1 means that the salesman goes from node i to node j 
-x = intvar(0, 1, shape=distance_matrix.shape, name="x") 
+# we use the successor variable formulation and circuit global constraint here
+# alternative is to model like in vrp.py
 
-# y[i,j] is the number of cars, which the salesman has after leaving
-# node i and before entering node j; in terms of the network analysis,
-# y[i,j] is a flow through arc (i,j)
-# This will help in subtour elimination
-y = intvar(0, n_city-1, shape=distance_matrix.shape, name="y")
+# x[i]=j means that j is visited immediately after i
+x = intvar(0, n_city-1, shape=n_city)
 
-model = Model(
-    # the salesman leaves and enters each node i exactly once 
-    [sum(x[i,:])==1 for i in range(n_city)],
-    [sum(x[:,i])==1 for i in range(n_city)],
-    # no self visits
-    [sum(x[i,i] for i in range(n_city))==0],
-
-    # salesman leaves with no load
-    sum(y[0,:]) == 0,
-    # flow out of node i through all outgoing arcs is equal to
-    # flow into node i through all ingoing arcs + 1
-    # for all but starting node '0'
-    [sum(y[i,:])==sum(y[:,i])+1 for i in range(1,n_city)],
-)
-
-# capacity constraint at each node (conditional on visit)
-for i in range(n_city):
-    for j in range(n_city):
-        model += y[i,j] <= (n_city-1)*x[i,j]
+# The 'circuit' global constraint ensures that the successor variables from a circuit
+model = Model( circuit(x) )
 
 # the objective is to minimze the travelled distance 
-model.minimize(sum(x*distance_matrix))
+distance_matrix = cpm_array(distance_matrix) # for indexing with variable
+travel_distance = sum(distance_matrix[i, x[i]] for i in range(n_city))
+model.minimize(travel_distance)
 
 # print(model)
 
@@ -70,14 +52,11 @@ val = model.solve()
 print(model.status())
 
 print("Total Cost of solution",val)
-sol = x.value()
-
-source = 0
-dest = np.argmax(sol[source])
-msg = "0"
-while dest != 0:
-    msg += f" --> {dest}"
-    source = dest
-    dest = np.argmax(sol[source])
-msg += f" --> {dest}"
-print(msg)
+def display(sol):
+    x = 0
+    msg = "0"
+    while sol[x] != 0:
+        x = sol[x]
+        msg += f" --> {x}"
+    print(msg + " --> 0")
+display(x.value())

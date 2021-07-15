@@ -24,16 +24,16 @@ def compute_euclidean_distance_matrix(locations):
 # data
 depot = 0
 locations= [
-        (288, 149), (288, 129), (270, 133), (256, 141), (256, 157), (246, 157),
-        (236, 169), (228, 169), (228, 161), (220, 169)
+        (288, 149), (288, 129), (270, 133), (256, 141), (256, 163),
+        (236, 169), (228, 169), (228, 148), (220, 164)
 ]
 # Pickup demand of each location 
-demand = [0,3,4,8,9,8,10,5,3,9] # depot has no demand
+demand = [0,3,4,8,8,10,5,3,9] # depot has no demand
 distance_matrix = compute_euclidean_distance_matrix(locations)
 
 n_city = len(locations)
-# 3 vehicles and capacity of each vehicle 25
-n_vehicle, q = 3, 25
+# 3 vehicles and capacity of each vehicle 20
+n_vehicle, q = 3, 20
 
 
 # x[i,j] = 1 means that a vehicle goes from node i to node j 
