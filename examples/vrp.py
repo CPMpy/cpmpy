@@ -62,7 +62,7 @@ for i in range(n_city):
     for j in range(n_city):
         model += y[i,j] <= q*x[i,j]
 
-#the objective is to minimze  the travel distance 
+# the objective is to minimze the travelled distance 
 model.minimize(sum(x*distance_matrix))
 
 # print(model)
