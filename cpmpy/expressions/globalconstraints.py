@@ -173,26 +173,31 @@ def circuit(args):
     return Circuit(*args) # unfold list as individual arguments
 class Circuit(GlobalConstraint):
     """
-    The sequence of variables form a circuit ex: 0 -> 3 -> 2 -> 0
+    The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
 
     def decompose(self):
         """
-            TODO needs explanation/reference
+            Not sure where we got it from,
+            MiniZinc has slightly different one:
+            https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
-        n = len(self.args)
-        a = cpm_array(self.args)
-        z = intvar(0, n-1, n)
-        constraints = [alldifferent(z),
-                       alldifferent(a),
-                       z[0]==a[0],
-                       z[n-1]==0]
-        for i in range(1,n-1):
-            constraints += [z[i] != 0,
-                            z[i] == a[z[i-1]]]
-        return constraints
+        succ = cpm_array(self.args)
+        n = len(succ)
+        order = intvar(0,n-1, shape=n)
+        return [
+            # different successors
+            AllDifferent(succ),
+            # different orders
+            AllDifferent(order),
+            # last one is '0'
+            order[n-1] == 0,
+            # loop: first one is successor of '0'
+            order[0] == succ[0],
+            # others: ith one is successor of i-1
+        ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 class Table(GlobalConstraint):
     """
