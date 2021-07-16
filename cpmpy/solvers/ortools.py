@@ -203,6 +203,9 @@ class CPM_ortools(SolverInterface):
             self.assumption_dict = dict( (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars) )
             self.ort_model.ClearAssumptions() # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
+            # workaround for a presolve with assumptions bug in ortools
+            # https://github.com/google/or-tools/issues/2649
+            self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
         # set additional keyword arguments in sat_parameters.proto
         for (kw, val) in kwargs.items():
