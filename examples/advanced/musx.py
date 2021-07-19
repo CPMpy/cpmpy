@@ -9,13 +9,13 @@ https://github.com/pysathq/pysat/blob/master/examples/musx.py
 import sys
 import copy
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
-from cpmpy.model_tools.get_variables import vars_expr
-from cpmpy.model_tools.flatten_model import flatten_constraint
+from cpmpy.solvers.ortools import CPM_ortools
+from cpmpy.transformations.get_variables import get_variables
+from cpmpy.transformations.flatten_model import flatten_constraint
 
 def main():
-    x, y = IntVar(-9,9, shape=2)
-    m = Model([
+    x, y = intvar(-9,9, shape=2)
+    m = Model(
         x < 0, 
         x < 1,
         x > 2,
@@ -23,8 +23,8 @@ def main():
         (y >= 0) | (x >= 0),
         (y < 0) | (x < 0),
         (y > 0) | (x < 0),
-        alldifferent([x,y]) # invalid for musx_assum
-    ])
+        AllDifferent(x,y) # invalid for musx_assum
+    )
     assert (m.solve() is False)
 
     mus = musx(m.constraints, [], verbose=True)
@@ -49,7 +49,7 @@ def musx(soft_constraints, hard_constraints=[], verbose=False):
         # see if solver supports reification of 'con'
         try:
             m = Model([BoolVar().implies(con)])
-            CPMpyORTools(m).solve()
+            CPM_ortools(m).solve()
             # it did
             soft_assum.append(con)
         except:
@@ -82,7 +82,7 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
     # this will favor MUS with few variables per constraint,
     # and will remove large constraints earlier which may speed it up
     # TODO: count nr of subexpressions? (generalisation of nr of vars)
-    soft_constraints = sorted(soft_constraints, key=lambda c: -len(vars_expr(c)))
+    soft_constraints = sorted(soft_constraints, key=lambda c: -len(get_variables(c)))
 
     # small optimisation: pre-flatten all constraints once
     # so it needs not be done over-and-over in solving
@@ -97,12 +97,12 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
     mus_idx = [] # index into 'soft_constraints' that belong to the MUS
 
     # init solver with hard constraints
-    #s_base = CPMpyORTools(Model(hard))
+    #s_base = CPM_ortools(Model(hard))
     m_base = Model(hard)
     for i in range(len(soft_constraints)):
         #s_without_i = copy.deepcopy(s_base) # deep copy solver state
         # add all other remaining (flattened) constraints
-        s_without_i = CPMpyORTools(m_base)
+        s_without_i = CPM_ortools(m_base)
         s_without_i += soft[i+1:] 
 
         if s_without_i.solve():
@@ -148,7 +148,7 @@ def musx_assum(soft_constraints, hard_constraints=[], verbose=False):
     indmap = dict((v,i) for (i,v) in enumerate(ind))
 
     # make solver once, check that it is unsat and start from core
-    assum_solver = CPMpyORTools(assum_model)
+    assum_solver = CPM_ortools(assum_model)
     if assum_solver.solve(assumptions=ind):
         if verbose:
             print("Unexpectedly, the model is SAT")
