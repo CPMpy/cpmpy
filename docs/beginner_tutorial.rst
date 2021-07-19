@@ -55,16 +55,14 @@ Cryptarythmetic in CPMpy
 
 First we need to import all the tools that we will need to create our CP model, namely numpy and our CPMpy library:
 
-```python
-import numpy as np
-from cpmpy import *
-```
+.. code-block:: python
+    import numpy as np
+    from cpmpy import *
 
 Secondly, as in every constraint programming model we need to define the decision variables:
 
-```python
-s,e,n,d,m,o,r,y = intvar(0,9, shape=8)
-```
+.. code-block:: python
+    s,e,n,d,m,o,r,y = intvar(0,9, shape=8)
 
 This line indicates that we are creating 8 integer decision variables, s,e,n,d,m,o,r,y, and each will take a value between 0 and 9 (inclusive) in the solution. The `shape` argument informs the shape of the tensor (in this case, a vector of size 8, unpacked over the individual letters).
 
@@ -73,16 +71,15 @@ Thirdly, the constraints. We will immediately wrap them in a `Model()` object:
 
 Constraints are included in the model as a list. First, we create a list to add the constraints. Then, we append an 'all different constraint' in a straightforward fashion. Finally, we add the constraint saying SEND + MORE = MONEY. 
 
-```python
-model = Model(
-    AllDifferent([s,e,n,d,m,o,r,y]),
-    (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
-       + sum(   [m,o,r,e] * np.array([       1000, 100, 10, 1]) ) \
-      == sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ) ),
-    s > 0,
-    m > 0,
-)
-```
+.. code-block:: python
+    model = Model(
+        AllDifferent(s,e,n,d,m,o,r,y),
+        (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
+           + sum(   [m,o,r,e] * np.array([       1000, 100, 10, 1]) ) \
+          == sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+        s > 0,
+        m > 0,
+    )
 
 The first line uses the `AllDifferent` global constraint. It is a CP primitive that will enforce that all variables get a different value. CP solvers have highly optimized procedures to enforce such constraints, hence the choice to model this with one `AllDifferent` global constraint rather then specifying that each pair of variables to have different values.
 
@@ -95,22 +92,20 @@ Solving a CPMpy model
 
 Solving a model is as easy as calling `.solve()` on it, which will automatically search for a solver installed on the system, and make it solve the model:
 
-```python
-model.solve()
-```
+.. code-block:: python
+    model.solve()
 
 The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimisation problem.
 
 The solution will be backpopulated in the decision variables used, and can be obtained by calling the `.value()` function on a decision variable. For example:
 
-```python
-if model.solve():
-    print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
-    print("  M,O,R,E =   ", [x.value() for x in [m,o,r,e]])
-    print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
-else:
-    print("No solution found")
-```
+.. code-block:: python
+    if model.solve():
+        print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
+        print("  M,O,R,E =   ", [x.value() for x in [m,o,r,e]])
+        print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+    else:
+        print("No solution found")
 
 And that is all there is to it...
 
@@ -120,7 +115,6 @@ And many more examples on scheduling, packing, routing and more in the [examples
 
 
 ### References
-
 
 <!---Add more references -->
 

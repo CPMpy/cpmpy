@@ -1,7 +1,7 @@
 CPMpy: Constraint Programming and Modeling in Python
 ====================================================
 
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy.
+CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
 
 Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
@@ -20,7 +20,7 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
 
 .. toctree::
    :maxdepth: 2
-   :caption: Documentation:
+   :caption: User Documentation:
 
    advanced_solver_features
    unsat_core_extraction
