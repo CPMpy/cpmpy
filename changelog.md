@@ -1,5 +1,20 @@
 # Change log
 
+## 0.9.0
+
+First beta release!
+
+* Reorganize cpmpy/ modules (not backward-compatible)
+* Rework variables/constraint constructors (deprecation warnings for old constructors, will be removed with stable release)
+* Updated all examples to follow new style
+* Add PySAT backend, with incrementality/core extraction (only accepts CNF input for now)
+* Add minimize()/maximize() to Model() and solver objects
+* simpler `from cpmpy.solvers import CPM_ortools` for solver-specific use
+* Add keyword arguments to solve() that configure solver-specific options
+* Add example of hyperparameter gridsearch
+* Updated API and user docs considerably
+
+
 ## 0.7.2
 
 * get_core() work around bug in upstream ortools
