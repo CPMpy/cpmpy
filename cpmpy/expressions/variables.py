@@ -4,6 +4,8 @@
 ## variables.py
 ##
 """
+    Integer and Boolean decision variables (as n-dimensional numpy objects)
+
     =================
     List of functions
     =================

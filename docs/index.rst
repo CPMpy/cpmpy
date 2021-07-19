@@ -28,12 +28,13 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
 
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: API documentation:
 
    api/expressions
    api/model
    api/solvers
+   api/transformations
 
 
 FAQ

@@ -4,6 +4,8 @@
 ## ortools.py
 ##
 """
+    Interface to ortools' Python API
+
     ===============
     List of classes
     ===============
@@ -12,10 +14,6 @@
         :nosignatures:
 
         CPM_ortools
-
-    ==============
-    Module details
-    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator

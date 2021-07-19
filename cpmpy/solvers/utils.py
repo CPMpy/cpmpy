@@ -1,3 +1,24 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## utils.py
+##
+"""
+    Utilities for handling solvers
+
+    Contains a static variable `builtin_solvers` that lists
+    CPMpy solvers (first one is the default solver by default)
+
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        get_supported_solvers
+"""
+
 #from .minizinc import CPMpyMiniZinc # closed for maintenance
 from .ortools import CPM_ortools
 from .pysat import CPM_pysat

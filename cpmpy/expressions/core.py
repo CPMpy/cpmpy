@@ -12,6 +12,7 @@
     Here is a list of standard python operators and what object (with what expr.name) it creates:
 
     Comparisons:
+
     - x == y        Comparison("==", x, y)
     - x != y        Comparison("!=", x, y)
     - x < y         Comparison("<", x, y)
@@ -20,6 +21,7 @@
     - x >= y        Comparison(">=", x, y)
 
     Mathematical operators:
+
     - -x            Operator("-", [x])
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
@@ -31,6 +33,7 @@
     - x ** y        Operator("pow", [x,y])
 
     Logical operators:
+
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
     - x ^ y         Operator("xor", [x,y])
@@ -39,10 +42,12 @@
     
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
+
     - x.implies(y)  Operator("->", [x,y])
 
     For negation, we rewrite this to the more generic expression `x == 0`.
     (which in turn creates a `NegBoolView()` in case x is a Boolean variable)
+
     - ~x            x == 0
 
 
@@ -74,7 +79,7 @@ from .utils import is_num, is_any_list, flatlist
 
 class Expression(object):
     """
-    An Expression is a function with a self.name and self.args (arguments)
+    An Expression represents a symbolic function with a self.name and self.args (arguments)
 
     Each Expression is considered to be a function whose value can be used
       in other expressions
@@ -277,6 +282,8 @@ class Expression(object):
 
 
 class Comparison(Expression):
+    """Represents a comparison between two sub-expressions
+    """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
@@ -311,10 +318,10 @@ class Comparison(Expression):
 
 class Operator(Expression):
     """
-    All kinds of operators on expressions,
-    including mathematical and logical
-    # convention for 2-ary operators: if one of the two is a constant,
-    # it is stored first (as expr[0]), this eases weighted sum detection
+    All kinds of mathematical and logical operators on expressions
+
+    Convention for 2-ary operators: if one of the two is a constant,
+    it is stored first (as expr[0]), this eases weighted sum detection
     """
     allowed = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 2

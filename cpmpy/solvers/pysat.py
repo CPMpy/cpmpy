@@ -4,6 +4,8 @@
 ## pysat.py
 ##
 """
+    Interface to PySAT's API
+
     ===============
     List of classes
     ===============
@@ -12,10 +14,6 @@
         :nosignatures:
 
         CPM_pysat
-
-    ==============
-    Module details
-    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *

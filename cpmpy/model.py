@@ -26,10 +26,6 @@
         :nosignatures:
 
         Model
-
-    ==============
-    Module details
-    ==============
 """
 import numpy as np
 from .expressions.core import Operator

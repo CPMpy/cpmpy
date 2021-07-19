@@ -4,27 +4,7 @@
 ## globalconstraints.py
 ##
 """
-    ===============
-    List of classes
-    ===============
-
-    .. autosummary::
-        :nosignatures:
-
-        AllDifferent
-        AllEqual
-        Circuit
-        Table
-        Minimum
-        Maximum
-        Element
-
-    ==================
-    Module Description
-    ==================
-
     Global constraints conveniently express non-primitive constraints.
-
 
     Using global constraints
     ------------------------
@@ -35,13 +15,14 @@
     If a solver does not support a global constraint (see solvers/) then it will be automatically
     decomposed by calling its `.decompose()` function.
 
-    As a user you **should almost never subclass GlobalConstraint** unless you know of a solver that
+    As a user you **should almost never subclass GlobalConstraint()** unless you know of a solver that
     supports that specific global constraint, and that you will update its solver interface to support it.
 
     For all other use cases, it sufficies to write your own helper function that immediately returns the
     decomposition, e.g.:
 
     .. code-block:: python
+
         def alldifferent_except0(args):
             return [ ((var1!= 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(args)]
 
@@ -104,6 +85,21 @@
     The above will use 'my_circuit_decomp', if the solver does not
     natively support 'circuit'.
 
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        AllDifferent
+        AllEqual
+        Circuit
+        Table
+        Minimum
+        Maximum
+        Element
+
 """
 import warnings # for deprecation warning
 from .core import Expression
@@ -134,12 +130,11 @@ class GlobalConstraint(Expression):
 
     def decompose(self):
         """
-            if a global constraint has a default decomposition,
-            then it should monkey-patch this function, e.g.:
-            def my_decomp_function(self):
-                return []
-            g = GlobalConstraint("g", args)
-            g.decompose = my_decom_function
+            Returns a decomposition into smaller constraints.
+
+            The decomposition might create auxiliary variables
+            and use other other global constraints as long as
+            it does not create a circular dependency.
         """
         return None
 
@@ -151,13 +146,14 @@ def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
 class AllDifferent(GlobalConstraint):
-    """
-    All arguments have a different (distinct) value
+    """All arguments have a different (distinct) value
     """
     def __init__(self, *args):
         super().__init__("alldifferent", flatlist(args))
 
     def decompose(self):
+        """Returns the decomposition
+        """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
 
@@ -165,27 +161,29 @@ def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
 class AllEqual(GlobalConstraint):
-    """
-    All arguments have the same value
+    """All arguments have the same value
     """
     def __init__(self, *args):
         super().__init__("allequal", flatlist(args))
 
     def decompose(self):
+        """Returns the decomposition
+        """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
 class Circuit(GlobalConstraint):
-    """
-    The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
+    """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
 
     def decompose(self):
         """
+            Decomposition for Circuit
+
             Not sure where we got it from,
             MiniZinc has slightly different one:
             https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
@@ -206,9 +204,7 @@ class Circuit(GlobalConstraint):
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 class Table(GlobalConstraint):
-    """
-    the values of the variables in 'array'
-    correspond to a row in 'table'
+    """The values of the variables in 'array' correspond to a row in 'table'
     """
     def __init__(self, array, table):
         super().__init__("table", [array, table])

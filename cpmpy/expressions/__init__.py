@@ -1,12 +1,19 @@
 """
     All forms of expression objects that allow you to specify constraints and objectives over variables
 
-    Contains the following submodules:
-    - expressions: the `Expression` superclass and common subclasses. None of these objects need to be directly created, they are created through operator overloading on variables, or through helper functions (global constraints)
-    - variables: integer and boolean variables as n-dimensional numpy objects
-    - python_builtins: overwrites a number of python built-ins, so that they work over CPMpy variables as expected
-    - globalconstraints: Expression objects for expressing constraints that have special handling routines in solvers
-    - utils: internal utilities for expression handling
+    ==================
+    List of submodules
+    ==================
+    .. autosummary::
+        :nosignatures:
+
+        variables
+        core
+        globalconstraints
+        python_builtins
+        utils
+
+
 """
 
 # we only import methods/classes that are used for modelling
