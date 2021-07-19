@@ -1,10 +1,21 @@
 Behind the scenes: CPMpy's pipeline
-=====================================
+===================================
 
-CPMpy has two key parts:
+CPMpy conceptually has two key parts:
 
 1. the 'language' that allows expressing constraint programming problems,
 2. a mechanism to translate this language to the API of solvers.
+
+Implementation wise, CPMpy has the following structure:
+
+   - cpmpy/
+      - model.py
+      - expressions/
+      - solvers/
+      - transformations/
+
+Everything related to the language is contained in the `cpmpy.expressions` module. The other modules support the translation and solving.
+
 
 The language
 ------------
@@ -34,6 +45,9 @@ Then, every solver has its own API, as well as some peculiarities (e.g. or-tools
 
 Flattened 'normal form'
 -----------------------
+
+**This part needs updating, see cpmpy.transformations.flatten_model for the latest docs***
+
 So that leaves the question, what is and is not allowed in this 'flattened' inbetween output?
 
 Ideally, we can come up with a grammar that determines a formal normal form. By lack of that, here is a more informal description that is grammar-like. ::

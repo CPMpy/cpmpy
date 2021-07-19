@@ -1,13 +1,21 @@
-# Tias Guns, 2019
-# current version
-#==============================================================================
-# VERSION = (0, 5, 2, "dev")
+"""
+    CPMpy is a numpy-based library for conveniently modeling constraint programming problems in Python.
 
-# __version__ = "%d.%d.%d.%s" % VERSION if len(VERSION) == 4 else \
-#               "%d.%d.%d" % VERSION
-__version__ = "0.7.2"
+    Documentation in docs/index.rst
+    as well as online at: https://cpmpy.readthedocs.io/
+
+    Source code and bug reports at https://github.com/CPMpy/cpmpy
+
+    The package constists of 4 modules:
+    - `model`: a generic container for expressions (constraints and an objective), it can also search for an available solver and call it
+    - `expressions`: all forms of expression objects that allow you to specify constraints and objectives over variables
+    - `solvers`: CPMpy classes that translate a model into approriate calls of a solver's API
+    - `transformations`: common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
+"""
+# Tias Guns, 2019-2021
+
+__version__ = "0.9.0"
+
 
 from .expressions import *
-from .variables import *
-from .globalconstraints import *
-from .model import *
+from .model import Model

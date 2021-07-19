@@ -4,6 +4,59 @@
 ## expressions.py
 ##
 """
+    The `Expression` superclass and common subclasses `Expression` and `Operator`.
+    
+    None of these objects should be directly created, they are automatically created through operator
+    overloading on variables and expressions.
+
+    Here is a list of standard python operators and what object (with what expr.name) it creates:
+
+    Comparisons:
+    - x == y        Comparison("==", x, y)
+    - x != y        Comparison("!=", x, y)
+    - x < y         Comparison("<", x, y)
+    - x <= y        Comparison("<=", x, y)
+    - x > y         Comparison(">", x, y)
+    - x >= y        Comparison(">=", x, y)
+
+    Mathematical operators:
+    - -x            Operator("-", [x])
+    - abs(x)        Operator("abs", [x])
+    - x + y         Operator("sum", [x,y])
+    - sum([x,y,z])  Operator("sum", [x,y,z])
+    - x - y         Operator("sum", [x,-y])
+    - x * y         Operator("mul", [x,y])
+    - x / y         Operator("div", [x,y])
+    - x % y         Operator("mod", [x,y])
+    - x ** y        Operator("pow", [x,y])
+
+    Logical operators:
+    - x & y         Operator("and", [x,y])
+    - x | y         Operator("or", [x,y])
+    - x ^ y         Operator("xor", [x,y])
+
+    Finally there are two special cases for logical operators 'implies' and '~/not'.
+    
+    Python has no built-in operator for __implication__ that can be overloaded.
+    CPMpy hence has a function 'implies()' that can be called:
+    - x.implies(y)  Operator("->", [x,y])
+
+    For negation, we rewrite this to the more generic expression `x == 0`.
+    (which in turn creates a `NegBoolView()` in case x is a Boolean variable)
+    - ~x            x == 0
+
+
+    Apart from operator overleading, expressions implement two important functions:
+
+    - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
+                    If it does, the expression can be used as top-level constraint
+                    or in logical operators.
+
+    - `value()`     computes the value of this expression, by calling .value() on its
+                    subexpressions and doing the appropriate computation
+                    this is used to conveniently print variable values, objective values
+                    and any other expression value (e.g. during debugging).
+    
     ===============
     List of classes
     ===============
@@ -13,70 +66,33 @@
         Expression
         Comparison
         Operator
-
 """
+from types import GeneratorType
+from collections.abc import Iterable
 import numpy as np
-
-# Helpers for type checking
-def is_num(arg):
-    return isinstance(arg, (int, np.integer, float, np.float64))
-def is_any_list(arg):
-    return isinstance(arg, (list, tuple, np.ndarray))
-def is_pure_list(arg):
-    return isinstance(arg, (list, tuple))
-
-# Overwriting all/any python built-ins
-# all: listwise 'and'
-def all(iterable):
-    collect = [] # logical expressions
-    for elem in iterable:
-        if elem is False:
-            return False # no need to create constraint
-        elif elem is True:
-            pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
-        else:
-            raise Exception("unknown argument '{}' to 'all'".format(elem))
-    if len(collect) == 1:
-        return collect[0]
-    if len(collect) >= 2:
-        return Operator("and", collect)
-    return True
-
-# any: listwise 'or'
-def any(iterable):
-    collect = [] # logical expressions
-    for elem in iterable:
-        if elem is True:
-            return True # no need to create constraint
-        elif elem is False:
-            pass
-        elif isinstance(elem, Expression):
-            collect.append( elem.boolexpr() )
-        else:
-            raise Exception("unknown argument '{}' to 'any'".format(elem))
-    if len(collect) == 1:
-        return collect[0]
-    if len(collect) >= 2:
-        return Operator("or", collect)
-    return False
-
+from .utils import is_num, is_any_list, flatlist
 
 class Expression(object):
     """
-    each Expression is a function with a self.name and self.args (arguments)
-    each Expression is considered to be a function whose value can be used
+    An Expression is a function with a self.name and self.args (arguments)
+
+    Each Expression is considered to be a function whose value can be used
       in other expressions
-    each Expression may implement:
-    - boolexpr(): the Boolean form of the expression
-        default: (expr == 1)
-        override for Boolean expressions (preferably through __eq__, see Comparison)
-    - value(): the value of the expression, default None
+
+    Expressions may implement:
+    - is_bool():    whether its return type is Boolean
+    - value():      the value of the expression, default None
+    - implies(x):   logical implication of this expression towards x
+    - __repr__():   for pretty printing the expression
+    - any __op__ python operator overloading
     """
 
     def __init__(self, name, arg_list):
-        if isinstance(arg_list, np.ndarray):
+        self.name = name
+
+        if isinstance(arg_list, (tuple,GeneratorType)):
+            arg_list = list(arg_list)
+        elif isinstance(arg_list, np.ndarray):
             # must flatten
             arg_list = arg_list.reshape(-1)
         for i in range(len(arg_list)):
@@ -85,8 +101,8 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.name = name
         self.args = arg_list
+
 
     def __repr__(self):
         strargs = []
@@ -98,11 +114,6 @@ class Expression(object):
             else:
                 strargs.append( f"{arg}" )
         return "{}({})".format(self.name, ",".join(strargs))
-
-    # booleanised expression
-    # optional, default: (self == 1)
-    def boolexpr(self):
-        return (self == 1)
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -243,10 +254,10 @@ class Expression(object):
         return Operator("mod", [other, self])
 
     def __pow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: module not supported"
+        assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [other, self])
 
     # Not implemented: (yet?)
@@ -260,7 +271,7 @@ class Expression(object):
         return self
     def __abs__(self):
         return Operator("abs", [self])
-    # 'not' for now, no unary constraint for it but like boolexpr()
+    # 'not' for now, no unary constraint for it
     def __invert__(self):
         return (self == 0)
 
@@ -270,9 +281,6 @@ class Comparison(Expression):
 
     def __init__(self, name, left, right):
         assert (name in Comparison.allowed), "Symbol not allowed"
-        # if vectorized, must match
-        if hasattr(left, '__len__') and hasattr(right, '__len__'): 
-            assert (len(left) == len(right)), "Comparison: arguments must have equal length"
         super().__init__(name, [left, right])
 
     def __repr__(self):
@@ -280,10 +288,6 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
-
-    # it could be a vectorized constraint
-    def __iter__(self):
-        return (Comparison(self.name,l,r) for l,r in zip(self.args[0], self.args[1]))
 
     # is bool, check special case
     def __eq__(self, other):
@@ -335,11 +339,9 @@ class Operator(Expression):
         arity, is_bool = Operator.allowed[name]
         if arity == 0:
             assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
+            arg_list = flatlist(arg_list)
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
-        if arity == 2 and hasattr(arg_list[0], '__len__'):
-            # special case: can be two lists
-            assert (len(arg_list[0]) == len(arg_list[1])), "Operator: the two arguments must have equal size"
 
         # convention for commutative binary operators:
         # swap if right is constant and left is not
@@ -375,12 +377,6 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-
-    # it could be a vectorized constraint
-    def __iter__(self):
-        if len(self.args) == 2:
-            return (Operator(self.name, list(args)) for args in zip(self.args[0], self.args[1]))
-        return super().__iter__(self)
 
     # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
     # + special case for weighted sum (sum of mul)
@@ -423,7 +419,10 @@ class Operator(Expression):
             return self
 
         if self.name == 'sum':
-            self.args.append(other)
+            if not isinstance(other, Iterable):
+                self.args.append(other)
+            else: # vector
+                self.args.extend(other)
             return self
         return super().__add__(other)
 
@@ -433,7 +432,10 @@ class Operator(Expression):
             return self
 
         if self.name == 'sum':
-            self.args.insert(0, other)
+            if not isinstance(other, Iterable):
+                self.args.insert(0, other)
+            else: # vector
+                self.args[:0] = other # prepend an array
             return self
         return super().__radd__(other)
 

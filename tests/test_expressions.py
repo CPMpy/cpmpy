@@ -1,15 +1,7 @@
-# TODO
-"""
-def test_value():
-    returns a non-None .value():
-    - NumVarImpl, BoolVarImpl
-    - Operator (all of them)
-    - Comparison (all of them)
-    - Element (both 2 and 3 args)
-"""
 import unittest
 import cpmpy as cp 
 from cpmpy.expressions import *
+from cpmpy.expressions.core import Operator
 
 class TestSum(unittest.TestCase):
 

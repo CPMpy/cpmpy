@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 import cpmpy as cp
+from cpmpy.solvers.utils import get_supported_solvers
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -11,7 +12,7 @@ class TestSolvers(unittest.TestCase):
             x[0] < x[1],
             x[1] < x[2]]
         model = cp.Model(constraints)
-        for solver in cp.get_supported_solvers():
+        for solver in get_supported_solvers():
             model.solve()
             self.assertEqual([xi.value() for xi in x], [0, 1, 2])
     
@@ -66,7 +67,7 @@ class TestSolvers(unittest.TestCase):
 
         If any of these tests break, update docs/advanced_solver_features.md accordingly
         """
-        from cpmpy.solver_interfaces.ortools import CPMpyORTools
+        from cpmpy.solvers.ortools import CPM_ortools
         from ortools.sat.python import cp_model as ort
 
         # standard use
@@ -76,11 +77,23 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 0)
 
+        # direct use
+        o = CPM_ortools()
+        o += x[0] > x[1]
+        self.assertTrue(o.solve())
+        o.minimize(x[0])
+        o.solve()
+        self.assertEquals(x[0].value(), 1)
+        o.maximize(x[1])
+        o.solve()
+        self.assertEquals(x[1].value(), 2)
+
+
 
         # advanced solver params
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
         s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
         self.assertTrue(s.solve())
@@ -100,7 +113,7 @@ class TestSolvers(unittest.TestCase):
 
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -128,7 +141,7 @@ class TestSolvers(unittest.TestCase):
 
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -138,7 +151,7 @@ class TestSolvers(unittest.TestCase):
 
         # intermediate solutions
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
-        s = CPMpyORTools(m_opt)
+        s = CPM_ortools(m_opt)
         ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
         self.assertEqual(s._after_solve(ort_status), 5.0) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
@@ -149,7 +162,7 @@ class TestSolvers(unittest.TestCase):
         # manually enumerating solutions
         x = cp.IntVar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         solcount = 0
         while(s.solve()):
             solcount += 1
@@ -167,8 +180,57 @@ class TestSolvers(unittest.TestCase):
             bv[1].implies(iv[1] > iv[2]),
             bv[2].implies(iv[2] > iv[0])
         ])
-        s = CPMpyORTools(m)
+        s = CPM_ortools(m)
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
+
+
+    def test_pysat(self):
+        from cpmpy.solvers.pysat import CPM_pysat
+        if not CPM_pysat.supported():
+            print("Skipping PySAT tests, not installed")
+            return
+
+        # Construct the model.
+        (mayo, ketchup, curry, andalouse, samurai) = cp.BoolVar(5)
+
+        Nora = mayo | ketchup
+        Leander = ~samurai | mayo
+        Benjamin = ~andalouse | ~curry | ~samurai
+        Behrouz = ketchup | curry | andalouse
+        Guy = ~ketchup | curry | andalouse
+        Daan = ~ketchup | ~curry | andalouse
+        Celine = ~samurai
+        Anton = mayo | ~curry | ~andalouse
+        Danny = ~mayo | ketchup | andalouse | samurai
+        Luc = ~mayo | samurai
+
+        allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
+
+        model = cp.Model(allwishes)
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pysat(model)
+        self.assertTrue(ps.solve())
+        self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
+
+        indmodel = cp.Model()
+        inds = cp.BoolVar(shape=len(model.constraints))
+        for i,c in enumerate(model.constraints):
+            indmodel += [c | ~inds[i]] # implication
+        ps2 = CPM_pysat(indmodel)
+
+        # check get core, simple
+        self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
+        self.assertEqual(ps2.get_core(), [mayo,~mayo])
+
+        # check get core, more realistic
+        self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
+        self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+
+
 
 

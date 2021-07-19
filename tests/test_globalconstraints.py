@@ -1,5 +1,6 @@
 import unittest
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
@@ -50,15 +51,15 @@ class TestGlobal(unittest.TestCase):
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.IntVar(1,9, 10)
-        self.assertIsInstance(min(iv), cp.GlobalConstraint) 
-        self.assertIsInstance(max(iv), cp.GlobalConstraint) 
+        self.assertIsInstance(min(iv), GlobalConstraint) 
+        self.assertIsInstance(max(iv), GlobalConstraint) 
 
     def test_minimax_cpm(self):
         iv = cp.IntVar(1,9, 10)
         mi = cp.min(iv)
         ma = cp.max(iv)
-        self.assertIsInstance(mi, cp.GlobalConstraint) 
-        self.assertIsInstance(ma, cp.GlobalConstraint) 
+        self.assertIsInstance(mi, GlobalConstraint) 
+        self.assertIsInstance(ma, GlobalConstraint) 
 
         self.assertEqual(cp.Model([], minimize=mi).solve(), 1)
         self.assertEqual(cp.Model([], minimize=ma).solve(), 1)

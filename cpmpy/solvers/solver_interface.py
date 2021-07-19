@@ -32,6 +32,8 @@ class SolverInterface(object):
         the ``SolverInterface``
     """
 
+    # REQUIRED functions:
+
     @staticmethod
     def supported():
         """
@@ -43,8 +45,32 @@ class SolverInterface(object):
         """
         return False
 
+    # REQUIRED functions to mimic `Model` interface:
+
     def __init__(self):
         self.cpm_status = SolverStatus("dummy") # status of solving this model
+
+    def __add__(self):
+        """
+            Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
+        """
+        raise NotImplementedError("Solver does not support eagerly adding constraints")
+
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("Solver does not support objective functions")
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("Solver does not support objective functions")
 
     def status(self):
         return self.cpm_status
@@ -65,6 +91,34 @@ class SolverInterface(object):
         :return: Bool or Int
         """
         return False
+
+    # OPTIONAL functions
+
+    def solution_hint(self, cpm_vars, vals):
+        """
+        For warmstarting the solver with a variable assignment
+
+        Typically implemented in SAT-based solvers
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        raise NotImplementedError("Solver does not support solution hinting")
+
+    def get_core(self):
+        """
+        For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT.
+
+        Typically implemented in SAT-based solvers
+        
+        Returns a small subset of assumption literals that are unsat together.
+        (a literal is either a `_BoolVarImpl` or a `NegBoolView` in case of its negation, e.g. x or ~x)
+        Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
+        """
+        raise NotImplementedError("Solver does not support unsat core extraction")
+
+
+    # shared helper functions
 
     def _solve_return(self, cpm_status, objective_value):
         """

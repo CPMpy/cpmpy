@@ -24,7 +24,7 @@
 
 from .solver_interface import ExitStatus, SolverStatus
 from .minizinc_text import MiniZincText
-from ..model_tools.get_variables import get_variables
+from ..transformations.get_variables import get_variables
 
 class CPMpyMiniZinc(MiniZincText):
     """

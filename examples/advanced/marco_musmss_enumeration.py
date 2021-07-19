@@ -54,8 +54,8 @@ between them:
 
 import sys
 from cpmpy import *
-from cpmpy.model_tools.get_variables import vars_expr
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.transformations.get_variables import get_variables
+from cpmpy.solvers.ortools import CPM_ortools
 
 def main():
     x, y = IntVar(-9,9, shape=2)
@@ -119,12 +119,12 @@ class SubsetSolver:
 
         # make reified model
         mdl_reif = Model([ self.indicators[i].implies(con) for i,con in enumerate(constraints) ])
-        self.solver = CPMpyORTools(mdl_reif)
+        self.solver = CPM_ortools(mdl_reif)
 
         if warmstart:
             self.warmstart = warmstart
             # for warmstarting from a previous solution
-            self.user_vars = vars_expr(constraints)
+            self.user_vars = get_variables(constraints)
             self.user_vars_sol = None
 
     def check_subset(self, seed):
@@ -183,7 +183,7 @@ class MapSolver:
             v._value = True
 
         # empty model
-        self.solver = CPMpyORTools(Model([]))
+        self.solver = CPM_ortools(Model([]))
 
     def next_seed(self):
         """Get the seed from the current model, if there is one.

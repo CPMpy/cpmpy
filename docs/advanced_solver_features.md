@@ -7,38 +7,53 @@ Here is the standard, solver-agnostic, way of solving a model in CPMpy:
 ```python
 from cpmpy import *
 
-x = IntVar(0,3, shape=2)
-m = Model([x[0] > x[1]])
+x = intvar(0,3, shape=2)
+m = Model(x[0] > x[1])
 
 print(m.solve())
 print(m.status())
 print(x.value())
 ```
 
-In the following, we will use the __or-tools CP-SAT Python interface__. To use its advanced features, it is recommended to read the [corresponding documentation](https://developers.google.com/optimization/reference/python/sat/python/cp_model).
+In the following, we will use the __or-tools CP-SAT Python interface__. To use some of its advanced features, it is recommended to read the [corresponding documentation](https://developers.google.com/optimization/reference/python/sat/python/cp_model).
 
-## Setting advanced solver parameters
-The CPMpy interface only exports some parameters of or-tools. It has MANY more, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto]).
+## Setting solver parameters
+or-tools has many solver parameters, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto]).
 
-All that needs to change is that you should create a CPMpyOrTools instance with the desired CPMpy model as argument. This will both translate the model and create the or-tools solver object, which you can then manipulate before calling solve:
+CPMpy's interface to ortools accepts any keyword argument to `solve()`, and will set the corresponding or-tools parameters if the name matches. We documented some of the frequent once in our [CPM_ortools API](cpmpy/solvers/ortools.py).
+
+For example, with `m` a CPMpy Model(), you can do the following to run on 8 cores and print search progress:
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers import CPM_ortools
 
-s = CPMpyORTools(m)
-# solver specific stuff:
-s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
-s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
-
-# CPMpy again, including CPMpy-level solution printing
-print(s.solve())
-print(s.status())
-print(x.value())
+s = CPM_ortools(model)
+s.solve(num_search_workers=8, log_search_progress=True)
 ```
 
+## Hyperparameter search across different parameters
+Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
+
+The full example is in [examples/advanced/hyperparameter_search.py](examples/advanced/hyperparameter_search.py), here is a relevant excrept:
+
+```python
+    params = {'cp_model_probing_level': [0,1,2,3],
+              'linearization_level': [0,1,2],
+              'symmetry_level': [0,1,2]}
+
+    configs = gridsearch(model, CPM_ortools, params)
+
+    best = configs[0]
+    print("Best config:", best[1])
+    print("    with runtime:", round(best[0],2))
+```
+
+
 ## Counting all solutions
-Or-tools uses a callback mechanism to handle cases that may have more then one solution. We can use the native callback system, and feed it directly to the created or-tools object created by the CPMpyOrTools constructor.
+Or-tools uses a callback mechanism to process solutions found, and it uses that to count all solutions effectively.
+
+We can use the native callback system, and feed it directly to the created or-tools object created by the CPM_ortools constructor.
 
 The status of or-tools, as well as variables etc, can then be translated back to CPMpy in the same way as is done when call s.solve(), by calling s._after_solve() directly.
 
@@ -46,7 +61,7 @@ We first demonstate this with a native or-tools callback that simply counts the 
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers import CPM_ortools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback
@@ -60,7 +75,7 @@ class ORT_solcount(ort.CpSolverSolutionCallback):
 cb = ORT_solcount()
 
 # direct manipulation of the ort_solver instance created by CPMpy:
-s = CPMpyORTools(m)
+s = CPM_ortools(m)
 ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
 print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
@@ -75,7 +90,7 @@ It uses the exact same solution callback as in the previous example where we pri
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers import CPM_ortools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback, with CPMpy variables and printing
@@ -95,8 +110,8 @@ class ORT_myprint(ort.CpSolverSolutionCallback):
         print("x:",self.x.value())
 cb = ORT_myprint(s.varmap, x)
 
-m_opt = Model([x[0] > x[1]], maximize=sum(x))
-s = CPMpyORTools(m_opt)
+m_opt = Model(x[0] > x[1], maximize=sum(x))
+s = CPM_ortools(m_opt)
 ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
 print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
@@ -111,7 +126,7 @@ from ortools.sat.python import cp_model as ort
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers import CPM_ortools
 from ortools.sat.python import cp_model as ort
 
 # native or-tools callback, with CPMpy variables and printing
@@ -131,7 +146,7 @@ class ORT_myprint(ort.CpSolverSolutionCallback):
         print("x:",self.x.value())
 cb = ORT_myprint(s.varmap, x)
 
-s = CPMpyORTools(m)
+s = CPM_ortools(m)
 ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
 print(s._after_solve(ort_status)) # post-process after solve() call...
 print(s.status())
@@ -146,11 +161,11 @@ However, in case you have custom blocking clauses, or don't care too much by som
 
 ```python
 from cpmpy import *
-from cpmpy.solver_interfaces.ortools import CPMpyORTools
+from cpmpy.solvers import CPM_ortools
 
-x = IntVar(0,3, shape=2)
-m = Model([x[0] > x[1]])
-s = CPMpyORTools(m)
+x = intvar(0,3, shape=2)
+m = Model(x[0] > x[1])
+s = CPM_ortools(m)
 solcount = 0
 while(s.solve()):
     solcount += 1

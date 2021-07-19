@@ -1,1 +1,0 @@
-#TODO add python sat interfacing for model 

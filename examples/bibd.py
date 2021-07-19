@@ -20,21 +20,25 @@ import numpy as np
 from cpmpy import *
 
 # Data
-b,v = 7,7
+v,b = 7,7
 r,k = 3,3
 l = 1
 
+
 # Variables, incidence matrix
-block = BoolVar(shape=(v,b), name="block")
+block = boolvar(shape=(v,b), name="block")
 
 # Constraints on incidence matrix
-m = Model([
+m = Model(
         [sum(row) == r for row in block],
         [sum(col) == k for col in block.T],
-        # the scalar product of every pair of columns adds up to l
-        [sum([(row[col_i] * row[col_j]) for row in block]) == l
-            for col_i in range(v) for col_j in range(col_i)],
-    ])
+)
+
+# the scalar product of every pair of distinct rows sums up to `l`
+for row_a in range(v):
+    for row_b in range(row_a+1,v):
+        m += sum(block[row_a,:] * block[row_b,:]) == l
+
 
 if m.solve():
     # pretty print

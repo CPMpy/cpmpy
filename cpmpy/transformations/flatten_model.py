@@ -1,7 +1,8 @@
 import sys
 import copy
-from ..expressions import *
-from ..variables import *
+from ..expressions.core import *
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.utils import is_num, is_any_list
 
 """
 Flattening a model (or individual constraints) into 'flat normal form'.
@@ -71,8 +72,10 @@ of the form specified above.
 The flattening does not promise to do common subexpression elimination or to automatically group
 commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
 
-TODO: not entirely implemented yet : )
-TODO: clean up behind_the_scenes.rst which sketches the previous normal form
+TODO: remove zipcycle (no longer needed)
+TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
+TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
+TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
 
 from itertools import cycle
@@ -94,21 +97,19 @@ def flatten_model(orig_model):
 
     # the objective
     if orig_model.objective is None:
-        return Model(basecons) # no objective, satisfaction problem
+        return Model(*basecons) # no objective, satisfaction problem
     else:
         (newobj, newcons) = flatten_objective(orig_model.objective)
         basecons += newcons
         if orig_model.objective_max:
-            return Model(basecons, maximize=newobj)
+            return Model(*basecons, maximize=newobj)
         else:
-            return Model(basecons, minimize=newobj)
-
-    return new_model
+            return Model(*basecons, minimize=newobj)
 
 
 def flatten_constraint(expr):
     """
-        input is any expression; except is_num(), pure NumVarImpl,
+        input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
         
         output: see definition of 'flat normal form' above.
@@ -117,9 +118,9 @@ def flatten_constraint(expr):
         TODO, what built-in python error is best?
     """
     # base cases
-    if isinstance(expr, BoolVarImpl) or isinstance(expr, bool):
+    if isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
         return [expr]
-    elif is_num(expr) or isinstance(expr, NumVarImpl):
+    elif is_num(expr) or isinstance(expr, _NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     # recursively flatten list of constraints
@@ -131,7 +132,7 @@ def flatten_constraint(expr):
         flatcons = [flatten_constraint(e) for e in expr.args]
         return [c for con in flatcons for c in con]
 
-    assert expr.is_bool(), "Boolean expressions only in flatten_constraint"
+    assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
 
     if isinstance(expr, Operator):
         """
@@ -152,7 +153,7 @@ def flatten_constraint(expr):
             return [newexpr]+[c for con in flatcons for c in con]
         else:
             # ->, allows a boolexpr on one side
-            if isinstance(expr.args[0], BoolVarImpl):
+            if isinstance(expr.args[0], _BoolVarImpl):
                 # LHS is var, ensure RHS is normalized 'Boolexpr'
                 lhs = expr.args[0]
                 (rhs,flatcons) = normalized_boolexpr(expr.args[1])
@@ -179,6 +180,7 @@ def flatten_constraint(expr):
 
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
+        # XXX: zipcycle no longer needed, vectorized now handled at creation level!
         for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
             if __is_flat_var(lexpr) and __is_flat_var(rexpr):
                 flatcons += [Comparison(expr.name, lexpr, rexpr)]
@@ -188,6 +190,8 @@ def flatten_constraint(expr):
                 exprname = expr.name
                 # ==,!=: can swap if lhs is var and rhs is not
                 # TODO: this is very similar to (part of) normalize_boolexpr??
+                # XXX indeed, every case that is not 'reification' can be
+                # delegated to normalize_boolexpr... TODO
                 if (exprname == '==' or exprname == '!=') and \
                     not __is_flat_var(rexpr) and __is_flat_var(lexpr):
                     (lexpr,rexpr) = (rexpr,lexpr)
@@ -196,6 +200,13 @@ def flatten_constraint(expr):
 
                 # LHS: check if Boolexpr == smth:
                 if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
+                    if is_num(rexpr):
+                        # BoolExpr == 0|False
+                        # special case, handled in normalized_boolexpr()
+                        (con, subs) = normalized_boolexpr(expr)
+                        flatcons += [con] + subs
+                        continue # ready with this one
+
                     # Reification (double implication): Boolexpr == Var
                     if __is_flat_var(lexpr):
                         (lhs, lcons) = (lexpr, [])
@@ -256,15 +267,15 @@ def flatten_objective(expr):
 
 
 def __is_flat_var(arg):
-    """ True if the variable is a numeric constant, or a NumVarImpl (incl subclasses)
+    """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
     """
-    return is_num(arg) or isinstance(arg, NumVarImpl)
+    return is_num(arg) or isinstance(arg, _NumVarImpl)
 
 def __is_flat_var_or_list(arg):
-    """ True if the variable is a numeric constant, or a NumVarImpl (incl subclasses)
+    """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
         or a list of __is_flat_var_or_list
     """
-    return is_num(arg) or isinstance(arg, NumVarImpl) or \
+    return is_num(arg) or isinstance(arg, _NumVarImpl) or \
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
@@ -281,7 +292,7 @@ def get_or_make_var(expr):
         # normalize expr into a boolexpr LHS, reify LHS == bvar
         (newexpr, flatcons) = normalized_boolexpr(expr)
 
-        bvar = BoolVarImpl()
+        bvar = _BoolVarImpl()
         return (bvar, [newexpr == bvar]+flatcons)
 
     #else:
@@ -296,32 +307,32 @@ def get_or_make_var(expr):
     if isinstance(expr, Operator):
         # TODO: more like above, call normalized_numexpr() on expr, then equate...
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args]) # also bool, reified...
-        lbs = [var.lb if isinstance(var, NumVarImpl) else var for var in flatvars]
-        ubs = [var.ub if isinstance(var, NumVarImpl) else var for var in flatvars]
+        lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
+        ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
         # TODO: weighted sum
         if expr.name == 'abs': # unary
-            ivar = IntVarImpl(0, ubs[0])
+            ivar = _IntVarImpl(0, ubs[0])
         elif expr.name == 'mul': # binary
             lb = lbs[0] * lbs[1]
             ub = ubs[0] * ubs[1]
             if lb > ub: # a negative nr
                 lb,ub = ub,lb
-            ivar = IntVarImpl(lb, ub) 
+            ivar = _IntVarImpl(lb, ub) 
         elif expr.name == 'div': # binary
             lb = lbs[0] // lbs[1]
             ub = ubs[0] // ubs[1]
             if lb > ub: # a negative nr
                 lb,ub = ub,lb
-            ivar = IntVarImpl(lb, ub) 
+            ivar = _IntVarImpl(lb, ub) 
         elif expr.name == 'mod': # binary 
-            ivar = IntVarImpl(0, ubs[0])
+            ivar = _IntVarImpl(0, ubs[0])
         elif expr.name == 'pow': # binary
-            ivar = IntVarImpl(lbs[0] ** lbs[1], ubs[0] ** ubs[1])
+            ivar = _IntVarImpl(lbs[0] ** lbs[1], ubs[0] ** ubs[1])
         elif expr.name == 'sum': # n-ary
-            ivar = IntVarImpl(sum(lbs), sum(ubs)) 
+            ivar = _IntVarImpl(sum(lbs), sum(ubs)) 
         elif expr.is_bool(): # Boolean
-            ivar = BoolVarImpl() # TODO: we can support Bool? check, update docs
+            ivar = _BoolVarImpl() # TODO: we can support Bool? check, update docs
         else:
             raise Exception("Operator '{}' not known in get_or_make_var".format(expr.name)) # or bug
 
@@ -348,7 +359,7 @@ def get_or_make_var(expr):
 
         # XXX Also, how to get the bounds on the new variable? have the solver handle it?
         # XXX Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
-        ivar = IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
+        ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
         return (ivar, [newexpr == ivar]+[c for con in flatcons for c in con])
     
@@ -414,11 +425,6 @@ def normalized_boolexpr(expr):
         else:
             # LHS can be numexpr, RHS has to be variable
 
-            # TODO: special case of <reify_ready_expr> == 0, e.g. (a > 10) == 0 :: (a <= 10)
-            # TODO: need to support negation of that expression...
-            #bvar = args[0] if __is_flat_var(args[0]) else args[1]
-            #base_cons = [ __check_or_flip_base_const(subexpr)]
-
             # TODO: optimisations that swap directions instead when it can avoid to create vars
             """
             if expr.name == '==' or expr.name == '!=':
@@ -471,6 +477,13 @@ def normalized_boolexpr(expr):
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
+                if is_num(rexpr):
+                    # BoolExpr == 0|False
+                    assert(not rexpr) # 'true' is preprocessed away
+
+                    nnexpr = negated_normal(lexpr)
+                    return normalized_boolexpr(nnexpr)
+
                 # Reification (double implication): Boolexpr == Var
                 (lhs, lcons) = normalized_boolexpr(lexpr)
                 if expr.name == '!=':
@@ -561,6 +574,10 @@ def negated_normal(expr):
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
         Global: should call decompose and negate that?
+
+        This function only ensures 'negated normal' for the top-level
+        constraint (negating arguments recursively as needed),
+        it does not ensure flatness (except if the input is flat)
     """
 
     if __is_flat_var(expr):
@@ -583,10 +600,14 @@ def negated_normal(expr):
             return Operator('or', [negated_normal(arg) for arg in expr.args])
         elif expr.name == 'or':
             return Operator('and', [negated_normal(arg) for arg in expr.args])
+        elif expr.name == '->':
+            return expr.args[0] & ~expr.args[1]
         else:
-            raise NotImplementedError("negate_normal {}".format(expr))
+            #raise NotImplementedError("negate_normal {}".format(expr))
+            return expr == 0 # can't do better than this...
 
     else:
         # global...
-        raise NotImplementedError("negate_normal {}".format(expr))
+        #raise NotImplementedError("negate_normal {}".format(expr))
+        return expr == 0 # can't do better than this...
 

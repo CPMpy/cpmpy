@@ -17,13 +17,13 @@ from cpmpy import *
 N = 8
 
 # Variables (one per row)
-queens = IntVar(1,N, shape=N, name="queens")
+queens = intvar(1,N, shape=N, name="queens")
 
 # Constraints on columns and left/right diagonal
 m = Model([
-        alldifferent(queens),
-        alldifferent([queens[i] + i for i in range(N)]),
-        alldifferent([queens[i] - i for i in range(N)]),
+        AllDifferent(queens),
+        AllDifferent([queens[i] + i for i in range(N)]),
+        AllDifferent([queens[i] - i for i in range(N)]),
     ])
 
 if m.solve():

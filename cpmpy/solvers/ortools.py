@@ -11,24 +11,20 @@
     .. autosummary::
         :nosignatures:
 
-        ORToolsPython
-
-    ==================
-    Module description
-    ==================
+        CPM_ortools
 
     ==============
     Module details
     ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions import *
-from ..globalconstraints import *
-from ..variables import *
-from ..model_tools.get_variables import get_variables, vars_expr
-from ..model_tools.flatten_model import flatten_model, flatten_constraint, get_or_make_var, negated_normal
+from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables_model, get_variables
+from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
 
-class CPMpyORTools(SolverInterface):
+class CPM_ortools(SolverInterface):
     """
     Interface to the python 'ortools' API
 
@@ -51,7 +47,7 @@ class CPMpyORTools(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model):
+    def __init__(self, cpm_model=None):
         """
         Constructor of the solver object
 
@@ -68,11 +64,17 @@ class CPMpyORTools(SolverInterface):
         super().__init__()
         self.name = "ortools"
 
-        # store original vars and objective (before flattening)
-        self.user_vars = get_variables(cpm_model)
+        if cpm_model is None:
+            self.user_vars = []
+            self.ort_model = ort.CpModel()
+            self.varmap = dict() # cppy var -> solver var
+        else:
+            # store original vars and objective (before flattening)
+            self.user_vars = get_variables_model(cpm_model)
 
-        # create model (includes conversion to flat normal form)
-        self.ort_model = self.make_model(cpm_model)
+            # create model (includes conversion to flat normal form)
+            self.ort_model = self.make_model(cpm_model)
+
         # create the solver instance
         # (so its params can still be changed before calling solve)
         self.ort_solver = ort.CpSolver()
@@ -91,13 +93,13 @@ class CPMpyORTools(SolverInterface):
         :type cpm_cons list of Expressions
         """
         # store new user vars
-        new_user_vars = vars_expr(cons)
+        new_user_vars = get_variables(cons)
         for v in frozenset(new_user_vars)-frozenset(self.user_vars):
             self.user_vars.append(v)
 
         flat_cons = flatten_constraint(cons)
         # add new (auxiliary) variables
-        for var in vars_expr(flat_cons):
+        for var in get_variables(flat_cons):
             if not var in self.varmap:
                 self.add_to_varmap(var)
         # add constraints
@@ -105,6 +107,38 @@ class CPMpyORTools(SolverInterface):
             self.post_constraint(cpm_con)
 
         return self
+
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        # flatten
+        (flat_obj, flat_cons) = flatten_objective(expr)
+
+        # add constraints if needed
+        if len(flat_cons) != 0:
+            self += flat_cons
+
+        obj = self.ort_numexpr(flat_obj)
+        self.ort_model.Minimize(obj)
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        # flatten
+        (flat_obj, flat_cons) = flatten_objective(expr)
+
+        # add constraints if needed
+        if len(flat_cons) != 0:
+            self += flat_cons
+
+        obj = self.ort_numexpr(flat_obj)
+        self.ort_model.Maximize(obj)
 
 
     def solution_hint(self, cpm_vars, vals):
@@ -123,11 +157,33 @@ class CPMpyORTools(SolverInterface):
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
-    def solve(self, time_limit = None, assumptions=None):
+    def solve(self, time_limit=None, assumptions=None, **kwargs):
         """
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
+            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+
+            Additional keyword arguments:
+            The ortools solver parameters are defined in its 'sat_parameters.proto' description:
+            https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
+
+            You can use any of these parameters as keyword argument to `solve()` and they will
+            be forwarded to the solver. Examples include:
+                - num_search_workers=8          number of parallel workers (default: 1)
+                - log_search_progress=True      to log the search process to stdout (default: False)
+                - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
+                - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
+                - linearization_level=0         to disable linearisation (default: 1, can also set to 2)
+                - optimize_with_core=True       to do max-sat like lowerbound optimisation (default: False)
+                - use_branching_in_lp=True      to generate more info in lp propagator (default: False)
+                - polish_lp_solution=True       to spend time in lp propagator searching integer values (default: False)
+                - symmetry_level=1              only do symmetry breaking in presolve (default: 2, also possible: 0)
+
+            example:
+            o.solve(num_search_workers=8, log_search_progress=True)
+
         """
         from ortools.sat.python import cp_model as ort
 
@@ -150,6 +206,10 @@ class CPMpyORTools(SolverInterface):
             # workaround for a presolve with assumptions bug in ortools
             # https://github.com/google/or-tools/issues/2649
             self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
+
+        # set additional keyword arguments in sat_parameters.proto
+        for (kw, val) in kwargs.items():
+            setattr(self.ort_solver.parameters, kw, val)
 
         ort_status = self.ort_solver.Solve(self.ort_model)
 
@@ -237,7 +297,7 @@ class CPMpyORTools(SolverInterface):
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
-        for var in get_variables(flat_model):
+        for var in get_variables_model(flat_model):
             self.add_to_varmap(var)
 
         # Post the (flat) constraint expressions to the solver
@@ -264,9 +324,9 @@ class CPMpyORTools(SolverInterface):
 
         Typically only needed for internal use
         """
-        if isinstance(cpm_var, BoolVarImpl):
+        if isinstance(cpm_var, _BoolVarImpl):
             revar = self.ort_model.NewBoolVar(str(cpm_var))
-        elif isinstance(cpm_var, IntVarImpl):
+        elif isinstance(cpm_var, _IntVarImpl):
             revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
         self.varmap[cpm_var] = revar
 
@@ -286,14 +346,14 @@ class CPMpyORTools(SolverInterface):
             Typically only needed for internal use
         """
         # Base case: Boolean variable
-        if isinstance(cpm_expr, BoolVarImpl):
+        if isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr( [self.ort_var(cpm_expr)] )
         
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
             lhs,rhs = cpm_expr.args
 
-            if isinstance(lhs, BoolVarImpl) and cpm_expr.name == '==':
+            if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == '==':
                 # base: bvar == bvar|const
                 lvar,rvar = map(self.ort_var, (lhs,rhs))
                 return self.ort_model.Add(lvar == rvar)
@@ -311,7 +371,7 @@ class CPMpyORTools(SolverInterface):
                 # numeric (non-reify) comparison case
                 rvar = self.ort_var(rhs)
                 # lhs can be numexpr
-                if isinstance(lhs, NumVarImpl):
+                if isinstance(lhs, _NumVarImpl):
                     # simplest LHS case, a var
                     newlhs = self.ort_var(lhs)
                 else:
@@ -367,10 +427,10 @@ class CPMpyORTools(SolverInterface):
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == '->' and \
-             (not isinstance(cpm_expr.args[0], BoolVarImpl) or \
-              not isinstance(cpm_expr.args[1], BoolVarImpl)):
+             (not isinstance(cpm_expr.args[0], _BoolVarImpl) or \
+              not isinstance(cpm_expr.args[1], _BoolVarImpl)):
                 # reified case: var -> boolexpr, boolexpr -> var
-                if isinstance(cpm_expr.args[0], BoolVarImpl):
+                if isinstance(cpm_expr.args[0], _BoolVarImpl):
                     # var -> boolexpr, natively supported by or-tools
                     bvar = self.ort_var(cpm_expr.args[0])
                     return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
@@ -414,7 +474,7 @@ class CPMpyORTools(SolverInterface):
                     flatdec = flatten_constraint(dec)
 
                     # collect and create new variables
-                    for var in vars_expr(flatdec):
+                    for var in get_variables(flatdec):
                         if not var in self.varmap:
                             self.add_to_varmap(var)
                     # post decomposition
@@ -439,7 +499,7 @@ class CPMpyORTools(SolverInterface):
         # decision variables, check in varmap
         if isinstance(cpm_var, NegBoolView):
             return self.varmap[cpm_var._bv].Not()
-        elif isinstance(cpm_var, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        elif isinstance(cpm_var, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
             return self.varmap[cpm_var]
 
         raise NotImplementedError("Not a know var {}".format(cpm_var))
@@ -470,7 +530,7 @@ class CPMpyORTools(SolverInterface):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, NumVarImpl): # BoolVarImpl is subclass of NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
             return self.ort_var(cpm_expr)
 
         # sum or (to be implemented: wsum)

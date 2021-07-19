@@ -5,7 +5,11 @@ N-puzzle problem in CPMpy
 Reworked based on Hakan Kjellerstrand's
 https://github.com/hakank/hakank/blob/master/minizinc/n_puzzle.mzn
 
-A typical children toy, where a picture is divided in n+1 blocks and mangled, and the goal is to trace the steps to the original picture.
+A typical children toy, where a picture is divided in n+1 blocks and mangled,
+and the goal is to trace the steps to the original picture.
+
+It is a typical planning problem, here solved with CSP over a finite
+planning horizon of `num_steps` steps.
 """
 
 # load the libraries
@@ -41,9 +45,6 @@ n = puzzle_start.shape[0] # flat length
 dim = int(math.sqrt(n))
 assert (dim*dim == n), "non-square matrix??"
 
-# max nr steps to the solution
-num_sols = 30
-
 # Generate the allowed moves (including to same position)
 # such that (move_from, move_to) in valid_table
 valid_table = []
@@ -56,18 +57,22 @@ for r in range(dim):
             if 0 <= r+rr and r+rr < dim and 0 <= c+cc and c+cc < dim:
                 valid_table.append([pos(r,c), pos(r+rr,c+cc)])
 
+
+# max nr steps to the solution
+num_steps = 30
+
 # Variables
-x = IntVar(0,n-1, shape=(num_sols,n), name="x")
+x = intvar(0,n-1, shape=(num_steps,n), name="x")
 
 # the moves, index in puzzle
-move_from = IntVar(0,n-1, shape=(num_sols), name="move_from") # is move_to[i-1]
-move_to = IntVar(0,n-1, shape=(num_sols), name="move_to")
+move_from = intvar(0,n-1, shape=(num_steps), name="move_from") # is move_to[i-1]
+move_to = intvar(0,n-1, shape=(num_steps), name="move_to")
 
 # is this row the solution?
-check = BoolVar(shape=num_sols, name="check")
+check = boolvar(shape=num_steps, name="check")
 
 # index of first solution
-check_ix = IntVar(0,num_sols, name="check_ix")
+check_ix = intvar(0,num_steps, name="check_ix")
 
 
 m = Model(minimize=check_ix)
@@ -78,36 +83,36 @@ def same(x, y):
 # start and end puzzle
 m += [
     same(x[0, :], puzzle_start),
-    same(x[num_sols-1, :], puzzle_end),
+    same(x[num_steps-1, :], puzzle_end),
 ]
 
 # in each puzzle, all cells different
-m += [ alldifferent(x[i,:]) for i in range(num_sols) ]
+m += [ AllDifferent(x[i,:]) for i in range(num_steps) ]
 
 
 # move_to is location of the empty piece
-m += [ x[i, move_to[i]] == 0 for i in range(num_sols) ]
+m += [ x[i, move_to[i]] == 0 for i in range(num_steps) ]
 
 # move_from is previous move_to, except first
 m += [ move_from[0] == move_to[0] ]
-m += [ move_from[i] == move_to[i-1] for i in range(1,num_sols) ]
+m += [ move_from[i] == move_to[i-1] for i in range(1,num_steps) ]
 
 # only move_from/move_to can have a change in x
 m += [
     ((move_from[i] != j) & (move_to[i] != j)).implies(x[i,j] == x[i-1,j])
-    for i in range(1,num_sols) for j in range(n)
+    for i in range(1,num_steps) for j in range(n)
 ]
 
 
 # require valid moves
-m += [ Table( (move_from[i],move_to[i]), valid_table) for i in range(num_sols)]
+m += [ Table( (move_from[i],move_to[i]), valid_table) for i in range(num_steps)]
 
 
 # check whether this is the end solution
-m += [ check[i] == same(x[i,:], puzzle_end) for i in range(num_sols)]
+m += [ check[i] == same(x[i,:], puzzle_end) for i in range(num_steps)]
 
 # once the solution is found, keep it
-m += [ check[i] >= check[i-1] for i in range(1,num_sols) ]
+m += [ check[i] >= check[i-1] for i in range(1,num_steps) ]
 
 # index of a solution (when minimized, index of first solution)
 m += [ check[check_ix] == 1 ]

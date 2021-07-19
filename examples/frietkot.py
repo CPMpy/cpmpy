@@ -6,8 +6,9 @@ http://homepages.vub.ac.be/~tiasguns/frietkot/
 from cpmpy import *
 
 # Construct the model.
-(mayo, ketchup, curry, andalouse, samurai) = BoolVar(5)
+(mayo, ketchup, curry, andalouse, samurai) = boolvar(5)
 
+# Pure CNF
 Nora = mayo | ketchup
 Leander = ~samurai | mayo
 Benjamin = ~andalouse | ~curry | ~samurai
@@ -22,8 +23,6 @@ Luc = ~mayo | samurai
 allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
 
 model = Model(allwishes)
-print(model)
-
 if model.solve():
     print("Mayonaise = ", mayo.value())
     print("Ketchup = ", ketchup.value())

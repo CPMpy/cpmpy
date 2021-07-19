@@ -1,11 +1,12 @@
 import unittest
 import cpmpy as cp
-from cpmpy.model_tools.flatten_model import *
+from cpmpy.transformations.flatten_model import *
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 class TestFlattenModel(unittest.TestCase):
     def setUp(self):
-        self.ivars = cp.IntVar(1, 10, (5,))
-        self.bvars = cp.BoolVar((2,))
+        self.ivars = cp.intvar(1, 10, (5,))
+        self.bvars = cp.boolvar((2,))
         #self.constraints = [self.ivars != 3] # should work in future (broadcasting)
         self.constraints = [iv != 3 for iv in self.ivars]
 
@@ -27,10 +28,10 @@ class TestFlattenModel(unittest.TestCase):
 
 class TestFlattenConstraint(unittest.TestCase):
     def setUp(self):
-        IntVarImpl.counter = 0
-        BoolVarImpl.counter = 0
-        self.ivars = cp.IntVar(1, 10, shape=(5,))
-        self.bvars = cp.BoolVar((3,))
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+        self.ivars = cp.intvar(1, 10, shape=(5,))
+        self.bvars = cp.boolvar((3,))
 
     def test_eq(self):
         (a,b,c,d,e) = self.ivars[:5]
@@ -67,10 +68,10 @@ class TestFlattenConstraint(unittest.TestCase):
     
 class TestFlattenExpr(unittest.TestCase):
     def setUp(self):
-        IntVarImpl.counter = 0
-        BoolVarImpl.counter = 0
-        self.ivars = cp.IntVar(1, 10, shape=(5,))
-        self.bvars = cp.BoolVar((3,))
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+        self.ivars = cp.intvar(1, 10, shape=(5,))
+        self.bvars = cp.boolvar((3,))
 
     # not directly tested on its on, new functions 'normalized_boolexpr' and 'normalized_numexpr'
 
@@ -87,12 +88,12 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var(x <= y)), "(BV6, [((BV0) <= (BV1)) == (BV6)])" )
 
         self.assertEqual( str(get_or_make_var((a > 10) == x)), "(BV7, [((IV0 > 10) == (BV0)) == (BV7)])" )
-        BoolVar() # increase counter
+        cp.boolvar() # increase counter
         self.assertEqual( str(get_or_make_var( (a > 10) == (d > 5) )), "(BV10, [((IV0 > 10) == (BV9)) == (BV10), (IV3 > 5) == (BV9)])" )
-        BoolVar() # increase counter
+        cp.boolvar() # increase counter
         self.assertEqual( str(get_or_make_var( a > c )), "(BV12, [((IV0) > (IV2)) == (BV12)])" )
         self.assertEqual( str(get_or_make_var( a + b > c )), "(BV13, [(((IV0) + (IV1)) > (IV2)) == (BV13)])" )
-        IntVar(0,2) # increase counter
+        cp.intvar(0,2) # increase counter
 
         self.assertEqual( str(get_or_make_var( (a>b).implies(x) )), "(BV15, [((~BV14) or (BV0)) == (BV15), ((IV0) > (IV1)) == (BV14)])" )
         self.assertEqual( str(get_or_make_var( x&y )), "(BV16, [((BV0) and (BV1)) == (BV16)])" )
@@ -103,23 +104,23 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var( x.implies(y.implies(z)) )), "(BV25, [((~BV0) or (BV24)) == (BV25), ((~BV1) or (BV2)) == (BV24)])" )
 
         self.assertEqual( str(get_or_make_var( (a > 10) )), "(BV26, [(IV0 > 10) == (BV26)])" )
-        self.assertEqual( str(get_or_make_var( (a > 10)&x&y )), "(BV28, [(and((BV27, BV0, BV1))) == (BV28), (IV0 > 10) == (BV27)])" )
+        self.assertEqual( str(get_or_make_var( (a > 10)&x&y )), "(BV28, [(and([BV27, BV0, BV1])) == (BV28), (IV0 > 10) == (BV27)])" )
 
     def test_get_or_make_var__num(self):
         (a,b,c,d,e) = self.ivars[:5]
         (x,y,z) = self.bvars[:3]
 
         self.assertEqual( str(get_or_make_var( a+b )), "(IV5, [((IV0) + (IV1)) == (IV5)])" )
-        self.assertEqual( str(get_or_make_var( a+b+c )), "(IV6, [(sum((IV0, IV1, IV2))) == (IV6)])" )
+        self.assertEqual( str(get_or_make_var( a+b+c )), "(IV6, [(sum([IV0, IV1, IV2])) == (IV6)])" )
         self.assertEqual( str(get_or_make_var( 2*a )), "(IV7, [(2 * (IV0)) == (IV7)])" ) # TODO, suboptimal
         self.assertEqual( str(get_or_make_var( a*b )), "(IV8, [((IV0) * (IV1)) == (IV8)])" )
         self.assertEqual( str(get_or_make_var( a/b )), "(IV9, [((IV0) / (IV1)) == (IV9)])" )
         self.assertEqual( str(get_or_make_var( 1/b )), "(IV10, [(1 / (IV1)) == (IV10)])" )
         self.assertEqual( str(get_or_make_var( a/1 )), "(IV0, [])" )
-        self.assertEqual( str(get_or_make_var( abs(a) )), "(IV11, [(abs((IV0,))) == (IV11)])" )
-        self.assertEqual( str(get_or_make_var( 1*a + 2*b + 3*c )), "(IV14, [(sum((IV0, IV12, IV13))) == (IV14), (2 * (IV1)) == (IV12), (3 * (IV2)) == (IV13)])" ) # TODO, suboptimal
-        self.assertEqual( str(get_or_make_var( cparray([1,2,3])[a] )), "(IV15, [([1 2 3][IV0]) == (IV15)])" )
-        self.assertEqual( str(get_or_make_var( cparray([b+c,2,3])[a] )), "(IV17, [((IV16, 2, 3)[IV0]) == (IV17), ((IV1) + (IV2)) == (IV16)])" )
+        self.assertEqual( str(get_or_make_var( abs(a) )), "(IV11, [(abs([IV0])) == (IV11)])" )
+        self.assertEqual( str(get_or_make_var( 1*a + 2*b + 3*c )), "(IV14, [(sum([IV0, IV12, IV13])) == (IV14), (2 * (IV1)) == (IV12), (3 * (IV2)) == (IV13)])" ) # TODO, suboptimal
+        self.assertEqual( str(get_or_make_var( cp.cpm_array([1,2,3])[a] )), "(IV15, [([1 2 3][IV0]) == (IV15)])" )
+        self.assertEqual( str(get_or_make_var( cp.cpm_array([b+c,2,3])[a] )), "(IV17, [((IV16, 2, 3)[IV0]) == (IV17), ((IV1) + (IV2)) == (IV16)])" )
 
     def test_objective(self):
         (a,b,c,d,e) = self.ivars[:5]
@@ -129,9 +130,9 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_objective( a+b )), "((IV0) + (IV1), [])" )
         self.assertEqual( str(flatten_objective( 2*a+3*b )), "((IV5) + (IV6), [(2 * (IV0)) == (IV5), (3 * (IV1)) == (IV6)])" ) # TODO, wsum
         self.assertEqual( str(flatten_objective( a/b+c )), "((IV7) + (IV2), [((IV0) / (IV1)) == (IV7)])" )
-        self.assertEqual( str(flatten_objective( cparray([1,2,3])[a] )), "(IV8, [([1 2 3][IV0]) == (IV8)])" )
-        self.assertEqual( str(flatten_objective( cparray([1,2,3])[a]+b )), "((IV9) + (IV1), [([1 2 3][IV0]) == (IV9)])" )
-        self.assertEqual( str(flatten_objective( a+b-c )), "(sum((IV0, IV1, IV10)), [(-1 * (IV2)) == (IV10)])" )
+        self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a] )), "(IV8, [([1 2 3][IV0]) == (IV8)])" )
+        self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )), "((IV9) + (IV1), [([1 2 3][IV0]) == (IV9)])" )
+        self.assertEqual( str(flatten_objective( a+b-c )), "(sum([IV0, IV1, IV10]), [(-1 * (IV2)) == (IV10)])" )
 
     def test_constraint(self):
         (a,b,c,d,e) = self.ivars[:5]
@@ -144,12 +145,12 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( x&y&~z )), "[BV0, BV1, ~BV2]" )
         self.assertEqual( str(flatten_constraint( x.implies(y) )), "[(BV0) -> (BV1)]" )
         self.assertEqual( str(flatten_constraint( (a > 10)&x )), "[IV0 > 10, BV0]" )
-        BoolVar() # increase counter
+        cp.boolvar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10).implies(x) )), "[(IV0 > 10) -> (BV0)]" )
-        BoolVar() # increase counter
+        cp.boolvar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10) )), "[IV0 > 10]" )
         self.assertEqual( str(flatten_constraint( (a > 10) == 1 )), "[IV0 > 10]" )
-        self.assertEqual( str(flatten_constraint( (a > 10) == 0 )), "[IV0 > 10 == 0]" )
+        self.assertEqual( str(flatten_constraint( (a > 10) == 0 )), "[IV0 <= 10]" )
         self.assertEqual( str(flatten_constraint( (a > 10) == x )), "[(IV0 > 10) == (BV0)]" )
         #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
         self.assertEqual( str(flatten_constraint( (a > 10) | (b + c > 2) )), "[(BV5) or (BV6), (IV0 > 10) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]" )
@@ -163,11 +164,11 @@ class TestFlattenExpr(unittest.TestCase):
         #self.assertEqual( str(flatten_constraint( c != a + b )), "[((IV0) + (IV1)) != (IV2)]" ) # TODO, make it do the swap (again)
         self.assertEqual( str(flatten_constraint( ((a > 5) == (b < 3)) )), "[(IV0 > 5) == (BV8), (IV1 < 3) == (BV8)]" )
 
-        self.assertEqual( str(flatten_constraint( cparray([1,2,3])[a] == b )), "[([1 2 3][IV0]) == (IV1)]" )
-        self.assertEqual( str(flatten_constraint( cparray([1,2,3])[a] > b )), "[([1 2 3][IV0]) > (IV1)]" )
-        IntVar(0,2, 4) # increase counter
-        self.assertEqual( str(flatten_constraint( cparray([1,2,3])[a] <= b )), "[([1 2 3][IV0]) <= (IV1)]" )
-        self.assertEqual( str(flatten_constraint( cp.alldifferent([a+b,b+c,c+3]) )), "[alldifferent(IV9,IV10,IV11), ((IV0) + (IV1)) == (IV9), ((IV1) + (IV2)) == (IV10), (3 + (IV2)) == (IV11)]" )
+        self.assertEqual( str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )), "[([1 2 3][IV0]) == (IV1)]" )
+        self.assertEqual( str(flatten_constraint( cp.cpm_array([1,2,3])[a] > b )), "[([1 2 3][IV0]) > (IV1)]" )
+        cp.intvar(0,2, 4) # increase counter
+        self.assertEqual( str(flatten_constraint( cp.cpm_array([1,2,3])[a] <= b )), "[([1 2 3][IV0]) <= (IV1)]" )
+        self.assertEqual( str(flatten_constraint( cp.AllDifferent([a+b,b+c,c+3]) )), "[alldifferent(IV9,IV10,IV11), ((IV0) + (IV1)) == (IV9), ((IV1) + (IV2)) == (IV10), (3 + (IV2)) == (IV11)]" )
 
         # issue #27
         self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), (((IV2) + (IV3)) == (IV1)) == (BV9)]" )
@@ -175,4 +176,12 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( (a == 10).implies(c+d == b) )), "[(IV0 == 10) -> (BV10), (((IV2) + (IV3)) == (IV1)) == (BV10)]" )
         self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) / (IV1)) == (IV2)]" )
         self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) / (IV1)) == (IV2)]" )
+
+        # negated normal form tests
+        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(~BV0) and (~BV1)]" )
+        self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((~BV0) and (~BV1))]" )
+        self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[(BV2) and (BV11), ((~BV0) and (~BV1)) == (BV11)]" ) # To optimize, BV11 not needed), "" )
+        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((~BV0) or (~BV1)) == (BV12)]" )
+        self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
+        self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((~BV2) or (BV1)) -> (BV13), ((~BV0) and (~BV1)) == (BV13)]" )
 

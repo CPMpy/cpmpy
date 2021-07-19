@@ -4,8 +4,8 @@ Knapsack problem in CPMpy
  
 Based on the Numberjack model of Hakan Kjellerstrand
 """
-from cpmpy import *
 import numpy as np
+from cpmpy import *
 
 # Problem data
 n = 10
@@ -15,15 +15,17 @@ weights = np.random.randint(1,5, n)
 capacity = np.random.randint(sum(weights)*.2, sum(weights)*.5)
 
 # Construct the model.
-x = BoolVar(shape=n, name="x")
+x = boolvar(shape=n, name="x")
 
-constraint = [ sum(x*weights) <= capacity ]
-objective  = sum(x*values)
-
-model = Model(constraint, maximize=objective)
-print(model)
-print("") # blank line
+model = Model(
+            sum(x*weights) <= capacity,
+        maximize=
+            sum(x*values)
+        )
 
 print("Value:", model.solve()) # solve returns objective value
-print("Solution:", x.value())
-print("In items: ", [i+1 for i,val in enumerate(x.value()) if val]) # offset 0+1
+print(f"Capacity: {capacity}, used: {sum(x.value()*weights)}")
+items = np.where(x.value())[0]
+print("In items:", items)
+print("Values:  ", values[items])
+print("Weights: ", weights[items])
