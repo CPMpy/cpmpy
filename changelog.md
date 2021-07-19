@@ -1,5 +1,9 @@
 # Change log
 
+## 0.7.2
+
+* get_core() work around bug in upstream ortools
+
 ## 0.7.1
 
 * still learning the right release flow, this is a stable release
