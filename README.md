@@ -1,4 +1,4 @@
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy.
+CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
 
 Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
@@ -8,10 +8,10 @@ Installing is as easy as `pip install cpmpy`, after which you are ready to go. S
 
 Its key features are:
 
-    - conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
-    - logging search progress and arbitrarily [modifying solver setting](https://cpmpy.readthedocs.io/en/latest/advanced_solver_features.html) (To Update)
-    - intuitive [hyperparameter search](examples/advanced/hyperparameter_search.py) for a solver
-    - easy UNSAT core extraction and computing [Minimal Unsatisfiable Subsets](https://cpmpy.readthedocs.io/en/latest/unsat_core_extraction.html) (MUS) of CP problems
+- conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
+- logging search progress and arbitrarily [modifying solver setting](https://cpmpy.readthedocs.io/en/latest/advanced_solver_features.html) (To Update)
+- intuitive [hyperparameter search](examples/advanced/hyperparameter_search.py) for a solver
+- easy UNSAT core extraction and computing [Minimal Unsatisfiable Subsets](https://cpmpy.readthedocs.io/en/latest/unsat_core_extraction.html) (MUS) of CP problems
 
 
 It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
