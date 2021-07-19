@@ -31,10 +31,7 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
    :maxdepth: 1
    :caption: API documentation:
 
-   api/expressions/variables
-   api/expressions/core
-   api/expressions/globalconstraints
-   api/expressions/python_builtins
+   api/expressions
    api/model
    api/solvers
 

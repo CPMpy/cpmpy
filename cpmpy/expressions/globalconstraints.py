@@ -18,7 +18,6 @@
         Minimum
         Maximum
         Element
-        GlobalConstraint
 
     ==================
     Module Description
@@ -115,6 +114,13 @@ from .utils import flatlist, all_pairs, argval
 # Base class GlobalConstraint
 
 class GlobalConstraint(Expression):
+    """
+        Abstract superclass of GlobalConstraints
+
+        Like all expressions it has a `.name` and `.args` property.
+        Overwrites the `.is_bool()` method. You can indicate
+        in the constructer whether it has Boolean return type or not.
+    """
     # is_bool: whether this is normal constraint (True or False)
     #   not is_bool: it computes a numeric value (ex: Minimum, Element)
     def __init__(self, name, arg_list, is_bool=True):
