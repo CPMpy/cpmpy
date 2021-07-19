@@ -1,30 +1,30 @@
-CPMpy: CP modeling made easy in Python
-==========================================
+CPMpy: Constraint Programming and Modeling in Python
+====================================================
 
-Welcome to CpMPy. Licensed under the MIT License.
+CPMpy is a Constraint Programming and Modeling library in Python, based on numpy.
 
-CpMPy is a numpy-based light-weight Python library for conveniently modeling constraint problems in Python. It aims to connect to common constraint solving systems that have a Python API, such as MiniZinc (with solvers gecode, chuffed, ortools, picatsat, etc), or-tools through its Python API and more.
+Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
-It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure.
-
-A longer description of its motivation and architecture is in :download:`pdf <modref19_cppy.pdf>`.
-
-The software is in ALPHA state, and near the end of its proof-of-concept stage. Do send suggestions, additions, API changes, or even reuse some of these ideas in your own project!
+CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer.
+   
+Source code and bug reports at https://github.com/CPMpy/cpmpy
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Installing the library:
+   :maxdepth: 1
+   :caption: Getting started:
 
-   tutorial/how_to_install
+   installation_instructions
+   beginner_tutorial
+   Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
+   More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
 
 .. toctree::
    :maxdepth: 2
    :caption: Documentation:
 
-   preface/overview
    advanced_solver_features
    unsat_core_extraction
-   preface/behind_the_scenes
+   behind_the_scenes
 
 
 .. toctree::
@@ -38,13 +38,6 @@ The software is in ALPHA state, and near the end of its proof-of-concept stage. 
    api/model
    api/solvers
 
-Supplementary :mod:`.examples` package
---------------------------------------
-
-.. toctree::
-   :caption: Examples:
-
-   examples/all_examples
 
 FAQ
 ---
@@ -56,16 +49,16 @@ FAQ
 
    "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
 
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cparray()` wrapper:
+Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cpm_array()` wrapper:
 
 .. code-block:: python
    :linenos:
 
    # x is a variable 
-   X = IntVar(0, 3)
+   X = intvar(0,3)
 
-   # Transforming a given numpy-array **m** into a cparray
-   m = cparray(m)
+   # Transforming a given numpy-array **m** into a CPMpy array
+   m = cpm_array(m)
    
    # apply constraint
    m[X] == 8

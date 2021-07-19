@@ -4,7 +4,7 @@
     Documentation in docs/index.rst
     as well as online at: https://cpmpy.readthedocs.io/
 
-    Source code and bug reports at https://github.com/cpmpy/cpmpy
+    Source code and bug reports at https://github.com/CPMpy/cpmpy
 
     The package constists of 4 modules:
     - `model`: a generic container for expressions (constraints and an objective), it can also search for an available solver and call it

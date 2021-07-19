@@ -12,7 +12,7 @@ from cpmpy import *
 import numpy as np
 
 # Construct the model.
-s,e,n,d,m,o,r,y = intvar(0,9, 8)
+s,e,n,d,m,o,r,y = intvar(0,9, shape=8)
 
 model = Model(
     AllDifferent([s,e,n,d,m,o,r,y]),
