@@ -1,9 +1,3 @@
-import sys
-import copy
-from ..expressions.core import *
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
-
 """
 Flattening a model (or individual constraints) into 'flat normal form'.
 
@@ -19,7 +13,8 @@ a constant, that is a - b :: a + -1*b :: wsum([1,-1],[a,b])
 The three families of possible constraints are:
 
 Base constraints: (no nesting)
------------------
+------------------------------
+
     - Boolean variable
     - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
     - Boolean impliciation: Var -> Var                     (CPMpy class 'Operator', is_bool())
@@ -28,7 +23,8 @@ Base constraints: (no nesting)
     - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
 
 Comparison constraints: (up to one nesting on one side)
------------------------
+-------------------------------------------------------
+
     - Numeric equality:  Numexpr == Var                    (CPMpy class 'Comparison')
                          Numexpr == Constant               (CPMpy class 'Comparison')
     - Numeric disequality: Numexpr != Var                  (CPMpy class 'Comparison')
@@ -36,31 +32,37 @@ Comparison constraints: (up to one nesting on one side)
     - Numeric inequality (>=,>,<,<=): Numexpr >=< Var      (CPMpy class 'Comparison')
 
     Numexpr:
+
         - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
                                                            (CPMpy class 'Operator', not is_bool())
         - Global constraint (non-Boolean) (examples: Max,Min,Element)
                                                            (CPMpy class 'GlobalConstraint', not is_bool()))
+
     wsum: wsum([Const],[Var]) represents sum([Const]*[Var]) # TODO: not implemented yet
 
 Reify/imply constraint: (up to two nestings on one side)
------------------------
+--------------------------------------------------------
+
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
     - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                    Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
 
     Boolexpr:
+
         - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         - Comparison constraint (see above)                    (CPMpy class 'Comparison')
     
     Reification of a comparison is the most complex case as it can allow up to 3 levels of nesting in total, e.g.:
+
         - (wsum([1,2,3],[IV1,IV2,IV3]) > 5) == BV
         - (IV1 == IV2) == BV
         - (BV1 == BV2) == BV3
 
 Objective: (up to one nesting)
----------
+------------------------------
+
     - Satisfaction problem: None
     - Decision variable: Var
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
@@ -77,6 +79,11 @@ TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
+import sys
+import copy
+from ..expressions.core import *
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.utils import is_num, is_any_list
 
 from itertools import cycle
 def __zipcycle(vars1, vars2):
@@ -519,6 +526,7 @@ def normalized_numexpr(expr):
         all 'flat normal form' numeric expressions...
 
         Currently, this is the case for:
+
         - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
                                                            (CPMpy class 'Operator', not is_bool())
         - Global constraint (non-Boolean) (examples: Max,Min,Element)

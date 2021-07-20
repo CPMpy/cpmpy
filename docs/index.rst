@@ -24,13 +24,12 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
 
    solver_parameters
    multiple_solutions
-   advanced_solver_features
    unsat_core_extraction
    behind_the_scenes
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API documentation:
 
    api/expressions

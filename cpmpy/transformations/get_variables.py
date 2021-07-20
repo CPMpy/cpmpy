@@ -1,13 +1,13 @@
+"""
+Returns an list of all variables in the model or expressions
+
+Variables are ordered by appearance, e.g. first encountered first
+"""
 import warnings # for deprecation warning
 from ..expressions.core import Expression
 from ..expressions.variables import _NumVarImpl,NegBoolView
 from ..expressions.utils import is_any_list
 
-"""
-Returns an (ordered by appearance) list of all variables in the model or expressions
-
-Does not modify any expression
-"""
 def get_variables_model(model):
     """
         Get variables of a model (constraints and objective)
