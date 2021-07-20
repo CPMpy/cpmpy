@@ -1,5 +1,8 @@
 # Change log
 
+## 0.9.1
+* easier hyperparameter search with `param_combinations()` helper function in cpmpy.solvers
+
 ## 0.9.0
 
 First beta release!
