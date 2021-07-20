@@ -9,7 +9,7 @@ Installing is as easy as `pip install cpmpy`, after which you are ready to go. S
 Its key features are:
 
 - conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
-- logging search progress and arbitrarily [modifying solver setting](https://cpmpy.readthedocs.io/en/latest/advanced_solver_features.html) (To Update)
+- logging search progress and arbitrarily [modifying solver parameters](https://cpmpy.readthedocs.io/en/latest/solver_parameters.html)
 - intuitive [hyperparameter search](examples/advanced/hyperparameter_search.py) for a solver
 - easy UNSAT core extraction and computing [Minimal Unsatisfiable Subsets](https://cpmpy.readthedocs.io/en/latest/unsat_core_extraction.html) (MUS) of CP problems
 
