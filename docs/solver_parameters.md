@@ -29,16 +29,19 @@ s.solve(num_search_workers=8, log_search_progress=True)
 ## Hyperparameter search across different parameters
 Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
 
-The full example is in [examples/advanced/hyperparameter_search.py](examples/advanced/hyperparameter_search.py), here is a relevant excrept:
+The cpmpy.solvers module has a helper function `param_combinations` that generates all parameter combinations of an input, which can then be looped over.
+
+The example is in [examples/advanced/hyperparameter_search.py](examples/advanced/hyperparameter_search.py), the key part is:
 
 ```python
+    from cpmpy.solvers import CPM_ortools, param_combinations
+
     params = {'cp_model_probing_level': [0,1,2,3],
               'linearization_level': [0,1,2],
               'symmetry_level': [0,1,2]}
 
-    configs = gridsearch(model, CPM_ortools, params)
-
-    best = configs[0]
-    print("Best config:", best[1])
-    print("    with runtime:", round(best[0],2))
+    for params in param_combinations(all_params):
+        s = CPM_ortools(model)
+        s.solve(**params)
+        print(s.status().runtime, "seconds for config", params)
 ```
