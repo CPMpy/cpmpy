@@ -19,9 +19,11 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
    More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: User Documentation:
 
+   solver_parameters
+   multiple_solutions
    advanced_solver_features
    unsat_core_extraction
    behind_the_scenes

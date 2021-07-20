@@ -4,7 +4,7 @@ Getting started with Constraint Programming and CPMpy
 Constraint Programming
 ----------------------
 
-Many real-life decisions involve searching over a large number of possible solutions to find one that satisfies all constraints and/or optimizes an objective function. For example in timetabling, scheduling, packing, routing and many more.
+Many real-life decision problems involve searching over a large number of possible solutions to find one that satisfies all constraints and/or optimizes an objective function. For example in timetabling, scheduling, packing, routing and many more.
 
 To decide if a problem is feasible or finding the best one amongst all the options is hard task to do by hand. And enumerating all possible solutions and simply checking whether they are good (generate-and-test) is usually infeasible in practice.
 
@@ -33,7 +33,7 @@ A typical CP problem is defined by the following elements:
 
 **Variables**: Variables represents the decisions to be made. Depending on the decisions to be made variables can be *Boolean*, whenever a Yes or No decision is needed to be made, or *Integer*, whenever an integer number is necessary to represent a decision. In the first case, we say the **domain** of a Boolean variable is the set {True, False}. For integer variables we represent this as an interval of integer numbers, [a,b].
 
-**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or [global constrains](https://github.com/tias/cppy/blob/master/docs/api/constraints.rst).
+**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or `global constrains <https://github.com/tias/cppy/blob/master/docs/api/constraints.rst>`_.
 
 Moreover, if we want to model an constrained optimization problem we also need to specify an 
 
@@ -56,12 +56,14 @@ Cryptarythmetic in CPMpy
 First we need to import all the tools that we will need to create our CP model, namely numpy and our CPMpy library:
 
 .. code-block:: python
+
     import numpy as np
     from cpmpy import *
 
 Secondly, as in every constraint programming model we need to define the decision variables:
 
 .. code-block:: python
+
     s,e,n,d,m,o,r,y = intvar(0,9, shape=8)
 
 This line indicates that we are creating 8 integer decision variables, s,e,n,d,m,o,r,y, and each will take a value between 0 and 9 (inclusive) in the solution. The `shape` argument informs the shape of the tensor (in this case, a vector of size 8, unpacked over the individual letters).
@@ -72,6 +74,7 @@ Thirdly, the constraints. We will immediately wrap them in a `Model()` object:
 Constraints are included in the model as a list. First, we create a list to add the constraints. Then, we append an 'all different constraint' in a straightforward fashion. Finally, we add the constraint saying SEND + MORE = MONEY. 
 
 .. code-block:: python
+
     model = Model(
         AllDifferent(s,e,n,d,m,o,r,y),
         (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
@@ -93,6 +96,7 @@ Solving a CPMpy model
 Solving a model is as easy as calling `.solve()` on it, which will automatically search for a solver installed on the system, and make it solve the model:
 
 .. code-block:: python
+
     model.solve()
 
 The return value will be whether the model was satisfiable or not (True/False) in case of a satisfaction problem, and what the optimal value was in case of an optimisation problem.
@@ -100,6 +104,7 @@ The return value will be whether the model was satisfiable or not (True/False) i
 The solution will be backpopulated in the decision variables used, and can be obtained by calling the `.value()` function on a decision variable. For example:
 
 .. code-block:: python
+
     if model.solve():
         print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
         print("  M,O,R,E =   ", [x.value() for x in [m,o,r,e]])
@@ -109,16 +114,14 @@ The solution will be backpopulated in the decision variables used, and can be ob
 
 And that is all there is to it...
 
-To get more familiar with these concepts, you can experiment with modeling and solving the sudoku puzzle problem in [the following notebook](https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb).
+To get more familiar with these concepts, you can experiment with modeling and solving the sudoku puzzle problem in `the following notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>`_.
 
-And many more examples on scheduling, packing, routing and more in the [examples folder](https://github.com/CPMpy/cpmpy/blob/master/examples/).
+And many more examples on scheduling, packing, routing and more in the `examples folder <https://github.com/CPMpy/cpmpy/blob/master/examples/>`_.
 
 
 ### References
 
-<!---Add more references -->
-
-To learn more about theory and practice of constraint programming you may want to check some references:
+To learn more about theory and practice of constraint programming you may want to check some of these references:
 
 1. Rossi, F., Van Beek, P., & Walsh, T. (Eds.). (2006). Handbook of constraint programming. Elsevier.
 2. Apt, K. (2003). Principles of constraint programming. Cambridge university press.
