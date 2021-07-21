@@ -169,14 +169,15 @@ def musx_assum(soft_constraints, hard_constraints=[], verbose=False):
             # with all but 'i' it is SAT, so 'i' belongs to the MUS
             if verbose:
                 print("\tSAT so in MUS:", soft_constraints[indmap[mus_vars[i]]])
+            i += 1
         else:
             # still UNSAT, 'i' does not belong to the MUS
             if verbose:
                 print("\tUNSAT so not in MUS:", soft_constraints[indmap[mus_vars[i]]])
-            # continue without, or even a smaller core
-            mus_vars = assum_solver.get_core()
+            # overwrite current 'i' and continue
+            # could do get_core but then have to check that mus_vars[:i] match
+            mus_vars = assum_lits
 
-        i += 1
 
     # return the list of original (non-flattened) constraints
     return [soft_constraints[indmap[v]] for v in mus_vars]
