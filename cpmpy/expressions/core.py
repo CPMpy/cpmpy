@@ -356,6 +356,17 @@ class Operator(Expression):
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
 
+        # merge same operators for n-ary ones
+        if arity == 0:
+            i = 0 # length can change
+            while i < len(arg_list):
+                if isinstance(arg_list[i], Operator) and arg_list[i].name == name:
+                    # merge args in at this position
+                    l = len(arg_list[i].args)
+                    arg_list[i:i+1] = arg_list[i].args
+                    i += l
+                i += 1
+
         super().__init__(name, arg_list)
 
     def is_bool(self):
