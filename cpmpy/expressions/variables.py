@@ -260,6 +260,13 @@ class _IntVarImpl(_NumVarImpl):
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
+    # special casing for intvars (and boolvars)
+    def __abs__(self):
+        if self.lb >= 0:
+            # no-op
+            return self
+        return super().__abs__()
+
 class _BoolVarImpl(_IntVarImpl):
     """
     **Boolean** constraint variable with given lowerbound and upperbound.
@@ -319,6 +326,9 @@ class NegBoolView(_BoolVarImpl):
 
     def __invert__(self):
         return self._bv
+
+    def __abs__(self):
+        return self
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
