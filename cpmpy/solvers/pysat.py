@@ -6,6 +6,9 @@
 """
     Interface to PySAT's API
 
+    This solver can be used if the model only has Boolean variables,
+    and only logical constraints (and,or,xor,implies,==,!=)
+
     ===============
     List of classes
     ===============
@@ -58,9 +61,6 @@ class CPM_pysat(SolverInterface):
         the PySAT docs use 'model' to refer to a solution.
 
         Only supports satisfaction problems (no objective)
-        Supports only clauses at this moment!!
-        Support for conjunctions and implications can be added through
-        translation to 'aiger', see PySAT's documentation
         """
         if not self.supported():
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface")
