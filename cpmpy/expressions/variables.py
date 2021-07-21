@@ -429,7 +429,11 @@ class NDVarArray(Expression, np.ndarray):
     def __ge__(self, other):
         return self._vectorized(other, '__ge__') 
 
-    # VECTORIZED operators (only binary ones, and not - either)
+    # VECTORIZED operators
+    # only 'abs' and binary ones
+    # '-' not needed, gets translated to ==0 and that is already handled
+    def __abs__(self):
+        return cpm_array([abs(s) for s in self])
     def __mul__(self, other):
         return self._vectorized(other, '__mul__') 
     def __rmul__(self, other):
