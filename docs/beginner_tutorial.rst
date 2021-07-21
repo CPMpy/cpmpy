@@ -114,6 +114,60 @@ The solution will be backpopulated in the decision variables used, and can be ob
 
 And that is all there is to it...
 
+Cryptarythmetic optimisation problem
+------------------------------------
+
+So far we have considered a _satisfaction_ problem, where we needed to find any satisfying solution (it was unique, see `multiple_solutions` doc on how to find out).
+
+We now consider the 'SEND + MOST = MONEY' problem, where we wish to maximize the number formed by the letters 'MONEY'.
+
+We first model the constraints as before:
+
+.. code-block:: python
+
+    import numpy as np
+    from cpmpy import *
+
+    s,e,n,d,m,o,t,y = intvar(0,9, shape=8)
+
+    model = Model(
+        AllDifferent(s,e,n,d,m,o,t,y),
+        (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
+           + sum(   [m,o,s,t] * np.array([       1000, 100, 10, 1]) ) \
+          == sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+        s > 0,
+        m > 0,
+    )
+
+And now the objective function. Note that this just *states* that it is a maximisation problem, it does not yet compute the maximization.
+
+.. code-block:: python
+
+   model.maximize(sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ))
+
+And then we solve and print! Now how `solve()` does not return True/False as for a satisfaction problem, but returns the objective's value.
+
+.. code-block:: python
+
+    model.solve()
+    print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
+    print("  M,O,S,T =   ", [x.value() for x in [m,o,s,t]])
+    print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+
+If you want to maximize the value of the word 'MOST', this is only requires changing the objective (you can overwrite objectives and resolve the same model without any problem):
+
+.. code-block:: python
+
+    model.maximize(sum( [m,o,s,t] * np.array([1000, 100, 10, 1]) ) )
+    model.solve()
+    print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
+    print("  M,O,S,T =   ", [x.value() for x in [m,o,s,t]])
+    print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+
+
+And much more
+-------------
+
 To get more familiar with these concepts, you can experiment with modeling and solving the sudoku puzzle problem in `the following notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>`_.
 
 And many more examples on scheduling, packing, routing and more in the `examples folder <https://github.com/CPMpy/cpmpy/blob/master/examples/>`_.
