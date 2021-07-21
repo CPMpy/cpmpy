@@ -20,7 +20,7 @@ from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables_model
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
     """
@@ -111,20 +111,14 @@ class CPM_pysat(SolverInterface):
         # base case, just var or ~var
         if isinstance(cpm_con, _BoolVarImpl):
             self.pysat_solver.add_clause([ self.pysat_var(cpm_con) ])
-        elif isinstance(cpm_con, Operator):
-            if cpm_con.name == 'or':
-                self.pysat_solver.add_clause([ self.pysat_var(var) for var in cpm_con.args ])
-            else:
-                raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
-                    
-        # generic case, list
-        elif is_any_list(cpm_con):
-            # call recursively
-            for con in cpm_con:
-                self += con
         else:
-            raise NotImplementedError(f"Non-operator constraint {cpm_con} not supported by CPM_pysat")
-
+            cpm_con = to_cnf(cpm_con)
+            for con in cpm_con:
+                if isinstance(con, Operator) and con.name == 'or':
+                    self.pysat_solver.add_clause([ self.pysat_var(var) for var in cpm_con.args ])
+                else:
+                    raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
+                    
         return self
 
 
@@ -245,8 +239,7 @@ class CPM_pysat(SolverInterface):
 
         # Post the constraint expressions to the solver
         # only CNF (list of disjunctions) supported for now
-        for con in flatten_constraint(cpm_model.constraints):
-            # TODO, perhaps we should check for lists of lists, or top-level ands?
+        for con in to_cnf(cpm_model.constraints):
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
