@@ -456,7 +456,7 @@ class CPM_ortools(SolverInterface):
                 elif cpm_expr.name == 'or':
                     return self.ort_model.AddBoolOr(args)
                 elif cpm_expr.name == 'xor':
-                    return self.ort_model.AddBoolXor(args)
+                    return self.ort_model.AddBoolXOr(args)
                 elif cpm_expr.name == '->':
                     return self.ort_model.AddImplication(args[0],args[1])
                 else:
