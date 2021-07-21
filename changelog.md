@@ -1,5 +1,16 @@
 # Change log
 
+## 0.9.2
+* pysat: tseitin encode all logical operators
+* to_cnf tseitin encoding for logical operators, with tests
+* better chaining of n-ary operators, fixes #39
+* doc: beginner tutorial add optimisation
+* doc: extend multiple solutions, minisearch, diverse solutions
+* ort: add OrtSolutionPrinter and solve(solution_callback=...)
+* example of diverse solutions
+* vectorized 'abs' operator
+* flatten: fix some bound computations
+
 ## 0.9.1
 * easier hyperparameter search with `param_combinations()` helper function in cpmpy.solvers
 
