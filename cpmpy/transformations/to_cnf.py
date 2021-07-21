@@ -1,35 +1,35 @@
-from ..model import Model
-from ..expressions.core import Operator
-from ..expressions.variables import BoolVarImpl, NegBoolView
+from ..expressions.core import Operator, Comparison
+from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .flatten_model import flatten_constraint, negated_normal
 """
-  Converts the logical constraints in a list of constraints,
-  into disjuctions using the tseitin transform.
+  Converts the logical constraints into disjuctions using the tseitin transform.
   
   Other constraints are copied verbatim so this transformation
-  can also be used in non-pure CNF settings (e.g. linear constraints)
+  can also be used in non-pure CNF settings
 
   The implementation first converts the list of constraints
   to 'flat normal form', this already flattens subexpressions using
   auxiliary variables.
 
-  What is then left to do is to tseitin encode
-  - and() constraints
-  - xor() constraints
-  - BE == BoolVar() with BE :: BoolVar()|and()|or()
-  - BE -> BoolVar()
-  - BoolVar() -> BE
+  What is then left to do is to tseitin encode the following into CNF:
+  - BV with BV a BoolVar (or NegBoolView)
+  - or([BV]) constraint
+  - and([BV]) constraint
+  - xor(BV,BV) constraint (length-2 only for now)
+  - BE != BV  with BE :: BV|or()|and()|xor()|BV!=BV|BV==BV|BV->BV
+  - BE == BV
+  - BE -> BV
+  - BV -> BE
 """
 
 def to_cnf(constraints):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
-        - constraints: list[Expression] or Model or Operator
+        Arguments:
+
+        - constraints: list[Expression] or Operator
     """
-    if isinstance(constraints, Model):
-        # transform model's constraints
-        return to_cnf(constraints.constraints)
     if isinstance(constraints, Operator): 
         if constraints.name == "and":
             # and() is same as a list of its elements
@@ -43,22 +43,29 @@ def to_cnf(constraints):
         constraints = [constraints]
 
     fnf = flatten_constraint(constraints)
-    cnf = flat2cnf(fnf)
+    return flat2cnf(fnf)
 
 def flat2cnf(constraints):
     """
         Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form
 
-        What is now left to do is to tseitin encode
-  - BoolVar()
-  - and() constraints
-  - xor() constraints
-  - BE == BoolVar() with BE :: BoolVar()|and()|or()|(BV == BV)
-  - BE -> BoolVar()
-  - BoolVar() -> BE
+        What is now left to do is to tseitin encode:
+
+  - BV with BV a BoolVar (or NegBoolView)
+  - or([BV]) constraint
+  - and([BV]) constraint
+  - xor(BV,BV) constraint (length-2 only for now)
+  - BE != BV  with BE :: BV|or()|and()|xor()|BV!=BV|BV==BV|BV->BV
+  - BE == BV
+  - BE -> BV
+  - BV -> BE
+
+        We do it in a principled way for each of the cases. (in)equalities
+        get transformed into implications, everything is modular.
     """
     cnf = []
     for expr in constraints:
+        is_operator = isinstance(expr, Operator)
         # base cases
         if isinstance(expr, (bool,int)):
             # python convention: 1 is true, rest is false
@@ -68,105 +75,71 @@ def flat2cnf(constraints):
                 return [False]
 
         # BoolVar()
-        elif isinstance(expr, BoolVarImpl): # includes NegBoolView
+        elif isinstance(expr, _BoolVarImpl): # includes NegBoolView
+            cnf.append(expr)
+            continue
+
+        # or() constraint
+        elif is_operator and expr.name == "or":
+            # top-level OR constraint, easy
             cnf.append(expr)
             continue
 
         # and() constraints
-        elif isinstance(expr, Operator) and expr.name == "and":
+        elif is_operator and expr.name == "and":
             # special case: top-level AND constraint,
             # flatten into toplevel conjunction
             cnf += expr.args
             continue
 
         # xor() constraints
-        elif isinstance(expr, Operator) and expr.name == "xor":
-            # xor(x,y,z) = (~x&y&z) | (x&~y~z) | (x&y&~z)
-            # need to flatten and tseitin that accordingly
-            raise NotImplementedError("TODO")
+        elif is_operator and expr.name == "xor":
+            if len(expr.args) == 2:
+                a0,a1 = expr.args
+                cnf += flat2cnf([(a0|a1), (~a0|~a1)]) # one true and one false
+                continue
+            else:
+                # xor(x,y,z) = (~x&y&z) | (x&~y~z) | (x&y&~z)
+                # need to flatten and tseitin that accordingly
+                raise NotImplementedError("TODO: nary xor")
 
-        # BoolVar() -> BoolVar()
-        # BE -> BoolVar() with BE :: and()|or()
-        # BoolVar() -> BE
-        elif isinstance(expr, Operator) and expr.name == '->':
+        # BE != BE (same as xor)
+        elif isinstance(expr, Comparison) and expr.name == "!=":
+            a0,a1 = expr.args
+            # using 'implies' means it will recursively work for BE's too
+            cnf += flat2cnf([a0.implies(~a1), (~a0).implies(a1)]) # one true and one false
+            continue
+
+        # BE == BE
+        elif isinstance(expr, Comparison) and expr.name == "==":
+            a0,a1 = expr.args
+            # using 'implies' means it will recursively work for BE's too
+            cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
+            continue
+
+        # BE -> BE
+        elif is_operator and expr.name == '->':
             a0,a1 = expr.args
 
-            if isinstance(a0, BoolVarImpl) and isinstance(a1, BoolVarImpl):
+            # BoolVar() -> BoolVar()
+            if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
                 cnf.append(~a0 | a1)
                 continue
-            elif isinstance(a0, BoolVarImpl):
-                # BV -> BE
-                if isinstance(a1, Operator) and a1.name == 'or':
-                    # trivial clause
-                    cnf.append( Operator("or", [~a0] + [~var for var in a1.args]) )
-                    continue
-                elif isinstance(a1, Operator) and a1.name == 'and':
-                    # BV -> and()
-                    # do tseitin on fresh var: [~BV | aux] + tseitin(aux == and())
-                    aux = BoolVar()
-                    subcnf = flat2cnf(aux == a1)
-                    cnf += [~a0 | aux] + subcnf
-                    continue
-            elif isinstance(a1, BoolVarImpl):
-                # BE -> BV
-                if isinstance(a0, Operator) and a1.name == 'and':
-                    # trivial clause
-                    cnf.append( Operator("or", [~var for var in a0.args] + [a1]) )
-                    continue
-                elif isinstance(a0, Operator) and a1.name == 'or':
-                    # or -> BV
-                    # do tseitin on fresh var: [~aux | BV] + tseitin(aux == or())
-                    aux = BoolVar()
-                    subcnf = flat2cnf(aux == a0)
-                    cnf += [~aux | a1] + subcnf
-                    continue
-
-        # BE == BoolVar() with BE :: BoolVar()|and()|or()
-        elif isinstance(expr, Comparison) and expr.name == '==':
-            a0,a1 = expr.args
-            if isinstance(a0, BoolVarImpl) and \ # includes NegBoolView
-               isinstance(a1, BoolVarImpl):
-                    # BV == BV :: BV <-> BV
-                    cnf += [~a0|a1, ~a1|a0] # [a0 -> a1, a1 -> a0]
-                    continue
-            elif isinstance(expr, Operator) and expr.name in ('and','or'):
-                # BE == BoolVar()
-                subvars = a0.expr
-                if a0.name == "and":
-                    # Tseitin of and(subvars) <-> a1:
-                    #   a1 or ~subvar1 or ~subvar2 or ...
-                    #   ~subvar1 or a1
-                    #   ~subvar2 or a1
-                    #   ...
-                    cnf.append( Operator("or", [a1] + [~var for var in subvars]) )
-                    for var in subvars:
-                        cnf.append( ~a1 | var )
-                    continue
-                elif a0.name == "or":
-                     # Tseitin of or(subvars) <-> a1:
-                     #   ~a1 or subvar1 or subvar2 or ...
-                     #   a1 or ~subvar1
-                     #   a1 or ~subvar2                        #   ...
-                     cnf.append( Operator("or", [~a1] + [var for var in subvars]) )
-                     for var in subvars:
-                        cnf.append( a1 | ~var )
-                     continue
+            # BoolVar() -> BE
+            elif isinstance(a0, _BoolVarImpl):
+                # flat, so a1 must itself be a base constraint
+                subcnf = flat2cnf([a1]) # will return a list that is flat
+                cnf += [~a0 | a1sub for a1sub in subcnf]
+                continue
+            # BE -> BoolVar()
+            elif isinstance(a1, _BoolVarImpl):
+                # a0 is the base constraint, negate to ~a1 -> ~a0
+                subcnf = flat2cnf([negated_normal(a0)])
+                cnf += [a0sub | a1 for a0sub in subcnf]
+                continue
 
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim
         cnf.append(expr)
 
-    # TODO:
-    if expr.name == '==':
-        # Aux :: A <-> B
-        # Aux A B
-        # 1   1 1
-        # 1   0 0
-        # 0   0 1
-        # 0   1 0
-        A = subvars[0]
-        B = subvars[1]
-        
-        cnf = [(Aux | A | B), (Aux | ~A | ~B), (~Aux | ~A | B), (~Aux | A | ~B)]
-
-        
+    return cnf
