@@ -155,13 +155,14 @@ class CPM_ortools(SolverInterface):
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
-    def solve(self, time_limit=None, assumptions=None, **kwargs):
+    def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
         """
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+            - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
             Additional keyword arguments:
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
@@ -209,7 +210,15 @@ class CPM_ortools(SolverInterface):
         for (kw, val) in kwargs.items():
             setattr(self.ort_solver.parameters, kw, val)
 
-        ort_status = self.ort_solver.Solve(self.ort_model)
+        if solution_callback is None:
+            ort_status = self.ort_solver.Solve(self.ort_model)
+        else:
+            try:
+                # from ortools 9.0 onwards
+                ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
+            except TypeError:
+                # ortools < 9.0
+                ort_status = self.ort_solver.SolveWithSolutionCallback(self.ort_model, solution_callback)
 
         return self._after_solve(ort_status)
 
@@ -538,3 +547,46 @@ class CPM_ortools(SolverInterface):
                 return sum(args) # OR-Tools supports this
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
+
+# solvers are optional, so this file should be interpretable
+# even if ortools is not installed...
+try:
+  from ortools.sat.python import cp_model as ort
+  import time
+  class OrtSolutionCounter(ort.CpSolverSolutionCallback):
+    """
+        Native or-tools callback for solution counting.
+
+        It is based on ortools' built-in `ObjectiveSolutionPrinter`
+        but with output printing being optional
+
+        use with CPM_ortools as follows:
+        `cb = OrtSolutionCounter()`
+        `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
+
+        then retrieve the solution count with `cb.solution_count()`
+
+        Arguments:
+            - verbose whether to print info on every solution found (bool, default: False)
+    """
+    def __init__(self, verbose=False):
+        super().__init__()
+        self.__solution_count = 0
+        self.__verbose = verbose
+        if self.__verbose:
+            self.__start_time = time.time()
+
+    def on_solution_callback(self):
+        """Called on each new solution."""
+        if self.__verbose:
+            current_time = time.time()
+            obj = self.ObjectiveValue()
+            print('Solution %i, time = %0.2f s, objective = %i' %
+                  (self.__solution_count, current_time - self.__start_time, obj))
+        self.__solution_count += 1
+
+    def solution_count(self):
+        """Returns the number of solutions found."""
+        return self.__solution_count
+except ImportError:
+    pass # Ok, no ortools installed...
