@@ -117,7 +117,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var( a/b )), "(IV9, [((IV0) / (IV1)) == (IV9)])" )
         self.assertEqual( str(get_or_make_var( 1/b )), "(IV10, [(1 / (IV1)) == (IV10)])" )
         self.assertEqual( str(get_or_make_var( a/1 )), "(IV0, [])" )
-        self.assertEqual( str(get_or_make_var( abs(a) )), "(IV11, [(abs([IV0])) == (IV11)])" )
+        self.assertEqual( str(get_or_make_var( abs(cp.intvar(-5,5, name="x")) )), "(IV11, [(abs([x])) == (IV11)])" )
         self.assertEqual( str(get_or_make_var( 1*a + 2*b + 3*c )), "(IV14, [(sum([IV0, IV12, IV13])) == (IV14), (2 * (IV1)) == (IV12), (3 * (IV2)) == (IV13)])" ) # TODO, suboptimal
         self.assertEqual( str(get_or_make_var( cp.cpm_array([1,2,3])[a] )), "(IV15, [([1 2 3][IV0]) == (IV15)])" )
         self.assertEqual( str(get_or_make_var( cp.cpm_array([b+c,2,3])[a] )), "(IV17, [((IV16, 2, 3)[IV0]) == (IV17), ((IV1) + (IV2)) == (IV16)])" )
