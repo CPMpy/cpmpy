@@ -317,9 +317,9 @@ def get_or_make_var(expr):
         lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
-        # TODO: weighted sum
         if expr.name == 'abs': # unary
-            ivar = _IntVarImpl(0, ubs[0])
+            abs_bnd = abs(lbs[0]), abs(ubs[0])
+            ivar = _IntVarImpl(min(abs_bnd), max(abs_bnd))
         elif expr.name == 'mul': # binary
             lb = lbs[0] * lbs[1]
             ub = ubs[0] * ubs[1]
@@ -333,11 +333,14 @@ def get_or_make_var(expr):
                 lb,ub = ub,lb
             ivar = _IntVarImpl(lb, ub) 
         elif expr.name == 'mod': # binary 
-            ivar = _IntVarImpl(0, ubs[0])
+            # broadest possible assumptions
+            # (negative possible if divisor is negative)
+            ivar = _IntVarImpl(lbs[0], ubs[0])
         elif expr.name == 'pow': # binary
             ivar = _IntVarImpl(lbs[0] ** lbs[1], ubs[0] ** ubs[1])
         elif expr.name == 'sum': # n-ary
             ivar = _IntVarImpl(sum(lbs), sum(ubs)) 
+        # TODO: weighted sum
         elif expr.is_bool(): # Boolean
             ivar = _BoolVarImpl() # TODO: we can support Bool? check, update docs
         else:
