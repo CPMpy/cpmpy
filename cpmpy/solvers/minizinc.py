@@ -4,30 +4,6 @@
 ## minizinc.py
 ##
 """
-    ===============
-    List of classes
-    ===============
-
-    .. autosummary::
-        :nosignatures:
-
-        MiniZincPython
-
-    ==================
-    Module description
-    ==================
-
-    ==============
-    Module details
-    ==============
-"""
-
-from .solver_interface import ExitStatus, SolverStatus
-from .minizinc_text import MiniZincText
-from ..transformations.get_variables import get_variables
-
-class CPMpyMiniZinc(MiniZincText):
-    """
     Interface to the python 'minizinc' package
 
     Requires that the 'minizinc' python package is installed:
@@ -37,7 +13,28 @@ class CPMpyMiniZinc(MiniZincText):
     as well as the MiniZinc bundled binary packages, downloadable from:
     https://www.minizinc.org/software.html
 
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_minizinc
+
+    ==============
+    Module details
+    ==============
+"""
+
+from .solver_interface import ExitStatus, SolverStatus
+from .minizinc_text import MiniZincText
+from ..transformations.get_variables import get_variables_model
+
+class CPM_minizinc(MiniZincText):
+    """
     Creates the following attributes:
+
     mzn_inst: the minizinc.Instance created by _model()
     mzn_result: the minizinc.Result used in solve()
     """
@@ -50,42 +47,64 @@ class CPMpyMiniZinc(MiniZincText):
         except ImportError as e:
             return False
 
-    def __init__(self):
+    def __init__(self, cpm_model=None, solvername=None):
+        """
+        Constructor of the solver object
+
+        Requires a CPMpy model as input, and will create the corresponding
+        minizinc model and solver object (mzn_model and mzn_solver)
+        """
+        if not self.supported():
+            raise Exception("Install the python 'minizinc-python' package to use this '{}' solver interface".format(self.name))
+        import minizinc
+
+        super().__init__()
         self.name = "minizinc_python"
-        raise NotImplementedError("Closed for maintenance, has _not yet_ caught up with CPMpy API changes; report in github if this disrupts your plans")
+
+        self._model(cpm_model, solvername=solvername)
+
 
     def _model(self, model, solvername=None):
         import minizinc
         if solvername is None:
             # default solver
             solvername = "gecode"
-
-        # from superclass
-        mzn_txt = self.convert(model)
+        self.mzn_solver = minizinc.Solver.lookup(solvername)
 
         # minizinc-python API
         # Create a MiniZinc model
-        mznmodel = minizinc.Model()
-        mznmodel.add_string(mzn_txt)
+        self.mzn_model = minizinc.Model()
+        if model is None:
+            self.user_vars = []
+        else:
+            # store original vars and objective (before flattening)
+            self.user_vars = get_variables_model(model)
+            mzn_txt = self.convert(model)
+            self.mzn_model.add_string(mzn_txt)
 
-        # Transform Model into a instance
-        slv = minizinc.Solver.lookup(solvername)
-        return minizinc.Instance(slv, mznmodel)
+        self.mzn_model = minizinc.Model()
+        self.mzn_model.add_string(mzn_txt)
+        return
 
-    def solve(self, model, solvername=None):
-        if not self.supported():
-            raise Exception("Install the python 'minizinc' package to use this '{}' solver interface".format(self.name))
+
+    def solve(self, **kwargs):
+        """
+            Call the (already created) solver
+
+            keyword arguments can be any argument accepted by minizinc.Instance.solve()
+            For example, set 'all_solutions=True' to have it enumerate all solutions
+        """
         import minizinc
 
-        # create self.mzn_inst
-        self.mzn_inst = self._model(model, solvername=solvername)
+        # Transform Model into a instance
+        self.mzn_inst = minizinc.Instance(self.mzn_solver, self.mzn_model)
 
         # Solve the instance
-        self.mzn_result = self.mzn_inst.solve(**{'output-time':True})#all_solutions=True)
+        kwargs['output-time'] = True # required for time getting
+        self.mzn_result = self.mzn_inst.solve(**kwargs)#all_solutions=True)
 
         # translate status
-        my_status = SolverStatus()
-        my_status.solver_name = self.name
+        my_status = SolverStatus(self.name)
         if self.mzn_result.status == minizinc.result.Status.SATISFIED:
             my_status.exitstatus = ExitStatus.FEASIBLE
         elif self.mzn_result.status == minizinc.result.Status.ALL_SOLUTIONS:
@@ -114,12 +133,29 @@ class CPMpyMiniZinc(MiniZincText):
             my_status.runtime = self.mzn_result.statistics['time'].total_seconds()
 
             # fill in variables
-            modelvars = get_variables(model)
-            for var in modelvars:
-                varname = str(var)
+            for var in self.user_vars:
+                varname = str(var).replace('[','_').replace(']','') # DANGER, hardcoded
                 if hasattr(mznsol, varname):
                     var._value = getattr(mznsol, varname)
                 else:
                     print("Warning, no value for ",varname)
 
+        #TODO: return self._solve_return(self.cpm_status, objective_value)
         return my_status
+
+    def __add__(self, cons):
+        raise NotImplementedError("adding constraints iteratively not yet implemented for CPM_minzinc")
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("not yet implemented for CPM_minzinc")
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("not yet implemented for CPM_minzinc")
