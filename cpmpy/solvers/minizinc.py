@@ -103,34 +103,36 @@ class CPM_minizinc(MiniZincText):
         kwargs['output-time'] = True # required for time getting
         self.mzn_result = self.mzn_inst.solve(**kwargs)#all_solutions=True)
 
+        mzn_status = self.mzn_result.status
+
         # translate status
-        my_status = SolverStatus(self.name)
-        if self.mzn_result.status == minizinc.result.Status.SATISFIED:
-            my_status.exitstatus = ExitStatus.FEASIBLE
-        elif self.mzn_result.status == minizinc.result.Status.ALL_SOLUTIONS:
-            my_status.exitstatus = ExitStatus.FEASIBLE
-        elif self.mzn_result.status == minizinc.result.Status.OPTIMAL_SOLUTION:
-            my_status.exitstatus = ExitStatus.OPTIMAL
-        elif self.mzn_result.status == minizinc.result.Status.UNSATISFIABLE:
-            my_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif self.mzn_result.status == minizinc.result.Status.ERROR:
-            my_status.exitstatus = ExitStatus.ERROR
+        self.cpm_status = SolverStatus(self.name)
+        if mzn_status == minizinc.result.Status.SATISFIED:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif mzn_status == minizinc.result.Status.UNSATISFIABLE:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif mzn_status == minizinc.result.Status.ERROR:
+            self.cpm_status.exitstatus = ExitStatus.ERROR
             raise Exception("MiniZinc solver returned with status 'Error'")
-        elif self.mzn_result.status == minizinc.result.Status.UNKNOWN:
+        elif mzn_status == minizinc.result.Status.UNKNOWN:
             # means, no solution was found (e.g. within timeout?)...
-            my_status.exitstatus = ExitStatus.ERROR
+            self.cpm_status.exitstatus = ExitStatus.ERROR
         else:
             raise NotImplementedError # a new status type was introduced, please report on github
 
-
-        # get runtime and solution
+        # translate runtime
         if 'time' in self.mzn_result.statistics:
-            my_status.runtime = self.mzn_result.statistics['time'] # --output-time
+            self.cpm_status.runtime = self.mzn_result.statistics['time'] # --output-time
 
-        if self.mzn_result.status.has_solution():
+        # translate solution values (of original vars only)
+        if mzn_status.has_solution():
             # runtime
             mznsol = self.mzn_result.solution
-            my_status.runtime = self.mzn_result.statistics['time'].total_seconds()
+            self.cpm_status.runtime = self.mzn_result.statistics['time'].total_seconds()
 
             # fill in variables
             for var in self.user_vars:
@@ -140,8 +142,29 @@ class CPM_minizinc(MiniZincText):
                 else:
                     print("Warning, no value for ",varname)
 
-        #TODO: return self._solve_return(self.cpm_status, objective_value)
-        return my_status
+            # translate objective (if any, otherwise None)
+            objective_value = self.mzn_result.objective
+
+        return self._solve_return(self.cpm_status, objective_value)
+
+    
+        # get runtime and solution
+
+        if mzn_status.has_solution():
+            # runtime
+            mznsol = self.mzn_result.solution
+            self.cpm_status.runtime = self.mzn_result.statistics['time'].total_seconds()
+
+            # fill in variables
+            for var in self.user_vars:
+                varname = str(var).replace('[','_').replace(']','') # DANGER, hardcoded
+                if hasattr(mznsol, varname):
+                    var._value = getattr(mznsol, varname)
+                else:
+                    print("Warning, no value for ",varname)
+
+        return self._solve_return(self.cpm_status, objective_value)
+        return self.cpm_status
 
     def __add__(self, cons):
         raise NotImplementedError("adding constraints iteratively not yet implemented for CPM_minzinc")
