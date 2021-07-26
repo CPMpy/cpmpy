@@ -244,6 +244,8 @@ class CPM_minizinc(SolverInterface):
             if expr is False:
                 return "false"
             # default
+            if isinstance(expr, NegBoolView):
+                return "not "+self.clean_varname(str(expr._bv))
             return self.clean_varname(str(expr))
         
         args_str = [self.convert_expression(e) for e in expr.args]
