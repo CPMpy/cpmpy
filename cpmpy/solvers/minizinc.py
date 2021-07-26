@@ -37,8 +37,11 @@ class CPM_minizinc(SolverInterface):
     """
     Creates the following attributes:
 
-    mzn_inst: the minizinc.Instance created by _model()
-    mzn_result: the minizinc.Result used in solve()
+    user_vars: variables used in the model (without auxiliaries),
+               these variables' .value() will be backpopulated on solve
+    mzn_solve: the minizinc.Solver instance
+    mzn_model: the minizinc.Model instance
+    mzn_txt_solve: the 'solve' item in text form, so it can be overwritten
     """
 
     @staticmethod
@@ -74,30 +77,38 @@ class CPM_minizinc(SolverInterface):
         self.mzn_model = minizinc.Model()
         if cpm_model is None:
             self.user_vars = []
+            self.mzn_txt_solve = "solve satisfy;"
         else:
             # store original vars and objective (before flattening)
             self.user_vars = get_variables_model(cpm_model)
-            mzn_txt = self.make_model(cpm_model)
+            (mzn_txt, self.mzn_txt_solve) = self.make_model(cpm_model)
             self.mzn_model.add_string(mzn_txt)
+            # do NOT add self.mzn_txt_solve yet, so that it can be overwritten later
 
 
     def solve(self, **kwargs):
         """
-            Call the (already created) solver
+            Create and call an Instance with the already created mzn_model and mzn_solver
 
             keyword arguments can be any argument accepted by minizinc.Instance.solve()
             For example, set 'all_solutions=True' to have it enumerate all solutions
+
+            Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
         """
         import minizinc
 
+        # hack, we need to add the objective in a way that it can be changed
+        # later, so make copy of the mzn_model
+        copy_model = self.mzn_model.__copy__() # it is implemented
+        copy_model.add_string(self.mzn_txt_solve)
         # Transform Model into an instance
-        self.mzn_inst = minizinc.Instance(self.mzn_solver, self.mzn_model)
+        mzn_inst = minizinc.Instance(self.mzn_solver, copy_model)
 
         # Solve the instance
         kwargs['output-time'] = True # required for time getting
-        self.mzn_result = self.mzn_inst.solve(**kwargs)#all_solutions=True)
+        mzn_result = mzn_inst.solve(**kwargs)#all_solutions=True)
 
-        mzn_status = self.mzn_result.status
+        mzn_status = mzn_result.status
 
         # translate status
         self.cpm_status = SolverStatus(self.name)
@@ -119,14 +130,14 @@ class CPM_minizinc(SolverInterface):
             raise NotImplementedError # a new status type was introduced, please report on github
 
         # translate runtime
-        if 'time' in self.mzn_result.statistics:
-            self.cpm_status.runtime = self.mzn_result.statistics['time'] # --output-time
+        if 'time' in mzn_result.statistics:
+            self.cpm_status.runtime = mzn_result.statistics['time'] # --output-time
 
         # translate solution values (of original vars only)
         if mzn_status.has_solution():
             # runtime
-            mznsol = self.mzn_result.solution
-            self.cpm_status.runtime = self.mzn_result.statistics['time'].total_seconds()
+            mznsol = mzn_result.solution
+            self.cpm_status.runtime = mzn_result.statistics['time'].total_seconds()
 
             # fill in variables
             for var in self.user_vars:
@@ -137,7 +148,7 @@ class CPM_minizinc(SolverInterface):
                     print("Warning, no value for ",varname)
 
             # translate objective (if any, otherwise None)
-            objective_value = self.mzn_result.objective
+            objective_value = mzn_result.objective
 
         return self._solve_return(self.cpm_status, objective_value)
 
@@ -161,14 +172,17 @@ class CPM_minizinc(SolverInterface):
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        raise NotImplementedError("not yet implemented for CPM_minzinc")
+        # do not add it to the model, support only one 'solve' entry
+        self.mzn_txt_solve = "solve minimize {};\n".format(self.convert_expression(expr))
+
     def maximize(self, expr):
         """
             Maximize the given objective function
 
             `maximize()` can be called multiple times, only the last one is stored
         """
-        raise NotImplementedError("not yet implemented for CPM_minzinc")
+        # do not add it to the model, support only one 'solve' entry
+        self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
 
     def clean_varname(self, varname):
         return varname.replace('[','_').replace(']','')
@@ -183,6 +197,10 @@ class CPM_minizinc(SolverInterface):
             (well, maybe that is not a coincidence)
 
             Typically only needed for internal use, or if you want to inspect the generated minizinc text
+
+            returns (txt_model, txt_objective)
+            txt_objective separate (you can just concatenate it), so that we can change it later
+            (the minizinc API does not support changing it later natively)
         """
         txt_vars = "% Generated by CPMpy\ninclude \"globals.mzn\";\n\n"
         for var in get_variables_model(cpm_model):
@@ -195,17 +213,15 @@ class CPM_minizinc(SolverInterface):
         for con in cpm_model.constraints:
             txt_cons += "constraint {};\n".format(self.convert_expression(con))
 
-        txt_obj = "solve "
-        if cpm_model.objective is None:
-            txt_obj += "satisfy;"
-        else:
+        txt_obj = "solve satisfy;"
+        if cpm_model.objective is not None:
             if cpm_model.objective_max:
-                txt_obj += "maximize "
+                txt_obj = "solve maximize "
             else:
-                txt_obj += "minimize "
+                txt_obj = "solve minimize "
             txt_obj += "{};\n".format(self.convert_expression(cpm_model.objective))
                 
-        return txt_vars+"\n"+txt_cons+txt_obj
+        return (txt_vars+"\n"+txt_cons, txt_obj)
 
     def convert_expression(self, expr):
         """
