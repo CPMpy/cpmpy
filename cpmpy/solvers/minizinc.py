@@ -171,6 +171,7 @@ class CPM_minizinc(SolverInterface):
             self.cpm_status.runtime = mzn_result.statistics['time'] # --output-time
 
         # translate solution values (of original vars only)
+        objective_value = None
         if mzn_status.has_solution():
             # runtime
             mznsol = mzn_result.solution
