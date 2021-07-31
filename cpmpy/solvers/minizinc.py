@@ -27,6 +27,7 @@
     ==============
 """
 
+from datetime import timedelta # for mzn's timeout
 from .solver_interface import SolverInterface, ExitStatus, SolverStatus
 from ..transformations.get_variables import get_variables_model
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -131,7 +132,7 @@ class CPM_minizinc(SolverInterface):
 
         # set time limit?
         if time_limit is not None:
-            raise NotImplementedError("Sorry, time_limit for minizinc not yet implemented, report on github that you need it")
+            kwargs['timeout'] = timedelta(seconds=time_limit)
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
