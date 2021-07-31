@@ -16,21 +16,13 @@
     .. autosummary::
         :nosignatures:
 
-        get_supported_solvers
         param_combinations
 """
 
-#from .minizinc import CPMpyMiniZinc # closed for maintenance
+import warnings # for deprecation warning
 from .ortools import CPM_ortools
+from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
-
-def get_supported_solvers():
-    """
-        Returns a list of solvers supported on this machine.
-
-    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
-    """
-    return [sv for sv in builtin_solvers if sv.supported()]
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -63,6 +55,62 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
                             remaining_keys=remaining_keys[1:],
                             cur_params=cur_params)
 
+class SolverLookup():
+    @staticmethod
+    def base_solvers():
+        """
+            Return ordered list of (name, class) of base CPMpy
+            solvers
 
+            First one is default
+        """
+        return [("ortools", CPM_ortools),
+                ("minizinc", CPM_minizinc),
+                ("pysat", CPM_pysat),
+               ]
+
+    @staticmethod
+    def solvernames():
+        names = []
+        for (basename, CPM_slv) in SolverLookup.base_solvers():
+            if CPM_slv.supported():
+                names.append(basename)
+                if hasattr(CPM_slv, "solvernames"):
+                    subnames = CPM_slv.solvernames()
+                    for subn in subnames:
+                        names.append(basename+":"+subn)
+        return names
+
+    @staticmethod
+    def lookup(name=None):
+        if name is None:
+            # first solver class
+            return SolverLookup.base_solvers()[0][1]
+
+        # split name if relevant
+        solvername = name
+        subname = None
+        if ':' in solvername:
+            solvername,subname = solvername.split(':',maxsplit=1)
+
+        # find CPM_slv
+        CPM_slv = None
+        for (basename, CPM_slv) in SolverLookup.base_solvers():
+            if basename == solvername:
+                # CPM_slv is assigned the right one
+                break
+
+        return CPM_slv
+
+
+# using builtin_solvers is DEPRECATED
 # Order matters! first is default, then tries second, etc...
-builtin_solvers=[CPM_ortools,CPM_pysat]
+builtin_solvers=[CPM_ortools,CPM_minizinc,CPM_pysat]
+def get_supported_solvers():
+    """
+        Returns a list of solvers supported on this machine.
+
+    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
+    """
+    warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
+    return [sv for sv in builtin_solvers if sv.supported()]

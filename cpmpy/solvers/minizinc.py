@@ -52,24 +52,53 @@ class CPM_minizinc(SolverInterface):
         except ImportError as e:
             return False
 
+    @staticmethod
+    def solvernames():
+        """
+            Returns solvers supported by MiniZinc on your system
+
+            WARNING, some of them may not actually be installed on your system
+            (namely cplex, gurobi, scip, xpress)
+            the following are bundled in the bundle: chuffed, coin-bc, gecode
+        """
+        import minizinc
+        import json
+        # from minizinc.Solver.lookup()
+        out = minizinc.default_driver.run(["--solvers-json"])
+        out_lst = json.loads(out.stdout)
+
+        solvers = []
+        for s in out_lst:
+            name = s["id"].split(".")[-1]
+            if name not in ['findmus', 'gist', 'globalizer']: # not actually solvers
+                solvers.append(name)
+        return solvers
+
+
     def __init__(self, cpm_model=None, solvername=None):
         """
         Constructor of the solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         minizinc model and solver object (mzn_model and mzn_solver)
+
+        solvername has to be one of solvernames()
         """
         if not self.supported():
             raise Exception("Install the python 'minizinc-python' package to use this '{}' solver interface".format(self.name))
         import minizinc
 
         super().__init__()
-        self.name = "minizinc_python"
 
-        import minizinc
         if solvername is None:
             # default solver
             solvername = "gecode"
+        elif solvername.startswith('minizinc:'):
+            # strip prepended 'minizinc:'
+            solvername = solvername[9:]
+        self.name = "minizinc:"+solvername
+
+        import minizinc
         self.mzn_solver = minizinc.Solver.lookup(solvername)
 
         # minizinc-python API

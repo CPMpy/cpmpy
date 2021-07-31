@@ -98,6 +98,27 @@ class Model(object):
         """
         self.objective = expr
         self.objective_max = True
+
+    @staticmethod
+    def solvernames():
+        """
+            Returns solver names supported on your system
+        """
+        names = []
+        # I need a dict/list (name, class), ordered...
+        # a package wide class named SolverDirectory that:
+        # - lists (ordered) names and classes of base solvers
+        # - lists with subsolvers
+        # - lookup with a consistent name
+        for solverclass in builtin_solvers:
+            #if solverclass.supported():
+                
+            if not name.startswith('__') and isinstance(attr, tuple):
+                if name not in attr:
+                    name = attr[-1]
+                names.append(name)
+        return names
+
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
