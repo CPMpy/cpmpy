@@ -172,6 +172,10 @@ class CPM_pysat(SolverInterface):
 
     def solve(self, time_limit=None, assumptions=None):
         """
+            Call the PySAT solver
+
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses

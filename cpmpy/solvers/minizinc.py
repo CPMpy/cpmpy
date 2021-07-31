@@ -115,9 +115,12 @@ class CPM_minizinc(SolverInterface):
             # do NOT add self.mzn_txt_solve yet, so that it can be overwritten later
 
 
-    def solve(self, **kwargs):
+    def solve(self, time_limit=None, **kwargs):
         """
             Create and call an Instance with the already created mzn_model and mzn_solver
+
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
 
             keyword arguments can be any argument accepted by minizinc.Instance.solve()
             For example, set 'all_solutions=True' to have it enumerate all solutions
@@ -125,6 +128,10 @@ class CPM_minizinc(SolverInterface):
             Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
         """
         import minizinc
+
+        # set time limit?
+        if time_limit is not None:
+            raise NotImplementedError("Sorry, time_limit for minizinc not yet implemented, report on github that you need it")
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
