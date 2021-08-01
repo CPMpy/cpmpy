@@ -76,14 +76,14 @@ class CPM_minizinc(SolverInterface):
         return solvers
 
 
-    def __init__(self, cpm_model=None, solvername=None):
+    def __init__(self, cpm_model=None, solver=None):
         """
         Constructor of the solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         minizinc model and solver object (mzn_model and mzn_solver)
 
-        solvername has to be one of solvernames()
+        solver has to be one of solvernames() [str, default: None]
         """
         if not self.supported():
             raise Exception("Install the python 'minizinc-python' package to use this '{}' solver interface".format(self.name))
@@ -91,6 +91,7 @@ class CPM_minizinc(SolverInterface):
 
         super().__init__()
 
+        solvername = solver
         if solvername is None:
             # default solver
             solvername = "gecode"

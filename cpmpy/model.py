@@ -142,7 +142,13 @@ class Model(object):
         assert(solver_class is not None)
                 
         # instatiate solver with this model
-        s = solver_class(self)
+        if isinstance(solver, str) and ':' in solver:
+            # solver is a name that contains a subsolver
+            s = solver_class(self, solver=solver)
+        else:
+            # no subsolver
+            s = solver_class(self)
+
         # call solver
         ret = s.solve(time_limit=time_limit)
         # store CPMpy status (s object has no further use)

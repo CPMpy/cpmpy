@@ -64,7 +64,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model, name=None):
+    def __init__(self, cpm_model, solver=None):
         """
         Constructor of the solver object
 
@@ -78,7 +78,7 @@ class CPM_pysat(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
-        - name: name of the pysat solver, e.g. glucose4
+        - solver: name of the pysat solver, e.g. glucose4
             see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
@@ -91,8 +91,8 @@ class CPM_pysat(SolverInterface):
         super().__init__()
 
         # determine solvername, set cpmpy name
-        solvername = name
-        if name is None:
+        solvername = solver
+        if solver is None:
             # default solver
             solvername = "glucose4" # something recent...
         elif solvername.startswith('pysat:'):
