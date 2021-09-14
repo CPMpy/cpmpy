@@ -210,7 +210,7 @@ class CPM_ortools(SolverInterface):
         for (kw, val) in kwargs.items():
             setattr(self.ort_solver.parameters, kw, val)
 
-        if kwargs['log_search_progress'] and hasattr(self.ort_solver, "log_callback"):
+        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback"):
             # ortools>9.0, for IPython use, force output redirecting
             # see https://github.com/google/or-tools/issues/1903
             self.ort_solver.log_callback = print
