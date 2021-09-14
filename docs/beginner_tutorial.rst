@@ -173,7 +173,8 @@ To get more familiar with these concepts, you can experiment with modeling and s
 And many more examples on scheduling, packing, routing and more in the `examples folder <https://github.com/CPMpy/cpmpy/blob/master/examples/>`_.
 
 
-### References
+References
+----------
 
 To learn more about theory and practice of constraint programming you may want to check some of these references:
 
