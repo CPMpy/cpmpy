@@ -119,7 +119,7 @@ class ORT_myprint(ort.CpSolverSolutionCallback):
 
     def on_solution_callback(self):
         # populate values before printing
-        for cpm_var in self.x: 
+        for cpm_var in self.x.flat: # flatten the vararray (or cpm_array())
             cpm_var._value = self.Value(self.varmap[cpm_var])
 
         self.solcount += 1
