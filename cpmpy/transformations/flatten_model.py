@@ -318,8 +318,9 @@ def get_or_make_var(expr):
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
         if expr.name == 'abs': # unary
-            abs_bnd = abs(lbs[0]), abs(ubs[0])
-            ivar = _IntVarImpl(min(abs_bnd), max(abs_bnd))
+            lb = max(0, lbs[0]) # cut negative part
+            ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
+            ivar = _IntVarImpl(lb, ub)
         elif expr.name == 'mul': # binary
             lb = lbs[0] * lbs[1]
             ub = ubs[0] * ubs[1]

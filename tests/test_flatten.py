@@ -25,6 +25,12 @@ class TestFlattenModel(unittest.TestCase):
         self.assertTrue(model2.objective is not None)
         self.assertTrue(model2.objective_max)
 
+    def test_abs(self):
+        l = cp.intvar(0,9, shape=3)
+        # bounds used to be computed wrong, making both unsat
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve() )
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve() )
+
 
 class TestFlattenConstraint(unittest.TestCase):
     def setUp(self):
@@ -184,4 +190,3 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((~BV0) or (~BV1)) == (BV12)]" )
         self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
         self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((~BV2) or (BV1)) -> (BV13), ((~BV0) and (~BV1)) == (BV13)]" )
-
