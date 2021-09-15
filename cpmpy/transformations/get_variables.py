@@ -55,7 +55,7 @@ def print_variables(expr_or_model):
         argument 'expr_or_model' can be an expression or a model
     """
     vars_ = None
-    if isinstance(expr_or_model, Expression):
+    if isinstance(expr_or_model, Expression) or is_any_list(expr_or_model):
         vars_ = get_variables(expr_or_model)
     else:
         vars_ = get_variables_model(expr_or_model)
