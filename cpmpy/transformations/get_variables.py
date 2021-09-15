@@ -48,6 +48,25 @@ def get_variables(expr):
     # else: every non-list, non-expression
     return vars_
 
+def print_variables(expr_or_model):
+    """
+        Print variables _and their domains_
+
+        argument 'expr_or_model' can be an expression or a model
+    """
+    vars_ = None
+    if isinstance(expr_or_model, Expression):
+        vars_ = get_variables(expr_or_model)
+    else:
+        vars_ = get_variables_model(expr_or_model)
+
+    # TODO: variables with the same prefix name will have the same domain
+    # group them for clarity?
+    # Currently: in order of appearance in the constraints, helps debugging too...
+    print("Variables:")
+    for var in vars_:
+        print(f"    {var}: {var.lb}..{var.ub}")
+
 # https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
 def _uniquify(seq):
     seen = set()
