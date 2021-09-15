@@ -318,7 +318,10 @@ def get_or_make_var(expr):
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
         if expr.name == 'abs': # unary
-            lb = max(0, lbs[0]) # cut negative part
+            if lbs[0] < 0 and ubs[0] > 0:
+                lb = 0 # from neg to pos, so includes 0
+            else:
+                lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
             ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
             ivar = _IntVarImpl(lb, ub)
         elif expr.name == 'mul': # binary
