@@ -252,8 +252,6 @@ class Expression(object):
         return Operator("div", [other, self])
 
     def __mod__(self, other):
-        if is_num(other) and other == 1:
-            return self
         return Operator("mod", [self, other])
     def __rmod__(self, other):
         return Operator("mod", [other, self])
