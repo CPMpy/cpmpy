@@ -23,3 +23,12 @@ CPMpy has regular small releases with updates and improvements, so it is a good 
 
     $ pip install -U cpmpy
 
+Installing from a git repository
+--------------------------------
+If you want the very latest, or perhaps from an in-development branch, you can install directly from github as follows:
+
+.. code-block:: bash
+
+    $ pip3 install git+https://github.com/cpmpy/cpmpy@master
+
+(change 'master' to any other branch or commit hash)
