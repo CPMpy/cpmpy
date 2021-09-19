@@ -79,8 +79,8 @@ TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
-import sys
 import copy
+import math
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
@@ -325,23 +325,27 @@ def get_or_make_var(expr):
             ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
             ivar = _IntVarImpl(lb, ub)
         elif expr.name == 'mul': # binary
-            lb = lbs[0] * lbs[1]
-            ub = ubs[0] * ubs[1]
-            if lb > ub: # a negative nr
-                lb,ub = ub,lb
-            ivar = _IntVarImpl(lb, ub) 
+            bnds = [lbs[i]*ubs[j] for i in [0,1] for j in [0,1]]
+            ivar = _IntVarImpl(min(bnds),max(bnds)) 
         elif expr.name == 'div': # binary
-            lb = lbs[0] // lbs[1]
-            ub = ubs[0] // ubs[1]
-            if lb > ub: # a negative nr
-                lb,ub = ub,lb
-            ivar = _IntVarImpl(lb, ub) 
+            num = [lbs[0], ubs[0]]
+            denom = [lbs[1], ubs[1]]
+            bnds = [num[i]/denom[j] for i in [0,1] for j in [0,1]]
+            # the above can give fractional values, tighten bounds to integer
+            ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds))) 
         elif expr.name == 'mod': # binary 
             # broadest possible assumptions
             # (negative possible if divisor is negative)
             ivar = _IntVarImpl(lbs[0], ubs[0])
         elif expr.name == 'pow': # binary
-            ivar = _IntVarImpl(lbs[0] ** lbs[1], ubs[0] ** ubs[1])
+            base = [lbs[0], ubs[0]]
+            exp = [lbs[1], ubs[1]]
+            if exp[0] < 0:
+                raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
+            bnds = [base[i]**exp[j] for i in [0,1] for j in [0,1]]
+            if exp[1] > 0: # even/uneven behave differently when base is negative
+                bnds += [base[0]**(exp[1]-1), base[1]**(exp[1]-1)]
+            ivar = _IntVarImpl(min(bnds), max(bnds))
         elif expr.name == 'sum': # n-ary
             ivar = _IntVarImpl(sum(lbs), sum(ubs)) 
         # TODO: weighted sum
