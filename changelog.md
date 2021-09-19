@@ -1,5 +1,10 @@
 # Change log
 
+## 0.9.3
+* make progress logging work in jupyter/IPython (beta ortools feature)
+* transf/get_variables now has print_variables that prints domains, for debugging with domains
+* fix automatic bounds computation of auxiliary variables for abs,mul,div,pow (mostly due to negative numbers)
+
 ## 0.9.2
 * pysat: tseitin encode all logical operators
 * to_cnf tseitin encoding for logical operators, with tests
