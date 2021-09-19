@@ -325,7 +325,9 @@ def get_or_make_var(expr):
             ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
             ivar = _IntVarImpl(lb, ub)
         elif expr.name == 'mul': # binary
-            bnds = [lbs[i]*ubs[j] for i in [0,1] for j in [0,1]]
+            v0 = [lbs[0], ubs[0]]
+            v1 = [lbs[1], ubs[1]]
+            bnds = [v0[i]*v1[j] for i in [0,1] for j in [0,1]]
             ivar = _IntVarImpl(min(bnds),max(bnds)) 
         elif expr.name == 'div': # binary
             num = [lbs[0], ubs[0]]
