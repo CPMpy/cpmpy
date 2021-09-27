@@ -24,6 +24,19 @@ while m.solve():
     m += ~all(x == x.value())
 ```
 
+Technical side-note: if your solution consists of more then one variable, you should first collect them in a single list (wrap arrays in list() and single vars in [] so you can concatenate them as pure python lists), for example:
+```python
+x = intvar(0,3, shape=2)
+b = boolvar()
+m = CPM_ortools(Model(b.implies(x[0] > x[1])))
+while m.solve():
+    print(x.value(), b.value())
+    allvars = list(x)+[b]
+    # block this solution from being valid
+    m += ~all(v == v.value() for v in allvars)
+```
+
+
 ## Diverse solution search
 Another example of repeated solving is when searching for diverse solutions.
 
