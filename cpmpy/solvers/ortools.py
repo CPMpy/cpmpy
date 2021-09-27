@@ -448,6 +448,9 @@ class CPM_ortools(SolverInterface):
                 # reified case: var -> boolexpr, boolexpr -> var
                 if isinstance(cpm_expr.args[0], _BoolVarImpl):
                     # var -> boolexpr, natively supported by or-tools
+                    # But not voor xor!!
+                    if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
+                        raise NotImplementedError("Reified XOR not allowed by ORTools",cpm_expr,"and CPMpy does not yet work around it")
                     bvar = self.ort_var(cpm_expr.args[0])
                     return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
                 else:
