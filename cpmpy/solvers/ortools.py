@@ -247,7 +247,7 @@ class CPM_ortools(SolverInterface):
         elif self.ort_status == ort.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
-            raise Exception("OR-Tools says: model invalid")
+            raise Exception("OR-Tools says: model invalid:", self.ort_model.Validate())
         elif self.ort_status == ort.UNKNOWN:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
