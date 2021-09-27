@@ -58,18 +58,21 @@ from cpmpy.transformations.get_variables import get_variables
 from cpmpy.solvers.ortools import CPM_ortools
 
 def main():
-    x, y = IntVar(-9,9, shape=2)
-    m = Model([
+    x = intvar(-9, 9, name="x")
+    y = intvar(-9, 9, name="y")
+    m = Model(
         x < 0, 
         x < 1,
         x > 2,
         (x + y > 0) | (y < 0),
         (y >= 0) | (x >= 0),
         (y < 0) | (x < 0),
-        (y > 0) | (x < 0)
-    ])
+        (y > 0) | (x < 0),
+    )
     assert (m.solve() is False)
 
+    print(m)
+    print("\nStart MUS/MSS enumeration:")
     # Warning, all constraints must support reification...
     for kind, exprs in do_marco(m):
         print(f"{kind} {exprs}")

@@ -14,7 +14,8 @@ from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
 
 def main():
-    x, y = intvar(-9,9, shape=2)
+    x = intvar(-9, 9, name="x")
+    y = intvar(-9, 9, name="y")
     m = Model(
         x < 0, 
         x < 1,
@@ -27,6 +28,8 @@ def main():
     )
     assert (m.solve() is False)
 
+    print(m)
+    print("\nStart MUS search:")
     mus = musx(m.constraints, [], verbose=True)
     print("MUS:", mus)
 
