@@ -22,7 +22,7 @@ Model(a|b).solve(solver='minizinc:chuffed')
 
 ## Direct solver access
 
-CPMpy also offers direct solver access, for more advanced use. For most cases, including setting solver parameters, access to CPMpy's solver API will be sufficient.
+CPMpy also offers direct access to its solver API, as well as to the underlying native solver API. For most cases, including setting solver parameters, access to CPMpy's solver API will be sufficient.
 
 In the following, we will use the [or-tools CP-SAT solver](cpmpy/solvers/ortools.py). The corresponding CPMpy class is `CPM_ortools` and can be included as follows:
 

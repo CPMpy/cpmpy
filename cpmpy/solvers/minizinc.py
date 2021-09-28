@@ -13,6 +13,11 @@
     as well as the MiniZinc bundled binary packages, downloadable from:
     https://www.minizinc.org/software.html
 
+    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
+    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
+    You can overcome this by `pip install nest_asyncio`
+    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
+
     ===============
     List of classes
     ===============
@@ -47,6 +52,10 @@ class CPM_minizinc(SolverInterface):
 
     @staticmethod
     def supported():
+        """
+            Make sure you installed the minizinc distribution from minizinc.org
+            as well as installing the 'minizinc-python' package (e.g. pip install minizinc)
+        """
         try:
             import minizinc
             return True
