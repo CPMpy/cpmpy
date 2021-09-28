@@ -32,6 +32,7 @@
     ==============
 """
 
+import numpy as np
 from datetime import timedelta # for mzn's timeout
 from .solver_interface import SolverInterface, ExitStatus, SolverStatus
 from ..transformations.get_variables import get_variables_model

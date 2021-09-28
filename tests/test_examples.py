@@ -5,6 +5,7 @@ from os.path import join
 import types
 import importlib.machinery
 import pytest
+from cpmpy import *
 
 EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.py"))
 
@@ -20,3 +21,14 @@ class TestExamples(unittest.TestCase):
     loader = importlib.machinery.SourceFileLoader("example", example)
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)
+    
+    # run again with minizinc, if installed on system
+    mzn_slv = SolverLookup.lookup('minizinc')
+    if mzn_slv.supported():
+        # temporarily brute-force overwrite SolverLookup.base_solvers
+        f = SolverLookup.base_solvers
+        try:
+            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]
+            loader.exec_module(mod)
+        finally:
+            SolverLookup.base_solvers = f
