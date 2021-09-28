@@ -6,15 +6,18 @@ from cpmpy.solvers.utils import get_supported_solvers
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
         # basic model
-        x = cp.IntVar(0,2, 3)
+        v = cp.boolvar(3)
+        x,y,z = v
 
-        constraints = [
-            x[0] < x[1],
-            x[1] < x[2]]
-        model = cp.Model(constraints)
-        for solver in get_supported_solvers():
-            model.solve()
-            self.assertEqual([xi.value() for xi in x], [0, 1, 2])
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z
+                )
+
+        for solvern,s in cp.SolverLookup.base_solvers():
+            if s.supported(): # only supported solvers in test suite
+                model.solve(solver=solvern)
+                self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
     
     # should move this test elsewhere later
     def test_tsp(self):
@@ -233,4 +236,29 @@ class TestSolvers(unittest.TestCase):
 
 
 
+    def test_minizinc(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+        if not CPM_minizinc.supported():
+            print("Skipping minizinc tests, not installed")
+            return
+
+        # (from or-tools)
+        b = cp.BoolVar()
+        x = cp.IntVar(1,13, shape=3)
+
+        # reifiability (automatic handling in case of !=)
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) == x[2])).solve() )
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) != x[2])).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]) == b).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]) == b).solve() )
+        
+        # table
+        t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
+        self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
+        self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
+
+        # modulo
+        self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 
