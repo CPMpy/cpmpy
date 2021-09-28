@@ -12,10 +12,10 @@ class TestGlobal(unittest.TestCase):
         nTests = 10
         for i in range(start, start + nTests):
             # construct the model vars = lb..i
-            vars = cp.IntVar(lb, i, i)
+            vars = cp.intvar(lb, i, i)
 
             # CONSTRAINTS
-            constraint = [ cp.alldifferent(vars) ]
+            constraint = [ cp.AllDifferent(vars) ]
 
             # MODEL Transformation to default solver specification
             model = cp.Model(constraint)
@@ -42,20 +42,20 @@ class TestGlobal(unittest.TestCase):
         means that there is a directed edge from 0 -> 3.
         """
         # TODO implement circuit unit test
-        x = cp.IntVar(0, 5, 6)
-        constraints = [cp.circuit(x)]
+        x = cp.intvar(0, 5, 6)
+        constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
         _ = model.solve()
 
     def test_minimax_python(self):
         from cpmpy import min,max
-        iv = cp.IntVar(1,9, 10)
+        iv = cp.intvar(1,9, 10)
         self.assertIsInstance(min(iv), GlobalConstraint) 
         self.assertIsInstance(max(iv), GlobalConstraint) 
 
     def test_minimax_cpm(self):
-        iv = cp.IntVar(1,9, 10)
+        iv = cp.intvar(1,9, 10)
         mi = cp.min(iv)
         ma = cp.max(iv)
         self.assertIsInstance(mi, GlobalConstraint) 

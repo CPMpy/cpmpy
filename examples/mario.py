@@ -30,7 +30,7 @@ s = intvar(0,nHouses-1, shape=nHouses, name="s")
 model = Model(
     #s should be a path, mimic (sub)circuit by connecting end-point back to start
     s[luigiHouse] == marioHouse,
-    circuit(s),  # should be subcircuit?
+    Circuit(s),  # should be subcircuit?
 )
 
 # consumption, knowing that always conso[i,i]=0 

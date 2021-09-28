@@ -39,7 +39,7 @@ n_city = len(locations)
 x = intvar(0, n_city-1, shape=n_city)
 
 # The 'circuit' global constraint ensures that the successor variables from a circuit
-model = Model( circuit(x) )
+model = Model( Circuit(x) )
 
 # the objective is to minimze the travelled distance 
 distance_matrix = cpm_array(distance_matrix) # for indexing with variable
