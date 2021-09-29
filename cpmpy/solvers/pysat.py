@@ -115,7 +115,7 @@ class CPM_pysat(SolverInterface):
             cpm_con = to_cnf(cpm_con)
             for con in cpm_con:
                 if isinstance(con, Operator) and con.name == 'or':
-                    self.pysat_solver.add_clause([ self.pysat_var(var) for var in cpm_con.args ])
+                    self.pysat_solver.add_clause([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
                     
