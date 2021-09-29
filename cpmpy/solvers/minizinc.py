@@ -234,7 +234,7 @@ class CPM_minizinc(SolverInterface):
         self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
 
     def clean_varname(self, varname):
-        return varname.replace('[','_').replace(']','')
+        return varname.replace(',','_').replace('[','_').replace(']','')
 
     def make_model(self, cpm_model):
         """
@@ -260,7 +260,11 @@ class CPM_minizinc(SolverInterface):
 
         txt_cons = ""
         for con in cpm_model.constraints:
-            txt_cons += "constraint {};\n".format(self.convert_expression(con))
+            mzn_con = self.convert_expression(con)
+            # might be a top-level vectorized constraint, e.g. is_any_list; if so, wrap in forall()
+            if is_any_list(con):
+                mzn_con = f"forall({mzn_con})"
+            txt_cons += f"constraint {mzn_con};\n"
 
         txt_obj = "solve satisfy;"
         if cpm_model.objective is not None:
@@ -296,6 +300,13 @@ class CPM_minizinc(SolverInterface):
             if isinstance(expr, NegBoolView):
                 return "not "+self.clean_varname(str(expr._bv))
             return self.clean_varname(str(expr))
+
+        # table(vars, tbl): no [] nesting of args, and special table output...
+        if expr.name == "table":
+            raise NotImplementedError("TODO: conversion of 2D array to minizinc matrix")
+            str_vars = self.convert_expression(expr.args[0])
+            str_tbl = self.convert_expression(expr.args[1]) # XXX, this is WRONG!
+            return "table({}, {})".format(str_vars, str_tbl)
         
         args_str = [self.convert_expression(e) for e in expr.args]
 
@@ -342,7 +353,9 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "element":
             subtype = "int"
-            if all(v.is_bool() for v in expr.args[0]):
+            if all(isinstance(v, bool) or \
+                   (isinstance(v, Expression) and v.is_bool()) \
+                     for v in expr.args[0]):
                 subtype = "bool"
             # minizinc is offset 1, which can be problematic for element...
             idx = args_str[1]
@@ -360,6 +373,5 @@ class CPM_minizinc(SolverInterface):
                 # redo args_str[0]
                 args_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args]
         
-
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
