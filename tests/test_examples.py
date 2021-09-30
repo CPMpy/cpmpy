@@ -23,6 +23,9 @@ class TestExamples(unittest.TestCase):
     loader.exec_module(mod)
     
     # run again with minizinc, if installed on system
+    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py']:
+        # except for these too slow ones
+        return
     mzn_slv = SolverLookup.lookup('minizinc')
     if mzn_slv.supported():
         # temporarily brute-force overwrite SolverLookup.base_solvers
