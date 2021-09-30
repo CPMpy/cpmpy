@@ -134,9 +134,19 @@ class CPM_minizinc(SolverInterface):
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
 
-            keyword arguments can be any argument accepted by minizinc.Instance.solve()
-            For example, set 'all_solutions=True' to have it compute all solutions,
-            however, only the last solution will be accessible from CPMpy (so pretty useless)
+            Additional keyword arguments:
+            The minizinc solver parameters are partly defined in its API:
+            https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
+
+            You can use any of these parameters as keyword argument to `solve()` and they will
+            be forwarded to the solver. Examples include:
+                - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
+                - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
+                - all_solutions=True            Computes all solutions. WARNING CPMpy only gives you access to the values of the last solution... so not very useful.
+                - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+
+            example:
+            o.solve(free_search=True, optimisation_level=0)
 
             Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
         """
