@@ -25,6 +25,7 @@ Source code and bug reports at https://github.com/CPMpy/cpmpy
    solver_parameters
    multiple_solutions
    unsat_core_extraction
+   how_to_debug
    behind_the_scenes
 
 
