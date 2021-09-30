@@ -22,7 +22,7 @@
 
     Mathematical operators:
 
-    - -x            Operator("-", [x])
+    - \-x            Operator("-", [x])
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
