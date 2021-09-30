@@ -234,7 +234,7 @@ class CPM_minizinc(SolverInterface):
         self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
 
     def clean_varname(self, varname):
-        return varname.replace(',','_').replace('[','_').replace(']','')
+        return varname.replace(',','_').replace('.','_').replace(' ','_').replace('[','_').replace(']','')
 
     def make_model(self, cpm_model):
         """
