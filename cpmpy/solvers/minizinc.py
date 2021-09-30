@@ -288,7 +288,11 @@ class CPM_minizinc(SolverInterface):
                 expr_str = [self.convert_expression(e) for e in expr.flat]
             else:
                 expr_str = [self.convert_expression(e) for e in expr]
-            return "[{}]".format(",".join(expr_str))
+            if len(expr_str) == 1:
+                # unary special case, don't put in list
+                return expr_str[0]
+            else:
+                return "[{}]".format(",".join(expr_str))
 
         if not isinstance(expr, Expression) or \
            isinstance(expr, _NumVarImpl):
