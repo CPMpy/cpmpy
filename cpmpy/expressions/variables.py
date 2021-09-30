@@ -296,9 +296,9 @@ class _BoolVarImpl(_IntVarImpl):
     def __eq__(self, other):
         # (BV == 1) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if other is 1 or other is True:
+        if (isinstance(other, int) and other == 1) or other is True:
             return self
-        if other is 0 or other is False:
+        if (isinstance(other, int) and other == 0) or other is False:
             return ~self
         return super().__eq__(other)
 
