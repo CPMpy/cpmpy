@@ -1,5 +1,23 @@
 # Change log
 
+## 0.9.4
+
+Major:
+* re-enabled MiniZinc as a backend solver!
+* reworked how solvers (and subsolvers) are accessed
+    -> you can now do `model.solve(solver="minizinc:chuffed")` and the like
+* added a SolverLookup.solvernames() to get supported names
+* a debugging guide in the docs
+
+Minor:
+* various documentation and test updates
+* some more explicit errors
+* add vectorized operations that were missing (thanks Hakan)
+* pysat: fix bug where constraints were duplicated
+* ort: show validation error when model is invalid
+* ort: work around 'xor' not being reifiable
+* add missing negated_normal for 'xor'
+
 ## 0.9.3
 * make progress logging work in jupyter/IPython (beta ortools feature)
 * transf/get_variables now has print_variables that prints domains, for debugging with domains

@@ -27,7 +27,7 @@ setup(
     description='A numpy-based library for modeling constraint programming problems',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/tias/cppy",
+    url="https://github.com/CPMpy/cpmpy",
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
