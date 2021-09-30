@@ -257,6 +257,11 @@ def flatten_objective(expr):
     if __is_flat_var(expr):
         return (expr, [])
 
+    # lets be very explicit here
+    if is_any_list(expr):
+        # one source of errors is sum(v) where v is a matrix, use np.sum(v) instead
+        raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
+
     if isinstance(expr, Operator) and (expr.name == 'sum' or expr.name == 'wsum'):
         if expr.name == 'sum':
             if all(__is_flat_var(arg) for arg in expr.args):
@@ -294,6 +299,9 @@ def get_or_make_var(expr):
     """
     if __is_flat_var(expr):
         return (expr, [])
+
+    if is_any_list(expr):
+        raise Exception(f"Expected single variable, not a list for: {expr}")
 
     if expr.is_bool():
         # normalize expr into a boolexpr LHS, reify LHS == bvar
