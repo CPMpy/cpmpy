@@ -258,13 +258,21 @@ class CPM_minizinc(SolverInterface):
             elif isinstance(var, _IntVarImpl):
                 txt_vars += "var {}..{}: {};\n".format(var.lb, var.ub, self.clean_varname(var.name))
 
+        # we can't unpack lists in convert_expression, so must do it upfront
+        # and can't make assumptions on '.flat' existing either...
+        # this is dirty code that should not be reused, keeping it hidden in this function...
+        def flatlist(lst):
+            flatlst = []
+            for elem in lst:
+                if is_any_list(elem):
+                    flatlst += flatlist(elem)
+                else:
+                    flatlst.append(elem)
+            return flatlst
+
         txt_cons = ""
-        for con in cpm_model.constraints:
-            if is_any_list(con):
-                for subcon in con:
-                    txt_cons += f"constraint {self.convert_expression(subcon)};\n"
-            else:
-                txt_cons += f"constraint {self.convert_expression(con)};\n"
+        for con in flatlist(cpm_model.constraints):
+            txt_cons += f"constraint {self.convert_expression(con)};\n"
 
         txt_obj = "solve satisfy;"
         if cpm_model.objective is not None:
