@@ -259,7 +259,7 @@ def flatten_objective(expr):
 
     # lets be very explicit here
     if is_any_list(expr):
-        # one source of errors is sum(v) where v is a matrix, use np.sum(v) instead
+        # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
 
     if isinstance(expr, Operator) and (expr.name == 'sum' or expr.name == 'wsum'):

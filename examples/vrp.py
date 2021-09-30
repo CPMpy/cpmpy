@@ -63,8 +63,8 @@ for i in range(n_city):
         model += y[i,j] <= q*x[i,j]
 
 # the objective is to minimze the travelled distance 
-# use np.sum for sum over all elements
-model.minimize(np.sum(x*distance_matrix))
+# sum(x*dist) does not work because 2D array, use .sum()
+model.minimize((x*distance_matrix).sum())
 
 # print(model)
 

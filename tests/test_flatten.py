@@ -18,8 +18,7 @@ class TestFlattenModel(unittest.TestCase):
         self.assertTrue(len(model2.constraints) > 1)
 
     def test_objective(self):
-        #obj = self.ivars.sum() # should work?
-        obj = np.sum(self.ivars)
+        obj = self.ivars.sum()
         model = cp.Model(self.constraints, maximize=obj)
         model2 = flatten_model(model)
         self.assertTrue(model2.objective is not None)
