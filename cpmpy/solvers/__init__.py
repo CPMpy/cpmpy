@@ -36,4 +36,4 @@
 from .utils import builtin_solvers, get_supported_solvers, param_combinations
 from .ortools import CPM_ortools
 from .pysat import CPM_pysat
-# from minizinc import CPMpyMiniZinc # closed for maintenance
+from .minizinc import CPM_minizinc

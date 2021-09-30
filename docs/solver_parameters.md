@@ -1,8 +1,30 @@
 # Setting solver parameters and hyperparameter search
 
-CPMpy offers direct solver access. For most cases, including setting solver parameters, access to CPMpy's solver API will be sufficient.
+## Calling a solver by name
 
-In the following, we will use the [or-tools CP-SAT solver](cpmpy/solvers/ortools.py>). The corresponding CPMpy class is `CPM_ortools` and can be included as follows:
+You can see the list of available solvers (and subsolvers) as follows:
+
+```python
+from cpmpy import *
+
+print(SolverLookup.solvernames())
+```
+
+On my system, with pysat and minizinc installed, this gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']
+
+You can use any of these solvers by passing its name to the `Model.solve()` parameter 'solver' as such:
+
+```python
+a,b = boolvar(2)
+Model(a|b).solve(solver='minizinc:chuffed')
+```
+
+
+## Direct solver access
+
+CPMpy also offers direct access to its solver API, as well as to the underlying native solver API. For most cases, including setting solver parameters, access to CPMpy's solver API will be sufficient.
+
+In the following, we will use the [or-tools CP-SAT solver](cpmpy/solvers/ortools.py). The corresponding CPMpy class is `CPM_ortools` and can be included as follows:
 
 ```python
    from cpmpy.solvers import CPM_ortools
@@ -12,7 +34,7 @@ The same principles will apply to the other solver interfaces too.
 
 
 ## Setting solver parameters
-or-tools has many solver parameters, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto]).
+or-tools has many solver parameters, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto).
 
 CPMpy's interface to ortools accepts keyword arguments to `solve()`, and will set the corresponding or-tools parameters if the name matches. We documented some of the frequent once in our [CPM_ortools API](cpmpy/solvers/ortools.py).
 

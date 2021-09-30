@@ -30,7 +30,7 @@
 import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
-from .solvers.utils import get_supported_solvers
+from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class Model(object):
@@ -98,13 +98,14 @@ class Model(object):
         """
         self.objective = expr
         self.objective_max = True
+
     
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
 
-        :param solver: solver to use (verifies that the solver is supported on the current system)
-        :type solver: None (default) or in [s.name in get_supported_solvers()] or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
+        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
+        :type string: None (default) or in SolverLookup.solvernames() or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
 
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
@@ -114,25 +115,20 @@ class Model(object):
             - False     if it is a satisfaction problem and not satisfiable
             - [int]     if it is an optimisation problem
         """
-        solver_class = None
-        # get supported solvers
-        supsolvers = get_supported_solvers()
-        if solver is None: # default is first
-            solver_class = supsolvers[0]
-        elif not isinstance(solver, SolverInterface):
-            solvername = solver
-            for s in supsolvers:
-                if s.name == solvername:
-                    solver_class = s
-                    break # break and hence 'solver' is correct object
-        elif isinstance(solver, SolverInterface) and solver.supported():
+        if isinstance(solver, SolverInterface):
             solver_class = solver
         else:
-            raise Exception("'{}' is not in the list of supported solvers and not a SolverInterface class".format(solver))
+            solver_class = SolverLookup.lookup(solver)
         assert(solver_class is not None)
                 
         # instatiate solver with this model
-        s = solver_class(self)
+        if isinstance(solver, str) and ':' in solver:
+            # solver is a name that contains a subsolver
+            s = solver_class(self, solver=solver)
+        else:
+            # no subsolver
+            s = solver_class(self)
+
         # call solver
         ret = s.solve(time_limit=time_limit)
         # store CPMpy status (s object has no further use)

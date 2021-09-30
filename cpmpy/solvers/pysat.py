@@ -50,7 +50,21 @@ class CPM_pysat(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model):
+    @staticmethod
+    def solvernames():
+        """
+            Returns solvers supported by PySAT on your system
+        """
+        from pysat.solvers import SolverNames
+        names = []
+        for name, attr in vars(SolverNames).items():
+            if not name.startswith('__') and isinstance(attr, tuple):
+                if name not in attr:
+                    name = attr[-1]
+                names.append(name)
+        return names
+
+    def __init__(self, cpm_model, solver=None):
         """
         Constructor of the solver object
 
@@ -61,6 +75,11 @@ class CPM_pysat(SolverInterface):
         the PySAT docs use 'model' to refer to a solution.
 
         Only supports satisfaction problems (no objective)
+
+        Arguments:
+        - cpm_model: a CPMpy Model()
+        - solver: name of the pysat solver, e.g. glucose4
+            see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface")
@@ -70,7 +89,15 @@ class CPM_pysat(SolverInterface):
         from pysat.solvers import Solver
 
         super().__init__()
-        self.name = "pysat"
+
+        # determine solvername, set cpmpy name
+        solvername = solver
+        if solver is None:
+            # default solver
+            solvername = "glucose4" # something recent...
+        elif solvername.startswith('pysat:'):
+            solvername = solvername[6:] # strip 'pysat:'
+        self.name = "pysat:"+solvername
 
         # store original vars
         self.user_vars = get_variables_model(cpm_model)
@@ -81,7 +108,7 @@ class CPM_pysat(SolverInterface):
         # create constraint model (list of clauses)
         cnf = self.make_cnf(cpm_model)
         # create the solver instance
-        self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True)
+        self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
 
 
     def pysat_var(self, cpm_var):
@@ -145,6 +172,10 @@ class CPM_pysat(SolverInterface):
 
     def solve(self, time_limit=None, assumptions=None):
         """
+            Call the PySAT solver
+
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses

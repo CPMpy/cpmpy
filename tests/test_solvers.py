@@ -6,15 +6,18 @@ from cpmpy.solvers.utils import get_supported_solvers
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
         # basic model
-        x = cp.IntVar(0,2, 3)
+        v = cp.boolvar(3)
+        x,y,z = v
 
-        constraints = [
-            x[0] < x[1],
-            x[1] < x[2]]
-        model = cp.Model(constraints)
-        for solver in get_supported_solvers():
-            model.solve()
-            self.assertEqual([xi.value() for xi in x], [0, 1, 2])
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z
+                )
+
+        for solvern,s in cp.SolverLookup.base_solvers():
+            if s.supported(): # only supported solvers in test suite
+                model.solve(solver=solvern)
+                self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
     
     # should move this test elsewhere later
     def test_tsp(self):
@@ -22,7 +25,7 @@ class TestSolvers(unittest.TestCase):
         np.random.seed(0)
         b = np.random.randint(1,100, size=(N,N))
         distance_matrix= ((b + b.T)/2).astype(int)
-        x = cp.IntVar(0, 1, shape=distance_matrix.shape) 
+        x = cp.intvar(0, 1, shape=distance_matrix.shape) 
         constraint  = []
         constraint  += [sum(x[i,:])==1 for i in range(N)]
         constraint  += [sum(x[:,i])==1 for i in range(N)]
@@ -42,8 +45,8 @@ class TestSolvers(unittest.TestCase):
          [1, 0, 0, 0, 0, 0]])
 
     def test_ortools(self):
-        b = cp.BoolVar()
-        x = cp.IntVar(1,13, shape=3)
+        b = cp.boolvar()
+        x = cp.intvar(1,13, shape=3)
 
         # reifiability (automatic handling in case of !=)
         self.assertTrue( cp.Model(b.implies((x[0]*x[1]) == x[2])).solve() )
@@ -71,7 +74,7 @@ class TestSolvers(unittest.TestCase):
         from ortools.sat.python import cp_model as ort
 
         # standard use
-        x = cp.IntVar(0,3, shape=2)
+        x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         self.assertTrue(m.solve())
         self.assertEqual(x[0].value(), 3)
@@ -83,15 +86,15 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(o.solve())
         o.minimize(x[0])
         o.solve()
-        self.assertEquals(x[0].value(), 1)
+        self.assertEqual(x[0].value(), 1)
         o.maximize(x[1])
         o.solve()
-        self.assertEquals(x[1].value(), 2)
+        self.assertEqual(x[1].value(), 2)
 
 
 
         # advanced solver params
-        x = cp.IntVar(0,3, shape=2)
+        x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
@@ -111,7 +114,7 @@ class TestSolvers(unittest.TestCase):
                 self.solcount += 1
         cb = ORT_solcount()
 
-        x = cp.IntVar(0,3, shape=2)
+        x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
@@ -139,7 +142,7 @@ class TestSolvers(unittest.TestCase):
                 print("x:",self.x.value())
         cb = ORT_myprint(s.varmap, x)
 
-        x = cp.IntVar(0,3, shape=2)
+        x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
@@ -160,7 +163,7 @@ class TestSolvers(unittest.TestCase):
 
 
         # manually enumerating solutions
-        x = cp.IntVar(0,3, shape=2)
+        x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         solcount = 0
@@ -172,8 +175,8 @@ class TestSolvers(unittest.TestCase):
 
 
         # assumptions
-        bv = cp.BoolVar(shape=3)
-        iv = cp.IntVar(0,9, shape=3)
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0,9, shape=3)
         # circular 'bigger then', UNSAT
         m = cp.Model([
             bv[0].implies(iv[0] > iv[1]),
@@ -192,7 +195,7 @@ class TestSolvers(unittest.TestCase):
             return
 
         # Construct the model.
-        (mayo, ketchup, curry, andalouse, samurai) = cp.BoolVar(5)
+        (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
 
         Nora = mayo | ketchup
         Leander = ~samurai | mayo
@@ -218,7 +221,7 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
 
         indmodel = cp.Model()
-        inds = cp.BoolVar(shape=len(model.constraints))
+        inds = cp.boolvar(shape=len(model.constraints))
         for i,c in enumerate(model.constraints):
             indmodel += [c | ~inds[i]] # implication
         ps2 = CPM_pysat(indmodel)
@@ -233,4 +236,29 @@ class TestSolvers(unittest.TestCase):
 
 
 
+    def test_minizinc(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+        if not CPM_minizinc.supported():
+            print("Skipping minizinc tests, not installed")
+            return
+
+        # (from or-tools)
+        b = cp.boolvar()
+        x = cp.intvar(1,13, shape=3)
+
+        # reifiability (automatic handling in case of !=)
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) == x[2])).solve() )
+        self.assertTrue( cp.Model(b.implies((x[0]*x[1]) != x[2])).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]).implies(b)).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) == x[2]) == b).solve() )
+        self.assertTrue( cp.Model(((x[0]*x[1]) != x[2]) == b).solve() )
+        
+        # table
+        t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
+        self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
+        self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
+
+        # modulo
+        self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 

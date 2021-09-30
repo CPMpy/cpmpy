@@ -19,3 +19,4 @@ __version__ = "0.9.3"
 
 from .expressions import *
 from .model import Model
+from .solvers.utils import SolverLookup
