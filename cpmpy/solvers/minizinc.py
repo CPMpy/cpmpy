@@ -260,11 +260,11 @@ class CPM_minizinc(SolverInterface):
 
         txt_cons = ""
         for con in cpm_model.constraints:
-            mzn_con = self.convert_expression(con)
-            # might be a top-level vectorized constraint, e.g. is_any_list; if so, wrap in forall()
             if is_any_list(con):
-                mzn_con = f"forall({mzn_con})"
-            txt_cons += f"constraint {mzn_con};\n"
+                for subcon in con:
+                    txt_cons += f"constraint {self.convert_expression(subcon)};\n"
+            else:
+                txt_cons += f"constraint {self.convert_expression(con)};\n"
 
         txt_obj = "solve satisfy;"
         if cpm_model.objective is not None:
