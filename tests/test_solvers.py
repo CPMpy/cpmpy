@@ -31,7 +31,8 @@ class TestSolvers(unittest.TestCase):
         constraint  += [sum(x[:,i])==1 for i in range(N)]
         constraint += [sum(x[i,i] for i in range(N))==0]
 
-        objective = sum(x*distance_matrix)
+        # np.sum over all elements (2D)
+        objective = np.sum(x*distance_matrix)
 
         model = cp.Model(constraint, minimize=objective)
         objval = model.solve()

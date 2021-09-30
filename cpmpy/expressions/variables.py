@@ -404,8 +404,8 @@ class NDVarArray(Expression, np.ndarray):
         if not axis is None or not out is None:
             raise NotImplementedError() # please report on github with usecase
 
-        # return sum object
-        return Operator("sum", self)
+        # return sum object over all dimensions
+        return Operator("sum", self.flat)
 
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):
@@ -429,11 +429,21 @@ class NDVarArray(Expression, np.ndarray):
     def __ge__(self, other):
         return self._vectorized(other, '__ge__') 
 
-    # VECTORIZED operators
-    # only 'abs' and binary ones
-    # '-' not needed, gets translated to ==0 and that is already handled
+    # VECTORIZED math operators
+    # only 'abs' 'neg' and binary ones
+    # '~' not needed, gets translated to ==0 and that is already handled
     def __abs__(self):
         return cpm_array([abs(s) for s in self])
+    def __neg__(self):
+        return cpm_array([-s for s in self])
+    def __add__(self, other):
+        return self._vectorized(other, '__add__') 
+    def __radd__(self, other):
+        return self._vectorized(other, '__radd__') 
+    def __sub__(self, other):
+        return self._vectorized(other, '__sub__') 
+    def __rsub__(self, other):
+        return self._vectorized(other, '__rsub__') 
     def __mul__(self, other):
         return self._vectorized(other, '__mul__') 
     def __rmul__(self, other):
@@ -452,6 +462,23 @@ class NDVarArray(Expression, np.ndarray):
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
         return self._vectorized(other, '__rpow__') 
+    
+    # VECTORIZED Bool operators
+    # __invert__ not needed because translated to == 0 and that is handled properly
+    def __and__(self, other):
+        return self._vectorized(other, '__and__') 
+    def __rand__(self, other):
+        return self._vectorized(other, '__rand__') 
+    def __or__(self, other):
+        return self._vectorized(other, '__or__') 
+    def __ror__(self, other):
+        return self._vectorized(other, '__ror__') 
+    def __xor__(self, other):
+        return self._vectorized(other, '__xor__') 
+    def __rxor__(self, other):
+        return self._vectorized(other, '__rxor__') 
+    def implies(self, other):
+        return self._vectorized(other, 'implies') 
 
     # TODO?
     #in	  __contains__(self, value) 	Check membership
