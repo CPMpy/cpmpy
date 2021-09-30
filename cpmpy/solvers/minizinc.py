@@ -303,9 +303,11 @@ class CPM_minizinc(SolverInterface):
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
-            raise NotImplementedError("TODO: conversion of 2D array to minizinc matrix")
             str_vars = self.convert_expression(expr.args[0])
-            str_tbl = self.convert_expression(expr.args[1]) # XXX, this is WRONG!
+            str_tbl = "[|\n" # opening
+            for row in expr.args[1]:
+                str_tbl += ",".join(map(str,row)) + " |" # rows
+            str_tbl += "\n|]" # closing
             return "table({}, {})".format(str_vars, str_tbl)
         
         args_str = [self.convert_expression(e) for e in expr.args]
