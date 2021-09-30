@@ -80,6 +80,9 @@ def musx_pure(soft_constraints, hard_constraints=[], verbose=False):
         with expensive decompositions).
         For those constraints that do support reification, see musx_assum()
     """
+    if len(soft_constraints) == 0:
+        return []
+
     # small optimisation:
     # order so that constraints with many variables are tried first
     # this will favor MUS with few variables per constraint,
@@ -140,6 +143,9 @@ def musx_assum(soft_constraints, hard_constraints=[], verbose=False):
         is supported by the solver or can be efficiently decomposed
         (which may not be the case for certain global constraints)
     """
+    if len(soft_constraints) == 0:
+        return []
+
     # init with hard constraints
     assum_model = Model(hard_constraints)
 
