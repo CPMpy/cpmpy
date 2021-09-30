@@ -135,7 +135,8 @@ class CPM_minizinc(SolverInterface):
             - time_limit:  maximum solve time in seconds (float, optional)
 
             keyword arguments can be any argument accepted by minizinc.Instance.solve()
-            For example, set 'all_solutions=True' to have it enumerate all solutions
+            For example, set 'all_solutions=True' to have it compute all solutions,
+            however, only the last solution will be accessible from CPMpy (so pretty useless)
 
             Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
         """
@@ -186,6 +187,9 @@ class CPM_minizinc(SolverInterface):
         if mzn_status.has_solution():
             # runtime
             mznsol = mzn_result.solution
+            if is_any_list(mznsol):
+                print("Warning: multiple solutions found, only returning last one")
+                mznsol = mznsol[-1]
             self.cpm_status.runtime = mzn_result.statistics['time'].total_seconds()
 
             # fill in variables
