@@ -399,8 +399,9 @@ class CPM_ortools(SolverInterface):
                         elif lhs.name == 'mod':
                             # catch tricky-to-find ortools limitation
                             divisor = lhs.args[1]
-                            if divisor.lb <= 0 and divisor.ub >= 0:
-                                raise Exception(f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                            if not is_num(divisor):
+                                if divisor.lb <= 0 and divisor.ub >= 0:
+                                    raise Exception(f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                             return self.ort_model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'div':
                             return self.ort_model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
