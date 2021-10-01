@@ -140,20 +140,24 @@ def explain_one_step_ocus(hard, cost, Iend, I, solver="ortools", verbose=False):
     hittingset_solver = SolverLookup.lookup(solver)(hs_model)
 
     while(True):
-        # Get hitting set
         hittingset_solver.solve()
-        S = hs_vars[hs_vars.value() == 1]
+
+        # Get hitting set
+        hs = hs_vars[hs_vars.value() == 1]
+
+        # map to vars of formula F
+        S = set(hs_vars_to_Iend[hs_var] for hs_var in hs)
 
         if verbose:
-            print("\t hs", S, [hs_vars_to_Iend[hs_var] for hs_var in S])
+            print("\t hs", hs, S)
 
         # SAT check and computation of model
-        if not sat.solve(assumptions=[hs_vars_to_Iend[hs_var] for hs_var in S]):
+        if not sat.solve(assumptions=S):
             if verbose:
-                print("OCUS=", [hs_vars_to_Iend[hs_var] for hs_var in S])
+                print("OCUS=", S)
 
             # deleting the hitting set solver
-            return set(hs_vars_to_Iend[hs_var] for hs_var in S)
+            return S
 
         # compute complement of model in formula F
         C =  [Iend_to_hs_vars[Iend_var] for Iend_var in F if not Iend_var.value()]
