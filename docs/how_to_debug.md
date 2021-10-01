@@ -9,9 +9,15 @@ The bug can be situated in one of three layers:
 
 coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
 
+If you don't have a bug yet, but are curious, here is some general advise from expert modeller [Håkan Kjellerstrand](http://www.hakank.org/):
+- Test the model early and often. This makes it easier to detect problems in the model.
+- When a model is not working, try to comment out all the constraints and then activate them again one by one to test which constraint is the culprit.
+- Check the domains (see lower). The domains should be as small as possible, but not smaller. If they are too large it can take a lot of time to get a solution. If they are too small, then there will be no solution.
+
+
 ## Debugging the solver
 
-If you get an error, try searching on the internet if other users have had the same.
+If you get an error and have difficulty understanding it, try searching on the internet if other users have had the same.
 
 If you don't find it, or if the solver runs fine and without error, but you don't get the answer you expect; then try swapping out the solver for another solver and see what gives...
 
@@ -26,6 +32,7 @@ You get an error when you create an expression? Then you are probably writing it
 Here are a few quirks in Python/CPMpy:
   - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter wont work, because Python will unfortunately think you meant `x == (1 & (y == 0))`.
   - you can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
+  - only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 
@@ -65,10 +72,12 @@ print(mf)`
 ```
 
 ### Automatically minimising the UNSAT program
-If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to its 'UNSAT core'. You can use 'MUSX' in examples/advanced/ for this:
+If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to its 'UNSAT core'.
+
+You can download our '[musx.py](https://raw.githubusercontent.com/CPMpy/cpmpy/master/examples/advanced/musx.py)' advanced example. If you put it in the same folder as your code, then you can use it as follows:
 
 ```python
-from examples.advanced.musx import musx
+from musx import musx
 
 x,y,z = boolvar(3)
 model = Model(
