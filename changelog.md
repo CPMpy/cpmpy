@@ -1,7 +1,11 @@
 # Change log
 
-## 0.9.4
+## 0.9.5
+* fix bug in ort limitation check for 'modulo' operator
+* mzn: better doc and check on single solution output
+* various documentation updates
 
+## 0.9.4
 Major:
 * re-enabled MiniZinc as a backend solver!
 * reworked how solvers (and subsolvers) are accessed
