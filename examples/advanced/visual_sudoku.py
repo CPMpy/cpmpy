@@ -30,11 +30,11 @@ def sudoku_model(grid):
 
 def solve_vizsudoku_baseline(puzvar, constraints, logprobs, is_given):
         #puzvar, constraints = sudoku_model(is_given)
-
+        cons = [*constraints]
         # Baseline: take most likely digit as deterministic input
         givens = np.argmax(logprobs, axis=2)
-        constraints += [puzvar[is_given] == givens[is_given]]
-        model = Model(constraints)
+        cons += [puzvar[is_given] == givens[is_given]]
+        model = Model(cons)
         if model.solve():
             return puzvar.value()
         else:
@@ -54,24 +54,24 @@ def solve_vizsudoku_hybrid1(puzvar, constraints, logprobs, is_given):
     else:
         return np.zeros_like(puzvar)
 
-def has_unique_solution(solution, is_given):
+def is_unique(solution, is_given):
     puzvar, constraints = sudoku_model(solution)
-    constraints += [puzvar[is_given] == solution[is_given]]
+    constraints += [all(puzvar[is_given] == solution[is_given])]
     # forbid current solution 
-    constraints += [puzvar != solution]
+    constraints += [any((puzvar != solution).flatten())] #FIXME auto-flatten 2d dvar arrays?
     model= CPM_ortools(Model(constraints))
     return model.solve(stop_after_first_solution=True) == ExitStatus.UNSATISFIABLE
 
 
-def solve_vizsudoku_hybrid2(puzvar, constraints, logprobs, is_given, max_iter=100):
+def solve_vizsudoku_hybrid2(puzvar, constraints, logprobs, is_given, max_iter=10):
     #puzvar, constraints = sudoku_model(is_given)
     solution = solve_vizsudoku_hybrid1(puzvar, constraints, logprobs, is_given)
     i = 0
-    while not has_unique_solution(solution, is_given):
+    while not is_unique(solution, is_given):
         if i == max_iter:
             break 
         # forbid current solution
-        constraints += [puzvar[is_given>0] != solution[is_given>0]]
+        constraints += [any(puzvar[is_given] != solution[is_given])]
         solution = solve_vizsudoku_hybrid1(puzvar, constraints, logprobs, is_given)
         i += 1
     print(i)
@@ -93,20 +93,25 @@ def cnn_output_simulation(puzzle):
     return probs
 
 if __name__ == '__main__':
-    puzzle = np.array([[0,0,0, 2,0,5, 0,0,0],
-                             [0,9,0, 0,0,0, 7,3,0],
-                             [0,0,2, 0,0,9, 0,6,0],
-                             [2,0,0, 0,0,0, 4,0,9],
-                             [0,0,0, 0,7,0, 0,0,0],
-                             [6,0,9, 0,0,0, 0,0,1],
-                             [0,8,0, 4,0,0, 1,0,0],
-                             [0,6,3, 0,0,0, 0,8,0],
-                             [0,0,0, 6,0,8, 0,0,0]])
+    puzzle = np.array(
+        [[0,0,0, 2,0,5, 0,0,0],
+        [0,9,0, 0,0,0, 7,3,0],
+        [0,0,2, 0,0,9, 0,6,0],
+        [2,0,0, 0,0,0, 4,0,9],
+        [0,0,0, 0,7,0, 0,0,0],
+        [6,0,9, 0,0,0, 0,0,1],
+        [0,8,0, 4,0,0, 1,0,0],
+        [0,6,3, 0,0,0, 0,8,0],
+        [0,0,0, 6,0,8, 0,0,0]]
+    )
     is_given = puzzle > 0
     probs = cnn_output_simulation(puzzle) 
+    # add some noise 
+    print('truth',np.argmax(probs, axis=-1))
+    probs[0,3], probs[8,5] = probs[8,5], probs[0,3]
     probs[puzzle==0][0] = 0.8
     logprobs = np.log(np.maximum(probs, PRECISION))
-    print(logprobs[0,3])
+    print(np.argmax(logprobs, axis=-1))
 
 
     dvar, cons = sudoku_model(puzzle)
