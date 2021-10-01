@@ -5,66 +5,86 @@ from cpmpy import *
 
 import numpy as np
 
-def print_explanations(explanations, soft_constraints, indmap):
+def frietkot_explain(verbose=False):
+    # Construct the model.
+    mayo = boolvar(name="mayo")
+    ketchup = boolvar(name="ketchup")
+    curry = boolvar(name="curry")
+    andalouse = boolvar(name="andalouse")
+    samurai = boolvar(name="samurai")
 
-    for expl_id, explanation in enumerate(explanations):
-        print(explanation)
-        print("Explanation", expl_id, "\t cost=", explanation["cost"])
-        for con_id in explanation['constraints']:
-            if con_id in indmap:
-                print('\t Constraints=', soft_constraints[indmap[con_id]])
-            else:
-                print('\t Fact=', con_id)
-        print('\tDerived:', explanation['derived'])
+    # Pure CNF
+    Nora = mayo | ketchup
+    Leander = ~samurai | mayo
+    Benjamin = ~andalouse | ~curry | ~samurai
+    Behrouz = ketchup | curry | andalouse
+    Guy = ~ketchup | curry | andalouse
+    Daan = ~ketchup | ~curry | andalouse
+    Celine = ~samurai
+    Anton = mayo | ~curry | ~andalouse
+    Danny = ~mayo | ketchup | andalouse | samurai
+    Luc = ~mayo | samurai
 
+    allwishes   = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
 
-def optimal_propagate(sat: CPM_pysat, I=[], user_vars=None, verbose=True):
-    """
-        optimal_propagate produces the intersection of all models of cnf more precise
-        projected on focus.
+    wish_weights = [40, 40, 60, 60, 60, 60, 20, 60, 80, 40]
 
-        Args:
-        sat (list): sat solver instantiated with assumption literals to activate or
-                de-active constraints.
+    explanation_sequence = explain_ocus(allwishes, wish_weights, hard=[], verbose=verbose)
+    print(explanation_sequence)
 
-        I (set): partial model of sat literals
+def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=False):
+    '''
+        A SAT-based explanation sequence generating algorithm using assumption
+        variables and weighted unsat core extraction.
+    '''
+    reified_soft = []
+    ind = BoolVar(shape=len(soft), name="ind")
 
-        user_vars (list):
-            +/- selected boolean variables of the sat solver
-        """
-    solved = sat.solve(assumptions=I)
+    ## adding assumption variables to the soft constraints
+    for i,bv in enumerate(ind):
+        reified_soft += [bv.implies(soft[i])]
 
-    if not solved:
-        raise Exception("UNSAT assumptions")
+    # to map indicator variable back to soft_constraints
+    indmap = dict((v,i) for (i,v) in enumerate(ind))
 
-    # mapping to the user variables
-    sat_model = set(lit if lit._value else ~lit for lit in sat.user_vars if lit in user_vars)
+    # adding the assumption variables
+    I = set(bv for bv in ind)
+
+    Iend = optimal_propagate(hard + reified_soft, I, solver, verbose)
+
+    cost = cost_func(indmap, soft_weights)
 
     if verbose:
-        print("1st sat model:", [lit for lit in sat_model])
+        print("\nMAXIMAL CONSEQUENCE\n\t", Iend)
+        print("\nREMAINING TO EXPLAIN\n\t", Iend-I)
 
-    bi = boolvar()
+    explanation_sequence = []
 
-    while(True):
-        # negate the values of the model
-        sat += bi.implies( Operator("or",[~lit for lit in sat_model]))
-        if verbose:
-            print("\n\t implies:", [~lit for lit in sat_model])
-        solved = sat.solve(assumptions=I | set([bi]))
+    while(I != Iend):
+        # explain 1 step using ocus
+        ocus_expl = explain_one_step_ocus(hard+reified_soft, cost, Iend, I, solver, verbose)
 
-        if not solved:
-            sat += (~bi)
-            return set(lit for lit in sat_model)
+        # project on known facts and constraints
+        soft_used = I & ocus_expl
 
-        # project onto sat model
-        new_sat_model = set(lit if lit._value else ~lit for lit in sat.user_vars)
-        sat_model = sat_model & new_sat_model
-        if verbose:
-            print("\n\t new sat model:", new_sat_model)
-            print("\n\t Intersection sat model:", sat_model)
+        # propagate and find information hold in all models
+        derived = optimal_propagate(hard + reified_soft, soft_used, solver, verbose) - I
 
+        # Add newly derived information
+        I |= derived
 
-def explain_one_step_ocus(sat, soft_weights, Iend, I, verbose=False):
+        explanation = {
+            "constraints": list(soft[indmap[con]] if con in indmap else con for con in soft_used),
+            "derived": list(derived),
+            "cost": sum(cost(con) for con in ocus_expl)
+        }
+
+        explanation_sequence.append(explanation)
+
+    # return the list of original (non-flattened) constraints
+    return explanation_sequence
+
+def explain_one_step_ocus(hard, cost, Iend, I, solver="ortools", verbose=False):
     """
     # Optimisation model:
 
@@ -93,154 +113,117 @@ def explain_one_step_ocus(sat, soft_weights, Iend, I, verbose=False):
 
         I (set): partial interpretation subset of Iend.
     """
+
+    sat = SolverLookup.lookup(solver)(Model(hard))
+
+    ## OPT Model: Variables
     hs_vars = boolvar(shape=len(Iend))
-    F = I | set(~var for var in Iend if var not in I)
+    F = I | set(~var for var in Iend - I)
+
+    # id of variables that need to be explained
     remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if var not in I]]
 
-    # mapping and back
-    hs_vars_Iend = {}
+    # mapping between hitting set variables hs_var <-> Iend
+    hs_vars_to_Iend = dict( (hs_vars[id], var) for id, var in enumerate(F))
+    Iend_to_hs_vars = dict( (var, hs_vars[id]) for id, var in enumerate(F))
 
-    for id, var in enumerate(F):
-        hs_vars_Iend[hs_vars[id]] = var
-        hs_vars_Iend[var] = hs_vars[id]
 
-    # conditional optimisation model
+    # CONDITIONAL OPTIMISATION MODEL
     hs_model = Model(
         # exactly one variable to explain!
         sum(remaining_hs_vars) == 1,
         # optimal hitting set
-        minimize=sum(hs_var * soft_weights[hs_vars_Iend[hs_var]] for hs_var in  hs_vars)
+        minimize=sum(hs_var * cost(hs_vars_to_Iend[hs_var]) for hs_var in hs_vars)
     )
 
     ## instantiate hitting set solver
-    hittingset_solver = CPM_ortools(hs_model)
+    hittingset_solver = SolverLookup.lookup(solver)(hs_model)
 
     while(True):
+        # Get hitting set
         hittingset_solver.solve()
-        hs = [hs_var for hs_var in hs_vars if hs_var.value()]
+        S = hs_vars[hs_vars.value() == 1]
 
-        if not sat.solve(assumptions=[hs_vars_Iend[hs_var] for hs_var in hs]):
+        if verbose:
+            print("\t hs", S, [hs_vars_to_Iend[hs_var] for hs_var in S])
+
+        # SAT check and computation of model
+        if not sat.solve(assumptions=[hs_vars_to_Iend[hs_var] for hs_var in S]):
             if verbose:
-                print("OCUS found !!!!")
-                print("hs=", [hs_vars_Iend[hs_var] for hs_var in hs])
+                print("OCUS=", [hs_vars_to_Iend[hs_var] for hs_var in S])
 
             # deleting the hitting set solver
-            del hittingset_solver
-            return set(hs_vars_Iend[hs_var] for hs_var in hs)
+            return set(hs_vars_to_Iend[hs_var] for hs_var in S)
 
-        # hit new hs
-        # sum x[j] * hij >= 1
-        C = [hs_vars_Iend[Iend_var] for Iend_var in F if not Iend_var.value()]
+        # compute complement of model in formula F
+        C =  [Iend_to_hs_vars[Iend_var] for Iend_var in F if not Iend_var.value()]
+
+        # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(C) >= 1)
 
         if verbose:
-            print("hs", hs, [hs_vars_Iend[hs_var] for hs_var in hs])
             print("C=", C)
 
-def explain_ocus(user_vars: set(), soft_weights=None,  hard_constraints=[], given=set(), verbose=False):
-    '''
-        A SAT-based explanation sequence generating algorithm using assumption
-        variables and weighted unsat core extraction.
-    '''
-    # example cost function
-    sat = CPM_pysat(Model(hard_constraints))
+def optimal_propagate(hard, soft, solver="ortools", verbose=False):
+    """
+        optimal_propagate produces the intersection of all models of cnf more precise
+        projected on focus.
 
-    # adding the assumption variables
-    I = set(given)
+        Args:
+        hard (list): List of hard constraints
 
-    Iend = optimal_propagate(sat, I=I, user_vars=user_vars, verbose=verbose)
+        soft (iterable): List of soft constraints
 
-    explanation_sequence = []
+        I (set): partial model of sat literals
 
-    while(I != Iend):
-        # explain 1 step using ocus
-        ocus_expl = explain_one_step_ocus(sat, soft_weights, Iend, I, verbose)
+        user_vars (list):
+            +/- selected boolean variables of the sat solver
+    """
+    sat = SolverLookup.lookup(solver)(Model(hard))
+    assert sat.solve(assumptions=soft), "Propagation of soft constraints only possible if model is SAT."
 
-        # project on known facts and constraints
-        used = I & ocus_expl
+    # initial model that needs to be refined
+    sat_model = set(lit if lit.value() else ~lit for lit in sat.user_vars)
 
-        # propagate and find information hold in all models
-        derived = optimal_propagate(sat, I=used, user_vars=user_vars, verbose=verbose) - I
+    if verbose:
+        print("Initial sat model:", sat_model)
 
-        # Add newly derived information
-        I |= derived
-
+    while(True):
+        # negate the values of the model
+        blocking_clause = any([~lit for lit in sat_model])
         if verbose:
-            print("\t Constraints and literals =", used)
-            print("\t Derived", derived)
-            print("\t cost=",sum(soft_weights[bv] for bv in ocus_expl) )
+            print("\n\tBlocking clause:", blocking_clause)
 
-        explanation = {
-            "constraints": list(used),
-            "derived": list(derived),
-            "cost": sum(soft_weights[bv] for bv in ocus_expl)
-        }
+        sat += blocking_clause
 
-        explanation_sequence.append(explanation)
+        solved = sat.solve(assumptions=soft)
 
-    # return the list of original (non-flattened) constraints
-    return explanation_sequence
+        if not solved:
+            return set(lit for lit in sat_model)
 
-def frietkot_explain():
-    # Construct the model.
-    mayo = boolvar(name="mayo")
-    ketchup = boolvar(name="ketchup")
-    curry = boolvar(name="curry")
-    andalouse = boolvar(name="andalouse")
-    samurai = boolvar(name="samurai")
+        new_sat_model = set(lit if lit.value() else ~lit for lit in sat.user_vars)
 
-    all_vars = (mayo, ketchup, curry, andalouse, samurai)
+        # project new model onto sat model
+        sat_model = sat_model & new_sat_model
+        if verbose:
+            print("\n\t new sat model:", new_sat_model)
+            print("\n\t Intersection sat model:", sat_model)
 
-    # Pure CNF
-    Nora = mayo | ketchup
-    Leander = ~samurai | mayo
-    Benjamin = ~andalouse | ~curry | ~samurai
-    Behrouz = ketchup | curry | andalouse
-    Guy = ~ketchup | curry | andalouse
-    Daan = ~ketchup | ~curry | andalouse
-    Celine = ~samurai
-    Anton = mayo | ~curry | ~andalouse
-    Danny = ~mayo | ketchup | andalouse | samurai
-    Luc = ~mayo | samurai
+def cost_func(indmap, soft_weights):
+    '''
+        Example cost function with mapping of indicator constraints to
+        corresponding given weight.
 
-    allwishes   = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
+        Variables not in the indicator map have a unit weight, which
+        corresponds to using a unit boolean variable.
+    '''
+    def cost_lit(var):
+        if var in indmap:
+            return soft_weights[indmap[var]]
+        else:
+            return 1
 
-    assum_Nora = boolvar(name="Nora")
-    assum_Leander = boolvar(name="Leander")
-    assum_Benjamin = boolvar(name="Benjamin")
-    assum_Behrouz = boolvar(name="Behrouz")
-    assum_Guy = boolvar(name="Guy")
-    assum_Daan = boolvar(name="Daan")
-    assum_Celine = boolvar(name="Celine")
-    assum_Anton = boolvar(name="Anton")
-    assum_Danny = boolvar(name="Danny")
-    assum_Luc = boolvar(name="Luc")
-
-    ind = [assum_Nora, assum_Leander, assum_Benjamin, assum_Behrouz, assum_Guy, assum_Daan, assum_Celine, assum_Anton, assum_Danny, assum_Luc]
-
-    wish_weights = [40, 40, 60, 60, 60, 60, 20, 60, 80, 40]
-
-    # make assumption indicators, add reified constraints
-    assum_allwishes = []
-    indcosts = {}
-
-    for i,bv in enumerate(ind):
-        assum_allwishes += [bv.implies(allwishes[i])]
-        indcosts[bv] = wish_weights[i]
-        indcosts[~bv] = wish_weights[i]
-
-    for bv in all_vars:
-        indcosts[bv] = 1
-        indcosts[~bv] = 1
-
-    # to map indicator variable back to soft_constraints
-    indmap = dict((v,i) for (i,v) in enumerate(ind))
-
-    user_vars = set(var for var in all_vars) | set(var for var in ind)
-    user_vars |= set(~var for var in user_vars)
-
-    explanation_sequence = explain_ocus(user_vars, indcosts, hard_constraints=assum_allwishes, given=set(var for var in ind))
-    print_explanations(explanation_sequence, soft_constraints=allwishes, indmap=indmap)
+    return cost_lit
 
 if __name__ == '__main__':
-    frietkot_explain()
+    frietkot_explain(verbose=False)
