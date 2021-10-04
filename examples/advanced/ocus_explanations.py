@@ -2,6 +2,7 @@ from cpmpy.solvers.ortools import CPM_ortools
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.expressions.core import Operator
 from cpmpy import *
+from cpmpy.transformations.get_variables import get_variables_model
 
 import numpy as np
 
@@ -183,18 +184,23 @@ def optimal_propagate(hard, soft, solver="ortools", verbose=False):
         user_vars (list):
             +/- selected boolean variables of the sat solver
     """
-    sat = SolverLookup.lookup(solver)(Model(hard))
+    # selecting the 
+    sat_model = Model(hard)
+    user_vars = get_variables_model(sat_model)
+    # building the sat solver
+    sat = SolverLookup.lookup(solver)(sat_model)
+
     assert sat.solve(assumptions=soft), "Propagation of soft constraints only possible if model is SAT."
 
     # initial model that needs to be refined
-    sat_model = set(lit if lit.value() else ~lit for lit in sat.user_vars)
+    sat_model = set(v == v.value() for v in user_vars)
 
     if verbose:
         print("Initial sat model:", sat_model)
 
     while(True):
         # negate the values of the model
-        blocking_clause = any([~lit for lit in sat_model])
+        blocking_clause = ~all(v == v.value() for v in sat_model)
         if verbose:
             print("\n\tBlocking clause:", blocking_clause)
 
@@ -203,9 +209,9 @@ def optimal_propagate(hard, soft, solver="ortools", verbose=False):
         solved = sat.solve(assumptions=soft)
 
         if not solved:
-            return set(lit for lit in sat_model)
+            return sat_model
 
-        new_sat_model = set(lit if lit.value() else ~lit for lit in sat.user_vars)
+        new_sat_model = set(v == v.value() for v in user_vars)
 
         # project new model onto sat model
         sat_model = sat_model & new_sat_model
