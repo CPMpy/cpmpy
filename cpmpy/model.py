@@ -32,6 +32,9 @@ from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .transformations.get_variables import get_variables_model
+from .transformations.to_bool import intvar_to_boolvar, translate_constraint
+
 
 class Model(object):
     """
@@ -56,7 +59,7 @@ class Model(object):
             self.constraints = []
         elif len(args) == 1 and is_any_list(args[0]):
             # top level list of constraints
-            self.constraints = args[0]
+            self.constraints = list(args[0])
         else:
             self.constraints = list(args) # instead of tuple
 
@@ -67,7 +70,7 @@ class Model(object):
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
-        
+
     def __add__(self, con):
         """
             Add one or more constraints to the model
@@ -78,6 +81,7 @@ class Model(object):
         if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
             # top level list of constraints
             con = con[0]
+
         self.constraints.append(con)
         return self
 
@@ -157,5 +161,33 @@ class Model(object):
             else:
                 obj_str = "minimize "
         obj_str += str(self.objective)
-            
+
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
+
+
+
+class BoolModel(Model):
+    """
+        CPMpy Model object, contains the constraint and objective expressions
+    """
+    def __init__(self, *args, from_int_model=None):
+
+        super().__init__(args)
+
+        if from_int_model:
+            int_model_variables = get_variables_model(from_int_model)
+            self.int_var_mapping, self.bool_var_mapping, constraints = intvar_to_boolvar(int_model_variables)
+
+            self.constraints += constraints
+
+            for constraint in from_int_model.constraints:
+                new_constraint = translate_constraint(constraint, self.int_var_mapping)
+                self.constraints += new_constraint
+
+    def get_assignment(self):
+        all_bool_vars = get_variables_model(self)
+
+        for var in all_bool_vars:
+            if var.value():
+                intvar, value = self.bool_var_mapping[var]
+                intvar._value = value
