@@ -10,7 +10,6 @@ import torch
 from torchvision import datasets, transforms
 
 from cpmpy.solvers.ortools import CPM_ortools
-from cpmpy.solvers.solver_interface import ExitStatus
 
 import matplotlib.pyplot as plt
 
@@ -19,16 +18,16 @@ PRECISION = 1e-4
 
 def model_sudoku(grid):
     '''
-        TODO: Basic doc.
+        Build a model for standard Sudoku by creating 81 Intvars (one per cell) and 
+        posting standard Sudoku constraints on row, columns and 3x3 blocks.
     '''
-    # TODO: Instead of returning constraints, you should return a model
     n = len(grid)
     b = np.sqrt(n).astype(int)
 
     # decision vars
     puzvar = IntVar(1,n, shape=grid.shape, name='cell')
 
-    # alldiff constraint
+    # alldiff constraints
     constraints = []
     constraints += [alldifferent(row) for row in puzvar]
     constraints += [alldifferent(col) for col in puzvar.T]
@@ -37,38 +36,65 @@ def model_sudoku(grid):
         for j in range(0,n,b):
             constraints += [alldifferent(puzvar[i: i +b, j:j+b])]
 
-
+    # Do not build the model yet, we need access to constraints and decision vars later on
     return puzvar, constraints 
 
 
-def solve_vizsudoku_baseline(puzvar, constraints, logprobs, is_given):
-        #TODO: either give model or ask to build new model
-        # TODO: IS given may be recomputed everytime for clarity :)
-        cons = [*constraints]
-        # Baseline: take most likely digit as deterministic input
-        givens = np.argmax(logprobs, axis=2)
-        cons += [puzvar[is_given] == givens[is_given]]
-        model = Model(cons)
+def solve_vizsudoku_baseline(logprobs, is_given):
+    '''
+        Baseline: we take the most likely label from our classifier
+        as deterministic input for the solver.
 
-        if model.solve():
-            return puzvar.value()
-        else:
-            return np.zeros_like(puzvar)
+        Args:
+
+            logprobs: N x N x (N+1) log-probability tensor 
+
+            is_given : N x N boolean matrix to distinguish clues from empty cells
+        
+        return:
+
+            N x N int matrix as solution
+    '''
+    # get constraints and decision vars to build a Sudoku model
+    puzvar, constraints = sudoku_model(is_given)
+    model = Model(constraints)
+
+    # TODO: IS given may be recomputed everytime for clarity :)
+    # "then why bother using logprobs?" -> you should not have 
+
+    # Baseline: take most likely digit as deterministic input
+    givens = np.argmax(logprobs, axis=2)
+    model += [puzvar[is_given] == givens[is_given]]
+
+    if model.solve():
+        return puzvar.value()
+    else:
+        return np.zeros_like(puzvar)
 
 # TODO: REname functions hybrid 1 / hybrid 2
-def solve_vizsudoku_hybrid1(puzvar, constraints, logprobs, is_given):
+def solve_vizsudoku_hybrid1(logprobs, is_given):
     '''
-        TODO: Please explain difference between hybrid 1 and hybrid 2
-    '''
-    # TODO: constraints => cpmpy model
-    # TODO: IS given may be recomputed everytime for clarity :)
-    #puzvar, constraints = sudoku_model(is_given)
-    # objective function: max log likelihood of all digits
+        Hyrbid 1 approach, as described in https://arxiv.org/pdf/2003.11001.pdf
 
-    # Emilio: Why do you need to devide by precision ?
+        We add an objective function, turning the satisfaction problem into an optimisation problem.
+        The goal is to find the feasible solution which maximizes the joint log-likelihood accross all givens. 
+
+        The objective function is a weighted sum of the decision variables for givens,
+         with as weight the log-probability of that decision variable being equal to the corresponding predicted value
+    '''
+    # get constraints and decision vars to build a Sudoku model
+    puzvar, constraints = sudoku_model(is_given)
+    model = Model(constraints)
+
+    # divide by PRECISION to turn logprobs into integers. 
     lprobs = np.array(-logprobs/PRECISION).astype(int)
+
+    # objective function: max log likelihood prediction for givens
     obj = sum(Element(lp, v) for lp,v in zip(lprobs[is_given], puzvar[is_given]))
-    model = Model(constraints, minimize=obj)
+
+    # Because we have log-probabilities, we flip the sign to only have positives 
+    # Hence the optimisation becomes a minimisation problem
+    model.minimize(obj)
 
     if model.solve():
         return puzvar.value()
@@ -76,13 +102,18 @@ def solve_vizsudoku_hybrid1(puzvar, constraints, logprobs, is_given):
         return np.zeros_like(puzvar)
 
 def is_unique(solution, is_given):
-    # TODO: constraints => cpmpy model
-    # TODO: IS given may be recomputed everytime for clarity :)
+    '''
+        Check that `solution` is unique, when we solve starting from clues located 
+        as specified by `is_given`
+    '''
     puzvar, constraints = model_sudoku(solution)
-    constraints += [puzvar[is_given] == solution[is_given]]
+    model = Model(constraints)
+    # constraint on values (cells that are non-empty)
+    model += [puzvar[is_given] == solution[is_given]]
     # forbid current solution 
     constraints += [any((puzvar != solution).flatten())] #FIXME auto-flatten 2d dvar arrays?
     model= CPM_ortools(Model(constraints))
+    # There should not exist another feasible solution starting from these clues
     return not model.solve(stop_after_first_solution=True)
 
 # TODO: REname functions hybrid 1 / hybrid 2
