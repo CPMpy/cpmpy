@@ -27,13 +27,14 @@
 
         Model
 """
+from cpmpy.expressions.variables import NDVarArray
 import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
-from .transformations.get_variables import get_variables_model
-from .transformations.to_bool import intvar_to_boolvar, translate_constraint
+from .transformations.get_variables import get_variables, get_variables_model
+from .transformations.to_bool import intvar_to_boolvar, reified_intvar_to_boolvar, reify_translate_constraint, translate_constraint
 
 
 class Model(object):
@@ -170,19 +171,94 @@ class BoolModel(Model):
     """
         CPMpy Model object, contains the constraint and objective expressions
     """
-    def __init__(self, *args, from_int_model=None):
+    def __init__(self, *args, int_model=None, reify=False):
 
         super().__init__(args)
+        self.reification_vars = []
+        self.constraints = []
+        self.reify = reify
+        self.int_var_mapping, self.bool_var_mapping = {}, {}
 
-        if from_int_model:
-            int_model_variables = get_variables_model(from_int_model)
-            self.int_var_mapping, self.bool_var_mapping, constraints = intvar_to_boolvar(int_model_variables)
+        if int_model:
+            if reify:
+                self.reify_from_int_model(int_model)
+            else:
+                self.from_int_model(int_model)
 
+    def from_int_model(self, int_model):
+        int_model_variables = get_variables_model(int_model)
+
+        iv_mapping, bv_mapping, constraints = intvar_to_boolvar(int_model_variables)
+
+        self.constraints += constraints
+
+        self.int_var_mapping.update(iv_mapping)
+        self.bool_var_mapping.update(bv_mapping)
+
+        for constraint in int_model.constraints:
+            new_constraint = translate_constraint(constraint, self.int_var_mapping)
+            self.constraints += new_constraint
+
+    def reify_from_int_model(self, int_model):
+        int_model_variables = get_variables_model(int_model)
+
+        iv_mapping, bv_mapping, constraints, reification_vars = reified_intvar_to_boolvar(int_model_variables)
+
+        self.reification_vars += reification_vars
+        self.constraints += constraints
+        self.int_var_mapping.update(iv_mapping)
+        self.bool_var_mapping.update(bv_mapping)
+
+        for constraint in int_model.constraints:
+            new_constraint, reification_vars = reify_translate_constraint(constraint, self.int_var_mapping)
+            self.constraints += new_constraint
+            self.reification_vars += reification_vars
+
+    def __add__(self, con):
+        if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
+            # top level list of constraints
+            con = con[0]
+
+        constraint_intvars = [ivar for ivar in get_variables(con)if ivar not in self.int_var_mapping]
+
+        if self.reify:
+            iv_mapping, bv_mapping, constraints = intvar_to_boolvar(constraint_intvars)
+
+            self.int_var_mapping.update(iv_mapping)
+            self.bool_var_mapping.update(bv_mapping)
+
+            new_constraint, reification_vars = reify_translate_constraint(con, self.int_var_mapping)
+            self.reification_vars += reification_vars
+            self.constraints += new_constraint + constraints
+
+        else:
+            iv_mapping, bv_mapping, constraints, reification_vars = reified_intvar_to_boolvar(constraint_intvars)
+
+            self.reification_vars += reification_vars
             self.constraints += constraints
+            self.int_var_mapping.update(iv_mapping)
+            self.bool_var_mapping.update(bv_mapping)
 
-            for constraint in from_int_model.constraints:
-                new_constraint = translate_constraint(constraint, self.int_var_mapping)
-                self.constraints += new_constraint
+            new_constraint = translate_constraint(con, self.int_var_mapping)
+            self.constraints += new_constraint + constraints
+
+        return self
+
+    def __repr__(self):
+        cons_str = ""
+        for c in self.constraints:
+            cons_str += "\t{}\n".format(c)
+
+        obj_str = ""
+
+        if not self.objective is None:
+            if self.objective_max:
+                obj_str = "maximize "
+            else:
+                obj_str = "minimize "
+        obj_str += str(self.objective)
+
+        return "Constraints:\n{}\n\nReification Vars:\n\n\t{}\n\nObjective: {}".format(cons_str, self.reification_vars ,obj_str)
 
     def get_assignment(self):
         all_bool_vars = get_variables_model(self)

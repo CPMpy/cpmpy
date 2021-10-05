@@ -11,42 +11,74 @@ def exactly_one(lst):
     allpairs = [(~a|~b) for a, b in combinations(lst, 2)]
     return [any(lst)] + allpairs
 
+def reified_intvar_to_boolvar(int_vars):
+
+        iv_mapping = {}
+        bv_mapping = {}
+        constraints = []
+
+        # reification var
+        bv = boolvar()
+
+        reification_vars = [bv]
+
+        if isinstance(int_vars, (list, NDVarArray)):
+            for ivar in int_vars:
+                sub_iv_mapping, sub_bv_mapping, int_cons = intvar_to_boolvar(ivar)
+                iv_mapping.update(sub_iv_mapping)
+                bv_mapping.update(sub_bv_mapping)
+                constraints += [bv.implies(cons) for cons in int_cons]
+
+        else:
+            iv_mapping, bv_mapping, constraints = intvar_to_boolvar(int_vars)
+            constraints = [bv.implies(con) for con in constraints]
+
+        return iv_mapping, bv_mapping, constraints, reification_vars
+
 def intvar_to_boolvar(int_var):
 
-    if isinstance(int_var, _BoolVarImpl):
-        return {int_var:int_var}, {int_var:int_var}, []
+    constraints = []
+    intvar_to_boolvar_mapping = {}
+    boolvar_to_intvar_mapping = {}
 
-    if isinstance(int_var, (list, NDVarArray)):
-        constraints = []
-        boolvar_to_intvar_mapping = {}
-        intvar_to_boolvar_mapping = {}
+    if isinstance(int_var, _BoolVarImpl):
+        intvar_to_boolvar_mapping = {int_var:int_var}
+        boolvar_to_intvar_mapping = {int_var:int_var}
+
+    elif isinstance(int_var, (list, NDVarArray)):
 
         for ivar in int_var:
-            int_mapping, bool_mapping, sub_constraints = intvar_to_boolvar(ivar)
-            intvar_to_boolvar_mapping.update(int_mapping)
-            boolvar_to_intvar_mapping.update(bool_mapping)
-            constraints += sub_constraints
+            sub_iv_mapping, sub_bv_mapping, int_cons = intvar_to_boolvar(ivar)
+            constraints += int_cons
+            intvar_to_boolvar_mapping.update(sub_iv_mapping)
+            boolvar_to_intvar_mapping.update(sub_bv_mapping)
 
-        return intvar_to_boolvar_mapping, boolvar_to_intvar_mapping, constraints
-
-    if not isinstance(int_var, _IntVarImpl):
+    elif not isinstance(int_var, _IntVarImpl):
         raise Exception("Only intvars!")
 
-    if int_var.lb == 0 and int_var.ub == 1:
+    elif int_var.lb == 0 and int_var.ub == 1:
         bv = boolvar(name="bv-"+int_var.name)
-        return {int_var: bv}, {bv: int_var}, []
+        intvar_to_boolvar_mapping = {int_var: bv}
+        boolvar_to_intvar_mapping = {bv: int_var}
 
-    bv_array = boolvar(name="bv-"+int_var.name, shape=(int_var.ub-int_var.lb+1))
+    else:
+        bv_array = boolvar(name=int_var.name, shape=(int_var.ub-int_var.lb+1))
 
-    intvar_to_boolvar_mapping = {int_var: {i: bv_array[id] for id, i in enumerate(range(int_var.lb, int_var.ub+1))}}
-    boolvar_to_intvar_mapping = {bv_array[id]: (int_var, i) for id, i in enumerate(range(int_var.lb, int_var.ub+1))}
+        intvar_to_boolvar_mapping = {
+            int_var: {i: bv_array[id] for id, i in enumerate(range(int_var.lb, int_var.ub+1))}
+        }
 
-    constraints = exactly_one(bv_array)
+        boolvar_to_intvar_mapping = {
+            bv_array[id]: (int_var, i) for id, i in enumerate(range(int_var.lb, int_var.ub+1))
+        }
+
+        constraints = exactly_one(bv_array)
 
     return intvar_to_boolvar_mapping, boolvar_to_intvar_mapping, constraints
 
 def translate_unit_comparison(constraint, mapping):
     bool_constraints=[]
+
     # assignment constraint
     left, right = constraint.args
     if constraint.name in [">", ">="]:
@@ -55,7 +87,14 @@ def translate_unit_comparison(constraint, mapping):
 
     if constraint.name == '==':
         ## 1 variables equal to a value
-        if any(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
+        if all(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
+            if constraint.args[0] == constraint.args[1]:
+                return []
+            # 2 different numbers are equal ??
+            else:
+                return False
+
+        elif any(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
             value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
             assert var.lb <= value and value <= var.ub, "Value must be between bounds!"
 
@@ -64,6 +103,7 @@ def translate_unit_comparison(constraint, mapping):
                     bool_constraints.append(bv_var)
                 else:
                     bool_constraints.append(~bv_var)
+
             return bool_constraints
 
         if left.ub < right.lb or right.ub < left.lb:
@@ -90,6 +130,7 @@ def translate_unit_comparison(constraint, mapping):
                     bool_constraints += [(~mapping[left][i] | ~mapping[right][j])]
 
         return bool_constraints
+
     # different constraint
     elif constraint.name == "!=":
         if any(True if isinstance(arg, int) else False for arg in constraint.args):
@@ -99,6 +140,7 @@ def translate_unit_comparison(constraint, mapping):
                 # Can only do this assumption!
                 if bv_value == value:
                     bool_constraints.append(~bv_var)
+
             return bool_constraints
 
         ## 2 variables equal to each other
@@ -109,6 +151,7 @@ def translate_unit_comparison(constraint, mapping):
         # TODO: check this is correct!
         for i in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
             bool_constraints += [(~mapping[left][i] | ~mapping[right][i])]
+
         return bool_constraints
 
     elif constraint.name in ["<", ">"]:
@@ -168,32 +211,71 @@ def translate_unit_comparison(constraint, mapping):
                             bool_constraints += [(~mapping[left][i] & ~mapping[right][j])]
         else:
             raise Exception("Val <= val?? or constraint < constraint ??")
+
+
         return bool_constraints
 
     else:
         raise Exception("COnstraint not handled yet!")
 
-def translate_constraint(constraint, mapping):
-    ## composition of constraints
-    if isinstance(constraint, NDVarArray):
-        bool_constraints = []
+def reify_translate_constraint(constraint, mapping):
+    bool_constraints = []
+    reification_vars = []
+    if isinstance(constraint, (list, NDVarArray)):
         for con in constraint:
-            bool_constraints += translate_unit_comparison(con, mapping)
-        return bool_constraints
-    elif isinstance(constraint, list):
-        bool_constraints = []
-        for con in constraint:
-            bool_constraints += translate_constraint(con, mapping)
-        return bool_constraints
-    # base constraints
+            sub_bool_constraints, sub_reification_vars = reify_translate_constraint(con, mapping)
+
+            bool_constraints += sub_bool_constraints
+            reification_vars += sub_reification_vars
+
+    # SPECIAL CASE: ASSIGNMENT: boolvars are considered reification vars
+    elif isinstance(constraint, Comparison) and constraint.name == "==" and any(isinstance(arg, (int, np.int64)) for arg in constraint.args):
+        sub_bool_constraints = translate_unit_comparison(constraint, mapping)
+        assert all(isinstance(sub_con, (_BoolVarImpl)) for sub_con in sub_bool_constraints), "Transalted assignment should be boolvars"
+
+        reification_vars += sub_bool_constraints
+
+    # assignment: boolvars are considered reification vars
     elif isinstance(constraint, Comparison):
-        return translate_unit_comparison(constraint, mapping)
+        sub_bool_constraints = translate_unit_comparison(constraint, mapping)
+        bv = boolvar()
+        reification_vars.append(bv)
+
+        for sub_con in sub_bool_constraints:
+            # boolean variable are added to reification_vars
+            bool_constraints.append(bv.implies(sub_con))
+
     # global constraints
     elif constraint.name == "alldifferent":
-        bool_constraints = []
+        bv = boolvar()
+        reification_vars.append(bv)
         for con in constraint.decompose():
-            bool_constraints += translate_unit_comparison(con, mapping)
-        return bool_constraints
-
+            sub_bool_constraints = translate_unit_comparison(con, mapping)
+            bool_constraints.append(bv.implies(sub_bool_constraints))
     else:
         raise Exception("COnstraint not handled yet!", type(constraint), constraint)
+
+    return bool_constraints, reification_vars
+
+def translate_constraint(constraint, mapping):
+    ## composition of constraints
+    bool_constraints = []
+
+    if isinstance(constraint, (list, NDVarArray)):
+
+        for con in constraint:
+            bool_constraints += translate_constraint(con, mapping)
+
+    # base constraints
+    elif isinstance(constraint, Comparison):
+        bool_constraints += translate_unit_comparison(constraint, mapping)
+
+    # global constraints
+    elif constraint.name == "alldifferent":
+
+        for con in constraint.decompose():
+            bool_constraints += translate_unit_comparison(con, mapping)
+    else:
+        raise Exception("COnstraint not handled yet!", type(constraint), constraint)
+
+    return bool_constraints
