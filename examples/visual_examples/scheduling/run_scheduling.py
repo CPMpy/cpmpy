@@ -25,7 +25,7 @@ def run():
 
     if model.solve():
         for v in vars:
-            print(v + ": " + str(vars[v].value()))
+            print(v + ":\t" + str(vars[v].value()))
         visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach)
 
 def model_scheduling(jobs, lastT, nTasks, dur, taskToMach):

@@ -38,7 +38,7 @@ def run():
 
     if model.solve():
         for v in vars:
-            print(v + ": " + str(vars[v].value()))
+            print(v + ":\t" + str(vars[v].value()))
         visualize_rect_packing(vars, widths, heights, n)
 
 def model_rect_packing(widths, heights, n, max_width_rect, 
