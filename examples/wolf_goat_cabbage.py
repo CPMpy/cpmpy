@@ -8,14 +8,19 @@ https://en.wikipedia.org/wiki/Wolf,_goat_and_cabbage_problem
 
 from cpmpy import *
 
-stages = 3
+def run():
+    stage = 3
+    while stage < 20:
+        if model_wgc(stage):
+            break
+        else:
+            stage += 1
 
-while stages < 20:
-
-    wolf_pos = intvar(0, 1, stages)
-    cabbage_pos = intvar(0, 1, stages)
-    goat_pos = intvar(0, 1, stages)
-    boat_pos = intvar(0, 1, stages)
+def model_wgc(stage):
+    wolf_pos = intvar(0, 1, stage)
+    cabbage_pos = intvar(0, 1, stage)
+    goat_pos = intvar(0, 1, stage)
+    boat_pos = intvar(0, 1, stage)
 
     model = Model(
         # Initial situation
@@ -25,31 +30,34 @@ while stages < 20:
         (cabbage_pos[0] == 0),
 
         # Boat keeps moving between shores
-        [boat_pos[i] != boat_pos[i-1] for i in range(1,stages)],   
+        [boat_pos[i] != boat_pos[i-1] for i in range(1,stage)],   
 
         # Final situation
-        (boat_pos[stages-1] == 1),
-        (wolf_pos[stages-1] == 1),
-        (goat_pos[stages-1] == 1),
-        (cabbage_pos[stages-1] == 1),
+        (boat_pos[stage-1] == 1),
+        (wolf_pos[stage-1] == 1),
+        (goat_pos[stage-1] == 1),
+        (cabbage_pos[stage-1] == 1),
 
         # # Wolf and goat cannot be left alone
-        [(goat_pos[i] != wolf_pos[i]) | (boat_pos[i] == wolf_pos[i]) for i in range(stages)],
+        [(goat_pos[i] != wolf_pos[i]) | (boat_pos[i] == wolf_pos[i]) for i in range(stage)],
 
         # # Goat and cabbage cannot be left alone
-        [(goat_pos[i] != cabbage_pos[i]) | (boat_pos[i] == goat_pos[i]) for i in range(stages)],
+        [(goat_pos[i] != cabbage_pos[i]) | (boat_pos[i] == goat_pos[i]) for i in range(stage)],
 
         # # Only one animal/cabbage can move per turn
-        [abs(wolf_pos[i] - wolf_pos[i+1]) + abs(goat_pos[i] - goat_pos[i+1]) + abs(cabbage_pos[i] - cabbage_pos[i+1]) <= 1 for i in range(stages-1)],
+        [abs(wolf_pos[i] - wolf_pos[i+1]) + abs(goat_pos[i] - goat_pos[i+1]) + abs(cabbage_pos[i] - cabbage_pos[i+1]) <= 1 for i in range(stage-1)],
     )
 
     if model.solve():
-        print(boat_pos.value())
-        print(wolf_pos.value())
-        print(goat_pos.value())
-        print(cabbage_pos.value())
-        print("Found a solution for " + str(stages) + " stages!")
-        break
+        print("Found a solution for " + str(stage) + " stage!")
+        print("Positions boat: \t", boat_pos.value())
+        print("Positions wolf: \t", wolf_pos.value())
+        print("Positions goat: \t", goat_pos.value())
+        print("Positions cabbage: \t", cabbage_pos.value())
+        return True
     else:
-        print("No solution for " + str(stages) + " stages")
-        stages += 1
+        print("No solution for " + str(stage) + " stage")
+        return False
+
+if __name__ == "__main__":
+    run()
