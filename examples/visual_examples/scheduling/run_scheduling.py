@@ -12,36 +12,49 @@ the program finds a schedule that satisfies all priority constraints while minim
 from cpmpy import *
 from PIL import Image, ImageDraw, ImageFont
 
-# All data related to the scheduling
-jobs = ['A', 'B', 'C', 'D']
-lastT = 20
-nTasks = 3
-dur = [ [5, 2, 3 ], [4, 5, 1], [ 3, 4, 2 ], [1, 1, 1]]
-nMachines = 3
-taskToMach = [[1, 2, 3 ],[ 2, 1, 3],[ 2, 3, 1 ], [3, 2, 1]]
+def run():
+    # All data related to the scheduling
+    jobs = ['A', 'B', 'C', 'D']
+    lastT = 20
+    nTasks = 3
+    dur = [ [5, 2, 3 ], [4, 5, 1], [ 3, 4, 2 ], [1, 1, 1]]
+    nMachines = 3
+    taskToMach = [[1, 2, 3 ],[ 2, 1, 3],[ 2, 3, 1 ], [3, 2, 1]]
 
-# Decision variables
-start = intvar(0, lastT, shape=(len(jobs), nTasks))
-end = intvar(0, lastT, shape=(len(jobs), nTasks))
-makespan = intvar(0, lastT)
+    (model, vars) = model_scheduling(jobs, lastT, nTasks, dur, taskToMach)
 
-model = Model(
-    # Necessary constraints
-    [end[i][j] == start[i][j] + dur[i][j] for i in range(len(jobs)) for j in range(nTasks)], # The end of every task is the sum of its start and duration
-    [(end[i1][j1] <= start[i2][j2]) | (end[i2][j2] <= start[i1][j1]) for i1 in range(len(jobs)) for i2 in range(len(jobs)) for j1 in range(nTasks) for j2 in range(nTasks) if (i1 != i2 and taskToMach[i1][j1] == taskToMach[i2][j2])], # In every pair of jobs on the same machine, one comes before the other
-    [end[i][j] <= start[i][j+1] for i in range(len(jobs)) for j in range(nTasks-1)], # Within a job, tasks have a fixed order
-    [makespan == max([end[i][j] for i in range(len(jobs)) for j in range(nTasks)])], # The makespan is defined as the total needed time to finish all jobs
+    if model.solve():
+        for v in vars:
+            print(v + ": " + str(vars[v].value()))
+        visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach)
 
-    # Optional constraints
-    [start[i][1] >= start[1][1] for i in range(len(jobs)) if i != 1] # The 2nd task of job B has to come before all 2nd tasks of other jobs
-)
+def model_scheduling(jobs, lastT, nTasks, dur, taskToMach):
 
-# Minimize wrt the makespan
-model.minimize(makespan)
+    # Decision variables
+    start = intvar(0, lastT, shape=(len(jobs), nTasks))
+    end = intvar(0, lastT, shape=(len(jobs), nTasks))
+    makespan = intvar(0, lastT)
 
-if model.solve():
-    print(start.value())
-    print(end.value())
+    model = Model(
+        # Necessary constraints
+        [end[i][j] == start[i][j] + dur[i][j] for i in range(len(jobs)) for j in range(nTasks)], # The end of every task is the sum of its start and duration
+        [(end[i1][j1] <= start[i2][j2]) | (end[i2][j2] <= start[i1][j1]) for i1 in range(len(jobs)) for i2 in range(len(jobs)) for j1 in range(nTasks) for j2 in range(nTasks) if (i1 != i2 and taskToMach[i1][j1] == taskToMach[i2][j2])], # In every pair of jobs on the same machine, one comes before the other
+        [end[i][j] <= start[i][j+1] for i in range(len(jobs)) for j in range(nTasks-1)], # Within a job, tasks have a fixed order
+        [makespan == max([end[i][j] for i in range(len(jobs)) for j in range(nTasks)])], # The makespan is defined as the total needed time to finish all jobs
+
+        # Optional constraints
+        [start[i][1] >= start[1][1] for i in range(len(jobs)) if i != 1] # The 2nd task of job B has to come before all 2nd tasks of other jobs
+    )
+
+    # Minimize wrt the makespan
+    model.minimize(makespan)
+
+    return (model, {"start": start, "end": end, "makespan": makespan})
+
+def visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach):
+    makespan = vars["makespan"]
+    start = vars["start"]
+    end = vars["end"]
 
     # Draw solution
     # Define start location image & unit sizes
@@ -102,3 +115,6 @@ if model.solve():
             img1.text((center_x - text_w / 2, center_y - text_h / 2), msg, fill="white", font=myFont)
 
     img.show()
+
+if __name__ == "__main__":
+    run()
