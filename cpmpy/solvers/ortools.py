@@ -403,6 +403,18 @@ class CPM_ortools(SolverInterface):
                                 if divisor.lb <= 0 and divisor.ub >= 0:
                                     raise Exception(f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                             return self.ort_model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
+                        elif lhs.name == 'pow':
+                            # translate to multiplications
+                            x = self.ort_var(lhs.args[0])
+                            y = lhs.args[1]
+                            assert is_num(y), f"Ort: 'pow' only supports constants as power, not {y}"
+                            if y == 0:
+                                return 1
+                            elif y == 1:
+                                return self.ort_model.Add(x == rvar)
+                            assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
+                            # mul([x,x,x,...]) with 'y' elements
+                            return self.ort_model.AddMultiplicationEquality(rvar, [x]*y)
                         elif lhs.name == 'div':
                             return self.ort_model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'min':

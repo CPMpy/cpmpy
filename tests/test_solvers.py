@@ -263,3 +263,8 @@ class TestSolvers(unittest.TestCase):
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 
+    def test_pow(self):
+        iv1 = cp.intvar(2,9)
+        for i in [0,1,2]:
+            self.assertTrue( cp.Model( iv1**i >= 0 ).solve() )
+
