@@ -81,6 +81,7 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 """
 import copy
 import math
+import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
@@ -344,9 +345,14 @@ def get_or_make_var(expr):
             # the above can give fractional values, tighten bounds to integer
             ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds))) 
         elif expr.name == 'mod': # binary 
-            # broadest possible assumptions
-            # (negative possible if divisor is negative)
-            ivar = _IntVarImpl(lbs[0], ubs[0])
+            # check all possibilities...
+            l = np.arange(lbs[0], ubs[0]+1)
+            lb = np.min(np.mod(l, lbs[1]))
+            ub = np.max(np.mod(l, lbs[1]))
+            for m in range(lbs[1]+1, lbs[1]+1):
+                lb = np.min(lb, np.min(np.mod(l, m)))
+                ub = np.max(lb, np.max(np.mod(l, m)))
+            ivar = _IntVarImpl(lb,ub)
         elif expr.name == 'pow': # binary
             base = [lbs[0], ubs[0]]
             exp = [lbs[1], ubs[1]]

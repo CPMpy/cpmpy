@@ -30,6 +30,12 @@ class TestFlattenModel(unittest.TestCase):
         self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve() )
         self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve() )
 
+    def test_mod(self):
+        iv1 = cp.intvar(2,9)
+        iv2 = cp.intvar(5,9)
+        m = cp.Model([(iv1+iv2) % 2 >= 0, (iv1+iv2) % 2 <= 1])
+        self.assertTrue( m.solve() )
+
 
 class TestFlattenConstraint(unittest.TestCase):
     def setUp(self):
