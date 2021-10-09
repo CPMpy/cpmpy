@@ -5,8 +5,9 @@ Sequencing problem in CPMPy + Visualization with Pillow
 Reworked based on Alexander Schiendorfer's
 https://github.com/Alexander-Schiendorfer/cp-examples/tree/main/car-sequencing
 
-Given different kinds of cars, an overall car demand and some constraints on the sequencing wrt to the cars' properties,
-the program finds a feasible ordering of cars in a time schedule.
+Given different types of cars (based on the present options), an overall car demand per type 
+and some constraints on how many times properties can be scheduled in consecutive timeslots,
+the program finds a feasible sequencing of the different cars for a timetable.
 """
 
 import builtins
@@ -16,46 +17,58 @@ import datetime
 
 def run():
     # All data related to the sequencing
-    nOptions = 5
-    nCarConfigs = 6
-    at_most = [1, 2, 2, 2, 1]
-    per_slots = [2, 3, 3, 5, 5]
-    demand = [1,1,2,2,2,2]
-    nCars = sum(demand)
-    nSlots = nCars
-    requires = [
+    at_most = cpm_array([1, 2, 2, 2, 1]) # The amount of times a property can be present in a group of consecutive timeslots (see next variable)
+    per_slots = cpm_array([2, 3, 3, 5, 5]) # The amount of consecutive timeslots
+    demand = cpm_array([1, 1, 2, 2, 2, 2]) # The demand per type of car
+    requires = cpm_array([
     [1, 0, 1, 1, 0],
     [0, 0, 0, 1, 0],
     [0, 1, 0, 0, 1],
     [0, 1, 0, 1, 0],
     [1, 0, 1, 0, 0],
-    [1, 1, 0, 0, 0]]
+    [1, 1, 0, 0, 0]]) # The properties per type of car
 
-    (model, vars) = model_sequence(nCarConfigs, nSlots, nOptions, demand, per_slots, at_most, requires)
+    (model, vars) = model_sequence(demand, per_slots, at_most, requires)
 
     if model.solve():
-        for v in vars:
-            print(v + ":\n" + str(vars[v].value()))
-        visualize_sequence(vars, nSlots, nOptions, nCarConfigs, requires, demand, at_most, nCars, per_slots)
+        for (name, var) in vars.items():
+            print(f"{name}:\n{var.value()}")
+        visualize_sequence(vars, requires, demand, at_most, per_slots)
 
-def model_sequence(nCarConfigs, nSlots, nOptions, demand, per_slots, at_most, requires):
+def model_sequence(demand, per_slots, at_most, requires):
+    nSlots = sum(demand) # The amount of timeslots to be filled
+    nOptions = len(at_most) # The amount of different options
+    nCarConfigs = len(demand) # The amount of different car types
+
     # Decision variables
-    line = intvar(1, nCarConfigs, shape = nSlots)
-    setup = boolvar(shape = (nSlots, nOptions))
+    line = intvar(1, nCarConfigs, shape = nSlots) # Sequence of different car types
+    setup = boolvar(shape = (nSlots, nOptions)) # Sequence of different options based on the car type
 
-    model = Model(
-        [sum((x == (i+1)) for x in line) == demand[i] for i in range(nCarConfigs)] # The amount of each type of car in the timetable has to be equal to the demand for that type
-    )
+    m = Model()
 
+    # The amount of each type of car in the sequence has to be equal to the demand for that type (offset because we talk about car type 1->nCarConfigs)
+    m += [sum((x == (i+1)) for x in line) == demand[i] for i in range(nCarConfigs)] 
+
+    # Check that no more than "at most" car properties are used per "per_slots" slots
     for o in range(nOptions):
-        model += [sum(setup[s2][o] == True for s2 in range(s, s + per_slots[o])) <= at_most[o] for s in range(nSlots - per_slots[o])] # Check that no more than "at most" car properties are used per "per_slots" slots
+        for s in range(nSlots - per_slots[o]):
+            slotrange = range(s, s + per_slots[o])
+            m += (sum(setup[slotrange, o]) <= at_most[o])
 
-    requires = cpm_array(requires) # So it can be indexed by a variable
-    model += [setup[s,o] == requires[line[s]-1,o] for s in range(nSlots) for o in range(nOptions)] # Make sure that the properties in the timetable correspond to those per car type
+    # Make sure that the properties in the timetable correspond to those per car type
+    for s in range(nSlots):
+        for o in range(nOptions):
+            m += (setup[s,o] == requires[line[s]-1,o]) 
 
-    return (model, {"line": line, "setup": setup})
+    return (m, {"line": line, "setup": setup})
 
-def visualize_sequence(vars, nSlots, nOptions, nCarConfigs, requires, demand, at_most, nCars, per_slots):
+# The remaining code below is exclusively focused on the visualization of the solution
+def visualize_sequence(vars, requires, demand, at_most, per_slots):
+    nSlots = len(demand)
+    nCars = sum(demand)
+    nOptions = len(at_most)
+    nCarConfigs = len(demand)
+
     def writeAt(x, y, msg, draw, myFont, fillc):
         # Write a label there
         text_w, text_h = draw.textsize(msg, font=myFont)
