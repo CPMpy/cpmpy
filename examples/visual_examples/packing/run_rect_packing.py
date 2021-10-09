@@ -38,8 +38,6 @@ def model_rect_packing(widths, heights):
     min_height_rect = builtins.max(heights)
     
     # Decision variables
-    print(min_height_rect, max_height_rect)
-    print(min_width_rect, max_width_rect)
     rect_height = intvar(min_height_rect, max_height_rect)
     rect_width = intvar(min_width_rect, max_width_rect)
 
@@ -76,6 +74,7 @@ def model_rect_packing(widths, heights):
 
     return (m, {"rect_height": rect_height, "rect_width": rect_width, "rect_area": rect_height*rect_width, "x": x, "y": y})
 
+# The remaining code below is exclusively focused on the visualization of the solution
 def visualize_rect_packing(vars, widths, heights):
     n = len(widths) # Amount of items
 

@@ -15,18 +15,18 @@ def run():
     # Number of squares we want to pack
     n = 8
 
+    (model, vars) = model_sq_packing(n)
+
+    if model.solve():
+        for (name, var) in vars.items():
+            print(f"{name}:\n{var.value()}")
+        visualize_sq_packing(vars, n)
+
+def model_sq_packing(n):
     # Dimension bounds of the overall needed space
     max_side = sum([i for i in range(1, n+1)])
     min_area = sum([(i*i) for i in range(1, n+1)])
 
-    (model, vars) = model_sq_packing(n, max_side, min_area)
-
-    if model.solve():
-        for v in vars:
-            print(v + ":\t" + str(vars[v].value()))
-        visualize_sq_packing(vars, n)
-
-def model_sq_packing(n, max_side, min_area):
     # Decision variables
     rect_height = intvar(n, max_side)
     rect_width = intvar(n, max_side)
@@ -34,24 +34,29 @@ def model_sq_packing(n, max_side, min_area):
     x = intvar(0, max_side, shape = n)
     y = intvar(0, max_side, shape = n)
 
-    model = Model(
-        ### Necessary constraints
-        (rect_area == rect_height * rect_width), # Definition of the area of the needed space
-        [x[i] + i + 1 <= rect_width for i in range(n)], # Every item has to be within the width of the overall area
-        [y[i] + i + 1  <= rect_height for i in range(n)], # Every item has to be withing the height of the overall area
-        [(x[i] + i + 1 <= x[j]) | (x[j] + j + 1 <= x[i]) | (y[i] + i + 1 <= y[j]) | (y[j] + j + 1 <= y[i]) for i in range(n) for j in range(n) if i != j], # Every item has to be fully above, below or next to every other item
+    m = Model()
+    ### Necessary constraints
+    # Definition of the area of the needed space
+    m += (rect_area == rect_height * rect_width)
 
-        ### Additional constraints
-        # (rect_width > rect_height),
-        # (rect_width >= 10),
-        # (rect_height >= 10)
-    )
+    # Every item has to be within the width of the overall area
+    m += [x[i] + i + 1 <= rect_width for i in range(n)]
+
+    # Every item has to be withing the height of the overall area
+    m += [y[i] + i + 1  <= rect_height for i in range(n)]
+
+    # Every item has to be fully above, below or next to every other item
+    for i in range(n): 
+        for j in range(n): 
+            if i != j: 
+                m += ((x[i] + i + 1 <= x[j]) | (x[j] + j + 1 <= x[i]) | (y[i] + i + 1 <= y[j]) | (y[j] + j + 1 <= y[i]))
 
     # Minimize wrt the overall area
-    model.minimize(rect_area)
+    m.minimize(rect_area)
 
-    return (model, {"rect_height": rect_height, "rect_width": rect_width, "rect_area": rect_area, "x": x, "y": y})
+    return (m, {"rect_height": rect_height, "rect_width": rect_width, "rect_area": rect_area, "x": x, "y": y})
 
+# The remaining code below is exclusively focused on the visualization of the solution
 def visualize_sq_packing(vars, n):
     # Extract separate decision variables
     rect_width = vars["rect_width"].value()
