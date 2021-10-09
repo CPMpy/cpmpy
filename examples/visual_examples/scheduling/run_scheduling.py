@@ -14,44 +14,65 @@ from PIL import Image, ImageDraw, ImageFont
 
 def run():
     # All data related to the scheduling
-    jobs = ['A', 'B', 'C', 'D']
-    lastT = 20
-    nTasks = 3
-    dur = [ [5, 2, 3 ], [4, 5, 1], [ 3, 4, 2 ], [1, 1, 1]]
-    nMachines = 3
-    taskToMach = [[1, 2, 3 ],[ 2, 1, 3],[ 2, 3, 1 ], [3, 2, 1]]
+    jobs = ['A', 'B', 'C', 'D'] # Different jobs
+    lastT = 20 # Time limit
+    dur = cpm_array([[5, 2, 3 ], [4, 5, 1], [ 3, 4, 2 ], [1, 1, 1]]) # Amount of time needed per task
+    taskToMach = cpm_array([[1, 2, 3 ],[ 2, 1, 3],[ 2, 3, 1 ], [3, 2, 1]]) # On what machine each task has to be performed
 
-    (model, vars) = model_scheduling(jobs, lastT, nTasks, dur, taskToMach)
+    (model, vars) = model_scheduling(jobs, lastT, dur, taskToMach)
 
     if model.solve():
-        for v in vars:
-            print(v + ":\t" + str(vars[v].value()))
-        visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach)
+        for (name, var) in vars.items():
+            print(f"{name}:\n{var.value()}")
+        visualize_scheduling(vars, lastT, jobs, taskToMach)
 
-def model_scheduling(jobs, lastT, nTasks, dur, taskToMach):
+def model_scheduling(jobs, lastT, dur, taskToMach):
+    nTasks = len(dur[0]) # Amount of tasks per job
+    nJobs = len(jobs) # Amount of jobs
 
     # Decision variables
-    start = intvar(0, lastT, shape=(len(jobs), nTasks))
-    end = intvar(0, lastT, shape=(len(jobs), nTasks))
-    makespan = intvar(0, lastT)
+    start = intvar(0, lastT, shape=(nJobs, nTasks)) # Start time of each task
+    end = intvar(0, lastT, shape=(nJobs, nTasks)) # End time of each task
+    makespan = intvar(0, lastT) # Overall needed time
 
-    model = Model(
-        # Necessary constraints
-        [end[i][j] == start[i][j] + dur[i][j] for i in range(len(jobs)) for j in range(nTasks)], # The end of every task is the sum of its start and duration
-        [(end[i1][j1] <= start[i2][j2]) | (end[i2][j2] <= start[i1][j1]) for i1 in range(len(jobs)) for i2 in range(len(jobs)) for j1 in range(nTasks) for j2 in range(nTasks) if (i1 != i2 and taskToMach[i1][j1] == taskToMach[i2][j2])], # In every pair of jobs on the same machine, one comes before the other
-        [end[i][j] <= start[i][j+1] for i in range(len(jobs)) for j in range(nTasks-1)], # Within a job, tasks have a fixed order
-        [makespan == max([end[i][j] for i in range(len(jobs)) for j in range(nTasks)])], # The makespan is defined as the total needed time to finish all jobs
+    m = Model()
+    # Necessary constraints
+    # The end of every task is the sum of its start and duration
+    m += [end[i,j] == start[i,j] + dur[i,j] for i in range(nJobs) for j in range(nTasks)] 
 
-        # Optional constraints
-        [start[i][1] >= start[1][1] for i in range(len(jobs)) if i != 1] # The 2nd task of job B has to come before all 2nd tasks of other jobs
-    )
+    # In every pair of jobs on the same machine, one comes before the other
+    for i1 in range(nJobs):
+        for i2 in range(nJobs): 
+            for j1 in range(nTasks): 
+                for j2 in range(nTasks):
+                    if (i1 != i2 and taskToMach[i1,j1] == taskToMach[i2,j2]):
+                        m += ((end[i1,j1] <= start[i2,j2]) | (end[i2,j2] <= start[i1,j1]))
+    
+    # Within a job, tasks have a fixed order
+    for i in range(nJobs): 
+        for j in range(nTasks-1):
+            m += (end[i,j] <= start[i,j+1])
+
+    # The makespan is defined as the total needed time to finish all jobs
+    m += (makespan == max([end[i,j] for i in range(len(jobs)) for j in range(nTasks)]))
+
+    # Optional constraints
+    # The 2nd task of job B has to come before all 2nd tasks of other jobs
+    for i in range(nJobs):
+        if i != 1:
+            m += (start[i,1] >= start[1,1])
+    
 
     # Minimize wrt the makespan
-    model.minimize(makespan)
+    m.minimize(makespan)
 
-    return (model, {"start": start, "end": end, "makespan": makespan})
+    return (m, {"start": start, "end": end, "makespan": makespan})
 
-def visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach):
+# The remaining code below is exclusively focused on the visualization of the solution
+def visualize_scheduling(vars, lastT, jobs, taskToMach):
+    nTasks = len(taskToMach[0]) # Amount of tasks per job
+    nMachines = max([taskToMach[i,j] for i in range(len(taskToMach)) for j in range(len(taskToMach[0]))]) # Amount of machines present
+
     makespan = vars["makespan"]
     start = vars["start"]
     end = vars["end"]
@@ -99,11 +120,11 @@ def visualize_scheduling(vars, lastT, nMachines,jobs, nTasks, taskToMach):
     for i,j in enumerate(jobs):
         job_name = str(j)
         for t in range(nTasks):
-            on_machine = taskToMach[i][t] - 1
+            on_machine = taskToMach[i,t] - 1
             start_m_x, start_m_y = machine_upper_lefts[on_machine]
 
-            start_rect_x, start_rect_y = start_m_x + start[i][t].value() * pixel_unit, start_m_y + inner_sep
-            end_rect_x, end_rect_y = start_m_x + end[i][t].value() * pixel_unit, start_m_y + pixel_task_height - inner_sep
+            start_rect_x, start_rect_y = start_m_x + start[i,t].value() * pixel_unit, start_m_y + inner_sep
+            end_rect_x, end_rect_y = start_m_x + end[i,t].value() * pixel_unit, start_m_y + pixel_task_height - inner_sep
 
             shape = [(start_rect_x, start_rect_y), (end_rect_x, end_rect_y)]
             img1.rectangle(shape, fill=task_cs[on_machine], outline=lane_border_cs[on_machine])
