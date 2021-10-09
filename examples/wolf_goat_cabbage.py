@@ -4,28 +4,30 @@ Planning problem in CPMPy
 
 Based on the famous planning puzzle.
 https://en.wikipedia.org/wiki/Wolf,_goat_and_cabbage_problem
+The wolf, goat and cabbage have to be transported to the other side of a river by a boat.
+At no time can the wolf and goat be left alone, as well as the goat and the cabbage.
 """
 
 from cpmpy import *
 
 def run():
     stage = 3
-    while stage < 20:
+    while True:
         (model, vars) = model_wgc(stage)
         if model.solve():
             print("Found a solution for " + str(stage) + " stage!")
-            for v in vars:
-                print(v + ":\t" + str(vars[v].value()))
+            for (name, var) in vars.items():
+                print(f"{name}:\n{var.value()}")
             break
         else:
             print("No solution for " + str(stage) + " stage")
             stage += 1
 
 def model_wgc(stage):
-    wolf_pos = intvar(0, 1, stage)
-    cabbage_pos = intvar(0, 1, stage)
-    goat_pos = intvar(0, 1, stage)
-    boat_pos = intvar(0, 1, stage)
+    wolf_pos = boolvar(stage)
+    cabbage_pos = boolvar(stage)
+    goat_pos = boolvar(stage)
+    boat_pos = boolvar(stage)
 
     model = Model(
         # Initial situation
@@ -38,10 +40,10 @@ def model_wgc(stage):
         [boat_pos[i] != boat_pos[i-1] for i in range(1,stage)],   
 
         # Final situation
-        (boat_pos[stage-1] == 1),
-        (wolf_pos[stage-1] == 1),
-        (goat_pos[stage-1] == 1),
-        (cabbage_pos[stage-1] == 1),
+        (boat_pos[-1] == 1),
+        (wolf_pos[-1] == 1),
+        (goat_pos[-1] == 1),
+        (cabbage_pos[-1] == 1),
 
         # # Wolf and goat cannot be left alone
         [(goat_pos[i] != wolf_pos[i]) | (boat_pos[i] == wolf_pos[i]) for i in range(stage)],
