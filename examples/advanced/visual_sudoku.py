@@ -36,11 +36,12 @@ def model_sudoku(grid):
         for j in range(0,n,b):
             constraints += [alldifferent(puzvar[i: i +b, j:j+b])]
 
-    # Do not build the model yet, we need access to constraints and decision vars later on
-    return puzvar, constraints 
+    model = Model(constraints)
+    # we need access to decision vars later on
+    return puzvar, model
 
 
-def solve_vizsudoku_baseline(logprobs, is_given):
+def solve_vizsudoku_baseline(logprobs, is_given, model, puzvar):
     '''
         Baseline: we take the most likely label from our classifier
         as deterministic input for the solver.
@@ -55,9 +56,8 @@ def solve_vizsudoku_baseline(logprobs, is_given):
 
             N x N int matrix as solution
     '''
-    # get constraints and decision vars to build a Sudoku model
-    puzvar, constraints = sudoku_model(is_given)
-    model = Model(constraints)
+    # get Sudoku model and decision vars
+    puzvar, model = sudoku_model(is_given)
 
     # TODO: IS given may be recomputed everytime for clarity :)
     # "then why bother using logprobs?" -> you should not have 
@@ -72,7 +72,7 @@ def solve_vizsudoku_baseline(logprobs, is_given):
         return np.zeros_like(puzvar)
 
 # TODO: REname functions hybrid 1 / hybrid 2
-def solve_vizsudoku_hybrid1(logprobs, is_given):
+def solve_vizsudoku_hybrid1(logprobs, is_given, model, puzvar):
     '''
         Hyrbid 1 approach, as described in https://arxiv.org/pdf/2003.11001.pdf
 
@@ -82,15 +82,15 @@ def solve_vizsudoku_hybrid1(logprobs, is_given):
         The objective function is a weighted sum of the decision variables for givens,
          with as weight the log-probability of that decision variable being equal to the corresponding predicted value
     '''
-    # get constraints and decision vars to build a Sudoku model
-    puzvar, constraints = sudoku_model(is_given)
-    model = Model(constraints)
+    # get Sudoku model and decision vars
+    puzvar, model = sudoku_model(is_given)
 
     # divide by PRECISION to turn logprobs into integers. 
     lprobs = np.array(-logprobs/PRECISION).astype(int)
 
     # objective function: max log likelihood prediction for givens
-    obj = sum(Element(lp, v) for lp,v in zip(lprobs[is_given], puzvar[is_given]))
+    # (probability vector indexed by an integer decision variable)
+    obj = sum(lp[v] for lp,v in zip(lprobs[is_given], puzvar[is_given]))
 
     # Because we have log-probabilities, we flip the sign to only have positives 
     # Hence the optimisation becomes a minimisation problem
@@ -106,13 +106,13 @@ def is_unique(solution, is_given):
         Check that `solution` is unique, when we solve starting from clues located 
         as specified by `is_given`
     '''
-    puzvar, constraints = model_sudoku(solution)
-    model = Model(constraints)
+    # get new Sudoku model and decision vars
+    puzvar, model = sudoku_model(is_given)
     # constraint on values (cells that are non-empty)
     model += [puzvar[is_given] == solution[is_given]]
     # forbid current solution 
-    constraints += [any((puzvar != solution).flatten())] #FIXME auto-flatten 2d dvar arrays?
-    model= CPM_ortools(Model(constraints))
+    model += [any((puzvar != solution).flatten())] #FIXME auto-flatten 2d dvar arrays?
+    model= CPM_ortools(model)
     # There should not exist another feasible solution starting from these clues
     return not model.solve(stop_after_first_solution=True)
 
@@ -121,21 +121,20 @@ def solve_vizsudoku_hybrid2(puzvar, constraints, logprobs, is_given, max_iter=10
     # TODO: create a new sudoku model/give one as argument here, instead of reusing the constraints for understandibility
     # TODO: IS given may be recomputed everytime for clarity :)
     #puzvar, constraints = sudoku_model(is_given)
-    cons = [*constraints]
-    solution = solve_vizsudoku_hybrid1(puzvar, cons, logprobs, is_given)
+    puzvar, model = sudoku_model(is_given)
+    solve_vizsudoku_hybrid1(logprobs, is_given, puzvar, model)
     i = 0
-    while not is_unique(solution, is_given):
+    while not is_unique(puzvar.value(), is_given):
         if i == max_iter:
             break 
         # forbid current solution
         # TODO: see enumerating solutions for cpmpy:
         # https://cpmpy.readthedocs.io/en/latest/multiple_solutions.html
-        cons += [any(puzvar[is_given] != solution[is_given])]
-        solution = solve_vizsudoku_hybrid1(puzvar, cons, logprobs, is_given)
+        model += ~all(puzvar[is_given] == puzvar[is_given].value())
+        #model += [any(puzvar[is_given] != solution[is_given])]
+        solve_vizsudoku_hybrid1(puzvar, model.constraints, logprobs, is_given)
         i += 1
-    # TODO: remove print(i)?
-    print(i)
-    return solution
+    return puzvar.value()
 
 
 # sample a dataset index for each non-zero number
