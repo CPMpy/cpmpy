@@ -137,7 +137,7 @@ def visualize_sequence(vars, requires, demand, at_most, per_slots):
     # Draw line separating problem and solution
     draw.line((center_x, 0, center_x, imheight), fill="black")
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20, )
+    myFont = ImageFont.load_default()
 
     # Write "problem" and "solution"
     problem_title_x = center_x/2

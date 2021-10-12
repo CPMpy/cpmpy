@@ -79,7 +79,7 @@ def visualize_sq_packing(vars, n):
     img1 = ImageDraw.Draw(img)
 
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20)
+    myFont = ImageFont.load_default()
 
     # Draw overall rectangle
     shape = [(start_x, start_y), (start_x + rect_width * pixel_unit, start_y + rect_height * pixel_unit)]

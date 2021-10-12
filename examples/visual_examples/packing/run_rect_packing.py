@@ -98,7 +98,7 @@ def visualize_rect_packing(vars, widths, heights):
     img1 = ImageDraw.Draw(img)
 
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20)
+    myFont = ImageFont.load_default()
 
     # Draw overall rectangle
     shape = [(start_x, start_y), (start_x + rect_width.value() * pixel_unit, start_y + rect_height.value() * pixel_unit)]

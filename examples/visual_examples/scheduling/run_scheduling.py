@@ -93,7 +93,7 @@ def visualize_scheduling(vars, lastT, jobs, taskToMach):
     img1 = ImageDraw.Draw(img)
 
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20, )
+    myFont = ImageFont.load_default()
 
     # Draw makespan label
     center_x, center_y = imwidth / 2, start_y / 2
