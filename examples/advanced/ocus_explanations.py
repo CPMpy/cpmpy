@@ -244,6 +244,7 @@ def solution_intersection(model, solver="ortools", verbose=False):
     sat_vars = get_variables_model(model)
 
     SAT = SolverLookup.lookup(solver)(model)
+
     assert SAT.solve(), "Propagation of soft constraints only possible if model is SAT."
     sat_model = set(bv if bv.value() else ~bv for bv in sat_vars)
 
