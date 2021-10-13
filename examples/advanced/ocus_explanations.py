@@ -36,14 +36,6 @@ def frietkot_explain(verbose=False):
 
     explanation_sequence = explain_ocus(allwishes, wish_weights, hard=[], verbose=verbose)
 
-    if verbose > 0:
-        print("\nExplanation Sequence:")
-        print("-" * len("Explanation Sequence:"))
-        for id, explanation in enumerate(explanation_sequence):
-            print(f"\n{id}. Using Constraints:\t", explanation["constraints"])
-            print("\t     Derived:\t", explanation["derived"])
-            print("\t        Cost:\t", explanation["cost"])
-
     return explanation_sequence
 
 def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=False):
@@ -62,56 +54,58 @@ def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=Fa
         [2] Bogaerts, B., Gamba, E., & Guns, T. (2021). A framework for step-wise explaining
         how to solve constraint satisfaction problems. Artificial Intelligence, 300, 103550.
     '''
+    curr_sol = set()
+    full_sol = solution_intersection(Model(hard + soft), solver, verbose)
+    #
     reified_soft = []
-    ind = BoolVar(shape=len(soft), name="ind")
-
-    ## adding assumption variables to the soft constraints
-    for i,bv in enumerate(ind):
+    soft_ind = BoolVar(shape=len(soft), name="ind")
+    for i,bv in enumerate(soft_ind):
         reified_soft += [bv.implies(soft[i])]
-
     # to map indicator variable back to soft_constraints
-    indmap = dict((v,i) for (i,v) in enumerate(ind))
-
-    # adding the assumption variables
-    I = set(bv for bv in ind)
-
-    Iend = optimal_propagate(hard + reified_soft, I, solver, verbose)
+    indmap = dict((v,i) for (i,v) in enumerate(soft_ind))
 
     # Cost function returns cost of soft weight if a constraint is used
     # otherwhise returns 1 (i.e. using a literal)
-    cost = cost_func(indmap, soft_weights)
+    cost = cost_func(list(soft_ind), soft_weights)
 
     if verbose > 0:
-        print("\nMAXIMAL CONSEQUENCE\n\t", Iend)
-        print("\nREMAINING TO EXPLAIN\n\t", Iend-I)
+        print("\nCurrent Model\n\t", curr_sol)
+        print("\nFull Model  (holds in all models) \n\t", full_sol)
+        print("\nRemaining to explain:\n\t", full_sol-curr_sol)
 
     explanation_sequence = []
 
-    while(I != Iend):
+    while(curr_sol != full_sol):
         # explain 1 step using ocus
-        ocus_expl = explain_one_step_ocus(hard+reified_soft, cost, Iend, I, solver, verbose)
+        all_soft = set(soft_ind) | curr_sol
+        remaining_to_explain = full_sol - curr_sol
+
+        ocus_expl = explain_one_step_ocus(hard + reified_soft, all_soft, cost, remaining_to_explain, solver, verbose)
 
         # project on known facts and constraints
-        soft_used = I & ocus_expl
-
-        # propagate and find information hold in all models
-        derived = optimal_propagate(hard + reified_soft, soft_used, solver, verbose) - I
+        cons_used =  [soft[indmap[con]] for con in set(soft_ind) & ocus_expl]
+        facts_used = curr_sol & ocus_expl
+        derived = set(~v for v in ocus_expl - set(soft_ind) - facts_used)
 
         # Add newly derived information
-        I |= derived
+        curr_sol |= derived
 
         explanation = {
-            "constraints": list(soft[indmap[con]] if con in indmap else con for con in soft_used),
+            "constraints": list(cons_used),
+            "facts": list(facts_used),
             "derived": list(derived),
             "cost": sum(cost(con) for con in ocus_expl)
         }
 
         explanation_sequence.append(explanation)
 
+        if verbose > 0:
+            print(f"\n Using:\t {explanation['constraints']} /\\ {explanation['facts']} => {explanation['derived']} [cost: {explanation['cost']}]")
+
     # return the list of original (non-flattened) constraints
     return explanation_sequence
 
-def explain_one_step_ocus(hard, cost, Iend, I, solver="ortools", verbose=False):
+def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="ortools", verbose=False):
     """
         Optimal Constrained Unsatisfiable Subsets (OCUS) for CSP explanations [1]
 
@@ -170,31 +164,31 @@ def explain_one_step_ocus(hard, cost, Iend, I, solver="ortools", verbose=False):
         [3] Reiter, R. (1987). A theory of diagnosis from first principles.
         Artificial intelligence, 32(1), 57-95.
     """
+    ## SAT solver initialisation
+    SAT = SolverLookup.lookup(solver)(Model(hard))
 
-    sat = SolverLookup.lookup(solver)(Model(hard))
+    ## Unsatisfiable Formula = soft constraints + (~remaining_to_explain)
+    neg_remaining_sol_to_explain = set(~var for var in remaining_sol_to_explain)
+    F = set(soft) | neg_remaining_sol_to_explain
 
-    ## OPT Model: Variables
-    hs_vars = boolvar(shape=len(Iend))
-    F = I | set(~var for var in Iend - I)
+    ## ----- CONDITIONAL OPTIMISATION MODEL------
+    ## -------------- VARIABLES -----------------
+    hs_vars = boolvar(shape=len(soft) + len(remaining_sol_to_explain))
 
     # id of variables that need to be explained
-    remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if var not in I]]
-
+    remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if ~var in remaining_sol_to_explain]]
     # mapping between hitting set variables hs_var <-> Iend
-    hs_vars_to_Iend = dict( (hs_vars[id], var) for id, var in enumerate(F))
-    Iend_to_hs_vars = dict( (var, hs_vars[id]) for id, var in enumerate(F))
+    varmap_hs_sat = dict( (hs_vars[id], var) for id, var in enumerate(F))
+    varmap_sat_hs = dict( (var, hs_vars[id]) for id, var in enumerate(F))
 
-
-    # CONDITIONAL OPTIMISATION MODEL
-    hs_model = Model(
-        # exactly one variable to explain!
-        sum(remaining_hs_vars) == 1,
-        # optimal hitting set
-        minimize=sum(hs_var * cost(hs_vars_to_Iend[hs_var]) for hs_var in hs_vars)
+    ## ----------------- MODEL ------------------
+    hs_mip_model = Model(
+        sum(remaining_hs_vars) == 1, # exactly one variable to explain!
+        minimize=sum(hs_var * cost(varmap_hs_sat[hs_var]) for hs_var in hs_vars) # cost-optimal hitting set
     )
 
-    ## instantiate hitting set solver
-    hittingset_solver = SolverLookup.lookup(solver)(hs_model)
+    # instantiate hitting set solver
+    hittingset_solver = SolverLookup.lookup(solver)(hs_mip_model)
 
     while(True):
         hittingset_solver.solve()
@@ -203,36 +197,36 @@ def explain_one_step_ocus(hard, cost, Iend, I, solver="ortools", verbose=False):
         hs = hs_vars[hs_vars.value() == 1]
 
         # map to vars of formula F
-        S = set(hs_vars_to_Iend[hs_var] for hs_var in hs)
+        S = set(varmap_hs_sat[hs_var] for hs_var in hs)
 
-        if verbose > 0:
+        if verbose > 1:
             print("\n\t hs =", hs, S)
 
         # SAT check and computation of model
-        if not sat.solve(assumptions=S):
-            if verbose > 0:
+        if not SAT.solve(assumptions=S):
+            if verbose > 1:
                 print("\n\t ===> OCUS =", S)
 
-            # deleting the hitting set solver
             return S
+
         # satisfying model
-        S = set(v == v.value() for v in F)
+        S = set(v if v.value() else ~v for v in F)
 
         # compute complement of model in formula F
         C =  F - S
-        set_to_hit = set(Iend_to_hs_vars[Iend_var] for Iend_var in F - S)
+
+        set_to_hit = set(varmap_sat_hs[Iend_var] for Iend_var in F - S)
 
         # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(set_to_hit) >= 1)
 
-        if verbose > 0:
+        if verbose > 1:
             print("\t Complement =", C)
             print("\t set-to-hit =", set_to_hit)
 
-def optimal_propagate(hard, soft, solver="ortools", verbose=False):
+def solution_intersection(model, solver="ortools", verbose=False):
     """
-        optimal_propagate produces the intersection of all models of cnf more precise
-        projected on focus.
+        solution_intersection produces the intersection of all models
 
         Args:
         hard (list): List of hard constraints
@@ -245,44 +239,24 @@ def optimal_propagate(hard, soft, solver="ortools", verbose=False):
             +/- selected boolean variables of the sat solver
     """
     # Build sat model
-    sat_model = Model(hard)
-    sat = SolverLookup.lookup(solver)(sat_model)
-    assert sat.solve(assumptions=soft), "Propagation of soft constraints only possible if model is SAT."
+    sat_vars = get_variables_model(model)
 
-    # Extracting only relevant variables
-    user_vars = get_variables_model(sat_model)
+    SAT = SolverLookup.lookup(solver)(model)
 
-    # initial model that needs to be refined
-    sat_model = set(v == v.value() for v in user_vars)
-
-    if verbose > 1:
-        print("\nOptimal Propagate")
-        print("-" * len("Optimal Propagate"))
-        print("\nInitial sat model:", sat_model)
-
-    while(True):
+    while(SAT.solve()):
         # negate the values of the model
-        blocking_clause = ~all(v == v.value() for v in sat_model)
+        sat_model = set(bv if bv.value() else ~bv for bv in sat_vars)
+        blocking_clause = ~all(sat_model)
+
         if verbose > 1:
             print("\n\tBlocking clause:", blocking_clause)
 
-        sat += blocking_clause
+        SAT += blocking_clause
 
-        solved = sat.solve(assumptions=soft)
+    return sat_model
 
-        if not solved:
-            return sat_model
 
-        new_sat_model = set(v == v.value() for v in user_vars)
-
-        # project new model onto sat model
-        sat_model = sat_model & new_sat_model
-
-        if verbose > 1:
-            print("\n\t new sat model:", new_sat_model)
-            print("\n\t Intersection with previous sat model:", sat_model)
-
-def cost_func(indmap, soft_weights):
+def cost_func(soft, soft_weights):
     '''
         Example cost function with mapping of indicator constraints to
         corresponding given weight.
@@ -290,9 +264,11 @@ def cost_func(indmap, soft_weights):
         Variables not in the indicator map have a unit weight, which
         corresponds to using a unit boolean variable.
     '''
-    def cost_lit(var):
-        if var in indmap:
-            return soft_weights[indmap[var]]
+
+    def cost_lit(cons):
+        # return soft weight if constraint is a soft constraint
+        if len(set({cons}) & set(soft)) > 0:
+            return soft_weights[soft.index(cons)]
         else:
             return 1
 
