@@ -176,15 +176,17 @@ def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="or
     hs_vars = boolvar(shape=len(soft) + len(remaining_sol_to_explain))
 
     # id of variables that need to be explained
-    remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if ~var in remaining_sol_to_explain]]
+    remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if var in neg_remaining_sol_to_explain]]
     # mapping between hitting set variables hs_var <-> Iend
     varmap_hs_sat = dict( (hs_vars[id], var) for id, var in enumerate(F))
     varmap_sat_hs = dict( (var, hs_vars[id]) for id, var in enumerate(F))
 
     ## ----------------- MODEL ------------------
     hs_mip_model = Model(
-        sum(remaining_hs_vars) == 1, # exactly one variable to explain!
-        minimize=sum(hs_var * cost(varmap_hs_sat[hs_var]) for hs_var in hs_vars) # cost-optimal hitting set
+         # exactly one variable to explain!
+        sum(remaining_hs_vars) == 1,
+        # Objective: min sum(x_l * w_l) over all l in I + (-Iend \ -I)
+        minimize=sum(hs_var * cost(varmap_hs_sat[hs_var]) for hs_var in hs_vars) 
     )
 
     # instantiate hitting set solver
