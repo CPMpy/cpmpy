@@ -1,45 +1,86 @@
+#!/usr/bin/python3
+"""
+Counterfactual explanation of a user query.
+
+Based on application on the knapsack problem of Korikov, A., & Beck, J. C. Counterfactual Explanations via Inverse Constraint Programming.
+
+Usecase:
+ 1) Some optimal solution x* is provided to the user by a constraint optimization solver.
+ 2) User enters a query to change solution variables x_i to a new value.
+    This extra set of constraints is used to generate a new optimal solution x_d
+ 3) Using inverse optimization, we calculate the values of constraints the objective function which result in x_d being the optimal solution.
+    Extra constraint: only values corresponding to foil items are allowed to change.
+ 4) The user is presented with the result.
+
+
+Given:
+    A constraint optimization problem (c, f, X) with an optimal solution x*
+    A set of foil constraints assigning a value to variables in x*, resulting in x_d
+Find:
+    d such that min(f(d,X)) == x_d and ||c - d|| is minimal
+
+
+The algorithm consists of 2 alternating problems: the master problem (MP), and the sub problem (SP)
+
+Algorithm:
+    1 S = {}
+    2 Solve MP to obtain optimal d*
+    3 Solve SP with d* as c to obtain x_0
+    4 if objective(x_d) > objective(x_0):
+        add x_0 to S
+        go to 2
+      else:
+          return d*
+
+
+Master problem:
+    Constraints:
+        - constraints of original forward problem
+        - objective(d*, x) >= objective(d*, x_0) forall x_0 in S
+        - foil constraints assigning values to x_i
+        - foil contraints restricting the altering of c to match the foil constraint indices
+    Objective:
+        - Minimize || c - d* ||_1
+
+Sub problem:
+    The original forward problem
+
+
+"""
+
 from cpmpy import *
 import numpy as np
-from musx import musx
-
-
-#TODO: remove
-import os
-os.system("clear") # Linux - OSX
 
 INFINITY = np.iinfo(np.int32).max
-verbose = True
+verbose = False
 np.random.seed(0)
-
-"""
-    Nearest counterfactual explanation for knapsack problem
-"""
 
 def main():
 
-    #Setup 0-1 knapsack cp model
-    n = 10
-    m = 3
+    n = 10  #Number of items in the knapsack
+    m = 5   #Number of items to change in the knapsack
 
     values, weights, capacity, x = generate_knapsack_model(n)
-    if verbose:
-        print_knapsack_model(values, weights, capacity, x)
+    #TODO: verbose statement?
+    print_knapsack_model(values, weights, capacity, x)
 
     x_user, foil_items = generate_foil_knapsack(values, weights, capacity, x, m)
     
     # Pretty print user query
-    if verbose:
-        pp_uquery(x, foil_items)
+    #TODO: verbose statement?
+    pp_uquery(x, foil_items)
 
     #Find the values vector such that x_foil is optimal
-    master_problem(values, weights, capacity, x_user, foil_items)
+    d_star = master_problem(values, weights, capacity, x_user, foil_items)
     
+    print(f"\n\nValues {d_star} results in the user query being optimal")
+    print(f"Value of objective function using d* = {sum(d_star * x_user)}")
 
 
 def generate_knapsack_model(n = 10):
     """
         Generation of a knapsack model
-        Using same generation parameters as TODO ref paper
+        Using same generation parameters as Korikov et al.
     """
     R = 1000
     values = np.random.randint(1,R,n)
@@ -51,6 +92,12 @@ def generate_knapsack_model(n = 10):
 
 
 def generate_foil_knapsack(values, weights, capacity, x, m, tries=1):
+    """
+        Generate a set of foil constraints
+        Pick m items and assign the opposite value.
+        If this results in an unfeasable assignment (surpassing the capacity), try again
+        @return A model
+    """
     n = len(x)
     foil_idx = np.random.choice(n,m, replace=False)
     foil_vals = np.abs(1 - x[foil_idx])
@@ -68,7 +115,11 @@ def generate_foil_knapsack(values, weights, capacity, x, m, tries=1):
                 ,foil_idx
 
 def extend_to_full_solution(values, weights, capacity, foil_idx, foil_vals):
-
+    """
+        Extend a given set of foil constraints to a full solution of the knapsack
+        Formally:
+            Given v and X, solve the COP 
+    """
     xv = boolvar(shape=len(values), name="xv")
     constraints = [xv[foil_idx] == foil_vals]
     constraints += [sum(xv * weights) <= capacity]
@@ -92,12 +143,12 @@ def master_problem(values, weights, capacity, x_d, foil_idx):
         @param foil_idx: A vector containing the items on which the user asked an explanation
                          All other items must retain their original values
     """
-
-    print(f"\n\n{'='*10} Solving the master problem {'='*10}")
-    print(f"x_d = {x_d}")
+    if verbose:
+        print(f"\n\n{'='*10} Solving the master problem {'='*10}")
     known_solutions, i= [], 1
     while i:
-        print(f"\nStarting iteration {i}")
+        if verbose:
+            print(f"\nStarting iteration {i}")
         d = intvar(0,INFINITY, values.shape, name="d")
         x = boolvar(shape=len(x_d), name="x")
         # The ususal knapsack constraint
@@ -119,36 +170,34 @@ def master_problem(values, weights, capacity, x_d, foil_idx):
 
         if master_model.solve() is not False:
             d_star = d.value()
-            print(f"d* = {d_star}")
             new_solution = solve_knapsack_problem(d_star, weights, capacity)
-            print(f"d* * x_d = {sum(d_star * x_d)}")
-            print(f"d* * x_0 = {sum(d_star * new_solution)}")
+            if verbose:
+                print(f"d* = {d_star}")
+                print(f"d* * x_d = {sum(d_star * x_d)}")
+                print(f"d* * x_0 = {sum(d_star * new_solution)}")
             if sum(d_star * x_d) >= sum(d_star * new_solution):
-                # Assignment given by the user is optimal for these values
                 return d_star
             else:
                 known_solutions.append(new_solution)
             i += 1
 
-      
         else:
             print("Model is UNSAT!")
-            print(musx(master_model.constraints))
             exit()
 
 def solve_knapsack_problem(values, weights, capacity):
     """
         Ordinary 0-1 knapsack problem
         Solve for vector x ∈ {T,F}^n
+
+        Based on the Numberjack model of Hakan Kjellerstrand
     """
     x = boolvar(len(values), name="x")
-
     model = Model(
                 [sum(x * weights) <= capacity],
                 maximize = sum(x * values)
             )
-
-    if model.solve():
+    if model.solve() is not False:
         return x.value()
 
 
