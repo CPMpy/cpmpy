@@ -136,8 +136,16 @@ def visualize_sequence(vars, requires, demand, at_most, per_slots):
 
     # Draw line separating problem and solution
     draw.line((center_x, 0, center_x, imheight), fill="black")
+    
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20, )
+    # To use Arial instead of the default Pillow font on Debian-based Linux distributions, run the following in terminal:
+    # 'sudo apt install ttf-mscorefonts-installer'
+    # 'sudo fc-cache -f'
+
+    try:
+        myFont = ImageFont.truetype("arialbd.ttf", 20)
+    except:
+        myFont = ImageFont.load_default()
 
     # Write "problem" and "solution"
     problem_title_x = center_x/2

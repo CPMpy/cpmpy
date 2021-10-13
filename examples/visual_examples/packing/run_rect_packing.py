@@ -98,7 +98,14 @@ def visualize_rect_packing(vars, widths, heights):
     img1 = ImageDraw.Draw(img)
 
     # Get a font
-    myFont = ImageFont.truetype("arialbd.ttf", 20)
+    # To use Arial instead of the default Pillow font on Debian-based Linux distributions, run the following in terminal:
+    # 'sudo apt install ttf-mscorefonts-installer'
+    # 'sudo fc-cache -f'
+
+    try:
+        myFont = ImageFont.truetype("arialbd.ttf", 20)
+    except:
+        myFont = ImageFont.load_default()
 
     # Draw overall rectangle
     shape = [(start_x, start_y), (start_x + rect_width.value() * pixel_unit, start_y + rect_height.value() * pixel_unit)]
