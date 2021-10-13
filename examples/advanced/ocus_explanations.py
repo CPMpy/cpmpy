@@ -173,7 +173,7 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
 
     ## ----- CONDITIONAL OPTIMISATION MODEL------
     ## -------------- VARIABLES -----------------
-    hs_vars = boolvar(shape=len(softlit) + len(remaining_sol_to_explain))
+    hs_vars = boolvar(shape=len(soft_lit) + len(remaining_sol_to_explain))
 
     # id of variables that need to be explained
     remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if var in neg_remaining_sol_to_explain]]
