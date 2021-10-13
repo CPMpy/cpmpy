@@ -1,9 +1,5 @@
-from cpmpy.solvers.ortools import CPM_ortools
-from cpmpy.solvers.pysat import CPM_pysat
-from cpmpy.expressions.core import Operator
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
-from cpmpy.transformations.get_variables import get_variables, get_variables_model
 
 import numpy as np
 
