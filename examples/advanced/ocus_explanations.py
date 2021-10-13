@@ -244,16 +244,18 @@ def solution_intersection(model, solver="ortools", verbose=False):
     sat_vars = get_variables_model(model)
 
     SAT = SolverLookup.lookup(solver)(model)
+    assert SAT.solve(), "Propagation of soft constraints only possible if model is SAT."
+    sat_model = set(bv if bv.value() else ~bv for bv in sat_vars)
 
     while(SAT.solve()):
         # negate the values of the model
-        sat_model = set(bv if bv.value() else ~bv for bv in sat_vars)
+        sat_model &= set(bv if bv.value() else ~bv for bv in sat_vars)
         blocking_clause = ~all(sat_model)
+
+        SAT += blocking_clause
 
         if verbose > 1:
             print("\n\tBlocking clause:", blocking_clause)
-
-        SAT += blocking_clause
 
     return sat_model
 
@@ -277,4 +279,4 @@ def cost_func(soft, soft_weights):
     return cost_lit
 
 if __name__ == '__main__':
-    frietkot_explain(verbose=1)
+    frietkot_explain(verbose=2)
