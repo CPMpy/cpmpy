@@ -3,7 +3,7 @@ from cpmpy.transformations.get_variables import get_variables_model
 
 import numpy as np
 
-def frietkot_explain(verbose=False):
+def frietkot_explain(verbose=0):
     '''
         The 'frietkot' problem; invented by Tias to explain SAT and SAT solving
         http://homepages.vub.ac.be/~tiasguns/frietkot/
@@ -35,7 +35,7 @@ def frietkot_explain(verbose=False):
 
     return explanation_sequence
 
-def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=False):
+def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=0):
     '''
         A SAT-based explanation sequence generating algorithm using assumption
         variables and weighted UNSAT core (Optimal Constrained Unsatisfiable Subset)
@@ -52,37 +52,42 @@ def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=Fa
         how to solve constraint satisfaction problems. Artificial Intelligence, 300, 103550.
     '''
     curr_sol = set()
+    # compute all derivable literals
     full_sol = solution_intersection(Model(hard + soft), solver, verbose)
-    #
+
+
+    # prep soft constraint formulation with a literal for each soft constraint
+    # (so we can iteratively use an assumption solver on softliterals)
+    soft_lit = BoolVar(shape=len(soft), name="ind")
     reified_soft = []
-    soft_ind = BoolVar(shape=len(soft), name="ind")
-    for i,bv in enumerate(soft_ind):
+    for i,bv in enumerate(soft_lit):
         reified_soft += [bv.implies(soft[i])]
     # to map indicator variable back to soft_constraints
-    indmap = dict((v,i) for (i,v) in enumerate(soft_ind))
+    indmap = dict((v,i) for (i,v) in enumerate(soft_lit))
 
     # Cost function returns cost of soft weight if a constraint is used
     # otherwhise returns 1 (i.e. using a literal)
-    cost = cost_func(list(soft_ind), soft_weights)
+    cost = cost_func(list(soft_lit), soft_weights)
 
     if verbose > 0:
         print("\nCurrent Model\n\t", curr_sol)
         print("\nFull Model  (holds in all models) \n\t", full_sol)
         print("\nRemaining to explain:\n\t", full_sol-curr_sol)
 
+    
+    # we will explain literal by literal
     explanation_sequence = []
-
     while(curr_sol != full_sol):
         # explain 1 step using ocus
-        all_soft = set(soft_ind) | curr_sol
         remaining_to_explain = full_sol - curr_sol
+        all_lit = set(soft_lit) | curr_sol
 
-        ocus_expl = explain_one_step_ocus(hard + reified_soft, all_soft, cost, remaining_to_explain, solver, verbose)
+        ocus_expl = explain_one_step_ocus(hard + reified_soft, all_lit, cost, remaining_to_explain, solver, verbose)
 
         # project on known facts and constraints
-        cons_used =  [soft[indmap[con]] for con in set(soft_ind) & ocus_expl]
+        cons_used =  [soft[indmap[con]] for con in set(soft_lit) & ocus_expl]
         facts_used = curr_sol & ocus_expl
-        derived = set(~v for v in ocus_expl - set(soft_ind) - facts_used)
+        derived = set(~v for v in ocus_expl - set(soft_lit) - facts_used)
 
         # Add newly derived information
         curr_sol |= derived
@@ -102,7 +107,7 @@ def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=Fa
     # return the list of original (non-flattened) constraints
     return explanation_sequence
 
-def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="ortools", verbose=False):
+def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver="ortools", verbose=False):
     """
         Optimal Constrained Unsatisfiable Subsets (OCUS) for CSP explanations [1]
 
@@ -161,16 +166,14 @@ def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="or
         [3] Reiter, R. (1987). A theory of diagnosis from first principles.
         Artificial intelligence, 32(1), 57-95.
     """
-    ## SAT solver initialisation
-    SAT = SolverLookup.lookup(solver)(Model(hard))
-
     ## Unsatisfiable Formula = soft constraints + (~remaining_to_explain)
     neg_remaining_sol_to_explain = set(~var for var in remaining_sol_to_explain)
-    F = set(soft) | neg_remaining_sol_to_explain
+    F = set(soft_lit) | neg_remaining_sol_to_explain
+
 
     ## ----- CONDITIONAL OPTIMISATION MODEL------
     ## -------------- VARIABLES -----------------
-    hs_vars = boolvar(shape=len(soft) + len(remaining_sol_to_explain))
+    hs_vars = boolvar(shape=len(softlit) + len(remaining_sol_to_explain))
 
     # id of variables that need to be explained
     remaining_hs_vars = hs_vars[[id for id, var in enumerate(F) if var in neg_remaining_sol_to_explain]]
@@ -188,6 +191,10 @@ def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="or
 
     # instantiate hitting set solver
     hittingset_solver = SolverLookup.lookup(solver)(hs_mip_model)
+
+
+    ## ----- SAT solver model ----
+    SAT = SolverLookup.lookup(solver)(Model(hard))
 
     while(True):
         hittingset_solver.solve()
@@ -226,16 +233,6 @@ def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="or
 def solution_intersection(model, solver="ortools", verbose=False):
     """
         solution_intersection produces the intersection of all models
-
-        Args:
-        hard (list): List of hard constraints
-
-        soft (iterable): List of soft constraints
-
-        I (set): partial model of sat literals
-
-        user_vars (list):
-            +/- selected boolean variables of the sat solver
     """
     # Build sat model
     sat_vars = get_variables_model(model)
@@ -252,7 +249,7 @@ def solution_intersection(model, solver="ortools", verbose=False):
 
         SAT += blocking_clause
 
-        if verbose > 1:
+        if verbose:
             print("\n\tBlocking clause:", blocking_clause)
 
     return sat_model
@@ -277,4 +274,4 @@ def cost_func(soft, soft_weights):
     return cost_lit
 
 if __name__ == '__main__':
-    frietkot_explain(verbose=2)
+    frietkot_explain(verbose=1)
