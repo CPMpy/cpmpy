@@ -217,7 +217,7 @@ def explain_one_step_ocus(hard, soft, cost, remaining_sol_to_explain, solver="or
         # compute complement of model in formula F
         C =  F - S
 
-        set_to_hit = set(varmap_sat_hs[Iend_var] for Iend_var in F - S)
+        set_to_hit = set(varmap_sat_hs[var] for var in C)
 
         # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(set_to_hit) >= 1)
