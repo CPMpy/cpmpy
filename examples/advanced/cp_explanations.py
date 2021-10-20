@@ -23,10 +23,10 @@ def main(verbose=False):
 
     print(m)
     print("\nStart MUS search:")
-    mus = ocus(m.constraints, weights, [], verbose=verbose)
+    mus = ous(m.constraints, weights, [], verbose=verbose)
     print("MUS:", mus)
 
-def ocus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def ous(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
     """
         Hitting set based weighted-MUS for CP
 
@@ -49,11 +49,15 @@ def ocus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
             use_assumption_literals = False
 
     if use_assumption_literals:
-        return ocus_assum(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
+        if verbose:
+            print("Using assumptions")
+        return ous_assum(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
     else:
-        return ocus_pure(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
+        if verbose:
+            print("Using pure constraints")
+        return ous_pure(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
 
-def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def ous_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
     # small optimisation: pre-flatten all constraints once
     # so it needs not be done over-and-over in solving
     hard = flatten_constraint(hard_constraints) # batch flatten
@@ -80,6 +84,8 @@ def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
 
         # Get hitting set
         hs_soft = [soft[id] for id, hs_var in enumerate(hs_vars) if hs_var.value() == 1]
+        if verbose>2:
+            print('\n\ths=', hs_soft)
 
         if not Model(hard+hs_soft).solve():
             if verbose > 1:
@@ -93,10 +99,10 @@ def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
         # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(C) >= 1)
 
-        if verbose > 1:
+        if verbose > 2:
             print("\t Complement =", C)
 
-def ocus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def ous_assum(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
     # init with hard constraints
     assum_model = Model(hard_constraints)
 
