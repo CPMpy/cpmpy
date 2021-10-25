@@ -145,6 +145,14 @@ class Model(object):
         """
         return self.cpm_status
 
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return self.objective.value()
+
     def __repr__(self):
         cons_str = ""
         for c in self.constraints:

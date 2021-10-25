@@ -92,6 +92,15 @@ class SolverInterface(object):
         """
         return False
 
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return None
+
+
     # OPTIONAL functions
 
     def solution_hint(self, cpm_vars, vals):

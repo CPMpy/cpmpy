@@ -268,3 +268,13 @@ class TestSolvers(unittest.TestCase):
         for i in [0,1,2]:
             self.assertTrue( cp.Model( iv1**i >= 0 ).solve() )
 
+    def test_objective(self):
+        iv = cp.intvar(0,10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
+        self.assertTrue( m.solve() )
+        self.assertEqual( m.objective_value(), 10 )
+
+        m = cp.Model(iv >= 1, iv <= 5, minimize=sum(iv))
+        self.assertTrue( m.solve() )
+        self.assertEqual( m.objective_value(), 2 )
+
