@@ -35,8 +35,8 @@ class TestSolvers(unittest.TestCase):
         objective = (x*distance_matrix).sum()
 
         model = cp.Model(constraint, minimize=objective)
-        objval = model.solve()
-        self.assertEqual(objval, 214)
+        self.assertTrue(model.solve())
+        self.assertEqual(model.objective_value(), 214)
         self.assertEqual(x.value().tolist(),
         [[0, 0, 0, 0, 0, 1],
          [0, 0, 1, 0, 0, 0],
@@ -59,8 +59,14 @@ class TestSolvers(unittest.TestCase):
         
         # table
         t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
-        self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
-        self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
+
+        m = cp.Model(t, minimize=x[0])
+        self.assertTrue(m.solve())
+        self.assertEqual( m.objective_value(), 2 )
+
+        m = cp.Model(t, maximize=x[0])
+        self.assertTrue(m.solve())
+        self.assertEqual( m.objective_value(), 7 )
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
@@ -157,7 +163,9 @@ class TestSolvers(unittest.TestCase):
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
         ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
-        self.assertEqual(s._after_solve(ort_status), 5.0) # post-process after solve() call...
+        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        self.assertEqual(s.objective_value(), 5.0)
+
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 2)
         self.assertEqual(cb.solcount, 7)
@@ -257,8 +265,14 @@ class TestSolvers(unittest.TestCase):
         
         # table
         t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
-        self.assertEqual( cp.Model(t, minimize=x[0]).solve(), 2 )
-        self.assertEqual( cp.Model(t, maximize=x[0]).solve(), 7 )
+
+        m = cp.Model(t, minimize=x[0])
+        self.assertTrue(m.solve())
+        self.assertEqual( m.objective_value(), 2 )
+
+        m = cp.Model(t, maximize=x[0])
+        self.assertTrue(m.solve())
+        self.assertEqual( m.objective_value(), 7 )
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )

@@ -264,11 +264,11 @@ class CPM_ortools(SolverInterface):
                 var._value = self.ort_solver.Value(self.varmap[var])
 
         # translate objective
-        self.objective_value = None
+        self.objective_value_ = None
         if self.ort_model.HasObjective():
-            self.objective_value = self.ort_solver.ObjectiveValue()
+            self.objective_value_ = self.ort_solver.ObjectiveValue()
 
-        return self._solve_return(self.cpm_status, self.objective_value)
+        return self._solve_return(self.cpm_status)
 
     def objective_value(self):
         """
@@ -276,7 +276,7 @@ class CPM_ortools(SolverInterface):
 
         :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
-        return self.objective_value
+        return self.objective_value_
 
 
     def get_core(self):

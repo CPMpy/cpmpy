@@ -110,10 +110,9 @@ class Model(object):
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
 
-        :return: the computed output:
-            - True      if it is a satisfaction problem and it is satisfiable
-            - False     if it is a satisfaction problem and not satisfiable
-            - [int]     if it is an optimisation problem
+        :return: Bool: the computed output:
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
         if isinstance(solver, SolverInterface):
             solver_class = solver

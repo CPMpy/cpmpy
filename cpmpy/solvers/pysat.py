@@ -237,7 +237,7 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = None
                     pass
 
-        return self._solve_return(self.cpm_status, pysat_status)
+        return self._solve_return(self.cpm_status)
 
 
     def get_core(self):

@@ -60,8 +60,11 @@ class TestGlobal(unittest.TestCase):
         ma = cp.max(iv)
         self.assertIsInstance(mi, GlobalConstraint) 
         self.assertIsInstance(ma, GlobalConstraint) 
-
-        self.assertEqual(cp.Model([], minimize=mi).solve(), 1)
-        self.assertEqual(cp.Model([], minimize=ma).solve(), 1)
-        self.assertEqual(cp.Model([], maximize=mi).solve(), 9)
-        self.assertEqual(cp.Model([], maximize=ma).solve(), 9)
+        
+        def solve_return(model):
+            model.solve()
+            return model.objective_value()
+        self.assertEqual( solve_return(cp.Model([], minimize=mi)), 1)
+        self.assertEqual( solve_return(cp.Model([], minimize=ma)), 1)
+        self.assertEqual( solve_return(cp.Model([], maximize=mi)), 9)
+        self.assertEqual( solve_return(cp.Model([], maximize=ma)), 9)

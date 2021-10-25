@@ -88,7 +88,9 @@ class SolverInterface(object):
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
 
-        :return: Bool or Int
+        :return: Bool:
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
         return False
 
@@ -129,7 +131,7 @@ class SolverInterface(object):
 
     # shared helper functions
 
-    def _solve_return(self, cpm_status, objective_value):
+    def _solve_return(self, cpm_status, objective_value=None):
         """
             Take a CPMpy Model and SolverStatus object and return
             the proper answer (True/False/objective_value)
@@ -137,22 +139,14 @@ class SolverInterface(object):
         :param cpm_status: status extracted from the solver
         :type cpm_status: SolverStatus
 
-        :param objective_value: None or Int, as computed by solver
+        :param objective_value: None or Int, as computed by solver [DEPRECATED]
 
-        :return: Bool or Int
+        :return: Bool
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
-        # return computed value
-        if objective_value is not None and \
-            (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
-             cpm_status.exitstatus == ExitStatus.FEASIBLE):
-            # optimisation problem
-            return objective_value
-        else:
-            # satisfaction problem
-            if cpm_status.exitstatus == ExitStatus.FEASIBLE or \
-               cpm_status.exitstatus == ExitStatus.OPTIMAL:
-                return True
-        return False
+        return (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
+                cpm_status.exitstatus == ExitStatus.FEASIBLE)
 
 
 #==============================================================================

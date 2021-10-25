@@ -193,7 +193,7 @@ class CPM_minizinc(SolverInterface):
             self.cpm_status.runtime = mzn_result.statistics['time'] # --output-time
 
         # translate solution values (of original vars only)
-        objective_value = None
+        self.objective_value_ = None
         if mzn_status.has_solution():
             # runtime
             mznsol = mzn_result.solution
@@ -211,9 +211,17 @@ class CPM_minizinc(SolverInterface):
                     print("Warning, no value for ",varname)
 
             # translate objective (if any, otherwise None)
-            self.objective_value = mzn_result.objective
+            self.objective_value_ = mzn_result.objective
 
-        return self._solve_return(self.cpm_status, self.objective_value)
+        return self._solve_return(self.cpm_status)
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return self.objective_value_
 
     def __add__(self, cons):
         """
@@ -246,14 +254,6 @@ class CPM_minizinc(SolverInterface):
         """
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
-
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
-
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
-        """
-        return self.objective_value
 
     def clean_varname(self, varname):
         return varname.replace(',','_').replace('.','_').replace(' ','_').replace('[','_').replace(']','')
