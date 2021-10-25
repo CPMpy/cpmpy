@@ -2,6 +2,34 @@ from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
 
 import numpy as np
+'''
+Weighted unsatisfiable cores from given weighted unsatisfiable formula
+
+
+Example Application of weighted unsatisfiable cores (cost-Optimal unsatisfiable subsets) for explaining solutions of constraint satisfaction problems. [1, 2, 3]
+
+Intuition:
+Uses the implicit hitting set duality between Minimum Correction Subsets (MCSes) and Minimum Unsatisfiable Subsets (MUSes) for computing Weighted Unsatisfiable subsets (cores).
+
+Iteratively look for a cost-minimal hitting set on the computed MCSes so far. 
+- If the hitting set is SAT, it is grown to a satisfiable subset and the complement is added to the collection of MCSes.
+- If the hitting set is UNSAT, the computed hitting set is a Weighted (cost-Optimal) Unsatisfiable Subset. 
+
+References:
+    [1] Gamba, E., Bogaerts, B., & Guns, T. (2021). Efficiently Explaining CSPs with Unsatisfiable Subset Optimization. 
+    In Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence. Pages 1381-1388. https://doi.org/10.24963/ijcai.2021/191
+
+    [2] Bogaerts, B., Gamba, E., Claes, J., & Guns, T. (2020). Step-wise explanations
+    of constraint satisfaction problems. In ECAI 2020-24th European Conference on
+    Artificial Intelligence, 29 August-8 September 2020, Santiago de Compostela,
+    Spain, August 29-September 8, 2020-Including 10th Conference on Prestigious
+    Applications of Artificial Intelligence (PAIS 2020) (Vol. 325, pp. 640-647).
+    IOS Press; https://doi. org/10.3233/FAIA200149.
+
+    [3] Bogaerts, B., Gamba, E., & Guns, T. (2021). A framework for step-wise explaining
+    how to solve constraint satisfaction problems. Artificial Intelligence, 300, 103550.
+'''
+
 
 def main(verbose=False):
     weights = [10, 10, 10, 1, 1, 40, 20, 20, 20, 1]
