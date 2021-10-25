@@ -45,12 +45,15 @@ class CPM_ortools(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model=None):
+    def __init__(self, cpm_model=None, solver=None):
         """
         Constructor of the solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         or-tools model and solver object (ort_model and ort_solver)
+
+            - cpm_model: CPMpy Model() object: ignored in this superclass
+            - solver: string: ignored in this superclass
 
         ort_model and ort_solver can both be modified externally before
         calling solve(), a prime way to use more advanced solver features
@@ -59,7 +62,7 @@ class CPM_ortools(SolverInterface):
             raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(self.name))
         from ortools.sat.python import cp_model as ort
 
-        super().__init__()
+        super().__init__(cpm_model, solver=solver)
         self.name = "ortools"
 
         if cpm_model is None:

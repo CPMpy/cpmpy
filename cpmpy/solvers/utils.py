@@ -82,7 +82,23 @@ class SolverLookup():
         return names
 
     @staticmethod
+    def get(name=None, model=None):
+        """
+            get a specific solver (by name), with 'model' passed to its constructor
+
+            This is the preferred way to initialise a solver from its name
+        """
+        cls = SolverLookup.lookup(name=name)
+        return cls(model, solver=name) # repeat name in case contains a subname
+
+    @staticmethod
     def lookup(name=None):
+        """
+            lookup a solver _class_ by its name
+
+            warning: returns a 'class', not an object!
+            see get() for normal uses
+        """
         if name is None:
             # first solver class
             return SolverLookup.base_solvers()[0][1]

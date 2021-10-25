@@ -47,7 +47,13 @@ class SolverInterface(object):
 
     # REQUIRED functions to mimic `Model` interface:
 
-    def __init__(self):
+    def __init__(self, cpm_model=None, solver=None):
+        """
+            Initalize solver interface
+
+            - cpm_model: CPMpy Model() object: ignored in this superclass
+            - solver: string: ignored in this superclass
+        """
         self.cpm_status = SolverStatus("dummy") # status of solving this model
 
     def __add__(self):

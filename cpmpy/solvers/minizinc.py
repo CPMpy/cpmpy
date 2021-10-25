@@ -102,7 +102,7 @@ class CPM_minizinc(SolverInterface):
         super().__init__()
 
         solvername = solver
-        if solvername is None:
+        if solvername is None or solvername == 'minizinc':
             # default solver
             solvername = "gecode"
         elif solvername.startswith('minizinc:'):

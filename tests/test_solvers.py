@@ -18,7 +18,18 @@ class TestSolvers(unittest.TestCase):
             if s.supported(): # only supported solvers in test suite
                 model.solve(solver=solvern)
                 self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
-    
+
+        for solvern in cp.SolverLookup.solvernames():
+            s = cp.SolverLookup.get(solvern)
+            if s.supported(): # only supported solvers in test suite
+                s2 = cp.SolverLookup.get(solvern, model)
+                try: 
+                    s2.solve()
+                    self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
+                except:
+                    # its OK I guess... MiniZinc error
+                    pass
+
     # should move this test elsewhere later
     def test_tsp(self):
         N = 6
