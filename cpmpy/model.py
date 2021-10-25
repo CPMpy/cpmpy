@@ -172,47 +172,55 @@ class BoolModel(Model):
         CPMpy Model object, contains the constraint and objective expressions
     """
     def __init__(self, *args, int_model=None, reify=False):
-
-        super().__init__(args)
-        self.reification_vars = []
         self.constraints = []
+        self.reification_vars = []
+        # self.constraints = []
         self.reify = reify
+        # int var to boolvar mapping
+        # boolvar to intvar-value mapping
         self.int_var_mapping, self.bool_var_mapping = {}, {}
 
-        if int_model:
-            if reify:
-                self.reify_from_int_model(int_model)
-            else:
-                self.from_int_model(int_model)
+        if len(args) == 0:
+            self.constraints = []
+        elif len(args) == 1 and is_any_list(args[0]):
+            # top level list of constraints
+            self.constraints = []
+            for con in list(args[0]):
+                self.__add__(con=con)
+        else:
+            for con in args:
+                print("con=", con)
+                self.__add__(con=con)
 
-    def from_int_model(self, int_model):
-        int_model_variables = get_variables_model(int_model)
+    def from_int_model(self, int_model, reify=False):
+        if reify:
+            int_model_variables = get_variables_model(int_model)
 
-        iv_mapping, bv_mapping, constraints = intvar_to_boolvar(int_model_variables)
+            iv_mapping, bv_mapping, constraints = intvar_to_boolvar(int_model_variables)
 
-        self.constraints += constraints
+            self.constraints += constraints
 
-        self.int_var_mapping.update(iv_mapping)
-        self.bool_var_mapping.update(bv_mapping)
+            self.int_var_mapping.update(iv_mapping)
+            self.bool_var_mapping.update(bv_mapping)
 
-        for constraint in int_model.constraints:
-            new_constraint = translate_constraint(constraint, self.int_var_mapping)
-            self.constraints += new_constraint
+            for constraint in int_model.constraints:
+                new_constraint = translate_constraint(constraint, self.int_var_mapping)
+                self.constraints += new_constraint
+        else:
 
-    def reify_from_int_model(self, int_model):
-        int_model_variables = get_variables_model(int_model)
+            int_model_variables = get_variables_model(int_model)
 
-        iv_mapping, bv_mapping, constraints, reification_vars = reified_intvar_to_boolvar(int_model_variables)
+            iv_mapping, bv_mapping, constraints, reification_vars = reified_intvar_to_boolvar(int_model_variables)
 
-        self.reification_vars += reification_vars
-        self.constraints += constraints
-        self.int_var_mapping.update(iv_mapping)
-        self.bool_var_mapping.update(bv_mapping)
-
-        for constraint in int_model.constraints:
-            new_constraint, reification_vars = reify_translate_constraint(constraint, self.int_var_mapping)
-            self.constraints += new_constraint
             self.reification_vars += reification_vars
+            self.constraints += constraints
+            self.int_var_mapping.update(iv_mapping)
+            self.bool_var_mapping.update(bv_mapping)
+
+            for constraint in int_model.constraints:
+                new_constraint, reification_vars = reify_translate_constraint(constraint, self.int_var_mapping)
+                self.constraints += new_constraint
+                self.reification_vars += reification_vars
 
     def __add__(self, con):
         if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
@@ -220,18 +228,9 @@ class BoolModel(Model):
             con = con[0]
 
         constraint_intvars = [ivar for ivar in get_variables(con)if ivar not in self.int_var_mapping]
+        print(constraint_intvars)
 
         if self.reify:
-            iv_mapping, bv_mapping, constraints = intvar_to_boolvar(constraint_intvars)
-
-            self.int_var_mapping.update(iv_mapping)
-            self.bool_var_mapping.update(bv_mapping)
-
-            new_constraint, reification_vars = reify_translate_constraint(con, self.int_var_mapping)
-            self.reification_vars += reification_vars
-            self.constraints += new_constraint + constraints
-
-        else:
             iv_mapping, bv_mapping, constraints, reification_vars = reified_intvar_to_boolvar(constraint_intvars)
 
             self.reification_vars += reification_vars
@@ -239,8 +238,19 @@ class BoolModel(Model):
             self.int_var_mapping.update(iv_mapping)
             self.bool_var_mapping.update(bv_mapping)
 
+            new_constraint, reification_vars = reify_translate_constraint(con, self.int_var_mapping)
+            self.reification_vars += reification_vars
+            self.constraints += new_constraint + constraints
+        else:
+            iv_mapping, bv_mapping, constraints = intvar_to_boolvar(constraint_intvars)
+
+            self.int_var_mapping.update(iv_mapping)
+            self.bool_var_mapping.update(bv_mapping)
+
             new_constraint = translate_constraint(con, self.int_var_mapping)
             self.constraints += new_constraint + constraints
+
+
 
         return self
 
