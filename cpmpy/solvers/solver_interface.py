@@ -47,7 +47,13 @@ class SolverInterface(object):
 
     # REQUIRED functions to mimic `Model` interface:
 
-    def __init__(self):
+    def __init__(self, cpm_model=None, solver=None):
+        """
+            Initalize solver interface
+
+            - cpm_model: CPMpy Model() object: ignored in this superclass
+            - solver: string: ignored in this superclass
+        """
         self.cpm_status = SolverStatus("dummy") # status of solving this model
 
     def __add__(self):
@@ -88,9 +94,20 @@ class SolverInterface(object):
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
 
-        :return: Bool or Int
+        :return: Bool:
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
         return False
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return None
+
 
     # OPTIONAL functions
 
@@ -120,7 +137,7 @@ class SolverInterface(object):
 
     # shared helper functions
 
-    def _solve_return(self, cpm_status, objective_value):
+    def _solve_return(self, cpm_status, objective_value=None):
         """
             Take a CPMpy Model and SolverStatus object and return
             the proper answer (True/False/objective_value)
@@ -128,22 +145,14 @@ class SolverInterface(object):
         :param cpm_status: status extracted from the solver
         :type cpm_status: SolverStatus
 
-        :param objective_value: None or Int, as computed by solver
+        :param objective_value: None or Int, as computed by solver [DEPRECATED]
 
-        :return: Bool or Int
+        :return: Bool
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
-        # return computed value
-        if objective_value is not None and \
-            (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
-             cpm_status.exitstatus == ExitStatus.FEASIBLE):
-            # optimisation problem
-            return objective_value
-        else:
-            # satisfaction problem
-            if cpm_status.exitstatus == ExitStatus.FEASIBLE or \
-               cpm_status.exitstatus == ExitStatus.OPTIMAL:
-                return True
-        return False
+        return (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
+                cpm_status.exitstatus == ExitStatus.FEASIBLE)
 
 
 #==============================================================================

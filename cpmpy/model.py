@@ -110,10 +110,9 @@ class Model(object):
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
 
-        :return: the computed output:
-            - True      if it is a satisfaction problem and it is satisfiable
-            - False     if it is a satisfaction problem and not satisfiable
-            - [int]     if it is an optimisation problem
+        :return: Bool: the computed output:
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
         """
         if isinstance(solver, SolverInterface):
             solver_class = solver
@@ -144,6 +143,14 @@ class Model(object):
         :return: an object of :class:`SolverStatus`
         """
         return self.cpm_status
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return self.objective.value()
 
     def __repr__(self):
         cons_str = ""

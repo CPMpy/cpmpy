@@ -68,7 +68,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model, solver=None):
+    def __init__(self, cpm_model=None, solver=None):
         """
         Constructor of the solver object
 
@@ -87,30 +87,36 @@ class CPM_pysat(SolverInterface):
         """
         if not self.supported():
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface (NOT the 'pysat' package!)")
-        if cpm_model.objective is not None:
+        if cpm_model and cpm_model.objective is not None:
             raise Exception("CPM_pysat: only satisfaction, does not support an objective function")
         from pysat.formula import IDPool
         from pysat.solvers import Solver
 
-        super().__init__()
+        super().__init__(cpm_model, solver)
 
         # determine solvername, set cpmpy name
         solvername = solver
-        if solver is None:
+        if solver is None or solvername == 'pysat':
             # default solver
             solvername = "glucose4" # something recent...
         elif solvername.startswith('pysat:'):
             solvername = solvername[6:] # strip 'pysat:'
         self.name = "pysat:"+solvername
 
-        # store original vars
-        self.user_vars = get_variables_model(cpm_model)
-
         # ID pool of variables
         self.pysat_vpool = IDPool()
 
-        # create constraint model (list of clauses)
-        cnf = self.make_cnf(cpm_model)
+        if cpm_model is None:
+            self.user_vars = []
+            from pysat.formula import CNF
+            cnf = CNF()
+        else:
+            # store original vars
+            self.user_vars = get_variables_model(cpm_model)
+
+            # create constraint model (list of clauses)
+            cnf = self.make_cnf(cpm_model)
+
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
 
@@ -237,7 +243,7 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = None
                     pass
 
-        return self._solve_return(self.cpm_status, pysat_status)
+        return self._solve_return(self.cpm_status)
 
 
     def get_core(self):
