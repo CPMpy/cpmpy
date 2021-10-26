@@ -39,7 +39,7 @@ References:
 '''
 
 
-def main(verbose=False):
+def main(verbose=1):
     weights = [10, 10, 10, 1, 1, 40, 20, 20, 20, 1]
     x = intvar(-9, 9, name="x")
     y = intvar(-9, 9, name="y")
@@ -58,11 +58,11 @@ def main(verbose=False):
     assert (m.solve() is False)
 
     print(m)
-    print("\nStart MUS search:")
-    mus = ocus(m.constraints, weights, [], verbose=verbose)
-    print("MUS:", mus)
+    print("\nStart OMUS search:")
+    mus = omus(m.constraints, weights, [], verbose=verbose)
+    print("OMUS:", mus)
 
-def ocus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def omus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=1):
     """
         Hitting set based weighted-MUS for CP
 
@@ -71,12 +71,11 @@ def ocus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
         contain aribtrary nested expressions, global constraints, etc.
 
         Will first check which soft contraints support reification,
-        and use ocus_assum on those (with others as hard).
+        and use omus_assum on those (with others as hard).
     """
     use_assumption_literals = True
     for con in soft_constraints:
         # see if solver supports reification of 'con'
-        print(con)
         try:
             m = Model([BoolVar().implies(con)])
             SolverLookup.lookup(solver)(m).solve()
@@ -85,11 +84,11 @@ def ocus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
             use_assumption_literals = False
 
     if use_assumption_literals:
-        return ocus_assum(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
+        return omus_assum(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
     else:
-        return ocus_pure(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
+        return omus_pure(soft_constraints, soft_weights, hard_constraints=hard_constraints, verbose=verbose)
 
-def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=1):
     # small optimisation: pre-flatten all constraints once
     # so it needs not be done over-and-over in solving
     hard = flatten_constraint(hard_constraints) # batch flatten
@@ -115,13 +114,19 @@ def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
         hittingset_solver.solve()
 
         # Get hitting set
-        hs_soft = [soft[id] for id, hs_var in enumerate(hs_vars) if hs_var.value() == 1]
+        hs_ids = [i for i, hs_var in enumerate(hs_vars) if hs_var.value() == 1]
+        hs_soft = [soft[i] for i in hs_ids]
 
         if not Model(hard+hs_soft).solve():
             if verbose > 1:
-                print("\n\t ===> OCUS =", hs_soft)
+                cost = sum([soft_weights[i] for i in hs_ids])
+                print("\t hitting set with cost", cost, "is UNSAT:", [soft_constraints[i] for i in hs_ids])
 
-            return [soft_constraints[id] for id, hs_var in enumerate(hs_vars) if hs_var.value() == 1]
+            return [soft_constraints[i] for i in hs_ids]
+
+        if verbose > 1:
+            cost = sum([soft_weights[i] for i in hs_ids])
+            print("\t hitting set with cost", cost, "is SAT:", [soft_constraints[i] for i in hs_ids])
 
         # compute complement of model in formula F
         C = hs_vars[hs_vars.value() != 1]
@@ -129,10 +134,8 @@ def ocus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
         # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(C) >= 1)
 
-        if verbose > 1:
-            print("\t Complement =", C)
 
-def ocus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=False):
+def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=1):
     # init with hard constraints
     assum_model = Model(hard_constraints)
 
@@ -167,9 +170,14 @@ def ocus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
 
         if not assum_solver.solve(assumptions=hs):
             if verbose > 1:
-                print("\n\t ===> OCUS =", hs)
+                cost = sum([soft_weights[indmap[v]] for v in hs])
+                print("\t hitting set with cost", cost, "is UNSAT:", [soft_constraints[indmap[v]] for v in hs])
 
             return [soft_constraints[indmap[v]] for v in hs]
+
+        if verbose > 1:
+            cost = sum([soft_weights[indmap[v]] for v in hs])
+            print("\t hitting set with cost", cost, "is SAT:", [soft_constraints[indmap[v]] for v in hs])
 
         # compute complement of model in formula F
         C = set(v for v in ind if not v.value())
@@ -177,8 +185,6 @@ def ocus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
         # Add complement as a new set to hit: sum x[j] * hij >= 1
         hittingset_solver += (sum(C) >= 1)
 
-        if verbose > 1:
-            print("\t Complement =", C)
 
 if __name__ == '__main__':
     main(verbose=2)
