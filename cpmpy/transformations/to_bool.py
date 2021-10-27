@@ -81,11 +81,14 @@ def translate_unit_comparison(constraint, mapping):
 
     # assignment constraint
     left, right = constraint.args
-    if constraint.name in [">", ">="]:
+
+    operator = constraint.name
+
+    if operator in [">", ">="]:
         # exchange 2 constraints arguments since x > 5 is the same as 5 < x
         left, right = right, left
 
-    if constraint.name == '==':
+    if operator == '==':
         ## 1 variables equal to a value
         if all(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
             if constraint.args[0] == constraint.args[1]:
@@ -132,7 +135,7 @@ def translate_unit_comparison(constraint, mapping):
         return bool_constraints
 
     # different constraint
-    elif constraint.name == "!=":
+    elif operator == "!=":
         if any(True if isinstance(arg, int) else False for arg in constraint.args):
             value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
 
@@ -154,14 +157,16 @@ def translate_unit_comparison(constraint, mapping):
 
         return bool_constraints
 
-    elif constraint.name in ["<", ">"]:
+    elif operator in ["<", ">"]:
         ## case1: var < value => values larger cannot be true
         if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
+            ## add constraint on values that cannot be true 
             for i in range(right, left.ub+1):
                 bool_constraints += [~mapping[left][i]]
         ## case2: value < var
         elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
-            for i in range(left.lb, right):
+            ## add constraint on values that cannot be true 
+            for i in range(right.lb, left):
                 bool_constraints += [~mapping[right][i]]
         ## case3: var < var
         elif isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
@@ -184,7 +189,7 @@ def translate_unit_comparison(constraint, mapping):
 
         return bool_constraints
 
-    elif constraint.name in ["<=", ">="]:
+    elif operator in ["<=", ">="]:
         ## case1: var <= value
         if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
             # left <= 5
@@ -193,7 +198,7 @@ def translate_unit_comparison(constraint, mapping):
         ## case2: value <= var
         elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
             # 5 <= right
-            for i in range(left.lb, left):
+            for i in range(left +1, right.ub+1):
                 bool_constraints += [~mapping[right][i]]
         ## case3: left <= right
         ### left [0, 1, 2, 3]
@@ -260,7 +265,7 @@ def reify_translate_constraint(constraint, mapping):
 def translate_constraint(constraint, mapping):
     ## composition of constraints
     bool_constraints = []
-
+    print(type(constraint),":\t", constraint)
     if isinstance(constraint, (list, NDVarArray)):
 
         for con in constraint:
@@ -268,6 +273,7 @@ def translate_constraint(constraint, mapping):
 
     # base constraints
     elif isinstance(constraint, Comparison):
+
         bool_constraints += translate_unit_comparison(constraint, mapping)
 
     # global constraints
