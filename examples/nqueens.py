@@ -14,25 +14,36 @@ another if it they are on the same row, same column, or same diagonal.
 import numpy as np
 from cpmpy import *
 
-N = 8
+def nqueens(N):
+    # Variables (one per row)
+    queens = intvar(1,N, shape=N, name="queens")
 
-# Variables (one per row)
-queens = intvar(1,N, shape=N, name="queens")
-
-# Constraints on columns and left/right diagonal
-m = Model([
+    # Constraints on columns and left/right diagonal
+    m = Model([
         AllDifferent(queens),
         AllDifferent([queens[i] + i for i in range(N)]),
         AllDifferent([queens[i] - i for i in range(N)]),
     ])
+    
+    return (m, queens)
 
-if m.solve():
-    # pretty print
-    line = '+---'*N+'+\n'
-    out = line
-    for queen in queens.value():
-        out += '|   '*(queen-1)+'| Q '+'|   '*(N-queen)+'|\n'
-        out += line
-    print(out)
-else:
-    print("No solution found")
+def nqueens_solve(N, prettyprint=True):
+    (m, queens) = nqueens(N)
+
+    if m.solve():
+        print(m.status())
+
+        if prettyprint:
+            # pretty print
+            line = '+---'*N+'+\n'
+            out = line
+            for queen in queens.value():
+                out += '|   '*(queen-1)+'| Q '+'|   '*(N-queen)+'|\n'
+                out += line
+            print(out)
+    else:
+        print("No solution found")
+
+if __name__ == "__main__":
+    N = 8
+    nqueens_solve(N)
