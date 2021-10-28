@@ -124,6 +124,7 @@ def flatten_constraint(expr):
         it will return 'Exception' if something is not supported
         TODO, what built-in python error is best?
     """
+    print(expr, type(expr))
     # base cases
     if isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
         return [expr]
@@ -133,6 +134,7 @@ def flatten_constraint(expr):
     # recursively flatten list of constraints
     if is_any_list(expr):
         flatcons = [flatten_constraint(e) for e in expr]
+
         return [c for con in flatcons for c in con]
     # recursively flatten top-level 'and'
     if isinstance(expr, Operator) and expr.name == 'and':

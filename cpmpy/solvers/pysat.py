@@ -18,12 +18,15 @@
 
         CPM_pysat
 """
+
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables_model
 from ..transformations.to_cnf import to_cnf
+
 
 class CPM_pysat(SolverInterface):
     """
@@ -100,16 +103,18 @@ class CPM_pysat(SolverInterface):
         self.name = "pysat:"+solvername
 
         # store original vars
-        self.user_vars = get_variables_model(cpm_model)
+        (self.ivarmap, bm) = cpm_model.int2bool_onehot()
+
+        self.user_vars = get_variables_model(bm)
 
         # ID pool of variables
         self.pysat_vpool = IDPool()
 
         # create constraint model (list of clauses)
-        cnf = self.make_cnf(cpm_model)
+        cnf = self.make_cnf(bm)
+
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
-
 
     def pysat_var(self, cpm_var):
         """
@@ -145,7 +150,7 @@ class CPM_pysat(SolverInterface):
                     self.pysat_solver.add_clause([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
-                    
+
         return self
 
 
@@ -222,8 +227,12 @@ class CPM_pysat(SolverInterface):
         if self.cpm_status.exitstatus == ExitStatus.FEASIBLE:
             sol = frozenset(self.pysat_solver.get_model()) # to speed up lookup
             # fill in variables
+            # TODO: adapt for user_vars
             for cpm_var in self.user_vars:
+
                 lit = self.pysat_var(cpm_var)
+                # if cpm_var in self.ivarmap:
+                #     cpm_var._value = which_val(self.ivarmap[v], lit)
                 if lit in sol:
                     cpm_var._value = True
                 elif -lit in sol:
@@ -267,11 +276,11 @@ class CPM_pysat(SolverInterface):
 
         # CNF object
         cnf = CNF()
-
         # Post the constraint expressions to the solver
         # only CNF (list of disjunctions) supported for now
         for con in to_cnf(cpm_model.constraints):
             # base case, just var or ~var
+
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
             elif isinstance(con, Operator):
@@ -279,8 +288,9 @@ class CPM_pysat(SolverInterface):
                     cnf.append([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
-                    
-            else:
+            elif isinstance(con, Comparison):
+                # assignment!
+                # if isinstance(con.args[0], )
                 raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
         return cnf

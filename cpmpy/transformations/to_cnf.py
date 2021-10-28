@@ -30,6 +30,7 @@ def to_cnf(constraints):
 
         - constraints: list[Expression] or Operator
     """
+    
     if isinstance(constraints, Operator): 
         if constraints.name == "and":
             # and() is same as a list of its elements
@@ -43,6 +44,7 @@ def to_cnf(constraints):
         constraints = [constraints]
 
     fnf = flatten_constraint(constraints)
+
     return flat2cnf(fnf)
 
 def flat2cnf(constraints):
@@ -113,10 +115,11 @@ def flat2cnf(constraints):
         # BE == BE
         elif isinstance(expr, Comparison) and expr.name == "==":
             a0,a1 = expr.args
-            # using 'implies' means it will recursively work for BE's too
-            cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
-            continue
 
+            if a0.is_bool() and a1.is_bool():
+                # using 'implies' means it will recursively work for BE's too
+                cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
+                continue
         # BE -> BE
         elif is_operator and expr.name == '->':
             a0,a1 = expr.args
@@ -140,6 +143,7 @@ def flat2cnf(constraints):
 
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim
+        print(cnf)
         cnf.append(expr)
-
+        print(cnf)
     return cnf
