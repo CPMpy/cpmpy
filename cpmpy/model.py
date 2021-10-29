@@ -28,6 +28,9 @@
         Model
 """
 import numpy as np
+from cpmpy.transformations.get_variables import get_variables_model
+
+from cpmpy.transformations.to_bool import intvar_to_boolvar, to_bool_constraint
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
@@ -99,7 +102,19 @@ class Model(object):
         self.objective = expr
         self.objective_max = True
 
-    
+    def int2bool_onehot(self):
+
+        user_vars = get_variables_model(self)
+
+        ivarmap, bool_cons = intvar_to_boolvar(user_vars)
+
+        bool_model = Model(bool_cons)
+
+        for constraint in self.constraints:
+            bool_model += to_bool_constraint(constraint, ivarmap)
+
+        return (ivarmap, bool_model)
+
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result

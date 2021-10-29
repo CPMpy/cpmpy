@@ -111,11 +111,13 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import CNF
             cnf = CNF()
         else:
+            (self.ivarmap, bm) = cpm_model.int2bool_onehot()
+
             # store original vars
-            self.user_vars = get_variables_model(cpm_model)
+            self.user_vars = get_variables_model(bm)
 
             # create constraint model (list of clauses)
-            cnf = self.make_cnf(cpm_model)
+            cnf = self.make_cnf(bm)
 
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
@@ -155,7 +157,7 @@ class CPM_pysat(SolverInterface):
                     self.pysat_solver.add_clause([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
-                    
+
         return self
 
 
@@ -292,26 +294,29 @@ class CPM_pysat(SolverInterface):
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
             elif isinstance(con, Comparison):
                 # only handle cardinality encodings
-                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
-                    lits = [self.pysat_var(var) for var in con.args[0].args]
-                    bound = con.args[1]
-                    if con.name == "<":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == "<=":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == ">=":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == ">":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == "==":
-                        equals = CardEnc.equals(lits=lits, bound=bound)
-                        cnf.extend(equals.clauses)
+                if isinstance(con.args[0], Operator) and con.args[0].name == "sum":
+                    if all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
+                        lits = [self.pysat_var(var) for var in con.args[0].args]
+                        bound = con.args[1]
+                        if con.name == "<":
+                            atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
+                            cnf.extend(atmost.clauses)
+                        elif con.name == "<=":
+                            atmost = CardEnc.atmost(lits=lits, bound=bound)
+                            cnf.extend(atmost.clauses)
+                        elif con.name == ">=":
+                            atleast = CardEnc.atleast(lits=lits, bound=bound)
+                            cnf.extend(atleast.clauses)
+                        elif con.name == ">":
+                            atleast = CardEnc.atleast(lits=lits, bound=bound+1)
+                            cnf.extend(atleast.clauses)
+                        elif con.name == "==":
+                            equals = CardEnc.equals(lits=lits, bound=bound)
+                            cnf.extend(equals.clauses)
+                        else:
+                            raise NotImplementedError(f"operation {con} not supported by CPM_pysat")
                     else:
-                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                        raise NotImplementedError(f"Weighted sum {con} not supported yet by CPM_pysat")
                 else:
                     raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
