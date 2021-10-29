@@ -269,6 +269,7 @@ class CPM_pysat(SolverInterface):
         """
         from pysat.formula import CNF
 
+        print(cpm_model)
         # check only BoolVarImpl (incl. NegBoolView)
         for var in get_variables_model(cpm_model):
             if not isinstance(var, _BoolVarImpl):
@@ -289,8 +290,14 @@ class CPM_pysat(SolverInterface):
                 else:
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
             elif isinstance(con, Comparison):
-                # assignment!
-                # if isinstance(con.args[0], )
+
+                try:
+                    import pysat.pb
+                except ImportError as e:
+                    raise Exception("Please install PyPBLib: pip install pypblib")
+                
+                
+
                 raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
         return cnf

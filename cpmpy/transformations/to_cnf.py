@@ -143,7 +143,5 @@ def flat2cnf(constraints):
 
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim
-        print(cnf)
         cnf.append(expr)
-        print(cnf)
     return cnf

@@ -14,14 +14,21 @@ x = intvar(0, 5, shape=3, name="x")
 
 x2 = intvar(0, 2, name="x2")
 x3 = intvar(0, 3, name="x3")
+bv2 = boolvar()
+bv3 = boolvar()
+
+y = intvar(2, 4, shape=(3, 4))
 x = [x1, x2, x3]
 a = [3, 2, 5]
 a0 = 5
 
 m = Model(
-    x1 == 4,
-    x1 == x2
+    # x1 != x2,
+    (x1 + x2) < 5,
+    # (x1 + x2 + x3) < 5,
+    # (3 * x1 + 2 * x2 + 5 * x3) < 15,
 )
+
 print("\n -----Make CNF ------")
 
 s = CPM_pysat(m)

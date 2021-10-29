@@ -1,206 +1,156 @@
 
-import numpy as np
-from cpmpy.expressions.core import Comparison
+from ..expressions.core import Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolvar, intvar
-from ..expressions.python_builtins import any
+# from ..expressions.python_builtins import any
 
-# import numpy as np
+import numpy as np
 
-def to_unit_comparison(con, ivarmap, level=0):
+def to_unit_comparison(con, ivarmap):
     bool_constraints=[]
 
     # assignment constraint
     left, right = con.args
     operator = con.name
+    if operator in [">", ">="]:
+        right, left = left, right
+        operator = operator.replace('>', '<')
 
     if operator == "==":
-        if all(True if isinstance(arg, (int, np.int64)) else False for arg in con.args):
-            bool_constraints.append(con.args[0] == con.args[1])
-        elif all(True if isinstance(arg, (_BoolVarImpl)) else False for arg in con.args):
-            return con
-        elif all(True if isinstance(arg, _IntVarImpl) else False for arg in con.args):
+        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
             # x1 ==  x2
-            print("x1 == x2:", con)
             if left.ub < right.lb or right.ub < left.lb:
-                raise Exception("No intersection between bounds", [left.lb, left.ub], [right.lb, right.ub])
+                return bool_constraints
 
-            ## 2 variables equal to each other
             # example x1 = [ 1, 7] x2 = [2, 5]
-            # common intersection
-            
+            smallest_lb, largest_lb = (left, right) if left.lb < right.lb else (right, left)
+            # small : exclude [1, 2[
+            for i in range(smallest_lb.lb, largest_lb.lb):
+                bool_constraints.append(~ivarmap[smallest_lb][i])
 
-            # outside intersection must be false
+            # large: exclude [6, 7]
+            smallest_ub, largest_ub = (left, right) if left.ub < right.ub else (right, left)
+            for i in range(smallest_ub.ub + 1, largest_ub.ub+1):
+                bool_constraints.append(~ivarmap[largest_ub][i])
+
+            # exclude tuples that have different values
+            # [2, 6[
+            for i in range(largest_lb.lb, smallest_ub.ub+1):
+                # [2, 6[
+                for j in range(largest_lb.lb, smallest_ub.ub+1):
+                    if i != j:
+                        bool_constraints.append( ~(ivarmap[left][i] & ivarmap[right][j]))
 
             return bool_constraints
+        # Value Assignment x == 5 
         elif any(True if isinstance(arg, (int, np.int64)) else False for arg in con.args):
             value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
-            assert var.lb <= value and value <= var.ub, "Value must be between bounds!"
-
-            for bv_value, bv_var in ivarmap[var].items():
-                if bv_value == value:
-                    bool_constraints.append(bv_var)
-
-            return bool_constraints
+            if var.lb <= value and value <= var.ub:
+                return bool_constraints.append(ivarmap[var][value])
+            else:
+                raise NotImplementedError(f"Constraint {con} not supported...")
         else:
             raise NotImplementedError(f"Constraint {con} not supported...")
-    
+    elif operator == "!=":
+        # x1  != x2
+        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+            for i in range(left.lb, left.ub+1):
+                for j in range(right.lb, right.ub+1):
+                    if i == j:
+                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+        # x1  != 3
+        elif any(True if isinstance(arg, (int, np.int64)) else False for arg in con.args):
+            value, var = (left, right) if isinstance(left, (int, np.int64)) else  (right, left)
+            if var.lb <= value and value <= var.ub:
+                bool_constraints.append(~ivarmap[var][value])
+        else:
+            raise NotImplementedError(f"Constraint {con} not supported...")
+    elif operator == '<':
+        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+            # x1  < x2
+            for i in range(left.lb, left.ub+1):
+                for j in range(right.lb, right.ub+1):
+                    if i >= j:
+                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
 
-    # if operator == '==':
-    #     ## 1 variables equal to a value
-    #     if all(True if isinstance(arg, (int, np.int64)) else False for arg in con.args):
-    #         if con.args[0] == con.args[1]:
-    #             return []
-    #         # 2 different numbers are equal ??
-    #         else:
-    #             return False
-
-    #     elif any(True if isinstance(arg, (int, np.int64)) else False for arg in con.args):
-    #         value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
-    #         assert var.lb <= value and value <= var.ub, "Value must be between bounds!"
-
-    #         for bv_value, bv_var in mapping[var].items():
-    #             if bv_value == value:
-    #                 bool_constraints.append(bv_var)
-    #             else:
-    #                 bool_constraints.append(~bv_var)
-
-    #         return bool_constraints
-
-    #     if left.ub < right.lb or right.ub < left.lb:
-    #         raise Exception("No intersection between bounds", [left.lb, left.ub], [right.lb, right.ub])
-
-    #     ## 2 variables equal to each other 
-    #     # example[ 1, 7] [2, 5]
-    #     smallest_lb_var, largest_lb_var = (left, right) if left.lb < right.lb else (right, left)
-    #     smallest_ub_var, largest_ub_var = (left, right) if left.ub < right.ub else (right, left)
-
-    #     # Before 2
-    #     for i in range(smallest_lb_var.lb, largest_lb_var.lb):
-    #         bool_constraints.append(~mapping[smallest_lb_var][i])
-
-    #     # After 5
-    #     for i in range(smallest_ub_var.ub+1, largest_ub_var.ub+1):
-    #         bool_constraints.append(~mapping[largest_ub_var][i])
-
-    #     # TODO: check this is correct!
-    #     # between intersection: between 2 and 5
-    #     for i in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-    #         for j in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-    #             if i != j:
-    #                 bool_constraints += [(~mapping[left][i] | ~mapping[right][j])]
-
-    #     return bool_constraints
-
-    # # different constraint
-    # elif operator == "!=":
-    #     if any(True if isinstance(arg, int) else False for arg in constraint.args):
-    #         value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
-
-    #         for bv_value, bv_var in mapping[var].items():
-    #             # Can only do this assumption!
-    #             if bv_value == value:
-    #                 bool_constraints.append(~bv_var)
-
-    #         return bool_constraints
-
-    #     ## 2 variables equal to each other
-    #     smallest_lb_var, largest_lb_var = (left, right) if left.lb < right.lb else (right, left)
-    #     smallest_ub_var, largest_ub_var = (left, right) if left.ub < right.ub else (right, left)
-
-    #     # only take care of common interval
-    #     # TODO: check this is correct!
-    #     for i in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-    #         bool_constraints += [(~mapping[left][i] | ~mapping[right][i])]
-
-    #     return bool_constraints
-
-    # elif operator in ["<", ">"]:
-    #     ## case1: var < value => values larger cannot be true
-    #     if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
-    #         ## add constraint on values that cannot be true 
-    #         for i in range(right, left.ub+1):
-    #             bool_constraints += [~mapping[left][i]]
-    #     ## case2: value < var
-    #     elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
-    #         ## add constraint on values that cannot be true 
-    #         for i in range(right.lb, left):
-    #             bool_constraints += [~mapping[right][i]]
-    #     ## case3: var < var
-    #     elif isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-    #         ## can be faster 
-    #         # left  = [0 , 1, 2, 3]
-    #         # right =     [1, 2]
-    #         # left < right
-    #         # TODO: check this is correct!
-    #         for i in range(left.lb, left.ub+1):
-    #             if i >= right.ub:
-    #                 bool_constraints += [(~mapping[left][i])]
-    #                 bool_constraints += [~mapping[right][j] for j in range(right.lb, right.ub+1)]
-    #             else:
-    #                 for j in range(right.lb, right.ub+1):
-    #                     if j <= i:
-    #                         # combination cannot be true
-    #                         bool_constraints += [(~mapping[left][i] & ~mapping[right][j])]
-    #     else:
-    #         raise Exception("Val <= val?? or constraint < constraint ??")
-
-    #     return bool_constraints
-
-    # elif operator in ["<=", ">="]:
-    #     ## case1: var <= value
-    #     if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
-    #         # left <= 5
-    #         for i in range(right+1, left.ub+1):
-    #             bool_constraints += [~mapping[left][i]]
-    #     ## case2: value <= var
-    #     elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
-    #         # 5 <= right
-    #         for i in range(left +1, right.ub+1):
-    #             bool_constraints += [~mapping[right][i]]
-    #     ## case3: left <= right
-    #     ### left [0, 1, 2, 3]
-    #     ### right   [1, 2]
-    #     # TODO: check this is correct!
-    #     elif isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-    #         for i in range(left.lb, left.ub+1):
-    #             # when left.ub >= right.ub
-    #             if i > right.ub:
-    #                 bool_constraints += [(~mapping[left][i])]
-    #                 bool_constraints += [~mapping[right][j] for j in range(right.lb, right.ub+1)]
-    #             else:
-    #                 for j in range(right.lb, right.ub+1):
-    #                     if j < i:
-    #                         bool_constraints += [(~mapping[left][i] & ~mapping[right][j])]
-    #     else:
-    #         raise Exception("Val <= val?? or constraint < constraint ??")
-
-
-    #     return bool_constraints
-
-    # else:
-    #     raise Exception("COnstraint not handled yet!")
-
+        # 5 < x1 ------> x1 != 5, x1!=4, ...
+        elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
+            for i in range(right.lb, right.ub+1):
+                if i <= left:
+                    bool_constraints.append(~ivarmap[right][i])
+        # x1 < 5
+        elif isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
+            for i in range(left.lb, left.ub+1):
+                if i >= right:
+                    bool_constraints.append(~ivarmap[left][i])
+        else:
+            raise NotImplementedError(f"Constraint {con} not supported...")
+    elif operator == '<=':
+        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+            # x1  <= x2
+            for i in range(left.lb, left.ub+1):
+                for j in range(right.lb, right.ub+1):
+                    if i > j:
+                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+        # 5 <= x1
+        elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
+            for i in range(right.lb, right.ub+1):
+                if i < left:
+                    bool_constraints.append(~ivarmap[right][i])
+        # x1 <= 5
+        elif isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
+            for i in range(left.lb, left.ub+1):
+                if i > right:
+                    bool_constraints.append(~ivarmap[left][i])
+        else:
+            raise NotImplementedError(f"Constraint {con} not supported...")
     return bool_constraints
 
+def to_bool_operation(constraint, ivarmap):
+
+    if isinstance(constraint, _BoolVarImpl):
+        return constraint
+    elif isinstance(constraint, _IntVarImpl):
+        return sum([val * bv for val, bv in ivarmap[constraint].items() if val != 0])
+
+    # x1 + x2  < 5
+    # write it as a stack to pop until no more operations
+    print(constraint, type(constraint))
+    if isinstance(constraint, Operator) and constraint.name == "sum":
+        return sum([to_bool_operation(arg, ivarmap) for arg in constraint.args])
+
+    return []
+
+def linear_constraint(constraint, ivarmap):
+    operator = constraint.name
+    left, right = constraint.args
+    value, operation = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
+    bool_operation = to_bool_operation(operation, ivarmap)
+
+    return Comparison(operator, bool_operation, value)
 
 def to_bool_constraint(constraint, ivarmap):
     ## composition of constraints
     bool_constraints = []
+    print(constraint, type(constraint))
+    if isinstance(constraint, bool):
+        return constraint
 
-    if isinstance(constraint, (list, NDVarArray)):
+    elif isinstance(constraint, (list, NDVarArray)):
         for con in constraint:
             bool_constraints += to_bool_constraint(con, ivarmap)
-
+    elif all(True if isinstance(arg, _BoolVarImpl) else False for arg in constraint.args):
+        return constraint
     # base constraints
+    elif isinstance(constraint, Comparison) and any(True if isinstance(arg, Operator) else False for arg in constraint.args):
+        bool_constraints += linear_constraint(constraint, ivarmap)
     elif isinstance(constraint, Comparison):
         bool_constraints += to_unit_comparison(constraint, ivarmap)
-
     # global constraints
     elif constraint.name == "alldifferent":
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
     else:
-        raise Exception("COnstraint not handled yet!", type(constraint), constraint)
+        raise NotImplementedError(f"Constraint {constraint} not supported...")
 
     return bool_constraints
 
@@ -214,7 +164,6 @@ def intvar_to_boolvar(int_var):
         ivarmap[int_var] = int_var
 
     elif isinstance(int_var, list):
-
         for ivar in int_var:
             sub_iv_mapping, int_cons = intvar_to_boolvar(ivar)
             constraints += int_cons
@@ -224,229 +173,15 @@ def intvar_to_boolvar(int_var):
         lb, ub = int_var[0].lb ,int_var[0].ub
         # reusing numpy notation if possible
         bvs = boolvar(shape=int_var.shape + (ub - lb + 1,))
+
         for i, ivar in enumerate(int_var):
             ivarmap[ivar] = {ivar_val: bv for bv, ivar_val in zip(bvs[i,:], range(lb, ub+1))}
             constraints.append(sum(bvs[i,:]) == 1)
-
-    elif not isinstance(int_var, _IntVarImpl):
-        raise Exception("Only intvars!")
-
     else:
         lb, ub = int_var.lb ,int_var.ub
         bvs = boolvar(shape=(ub - lb +1))
         ivarmap[int_var] = {ivar_val: bv for bv, ivar_val in zip(bvs, range(lb, ub+1))}
 
         constraints.append(sum(bvs) == 1)
-    if isinstance(int_var, _IntVarImpl) and int_var.lb == 0 and int_var.ub == 1:
-        print("TODO: check for int_var.lb == 0 and int_var.ub == 1 if correct!")
+
     return ivarmap, constraints
-
-# def translate_unit_comparison(constraint, mapping):
-#     bool_constraints=[]
-
-#     # assignment constraint
-#     left, right = constraint.args
-
-#     operator = constraint.name
-
-#     if operator in [">", ">="]:
-#         # exchange 2 constraints arguments since x > 5 is the same as 5 < x
-#         left, right = right, left
-
-#     if operator == '==':
-#         ## 1 variables equal to a value
-#         if all(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
-#             if constraint.args[0] == constraint.args[1]:
-#                 return []
-#             # 2 different numbers are equal ??
-#             else:
-#                 return False
-
-#         elif any(True if isinstance(arg, (int, np.int64)) else False for arg in constraint.args):
-#             value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
-#             assert var.lb <= value and value <= var.ub, "Value must be between bounds!"
-
-#             for bv_value, bv_var in mapping[var].items():
-#                 if bv_value == value:
-#                     bool_constraints.append(bv_var)
-#                 else:
-#                     bool_constraints.append(~bv_var)
-
-#             return bool_constraints
-
-#         if left.ub < right.lb or right.ub < left.lb:
-#             raise Exception("No intersection between bounds", [left.lb, left.ub], [right.lb, right.ub])
-
-#         ## 2 variables equal to each other 
-#         # example[ 1, 7] [2, 5]
-#         smallest_lb_var, largest_lb_var = (left, right) if left.lb < right.lb else (right, left)
-#         smallest_ub_var, largest_ub_var = (left, right) if left.ub < right.ub else (right, left)
-
-#         # Before 2
-#         for i in range(smallest_lb_var.lb, largest_lb_var.lb):
-#             bool_constraints.append(~mapping[smallest_lb_var][i])
-
-#         # After 5
-#         for i in range(smallest_ub_var.ub+1, largest_ub_var.ub+1):
-#             bool_constraints.append(~mapping[largest_ub_var][i])
-
-#         # TODO: check this is correct!
-#         # between intersection: between 2 and 5
-#         for i in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-#             for j in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-#                 if i != j:
-#                     bool_constraints += [(~mapping[left][i] | ~mapping[right][j])]
-
-#         return bool_constraints
-
-#     # different constraint
-#     elif operator == "!=":
-#         if any(True if isinstance(arg, int) else False for arg in constraint.args):
-#             value, var = (left, right) if isinstance(left, (int, np.int64)) else (right, left)
-
-#             for bv_value, bv_var in mapping[var].items():
-#                 # Can only do this assumption!
-#                 if bv_value == value:
-#                     bool_constraints.append(~bv_var)
-
-#             return bool_constraints
-
-#         ## 2 variables equal to each other
-#         smallest_lb_var, largest_lb_var = (left, right) if left.lb < right.lb else (right, left)
-#         smallest_ub_var, largest_ub_var = (left, right) if left.ub < right.ub else (right, left)
-
-#         # only take care of common interval
-#         # TODO: check this is correct!
-#         for i in range(largest_lb_var.lb, smallest_ub_var.ub + 1):
-#             bool_constraints += [(~mapping[left][i] | ~mapping[right][i])]
-
-#         return bool_constraints
-
-#     elif operator in ["<", ">"]:
-#         ## case1: var < value => values larger cannot be true
-#         if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
-#             ## add constraint on values that cannot be true 
-#             for i in range(right, left.ub+1):
-#                 bool_constraints += [~mapping[left][i]]
-#         ## case2: value < var
-#         elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
-#             ## add constraint on values that cannot be true 
-#             for i in range(right.lb, left):
-#                 bool_constraints += [~mapping[right][i]]
-#         ## case3: var < var
-#         elif isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-#             ## can be faster 
-#             # left  = [0 , 1, 2, 3]
-#             # right =     [1, 2]
-#             # left < right
-#             # TODO: check this is correct!
-#             for i in range(left.lb, left.ub+1):
-#                 if i >= right.ub:
-#                     bool_constraints += [(~mapping[left][i])]
-#                     bool_constraints += [~mapping[right][j] for j in range(right.lb, right.ub+1)]
-#                 else:
-#                     for j in range(right.lb, right.ub+1):
-#                         if j <= i:
-#                             # combination cannot be true
-#                             bool_constraints += [(~mapping[left][i] & ~mapping[right][j])]
-#         else:
-#             raise Exception("Val <= val?? or constraint < constraint ??")
-
-#         return bool_constraints
-
-#     elif operator in ["<=", ">="]:
-#         ## case1: var <= value
-#         if isinstance(left, _IntVarImpl) and isinstance(right, (int, np.int64)):
-#             # left <= 5
-#             for i in range(right+1, left.ub+1):
-#                 bool_constraints += [~mapping[left][i]]
-#         ## case2: value <= var
-#         elif isinstance(left, (int, np.int64)) and isinstance(right, _IntVarImpl):
-#             # 5 <= right
-#             for i in range(left +1, right.ub+1):
-#                 bool_constraints += [~mapping[right][i]]
-#         ## case3: left <= right
-#         ### left [0, 1, 2, 3]
-#         ### right   [1, 2]
-#         # TODO: check this is correct!
-#         elif isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-#             for i in range(left.lb, left.ub+1):
-#                 # when left.ub >= right.ub
-#                 if i > right.ub:
-#                     bool_constraints += [(~mapping[left][i])]
-#                     bool_constraints += [~mapping[right][j] for j in range(right.lb, right.ub+1)]
-#                 else:
-#                     for j in range(right.lb, right.ub+1):
-#                         if j < i:
-#                             bool_constraints += [(~mapping[left][i] & ~mapping[right][j])]
-#         else:
-#             raise Exception("Val <= val?? or constraint < constraint ??")
-
-
-#         return bool_constraints
-
-#     else:
-#         raise Exception("COnstraint not handled yet!")
-
-# def reify_translate_constraint(constraint, mapping):
-#     bool_constraints = []
-#     reification_vars = []
-#     if isinstance(constraint, (list, NDVarArray)):
-#         for con in constraint:
-#             sub_bool_constraints, sub_reification_vars = reify_translate_constraint(con, mapping)
-
-#             bool_constraints += sub_bool_constraints
-#             reification_vars += sub_reification_vars
-
-#     # SPECIAL CASE: ASSIGNMENT: boolvars are considered reification vars
-#     elif isinstance(constraint, Comparison) and constraint.name == "==" and any(isinstance(arg, (int, np.int64)) for arg in constraint.args):
-#         sub_bool_constraints = translate_unit_comparison(constraint, mapping)
-#         assert all(isinstance(sub_con, (_BoolVarImpl)) for sub_con in sub_bool_constraints), "Transalted assignment should be boolvars"
-
-#         reification_vars += sub_bool_constraints
-
-#     # assignment: boolvars are considered reification vars
-#     elif isinstance(constraint, Comparison):
-#         sub_bool_constraints = translate_unit_comparison(constraint, mapping)
-#         bv = boolvar()
-#         reification_vars.append(bv)
-
-#         for sub_con in sub_bool_constraints:
-#             # boolean variable are added to reification_vars
-#             bool_constraints.append(bv.implies(sub_con))
-
-#     # global constraints
-#     elif constraint.name == "alldifferent":
-#         bv = boolvar()
-#         reification_vars.append(bv)
-#         for con in constraint.decompose():
-#             sub_bool_constraints = translate_unit_comparison(con, mapping)
-#             bool_constraints.append(bv.implies(sub_bool_constraints))
-#     else:
-#         raise Exception("COnstraint not handled yet!", type(constraint), constraint)
-
-#     return bool_constraints, reification_vars
-
-# def translate_constraint(constraint, mapping):
-#     ## composition of constraints
-#     bool_constraints = []
-#     print(type(constraint),":\t", constraint)
-#     if isinstance(constraint, (list, NDVarArray)):
-
-#         for con in constraint:
-#             bool_constraints += translate_constraint(con, mapping)
-
-#     # base constraints
-#     elif isinstance(constraint, Comparison):
-
-#         bool_constraints += translate_unit_comparison(constraint, mapping)
-
-#     # global constraints
-#     elif constraint.name == "alldifferent":
-
-#         for con in constraint.decompose():
-#             bool_constraints += translate_unit_comparison(con, mapping)
-#     else:
-#         raise Exception("COnstraint not handled yet!", type(constraint), constraint)
-
-#     return bool_constraints
