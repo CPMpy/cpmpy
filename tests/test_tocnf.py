@@ -39,6 +39,24 @@ class TestToCnf(unittest.TestCase):
             for ss1,ss2 in zip(s1,s2):
                 self.assertTrue(np.all(ss1 == ss2), (case, s1, s2))
 
+        # test for errors in edge cases of to_cnf
+        bvs = boolvar(shape=3)
+        ivs = intvar(lb=2, ub=3, shape=3)
+        edge_cases = [
+            # do not consider object as a double implcation, but as a sum
+            (a + b + c) == 1,
+            (a + b + c) != 1,
+            sum(bvs) > 2,
+            sum(bvs) <= 2,
+            sum(ivs) <= 3
+        ]
+
+        # check for error in edge cases
+        for case in edge_cases:
+            cnf = to_cnf(case)
+            # Expressions should not be decomposed at the to_cnf level!
+            self.assertEqual(len(cnf), 1)
+
     def allsols(self, cons, vs):
         sols = []
 
@@ -49,3 +67,6 @@ class TestToCnf(unittest.TestCase):
 
         return np.array(sols)
 
+
+if __name__ == '__main__':
+    unittest.main()

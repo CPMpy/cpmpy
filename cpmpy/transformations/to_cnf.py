@@ -106,16 +106,19 @@ def flat2cnf(constraints):
         # BE != BE (same as xor)
         elif isinstance(expr, Comparison) and expr.name == "!=":
             a0,a1 = expr.args
-            # using 'implies' means it will recursively work for BE's too
-            cnf += flat2cnf([a0.implies(~a1), (~a0).implies(a1)]) # one true and one false
-            continue
+            if a0.is_bool() and a1.is_bool():
+                # using 'implies' means it will recursively work for BE's too
+                cnf += flat2cnf([a0.implies(~a1), (~a0).implies(a1)]) # one true and one false
+                continue
 
         # BE == BE
         elif isinstance(expr, Comparison) and expr.name == "==":
             a0,a1 = expr.args
-            # using 'implies' means it will recursively work for BE's too
-            cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
-            continue
+
+            if a0.is_bool() and a1.is_bool():
+                # using 'implies' means it will recursively work for BE's too
+                cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
+                continue
 
         # BE -> BE
         elif is_operator and expr.name == '->':
