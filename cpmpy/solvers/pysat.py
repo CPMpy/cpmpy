@@ -296,7 +296,7 @@ class CPM_pysat(SolverInterface):
                     lits = [self.pysat_var(var) for var in con.args[0].args]
                     bound = con.args[1]
                     if con.name == "<":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound + 1)
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
                         cnf.extend(atmost.clauses)
                     elif con.name == "<=":
                         atmost = CardEnc.atmost(lits=lits, bound=bound)
