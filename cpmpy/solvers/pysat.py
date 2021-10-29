@@ -269,6 +269,7 @@ class CPM_pysat(SolverInterface):
             Typically only needed for internal use
         """
         from pysat.formula import CNF
+        from pysat.card import CardEnc
 
         # check only BoolVarImpl (incl. NegBoolView)
         for var in get_variables_model(cpm_model):
@@ -289,7 +290,31 @@ class CPM_pysat(SolverInterface):
                     cnf.append([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
-                    
+            elif isinstance(con, Comparison):
+                # only handle cardinality encodings
+                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
+                    lits = [self.pysat_var(var) for var in con.args[0].args]
+                    bound = con.args[1]
+                    if con.name == "<":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound + 1)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == "<=":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == ">=":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == ">":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == "==":
+                        equals = CardEnc.equals(lits=lits, bound=bound)
+                        cnf.extend(equals.clauses)
+                    else:
+                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                else:
+                    raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+
             else:
                 raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
