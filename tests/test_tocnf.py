@@ -45,6 +45,8 @@ class TestToCnf(unittest.TestCase):
         edge_cases = [
             # do not consider object as a double implcation, but as a sum
             (a + b + c) == 1,
+            a * b == 1,
+            a * b != 1,
             (a + b + c) != 1,
             sum(bvs) > 2,
             sum(bvs) <= 2,
