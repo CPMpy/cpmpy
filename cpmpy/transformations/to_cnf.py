@@ -104,14 +104,14 @@ def flat2cnf(constraints):
                 raise NotImplementedError("TODO: nary xor")
 
         # BE != BE (same as xor)
-        elif isinstance(expr, Comparison) and expr.name == "!=":
+        elif isinstance(expr, Comparison) and expr.name == "!=" and expr.args[0].is_bool():
             a0,a1 = expr.args
             # using 'implies' means it will recursively work for BE's too
             cnf += flat2cnf([a0.implies(~a1), (~a0).implies(a1)]) # one true and one false
             continue
 
         # BE == BE
-        elif isinstance(expr, Comparison) and expr.name == "==":
+        elif isinstance(expr, Comparison) and expr.name == "==" and expr.args[0].is_bool():
             a0,a1 = expr.args
             # using 'implies' means it will recursively work for BE's too
             cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
