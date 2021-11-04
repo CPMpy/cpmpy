@@ -9,7 +9,7 @@ class TestInt2Bool(unittest.TestCase):
     def setUp(self):
         self.iv = intvar(lb=2, ub=7,name="iv")
         self.bvs = boolvar(shape=5, name="bv")
-        self.iv_vector = intvar(lb=2, ub=7, shape=5, name="iv_vec")
+        self.iv_vector = intvar(lb=2, ub=6, shape=5, name="iv_vec")
         self.iv_2dmatrix = intvar(lb=2, ub=4, shape=(5, 7), name="iv_2d")
         self.iv_3dmatrix = intvar(lb=2, ub=4, shape=(5, 6, 7), name="iv_3d")
 
@@ -133,6 +133,22 @@ class TestInt2Bool(unittest.TestCase):
         ivarmap, bool_model = iv_model.int2bool_onehot()
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
+
+    def test_comparison_vars(self):
+        iv_model = Model(
+            self.iv_vector[0] < self.iv_vector[1],
+            self.iv_vector[1] < self.iv_vector[2],
+            self.iv_vector[2] < self.iv_vector[3],
+            self.iv_vector[3] < self.iv_vector[4],
+        )
+        iv_model.solve()
+        ivarmap, bool_model = iv_model.int2bool_onehot()
+        bool_model.solve()
+
+        self.assertEqual(
+            extract_solution(ivarmap),
+            set((iv, iv.value()) for iv in self.iv_vector)
+        )
 
     def test_comparison(self):
         iv_model = Model(
