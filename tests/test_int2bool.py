@@ -9,7 +9,7 @@ class TestInt2Bool(unittest.TestCase):
     def setUp(self):
         self.iv = intvar(lb=2, ub=7,name="iv")
         self.bvs = boolvar(shape=5, name="bv")
-        self.iv_vector = intvar(lb=2, ub=4, shape=5, name="iv_vec")
+        self.iv_vector = intvar(lb=2, ub=7, shape=5, name="iv_vec")
         self.iv_2dmatrix = intvar(lb=2, ub=4, shape=(5, 7), name="iv_2d")
         self.iv_3dmatrix = intvar(lb=2, ub=4, shape=(5, 6, 7), name="iv_3d")
 
@@ -144,21 +144,33 @@ class TestInt2Bool(unittest.TestCase):
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
+        iv_model2 = Model(
+            self.iv >= 6,
+            self.iv <= 6
+        )
+        iv_model2.solve()
+        ivarmap2, bool_model2 = iv_model2.int2bool_onehot()
+        bool_model2.solve()
+        self.assertEqual(extract_solution(ivarmap2), set([(self.iv, self.iv.value())]))
+
     def test_comparison_edge_cases(self):
         iv_model = Model(
             self.iv < 10,
-            self.iv > -1
+            self.iv > -1,
+            self.iv >= 7
         )
+
+        iv_model.solve()
         ivarmap, bool_model = iv_model.int2bool_onehot()
-        print(ivarmap)
-        print(bool_model)
+        bool_model.solve()
+        self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
 def extract_solution(ivarmap):
 
     sol = set()
     for iv, value_dict in ivarmap.items():
         n_val_assigned = sum(1 if bv.value() else 0 for iv_val, bv in value_dict.items())
-        assert n_val_assigned == 1, "Only 1 value can be assigned!"
+        assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
         for iv_val, bv in value_dict.items():
             if bv.value():
                 sol.add((iv, iv_val))
