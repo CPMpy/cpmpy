@@ -150,6 +150,21 @@ class TestInt2Bool(unittest.TestCase):
             set((iv, iv.value()) for iv in self.iv_vector)
         )
 
+        iv_model2 = Model(
+            self.iv_vector[0] > self.iv_vector[1],
+            self.iv_vector[1] > self.iv_vector[2],
+            self.iv_vector[2] > self.iv_vector[3],
+            self.iv_vector[3] > self.iv_vector[4],
+        )
+        iv_model2.solve()
+        ivarmap2, bool_model2 = iv_model2.int2bool_onehot()
+        bool_model2.solve()
+
+        self.assertEqual(
+            extract_solution(ivarmap2),
+            set((iv, iv.value()) for iv in self.iv_vector)
+        )
+
     def test_comparison(self):
         iv_model = Model(
             self.iv > 5,
