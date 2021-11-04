@@ -111,17 +111,14 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import CNF
             cnf = CNF()
         else:
-            (self.ivarmap, bm) = cpm_model.int2bool_onehot()
-
             # store original vars
-            self.user_vars = get_variables_model(bm)
+            self.user_vars = get_variables_model(cpm_model)
 
             # create constraint model (list of clauses)
-            cnf = self.make_cnf(bm)
+            cnf = self.make_cnf(cpm_model)
 
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
-
 
     def pysat_var(self, cpm_var):
         """
