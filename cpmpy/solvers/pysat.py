@@ -20,7 +20,7 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables_model
 from ..transformations.to_cnf import to_cnf
@@ -269,6 +269,7 @@ class CPM_pysat(SolverInterface):
             Typically only needed for internal use
         """
         from pysat.formula import CNF
+        from pysat.card import CardEnc
 
         # check only BoolVarImpl (incl. NegBoolView)
         for var in get_variables_model(cpm_model):
@@ -289,7 +290,51 @@ class CPM_pysat(SolverInterface):
                     cnf.append([ self.pysat_var(var) for var in con.args ])
                 else:
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
-                    
+            elif isinstance(con, Comparison):
+                # only handle cardinality encodings
+                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
+                    lits = [self.pysat_var(var) for var in con.args[0].args]
+                    bound = con.args[1]
+                    #TODO: Edge case where sum(x) < 0: Raises error
+                    if con.name == "<":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == "<=":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == ">=":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == ">":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == "==":
+                        equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        cnf.extend(equals.clauses)
+                    # special cases with bounding 'hardcoded' for clarity
+                    elif con.name == "!=" and bound <= 0:
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == "!=" and bound >= len(lits):
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == "!=":
+                        ## add implication literal
+                        is_atleast = self.pysat_var(boolvar())
+                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
+                        cnf.extend(atleast)
+                        
+                        is_atmost = self.pysat_var(boolvar())
+                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
+                        cnf.extend(atmost)
+                        
+                        ## add is_atleast or is_atmost
+                        cnf.append([is_atleast, is_atmost])
+                    else:
+                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                else:
+                    raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+
             else:
                 raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
