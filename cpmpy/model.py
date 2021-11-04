@@ -60,7 +60,7 @@ class Model(object):
             self.constraints = []
         elif len(args) == 1 and is_any_list(args[0]):
             # top level list of constraints
-            self.constraints = args[0]
+            self.constraints = list(args[0]) # make sure it is a Python list
         else:
             self.constraints = list(args) # instead of tuple
 

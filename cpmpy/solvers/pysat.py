@@ -318,17 +318,19 @@ class CPM_pysat(SolverInterface):
                         atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
                         cnf.extend(atmost.clauses)
                     elif con.name == "!=":
-                        is_atleast = self.pysat_var(boolvar())
-                        is_atmost = self.pysat_var(boolvar())
-                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
-                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
                         ## add implication literal
-                        cnf.extend(atmost)
+                        is_atleast = self.pysat_var(boolvar())
+                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
                         cnf.extend(atleast)
-                        ## add ~all([bv1, bv2]) <=> (~bv1 | ~bv2)
+                        
+                        is_atmost = self.pysat_var(boolvar())
+                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
+                        cnf.extend(atmost)
+                        
+                        ## add is_atleast or is_atmost
                         cnf.append([is_atleast, is_atmost])
                     else:
-                        raise NotImplementedError(f"Weighted sum {con} not supported yet by CPM_pysat")
+                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
                 else:
                     raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
