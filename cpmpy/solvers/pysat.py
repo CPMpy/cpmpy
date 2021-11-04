@@ -297,37 +297,37 @@ class CPM_pysat(SolverInterface):
                     bound = con.args[1]
                     #TODO: Edge case where sum(x) < 0: Raises error
                     if con.name == "<":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
                         cnf.extend(atmost.clauses)
                     elif con.name == "<=":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound)
+                        atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
                         cnf.extend(atmost.clauses)
                     elif con.name == ">=":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound)
+                        atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
                         cnf.extend(atleast.clauses)
                     elif con.name == ">":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1)
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
                         cnf.extend(atleast.clauses)
                     elif con.name == "==":
-                        equals = CardEnc.equals(lits=lits, bound=bound)
+                        equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
                         cnf.extend(equals.clauses)
                     # special cases with bounding 'hardcoded' for clarity
                     elif con.name == "!=" and bound <= 0:
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1)
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
                         cnf.extend(atleast.clauses)
                     elif con.name == "!=" and bound >= len(lits):
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
                         cnf.extend(atmost.clauses)
                     elif con.name == "!=":
-                        bv1 = self.pysat_var(boolvar())
-                        bv2 = self.pysat_var(boolvar())
-                        atleast = [cl + [bv1] for cl in CardEnc.atleast(lits=lits, bound=bound+1).clauses]
-                        atmost =  [cl + [bv2] for cl in CardEnc.atmost(lits=lits, bound=bound-1).clauses]
+                        is_atleast = self.pysat_var(boolvar())
+                        is_atmost = self.pysat_var(boolvar())
+                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
+                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
                         ## add implication literal
                         cnf.extend(atmost)
                         cnf.extend(atleast)
                         ## add ~all([bv1, bv2]) <=> (~bv1 | ~bv2)
-                        cnf.append([-bv1, -bv2])
+                        cnf.append([is_atleast, is_atmost])
                     else:
                         raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
                 else:

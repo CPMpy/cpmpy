@@ -6,6 +6,7 @@ from cpmpy.transformations.to_cnf import to_cnf
 
 class TestCardinality(unittest.TestCase):
     def setUp(self):
+        self.bv_before = boolvar(shape=7)
         self.bvs = boolvar(shape=3)
 
     def test_pysat_atmost(self):
@@ -92,7 +93,7 @@ class TestCardinality(unittest.TestCase):
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
     def test_pysat_different(self):
-
+        
         differrent = cp.Model(
             sum(self.bvs) != 3,
             sum(self.bvs) != 1,
@@ -100,7 +101,7 @@ class TestCardinality(unittest.TestCase):
         )
         ps = CPM_pysat(differrent)
         ps.solve()
-
+        print(self.bvs.value())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
 if __name__ == '__main__':
