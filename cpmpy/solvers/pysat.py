@@ -20,7 +20,7 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables_model
 from ..transformations.to_cnf import to_cnf
@@ -295,6 +295,7 @@ class CPM_pysat(SolverInterface):
                 if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
                     lits = [self.pysat_var(var) for var in con.args[0].args]
                     bound = con.args[1]
+                    #TODO: Edge case where sum(x) < 0: Raises error
                     if con.name == "<":
                         atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
                         cnf.extend(atmost.clauses)
@@ -310,6 +311,23 @@ class CPM_pysat(SolverInterface):
                     elif con.name == "==":
                         equals = CardEnc.equals(lits=lits, bound=bound)
                         cnf.extend(equals.clauses)
+                    # special cases with bounding 'hardcoded' for clarity
+                    elif con.name == "!=" and bound <= 0:
+                        atleast = CardEnc.atleast(lits=lits, bound=bound+1)
+                        cnf.extend(atleast.clauses)
+                    elif con.name == "!=" and bound >= len(lits):
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1)
+                        cnf.extend(atmost.clauses)
+                    elif con.name == "!=":
+                        bv1 = self.pysat_var(boolvar())
+                        bv2 = self.pysat_var(boolvar())
+                        atleast = [cl + [bv1] for cl in CardEnc.atleast(lits=lits, bound=bound+1).clauses]
+                        atmost =  [cl + [bv2] for cl in CardEnc.atmost(lits=lits, bound=bound-1).clauses]
+                        ## add implication literal
+                        cnf.extend(atmost)
+                        cnf.extend(atleast)
+                        ## add ~all([bv1, bv2]) <=> (~bv1 | ~bv2)
+                        cnf.append([-bv1, -bv2])
                     else:
                         raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
                 else:
