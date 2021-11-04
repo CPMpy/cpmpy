@@ -120,7 +120,8 @@ class Model(object):
 
         for constraint in self.constraints:
             bool_constraint = to_bool_constraint(constraint, ivarmap)
-            print(constraint, bool_constraint)
+            if len(bool_constraint) == 0:
+                continue
             bool_model += bool_constraint
 
         return (ivarmap, bool_model)
