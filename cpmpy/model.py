@@ -28,6 +28,7 @@
         Model
 """
 import numpy as np
+from cpmpy.expressions.variables import _BoolVarImpl
 from cpmpy.transformations.get_variables import get_variables_model
 
 from cpmpy.transformations.to_bool import intvar_to_boolvar, to_bool_constraint
@@ -103,15 +104,20 @@ class Model(object):
         self.objective_max = True
 
     def int2bool_onehot(self):
-
         user_vars = get_variables_model(self)
+
+        # already bool variables no transformation to apply
+        if all(True if isinstance(var, _BoolVarImpl) else False for var in user_vars):
+            return (dict(), self)
 
         ivarmap, bool_cons = intvar_to_boolvar(user_vars)
 
         bool_model = Model(bool_cons)
 
         for constraint in self.constraints:
-            bool_model += to_bool_constraint(constraint, ivarmap)
+            bool_constraint = to_bool_constraint(constraint, ivarmap)
+            print(constraint, bool_constraint)
+            bool_model += bool_constraint
 
         return (ivarmap, bool_model)
 
@@ -134,7 +140,7 @@ class Model(object):
         else:
             solver_class = SolverLookup.lookup(solver)
         assert(solver_class is not None)
-                
+
         # instatiate solver with this model
         if isinstance(solver, str) and ':' in solver:
             # solver is a name that contains a subsolver
