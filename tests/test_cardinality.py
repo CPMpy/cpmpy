@@ -101,7 +101,6 @@ class TestCardinality(unittest.TestCase):
         )
         ps = CPM_pysat(differrent)
         ps.solve()
-        print(self.bvs.value())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
 if __name__ == '__main__':
