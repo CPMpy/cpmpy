@@ -79,6 +79,10 @@ class Model(object):
             m = Model()
             m += [x > 0]
         """
+        # ignore empty clause
+        if is_any_list(con) and len(con)==0:
+            return self
+
         if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
             # top level list of constraints
             con = con[0]
