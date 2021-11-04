@@ -9,3 +9,8 @@ class TestModel(unittest.TestCase):
         m = cp.Model( iv > 3 )
         m += (iv[0] == 5)
         self.assertTrue(m.solve())
+
+    def test_empty(self):
+        m = cp.Model()
+        m += [] # should do nothing
+        assert(len(m.constraints) == 0)
