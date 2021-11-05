@@ -6,6 +6,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.to_bool import extract_boolvar, intvar_to_boolvar
+import numpy as np
 
 class TestInt2Bool(unittest.TestCase):
     def setUp(self):
