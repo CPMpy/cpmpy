@@ -191,7 +191,6 @@ class CPM_pysat(SolverInterface):
 
         return self
 
-
     def solution_hint(self, cpm_vars, vals):
         """
         PySAT supports warmstarting the solver with a feasible solution
@@ -379,5 +378,5 @@ class CPM_pysat(SolverInterface):
             if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 
-        self._to_cnf_constraints(cpm_model.constraints)
+        return self._to_cnf_constraints(cpm_model.constraints)
 
