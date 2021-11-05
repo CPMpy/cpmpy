@@ -48,8 +48,6 @@ def intvar_to_boolvar(int_var):
             # The following encoding with the exactlyone constraint is then 
             # equivalent to specifying x1 as an integer variable.
             x1 = 4 * bv4 + 5 * bv5 + 6 * bv6 + 7 * bv7 + 8 * bv8
-        
-
     '''
     constraints = []
     ivarmap = {}
@@ -178,95 +176,88 @@ def to_unit_comparison(con, ivarmap):
         right, left = left, right
         operator = operator.replace('>', '<')
 
-    if operator == "==":
-        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-            # x1 ==  x2
-            if left.ub < right.lb or right.ub < left.lb:
-                return bool_constraints
-
-            # example x1 = [ 1, 7] x2 = [2, 5]
-            smallest_lb, largest_lb = (left, right) if left.lb < right.lb else (right, left)
-            # small : exclude [1, 2[
-            for i in range(smallest_lb.lb, largest_lb.lb):
-                bool_constraints.append(~ivarmap[smallest_lb][i])
-
-            # large: exclude [6, 7]
-            smallest_ub, largest_ub = (left, right) if left.ub < right.ub else (right, left)
-            for i in range(smallest_ub.ub + 1, largest_ub.ub+1):
-                bool_constraints.append(~ivarmap[largest_ub][i])
-
-            # exclude tuples that have different values
-            # [2, 6[
-            for i in range(largest_lb.lb, smallest_ub.ub+1):
-                # [2, 6[
-                for j in range(largest_lb.lb, smallest_ub.ub+1):
-                    if i != j:
-                        bool_constraints.append( ~(ivarmap[left][i] & ivarmap[right][j]))
-
+    if operator == "==" and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        # x1 ==  x2
+        if left.ub < right.lb or right.ub < left.lb:
             return bool_constraints
-        # Value Assignment x == 5 
-        elif any(True if is_int(arg) else False for arg in con.args):
-            value, var = (left, right) if is_int(left) else (right, left)
-            if var.lb <= value and value <= var.ub:
-                bool_constraints.append(ivarmap[var][value])
-            else:
-                raise NotImplementedError(f"Constraint {con} not supported...")
-        else:
-            raise NotImplementedError(f"Constraint {con} not supported...")
 
-    elif operator == "!=":
-        # x1  != x2
-        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-            for i in range(left.lb, left.ub+1):
-                for j in range(right.lb, right.ub+1):
-                    if i == j:
-                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
-        # x1  != 3
-        elif any(True if isinstance(arg, (int, np.integer)) else False for arg in con.args):
-            value, var = (left, right) if is_int(left) else  (right, left)
-            if var.lb <= value and value <= var.ub:
-                bool_constraints.append(~ivarmap[var][value])
-        else:
-            raise NotImplementedError(f"Constraint {con} not supported...")
-    elif operator == '<':
-        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-            # x1  < x2
-            for i in range(left.lb, left.ub+1):
-                for j in range(right.lb, right.ub+1):
-                    if i >= j:
-                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+        # example x1 = [ 1, 7] x2 = [2, 5]
+        smallest_lb, largest_lb = (left, right) if left.lb < right.lb else (right, left)
+        # small : exclude [1, 2[
+        for i in range(smallest_lb.lb, largest_lb.lb):
+            bool_constraints.append(~ivarmap[smallest_lb][i])
 
-        # 5 < x1 ------> x1 != 5, x1!=4, ...
-        elif is_int(left) and isinstance(right, _IntVarImpl):
-            for i in range(right.lb, right.ub+1):
-                if i <= left:
-                    bool_constraints.append(~ivarmap[right][i])
-        # x1 < 5
-        elif isinstance(left, _IntVarImpl) and is_int(right):
-            for i in range(left.lb, left.ub+1):
-                if i >= right:
-                    bool_constraints.append(~ivarmap[left][i])
-        else:
-            raise NotImplementedError(f"Constraint {con} not supported...")
-    elif operator == '<=':
-        if  isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
-            # x1  <= x2
-            for i in range(left.lb, left.ub+1):
-                for j in range(right.lb, right.ub+1):
-                    if i > j:
-                        bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+        # large: exclude [6, 7]
+        smallest_ub, largest_ub = (left, right) if left.ub < right.ub else (right, left)
+        for i in range(smallest_ub.ub + 1, largest_ub.ub+1):
+            bool_constraints.append(~ivarmap[largest_ub][i])
+
+        # exclude tuples that have different values
+        # [2, 6[
+        for i in range(largest_lb.lb, smallest_ub.ub+1):
+            # [2, 6[
+            for j in range(largest_lb.lb, smallest_ub.ub+1):
+                if i != j:
+                    bool_constraints.append( ~(ivarmap[left][i] & ivarmap[right][j]))
+
+        return bool_constraints
+
+    # Value Assignment x == 5
+    elif operator == "==" and any(True if is_int(arg) else False for arg in con.args):
+        value, var = (left, right) if is_int(left) else (right, left)
+        if var.lb <= value and value <= var.ub:
+            bool_constraints.append(ivarmap[var][value])
+
+    # x1  != x2
+    elif operator == "!=" and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i == j:
+                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+    # x1  != 3
+    elif operator == "!=" and any(True if isinstance(arg, (int, np.integer)) else False for arg in con.args):
+        value, var = (left, right) if is_int(left) else  (right, left)
+        if var.lb <= value and value <= var.ub:
+            bool_constraints.append(~ivarmap[var][value])
+
+    # x1  < x2
+    elif operator == '<' and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i >= j:
+                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+
+    # 5 < x1 ------> x1 != 5, x1!=4, ...
+    elif operator == '<' and is_int(left) and isinstance(right, _IntVarImpl):
+        for i in range(right.lb, right.ub+1):
+            if i <= left:
+                bool_constraints.append(~ivarmap[right][i])
+
+    # x1 < 5 ----> x1 != 5, x1 != 6, x1 != 7, ...
+    elif operator == '<' and isinstance(left, _IntVarImpl) and is_int(right):
+        for i in range(left.lb, left.ub+1):
+            if i >= right:
+                bool_constraints.append(~ivarmap[left][i])
+
+    elif operator == '<=' and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        # x1  <= x2
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i > j:
+                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
         # 5 <= x1
-        elif is_int(left) and isinstance(right, _IntVarImpl):
-            for i in range(right.lb, right.ub+1):
-                if i < left:
-                    bool_constraints.append(~ivarmap[right][i])
+    elif operator == '<=' and is_int(left) and isinstance(right, _IntVarImpl):
+        for i in range(right.lb, right.ub+1):
+            if i < left:
+                bool_constraints.append(~ivarmap[right][i])
         # x1 <= 5
-        elif isinstance(left, _IntVarImpl) and is_int(right):
-            for i in range(left.lb, left.ub+1):
-                if i > right:
-                    bool_constraints.append(~ivarmap[left][i])
-        else:
-            raise NotImplementedError(f"Constraint {con} not supported...")
+    elif operator == '<=' and isinstance(left, _IntVarImpl) and is_int(right):
+        for i in range(left.lb, left.ub+1):
+            if i > right:
+                bool_constraints.append(~ivarmap[left][i])
+    else:
+        raise NotImplementedError(f"Constraint {con} not supported...")
+
     return bool_constraints
 
 def extract_boolvar(ivarmap):
