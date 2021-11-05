@@ -175,13 +175,12 @@ class CPM_pysat(SolverInterface):
             new_iv_vars = [var for var in con_vars if var not in self.ivarmap and not var.is_bool()]
 
             new_ivarmap, new_bool_cons = intvar_to_boolvar(new_iv_vars)
-
             new_constraints += new_bool_cons
             self.ivarmap.update(new_ivarmap)
+            self.user_vars += extract_boolvar(new_ivarmap)
 
             for constraint in cnf_cons:
                 new_bool_constraints = to_bool_constraint(constraint, self.ivarmap)
-                self.user_vars += extract_boolvar(new_ivarmap)
                 new_constraints += new_bool_constraints
         else:
             new_constraints = cnf_cons
