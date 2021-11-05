@@ -1,4 +1,5 @@
 from cpmpy.expressions.core import Comparison, Operator
+from cpmpy.expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Table
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolvar, intvar
 # from ..expressions.python_builtins import any
 
@@ -106,6 +107,7 @@ def to_unit_comparison(con, ivarmap):
 
 def to_bool_constraint(constraint, ivarmap):
     ## composition of constraints
+    print(constraint, constraint.name, type(constraint))
     bool_constraints = []
 
     if isinstance(constraint, bool):
@@ -114,13 +116,16 @@ def to_bool_constraint(constraint, ivarmap):
     elif isinstance(constraint, (list, NDVarArray)):
         for con in constraint:
             bool_constraints += to_bool_constraint(con, ivarmap)
+
     elif all(True if isinstance(arg, _BoolVarImpl) else False for arg in constraint.args):
         return constraint
-    # base constraints
+
+    # base comparison constraints
     elif isinstance(constraint, Comparison):
         bool_constraints += to_unit_comparison(constraint, ivarmap)
+
     # global constraints
-    elif constraint.name == "alldifferent":
+    elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
     else:
