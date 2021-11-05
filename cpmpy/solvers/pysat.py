@@ -185,7 +185,7 @@ class CPM_pysat(SolverInterface):
         else:
             new_constraints = cnf_cons
 
-        cnf = self._to_cnf_constraints(new_constraints)
+        cnf = self._to_pysat_cnf(new_constraints)
         self.pysat_solver.append_formula(cnf)
 
         return self
@@ -296,7 +296,7 @@ class CPM_pysat(SolverInterface):
 
         return [v for v in self.assumption_vars if self.pysat_var(v) in assum_idx]
 
-    def _to_cnf_constraints(self, constraints):
+    def _to_pysat_cnf(self, constraints):
         from pysat.formula import CNF
         from pysat.card import CardEnc
 
@@ -377,5 +377,5 @@ class CPM_pysat(SolverInterface):
             if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 
-        return self._to_cnf_constraints(cpm_model.constraints)
+        return self._to_pysat_cnf(cpm_model.constraints)
 
