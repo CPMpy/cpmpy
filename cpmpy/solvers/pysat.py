@@ -18,11 +18,12 @@
 
         CPM_pysat
 """
+from cpmpy.transformations.to_bool import extract_boolvar, intvar_to_boolvar, to_bool_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables_model
+from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -50,6 +51,7 @@ class CPM_pysat(SolverInterface):
             # while we need the 'python-sat' package, some more checks:
             from pysat.formula import IDPool
             from pysat.solvers import Solver
+            from pysat.card import CardEnc
             return True
         except ImportError as e:
             return False
@@ -91,6 +93,7 @@ class CPM_pysat(SolverInterface):
             raise Exception("CPM_pysat: only satisfaction, does not support an objective function")
         from pysat.formula import IDPool
         from pysat.solvers import Solver
+        from pysat.card import CardEnc
 
         super().__init__(cpm_model, solver)
 
@@ -105,17 +108,27 @@ class CPM_pysat(SolverInterface):
 
         # ID pool of variables
         self.pysat_vpool = IDPool()
+        self.ivarmap = dict()
 
         if cpm_model is None:
             self.user_vars = []
             from pysat.formula import CNF
             cnf = CNF()
-        else:
+        # Model is bool variable based, there is no need for intvar transformations
+        elif all(True if var.is_bool() else False for var in get_variables_model(cpm_model)):
             # store original vars
             self.user_vars = get_variables_model(cpm_model)
 
             # create constraint model (list of clauses)
             cnf = self.make_cnf(cpm_model)
+        # Model has int variables and needs to be encoded with boolean variables
+        else:
+            (self.ivarmap, bm) = cpm_model.int2bool_onehot()
+
+            self.user_vars = get_variables_model(bm)
+
+            # create constraint model (list of clauses)
+            cnf = self.make_cnf(bm)
 
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
@@ -144,16 +157,37 @@ class CPM_pysat(SolverInterface):
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
-        # base case, just var or ~var
-        if isinstance(cpm_con, _BoolVarImpl):
-            self.pysat_solver.add_clause([ self.pysat_var(cpm_con) ])
+        from pysat.card import CardEnc
+
+        # flatten constraints and to cnf
+        cnf_cons = to_cnf(cpm_con)
+
+        con_vars = get_variables(cnf_cons)
+
+        # new variables should be added to user variables
+        self.user_vars += [var for var in con_vars if var not in self.user_vars and var.is_bool()]
+
+        new_constraints = []
+
+        # check if no new variables have to be added
+        if any(True if not var.is_bool() else False for var in con_vars):
+
+            new_iv_vars = [var for var in con_vars if var not in self.ivarmap and not var.is_bool()]
+
+            new_ivarmap, new_bool_cons = intvar_to_boolvar(new_iv_vars)
+
+            new_constraints += new_bool_cons
+            self.ivarmap.update(new_ivarmap)
+
+            for constraint in cnf_cons:
+                new_bool_constraints = to_bool_constraint(constraint, self.ivarmap)
+                self.user_vars += extract_boolvar(new_ivarmap)
+                new_constraints += new_bool_constraints
         else:
-            cpm_con = to_cnf(cpm_con)
-            for con in cpm_con:
-                if isinstance(con, Operator) and con.name == 'or':
-                    self.pysat_solver.add_clause([ self.pysat_var(var) for var in con.args ])
-                else:
-                    raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
+            new_constraints = cnf_cons
+
+        cnf = self._to_cnf_constraints(new_constraints)
+        self.pysat_solver.append_formula(cnf)
 
         return self
 
@@ -241,6 +275,10 @@ class CPM_pysat(SolverInterface):
                     # not specified...
                     cpm_var._value = None
                     pass
+            # assign value of original int model based on encoding
+            if len(self.ivarmap) > 0:
+                for var, val_bv_dict in self.ivarmap.items():
+                    var._value = sum(value*bv.value() for value, bv in val_bv_dict.items())
 
         return self._solve_return(self.cpm_status)
 
@@ -260,27 +298,16 @@ class CPM_pysat(SolverInterface):
 
         return [v for v in self.assumption_vars if self.pysat_var(v) in assum_idx]
 
-    def make_cnf(self, cpm_model):
-        """
-            Makes a pysat.formulae CNF out of 
-            a CPMpy model (only supports clauses for now)
-
-            Typically only needed for internal use
-        """
+    def _to_cnf_constraints(self, constraints):
         from pysat.formula import CNF
         from pysat.card import CardEnc
-
-        # check only BoolVarImpl (incl. NegBoolView)
-        for var in get_variables_model(cpm_model):
-            if not isinstance(var, _BoolVarImpl):
-                raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 
         # CNF object
         cnf = CNF()
 
         # Post the constraint expressions to the solver
         # only CNF (list of disjunctions) supported for now
-        for con in to_cnf(cpm_model.constraints):
+        for con in to_cnf(constraints):
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
@@ -322,11 +349,11 @@ class CPM_pysat(SolverInterface):
                         is_atleast = self.pysat_var(boolvar())
                         atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
                         cnf.extend(atleast)
-                        
+
                         is_atmost = self.pysat_var(boolvar())
                         atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
                         cnf.extend(atmost)
-                        
+
                         ## add is_atleast or is_atmost
                         cnf.append([is_atleast, is_atmost])
                     else:
@@ -338,4 +365,19 @@ class CPM_pysat(SolverInterface):
                 raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
 
         return cnf
+
+    def make_cnf(self, cpm_model):
+        """
+            Makes a pysat.formulae CNF out of 
+            a CPMpy model (only supports clauses for now)
+
+            Typically only needed for internal use
+        """
+
+        # check only BoolVarImpl (incl. NegBoolView)
+        for var in get_variables_model(cpm_model):
+            if not isinstance(var, _BoolVarImpl):
+                raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
+
+        self._to_cnf_constraints(cpm_model.constraints)
 

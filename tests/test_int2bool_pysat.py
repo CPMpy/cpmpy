@@ -1,11 +1,38 @@
 import unittest
-import numpy as np
-import cpmpy as cp
+import cpmpy as cp 
 from cpmpy.expressions import *
 from cpmpy.model import Model
-from examples.nqueens import nqueens
+from cpmpy.solvers.pysat import CPM_pysat
+import numpy as np
 
-class TestInt2boolExamples(unittest.TestCase):
+class TestInt2BoolPySAT(unittest.TestCase):
+    def test_base_bool_model(self):
+        iv = intvar(lb=3, ub=7)
+
+        m = Model(
+            iv > 4
+        )
+        s = CPM_pysat(m)
+        s.solve()
+        print(iv.value())
+    
+    def test_incremental_int2bool_model(self):
+        iv1 = intvar(lb=3, ub=7)
+        iv2 = intvar(lb=3, ub=5)
+
+        m = Model(
+            iv1 > 6
+        )
+
+        s = CPM_pysat(m)
+        s.solve()
+        print(iv1.value())
+
+        s += iv2 < 4
+        s.solve()
+        print(iv1.value(), iv2.value())
+
+class TestInt2boolPySATExamples(unittest.TestCase):
     def test_sudoku(self):
 
         e = 0 # value for empty cells
@@ -38,27 +65,13 @@ class TestInt2boolExamples(unittest.TestCase):
             for j in range(0,9, 3):
                 sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
 
+        CPM_pysat(sudoku_iv_model).solve()
+        solution_pysat = puzzle.value()
         sudoku_iv_model.solve()
+        solution_ortools = puzzle.value()
 
-        ivarmap, sudoku_bv_model = sudoku_iv_model.int2bool_onehot()
-        sudoku_bv_model.solve()
-
-        self.assertEqual(
-            extract_solution(ivarmap),
-            set((iv, iv.value() ) for iv in puzzle.flat )
-        )
-
-def extract_solution(ivarmap):
-
-    sol = set()
-    for iv, value_dict in ivarmap.items():
-        n_val_assigned = sum(1 if bv.value() else 0 for iv_val, bv in value_dict.items())
-        assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
-        for iv_val, bv in value_dict.items():
-            if bv.value():
-                sol.add((iv, iv_val))
-
-    return sol
+        for sol_pysat, sol_ortools in zip(solution_pysat.flat, solution_ortools.flat):
+            self.assertEqual(sol_pysat, sol_ortools)
 
 if __name__ == '__main__':
     unittest.main()

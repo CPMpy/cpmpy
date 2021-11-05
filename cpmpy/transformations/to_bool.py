@@ -55,6 +55,7 @@ def intvar_to_boolvar(int_var):
     if isinstance(int_var, _BoolVarImpl):
         ivarmap[int_var] = int_var
 
+    # takes care of empty list!
     elif isinstance(int_var, list):
         for ivar in int_var:
             sub_iv_mapping, int_cons = intvar_to_boolvar(ivar)
@@ -261,6 +262,7 @@ def to_unit_comparison(con, ivarmap):
     return bool_constraints
 
 def extract_boolvar(ivarmap):
+    print(ivarmap)
     all_boolvars = []
     for varmap in ivarmap.values():
         all_boolvars += [bv for bv in varmap.values()]
