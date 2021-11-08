@@ -33,6 +33,8 @@ from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
 
+import pickle
+
 class Model(object):
     """
     CPMpy Model object, contains the constraint and objective expressions
@@ -170,3 +172,25 @@ class Model(object):
         obj_str += str(self.objective)
             
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
+
+
+    def to_file(self, fname):
+        """
+            Serializes this model to a .pickle format
+
+            :param: fname: Filename of the resulting serialized model
+        """
+        with open(fname,"wb") as f:
+            pickle.dump(self, file=f)
+
+
+    @staticmethod
+    def from_file(fname):
+        """
+            Reads a Model instance from a binary pickled file
+
+            :return: an object of :class: `Model`
+        """
+        with open(fname, "rb") as f:
+            return pickle.load(f)
+    
