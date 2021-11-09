@@ -215,18 +215,20 @@ class Expression(object):
         if is_num(other) and other == 0:
             return self
 
-         # add weighted sum x + 3 * Y
         x, w = [], []
         # Existing Weighted SUM
         if isinstance(self, Operator) and self.name == "wsum":
             x += self.args[0]
             w += self.args[1]
+            # add weighted sum 3 * x + 3 * Y + (3 * z)
             if isinstance(other,Operator) and other.name == "mul":
                 x += [other.args[1]]
                 w += [other.args[0]]
+            # add weighted sum 3 * x + 3 * Y + (3 * z)
             elif isinstance(other,Operator) and other.name == "sum":
                 x += other.args
                 w += [1] * len(other.args)
+            # add weighted sum 3 * x + 3 * Y +  z)
             elif hasattr(other, 'lb'):
                 x += [other]
                 w += [1]
@@ -237,8 +239,9 @@ class Expression(object):
                 x += [other.args[0].args[1]]
                 w += [-other.args[0].args[0]]
             else:
-                raise NotImplementedError("something missing here!", self, other)
+                return Operator("sum", [self, other])
             return Operator("wsum", (x, w))
+
         elif isinstance(self, Operator) and self.name == "sum":
             x += self.args
             w += [1]*len(self.args)
@@ -270,6 +273,7 @@ class Expression(object):
                 return Operator("wsum", (x, w))
             else:
                 print("262 What case did I not handle ?", self, other)
+                
             # remaining case should be ignored
         elif hasattr(self, 'lb') and isinstance(other, Operator) and other.name == "mul":
             x += [self] + [other.args[1]]
