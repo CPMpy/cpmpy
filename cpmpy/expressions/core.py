@@ -214,7 +214,73 @@ class Expression(object):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-        
+
+         # add weighted sum x + 3 * Y
+        x, w = [], []
+        # Existing Weighted SUM
+        if isinstance(self, Operator) and self.name == "wsum":
+            x += self.args[0]
+            w += self.args[1]
+            if isinstance(other,Operator) and other.name == "mul":
+                x += [other.args[1]]
+                w += [other.args[0]]
+            elif isinstance(other,Operator) and other.name == "sum":
+                x += other.args
+                w += [1] * len(other.args)
+            elif hasattr(other, 'lb'):
+                x += [other]
+                w += [1]
+            elif isinstance(other, Operator) and other.name == "-" and hasattr(other.args[0], 'lb'):
+                x += [other.args[0]]
+                w += [-1]
+            elif isinstance(other, Operator) and other.name == "-" and isinstance(other.args[0], Operator) and other.args[0].name == "mul":
+                x += [other.args[0].args[1]]
+                w += [-other.args[0].args[0]]
+            else:
+                raise NotImplementedError("something missing here!", self, other)
+            return Operator("wsum", (x, w))
+        elif isinstance(self, Operator) and self.name == "sum":
+            x += self.args
+            w += [1]*len(self.args)
+            if isinstance(other, Operator) and other.name == "mul":
+                x += [other.args[1]]
+                w += [other.args[0]]
+                return Operator("wsum", (x, w))
+            else:
+                print("Default sum case", self, other)
+        elif isinstance(self, Operator) and self.name == "mul":
+            x += [self.args[1]]
+            w += [self.args[0]]
+
+            if hasattr(other, 'lb'):
+                x += [other]
+                w += [1]
+                return Operator("wsum", (x, w))
+            elif isinstance(other, Operator) and other.name == "mul":
+                x += [other.args[1]]
+                w += [other.args[0]]
+                return Operator("wsum", (x, w))
+            elif isinstance(other, Operator) and other.name == "-" and hasattr(other.args[0], 'lb'):
+                x += [other.args[0]]
+                w += [-1]
+                return Operator("wsum", (x, w))
+            elif isinstance(other, Operator) and other.name == "-" and isinstance(other.args[0], Operator) and other.args[0].name == "mul":
+                x += [other.args[0].args[1]]
+                w += [-other.args[0].args[0]]
+                return Operator("wsum", (x, w))
+            else:
+                print("262 What case did I not handle ?", self, other)
+            # remaining case should be ignored
+        elif hasattr(self, 'lb') and isinstance(other, Operator) and other.name == "mul":
+            x += [self] + [other.args[1]]
+            w += [1] + [other.args[0]]
+            return Operator("wsum", (x, w))
+        elif isinstance(self, Operator) and self.name == "-" and other.name == "mul":
+            x += [self.args[0]] + [other.args[1]]
+            w += [-1] + [other.args[0]]
+            return Operator("wsum", (x, w))
+        else:
+            print("268 What case did I not handle ?", self, other)
         # add weighted sum 3 * x + 3 * Y
 
         return Operator("sum", [self, other])
@@ -441,61 +507,16 @@ class Operator(Expression):
         if is_num(other) and other == 0:
             return self
 
-        # add weighted sum x + 3 * Y
-        x, w = [], []
-        
-        if isinstance(self, Operator) and self.name == "wsum":
-            x += self.args[0]
-            w += self.args[1]
-            if isinstance(other,Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-            elif isinstance(other,Operator) and other.name == "sum":
-                x += other.args
-                w += [1] * len(other.args)
-            elif hasattr(other, 'lb'):
-                x += [other]
-                w += [1]
-            else:
-                raise NotImplementedError("something missing here!", self, other)
-            return Operator("wsum", (x, w))
-        elif isinstance(self, Operator) and self.name == "sum":
-            x += self.args
-            w += [1]*len(self.args)
-            if isinstance(other, Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-                return Operator("wsum", (x, w))
-            else:
-                print("Default sum case", self, other)
-        elif isinstance(self, Operator) and self.name == "mul":
-            x += [self.args[1]]
-            w += [self.args[0]]
-            if hasattr(other, 'lb'):
-                x += [other]
-                w += [1]
-            elif isinstance(other, Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-            else:
-                raise NotImplementedError("something missing here!", self, other)
-            return Operator("wsum", (x, w))
-        else:
-            print("What case did I not handle ?", self, other)
-
         if self.name == 'sum':
             if not isinstance(other, Iterable):
                 self.args.append(other)
             else: # vector
                 self.args.extend(other)
             return self
-        else:
-            raise NotImplementedError("something missing here!", self, other)
 
         return super().__add__(other)
 
     def __radd__(self, other):
-        print('Op-radd', self, other)
         # only for constants
         if is_num(other) and other == 0:
             return self
