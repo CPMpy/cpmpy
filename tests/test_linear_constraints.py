@@ -32,8 +32,29 @@ class TestLinearConstraint(unittest.TestCase):
 
 
     def test_pysat_boolean_linear_sum(self):
+        n = 5
+        color = intvar(1,n,shape=n,name="color")
+        red,green,yellow,blue,ivory = color
+
+        nationality = intvar(1,n,shape=n,name="nationality")
+        englishman,spaniard,japanese,ukrainian,norwegian = nationality
+        # This is used in the solution below.
+        englishman.name="englishman"; spaniard.name="spaniard";
+        japanese.name="japanese";ukrainian.name="ukrainan";
+        norwegian.name="norwegian"
+
+        animal = intvar(1,n,shape=n,name="animal")
+        dog,snails,fox,zebra,horse = animal
+
+        drink = intvar(1,n,shape=n,name="drink")
+        tea,coffee,water,milk,fruit_juice = drink
+
+        smoke = intvar(1,n,shape=n,name="smoke")
+        old_gold,kools,chesterfields,lucky_strike,parliaments = smoke
+
         ls = cp.Model(
-            2 * self.bv[0] + 3 * self.bv[1] <= 3,
+            # 2 * self.bv[0] + 3 * self.bv[1] <= 3,
+            [1 == abs(norwegian - blue)]
         )
         ps = CPM_pysat(ls)
 

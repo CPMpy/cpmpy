@@ -1,7 +1,8 @@
-from cpmpy.expressions.core import Comparison
+import itertools
+from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Table
 from cpmpy.expressions.utils import is_int
-from cpmpy.transformations.get_variables import get_variables
+from cpmpy.transformations.get_variables import get_all_elems, get_variables
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolvar
 # from ..expressions.python_builtins import any
 
@@ -79,6 +80,29 @@ def intvar_to_boolvar(int_var):
 
     return ivarmap, constraints
 
+def linear_to_bool_constraint(constraint, ivarmap):
+    print("\n")
+    print(constraint, type(constraint))
+    print("\t name:", constraint.name)
+    print("\t args:", constraint.args, "\n")
+    bool_constraints = []
+    if isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator):
+        left, right = constraint.args
+        print("\t\t left.name:", left.name)
+        print("\t\t left.args:", left.args, "\n")
+        exprs_, vars_ = get_all_elems(left.args)
+        # base sum
+        if left.name == "sum" and all(isinstance(var, _IntVarImpl) for var in ):
+            bool_constraints.append(sum([val * bv for var in get_variables(left) for val, bv in ivarmap[var].items()]))
+            print("\t\t", left)
+            print("\t\t", bool_constraints)
+        
+        else:
+            raise NotImplementedError(f"Constraint {constraint} not supported...")    
+    else:
+        # TODO: Handle linear constraints with appropriate transformations
+        raise NotImplementedError(f"Constraint {constraint} not supported...")
+    return bool_constraints
 
 def to_bool_constraint(constraint, ivarmap):
     '''
@@ -128,8 +152,8 @@ def to_bool_constraint(constraint, ivarmap):
 
     # CASE 6: Linear constraints & others (ex: Global consraints Min/Max/...)
     else:
-        # TODO: Handle linear constraints with appropriate transformations
-        raise NotImplementedError(f"Constraint {constraint} not supported...")
+        bool_constraints += linear_to_bool_constraint(constraint, ivarmap)
+
 
     return bool_constraints
 

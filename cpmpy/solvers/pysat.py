@@ -312,8 +312,10 @@ class CPM_pysat(SolverInterface):
 
         # CNF object
         cnf = CNF()
+        print(constraints, to_cnf(constraints))
 
         for con in to_cnf(constraints):
+            
 
             # print(con.name, [(arg, type(arg)) for arg in con.args])
             # base case, just var or ~var
