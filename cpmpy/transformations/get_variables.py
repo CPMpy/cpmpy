@@ -6,7 +6,7 @@ Variables are ordered by appearance, e.g. first encountered first
 import warnings # for deprecation warning
 from ..expressions.core import Expression
 from ..expressions.variables import _NumVarImpl,NegBoolView
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, is_int
 
 def get_variables_model(model):
     """
@@ -47,6 +47,29 @@ def get_variables(expr):
             vars_ += get_variables(subexpr)
     # else: every non-list, non-expression
     return vars_
+
+def get_all_elems(expr):
+
+    
+    if isinstance(expr, (NegBoolView, _NumVarImpl)) or is_int(expr):
+        # a real var, do our thing
+        return [], [expr]
+
+    expr_names_, vars_ = [], []
+    # if list or Expr: recurse
+    if is_any_list(expr):
+        for subexpr in expr:
+            new_expr_names, new_vars = get_all_elems(subexpr)
+            expr_names_ += new_expr_names
+            vars_ += new_vars
+    elif isinstance(expr, Expression):
+        expr_names_ += [expr.name]
+        for subexpr in expr.args:
+            new_expr_names, new_vars = get_all_elems(subexpr)
+            expr_names_ += new_expr_names
+            vars_ += new_vars
+    # else: every non-list, non-expression
+    return expr_names_, vars_
 
 def print_variables(expr_or_model):
     """

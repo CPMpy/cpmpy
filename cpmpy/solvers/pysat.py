@@ -18,12 +18,13 @@
 
         CPM_pysat
 """
+from cpmpy.transformations.flatten_model import flatten_constraint, normalized_boolexpr, normalized_numexpr
 from cpmpy.transformations.to_bool import extract_boolvar, intvar_to_boolvar, to_bool_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
-from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables, get_variables_model
+from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
+from ..expressions.utils import is_any_list, is_int
+from ..transformations.get_variables import get_all_elems, get_variables, get_variables_model
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -52,6 +53,14 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import IDPool
             from pysat.solvers import Solver
             from pysat.card import CardEnc
+            return True
+        except ImportError as e:
+            return False
+
+    @staticmethod
+    def pb_supported():
+        try:
+            from pysat.pb import PBEnc
             return True
         except ImportError as e:
             return False
@@ -121,6 +130,7 @@ class CPM_pysat(SolverInterface):
 
             # create constraint model (list of clauses)
             cnf = self.make_cnf(cpm_model)
+            
         # Model has int variables and needs to be encoded with boolean variables
         else:
             (self.ivarmap, bm) = cpm_model.int2bool_onehot()
@@ -303,9 +313,9 @@ class CPM_pysat(SolverInterface):
         # CNF object
         cnf = CNF()
 
-        # Post the constraint expressions to the solver
-        # only CNF (list of disjunctions) supported for now
         for con in to_cnf(constraints):
+
+            # print(con.name, [(arg, type(arg)) for arg in con.args])
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
@@ -316,51 +326,80 @@ class CPM_pysat(SolverInterface):
                     raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
             elif isinstance(con, Comparison):
                 # only handle cardinality encodings
-                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
-                    lits = [self.pysat_var(var) for var in con.args[0].args]
-                    bound = con.args[1]
-                    #TODO: Edge case where sum(x) < 0: Raises error
-                    if con.name == "<":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == "<=":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == ">=":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == ">":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == "==":
-                        equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(equals.clauses)
-                    # special cases with bounding 'hardcoded' for clarity
-                    elif con.name == "!=" and bound <= 0:
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == "!=" and bound >= len(lits):
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == "!=":
-                        ## add implication literal
-                        is_atleast = self.pysat_var(boolvar())
-                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
-                        cnf.extend(atleast)
+                left, right = con.args[0], con.args[1]
+                bound = None
+                lits, weights = None, None
+                if not CPM_pysat.pb_supported():
+                    raise ImportError("Please install PyPBLib: pip install pypblib")
+                from pysat.pb import PBEnc
 
-                        is_atmost = self.pysat_var(boolvar())
-                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
-                        cnf.extend(atmost)
+                if isinstance(left, Operator) and all(isinstance(v, _BoolVarImpl) for v in left.args) and is_int(right):
+                    lits = [self.pysat_var(var) for var in left.args]
+                    weights = [1]*len(lits)
+                    bound = right
 
-                        ## add is_atleast or is_atmost
-                        cnf.append([is_atleast, is_atmost])
-                    else:
-                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                # WEIGHTED !
+                elif isinstance(left, Operator) and all(isinstance(v, _BoolVarImpl) or is_int(v) for v in left.args) and is_int(right):
+
+                    lits = [self.pysat_var(v) for v in left.args if isinstance(v, _BoolVarImpl)]
+                    weights = [v for v in left.args if is_int(v)]
+                    bound = right
                 else:
-                    raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                    raise NotImplementedError(f"Comparison constraint {con} not supported by CPM_pysat")
+
+                if con.name == "<":
+                    atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool)
+                    if len(atmost.clauses) > 0:
+                        cnf.extend(atmost.clauses)
+                elif con.name == "<=":
+                    atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool)
+
+                    if len(atmost.clauses) > 0:
+                        cnf.extend(atmost.clauses)
+                elif con.name == ">":
+                    atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool)
+
+                    if len(atleast.clauses) > 0:
+                        cnf.extend(atleast.clauses)
+                elif con.name == ">=":
+                    atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool)
+                    if len(atleast.clauses) > 0:
+                        cnf.extend(atleast.clauses)
+                elif con.name == "==":
+                    equals = PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
+                    if len(equals.clauses) > 0:
+                        cnf.extend(equals.clauses)
+                elif con.name == "!=" and bound <= 0:
+                    atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool)
+                    if len(atleast.clauses) > 0:
+                        cnf.extend(atleast.clauses)
+                elif con.name == "!=" and bound >= len(lits):
+                    atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound - 1, vpool=self.pysat_vpool)
+                    if len(atmost.clauses) > 0:
+                        cnf.extend(atmost.clauses)
+                elif con.name == "!=":
+                    # BUG with pblib
+                    is_atleast = self.pysat_var(boolvar())
+                    is_atmost = self.pysat_var(boolvar())
+
+                    atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
+                    atleast_clauses = [cl + [-is_atleast] for cl in atleast]
+                    if len(atleast) > 0:
+                        cnf.extend(atleast_clauses)
+
+                    atmost =  PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
+                    atmost_clauses = [cl + [-is_atmost] for cl in atmost]
+                    if len(atmost_clauses) > 0:
+                        cnf.extend(atmost_clauses)
+
+                    ## add is_atleast or is_atmost
+                    cnf.append([is_atleast, is_atmost])
+
+                else:
+                    raise NotImplementedError(f"Comparison: {con} operator not supported by CPM_pysat")     
 
             else:
-                raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                raise NotImplementedError(f"Other type Operator {con} not supported by CPM_pysat")
 
         return cnf
 
@@ -376,6 +415,8 @@ class CPM_pysat(SolverInterface):
         for var in get_variables_model(cpm_model):
             if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
+
+        assert all(constraint.is_bool() for constraint in cpm_model.constraints), f"Constraints \n{[constraint for constraint in cpm_model.constraints if not constraint.is_bool()]} should be a mapping to Boolean."
 
         return self._to_pysat_cnf(cpm_model.constraints)
 

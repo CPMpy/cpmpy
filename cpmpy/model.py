@@ -133,6 +133,7 @@ class Model(object):
         bool_model = Model(bool_cons)
 
         for constraint in flattened_model.constraints:
+            assert constraint.is_bool(), "Constraint {constraint} return type should be Boolean."
 
             bool_model += to_bool_constraint(constraint, ivarmap)
 
