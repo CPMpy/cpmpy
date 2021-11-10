@@ -280,7 +280,7 @@ def flatten_objective(expr):
                 # one of the arguments is not flat, flatten all
                 flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in x])
                 # one of the expressions in x is not flat, flatten all
-                newexpr = Operator(expr.name, (flatvars, w))
+                newexpr = Operator(expr.name, (w, flatvars))
                 return (newexpr, [c for con in flatcons for c in con])
     
     # any other numeric expression
@@ -335,7 +335,7 @@ def get_or_make_var(expr):
         lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
         ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
         ivar = _IntVarImpl(lb, ub)
-        newexpr = (Operator(expr.name, (flatvars, flatweights)) == ivar)
+        newexpr = (Operator(expr.name, (flatweights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
@@ -595,7 +595,7 @@ def normalized_numexpr(expr):
         weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
         flatweights = weights
-        newexpr = Operator(expr.name, (flatvars, flatweights))
+        newexpr = Operator(expr.name, (flatweights, flatvars))
         return (newexpr, [c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
