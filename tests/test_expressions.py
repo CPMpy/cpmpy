@@ -101,6 +101,13 @@ class TestWeightedSum(unittest.TestCase):
         expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
+    
+    def test_weighted_nested_epxressions(self):
+        expr = self.ivs[0] * 4 + 5 * (self.ivs[1] + 6 * self.ivs[2])
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+        print(expr)
+        
 
 if __name__ == '__main__':
     unittest.main()

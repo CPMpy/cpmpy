@@ -273,7 +273,16 @@ def flatten_objective(expr):
                 newexpr = Operator(expr.name, flatvars)
                 return (newexpr, [c for con in flatcons for c in con])
         elif expr.name == 'wsum':
-            raise NotImplementedError(expr) # TODO, wsum
+            x, w = expr.args
+            if all(__is_flat_var(arg) for arg in x):
+                return (expr, [])
+            else:
+                # one of the arguments is not flat, flatten all
+                flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in x])
+                # one of the expressions in x is not flat, flatten all
+                print("x=", x , "w=", w)
+                print(flatvars, flatcons, [c for con in flatcons for c in con])
+                raise NotImplementedError(expr) # TODO, wsum
     
     # any other numeric expression
     return get_or_make_var(expr)
@@ -319,10 +328,20 @@ def get_or_make_var(expr):
     # XXX until we do weighted sum, turn into -1*args[0]
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return get_or_make_var(-1*expr.args[0])
+    elif isinstance(expr, Operator) and expr.name == "wsum":
+        sub_exprs, weights = expr.args
+        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
+        flatweights = weights
+        lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
+        ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
+        ivar = _IntVarImpl(lb, ub)
+        newexpr = (Operator(expr.name, (flatvars, flatweights)) == ivar)
+        return (ivar, [newexpr]+[c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
         # TODO: more like above, call normalized_numexpr() on expr, then equate...
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args]) # also bool, reified...
+        print(expr, flatvars, flatcons)
         lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
