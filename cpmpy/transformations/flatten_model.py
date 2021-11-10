@@ -273,7 +273,7 @@ def flatten_objective(expr):
                 newexpr = Operator(expr.name, flatvars)
                 return (newexpr, [c for con in flatcons for c in con])
         elif expr.name == 'wsum':
-            x, w = expr.args
+            w, x = expr.args
             if all(__is_flat_var(arg) for arg in x):
                 return (expr, [])
             else:
@@ -329,7 +329,7 @@ def get_or_make_var(expr):
         return get_or_make_var(-1*expr.args[0])
 
     elif isinstance(expr, Operator) and expr.name == "wsum":
-        sub_exprs, weights = expr.args
+        weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
         flatweights = weights
         lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
@@ -592,7 +592,7 @@ def normalized_numexpr(expr):
         return normalized_numexpr(-1*expr.args[0])
 
     elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
-        sub_exprs, weights = expr.args
+        weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
         flatweights = weights
         newexpr = Operator(expr.name, (flatvars, flatweights))

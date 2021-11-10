@@ -26,7 +26,7 @@
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
-    - wsum([w1 * x, w2 * y, w3* z])  Operator("sum", [x,w])
+    - wsum([w1 * x, w2 * y, w3* z])  Operator("sum", [w,x])
     - x - y         Operator("sum", [x,-y])
     - x * y         Operator("mul", [x,y])
     - x / y         Operator("div", [x,y])
@@ -240,7 +240,7 @@ class Expression(object):
                 w += [-other.args[0].args[0]]
             else:
                 return Operator("sum", [self, other])
-            return Operator("wsum", (x, w))
+            return Operator("wsum", (w, x))
 
         elif isinstance(self, Operator) and self.name == "sum":
             x += self.args
@@ -248,9 +248,8 @@ class Expression(object):
             if isinstance(other, Operator) and other.name == "mul":
                 x += [other.args[1]]
                 w += [other.args[0]]
-                return Operator("wsum", (x, w))
-            else:
-                print("Default sum case", self, other)
+                return Operator("wsum", (w, x))
+
         elif isinstance(self, Operator) and self.name == "mul":
             x += [self.args[1]]
             w += [self.args[0]]
@@ -258,29 +257,29 @@ class Expression(object):
             if hasattr(other, 'lb'):
                 x += [other]
                 w += [1]
-                return Operator("wsum", (x, w))
+                return Operator("wsum", (w, x))
             elif isinstance(other, Operator) and other.name == "mul":
                 x += [other.args[1]]
                 w += [other.args[0]]
-                return Operator("wsum", (x, w))
+                return Operator("wsum", (w, x))
             elif isinstance(other, Operator) and other.name == "-" and hasattr(other.args[0], 'lb'):
                 x += [other.args[0]]
                 w += [-1]
-                return Operator("wsum", (x, w))
+                return Operator("wsum", (w, x))
             elif isinstance(other, Operator) and other.name == "-" and isinstance(other.args[0], Operator) and other.args[0].name == "mul":
                 x += [other.args[0].args[1]]
                 w += [-other.args[0].args[0]]
-                return Operator("wsum", (x, w))
+                return Operator("wsum", (w, x))
 
             # remaining case should be ignored
         elif hasattr(self, 'lb') and isinstance(other, Operator) and other.name == "mul":
             x += [self] + [other.args[1]]
             w += [1] + [other.args[0]]
-            return Operator("wsum", (x, w))
+            return Operator("wsum", (w, x))
         elif isinstance(self, Operator) and self.name == "-" and other.name == "mul":
             x += [self.args[0]] + [other.args[1]]
             w += [-1] + [other.args[0]]
-            return Operator("wsum", (x, w))
+            return Operator("wsum", (w, x))
 
         # add weighted sum 3 * x + 3 * Y
 
@@ -560,7 +559,7 @@ class Operator(Expression):
 
         if any(a is None for a in arg_vals): return None
         if   self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(xi.value() * wi for xi, wi in zip(*arg_vals))
+        elif self.name == "wsum": return sum(xi.value() * wi for wi, xi in zip(*arg_vals))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "div": return arg_vals[0] / arg_vals[1]
