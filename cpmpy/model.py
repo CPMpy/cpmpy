@@ -108,36 +108,6 @@ class Model(object):
         self.objective = expr
         self.objective_max = True
 
-    def int2bool_onehot(self):
-        '''
-            Flatten model to ensure flat int variable-based constraints that
-            can be encoded to a boolean version.
-
-        :return: (dict, Model):
-            - dict: mapping of int variable values to boolean variables
-            - model: new boolean encoding of int model
-        '''
-
-        flattened_model = flatten_model(self)
-
-        # keep track of all variables that are encoded into their boolean counterpart.
-        user_vars = get_variables_model(flattened_model)
-
-        # already bool variables no transformation to apply
-        if all(True if isinstance(var, _BoolVarImpl) else False for var in user_vars):
-            return (dict(), self)
-
-        # mapping of intvar to boolvar and constraint on the boolvars
-        ivarmap, bool_cons = intvar_to_boolvar(user_vars)
-
-        bool_model = Model(bool_cons)
-
-        for constraint in flattened_model.constraints:
-
-            bool_model += to_bool_constraint(constraint, ivarmap)
-
-        return (ivarmap, bool_model)
-
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result

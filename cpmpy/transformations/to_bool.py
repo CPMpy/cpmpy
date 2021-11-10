@@ -1,11 +1,50 @@
-from cpmpy.expressions.core import Comparison
-from cpmpy.expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Table
-from cpmpy.expressions.utils import is_int
-from cpmpy.transformations.get_variables import get_variables
+
+from ..expressions.core import Comparison
+from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Table
+from ..expressions.utils import is_any_list, is_int
+from ..transformations.get_variables import get_variables, get_variables_model
+from ..transformations.flatten_model import flatten_constraint, flatten_model
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolvar
-# from ..expressions.python_builtins import any
+
 
 import numpy as np
+
+def int2bool(constraints):
+    # keep track of all variables that are encoded into their boolean counterpart.
+    user_vars = get_variables(constraints)
+
+    # already bool variables no transformation to apply
+    if all(True if isinstance(var, _BoolVarImpl) else False for var in user_vars):
+        return (dict(), constraints)
+
+    flattened_constraints = flatten_constraint(constraints)
+    user_vars = get_variables(flattened_constraints)
+
+    # mapping of intvar to boolvar and constraint on the boolvars
+    ivarmap, bool_cons = intvar_to_boolvar(user_vars)
+
+    bool_constraints = bool_cons
+
+    for constraint in flattened_constraints:
+
+        bool_constraints += to_bool_constraint(constraint, ivarmap)
+
+    return (ivarmap, bool_constraints)
+
+def int2bool_model(model):
+    '''
+        Flatten model to ensure flat int variable-based constraints that
+        can be encoded to a boolean version.
+
+    :return: (dict, Model):
+        - dict: mapping of int variable values to boolean variables
+        - model: new boolean encoding of int model
+    '''
+    from ..model import Model
+
+    assert isinstance(model, Model), f"Input expected Cpmpy.Model got ({type(model)})"
+
+    return int2bool(model.constraints)
 
 
 def intvar_to_boolvar(int_var):
