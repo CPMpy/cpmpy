@@ -9,7 +9,31 @@ from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolv
 
 import numpy as np
 
+
+def int2bool_model(model):
+    '''
+    Flatten model to ensure flat int variable-based constraints can be 
+    encoded to a boolean version.
+
+    :return: (dict, Model):
+        - dict: mapping of int variable values to boolean variables
+        - model: new boolean encoding of int model
+    '''
+    from ..model import Model
+
+    assert isinstance(model, Model), f"Input expected Cpmpy.Model got ({type(model)})"
+
+    return int2bool(model.constraints)
+
 def int2bool(constraints):
+    '''
+    Encode the int variables-based constraints into their boolean encoding
+    and keep track of int->bool variable mapping.
+
+    :return: (dict, Model):
+        - dict: mapping of int variable values to boolean variables
+        - model: new boolean encoding of int model
+    '''
     # keep track of all variables that are encoded into their boolean counterpart.
     user_vars = get_variables(constraints)
 
@@ -30,21 +54,6 @@ def int2bool(constraints):
         bool_constraints += to_bool_constraint(constraint, ivarmap)
 
     return (ivarmap, bool_constraints)
-
-def int2bool_model(model):
-    '''
-        Flatten model to ensure flat int variable-based constraints that
-        can be encoded to a boolean version.
-
-    :return: (dict, Model):
-        - dict: mapping of int variable values to boolean variables
-        - model: new boolean encoding of int model
-    '''
-    from ..model import Model
-
-    assert isinstance(model, Model), f"Input expected Cpmpy.Model got ({type(model)})"
-
-    return int2bool(model.constraints)
 
 
 def intvar_to_boolvar(int_var):
