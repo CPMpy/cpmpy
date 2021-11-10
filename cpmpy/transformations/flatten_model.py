@@ -270,6 +270,7 @@ def flatten_objective(expr):
             else:
                 # one of the arguments is not flat, flatten all
                 flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+                print("sum=", flatvars, flatcons)
                 newexpr = Operator(expr.name, flatvars)
                 return (newexpr, [c for con in flatcons for c in con])
         elif expr.name == 'wsum':
@@ -281,8 +282,12 @@ def flatten_objective(expr):
                 flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in x])
                 # one of the expressions in x is not flat, flatten all
                 print("x=", x , "w=", w)
-                print(flatvars, flatcons, [c for con in flatcons for c in con])
-                raise NotImplementedError(expr) # TODO, wsum
+                print("\tflatvars=", flatvars)
+                print("\tflatcons=", flatcons)
+                print("\tc:", [c for con in flatcons for c in con])
+
+                newexpr = Operator(expr.name, (flatvars, w))
+                return (newexpr, [c for con in flatcons for c in con])
     
     # any other numeric expression
     return get_or_make_var(expr)
@@ -328,6 +333,7 @@ def get_or_make_var(expr):
     # XXX until we do weighted sum, turn into -1*args[0]
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return get_or_make_var(-1*expr.args[0])
+
     elif isinstance(expr, Operator) and expr.name == "wsum":
         sub_exprs, weights = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
