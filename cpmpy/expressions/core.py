@@ -218,8 +218,8 @@ class Expression(object):
         x, w = [], []
         # Existing Weighted SUM
         if isinstance(self, Operator) and self.name == "wsum":
-            x += self.args[0]
-            w += self.args[1]
+            w += self.args[0]
+            x += self.args[1]
             # add weighted sum 3 * x + 3 * Y + (3 * z)
             if isinstance(other,Operator) and other.name == "mul":
                 x += [other.args[1]]

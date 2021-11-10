@@ -330,18 +330,18 @@ def get_or_make_var(expr):
 
     elif isinstance(expr, Operator) and expr.name == "wsum":
         weights, sub_exprs  = expr.args
+        print(weights, sub_exprs)
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
-        flatweights = weights
+        print(flatvars, flatcons)
         lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
         ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
         ivar = _IntVarImpl(lb, ub)
-        newexpr = (Operator(expr.name, (flatweights, flatvars)) == ivar)
+        newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
         # TODO: more like above, call normalized_numexpr() on expr, then equate...
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args]) # also bool, reified...
-        print(expr, flatvars, flatcons)
         lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
 
@@ -594,8 +594,7 @@ def normalized_numexpr(expr):
     elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
         weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
-        flatweights = weights
-        newexpr = Operator(expr.name, (flatweights, flatvars))
+        newexpr = Operator(expr.name, (weights, flatvars))
         return (newexpr, [c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
