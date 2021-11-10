@@ -191,9 +191,6 @@ class CPM_pysat(SolverInterface):
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # set time limit?
-        if time_limit is not None:
-            raise NotImplementedError("Didn't get to it yet, see pysat.solver.interrupt() for an example of what to implement")
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -201,7 +198,13 @@ class CPM_pysat(SolverInterface):
             pysat_assum_vars = [self.pysat_var(v) for v in assumptions]
             self.assumption_vars = assumptions
 
-        pysat_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
+        # set time limit?
+        if time_limit is not None:
+            from threading import Timer
+            Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver]).start()
+            pysat_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
+        else:
+            pysat_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
 
         return self._after_solve(pysat_status)
 
