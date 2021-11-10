@@ -271,9 +271,7 @@ class Expression(object):
                 x += [other.args[0].args[1]]
                 w += [-other.args[0].args[0]]
                 return Operator("wsum", (x, w))
-            else:
-                print("262 What case did I not handle ?", self, other)
-                
+
             # remaining case should be ignored
         elif hasattr(self, 'lb') and isinstance(other, Operator) and other.name == "mul":
             x += [self] + [other.args[1]]
@@ -283,8 +281,7 @@ class Expression(object):
             x += [self.args[0]] + [other.args[1]]
             w += [-1] + [other.args[0]]
             return Operator("wsum", (x, w))
-        else:
-            print("268 What case did I not handle ?", self, other)
+
         # add weighted sum 3 * x + 3 * Y
 
         return Operator("sum", [self, other])
