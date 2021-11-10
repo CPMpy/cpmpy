@@ -28,6 +28,11 @@
         Model
 """
 import numpy as np
+from cpmpy.expressions.variables import _BoolVarImpl
+from cpmpy.transformations.get_variables import get_variables_model
+from cpmpy.transformations.flatten_model import flatten_model
+
+from cpmpy.transformations.to_bool import intvar_to_boolvar, to_bool_constraint
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
@@ -105,7 +110,6 @@ class Model(object):
         self.objective = expr
         self.objective_max = True
 
-    
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
@@ -125,7 +129,7 @@ class Model(object):
         else:
             solver_class = SolverLookup.lookup(solver)
         assert(solver_class is not None)
-                
+
         # instatiate solver with this model
         if isinstance(solver, str) and ':' in solver:
             # solver is a name that contains a subsolver
