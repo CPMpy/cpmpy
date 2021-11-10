@@ -151,7 +151,7 @@ class CPM_pysat(SolverInterface):
         immediately adds the constraint to PySAT
 
         Note that we don't store the resulting cpm_model, we translate
-        directly to the ort_model
+        directly to the internal pysat solver
 
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
