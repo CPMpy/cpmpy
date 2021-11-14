@@ -97,33 +97,27 @@ def intvar_to_boolvar(int_var):
             # equivalent to specifying x1 as an integer variable.
             x1 = 4 * bv4 + 5 * bv5 + 6 * bv6 + 7 * bv7 + 8 * bv8
     '''
-    constraints = []
     ivarmap = {}
+    constraints = []
     # Bool
     if isinstance(int_var, _BoolVarImpl):
         ivarmap[int_var] = int_var
 
     # takes care of empty list!
-    elif isinstance(int_var, list):
+    elif is_any_list(int_var):
         for ivar in int_var:
-            sub_iv_mapping, int_cons = intvar_to_boolvar(ivar)
-            constraints += int_cons
-            ivarmap.update(sub_iv_mapping)
+            sub_ivarmap, sub_cons = intvar_to_boolvar(ivar)
+            ivarmap.update(sub_ivarmap)
+            constraints += sub_cons
 
-    elif isinstance(int_var, NDVarArray):
-        lb, ub = int_var.flat[0].lb ,int_var.flat[0].ub
-        # reusing numpy notation if possible
-        bvs = boolvar(shape=int_var.shape + (ub - lb + 1,))
-
-        for i, ivar in np.ndenumerate(int_var):
-            ivarmap[ivar] = {ivar_val: bv for bv, ivar_val in zip(bvs[i], range(lb, ub+1))}
-            constraints.append(sum(bvs[i]) == 1)
     else:
         lb, ub = int_var.lb ,int_var.ub
-        bvs = boolvar(shape=(ub - lb +1))
-        ivarmap[int_var] = {ivar_val: bv for bv, ivar_val in zip(bvs, range(lb, ub+1))}
-
-        constraints.append(sum(bvs) == 1)
+        d = dict()
+        for v in range(lb,ub+1):
+            # use debug-friendly naming scheme
+            d[v] = boolvar(name=f"i2b_{int_var.name}={v}")
+        ivarmap[int_var] = d
+        constraints.append(sum(d.values()) == 1) # the created Boolean vars
 
     return ivarmap, constraints
 
