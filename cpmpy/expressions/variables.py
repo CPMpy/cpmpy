@@ -319,7 +319,10 @@ class NegBoolView(_BoolVarImpl):
         self._bv = bv
 
     def value(self):
-        return not self._bv.value()
+        v = self._bv.value()
+        if v is None:
+            return None
+        return (not v)
 
     def __repr__(self):
         return "~{}".format(self._bv.name)
