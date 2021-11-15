@@ -273,6 +273,25 @@ class CPM_ortools(SolverInterface):
 
         return self._solve_return(self.cpm_status)
 
+    def solveAll(self, variables=[], printer=None, time_limit=None, **kwargs):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and call
+            the `printer` callback function on it.
+
+            It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
+
+            Arguments:
+                - variables: list of (single or NDVarArray) variables to print
+                            default/[]: won't print anything
+                - printer: a callback function, called with the variables after value-mapping
+                            default/None: just print the (list of) the values of `variables`
+
+            Returns: number of solutions found
+        """
+        cb = OrtSolutionPrinter(self, variables, printer=printer)
+        self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
+        return cb.solution_count()
+
     def objective_value(self):
         """
             Returns the value of the objective function of the latste solver run on this model
@@ -639,6 +658,12 @@ try:
 
         for multiple variabes (single or NDVarArray), use:
         `cb = OrtSolutionPrinter(s, [v, x, z])`
+
+        for a custom print function, use for example:
+        ```def myprint(variables):
+    x0, x1 = variables # we know we will give it 'x' as variables
+    print(f"x0={x0.value()}, x1={x1.value()}")
+cb = OrtSolutionPrinter(s, [x0,x1], printer=myprint)```
 
         optionally retrieve the solution count with `cb.solution_count()`
 
