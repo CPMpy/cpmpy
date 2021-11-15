@@ -60,6 +60,9 @@ class CPM_pysat(SolverInterface):
     def pb_supported():
         try:
             from pysat.pb import PBEnc
+            from distutils.version import LooseVersion
+            import pysat
+            assert LooseVersion(pysat.__version__) >= LooseVersion("0.1.7.dev12"), "Upgrade PySAT version with command: pip3 install -U python-sat"
             return True
         except ImportError as e:
             return False
@@ -368,7 +371,7 @@ class CPM_pysat(SolverInterface):
                     if len(atmost.clauses) > 0:
                         cnf.extend(atmost.clauses)
                 elif con.name == "!=":
-                    # BUG with pblib
+                    # BUG with pblib solved in Pysat dev 0.1.7.dev12
                     is_atleast = self.pysat_var(boolvar())
                     is_atmost = self.pysat_var(boolvar())
 
@@ -386,7 +389,7 @@ class CPM_pysat(SolverInterface):
                     cnf.append([is_atleast, is_atmost])
 
                 else:
-                    raise NotImplementedError(f"Comparison: {con} operator not supported by CPM_pysat")     
+                    raise NotImplementedError(f"Comparison: {con} operator not supported by CPM_pysat")
 
             else:
                 raise NotImplementedError(f"Other type Operator {con} not supported by CPM_pysat")
