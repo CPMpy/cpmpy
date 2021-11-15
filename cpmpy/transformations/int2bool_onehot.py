@@ -1,12 +1,10 @@
 
 from ..expressions.core import Comparison, Operator
-from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Maximum, Minimum, Table
+from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Table
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables, get_variables_model
-from ..transformations.flatten_model import flatten_constraint, flatten_model
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolvar
-
-
+from ..transformations.flatten_model import flatten_constraint
+from ..expressions.variables import  _IntVarImpl, boolvar, intvar
 import numpy as np
 
 def int2bool_onehot(model):
@@ -108,6 +106,8 @@ def intvar_to_boolvar(int_var):
             ivarmap.update(sub_ivarmap)
             constraints += sub_cons
 
+    elif intvar.is_bool():
+        return ivarmap, constraints
     else:
         lb, ub = int_var.lb ,int_var.ub
         d = dict()
@@ -144,7 +144,7 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     '''
     bool_constraints = []
     user_vars = get_variables(constraint)
-    iv_not_mapped = [iv for iv in user_vars if iv not in ivarmap]
+    iv_not_mapped = [iv for iv in user_vars if iv not in ivarmap and not iv.is_bool()]
 
     if len(iv_not_mapped) > 0:
         new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
