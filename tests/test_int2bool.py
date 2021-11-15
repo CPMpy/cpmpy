@@ -20,12 +20,6 @@ class TestInt2Bool(unittest.TestCase):
         self.assertEqual(len(ivarmap[iv]), iv.ub - iv.lb + 1)
         self.assertEqual(len(extract_boolvar(ivarmap)), iv.ub - iv.lb + 1)
 
-    def test_boolvar_to_boolvar(self):
-        bv = boolvar()
-        ivarmap, constraints = intvar_to_boolvar(bv)
-        self.assertEqual(ivarmap[bv], bv)
-        self.assertEqual(len(constraints), 0)
-
     def test_intvar_arr_to_boolvar_array(self):
         iv = intvar(0, 5, shape=10, name="x")
         ivarmap, constraints = intvar_to_boolvar(iv)
@@ -40,14 +34,16 @@ class TestInt2Bool(unittest.TestCase):
         for varmap in ivarmap.values():
             self.assertEqual(len(varmap), iv_matrix[0, 0].ub - iv_matrix[0, 0].lb + 1)
 
-    ## CONSTRAINTS:
+    # ## CONSTRAINTS:
     def test_equals_var(self):
 
         iv_model = Model(
             self.iv == 6
         )
 
+        print('Test_equals_var')
         ivarmap, bool_constraints = int2bool_onehot(iv_model)
+        print(f'\t{ivarmap=}, \n\t{bool_constraints=}')
         bool_model = Model(bool_constraints)
 
         # solve both models and checking for result
@@ -137,6 +133,7 @@ class TestInt2Bool(unittest.TestCase):
             extract_solution(ivarmap),
             set((iv, iv.value()) for iv in self.iv_vector)
         )
+    def test_comparison_vars2(self):
 
         iv_model2 = Model(
             self.iv_vector[0] > self.iv_vector[1],
@@ -153,7 +150,7 @@ class TestInt2Bool(unittest.TestCase):
             extract_solution(ivarmap2),
             set((iv, iv.value()) for iv in self.iv_vector)
         )
-
+    def test_comparison_vars3(self):
         iv_model3 = Model(
             self.iv_vector[0] > 3,
             self.iv_vector[0] < self.iv_vector[1],

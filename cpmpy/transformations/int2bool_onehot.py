@@ -24,7 +24,7 @@ def int2bool_onehot(model):
 
     return int2bool(model.constraints)
 
-def int2bool(constraints, ivarmap=dict()):
+def int2bool(constraints, ivarmap=None):
     '''
     Encode the int variables-based constraints into their boolean encoding
     and keep track of int->bool variable mapping.
@@ -34,11 +34,11 @@ def int2bool(constraints, ivarmap=dict()):
         - model: new boolean encoding of int model
     '''
     # already bool variables no transformation to apply
+    if ivarmap is None:
+        ivarmap = {}
+
     if all(var.is_bool() for var in get_variables(constraints)):
         return (ivarmap, constraints)
-
-    if any(not constraint.is_bool() for constraint in constraints):
-        raise NotImplementedError(f"Constraints {[constraint for constraint in constraints if not constraint.is_bool()]} cannot be encoded.")
 
     bool_constraints = []
 
@@ -146,7 +146,7 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     user_vars = get_variables(constraint)
     iv_not_mapped = [iv for iv in user_vars if iv not in ivarmap]
 
-    if iv_not_mapped:
+    if len(iv_not_mapped) > 0:
         new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
         ivarmap.update(new_ivarmap)
         bool_constraints += new_bool_constraints
