@@ -27,12 +27,6 @@
 
         Model
 """
-import numpy as np
-from cpmpy.expressions.variables import _BoolVarImpl
-from cpmpy.transformations.get_variables import get_variables_model
-from cpmpy.transformations.flatten_model import flatten_model
-
-from cpmpy.transformations.to_bool import intvar_to_boolvar, to_bool_constraint
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
@@ -74,7 +68,7 @@ class Model(object):
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
-        
+
     def __add__(self, con):
         """
             Add one or more constraints to the model
