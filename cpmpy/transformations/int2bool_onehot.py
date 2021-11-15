@@ -1,6 +1,6 @@
 
-from ..expressions.core import Comparison
-from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Table
+from ..expressions.core import Comparison, Operator
+from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Maximum, Minimum, Table
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.flatten_model import flatten_constraint, flatten_model
@@ -9,8 +9,7 @@ from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NDVarArray, boolv
 
 import numpy as np
 
-
-def int2bool_model(model):
+def int2bool_onehot(model):
     '''
     Flatten model to ensure flat int variable-based constraints can be 
     encoded to a boolean version.
@@ -34,24 +33,19 @@ def int2bool(constraints):
         - dict: mapping of int variable values to boolean variables
         - model: new boolean encoding of int model
     '''
-    # keep track of all variables that are encoded into their boolean counterpart.
-    user_vars = get_variables(constraints)
-
     # already bool variables no transformation to apply
-    if all(True if isinstance(var, _BoolVarImpl) else False for var in user_vars):
+    if all(True if isinstance(var, _BoolVarImpl) else False for var in get_variables(constraints)):
         return (dict(), constraints)
 
+    bool_constraints, ivarmap = [], dict()
+
     flattened_constraints = flatten_constraint(constraints)
-    user_vars = get_variables(flattened_constraints)
-
-    # mapping of intvar to boolvar and constraint on the boolvars
-    ivarmap, bool_cons = intvar_to_boolvar(user_vars)
-
-    bool_constraints = bool_cons
 
     for constraint in flattened_constraints:
 
-        bool_constraints += to_bool_constraint(constraint, ivarmap)
+        new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
+        ivarmap.update(new_ivarmap)
+        bool_constraints += new_bool_cons
 
     return (ivarmap, bool_constraints)
 
@@ -80,7 +74,8 @@ def intvar_to_boolvar(int_var):
                     xn: {...}
                 }
 
-        (2) Exactly one constraint on the boolean variables
+        (2) an 'exactly one' constraint per integer variable on its corresponding
+            Boolean variables.
 
         Example:
 
@@ -99,12 +94,9 @@ def intvar_to_boolvar(int_var):
     '''
     ivarmap = {}
     constraints = []
-    # Bool
-    if isinstance(int_var, _BoolVarImpl):
-        ivarmap[int_var] = int_var
 
     # takes care of empty list!
-    elif is_any_list(int_var):
+    if is_any_list(int_var):
         for ivar in int_var:
             sub_ivarmap, sub_cons = intvar_to_boolvar(ivar)
             ivarmap.update(sub_ivarmap)
@@ -116,13 +108,14 @@ def intvar_to_boolvar(int_var):
         for v in range(lb,ub+1):
             # use debug-friendly naming scheme
             d[v] = boolvar(name=f"i2b_{int_var.name}={v}")
+
         ivarmap[int_var] = d
         constraints.append(sum(d.values()) == 1) # the created Boolean vars
 
     return ivarmap, constraints
 
 
-def to_bool_constraint(constraint, ivarmap):
+def to_bool_constraint(constraint, ivarmap=dict()):
     '''
         Decomposition of integer constraint using the provided mapping
         of integer variables to boolvariables
@@ -138,42 +131,78 @@ def to_bool_constraint(constraint, ivarmap):
         - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
         - False     if no solution is found
     '''
-    assert all(
-        True if iv in ivarmap else False for iv in get_variables(constraint)
-    ),f"""int var(s):
-        {[iv for iv in get_variables(constraint) if iv not in ivarmap]}
-    has not been mapped to a boolvar."""
-
     bool_constraints = []
+    user_vars = get_variables(constraint)
+    iv_not_mapped = [iv for iv in user_vars if iv not in ivarmap]
 
-    # CASE 1: True/False
-    if isinstance(constraint, bool):
-        return constraint
+    if iv_not_mapped:
+        new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
+        ivarmap.update(new_ivarmap)
+        bool_constraints += new_bool_constraints
 
-    # CASE 2: Only bool vars in constraint
-    elif all(True if isinstance(arg, _BoolVarImpl) else False for arg in constraint.args):
-        return constraint
-
-    # CASE 3: Decompose list of constraints and handle individually
-    elif isinstance(constraint, (list, NDVarArray)):
+    # CASE 1: Decompose list of constraints and handle individually
+    if is_any_list(constraint):
         for con in constraint:
-            bool_constraints += to_bool_constraint(con, ivarmap)
+            new_bool_constraints, new_ivarmap = to_bool_constraint(con, ivarmap)
+            ivarmap.update(new_ivarmap)
+            bool_constraints += new_bool_constraints
 
-    # CASE 4: base comparison constraints + ensure only handling what it can
+    # CASE 2: base comparison constraints + ensure only handling what it can
     elif isinstance(constraint, Comparison) and all(is_int(arg) or isinstance(arg, (_IntVarImpl, _BoolVarImpl)) for arg in constraint.args) :
         bool_constraints += to_unit_comparison(constraint, ivarmap)
 
-    # CASE 5: global constraints
+    # CASE 3: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
 
-    # CASE 6: Linear constraints & others (ex: Global consraints Min/Max/...)
-    else:
-        # TODO: Handle linear constraints with appropriate transformations
-        raise NotImplementedError(f"Constraint {constraint} not supported...")
+    # CASE 4: Remaining Global constraints (ex: Global consraints Min/Max/...)
+    elif isinstance(constraint, (Minimum, Maximum)):
+        raise NotImplementedError(f"Global Constraint {constraint} not supported...")
 
-    return bool_constraints
+    elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and is_int(constraint.args[1]):
+        bool_constraints += encode_linear_constraint(constraint, ivarmap)
+
+    elif isinstance(constraint, Operator) and not all(isinstance(var, _BoolVarImpl) for var in user_vars):
+        raise NotImplementedError(f"Operator Constraint {constraint} not supported...")
+    # assertion to be removed
+    else:
+        assert all(isinstance(var, (bool, _BoolVarImpl)) for var in user_vars) or isinstance(constraint, bool), f"Operation not handled {constraint} yet"
+
+    return bool_constraints, ivarmap
+
+def encode_linear_constraint(con, ivarmap):
+    """Encode the linear sum integer variable constraint with input int-to-bool 
+    variable encoding.
+
+    Args:
+        con (cpmpy.Expression.Comparison): Comparison operator with 
+        ivarmap ([type]): [description]
+    """
+    op, val = con.args[0].name, con.args[1]
+    # SUM CASE
+    if op == "sum":
+        op_args = con.args[0].args
+        w, x = [], []
+
+        for var in op_args:
+            for wi, bv in ivarmap[var].items():
+                w.append(wi)
+                x.append(bv)
+
+        return Operator(con.name, [Operator("wsum", (w, x)), val])
+    # WEIGHTED SUM
+    elif op == "wsum":
+        w_in, x_in = con.args[0].args
+        w_out, x_out = [], []
+
+        for wi, xi in w_in, x_in:
+            w_out += [wj * wi for wj, _ in ivarmap[xi].items()]
+            x_out += [bv for _, bv in ivarmap[xi].items()]
+        return Operator(con.name, [Operator("wsum", (w_out, x_out)), val])
+    # TODO other comparison ??
+    else:
+        raise NotImplementedError(f"Comparison {con} not supported yet...")
 
 def to_unit_comparison(con, ivarmap):
     """Encoding of comparison constraint with input int-to-bool variable encoding.
