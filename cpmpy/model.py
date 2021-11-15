@@ -27,16 +27,12 @@
 
         Model
 """
-import numpy as np
-from cpmpy.expressions.variables import _BoolVarImpl
-from cpmpy.transformations.get_variables import get_variables_model
-from cpmpy.transformations.flatten_model import flatten_model
-
-from cpmpy.transformations.to_bool import intvar_to_boolvar, to_bool_constraint
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+
+import pickle
 
 class Model(object):
     """
@@ -72,7 +68,7 @@ class Model(object):
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
-        
+
     def __add__(self, con):
         """
             Add one or more constraints to the model
@@ -107,37 +103,6 @@ class Model(object):
         """
         self.objective = expr
         self.objective_max = True
-
-    def int2bool_onehot(self):
-        '''
-            Flatten model to ensure flat int variable-based constraints that
-            can be encoded to a boolean version.
-
-        :return: (dict, Model):
-            - dict: mapping of int variable values to boolean variables
-            - model: new boolean encoding of int model
-        '''
-
-        flattened_model = flatten_model(self)
-
-        # keep track of all variables that are encoded into their boolean counterpart.
-        user_vars = get_variables_model(flattened_model)
-
-        # already bool variables no transformation to apply
-        if all(True if isinstance(var, _BoolVarImpl) else False for var in user_vars):
-            return (dict(), self)
-
-        # mapping of intvar to boolvar and constraint on the boolvars
-        ivarmap, bool_cons = intvar_to_boolvar(user_vars)
-
-        bool_model = Model(bool_cons)
-
-        for constraint in flattened_model.constraints:
-            assert constraint.is_bool(), "Constraint {constraint} return type should be Boolean."
-
-            bool_model += to_bool_constraint(constraint, ivarmap)
-
-        return (ivarmap, bool_model)
 
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
@@ -205,3 +170,25 @@ class Model(object):
         obj_str += str(self.objective)
             
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
+
+
+    def to_file(self, fname):
+        """
+            Serializes this model to a .pickle format
+
+            :param: fname: Filename of the resulting serialized model
+        """
+        with open(fname,"wb") as f:
+            pickle.dump(self, file=f)
+
+
+    @staticmethod
+    def from_file(fname):
+        """
+            Reads a Model instance from a binary pickled file
+
+            :return: an object of :class: `Model`
+        """
+        with open(fname, "rb") as f:
+            return pickle.load(f)
+    

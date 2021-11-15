@@ -18,13 +18,12 @@
 
         CPM_pysat
 """
-from cpmpy.transformations.flatten_model import flatten_constraint, normalized_boolexpr, normalized_numexpr
-from cpmpy.transformations.to_bool import extract_boolvar, intvar_to_boolvar, to_bool_constraint
+from ..transformations.int2bool_onehot import int2bool_onehot, extract_boolvar, is_bool_model, to_bool_constraint, is_boolvar_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, _NumVarImpl, NegBoolView, boolvar
-from ..expressions.utils import is_any_list, is_int
-from ..transformations.get_variables import get_all_elems, get_variables, get_variables_model
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.utils import is_int
+from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -124,21 +123,20 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import CNF
             cnf = CNF()
         # Model is bool variable based, there is no need for intvar transformations
-        elif all(True if var.is_bool() else False for var in get_variables_model(cpm_model)):
+        elif is_bool_model(cpm_model):
             # store original vars
             self.user_vars = get_variables_model(cpm_model)
 
             # create constraint model (list of clauses)
             cnf = self.make_cnf(cpm_model)
-            
         # Model has int variables and needs to be encoded with boolean variables
         else:
-            (self.ivarmap, bm) = cpm_model.int2bool_onehot()
+            (self.ivarmap, bool_constraints) = int2bool_onehot(cpm_model)
 
-            self.user_vars = get_variables_model(bm)
+            self.user_vars = get_variables(bool_constraints)
 
             # create constraint model (list of clauses)
-            cnf = self.make_cnf(bm)
+            cnf = self._to_pysat_cnf(bool_constraints)
 
         # create the solver instance
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
@@ -162,12 +160,11 @@ class CPM_pysat(SolverInterface):
         immediately adds the constraint to PySAT
 
         Note that we don't store the resulting cpm_model, we translate
-        directly to the ort_model
+        directly to the internal pysat solver
 
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
-        from pysat.card import CardEnc
 
         # flatten constraints and to cnf
         cnf_cons = to_cnf(cpm_con)
@@ -179,21 +176,14 @@ class CPM_pysat(SolverInterface):
 
         new_constraints = []
 
-        # check if no new variables have to be added
-        if any(True if not var.is_bool() else False for var in con_vars):
-
-            new_iv_vars = [var for var in con_vars if var not in self.ivarmap and not var.is_bool()]
-
-            new_ivarmap, new_bool_cons = intvar_to_boolvar(new_iv_vars)
-            new_constraints += new_bool_cons
-            self.ivarmap.update(new_ivarmap)
-            self.user_vars += extract_boolvar(new_ivarmap)
-
-            for constraint in cnf_cons:
-                new_bool_constraints = to_bool_constraint(constraint, self.ivarmap)
+        for constraint in cnf_cons:
+            if not is_boolvar_constraint(constraint):
+                new_bool_constraints, new_ivarmap = to_bool_constraint(constraint, self.ivarmap)
                 new_constraints += new_bool_constraints
-        else:
-            new_constraints = cnf_cons
+                self.user_vars += extract_boolvar(new_ivarmap)
+                self.ivarmap.update(new_ivarmap)
+            else:
+                new_constraints.append(constraint)
 
         cnf = self._to_pysat_cnf(new_constraints)
         self.pysat_solver.append_formula(cnf)

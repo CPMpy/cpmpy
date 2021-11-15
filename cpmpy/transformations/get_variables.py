@@ -16,11 +16,13 @@ def get_variables_model(model):
         `Model` without a circular dependency...
     """
     # want an ordered set. Emulate with full list that is uniquified
-    vars_cons = get_variables(model.constraints)
-    vars_obj = get_variables(model.objective)
+    vars_ = get_variables(model.constraints)
 
-    # mimics an ordered set, manually...
-    return _uniquify(vars_cons+vars_obj)
+    # then append to it from objective
+    seen = frozenset(vars_)
+    vars_ += [x for x in get_variables(model.objective) if not x in seen]
+
+    return vars_
 
 def vars_expr(expr):
     warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
@@ -46,7 +48,9 @@ def get_variables(expr):
         for subexpr in expr.args:
             vars_ += get_variables(subexpr)
     # else: every non-list, non-expression
-    return vars_
+
+    # mimics an ordered set, manually...
+    return _uniquify(vars_)
 
 def get_all_elems(expr):
 

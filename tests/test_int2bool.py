@@ -2,10 +2,7 @@ import unittest
 import cpmpy as cp 
 from cpmpy.expressions import *
 from cpmpy.model import Model
-from cpmpy.solvers.pysat import CPM_pysat
-from cpmpy.transformations.flatten_model import flatten_constraint
-from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.to_bool import extract_boolvar, intvar_to_boolvar
+from cpmpy.transformations.to_bool import extract_boolvar, int2bool_model, intvar_to_boolvar
 import numpy as np
 
 class TestInt2Bool(unittest.TestCase):
@@ -15,24 +12,6 @@ class TestInt2Bool(unittest.TestCase):
         self.iv_vector = intvar(lb=2, ub=6, shape=5, name="iv_vec")
         self.iv_2dmatrix = intvar(lb=2, ub=4, shape=(5, 7), name="iv_2d")
         self.iv_3dmatrix = intvar(lb=2, ub=4, shape=(5, 6, 7), name="iv_3d")
-
-    def test_boolmodel(self):
-        boolmodel = Model(
-            sum(self.bvs) > 4,
-        )
-        boolmodel2 = Model(
-            sum(self.bvs) > 4,
-        )
-
-        ivarmap, new_model = boolmodel.int2bool_onehot()
-
-        self.assertEqual(len(ivarmap), 0)
-        # returns same model
-        self.assertEqual(new_model, boolmodel)
-
-        # ensuring model with same constraints are not equal
-        # different refence to object
-        self.assertNotEqual(boolmodel, boolmodel2)
 
     ## VARIABLES: intvar -> boolvar
     def test_intvar_to_boolvar(self):
@@ -68,7 +47,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv == 6
         )
 
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
 
         # solve both models and checking for result
         bool_model.solve()
@@ -87,7 +67,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv_vector[4] == 2,
         )
 
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         iv_model.solve()
         bool_model.solve()
 
@@ -104,7 +85,8 @@ class TestInt2Bool(unittest.TestCase):
         iv_model = Model(
             self.iv_vector == [2, 3, 4, 3, 2]
         )
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         bool_model.solve()
 
         iv_model_sol = extract_solution(ivarmap)
@@ -117,7 +99,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv_vector[4] == 2,
         )
 
-        ivarmap2, bool_model2 = iv_model2.int2bool_onehot()
+        ivarmap2, bool_constraints2 = int2bool_model(iv_model2)
+        bool_model2 = Model(bool_constraints2)
         bool_model2.solve()
         iv_model2_sol = extract_solution(ivarmap)
 
@@ -133,7 +116,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv != 6,
         )
         iv_model.solve()
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
@@ -145,7 +129,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv_vector[3] < self.iv_vector[4],
         )
         iv_model.solve()
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         bool_model.solve()
 
         self.assertEqual(
@@ -160,7 +145,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv_vector[3] > self.iv_vector[4],
         )
         iv_model2.solve()
-        ivarmap2, bool_model2 = iv_model2.int2bool_onehot()
+        ivarmap2, bool_constraints2 = int2bool_model(iv_model2)
+        bool_model2 = Model(bool_constraints2)
         bool_model2.solve()
 
         self.assertEqual(
@@ -180,7 +166,8 @@ class TestInt2Bool(unittest.TestCase):
 
         iv_model3.solve()
 
-        ivarmap3, bool_model3 = iv_model3.int2bool_onehot()
+        ivarmap3, bool_constraints3 = int2bool_model(iv_model3)
+        bool_model3 = Model(bool_constraints3)
         bool_model3.solve()
         self.assertEqual(
             extract_solution(ivarmap3),
@@ -193,7 +180,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv < 7
         )
         iv_model.solve()
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
@@ -202,7 +190,8 @@ class TestInt2Bool(unittest.TestCase):
             self.iv <= 6
         )
         iv_model2.solve()
-        ivarmap2, bool_model2 = iv_model2.int2bool_onehot()
+        ivarmap2, bool_constraints2 = int2bool_model(iv_model2)
+        bool_model2 = Model(bool_constraints2)
         bool_model2.solve()
         self.assertEqual(extract_solution(ivarmap2), set([(self.iv, self.iv.value())]))
 
@@ -214,7 +203,8 @@ class TestInt2Bool(unittest.TestCase):
         )
 
         iv_model.solve()
-        ivarmap, bool_model = iv_model.int2bool_onehot()
+        ivarmap, bool_constraints = int2bool_model(iv_model)
+        bool_model = Model(bool_constraints)
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
@@ -253,8 +243,8 @@ class TestInt2boolExamples(unittest.TestCase):
                 sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
 
         sudoku_iv_model.solve()
-
-        ivarmap, sudoku_bv_model = sudoku_iv_model.int2bool_onehot()
+        ivarmap, sudoku_bool_constraints = int2bool_model(sudoku_iv_model)
+        sudoku_bv_model = Model(sudoku_bool_constraints)
         sudoku_bv_model.solve()
 
         self.assertEqual(
