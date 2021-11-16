@@ -40,7 +40,10 @@ def int2bool(constraints, ivarmap=None):
 
     bool_constraints = []
 
+    for constraint in constraints:
+        print(f"int2bool before - {constraint=} {flatten_constraint(constraint)=}" )
     for constraint in flatten_constraint(constraints):
+        print(f"int2bool - {constraint=}")
         if not is_boolvar_constraint(constraint):
             new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
 
@@ -161,6 +164,8 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and is_int(constraint.args[1]):
         bool_constraints += encode_linear_constraint(constraint, ivarmap)
 
+    elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and isinstance(constraint.args[1], _IntVarImpl):
+        raise NotImplementedError(f"Global Constraint {constraint} not supported...")
     # CASE 4: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
@@ -234,8 +239,12 @@ def encode_linear_constraint(con, ivarmap):
         if val < 0:
             return [-con]
         return [con]
+    elif op == "abs" and isinstance(con.args[0].args[0], _IntVarImpl):
+        var = con.args[0].args[0]
+        # print(f"\t abs: {var=} {var.lb=} {var.ub=}")
+        return [[~bv] for wi, bv in ivarmap[var].items() if wi < 0]
     else:
-        raise NotImplementedError(f"Comparison {con} not supported yet...")
+        raise NotImplementedError(f"Comparison {con=} {op=} {con.args[0].args=} not supported yet...")
 
 def to_unit_comparison(con, ivarmap):
     """Encoding of comparison constraint with input int-to-bool variable encoding.
