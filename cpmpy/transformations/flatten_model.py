@@ -84,7 +84,7 @@ import math
 import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_int, is_num, is_any_list
 
 from itertools import cycle
 def __zipcycle(vars1, vars2):
@@ -125,6 +125,7 @@ def flatten_constraint(expr):
         it will return 'Exception' if something is not supported
         TODO, what built-in python error is best?
     """
+    
     # base cases
     if isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
         return [expr]
@@ -174,6 +175,16 @@ def flatten_constraint(expr):
             newexpr = Operator(expr.name, (lhs,rhs))
             return [newexpr]+[c for c in flatcons]
 
+    elif isinstance(expr, Comparison) and expr.args[0].name == "sum" and all(
+        # weight
+        is_int(arg) or \
+        # variable
+        isinstance(arg,_NumVarImpl) or \
+        # weighted variable
+        (isinstance(arg, Operator) and arg.name == "mul" and is_int(arg.args[0]) and isinstance(arg.args[1], _NumVarImpl)) \
+        for arg in expr.args[0].args):
+        return [expr]
+
     elif isinstance(expr, Comparison):
         """
     - Base Boolean equality: Var == Var                         (CPMpy class 'Comparison')
@@ -185,7 +196,7 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
-
+        
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
         # XXX: zipcycle no longer needed, vectorized now handled at creation level!

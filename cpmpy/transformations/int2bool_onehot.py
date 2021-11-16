@@ -40,19 +40,16 @@ def int2bool(constraints, ivarmap=None):
 
     bool_constraints = []
 
-    flattened_constraints = flatten_constraint(constraints)
-
-    for constraint in flattened_constraints:
-
+    for constraint in flatten_constraint(constraints):
         if not is_boolvar_constraint(constraint):
             new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
+
             ivarmap.update(new_ivarmap)
             bool_constraints += new_bool_cons
         else:
             bool_constraints.append(constraint)
 
     return (ivarmap, bool_constraints)
-
 
 def intvar_to_boolvar(int_var):
     '''
@@ -105,8 +102,7 @@ def intvar_to_boolvar(int_var):
             sub_ivarmap, sub_cons = intvar_to_boolvar(ivar)
             ivarmap.update(sub_ivarmap)
             constraints += sub_cons
-
-    elif intvar.is_bool():
+    elif int_var.is_bool():
         return ivarmap, constraints
     else:
         lb, ub = int_var.lb ,int_var.ub
@@ -161,10 +157,11 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     # CASE 2: base comparison constraints + ensure only handling what it can
     elif isinstance(constraint, Comparison) and all(is_int(arg) or isinstance(arg, (_IntVarImpl)) for arg in constraint.args):
         bool_constraints += to_unit_comparison(constraint, ivarmap)
+    # CASE 3: Linear WEIGHTED SUM
     elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and is_int(constraint.args[1]):
         bool_constraints += encode_linear_constraint(constraint, ivarmap)
 
-    # CASE 3: global constraints
+    # CASE 4: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
@@ -192,22 +189,14 @@ def encode_linear_constraint(con, ivarmap):
         w, x = [], []
 
         for var in op_args:
-            for wi, bv in ivarmap[var].items():
-                w.append(wi)
-                x.append(bv)
-
-        return Operator(con.name, [Operator("wsum", (w, x)), val])
-    # WEIGHTED SUM
-    elif op == "wsum":
-        w_in, x_in = con.args[0].args
-        w_out, x_out = [], []
-
-        for wi, xi in w_in, x_in:
-            for wj, bv in ivarmap[xi].items():
-                w_out.append(wi * wj)
-                x_out.append(bv)
-        return Operator(con.name, [Operator("wsum", (w_out, x_out)), val])
-    # TODO other comparison ??
+            if isinstance(var, _IntVarImpl):
+                for wi, bv in ivarmap[var].items():
+                    w.append(wi)
+                    x.append(bv)
+            else:
+                raise NotImplementedError(f"Weighted sum {var} not supported yet...")
+        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), val)]
+        # return [Comparison(con.name, Operator("wsum", (w, x)), val)]
     else:
         raise NotImplementedError(f"Comparison {con} not supported yet...")
 
@@ -340,7 +329,6 @@ def to_unit_comparison(con, ivarmap):
     return bool_constraints
 
 def extract_boolvar(ivarmap):
-    print(ivarmap)
     all_boolvars = []
     for varmap in ivarmap.values():
         all_boolvars += [bv for bv in varmap.values()]
