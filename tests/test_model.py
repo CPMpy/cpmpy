@@ -1,7 +1,7 @@
 import unittest
 import tempfile
+import os
 from os.path import join
-from os import rmdir
 
 import cpmpy as cp
 
@@ -13,7 +13,7 @@ class TestModel(unittest.TestCase):
         return super().setUp()
     
     def tearDown(self) -> None:
-        rmdir(self.tempdir)
+        os.rmdir(self.tempdir)
         return super().tearDown()
 
     def test_ndarray(self):
@@ -36,3 +36,4 @@ class TestModel(unittest.TestCase):
 
         loaded = cp.Model.from_file(fname)
         self.assertTrue(loaded.solve())
+        os.remove(fname)

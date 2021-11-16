@@ -52,29 +52,6 @@ def get_variables(expr):
     # mimics an ordered set, manually...
     return _uniquify(vars_)
 
-def get_all_elems(expr):
-
-    
-    if isinstance(expr, (NegBoolView, _NumVarImpl)) or is_int(expr):
-        # a real var, do our thing
-        return [], [expr]
-
-    expr_names_, vars_ = [], []
-    # if list or Expr: recurse
-    if is_any_list(expr):
-        for subexpr in expr:
-            new_expr_names, new_vars = get_all_elems(subexpr)
-            expr_names_ += new_expr_names
-            vars_ += new_vars
-    elif isinstance(expr, Expression):
-        expr_names_ += [expr.name]
-        for subexpr in expr.args:
-            new_expr_names, new_vars = get_all_elems(subexpr)
-            expr_names_ += new_expr_names
-            vars_ += new_vars
-    # else: every non-list, non-expression
-    return expr_names_, vars_
-
 def print_variables(expr_or_model):
     """
         Print variables _and their domains_

@@ -273,6 +273,25 @@ class CPM_ortools(SolverInterface):
 
         return self._solve_return(self.cpm_status)
 
+    def solveAll(self, variables=[], printer=None, time_limit=None, **kwargs):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and call
+            the `printer` callback function on it.
+
+            It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
+
+            Arguments:
+                - variables: list of (single or NDVarArray) variables to print
+                            default/[]: won't print anything
+                - printer: a callback function, called with the variables after value-mapping
+                            default/None: just print the (list of) the values of `variables`
+
+            Returns: number of solutions found
+        """
+        cb = OrtSolutionPrinter(self, variables, printer=printer)
+        self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
+        return cb.solution_count()
+
     def objective_value(self):
         """
             Returns the value of the objective function of the latste solver run on this model
@@ -588,7 +607,9 @@ class CPM_ortools(SolverInterface):
 # even if ortools is not installed...
 try:
   from ortools.sat.python import cp_model as ort
+  from cpmpy import cpm_array
   import time
+
   class OrtSolutionCounter(ort.CpSolverSolutionCallback):
     """
         Native or-tools callback for solution counting.
@@ -624,5 +645,60 @@ try:
     def solution_count(self):
         """Returns the number of solutions found."""
         return self.__solution_count
+
+  class OrtSolutionPrinter(OrtSolutionCounter):
+    """
+        Native or-tools callback for solution printing.
+
+        Subclasses OrtSolutionCounter, see those docs too
+
+        use with CPM_ortools as follows:
+        `cb = OrtSolutionPrinter(s, vars)`
+        `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
+
+        for multiple variabes (single or NDVarArray), use:
+        `cb = OrtSolutionPrinter(s, [v, x, z])`
+
+        for a custom print function, use for example:
+        ```def myprint(variables):
+    x0, x1 = variables # we know we will give it 'x' as variables
+    print(f"x0={x0.value()}, x1={x1.value()}")
+cb = OrtSolutionPrinter(s, [x0,x1], printer=myprint)```
+
+        optionally retrieve the solution count with `cb.solution_count()`
+
+        Arguments:
+            - verbose: whether to print info on every solution found (bool, default: False)
+            - variables: list of (single or NDVarArray) variables to print
+                        default/[]: identical behaviour to OrtSolutionCounter!
+            - printer: a callback function, called with the variables after value-mapping
+                        default/None: just print the (list of) their values
+    """
+    def __init__(self, solver, variables=[], printer=None, verbose=False):
+        super().__init__(verbose)
+        self._cpm_vars = variables
+        self._printer = printer
+        # we only need the cpmpy->solver varmap from the solver
+        self._varmap = solver.varmap
+
+    def on_solution_callback(self):
+        """Called on each new solution."""
+        super().on_solution_callback()
+        if len(self._cpm_vars):
+            # populate values before printing
+            for cpm_var in self._cpm_vars:
+                # it might be an NDVarArray
+                if hasattr(cpm_var, "flat"):
+                    for cpm_subvar in cpm_var.flat:
+                        cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
+                else:
+                    cpm_var._value = self.Value(self._varmap[cpm_var])
+            if self._printer is None:
+                # print their values
+                print([v.value() for v in self._cpm_vars])
+            else:
+                # call the callback
+                self._printer(self._cpm_vars)
+
 except ImportError:
     pass # Ok, no ortools installed...

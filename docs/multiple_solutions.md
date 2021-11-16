@@ -105,45 +105,49 @@ s.solve(enumerate_all_solutions=True, solution_callback=cb)
 print("Nr of solutions:",cb.solution_count())
 ```
 
-## Using the native solver API directly
+Note that you can set `cb = OrtSolutionCounter(verbose=True)` if you want to see intermediate runtimes.
 
-In the following, we will use the __or-tools CP-SAT Python interface__. To use some of its advanced features, it is recommended to read the [corresponding documentation](https://developers.google.com/optimization/reference/python/sat/python/cp_model).
+## Printing all solutions efficiently
 
-This very advanced examples shows how to **print all solutions with CPMpy using a custom or-tools native callback**.
+The key part is that the solver does not understand CPMpy variables. Hence, before printing, we must first map our CPMpy variable to the corresponding solver variable, and then ask the solver what the value of that solver-native variable is. For this, every CPMpy solver interface maintains a `varmap` variable map.
 
-To do this, you need to pass the hidden 'varmap' mapping from CPMpy variables to the callback, so that we can populate the CPMpy variable`._value` property from the or-tools variableor-tools variables. As such:
+We created an or-tools native `OrtSolutionPrinter` that does this mapping and value fetching for you. Check the source code to learn more, or to adapt it for special printing or other actions.
+
+Here is example usage code:
+```python
+from cpmpy import *
+from cpmpy.solvers import CPM_ortools
+from cpmpy.solvers.ortools import OrtSolutionPrinter
+
+x = intvar(0,3, shape=2)
+m = Model(x[0] > x[1])
+
+s = CPM_ortools(m)
+cb = OrtSolutionPrinter(s, x)
+s.solve(enumerate_all_solutions=True, solution_callback=cb)
+print("Nr of solutions:",cb.solution_count())
+```
+
+### Custom print functions
+
+We also support custom print functions. The 'printer' argument is a callback that will be used to print the variables. By default, it is just the Python built-in `print` function, but you can give your own print function that will be called on each solution.
+
+For example:
 
 ```python
 from cpmpy import *
 from cpmpy.solvers import CPM_ortools
-from ortools.sat.python import cp_model as ort
+from cpmpy.solvers.ortools import OrtSolutionPrinter
 
 x = intvar(0,3, shape=2)
 m = Model(x[0] > x[1])
 s = CPM_ortools(m)
 
-# native or-tools callback, with CPMpy variables and printing
-class ORT_myprint(ort.CpSolverSolutionCallback):
-    def __init__(self, varmap, x):
-        super().__init__()
-        self.solcount = 0
-        self.varmap = varmap
-        self.x = x
+def myprint(variables):
+    x0, x1 = variables # we know we will give it 'x' as variables
+    print(f"x0={x0.value()}, x1={x1.value()}")
+cb = OrtSolutionPrinter(s, x, printer=myprint)
 
-    def on_solution_callback(self):
-        # populate values before printing
-        for cpm_var in self.x.flat: # flatten the vararray (or cpm_array())
-            cpm_var._value = self.Value(self.varmap[cpm_var])
-
-        self.solcount += 1
-        print("x:",self.x.value())
-cb = ORT_myprint(s.varmap, x)
-
-ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
-print(s._after_solve(ort_status)) # post-process after solve() call...
-print(s.status())
-print(x.value()) # will be the last found one
-print("Nr solutions:", cb.solcount)
+s.solve(enumerate_all_solutions=True, solution_callback=cb)
+print("Nr of solutions:",cb.solution_count())
 ```
-
-Actually `s.solve(enumerate_all_solutions=True, solution_callback=cb)` would also have worked, but this shows that if you want you can do your own calls and `_after_solve` and forward and reverse mapping between variables as you wish...
