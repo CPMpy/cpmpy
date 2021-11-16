@@ -188,13 +188,22 @@ def encode_linear_constraint(con, ivarmap):
         op_args = con.args[0].args
         w, x = [], []
 
-        for var in op_args:
-            if isinstance(var, _IntVarImpl):
-                for wi, bv in ivarmap[var].items():
+        for expr in op_args:
+            # unweighted sum
+            if isinstance(expr, _IntVarImpl):
+                for wi, bv in ivarmap[expr].items():
                     w.append(wi)
                     x.append(bv)
+            # Weighted sum
+            elif isinstance(expr, Operator) and expr.name == "mul":
+                coeff = expr.args[0]
+                var = expr.args[1]
+                for wi, bv in ivarmap[var].items():
+                    w.append(wi * coeff)
+                    x.append(bv)
+            # Other functions
             else:
-                raise NotImplementedError(f"Weighted sum {var} not supported yet...")
+                raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
         return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), val)]
         # return [Comparison(con.name, Operator("wsum", (w, x)), val)]
     else:

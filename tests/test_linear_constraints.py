@@ -74,35 +74,35 @@ class TestIntVarLinearConstraint(unittest.TestCase):
 
     def test_weighted_linearsum_smaller(self):
         ls = cp.Model(
-            self.iv[0] + self.iv[1] < 9
+            2 * self.iv[0] + 3 * self.iv[1] < 9
         )
         ps = CPM_pysat(ls)
         ps.solve()
 
     def test_weighted_linearsum_smaller_equal(self):
         ls = cp.Model(
-            self.iv[0] + self.iv[1] <= 9
+            2 * self.iv[0] + 3 * self.iv[1] <= 9
         )
         ps = CPM_pysat(ls)
         ps.solve()
 
     def test_weighted_linearsum_larger_equal(self):
         ls = cp.Model(
-            self.iv[0] + self.iv[1] >= 9
+            2 * self.iv[0] + 3 * self.iv[1] >= 9
         )
         ps = CPM_pysat(ls)
         ps.solve()
     
     def test_weighted_linearsum_larger(self):
         ls = cp.Model(
-            self.iv[0] + self.iv[1] > 8
+            2 * self.iv[0] + 3 * self.iv[1] > 8
         )
         ps = CPM_pysat(ls)
         ps.solve()
 
     def test_weighted_linearsum_equality(self):
         ls = cp.Model(
-            self.iv[0] + self.iv[1] == 15
+            2 * self.iv[0] + 3 * self.iv[1] == 15
         )
         ps = CPM_pysat(ls)
         ps.solve()
