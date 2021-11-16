@@ -4,12 +4,37 @@ from cpmpy.expressions import *
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.int2bool_onehot import int2bool_onehot
+from cpmpy.transformations.flatten_model import flatten_constraint
 
 class TestEncodeLinearConstraint(unittest.TestCase):
     def setUp(self):
         self.iv = intvar(lb=1, ub=4, shape=3)
+        self.bv = boolvar(shape=3)
 
+    def test_encode_linear_expressions(self):
+        print(-(-self.iv[0]))
+        expressions = [
+            - self.iv[2] == -1,
+            - self.bv[2] == -1,
+            - 2 * self.iv[2] == -2,
+            - 2 * self.bv[2] == -2,
+            self.iv[0] - self.iv[2] > 1,
+            self.bv[0] - self.bv[2] > 0,
+            -self.bv[0] + self.bv[2] > 0,
+            self.iv[0] - 3 * self.iv[2] >= 1,
+            self.bv[0] - 3 * self.bv[2] > 0,
+            2 * self.iv[0] + 3 * self.iv[0] + 3 * self.iv[2] < 9,
+            2 * self.iv[0] - 3 * self.iv[2] < 9,
+            2 * self.iv[0] + 3  * (self.iv[2] + self.iv[1]) < 9,
+            2 * self.iv[0] + 3  * (self.iv[2] - self.iv[1]) < 9,
+        ]
 
+        for expression in expressions:
+            print(f"{expression=}", "\n\n\t", flatten_constraint(expression), "\n")
+            ps = CPM_pysat(cp.Model(
+                expression
+            ))
+            ps.solve()
 
 class TestLinearConstraint(unittest.TestCase):
     def setUp(self):
@@ -36,8 +61,6 @@ class TestLinearConstraint(unittest.TestCase):
         )
         ps = CPM_pysat(ls)
         ps.solve()
-
-
 
 class TestIntVarLinearConstraint(unittest.TestCase):
     def setUp(self) -> None:

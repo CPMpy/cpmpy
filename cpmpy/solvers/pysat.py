@@ -336,6 +336,12 @@ class CPM_pysat(SolverInterface):
                         elif isinstance(arg, Operator) and arg.name == "mul":
                             lits += [self.pysat_var(arg.args[1])]
                             weights += [arg.args[0]]
+                        elif isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], _BoolVarImpl):
+                            lits += [self.pysat_var(arg.args[0])]
+                            weights += [-1]
+                        elif isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], Operator) and arg.args[0].name == "mul":
+                            lits += [self.pysat_var(arg.args[0].args[1])]
+                            weights += [-arg.args[0].args[0]]
                         else:
                             raise NotImplementedError(f"Other type of sum arg constraint {arg} not supported by CPM_pysat")
                 # WEIGHTED !

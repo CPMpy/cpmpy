@@ -183,10 +183,10 @@ def encode_linear_constraint(con, ivarmap):
         ivarmap ([type]): [description]
     """
     op, val = con.args[0].name, con.args[1]
+    w, x = [], []
     # SUM CASE
     if op == "sum":
         op_args = con.args[0].args
-        w, x = [], []
 
         for expr in op_args:
             # unweighted sum
@@ -202,10 +202,37 @@ def encode_linear_constraint(con, ivarmap):
                     w.append(wi * coeff)
                     x.append(bv)
             # Other functions
+            elif isinstance(expr, Operator) and expr.name == "-":
+                sub_expr = expr.args[0]
+                if isinstance(sub_expr, _IntVarImpl):
+                    for wi, bv in ivarmap[sub_expr].items():
+                        w.append(-wi)
+                        x.append(bv)
+                elif isinstance(sub_expr, Operator) and sub_expr.name == "mul" and isinstance(sub_expr.args[1], _IntVarImpl):
+                    coeff = sub_expr.args[0]
+                    var = sub_expr.args[1]
+                    for wi, bv in ivarmap[var].items():
+                        w.append(wi * coeff)
+                        x.append(bv)
+                else:
+                    raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
             else:
                 raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
-        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), val)]
+        if val < 0:
+            w = [-wi for wi in w]
+        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
         # return [Comparison(con.name, Operator("wsum", (w, x)), val)]
+    elif op == "mul" and is_int(con.args[0].args[0]) and isinstance(con.args[0].args[1], _IntVarImpl):
+        coeff = con.args[0].args[0]
+        var = con.args[0].args[1]
+        for wi, bv in ivarmap[var].items():
+            w.append(wi * coeff)
+            x.append(bv)
+        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
+    elif op == "-":
+        if val < 0:
+            return [-con]
+        return [con]
     else:
         raise NotImplementedError(f"Comparison {con} not supported yet...")
 

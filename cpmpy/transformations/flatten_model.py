@@ -180,8 +180,11 @@ def flatten_constraint(expr):
         is_int(arg) or \
         # variable
         isinstance(arg,_NumVarImpl) or \
-        # weighted variable
-        (isinstance(arg, Operator) and arg.name == "mul" and is_int(arg.args[0]) and isinstance(arg.args[1], _NumVarImpl)) \
+        # +/- weighted variable
+        (isinstance(arg, Operator) and arg.name == "mul" and is_int(arg.args[0]) and isinstance(arg.args[1], _NumVarImpl)) or \
+        # - variable
+        (isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], _IntVarImpl)) or \
+        (isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], Operator) and arg.args[0].name == "mul" and is_int(arg.args[0].args[0]) and isinstance(arg.args[0].args[1], _NumVarImpl))
         for arg in expr.args[0].args):
         return [expr]
 
