@@ -5,9 +5,15 @@ from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.int2bool_onehot import int2bool_onehot
 
+class TestEncodeLinearConstraint(unittest.TestCase):
+    def setUp(self):
+        self.iv = intvar(lb=1, ub=4, shape=3)
+
+
+
 class TestLinearConstraint(unittest.TestCase):
     def setUp(self):
-        self.bv = boolvar(shape=4)
+        self.bv = boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
 
@@ -32,9 +38,10 @@ class TestLinearConstraint(unittest.TestCase):
         ps.solve()
 
 
+
 class TestIntVarLinearConstraint(unittest.TestCase):
     def setUp(self) -> None:
-        self.iv = intvar(lb=4, ub=8, shape=5)
+        self.iv = intvar(lb=4, ub=8, shape=2)
         return super().setUp()
 
     def test_linearsum_smaller(self):
@@ -106,6 +113,7 @@ class TestIntVarLinearConstraint(unittest.TestCase):
         )
         ps = CPM_pysat(ls)
         ps.solve()
+    
 
 if __name__ == '__main__':
     unittest.main()
