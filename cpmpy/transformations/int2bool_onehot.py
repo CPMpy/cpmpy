@@ -165,7 +165,7 @@ def to_bool_constraint(constraint, ivarmap=dict()):
         bool_constraints += encode_linear_constraint(constraint, ivarmap)
 
     elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and isinstance(constraint.args[1], _IntVarImpl):
-        raise NotImplementedError(f"Global Constraint {constraint} not supported...")
+        raise NotImplementedError(f"Comparison Constraint {constraint} not supported...")
     # CASE 4: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
