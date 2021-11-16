@@ -323,7 +323,7 @@ class CPM_pysat(SolverInterface):
                 if not CPM_pysat.pb_supported():
                     raise ImportError("Please install PyPBLib: pip install pypblib")
                 from pysat.pb import PBEnc
-
+                # TODO: CASES need to be handled by weighted sum !
                 if isinstance(left, Operator) and left.name == "sum" and is_int(right):
                     # weighted 
                     bound = right

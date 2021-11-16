@@ -185,6 +185,7 @@ def encode_linear_constraint(con, ivarmap):
     op, val = con.args[0].name, con.args[1]
     w, x = [], []
     # SUM CASE
+    # TODO: CASES need to be handled by weighted sum !
     if op == "sum":
         op_args = con.args[0].args
 

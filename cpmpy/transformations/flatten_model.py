@@ -174,7 +174,7 @@ def flatten_constraint(expr):
 
             newexpr = Operator(expr.name, (lhs,rhs))
             return [newexpr]+[c for c in flatcons]
-
+    # TODO: CASES need to be handled by weighted sum constraint!
     elif isinstance(expr, Comparison) and expr.args[0].name == "sum" and all(
         # weight
         is_int(arg) or \
