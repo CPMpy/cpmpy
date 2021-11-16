@@ -21,7 +21,7 @@
 from ..transformations.int2bool_onehot import int2bool_onehot, extract_boolvar, is_bool_model, to_bool_constraint, is_boolvar_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_int
 from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.to_cnf import to_cnf
@@ -129,15 +129,12 @@ class CPM_pysat(SolverInterface):
         elif is_bool_model(cpm_model):
             # store original vars
             self.user_vars = get_variables_model(cpm_model)
-            print("\nis_bool_model")
-            print(f"\t{cpm_model=}")
+
             # create constraint model (list of clauses)
             cnf = self.make_cnf(cpm_model)
         # Model has int variables and needs to be encoded with boolean variables
         else:
             (self.ivarmap, bool_constraints) = int2bool_onehot(cpm_model)
-            print("\nint2bool_onehot")
-            print(f"\t{bool_constraints=}")
 
             self.user_vars = get_variables(bool_constraints)
 
@@ -309,10 +306,7 @@ class CPM_pysat(SolverInterface):
         # CNF object
         cnf = CNF()
 
-        print("Before to_cnf:")
         for con in to_cnf(constraints):
-            print(f"\t to_cnf - {con=}")
-            # print(con.name, [(arg, type(arg)) for arg in con.args])
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
@@ -331,10 +325,19 @@ class CPM_pysat(SolverInterface):
                 from pysat.pb import PBEnc
 
                 if isinstance(left, Operator) and left.name == "sum" and is_int(right):
-                    lits = [self.pysat_var(var) for var in left.args]
-                    weights = [1]*len(lits)
+                    # weighted 
                     bound = right
-
+                    lits, weights = [], []
+                    for arg in left.args:
+                        if isinstance(arg, _BoolVarImpl):
+                        # unweighted
+                            lits += [self.pysat_var(arg)]
+                            weights += [1]
+                        elif isinstance(arg, Operator) and arg.name == "mul":
+                            lits += [self.pysat_var(arg.args[1])]
+                            weights += [arg.args[0]]
+                        else:
+                            raise NotImplementedError(f"Other type of sum arg constraint {arg} not supported by CPM_pysat")
                 # WEIGHTED !
                 elif isinstance(left, Operator) and left.name == "wsum" and is_int(right):
                     weights, lits = left.args[0], [self.pysat_var(var) for var in left.args[1]]
