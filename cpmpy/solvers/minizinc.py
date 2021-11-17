@@ -393,12 +393,10 @@ class CPM_minizinc(SolverInterface):
                    (isinstance(v, Expression) and v.is_bool()) \
                      for v in expr.args[0]):
                 subtype = "bool"
-            # minizinc is offset 1, which can be problematic for element...
             idx = args_str[1]
-            if isinstance(expr.args[1], _IntVarImpl) and expr.args[1].lb == 0:
-                idx = "{}+1".format(idx)
-            # almost there
-            txt  = "\n    let {{ array[int] of var {}: arr={} }} in\n".format(subtype, args_str[0])
+            # minizinc is offset 1, which can be problematic for element...
+            # thx Hakan, fix by using array1d(0..len, []), issue #54
+            txt  = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0, len(expr.args[0])-1, args_str[0])
             txt += f"      arr[{idx}]"
             return txt
         
