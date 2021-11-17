@@ -198,6 +198,9 @@ class TestSolvers(unittest.TestCase):
         n = s.solveAll()
         self.assertEqual(n, 6)
 
+        n = s.solveAll(display=x)
+        self.assertEqual(n, 6)
+
         n = s.solveAll(cp_model_probing_level=0)
         self.assertEqual(n, 6)
 
