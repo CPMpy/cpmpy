@@ -42,12 +42,12 @@ def int2bool(constraints, ivarmap=None):
 
     for constraint in flatten_constraint(constraints):
         if not is_boolvar_constraint(constraint):
-            print(f"\nTo Bool Constraint: {constraint=}")
-            print('-'*len(f"\nTo Bool Constraint: {constraint=}"), "\n")
+            # # print(f"\nTo Bool Constraint: {constraint=}")
+            # # print('-'*len(f"\nTo Bool Constraint: {constraint=}"), "\n")
             new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
-            print(f"\nnew_bool_cons:")
-            for con in new_bool_cons:
-                print(f"\n\t{con=}")
+            # # print(f"\nnew_bool_cons:")
+            # for con in new_bool_cons:
+            #     # print(f"\n\t{con=}")
             ivarmap.update(new_ivarmap)
             bool_constraints += new_bool_cons
         else:
@@ -181,8 +181,8 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     return bool_constraints, ivarmap
 
 def encode_var_comparison(constraint, ivarmap):
-    print("Enconding as var comparison!")
-    print(f"\t{constraint=}")
+    # print("Enconding as var comparison!")
+    # print(f"\t{constraint=}")
     bool_constraints = []
     left, right = constraint.args
     if isinstance(left, Operator) and isinstance(right, _IntVarImpl):
@@ -264,8 +264,11 @@ def encode_linear_constraint(con, ivarmap):
         return [con]
     elif op == "abs" and isinstance(con.args[0].args[0], _IntVarImpl):
         var = con.args[0].args[0]
-        # print(f"\t abs: {var=} {var.lb=} {var.ub=}")
-        return [[~bv] for wi, bv in ivarmap[var].items() if wi < 0]
+        bool_cons = []# # print(f"\t abs: {var=} {var.lb=} {var.ub=}")
+        for wi, bv in ivarmap[var].items():
+            if abs(wi) != val:
+                bool_cons.append([~bv])
+        return bool_cons
     else:
         raise NotImplementedError(f"Comparison {con=} {op=} {con.args[0].args=} not supported yet...")
 

@@ -67,9 +67,23 @@ m = Model(
     norway == zebra,
     abs(green - white) == 1,
     #horse in {diplomat - 1, diplomat + 1},
-    (horse == diplomat-1)|(horse == diplomat+1),
+    1 == abs(horse - diplomat),
     #italy in {red, white, green}
     (italy == red)|(italy == white)|(italy == green),
 )
 m.solve()
 print("The zebra (owner) lives in house number",zebra.value())
+
+colors_value = [v for v in colors.value()]
+nations_value = [v for v in nations.value()]
+jobs_value = [v for v in jobs.value()]
+pets_value = [v for v in pets.value()]
+drinks_value = [v for v in drinks.value()]
+
+m.solve()
+print(colors_value, [v for v in colors.value()])
+print(nations_value, [v for v in nations.value()])
+print(jobs_value, [v for v in jobs.value()])
+print(pets_value , [v for v in pets.value()])
+print(drinks_value, [v for v in drinks.value()])
+

@@ -305,8 +305,10 @@ class CPM_pysat(SolverInterface):
 
         # CNF object
         cnf = CNF()
-
+        # for con in constraints:
+        #     print(f"{con=}, {to_cnf(con)=}")
         for con in to_cnf(constraints):
+            # print(f"to_cnf: {con=} {type(con)=}  ")
             # base case, just var or ~var
             if isinstance(con, _BoolVarImpl):
                 cnf.append([ self.pysat_var(con) ])
@@ -343,7 +345,7 @@ class CPM_pysat(SolverInterface):
                             lits += [self.pysat_var(arg.args[0].args[1])]
                             weights += [-arg.args[0].args[0]]
                         else:
-                            raise NotImplementedError(f"Other type of sum arg constraint {arg} not supported by CPM_pysat")
+                            raise NotImplementedError(f"Other type of sum arg constraint {con} not supported by CPM_pysat")
                 # WEIGHTED !
                 elif isinstance(left, Operator) and left.name == "wsum" and is_int(right):
                     weights, lits = left.args[0], [self.pysat_var(var) for var in left.args[1]]
@@ -425,7 +427,7 @@ class CPM_pysat(SolverInterface):
             if not isinstance(var, _BoolVarImpl):
                 raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
 
-        assert all(constraint.is_bool() for constraint in cpm_model.constraints), f"Constraints \n{[constraint for constraint in cpm_model.constraints if not constraint.is_bool()]} should be a mapping to Boolean."
+        # assert all(constraint.is_bool() for constraint in cpm_model.constraints), f"Constraints \n{[constraint for constraint in cpm_model.constraints if not constraint.is_bool()]} should be a mapping to Boolean."
 
         return self._to_pysat_cnf(cpm_model.constraints)
 
