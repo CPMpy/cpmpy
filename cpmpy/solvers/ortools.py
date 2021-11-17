@@ -358,7 +358,6 @@ class CPM_ortools(SolverInterface):
 
         return self.ort_model
 
-
     def add_to_varmap(self, cpm_var):
         """
         Add the CPMpy variable to the 'varmap' mapping,

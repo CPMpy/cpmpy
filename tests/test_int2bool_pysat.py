@@ -6,69 +6,83 @@ from cpmpy.solvers.pysat import CPM_pysat
 import numpy as np
 
 class TestInt2BoolPySAT(unittest.TestCase):
-    def test_base_bool_model(self):
-        iv = intvar(lb=3, ub=7)
+    # def test_base_bool_model(self):
+    #     iv = intvar(lb=3, ub=7)
 
-        m = Model(
-            iv > 4
-        )
-        s = CPM_pysat(m)
-        s.solve()
+    #     m = Model(
+    #         iv > 4
+    #     )
+    #     s = CPM_pysat(m)
+    #     s.solve()
     
-    def test_incremental_int2bool_model(self):
-        iv1 = intvar(lb=3, ub=7)
-        iv2 = intvar(lb=3, ub=5)
+    # def test_incremental_int2bool_model(self):
+    #     iv1 = intvar(lb=3, ub=7)
+    #     iv2 = intvar(lb=3, ub=5)
 
-        m = Model(
-            iv1 > 6
-        )
+    #     m = Model(
+    #         iv1 > 6
+    #     )
 
-        s = CPM_pysat(m)
-        s.solve()
+    #     s = CPM_pysat(m)
+    #     s.solve()
 
-        s += iv2 < 4
-        s.solve()
+    #     s += iv2 < 4
+    #     s.solve()
+    
+    def test_weird_expression(self):
+        n_houses = 5
 
-class TestInt2boolPySATExamples(unittest.TestCase):
-    def test_sudoku(self):
+        # colors[i] is the house of the ith color
+        yellow, green, red, white, blue = colors = intvar(0,n_houses-1, shape=n_houses)
 
-        e = 0 # value for empty cells
-        given = np.array([
-            [e, e, e,  2, e, 5,  e, e, e],
-            [e, 9, e,  e, e, e,  7, 3, e],
-            [e, e, 2,  e, e, 9,  e, 6, e],
+        # nations[i] is the house of the inhabitant with the ith nationality
+        italy, spain, japan, england, norway = nations = intvar(0,n_houses-1, shape=n_houses)
 
-            [2, e, e,  e, e, e,  4, e, 9],
-            [e, e, e,  e, 7, e,  e, e, e],
-            [6, e, 9,  e, e, e,  e, e, 1],
+        m = CPM_pysat(Model(
+            (italy == red)|(italy == white)
+        ))
+        m.solve()
 
-            [e, 8, e,  4, e, e,  1, e, e],
-            [e, 6, 3,  e, e, e,  e, 8, e],
-            [e, e, e,  6, e, 8,  e, e, e]])
+# class TestInt2boolPySATExamples(unittest.TestCase):
+#     def test_sudoku(self):
 
-        # Variables
-        puzzle = intvar(1,9, shape=given.shape, name="puzzle")
+#         e = 0 # value for empty cells
+#         given = np.array([
+#             [e, e, e,  2, e, 5,  e, e, e],
+#             [e, 9, e,  e, e, e,  7, 3, e],
+#             [e, e, 2,  e, e, 9,  e, 6, e],
 
-        sudoku_iv_model = Model(
-            # Constraints on values (cells that are not empty)
-            puzzle[given!=e] == given[given!=e], # numpy's indexing, vectorized equality
-            # Constraints on rows and columns
-            [AllDifferent(row) for row in puzzle],
-            [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
-        )
+#             [2, e, e,  e, e, e,  4, e, 9],
+#             [e, e, e,  e, 7, e,  e, e, e],
+#             [6, e, 9,  e, e, e,  e, e, 1],
 
-        # Constraints on blocks
-        for i in range(0,9, 3):
-            for j in range(0,9, 3):
-                sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
+#             [e, 8, e,  4, e, e,  1, e, e],
+#             [e, 6, 3,  e, e, e,  e, 8, e],
+#             [e, e, e,  6, e, 8,  e, e, e]])
 
-        CPM_pysat(sudoku_iv_model).solve()
-        solution_pysat = puzzle.value()
-        sudoku_iv_model.solve()
-        solution_ortools = puzzle.value()
+#         # Variables
+#         puzzle = intvar(1,9, shape=given.shape, name="puzzle")
 
-        for sol_pysat, sol_ortools in zip(solution_pysat.flat, solution_ortools.flat):
-            self.assertEqual(sol_pysat, sol_ortools)
+#         sudoku_iv_model = Model(
+#             # Constraints on values (cells that are not empty)
+#             puzzle[given!=e] == given[given!=e], # numpy's indexing, vectorized equality
+#             # Constraints on rows and columns
+#             [AllDifferent(row) for row in puzzle],
+#             [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
+#         )
+
+#         # Constraints on blocks
+#         for i in range(0,9, 3):
+#             for j in range(0,9, 3):
+#                 sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
+
+#         CPM_pysat(sudoku_iv_model).solve()
+#         solution_pysat = puzzle.value()
+#         sudoku_iv_model.solve()
+#         solution_ortools = puzzle.value()
+
+#         for sol_pysat, sol_ortools in zip(solution_pysat.flat, solution_ortools.flat):
+#             self.assertEqual(sol_pysat, sol_ortools)
 
     def test_zebra(self):
 
@@ -117,6 +131,18 @@ class TestInt2boolPySATExamples(unittest.TestCase):
 
         zebra_pysat_solver = CPM_pysat(zebra_model)
         zebra_pysat_solver.solve()
+        colors_value = [v for v in colors.value()]
+        nations_value = [v for v in nations.value()]
+        jobs_value = [v for v in jobs.value()]
+        pets_value = [v for v in pets.value()]
+        drinks_value = [v for v in drinks.value()]
+
+        zebra_model.solve()
+        print(colors_value, [v for v in colors.value()])
+        print(nations_value, [v for v in nations.value()])
+        print(jobs_value, [v for v in jobs.value()])
+        print(pets_value , [v for v in pets.value()])
+        print(drinks_value, [v for v in drinks.value()])
 
 if __name__ == '__main__':
     unittest.main()

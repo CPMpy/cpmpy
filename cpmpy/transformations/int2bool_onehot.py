@@ -4,7 +4,7 @@ from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, Glo
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.flatten_model import flatten_constraint
-from ..expressions.variables import  _IntVarImpl, boolvar, intvar
+from ..expressions.variables import  _BoolVarImpl, _IntVarImpl, boolvar, intvar
 import numpy as np
 
 def int2bool_onehot(model):
@@ -40,13 +40,14 @@ def int2bool(constraints, ivarmap=None):
 
     bool_constraints = []
 
-    for constraint in constraints:
-        print(f"int2bool before - {constraint=} {flatten_constraint(constraint)=}" )
     for constraint in flatten_constraint(constraints):
-        print(f"int2bool - {constraint=}")
         if not is_boolvar_constraint(constraint):
+            print(f"\nTo Bool Constraint: {constraint=}")
+            print('-'*len(f"\nTo Bool Constraint: {constraint=}"), "\n")
             new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
-
+            print(f"\nnew_bool_cons:")
+            for con in new_bool_cons:
+                print(f"\n\t{con=}")
             ivarmap.update(new_ivarmap)
             bool_constraints += new_bool_cons
         else:
@@ -163,9 +164,9 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     # CASE 3: Linear WEIGHTED SUM
     elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and is_int(constraint.args[1]):
         bool_constraints += encode_linear_constraint(constraint, ivarmap)
-
-    elif isinstance(constraint, Comparison) and isinstance(constraint.args[0], Operator) and isinstance(constraint.args[1], _IntVarImpl):
-        raise NotImplementedError(f"Comparison Constraint {constraint} not supported...")
+    elif isinstance(constraint, Comparison) and isinstance(constraint.args[1], _IntVarImpl):
+        bool_constraints += encode_var_comparison(constraint, ivarmap)
+        # raise NotImplementedError(f"Comparison Constraint {constraint} not supported...")
     # CASE 4: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
@@ -178,6 +179,28 @@ def to_bool_constraint(constraint, ivarmap=dict()):
         assert all(isinstance(var, bool) or var.is_bool() for var in user_vars) or isinstance(constraint, bool), f"Operation not handled {constraint} yet"
 
     return bool_constraints, ivarmap
+
+def encode_var_comparison(constraint, ivarmap):
+    print("Enconding as var comparison!")
+    print(f"\t{constraint=}")
+    bool_constraints = []
+    left, right = constraint.args
+    if isinstance(left, Operator) and isinstance(right, _IntVarImpl):
+        cons, _ = to_bool_constraint(
+            Comparison(name=constraint.name, left=left-right, right=0),
+            ivarmap
+        )
+        bool_constraints += cons
+    # (italy == red) == BV
+    elif isinstance(left, Comparison) and isinstance(right, _BoolVarImpl):
+        from cpmpy.expressions.python_builtins import any
+        any_left = any(to_unit_comparison_pos(left, ivarmap))
+        bool_constraints += [any_left.implies(right)]
+        bool_constraints += [right.implies(any_left)]
+    else:
+        raise NotImplementedError(f"Intvar Comparison {constraint} not supported...")
+
+    return bool_constraints
 
 def encode_linear_constraint(con, ivarmap):
     """Encode the linear sum integer variable constraint with input int-to-bool 
@@ -246,6 +269,80 @@ def encode_linear_constraint(con, ivarmap):
     else:
         raise NotImplementedError(f"Comparison {con=} {op=} {con.args[0].args=} not supported yet...")
 
+def to_unit_comparison_pos(con, ivarmap):
+    """Encoding of comparison constraint with input int-to-bool variable encoding.
+    The comparison constraint is encoded using the positives version instead of keeping
+    only the negations. 
+
+    :param constraint: Input flattened expression encoded in given boolean variable
+    encoding.
+    :type Comparison
+
+    :param ivarmap: Encoding of intvar to boolvar
+    :type dict
+
+    :return: Expression: encoding of int variable-based comparison constraint
+    with given int-to-bool variable encoding.
+
+    For example:
+        x1 = intvar(lb=4, ub=8)
+        x2 = intvar(lb=4, ub=8)
+        # Introduce a boolean variable "linked" to an int value
+        bv4, bv5, bv6, bv7, bv8 = boolvar(shape=(ub-lb+1))
+
+        #Ensure only 1 value can be selected;
+        exactlyone_val_constraint = sum([bv4, bv5, bv6, bv7, bv8]) == 1
+
+        # The following encoding with the exactlyone constraint is then 
+        # equivalent to specifying x1 as an integer variable.
+        x1 = 4 * bv4 + 5 * bv5 + 6 * bv6 + 7 * bv7 + 8 * bv8
+
+    Encoded using their negation:
+
+        1. x1 > 5 ---> [[~bv4], [~bv5]]
+        2. x1 < 5 ---> [[~bv5], [~bv6], [~bv7], [~bv8]]
+        3. x1 < x2 --> [[~(x1i & x2i)] for x1i in x1 for x2i in x2 if x1i >= x2i]
+
+    """
+    bool_constraints =[]
+
+    left, right = con.args
+    operator = con.name
+
+    if operator == "==" and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        # x1 ==  x2
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i == j:
+                    bool_constraints.append(ivarmap[left][i] & ivarmap[right][j])
+
+    elif operator == "<"  and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i < j:
+                    bool_constraints.append(ivarmap[left][i] & ivarmap[right][j])
+
+    elif operator == "<="  and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i <= j:
+                    bool_constraints.append(ivarmap[left][i] & ivarmap[right][j])
+
+    elif operator == ">"  and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i > j:
+                    bool_constraints.append(ivarmap[left][i] & ivarmap[right][j])
+
+    elif operator == ">="  and isinstance(left, _IntVarImpl) and isinstance(right, _IntVarImpl):
+        for i in range(left.lb, left.ub+1):
+            for j in range(right.lb, right.ub+1):
+                if i >= j:
+                    bool_constraints.append(ivarmap[left][i] & ivarmap[right][j])
+    else:
+        raise NotImplementedError(f"Constraint {con} not supported...")
+
+    return bool_constraints
 def to_unit_comparison(con, ivarmap):
     """Encoding of comparison constraint with input int-to-bool variable encoding.
     The comparison constraint is encoded using a negative version instead of keeping 
