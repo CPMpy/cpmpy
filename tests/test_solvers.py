@@ -135,7 +135,8 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
-        ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
+        s.ort_solver.parameters.enumerate_all_solutions=True
+        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 0)
@@ -163,7 +164,8 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
-        ort_status = s.ort_solver.SearchForAllSolutions(s.ort_model, cb)
+        s.ort_solver.parameters.enumerate_all_solutions=True
+        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(x[0].value(), 3)
         self.assertEqual(x[1].value(), 0)
@@ -173,7 +175,7 @@ class TestSolvers(unittest.TestCase):
         # intermediate solutions
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
-        ort_status = s.ort_solver.SolveWithSolutionCallback(s.ort_model, cb)
+        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
         self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
         self.assertEqual(s.objective_value(), 5.0)
 
