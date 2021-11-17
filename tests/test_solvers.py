@@ -193,13 +193,6 @@ class TestSolvers(unittest.TestCase):
             s += [ cp.any(x != x.value()) ]
         self.assertEqual(solcount, 6)
 
-        # native all solutions
-        s = CPM_ortools(m)
-        n = s.solveAll()
-        self.assertEqual(n, 6)
-
-        n = s.solveAll(cp_model_probing_level=0)
-        self.assertEqual(n, 6)
 
         # assumptions
         bv = cp.boolvar(shape=3)
