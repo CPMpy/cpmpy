@@ -706,10 +706,9 @@ cb = OrtSolutionPrinter(s, printer=myprint)```
             else: # callable
                 self._display()
 
-            # check for count limit
-            if self._solution_limit is not None and \
-               self.solution_count() == self._solution_limit:
-                self.StopSearch()
+        # check for count limit
+        if self.solution_count() == self._solution_limit:
+            self.StopSearch()
 
 except ImportError:
     pass # Ok, no ortools installed...
