@@ -153,8 +153,8 @@ class CPM_ortools(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+        self.ort_model.ClearHints() # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
-            self.ort_model.ClearHints() # because add just appends
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
