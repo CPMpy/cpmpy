@@ -15,6 +15,8 @@
 
         CPM_ortools
 """
+import sys # for stdout checking
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -213,9 +215,12 @@ class CPM_ortools(SolverInterface):
         for (kw, val) in kwargs.items():
             setattr(self.ort_solver.parameters, kw, val)
 
-        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback"):
+        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback") \
+           and (sys.stdout != sys.__stdout__):
             # ortools>9.0, for IPython use, force output redirecting
             # see https://github.com/google/or-tools/issues/1903
+            # but only if a nonstandard stdout, otherwise duplicate output
+            # see https://github.com/CPMpy/cpmpy/issues/84
             self.ort_solver.log_callback = print
 
         if solution_callback is None:
