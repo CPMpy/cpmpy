@@ -7,7 +7,7 @@ CPMpy allows to model search problems in a high-level manner, by defining decisi
 Getting started:
 
 - Watch the [tutorial video](https://www.youtube.com/watch?v=A4mmmDAdusQ) on YouTube
-- Try it out [online without installation](https://mybinder.org/v2/gh/CPMpy/cpmpy/HEAD?labpath=examples) or browse the [examples/](examples/)
+- Try it out [online without installation](https://mybinder.org/v2/gh/CPMpy/cpmpy/HEAD?labpath=examples%2Fquickstart_sudoku.ipynb) or browse the [examples/](examples/)
 - Install as easily as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/installation_instructions.html)
 - Full documentation at [read the docs](https://cpmpy.readthedocs.io/) for more.
 
