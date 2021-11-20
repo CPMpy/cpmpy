@@ -4,7 +4,7 @@ Constraint Programming is a methodology for solving combinatorial optimisation p
 
 CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer. 
 
-Installing is as easy as `pip install cpmpy`, after which you are ready to go. See [examples](examples/) and the [online documentation](https://cpmpy.readthedocs.io/) for more. For installation on Apple Silicon, follow [this guide](M1_installation.).
+Installing is as easy as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/). See [examples/](examples/) and the [online documentation](https://cpmpy.readthedocs.io/) for more.
 
 Its key features are:
 
