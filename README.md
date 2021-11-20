@@ -4,9 +4,14 @@ Constraint Programming is a methodology for solving combinatorial optimisation p
 
 CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer. 
 
-Installing is as easy as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/). See [examples/](examples/) and the [online documentation](https://cpmpy.readthedocs.io/) for more.
+Getting started:
 
-Its key features are:
+- Watch the [tutorial video](https://www.youtube.com/watch?v=A4mmmDAdusQ) on YouTube
+- Try it out [online without installation](https://mybinder.org/v2/gh/CPMpy/cpmpy/HEAD?labpath=examples) or browse the [examples/](examples/)
+- Install as easily as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/)
+- Full documentation at [read the docs](https://cpmpy.readthedocs.io/) for more.
+
+Here is a quick highlight of some key features:
 
 - conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
 - logging search progress and arbitrarily [modifying solver parameters](https://cpmpy.readthedocs.io/en/latest/solver_parameters.html)
