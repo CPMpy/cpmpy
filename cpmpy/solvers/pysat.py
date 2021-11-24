@@ -59,6 +59,7 @@ class CPM_pysat(SolverInterface):
     @staticmethod
     def pb_supported():
         try:
+            from pypblib import pblib
             from pysat.pb import PBEnc
             from distutils.version import LooseVersion
             import pysat
