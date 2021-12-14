@@ -60,14 +60,14 @@ class TestInterface(unittest.TestCase):
     def test_objective(self):
 
         x = intvar(1, 10)
-        solver = TestInterface.solver_class(Model([x]))
+        solver = TestInterface.solver_class()
 
         try:
             solver.minimize(x)
         except NotImplementedError:
             return
 
-        self.assertIsNotNone(solver.objective_value())
+        self.assertFalse(hasattr(solver, "objective_value_"))
         self.assertTrue(solver.solve())
         self.assertEqual(solver.objective_value(), 1)
 
@@ -80,4 +80,4 @@ class TestInterface(unittest.TestCase):
         solver.solver_var(x)
 
         self.assertEqual(len(solver.user_vars), 1)
-        self.assertEqual(len(solver._var_map), 1)
+        self.assertEqual(len(solver._varmap), 1)

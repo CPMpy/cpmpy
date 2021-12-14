@@ -76,7 +76,6 @@ class SolverInterface(object):
                 else:
                     self.minimize(cpm_model.objective)
 
-
     def __add__(self, cpm_cons):
         """
             Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
