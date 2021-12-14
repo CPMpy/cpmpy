@@ -129,6 +129,23 @@ class SolverInterface(object):
         """
         return None
 
+    def solver_var(self, cpm_var):
+        """
+           Creates solver variable for cpmpy variable
+           or returns from cache if previously created
+        """
+        return None
+
+    def _post_constraint(self, cpm_expr):
+        """
+            Post a primitive CPMpy constraint to the native solver API
+
+            What 'primitive' means depends on the solver capabilities,
+            more specifically on the transformations applied in `__add__()`
+
+            Solvers do not need to support all constraints.
+        """
+        return None
 
     # OPTIONAL functions
 
