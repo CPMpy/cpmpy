@@ -18,11 +18,13 @@
 
         CPM_pysat
 """
+import pysat.formula
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables_model
+from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -89,10 +91,9 @@ class CPM_pysat(SolverInterface):
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface (NOT the 'pysat' package!)")
         if cpm_model and cpm_model.objective is not None:
             raise Exception("CPM_pysat: only satisfaction, does not support an objective function")
+
         from pysat.formula import IDPool
         from pysat.solvers import Solver
-
-        super().__init__(cpm_model, solver)
 
         # determine solvername, set cpmpy name
         solvername = solver
@@ -101,25 +102,13 @@ class CPM_pysat(SolverInterface):
             solvername = "glucose4" # something recent...
         elif solvername.startswith('pysat:'):
             solvername = solvername[6:] # strip 'pysat:'
-        self.name = "pysat:"+solvername
 
-        # ID pool of variables
+        # Create solver specific objects
         self.pysat_vpool = IDPool()
-
-        if cpm_model is None:
-            self.user_vars = []
-            from pysat.formula import CNF
-            cnf = CNF()
-        else:
-            # store original vars
-            self.user_vars = get_variables_model(cpm_model)
-
-            # create constraint model (list of clauses)
-            cnf = self.make_cnf(cpm_model)
-
-        # create the solver instance
+        cnf = pysat.formula.CNF()
         self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
 
+        super().__init__(cpm_model, solver=solver, name=solvername)
 
     def pysat_var(self, cpm_var):
         """
@@ -140,22 +129,83 @@ class CPM_pysat(SolverInterface):
         immediately adds the constraint to PySAT
 
         Note that we don't store the resulting cpm_model, we translate
-        directly to the ort_model
+        directly to the pysat model
 
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
+        from pysat.card import CardEnc
+
+        self.user_vars.update(get_variables(cpm_con))
+
         # base case, just var or ~var
         if isinstance(cpm_con, _BoolVarImpl):
             self.pysat_solver.add_clause([ self.pysat_var(cpm_con) ])
-        else:
-            cpm_con = to_cnf(cpm_con)
-            for con in cpm_con:
-                if isinstance(con, Operator) and con.name == 'or':
-                    self.pysat_solver.add_clause([ self.pysat_var(var) for var in con.args ])
+            return self
+
+        # Post the constraint expressions to the solver
+        # only CNF (list of disjunctions) supported for now
+        for con in to_cnf(cpm_con):
+            # base case, just var or ~var
+            if isinstance(con, _BoolVarImpl):
+                self.pysat_solver.add_clause([self.pysat_var(con)])
+            elif isinstance(con, Operator):
+                if con.name == 'or':
+                    self.pysat_solver.add_clause([self.pysat_var(var) for var in con.args])
                 else:
-                    raise NotImplementedError("PySAT: to_cnf create non-clause constraint",con)
-                    
+                    raise NotImplementedError(
+                        "Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
+            elif isinstance(con, Comparison):
+                # only handle cardinality encodings
+                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(
+                        isinstance(v, _BoolVarImpl) for v in con.args[0].args):
+                    lits = [self.pysat_var(var) for var in con.args[0].args]
+                    bound = con.args[1]
+                    # TODO: Edge case where sum(x) < 0: Raises error
+                    if con.name == "<":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(atmost.clauses)
+                    elif con.name == "<=":
+                        atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(atmost.clauses)
+                    elif con.name == ">=":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(atleast.clauses)
+                    elif con.name == ">":
+                        atleast = CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool)
+                        # self.pysat_solver.add_clause(atleast.clauses)
+                        self.pysat_solver.append_formula(atleast)
+                    elif con.name == "==":
+                        equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(equals.clauses)
+                    # special cases with bounding 'hardcoded' for clarity
+                    elif con.name == "!=" and bound <= 0:
+                        atleast = CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(atleast.clauses)
+                    elif con.name == "!=" and bound >= len(lits):
+                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
+                        self.pysat_solver.append_formula(atmost.clauses)
+                    elif con.name == "!=":
+                        ## add implication literal
+                        is_atleast = self.pysat_var(boolvar())
+                        atleast = [cl + [-is_atleast] for cl in
+                                   CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
+                        self.pysat_solver.append_formula(atleast)
+
+                        is_atmost = self.pysat_var(boolvar())
+                        atmost = [cl + [-is_atmost] for cl in
+                                  CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
+                        self.pysat_solver.append_formula(atmost)
+
+                        ## add is_atleast or is_atmost
+                        self.pysat_solver.add_clause([is_atleast, is_atmost])
+                    else:
+                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+                else:
+                    raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
+
+            else:
+                raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
         return self
 
 
@@ -260,83 +310,3 @@ class CPM_pysat(SolverInterface):
         assum_idx = frozenset(self.pysat_solver.get_core()) # to speed up lookup
 
         return [v for v in self.assumption_vars if self.pysat_var(v) in assum_idx]
-
-    def make_cnf(self, cpm_model):
-        """
-            Makes a pysat.formulae CNF out of 
-            a CPMpy model (only supports clauses for now)
-
-            Typically only needed for internal use
-        """
-        from pysat.formula import CNF
-        from pysat.card import CardEnc
-
-        # check only BoolVarImpl (incl. NegBoolView)
-        for var in get_variables_model(cpm_model):
-            if not isinstance(var, _BoolVarImpl):
-                raise NotImplementedError("Non-Boolean variables not (yet) supported. Reach out on github if you want to help implement a translation")
-
-        # CNF object
-        cnf = CNF()
-
-        # Post the constraint expressions to the solver
-        # only CNF (list of disjunctions) supported for now
-        for con in to_cnf(cpm_model.constraints):
-            # base case, just var or ~var
-            if isinstance(con, _BoolVarImpl):
-                cnf.append([ self.pysat_var(con) ])
-            elif isinstance(con, Operator):
-                if con.name == 'or':
-                    cnf.append([ self.pysat_var(var) for var in con.args ])
-                else:
-                    raise NotImplementedError("Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
-            elif isinstance(con, Comparison):
-                # only handle cardinality encodings
-                if isinstance(con.args[0], Operator) and con.args[0].name == "sum" and all(isinstance(v, _BoolVarImpl) for v in con.args[0].args):
-                    lits = [self.pysat_var(var) for var in con.args[0].args]
-                    bound = con.args[1]
-                    #TODO: Edge case where sum(x) < 0: Raises error
-                    if con.name == "<":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == "<=":
-                        atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == ">=":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == ">":
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == "==":
-                        equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                        cnf.extend(equals.clauses)
-                    # special cases with bounding 'hardcoded' for clarity
-                    elif con.name == "!=" and bound <= 0:
-                        atleast = CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool)
-                        cnf.extend(atleast.clauses)
-                    elif con.name == "!=" and bound >= len(lits):
-                        atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                        cnf.extend(atmost.clauses)
-                    elif con.name == "!=":
-                        ## add implication literal
-                        is_atleast = self.pysat_var(boolvar())
-                        atleast = [cl + [-is_atleast] for cl in CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
-                        cnf.extend(atleast)
-                        
-                        is_atmost = self.pysat_var(boolvar())
-                        atmost =  [cl + [-is_atmost] for cl in CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
-                        cnf.extend(atmost)
-                        
-                        ## add is_atleast or is_atmost
-                        cnf.append([is_atleast, is_atmost])
-                    else:
-                        raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
-                else:
-                    raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
-
-            else:
-                raise NotImplementedError(f"Non-operator constraint {con} not supported by CPM_pysat")
-
-        return cnf
-

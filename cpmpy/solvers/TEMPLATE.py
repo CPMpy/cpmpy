@@ -244,7 +244,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
 
 
-    def __add__(self, cpm_cons):
+    def __add__(self, cpm_con):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
 
@@ -256,11 +256,11 @@ class CPM_template(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars += get_variables(cpm_cons)
+        self.user_vars += get_variables(cpm_con)
 
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
-        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_con)
         for con in cpm_cons:
             self._post_constraint(con)
 

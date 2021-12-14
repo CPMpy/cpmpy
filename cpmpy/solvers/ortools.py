@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## ortools.py
 ##
@@ -15,14 +15,16 @@
 
         CPM_ortools
 """
-import sys # for stdout checking
+import sys  # for stdout checking
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
-from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
+from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, \
+    negated_normal
+
 
 class CPM_ortools(SolverInterface):
     """
@@ -47,41 +49,28 @@ class CPM_ortools(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, solver=None, name="ortools"):
         """
         Constructor of the solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         or-tools model and solver object (ort_model and ort_solver)
 
-            - cpm_model: CPMpy Model() object: ignored in this superclass
-            - solver: string: ignored in this superclass
+            - cpm_model: CPMpy Model() object
+            - solver: string
+            - name: string
 
         ort_model and ort_solver can both be modified externally before
         calling solve(), a prime way to use more advanced solver features
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(self.name))
-        from ortools.sat.python import cp_model as ort
 
-        super().__init__(cpm_model, solver=solver)
-        self.name = "ortools"
-
-        if cpm_model is None:
-            self.user_vars = []
-            self.ort_model = ort.CpModel()
-            self.varmap = dict() # cppy var -> solver var
-        else:
-            # store original vars and objective (before flattening)
-            self.user_vars = get_variables_model(cpm_model)
-
-            # create model (includes conversion to flat normal form)
-            self.ort_model = self.make_model(cpm_model)
-
-        # create the solver instance
-        # (so its params can still be changed before calling solve)
+        # Initialize solver specific variables
+        self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
+        super().__init__(cpm_model, solver=solver, name=name)
 
     def __add__(self, cons):
         """
@@ -97,13 +86,13 @@ class CPM_ortools(SolverInterface):
         """
         # store new user vars
         new_user_vars = get_variables(cons)
-        for v in frozenset(new_user_vars)-frozenset(self.user_vars):
-            self.user_vars.append(v)
+        for v in frozenset(new_user_vars) - frozenset(self.user_vars):
+            self.user_vars.add(v)
 
         flat_cons = flatten_constraint(cons)
         # add new (auxiliary) variables
         for var in get_variables(flat_cons):
-            if not var in self.varmap:
+            if not var in self._varmap:
                 self.add_to_varmap(var)
         # add constraints
         for cpm_con in flat_cons:
@@ -143,7 +132,6 @@ class CPM_ortools(SolverInterface):
         obj = self.ort_numexpr(flat_obj)
         self.ort_model.Maximize(obj)
 
-
     def solution_hint(self, cpm_vars, vals):
         """
         or-tools supports warmstarting the solver with a feasible solution
@@ -155,10 +143,9 @@ class CPM_ortools(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        self.ort_model.ClearHints() # because add just appends
+        self.ort_model.ClearHints()  # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
-
 
     def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
         """
@@ -204,8 +191,9 @@ class CPM_ortools(SolverInterface):
             # oh, actually... its a bug that I already reported earlier for
             # VarIndexToVarProto(0) and that Laurent then fixed...
             # Until version 8.3 is released, I'm sticking to own dict
-            self.assumption_dict = dict( (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars) )
-            self.ort_model.ClearAssumptions() # because add just appends
+            self.assumption_dict = dict(
+                (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars))
+            self.ort_model.ClearAssumptions()  # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
             # workaround for a presolve with assumptions bug in ortools
             # https://github.com/google/or-tools/issues/2649
@@ -216,7 +204,7 @@ class CPM_ortools(SolverInterface):
             setattr(self.ort_solver.parameters, kw, val)
 
         if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback") \
-           and (sys.stdout != sys.__stdout__):
+                and (sys.stdout != sys.__stdout__):
             # ortools>9.0, for IPython use, force output redirecting
             # see https://github.com/google/or-tools/issues/1903
             # but only if a nonstandard stdout, otherwise duplicate output
@@ -259,8 +247,8 @@ class CPM_ortools(SolverInterface):
         elif self.ort_status == ort.UNKNOWN:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else: # another?
-            raise NotImplementedError(self.ort_status) # a new status type was introduced, please report on github
+        else:  # another?
+            raise NotImplementedError(self.ort_status)  # a new status type was introduced, please report on github
 
         # translate runtime
         self.cpm_status.runtime = self.ort_solver.WallTime()
@@ -269,7 +257,7 @@ class CPM_ortools(SolverInterface):
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # fill in variables
             for var in self.user_vars:
-                var._value = self.ort_solver.Value(self.varmap[var])
+                var._value = self.ort_solver.Value(self._varmap[var])
 
         # translate objective
         self.objective_value_ = None
@@ -286,7 +274,6 @@ class CPM_ortools(SolverInterface):
         """
         return self.objective_value_
 
-
     def get_core(self):
         from ortools.sat.python import cp_model as ort
         """
@@ -300,7 +287,8 @@ class CPM_ortools(SolverInterface):
 
             Requires or-tools >= 8.2!!!
         """
-        assert (self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
+        assert (
+                    self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
@@ -308,42 +296,40 @@ class CPM_ortools(SolverInterface):
 
         return [self.assumption_dict[i] for i in assum_idx]
 
-    def make_model(self, cpm_model):
-        """
-            Makes the ortools.sat.python.cp_model formulation out of 
-            a CPMpy model (will do flattening and other transformations)
-
-            Typically only needed for internal use
-        """
-        from ortools.sat.python import cp_model as ort
-
-        # Constraint programming engine
-        self.ort_model = ort.CpModel()
-
-        # Transform into flattened model
-        flat_model = flatten_model(cpm_model)
-
-        # Create corresponding solver variables
-        self.varmap = dict() # cppy var -> solver var
-        for var in get_variables_model(flat_model):
-            self.add_to_varmap(var)
-
-        # Post the (flat) constraint expressions to the solver
-        for con in flat_model.constraints:
-            self.post_constraint(con)
-
-        # Post the objective
-        if flat_model.objective is None:
-            pass # no objective, satisfaction problem
-        else:
-            obj = self.ort_numexpr(flat_model.objective)
-            if flat_model.objective_max:
-                self.ort_model.Maximize(obj)
-            else:
-                self.ort_model.Minimize(obj)
-
-        return self.ort_model
-
+    # def make_model(self, cpm_model):
+    #     """
+    #         Makes the ortools.sat.python.cp_model formulation out of
+    #         a CPMpy model (will do flattening and other transformations)
+    #
+    #         Typically only needed for internal use
+    #     """
+    #     from ortools.sat.python import cp_model as ort
+    #
+    #     # Constraint programming engine
+    #     # self.ort_model = ort.CpModel()
+    #     #
+    #     # # Transform into flattened model
+    #     # flat_model = flatten_model(cpm_model)
+    #     #
+    #     # # Create corresponding solver variables
+    #     # for var in get_variables_model(flat_model):
+    #     #     self.add_to_varmap(var)
+    #     #
+    #     # # Post the (flat) constraint expressions to the solver
+    #     # for con in flat_model.constraints:
+    #     #     self.post_constraint(con)
+    #
+    #     # Post the objective
+    #     if flat_model.objective is None:
+    #         pass  # no objective, satisfaction problem
+    #     else:
+    #         obj = self.ort_numexpr(flat_model.objective)
+    #         if flat_model.objective_max:
+    #             self.ort_model.Maximize(obj)
+    #         else:
+    #             self.ort_model.Minimize(obj)
+    #
+    #     return self.ort_model
 
     def add_to_varmap(self, cpm_var):
         """
@@ -356,8 +342,7 @@ class CPM_ortools(SolverInterface):
             revar = self.ort_model.NewBoolVar(str(cpm_var))
         elif isinstance(cpm_var, _IntVarImpl):
             revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
-        self.varmap[cpm_var] = revar
-
+        self._varmap[cpm_var] = revar
 
     def post_constraint(self, cpm_expr, reifiable=False):
         """
@@ -375,15 +360,15 @@ class CPM_ortools(SolverInterface):
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
-            return self.ort_model.AddBoolOr( [self.ort_var(cpm_expr)] )
-        
+            return self.ort_model.AddBoolOr([self.ort_var(cpm_expr)])
+
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
-            lhs,rhs = cpm_expr.args
+            lhs, rhs = cpm_expr.args
 
             if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == '==':
                 # base: bvar == bvar|const
-                lvar,rvar = map(self.ort_var, (lhs,rhs))
+                lvar, rvar = map(self.ort_var, (lhs, rhs))
                 return self.ort_model.Add(lvar == rvar)
 
             elif lhs.is_bool() and cpm_expr.name == '==':
@@ -405,7 +390,7 @@ class CPM_ortools(SolverInterface):
                 else:
                     if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
                         # a BoundedLinearExpression LHS, special case, like in objective
-                        newlhs = self.ort_numexpr(lhs) 
+                        newlhs = self.ort_numexpr(lhs)
                     elif cpm_expr.name == '==' and not reifiable:
                         newlhs = None
                         if lhs.name == 'abs':
@@ -417,7 +402,8 @@ class CPM_ortools(SolverInterface):
                             divisor = lhs.args[1]
                             if not is_num(divisor):
                                 if divisor.lb <= 0 and divisor.ub >= 0:
-                                    raise Exception(f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                                    raise Exception(
+                                        f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                             return self.ort_model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'pow':
                             # translate to multiplications
@@ -430,7 +416,7 @@ class CPM_ortools(SolverInterface):
                                 return self.ort_model.Add(x == rvar)
                             assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
                             # mul([x,x,x,...]) with 'y' elements
-                            return self.ort_model.AddMultiplicationEquality(rvar, [x]*y)
+                            return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
                         elif lhs.name == 'div':
                             return self.ort_model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'min':
@@ -439,9 +425,11 @@ class CPM_ortools(SolverInterface):
                             return self.ort_model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
                         elif lhs.name == 'element':
                             # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                            return self.ort_model.AddElement(self.ort_var(lhs.args[1]), self.ort_var_or_list(lhs.args[0]), rvar)
+                            return self.ort_model.AddElement(self.ort_var(lhs.args[1]),
+                                                             self.ort_var_or_list(lhs.args[0]), rvar)
                         else:
-                            raise NotImplementedError("Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                            raise NotImplementedError(
+                                "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
                     else:
                         # other equality than == 
                         # example: x*y > 10 :: x*y == aux, aux > 10
@@ -455,32 +443,33 @@ class CPM_ortools(SolverInterface):
                         newlhs = self.ort_var(newvar)
 
                 if newlhs is None:
-                    pass # is already posted directly, eg a '=='
+                    pass  # is already posted directly, eg a '=='
                 elif cpm_expr.name == '==':
-                    return self.ort_model.Add( newlhs == rvar)
+                    return self.ort_model.Add(newlhs == rvar)
                 elif cpm_expr.name == '!=':
-                    return self.ort_model.Add( newlhs != rvar )
+                    return self.ort_model.Add(newlhs != rvar)
                 elif cpm_expr.name == '<=':
-                    return self.ort_model.Add( newlhs <= rvar )
+                    return self.ort_model.Add(newlhs <= rvar)
                 elif cpm_expr.name == '<':
-                    return self.ort_model.Add( newlhs < rvar )
+                    return self.ort_model.Add(newlhs < rvar)
                 elif cpm_expr.name == '>=':
-                    return self.ort_model.Add( newlhs >= rvar )
+                    return self.ort_model.Add(newlhs >= rvar)
                 elif cpm_expr.name == '>':
-                    return self.ort_model.Add( newlhs > rvar )
+                    return self.ort_model.Add(newlhs > rvar)
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == '->' and \
-             (not isinstance(cpm_expr.args[0], _BoolVarImpl) or \
-              not isinstance(cpm_expr.args[1], _BoolVarImpl)):
+                    (not isinstance(cpm_expr.args[0], _BoolVarImpl) or \
+                     not isinstance(cpm_expr.args[1], _BoolVarImpl)):
                 # reified case: var -> boolexpr, boolexpr -> var
                 if isinstance(cpm_expr.args[0], _BoolVarImpl):
                     # var -> boolexpr, natively supported by or-tools
                     bvar = self.ort_var(cpm_expr.args[0])
                     # Special case for 'xor', which is not reifiable in ortools
                     if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
-                        return self.post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(bvar)
+                        return self.post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(
+                            bvar)
                     return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
                 else:
                     # boolexpr -> var, have to convert to ~var -> ~boolexpr
@@ -499,18 +488,19 @@ class CPM_ortools(SolverInterface):
                 elif cpm_expr.name == 'xor':
                     return self.ort_model.AddBoolXOr(args)
                 elif cpm_expr.name == '->':
-                    return self.ort_model.AddImplication(args[0],args[1])
+                    return self.ort_model.AddImplication(args[0], args[1])
                 else:
-                    raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
+                    raise NotImplementedError(
+                        "Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
 
         # rest: base (Boolean) global constraints
         else:
             args = [self.ort_var_or_list(v) for v in cpm_expr.args]
 
             if cpm_expr.name == 'alldifferent':
-                return self.ort_model.AddAllDifferent(args) 
+                return self.ort_model.AddAllDifferent(args)
             elif cpm_expr.name == 'table':
-                assert(len(args) == 2) # args = [array, table]
+                assert (len(args) == 2)  # args = [array, table]
                 return self.ort_model.AddAllowedAssignments(args[0], args[1])
             # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
@@ -523,16 +513,16 @@ class CPM_ortools(SolverInterface):
 
                     # collect and create new variables
                     for var in get_variables(flatdec):
-                        if not var in self.varmap:
+                        if not var in self._varmap:
                             self.add_to_varmap(var)
                     # post decomposition
                     for con in flatdec:
                         self.post_constraint(con)
                     # XXX how to deal with reification of such a global??
                     # TODO: we would have to catch this at the time of the reification... (outer call)
-                    return None # will throw error if used in reification...
+                    return None  # will throw error if used in reification...
                 else:
-                    raise NotImplementedError(cpm_expr) # if you reach this... please report on github
+                    raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
     def ort_var(self, cpm_var):
         """
@@ -546,9 +536,9 @@ class CPM_ortools(SolverInterface):
 
         # decision variables, check in varmap
         if isinstance(cpm_var, NegBoolView):
-            return self.varmap[cpm_var._bv].Not()
-        elif isinstance(cpm_var, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
-            return self.varmap[cpm_var]
+            return self._varmap[cpm_var._bv].Not()
+        elif isinstance(cpm_var, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
+            return self._varmap[cpm_var]
 
         raise NotImplementedError("Not a know var {}".format(cpm_var))
 
@@ -561,7 +551,6 @@ class CPM_ortools(SolverInterface):
         if is_any_list(cpm_expr):
             return [self.ort_var_or_list(sub) for sub in cpm_expr]
         return self.ort_var(cpm_expr)
-
 
     def ort_numexpr(self, cpm_expr):
         """
@@ -578,24 +567,27 @@ class CPM_ortools(SolverInterface):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.ort_var(cpm_expr)
 
         # sum or (to be implemented: wsum)
         if isinstance(cpm_expr, Operator):
             args = [self.ort_var(v) for v in cpm_expr.args]
             if cpm_expr.name == 'sum':
-                return sum(args) # OR-Tools supports this
+                return sum(args)  # OR-Tools supports this
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
+
 
 # solvers are optional, so this file should be interpretable
 # even if ortools is not installed...
 try:
-  from ortools.sat.python import cp_model as ort
-  import time
-  class OrtSolutionCounter(ort.CpSolverSolutionCallback):
-    """
+    from ortools.sat.python import cp_model as ort
+    import time
+
+
+    class OrtSolutionCounter(ort.CpSolverSolutionCallback):
+        """
         Native or-tools callback for solution counting.
 
         It is based on ortools' built-in `ObjectiveSolutionPrinter`
@@ -610,24 +602,25 @@ try:
         Arguments:
             - verbose whether to print info on every solution found (bool, default: False)
     """
-    def __init__(self, verbose=False):
-        super().__init__()
-        self.__solution_count = 0
-        self.__verbose = verbose
-        if self.__verbose:
-            self.__start_time = time.time()
 
-    def on_solution_callback(self):
-        """Called on each new solution."""
-        if self.__verbose:
-            current_time = time.time()
-            obj = self.ObjectiveValue()
-            print('Solution %i, time = %0.2f s, objective = %i' %
-                  (self.__solution_count, current_time - self.__start_time, obj))
-        self.__solution_count += 1
+        def __init__(self, verbose=False):
+            super().__init__()
+            self.__solution_count = 0
+            self.__verbose = verbose
+            if self.__verbose:
+                self.__start_time = time.time()
 
-    def solution_count(self):
-        """Returns the number of solutions found."""
-        return self.__solution_count
+        def on_solution_callback(self):
+            """Called on each new solution."""
+            if self.__verbose:
+                current_time = time.time()
+                obj = self.ObjectiveValue()
+                print('Solution %i, time = %0.2f s, objective = %i' %
+                      (self.__solution_count, current_time - self.__start_time, obj))
+            self.__solution_count += 1
+
+        def solution_count(self):
+            """Returns the number of solutions found."""
+            return self.__solution_count
 except ImportError:
-    pass # Ok, no ortools installed...
+    pass  # Ok, no ortools installed...

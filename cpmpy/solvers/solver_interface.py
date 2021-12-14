@@ -26,6 +26,9 @@ from enum import Enum
 import time
 
 #==============================================================================
+from cpmpy.transformations.get_variables import get_variables_model
+
+
 class SolverInterface(object):
     """
         Abstract class for defining solver interfaces. All classes implementing
@@ -47,16 +50,34 @@ class SolverInterface(object):
 
     # REQUIRED functions to mimic `Model` interface:
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, solver=None, name="dummy"):
         """
             Initalize solver interface
 
             - cpm_model: CPMpy Model() object: ignored in this superclass
             - solver: string: ignored in this superclass
         """
-        self.cpm_status = SolverStatus("dummy") # status of solving this model
+        self.name = name
+        self.cpm_status = SolverStatus(self.name) # status of solving this model
 
-    def __add__(self):
+        # initialise variable handling
+        self.user_vars = set()  # variables in the original (non-transformed) model
+        self._varmap = dict()  # maps cpmpy variables to native solver variables
+
+        # rest uses own API
+        if cpm_model is not None:
+            # post all constraints at once, implemented in __add__()
+            self += cpm_model.constraints
+
+            # post objective
+            if cpm_model.objective is not None:
+                if cpm_model.objective_max:
+                    self.maximize(cpm_model.objective)
+                else:
+                    self.minimize(cpm_model.objective)
+
+
+    def __add__(self, cpm_cons):
         """
             Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
         """

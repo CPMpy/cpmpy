@@ -159,7 +159,7 @@ class TestSolvers(unittest.TestCase):
         
                 self.solcount += 1
                 print("x:",self.x.value())
-        cb = ORT_myprint(s.varmap, x)
+        cb = ORT_myprint(s._varmap, x)
 
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
