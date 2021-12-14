@@ -95,7 +95,7 @@ class TestWeightedSum(unittest.TestCase):
         expr4 = - self.ivs[0] + self.ivs[1] * 4 - 6 * self.ivs[2]
         self.assertIsInstance(expr4, Operator)
         self.assertEqual(expr4.name, 'wsum')
-        self.assertEqual(str(str([-1, 4, -6])+ " .* " + [self.ivs[0] ,self.ivs[1],self.ivs[2]]) , str(expr4))
+        self.assertEqual(str([-1, 4, -6])+ " .* " + str([self.ivs[0] ,self.ivs[1],self.ivs[2]]) , str(expr4))
 
     def test_weightedadd_int(self):
         expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
