@@ -20,6 +20,8 @@
     Each solver has its own class that inherits from `SolverInterface`.
 
 """
+from ..expressions.core import Expression
+from ..expressions.python_builtins import any,all
 #
 #==============================================================================
 from enum import Enum
@@ -110,6 +112,44 @@ class SolverInterface(object):
 
 
     # OPTIONAL functions
+
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            This is the generic implementation, solvers can overwrite this with
+            a more efficient native implementation
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+        # XXX: check that no objective function??
+        solution_count = 0
+        while self.solve(time_limit=time_limit, **kwargs):
+            # display if needed
+            if display:
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print([v.value() for v in display])
+                else:
+                    display() # callback
+
+            # count and stop
+            solution_count += 1
+            if solution_count == solution_limit:
+                break
+
+            # add nogood on the user variables
+            self += any([v != v.value() for v in self.user_vars])
+
+        return solution_count
 
     def solution_hint(self, cpm_vars, vals):
         """
