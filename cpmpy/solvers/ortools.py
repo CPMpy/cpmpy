@@ -23,6 +23,7 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
+from ..transformations.reification import only_bv_implies
 
 class CPM_ortools(SolverInterface):
     """
@@ -100,7 +101,7 @@ class CPM_ortools(SolverInterface):
         for v in frozenset(new_user_vars)-frozenset(self.user_vars):
             self.user_vars.append(v)
 
-        flat_cons = flatten_constraint(cons)
+        flat_cons = only_bv_implies(flatten_constraint(cons))
         # add new (auxiliary) variables
         for var in get_variables(flat_cons):
             if not var in self.varmap:
@@ -322,6 +323,7 @@ class CPM_ortools(SolverInterface):
 
         # Transform into flattened model
         flat_model = flatten_model(cpm_model)
+        flat_model.constraints = only_bv_implies(flat_model.constraints)
 
         # Create corresponding solver variables
         self.varmap = dict() # cppy var -> solver var
@@ -362,6 +364,7 @@ class CPM_ortools(SolverInterface):
     def post_constraint(self, cpm_expr, reifiable=False):
         """
             Constraints are expected to be in 'flat normal form' (see flatten_model.py)
+            and 'only_bv_implies' (see transformations/reification.py)
 
             While the normal form is divided in 'base', 'comparison' and 'reified', we
             here regroup it per CPMpy class
@@ -385,15 +388,6 @@ class CPM_ortools(SolverInterface):
                 # base: bvar == bvar|const
                 lvar,rvar = map(self.ort_var, (lhs,rhs))
                 return self.ort_model.Add(lvar == rvar)
-
-            elif lhs.is_bool() and cpm_expr.name == '==':
-                assert (not reifiable), "can not reify a reification"
-                # reified case: boolexpr == var, split into two implications
-                lexpr = cpm_expr.args[0]
-                rvar = cpm_expr.args[1]
-                # split in boolexpr -> var and var -> boolexpr
-                self.post_constraint(lexpr.implies(rvar))
-                self.post_constraint(rvar.implies(lexpr))
 
             else:
                 # numeric (non-reify) comparison case
@@ -472,21 +466,17 @@ class CPM_ortools(SolverInterface):
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == '->' and \
-             (not isinstance(cpm_expr.args[0], _BoolVarImpl) or \
-              not isinstance(cpm_expr.args[1], _BoolVarImpl)):
-                # reified case: var -> boolexpr, boolexpr -> var
-                if isinstance(cpm_expr.args[0], _BoolVarImpl):
-                    # var -> boolexpr, natively supported by or-tools
-                    bvar = self.ort_var(cpm_expr.args[0])
-                    # Special case for 'xor', which is not reifiable in ortools
-                    if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
+                    isinstance(cpm_expr.args[0], _BoolVarImpl) and \
+                    not isinstance(cpm_expr.args[1], _BoolVarImpl):
+                # var -> boolexpr, natively supported by or-tools
+                bvar = self.ort_var(cpm_expr.args[0])
+                # Special case for 'xor', which is not natively reifiable in ortools
+                if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
+                    if len(cpm_expr.args) == 2:
                         return self.post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(bvar)
-                    return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
-                else:
-                    # boolexpr -> var, have to convert to ~var -> ~boolexpr
-                    negbvar = self.ort_var(cpm_expr.args[1]).Not()
-                    negleft = negated_normal(cpm_expr.args[0])
-                    return self.post_constraint(negleft, reifiable=True).OnlyEnforceIf(negbvar)
+                    else:
+                        raise NotImplementedError("ORT: reified n-ary XOR not yet supported, make an issue on github if you need it")
+                return self.post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
 
             else:
                 # base 'and'/n, 'or'/n, 'xor'/n, '->'/2
@@ -519,7 +509,7 @@ class CPM_ortools(SolverInterface):
                 # global constraint not known, try generic decomposition
                 dec = cpm_expr.decompose()
                 if not dec is None:
-                    flatdec = flatten_constraint(dec)
+                    flatdec = only_bv_implies(flatten_constraint(dec))
 
                     # collect and create new variables
                     for var in get_variables(flatdec):
