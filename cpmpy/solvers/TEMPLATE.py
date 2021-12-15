@@ -194,7 +194,7 @@ class CPM_template(SolverInterface):
         self += flat_cons # add potentially created constraints
 
         # make objective function or variable and post
-        obj = self._make_numpexpr(flat_obj)
+        obj = self._make_numexpr(flat_obj)
         TEMPLATEpy.Minimize(obj)
 
     def maximize(self, expr):
@@ -211,10 +211,10 @@ class CPM_template(SolverInterface):
         self += flat_cons # add potentially created constraints
 
         # make objective function or variable and post
-        obj = self._make_numpexpr(flat_obj)
+        obj = self._make_numexpr(flat_obj)
         TEMPLATEpy.Maximize(obj)
 
-    def _make_numexpr(cpm_expr):
+    def _make_numexpr(self, cpm_expr):
         """
             Turns a numeric CPMpy 'flat' expression into a solver-specific
             numeric expression
@@ -264,6 +264,7 @@ class CPM_template(SolverInterface):
         for con in cpm_cons:
             self._post_constraint(con)
 
+        return self
 
     def _post_constraint(self, cpm_con):
         """

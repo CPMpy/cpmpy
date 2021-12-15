@@ -9,7 +9,7 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 class TestInterface(unittest.TestCase):
 
     # Replace by your own solver class
-    solver_class = CPM_ortools
+    solver_class = CPM_pysat
 
     def setUp(self) -> None:
         self.solver = TestInterface.solver_class()
@@ -63,8 +63,7 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(self.solver.solve())
         self.assertEqual(ExitStatus.FEASIBLE, self.solver.status().exitstatus)
 
-        self.assertEquals((0,1,0), self.bvar)
-
+        self.assertListEqual([0,1,0], [self.x.value(), self.y.value(), self.z.value()])
 
     def test_objective(self):
 
