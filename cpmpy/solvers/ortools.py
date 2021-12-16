@@ -578,9 +578,13 @@ class CPM_ortools(SolverInterface):
 
         # sum or (to be implemented: wsum)
         if isinstance(cpm_expr, Operator):
-            args = [self.ort_var(v) for v in cpm_expr.args]
             if cpm_expr.name == 'sum':
+                args = [self.ort_var(v) for v in cpm_expr.args]
                 return sum(args) # OR-Tools supports this
+            elif cpm_expr.name == 'wsum':
+                w = cpm_expr.args[0]
+                x = [self.ort_var(v) for v in cpm_expr.args[1]]
+                return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
 
