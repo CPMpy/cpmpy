@@ -343,8 +343,8 @@ class Operator(Expression):
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool = Operator.allowed[name]
         if arity == 0:
-            assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
             arg_list = flatlist(arg_list)
+            assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
