@@ -421,7 +421,7 @@ class CPM_ortools(SolverInterface):
                     isinstance(cpm_expr.args[0], _BoolVarImpl) and \
                     not isinstance(cpm_expr.args[1], _BoolVarImpl):
                 # var -> boolexpr, natively supported by or-tools
-                bvar = self.ort_var(cpm_expr.args[0])
+                bvar = self.solver_var(cpm_expr.args[0])
                 # Special case for 'xor', which is not natively reifiable in ortools
                 if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
                     if len(cpm_expr.args) == 2:
