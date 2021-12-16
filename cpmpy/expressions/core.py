@@ -296,7 +296,7 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
-    # is bool, check special case
+    # a comparison itself is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
             return self
@@ -359,7 +359,7 @@ class Operator(Expression):
         # we also have the convention that weighted sums are [weights, vars]
         # this is ensured at creation time
 
-        # merge same operators for n-ary ones
+        # args of same operator are merged in for n-ary ones
         if arity == 0:
             i = 0 # length can change
             while i < len(arg_list):
@@ -403,77 +403,7 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
-    # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
-    # + special case for weighted sum (sum of mul)
-
-    def __and__(self, other):
-        if self.name == 'and':
-            self.args.append(other)
-            return self
-        return super().__and__(other)
-    def __rand__(self, other):
-        if self.name == 'and':
-            self.args.insert(0,other)
-            return self
-        return super().__rand__(other)
-
-    def __or__(self, other):
-        if self.name == 'or':
-            self.args.append(other)
-            return self
-        return super().__or__(other)
-    def __ror__(self, other):
-        if self.name == 'or':
-            self.args.insert(0,other)
-            return self
-        return super().__ror__(other)
-
-    def __xor__(self, other):
-        if self.name == 'xor':
-            self.args.append(other)
-            return self
-        return super().__xor__(other)
-    def __rxor__(self, other):
-        if self.name == 'xor':
-            self.args.insert(0,other)
-            return self
-        return super().__rxor__(other)
-
-    def __add__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        return super().__add__(other)
-
-    def __radd__(self, other):
-        # only for constants
-        if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            if not isinstance(other, Iterable):
-                self.args.insert(0, other)
-            else: # vector
-                self.args[:0] = other # prepend an array
-            return self
-        return super().__radd__(other)
-
-    # substraction; in case of sum or wsum, add
-    def __sub__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            self.args.append(-other)
-            return self
-        return super().__sub__(other)
-    def __rsub__(self, other):
-        if is_num(other) and other == 0:
-            return -self
-
-        return (-self).__radd__(other)
-
-    # is bool, check special case
+    # if self is bool, special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
             # check if bool operator, do not add == 1
