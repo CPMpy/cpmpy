@@ -197,15 +197,7 @@ class CPM_ortools(SolverInterface):
             # see https://github.com/CPMpy/cpmpy/issues/84
             self.ort_solver.log_callback = print
 
-        if solution_callback is None:
-            ort_status = self.ort_solver.Solve(self.ort_model)
-        else:
-            try:
-                # from ortools 9.0 onwards
-                ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
-            except TypeError:
-                # ortools < 9.0
-                ort_status = self.ort_solver.SolveWithSolutionCallback(self.ort_model, solution_callback)
+        ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
 
         return self._after_solve(ort_status)
 
@@ -490,7 +482,7 @@ class CPM_ortools(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return -self.solver_var(cpm_var._bv).Not()
+            return self.solver_var(cpm_var._bv).Not()
 
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
