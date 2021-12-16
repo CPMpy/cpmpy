@@ -351,7 +351,9 @@ class Operator(Expression):
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
-        if name == 'sum' and any(_wsum_should(a) for a in arg_list):
+        # should we convert the sum into a wsum?
+        if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
+                not any(is_num(a) for a in arg_list):
             w,x = [], []
             for a in arg_list:
                 w1,x1 = _wsum_make(a)
