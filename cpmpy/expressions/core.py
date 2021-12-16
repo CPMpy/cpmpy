@@ -26,7 +26,7 @@
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
-    - wsum([w1 * x, w2 * y, w3* z])  Operator("sum", [w,x])
+    - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
     - x - y         Operator("sum", [x,-y])
     - x * y         Operator("mul", [x,y])
     - x / y         Operator("div", [x,y])
@@ -214,75 +214,6 @@ class Expression(object):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-
-        x, w = [], []
-        # Existing Weighted SUM
-        if isinstance(self, Operator) and self.name == "wsum":
-            w += self.args[0]
-            x += self.args[1]
-            # add weighted sum 3 * x + 3 * Y + (3 * z)
-            if isinstance(other,Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-            # add weighted sum 3 * x + 3 * Y + (3 * z)
-            elif isinstance(other,Operator) and other.name == "sum":
-                x += other.args
-                w += [1] * len(other.args)
-            # add weighted sum 3 * x + 3 * Y +  z)
-            elif hasattr(other, 'lb'):
-                x += [other]
-                w += [1]
-            elif isinstance(other, Operator) and other.name == "-" and hasattr(other.args[0], 'lb'):
-                x += [other.args[0]]
-                w += [-1]
-            elif isinstance(other, Operator) and other.name == "-" and isinstance(other.args[0], Operator) and other.args[0].name == "mul":
-                x += [other.args[0].args[1]]
-                w += [-other.args[0].args[0]]
-            else:
-                return Operator("sum", [self, other])
-            return Operator("wsum", (w, x))
-
-        elif isinstance(self, Operator) and self.name == "sum":
-            x += self.args
-            w += [1]*len(self.args)
-            if isinstance(other, Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-                return Operator("wsum", (w, x))
-
-        elif isinstance(self, Operator) and self.name == "mul":
-            x += [self.args[1]]
-            w += [self.args[0]]
-
-            if hasattr(other, 'lb'):
-                x += [other]
-                w += [1]
-                return Operator("wsum", (w, x))
-            elif isinstance(other, Operator) and other.name == "mul":
-                x += [other.args[1]]
-                w += [other.args[0]]
-                return Operator("wsum", (w, x))
-            elif isinstance(other, Operator) and other.name == "-" and hasattr(other.args[0], 'lb'):
-                x += [other.args[0]]
-                w += [-1]
-                return Operator("wsum", (w, x))
-            elif isinstance(other, Operator) and other.name == "-" and isinstance(other.args[0], Operator) and other.args[0].name == "mul":
-                x += [other.args[0].args[1]]
-                w += [-other.args[0].args[0]]
-                return Operator("wsum", (w, x))
-
-            # remaining case should be ignored
-        elif hasattr(self, 'lb') and isinstance(other, Operator) and other.name == "mul":
-            x += [self] + [other.args[1]]
-            w += [1] + [other.args[0]]
-            return Operator("wsum", (w, x))
-        elif isinstance(self, Operator) and self.name == "-" and other.name == "mul":
-            x += [self.args[0]] + [other.args[1]]
-            w += [-1] + [other.args[0]]
-            return Operator("wsum", (w, x))
-
-        # add weighted sum 3 * x + 3 * Y
-
         return Operator("sum", [self, other])
     def __radd__(self, other):
         if is_num(other) and other == 0:
@@ -408,7 +339,7 @@ class Operator(Expression):
         '-':   (1, False), # -x
         'abs': (1, False),
     }
-    printmap = {'sum': '+', 'wsum':'.*', 'sub': '-', 'mul': '*', 'div': '/'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -425,6 +356,8 @@ class Operator(Expression):
         if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        # we also have the convention that weighted sums are [weights, vars]
+        # this is ensured at creation time
 
         # merge same operators for n-ary ones
         if arity == 0:
@@ -452,6 +385,10 @@ class Operator(Expression):
         # special cases
         if self.name == '-': # unary -
             return "-({})".format(self.args[0])
+
+        # weighted sum
+        if self.name == 'wsum':
+            return f"sum({self.args[0]} * {self.args[1]})"
 
         # infix printing of two arguments
         if len(self.args) == 2:
@@ -503,15 +440,7 @@ class Operator(Expression):
         return super().__rxor__(other)
 
     def __add__(self, other):
-
         if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            if not isinstance(other, Iterable):
-                self.args.append(other)
-            else: # vector
-                self.args.extend(other)
             return self
 
         return super().__add__(other)
