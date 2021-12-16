@@ -122,6 +122,59 @@ class CPM_minizinc(SolverInterface):
 
         super().__init__(cpm_model, solver=solver, name=solvername)
 
+    def __add__(self, cons):
+        """
+            Add an additional (list of) constraints to the model
+        """
+        # Add variables in cons
+        for var in get_variables(cons):
+            if var in self.user_vars:  # Might be possible to do this prettier?
+                continue
+            if isinstance(var, _BoolVarImpl):
+                self.mzn_model.add_string(f"var bool: {self.clean_varname(var.name)};\n")
+            elif isinstance(var, _IntVarImpl):
+                self.mzn_model.add_string(f"var {var.lb}..{var.ub}: {self.clean_varname(var.name)};\n")
+            self.user_vars.add(var)
+
+        if not is_any_list(cons):
+            cons = [cons]
+
+        # we can't unpack lists in convert_expression, so must do it upfront
+        # and can't make assumptions on '.flat' existing either...
+        # this is dirty code that should not be reused, keeping it hidden in this function...
+        # TODO: can't we put it in convert_expression now?
+        def flatlist(lst):
+            flatlst = []
+            for elem in lst:
+                if is_any_list(elem):
+                    flatlst += flatlist(elem)
+                else:
+                    flatlst.append(elem)
+            return flatlst
+
+        cons = flatlist(cons)
+        for con in cons:
+            self._post_constraint(con)
+        return self
+
+    def minimize(self, expr):
+        """
+            Minimize the given objective function
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        # do not add it to the model, support only one 'solve' entry
+        self.mzn_txt_solve = "solve minimize {};\n".format(self._convert_expression(expr))
+
+    def maximize(self, expr):
+        """
+            Maximize the given objective function
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        # do not add it to the model, support only one 'solve' entry
+        self.mzn_txt_solve = "solve maximize {};\n".format(self._convert_expression(expr))
+
     def solve(self, time_limit=None, **kwargs):
         """
             Create and call an Instance with the already created mzn_model and mzn_solver
@@ -189,7 +242,8 @@ class CPM_minizinc(SolverInterface):
 
         # translate solution values (of original vars only)
         self.objective_value_ = None
-        if mzn_status.has_solution():
+        has_sol = self._solve_return(self.cpm_status)
+        if has_sol:
             # runtime
             mznsol = mzn_result.solution
             if is_any_list(mznsol):
@@ -208,7 +262,7 @@ class CPM_minizinc(SolverInterface):
             # translate objective (if any, otherwise None)
             self.objective_value_ = mzn_result.objective
 
-        return self._solve_return(self.cpm_status)
+        return has_sol
 
     def objective_value(self):
         """
@@ -218,65 +272,19 @@ class CPM_minizinc(SolverInterface):
         """
         return self.objective_value_
 
-    def __add__(self, cons):
-        """
-            Add an additional (list of) constraints to the model
-        """
-        #Add variables in cons
-        for var in get_variables(cons):
-            if var in self.user_vars: # Might be possible to do this prettier?
-                continue
-            if isinstance(var, _BoolVarImpl):
-                self.mzn_model.add_string(f"var bool: {self.clean_varname(var.name)};\n")
-            elif isinstance(var, _IntVarImpl):
-                self.mzn_model.add_string(f"var {var.lb}..{var.ub}: {self.clean_varname(var.name)};\n")
-            self.user_vars.add(var)
+    def solver_var(self, cpm_var):
+        pass
 
-        if not is_any_list(cons):
-            cons = [cons]
+    def _post_constraint(self, cpm_expr):
 
-        # we can't unpack lists in convert_expression, so must do it upfront
-        # and can't make assumptions on '.flat' existing either...
-        # this is dirty code that should not be reused, keeping it hidden in this function...
-        # TODO: can't we put it in convert_expression now?
-        def flatlist(lst):
-            flatlst = []
-            for elem in lst:
-                if is_any_list(elem):
-                    flatlst += flatlist(elem)
-                else:
-                    flatlst.append(elem)
-            return flatlst
-
-        txt_cons = ""
-        for con in flatlist(cons):
-            txt_cons += "constraint {};\n".format(self.convert_expression(con))
-
+        txt_cons = f"constraint {self._convert_expression(cpm_expr)};\n"
         self.mzn_model.add_string(txt_cons)
-        return self
 
-    def minimize(self, expr):
-        """
-            Minimize the given objective function
-
-            `minimize()` can be called multiple times, only the last one is stored
-        """
-        # do not add it to the model, support only one 'solve' entry
-        self.mzn_txt_solve = "solve minimize {};\n".format(self.convert_expression(expr))
-
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is stored
-        """
-        # do not add it to the model, support only one 'solve' entry
-        self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
 
     def clean_varname(self, varname):
-        return varname.replace(',','_').replace('.','_').replace(' ','_').replace('[','_').replace(']','')
+            return varname.replace(',','_').replace('.','_').replace(' ','_').replace('[','_').replace(']','')
 
-    def convert_expression(self, expr):
+    def _convert_expression(self, expr):
         """
             Convert a CPMpy expression into a minizinc-compatible string
 
@@ -285,9 +293,9 @@ class CPM_minizinc(SolverInterface):
         if is_any_list(expr):
             if isinstance(expr, np.ndarray):
                 # must flatten
-                expr_str = [self.convert_expression(e) for e in expr.flat]
+                expr_str = [self._convert_expression(e) for e in expr.flat]
             else:
-                expr_str = [self.convert_expression(e) for e in expr]
+                expr_str = [self._convert_expression(e) for e in expr]
             if len(expr_str) == 1:
                 # unary special case, don't put in list
                 return expr_str[0]
@@ -307,14 +315,14 @@ class CPM_minizinc(SolverInterface):
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
-            str_vars = self.convert_expression(expr.args[0])
+            str_vars = self._convert_expression(expr.args[0])
             str_tbl = "[|\n" # opening
             for row in expr.args[1]:
                 str_tbl += ",".join(map(str,row)) + " |" # rows
             str_tbl += "\n|]" # closing
             return "table({}, {})".format(str_vars, str_tbl)
         
-        args_str = [self.convert_expression(e) for e in expr.args]
+        args_str = [self._convert_expression(e) for e in expr.args]
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
@@ -366,7 +374,7 @@ class CPM_minizinc(SolverInterface):
             idx = args_str[1]
             # minizinc is offset 1, which can be problematic for element...
             # thx Hakan, fix by using array1d(0..len, []), issue #54
-            txt  = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0, len(expr.args[0])-1, args_str[0])
+            txt = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0, len(expr.args[0])-1, args_str[0])
             txt += f"      arr[{idx}]"
             return txt
         
@@ -375,7 +383,7 @@ class CPM_minizinc(SolverInterface):
             # minizinc is offset 1, which can be problematic here...
             if any(isinstance(e, _IntVarImpl) and e.lb == 0 for e in expr.args):
                 # redo args_str[0]
-                args_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args]
+                args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
         
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))

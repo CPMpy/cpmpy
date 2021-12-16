@@ -92,8 +92,8 @@ class CPM_ortools(SolverInterface):
         flat_cons = only_bv_implies(flatten_constraint(cons))
         # add new (auxiliary) variables
         for var in get_variables(flat_cons):
-            if not var in self._varmap:
-                self.add_to_varmap(var)
+            _ = self.solver_var(var)
+
         # add constraints
         for cpm_con in flat_cons:
             self._post_constraint(cpm_con)
@@ -170,19 +170,11 @@ class CPM_ortools(SolverInterface):
 
         if assumptions is not None:
             ort_assum_vars = [self.solver_var(v) for v in assumptions]
-            # this is fucked up... the ort_var()'s index does not seem
-            # to match ort_model.VarIndexToVarProto(index)...
-            # yet, SufficientAssum... will return that index, so keep own map
-            #
-            # oh, actually... its a bug that I already reported earlier for
-            # VarIndexToVarProto(0) and that Laurent then fixed...
-            # Until version 8.3 is released, I'm sticking to own dict
-            self.assumption_dict = dict(
-                (ort_var.Index(), cpm_var) for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars))
             self.ort_model.ClearAssumptions()  # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
             # workaround for a presolve with assumptions bug in ortools
             # https://github.com/google/or-tools/issues/2649
+            # still present in v9.0
             self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
         # set additional keyword arguments in sat_parameters.proto
@@ -280,27 +272,13 @@ class CPM_ortools(SolverInterface):
 
             Requires or-tools >= 8.2!!!
         """
-        assert (
-                    self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
         assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
 
-        return [self.assumption_dict[i] for i in assum_idx]
-
-    def add_to_varmap(self, cpm_var):
-        """
-        Add the CPMpy variable to the 'varmap' mapping,
-        which maps CPMpy variables to or-tools variables
-
-        Typically only needed for internal use
-        """
-        if isinstance(cpm_var, _BoolVarImpl):
-            revar = self.ort_model.NewBoolVar(str(cpm_var))
-        elif isinstance(cpm_var, _IntVarImpl):
-            revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
-        self._varmap[cpm_var] = revar
+        # return [self.assumption_dict[i] for i in assum_idx]
+        return [self.ort_model.VarIndexToVarProto(i) for i in assum_idx]
 
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
@@ -385,7 +363,7 @@ class CPM_ortools(SolverInterface):
                         # example: x*y > 10 :: x*y == aux, aux > 10
                         # creat the equality (will handle appropriate bounds)
                         (newvar, cons) = get_or_make_var(lhs)
-                        self.add_to_varmap(newvar)
+                        _ = self.solver_var(newvar) # Pretty ugly, but gets the job done...
                         for con in cons:
                             # post the flattened constraints, including the 'lhs == newvar' one
                             # if this contains new auxiliary variables we will crash
@@ -458,8 +436,7 @@ class CPM_ortools(SolverInterface):
 
                     # collect and create new variables
                     for var in get_variables(flatdec):
-                        if not var in self._varmap:
-                            self.add_to_varmap(var)
+                        self.solver_var(var)
                     # post decomposition
                     for con in flatdec:
                         self._post_constraint(con)
@@ -492,7 +469,6 @@ class CPM_ortools(SolverInterface):
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
             self._varmap[cpm_var] = ort_var
-            self.user_vars.add(cpm_var) #Todo remove?
 
         return self._varmap[cpm_var]
 

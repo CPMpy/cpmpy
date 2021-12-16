@@ -1,6 +1,6 @@
 import unittest
 
-from cpmpy.solvers import CPM_pysat, CPM_ortools
+from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
