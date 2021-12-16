@@ -483,8 +483,11 @@ class NDVarArray(Expression, np.ndarray):
     def implies(self, other):
         return self._vectorized(other, 'implies') 
 
-    # TODO?
     #in	  __contains__(self, value) 	Check membership
+    # CANNOT meaningfully overwrite, python always returns True/False
+    # regardless of what you return in the __contains__ function
+
+    # TODO?
     #object.__matmul__(self, other)
 
 
