@@ -351,13 +351,23 @@ class Operator(Expression):
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
+        if name == 'sum' and any(_wsum_should(a) for a in arg_list):
+            w,x = [], []
+            for a in arg_list:
+                w1,x1 = _wsum_make(a)
+                w += w1
+                x += x1
+            name = 'wsum'
+            arg_list = [w,x]
+
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        # we also have the convention that weighted sums are [weights, vars]
-        # this is ensured at creation time
+        if name == 'wsum':
+            # we also have the convention that weighted sums are [weights, vars]
+            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
 
         # args of same operator are merged in for n-ary ones
         if arity == 0:
@@ -417,8 +427,8 @@ class Operator(Expression):
         arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
 
         if any(a is None for a in arg_vals): return None
-        if   self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(xi.value() * wi for wi, xi in zip(*arg_vals))
+        elif self.name == "sum": return sum(arg_vals)
+        elif self.name == "wsum": return sum(arg_vals[0]*arg_vals[1]) # av[1] will be np array
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "div": return arg_vals[0] / arg_vals[1]
@@ -429,3 +439,21 @@ class Operator(Expression):
         
         return None # default
 
+def _wsum_should(arg):
+    """ Internal helper: should the arg be in a wsum instead of sum """
+    # Undecided: -x + y, -x + -y?
+    return isinstance(arg, Operator) and \
+           (arg.name == 'wsum' or \
+            arg.name == 'mul' and is_num(arg.args[0]))
+def _wsum_make(arg):
+    """ Internal helper: prep the arg for wsum """
+    # returns ([weights], [vars])
+    # call only if arg is Operator
+    if arg.name == 'wsum':
+        return arg.args
+    elif arg.name == 'mul':
+        return [arg.args[0]], [arg.args[1]]
+    elif arg.name == '-':
+        return [-1], [arg.args[0]]
+    else:
+        return [1], [arg]
