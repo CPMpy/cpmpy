@@ -270,8 +270,9 @@ class TestSolvers(unittest.TestCase):
         )
         ps2 = CPM_pysat(model)
 
-        for m in ps2.solveAll():
-            print(f"mayo={mayo.value()}, ketchup={ketchup.value()}, curry={curry.value()}")
+        nsols = ps2.solveAll()
+
+        self.assertEqual(nsols, 4)
 
     def test_minizinc(self):
         from cpmpy.solvers.minizinc import CPM_minizinc

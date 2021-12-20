@@ -213,55 +213,6 @@ class CPM_pysat(SolverInterface):
 
         return self._after_solve(pysat_status)
 
-    def solveAll(self, time_limit=None, assumptions=None):
-        """
-            Call the PySAT solver and yield models. SolveAll does not use enum_model from pysat
-            because enum_model blocks the models and eventually will 
-
-            A new indicator boolean variable is introduced in order to block model, 
-            when we are done with finding new non-intersecting models we ensure the models 
-            do not interfere with future solve calls by adding its negation making these models
-            always true.
-
-            Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
-        """
-        bi = self.pysat_var(boolvar(name="pysat-blocking-var"))
-
-        if assumptions is None:
-            pysat_assum_vars = [bi]
-        else:
-            pysat_assum_vars = [self.pysat_var(v) for v in assumptions] + [bi]
-            self.assumption_vars = assumptions
-
-        if time_limit is not None:
-            from threading import Timer
-
-            timer = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
-            timer.start()
-
-        # enum_model does not allow for time limit
-        pysat_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=time_limit is not None)
-
-        while(pysat_status):
-            yield self._after_solve(pysat_status)
-
-            blocking_model = [-lit for lit in self.pysat_solver.get_model()] + [-bi]
-            self.pysat_solver.add_clause(blocking_model)
-
-            pysat_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=time_limit is not None)
-
-        # Stops once there are no other models in
-        if time_limit is not None:
-            self.pysat_solver.clear_interrupt()
-
-        self.pysat_solver.add_clause([-bi])
-
-        return self._after_solve(pysat_status)
-
     def _after_solve(self, pysat_status):
         """
             To be called immediately after calling pysat solve() or solve_limited()
