@@ -63,7 +63,7 @@ class CPM_ortools(SolverInterface):
         calling solve(), a prime way to use more advanced solver features
         """
         if not self.supported():
-            raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(self.name))
+            raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(name))
         from ortools.sat.python import cp_model as ort
 
         # Initialize solver specific variables
