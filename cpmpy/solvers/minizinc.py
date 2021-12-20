@@ -99,7 +99,7 @@ class CPM_minizinc(SolverInterface):
         """
         if not self.supported():
             raise Exception(
-                "Install the python 'minizinc-python' package to use this '{}' solver interface".format(self.name))
+                "Install the python 'minizinc-python' package to use this 'minizinc' solver interface")
         import minizinc
 
         super().__init__()
@@ -148,6 +148,9 @@ class CPM_minizinc(SolverInterface):
 
             `minimize()` can be called multiple times, only the last one is stored
         """
+        # Add vars to model
+        for var in get_variables(expr):
+            _ = self.solver_var(var)
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve minimize {};\n".format(self._convert_expression(expr))
 
@@ -157,6 +160,9 @@ class CPM_minizinc(SolverInterface):
 
             `maximize()` can be called multiple times, only the last one is stored
         """
+        # Add vars to model
+        for var in get_variables(expr):
+            _ = self.solver_var(var)
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve maximize {};\n".format(self._convert_expression(expr))
 
