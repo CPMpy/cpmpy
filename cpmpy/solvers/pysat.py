@@ -106,8 +106,7 @@ class CPM_pysat(SolverInterface):
 
         # Create solver specific objects
         self.pysat_vpool = IDPool()
-        cnf = pysat.formula.CNF()
-        self.pysat_solver = Solver(bootstrap_with=cnf.clauses, use_timer=True, name=solvername)
+        self.pysat_solver = Solver(use_timer=True, name=solvername)
 
         super().__init__(cpm_model, solver=solver, name=solvername)
 
@@ -223,7 +222,7 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.add_clause([self.solver_var(var) for var in cpm_expr.args])
             else:
                 raise NotImplementedError(
-                    "Only 'or' operator supported by CPM_pysat for now (more possible with aiger, contact us on github")
+                    f"Automatic conversion of Operator {cpm_expr} to CNF not supported, please report on github.")
         elif isinstance(cpm_expr, Comparison):
             # only handle cardinality encodings
             if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum" and all(
@@ -301,9 +300,11 @@ class CPM_pysat(SolverInterface):
         """
             For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
-            CPMpy will return only those variables that are False (in the UNSAT core)
+            CPMpy will return only those assumptions which are False (in the UNSAT core)
 
-            Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+            Note that there is no guarantee that the core is minimal.
+            More advanced Minimal Unsatisfiable Subset are available in the 'examples' folder on GitHub
+
         """
         assert hasattr(self, 'assumption_vars'), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
         assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "get_core(): solver must return UNSAT"
