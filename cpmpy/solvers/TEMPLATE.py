@@ -256,7 +256,7 @@ class CPM_template(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars += get_variables(cpm_con)
+        self.user_vars.update(set(get_variables(cpm_con)))
 
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
