@@ -1,6 +1,6 @@
 import unittest
 
-from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc
+from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc, CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
@@ -9,7 +9,7 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 class TestInterface(unittest.TestCase):
 
     # Replace by your own solver class
-    solver_class = CPM_minizinc
+    solver_class = CPM_gurobi
 
     def setUp(self) -> None:
         self.solver = TestInterface.solver_class()
