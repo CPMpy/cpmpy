@@ -256,7 +256,22 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
+    def test_pysat_solveAll(self):
+        from cpmpy.solvers.pysat import CPM_pysat
+        if not CPM_pysat.supported():
+            print("Skipping PySAT tests, not installed")
+            return
 
+        # Construct the model.
+        (mayo, ketchup, curry) = cp.boolvar(3)
+        model = cp.Model(
+            (~mayo | ketchup),
+            (~ketchup| curry)
+        )
+        ps2 = CPM_pysat(model)
+
+        for m in ps2.solveAll():
+            print(f"mayo={mayo.value()}, ketchup={ketchup.value()}, curry={curry.value()}")
 
     def test_minizinc(self):
         from cpmpy.solvers.minizinc import CPM_minizinc
@@ -305,3 +320,5 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue( m.solve() )
         self.assertEqual( m.objective_value(), 2 )
 
+if __name__ == '__main__':
+    unittest.main()
