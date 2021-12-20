@@ -85,15 +85,9 @@ class CPM_ortools(SolverInterface):
         :type cpm_cons list of Expressions
         """
         # store new user vars
-        new_user_vars = get_variables(cons)
-        for v in frozenset(new_user_vars) - frozenset(self.user_vars):
-            self.user_vars.add(v)
+        self.user_vars.update(set(get_variables(cons)))
 
         flat_cons = only_bv_implies(flatten_constraint(cons))
-        # add new (auxiliary) variables
-        for var in get_variables(flat_cons):
-            _ = self.solver_var(var)
-
         # add constraints
         for cpm_con in flat_cons:
             self._post_constraint(cpm_con)
@@ -227,7 +221,7 @@ class CPM_ortools(SolverInterface):
         if self.ort_status == ort.FEASIBLE or self.ort_status == ort.OPTIMAL:
             # fill in variables
             for var in self.user_vars:
-                var._value = self.ort_solver.Value(self._varmap[var])
+                var._value = self.ort_solver.Value(self.solver_var(var))
 
         # translate objective
         self.objective_value_ = None
