@@ -316,7 +316,9 @@ class CPM_minizinc(SolverInterface):
             # default
             if isinstance(expr, NegBoolView):
                 return "not " + self.solver_var(expr._bv)
-            return self.solver_var(expr)
+            if isinstance(expr, _NumVarImpl):
+                return self.solver_var(expr)
+            return str(expr)
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
