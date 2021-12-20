@@ -148,9 +148,6 @@ class CPM_minizinc(SolverInterface):
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        # Add vars to model
-        for var in get_variables(expr):
-            _ = self.solver_var(var)
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve minimize {};\n".format(self._convert_expression(expr))
 
@@ -160,9 +157,6 @@ class CPM_minizinc(SolverInterface):
 
             `maximize()` can be called multiple times, only the last one is stored
         """
-        # Add vars to model
-        for var in get_variables(expr):
-            _ = self.solver_var(var)
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve maximize {};\n".format(self._convert_expression(expr))
 
@@ -321,8 +315,8 @@ class CPM_minizinc(SolverInterface):
                 return "false"
             # default
             if isinstance(expr, NegBoolView):
-                return "not " + self.clean_varname(str(expr._bv))
-            return self.clean_varname(str(expr))
+                return "not " + self.solver_var(expr._bv)
+            return self.solver_var(expr)
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
