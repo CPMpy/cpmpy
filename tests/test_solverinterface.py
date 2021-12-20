@@ -9,7 +9,7 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 class TestInterface(unittest.TestCase):
 
     # Replace by your own solver class
-    solver_class = CPM_ortools
+    solver_class = CPM_minizinc
 
     def setUp(self) -> None:
         self.solver = TestInterface.solver_class()
