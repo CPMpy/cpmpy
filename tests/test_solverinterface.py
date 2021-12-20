@@ -15,7 +15,7 @@ class TestInterface(unittest.TestCase):
         self.solver = TestInterface.solver_class()
 
         self.bvar = boolvar(shape=3)
-        self.x,self.y,self.z = self.bvar
+        self.x, self.y, self.z = self.bvar
 
         ivar = intvar(1,10, shape=2)
         self.i, self.j = ivar
@@ -43,7 +43,6 @@ class TestInterface(unittest.TestCase):
 
         self.assertEqual(1, len(self.solver.user_vars))
         self.assertEqual(1, len(self.solver._varmap))
-
 
 
     def test_add_constraint(self):
@@ -78,13 +77,6 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(1, self.solver.objective_value())
         self.assertEqual(ExitStatus.OPTIMAL, self.solver.status().exitstatus)
 
-    def test_operators(self):
-        """
-        TODO: test every operator, but might be difficult, not all solvers support every operator...
-        How should we check this? Just catch 'NotImplemented' errors? Or maybe make a different test for every operator?
-        This way it is clear to the user which operators failed and if this is in line with his expectations...
-        """
-        pass
 
 #########################
 #    Test operators     #
@@ -156,73 +148,51 @@ class TestInterface(unittest.TestCase):
         self.check_xy()
 
 
-    # Test non-boolean operators, checked by directly posting constraint
-    # TODO: Not all accepted operators are working --> because of transformations
-    # Maybe we should add a "transform(cpm_expr)" function to the interface?
+    # Test non-boolean operators, checked by directly posting constraints
+    def check_ij(self):
+        self.assertIn(self.i, self.solver.user_vars)
+        self.assertIn(self.j, self.solver.user_vars)
+        self.assertIn(self.i, self.solver._varmap)
+        self.assertIn(self.j, self.solver._varmap)
 
     def test_sum(self):
 
-        try:
-            self.solver._post_constraint(sum([self.x, self.y]))
-        except NotImplementedError:
-            return
-        self.check_xy()
-
+        self.solver += sum([self.i, self.j]) == 0
+        self.check_ij()
 
     def test_sub(self):
-        #Todo: fix with tranformations
-        try:
-            self.solver._post_constraint(self.x - self.y)
-        except NotImplementedError:
-            return
-        self.check_xy()
 
+        self.solver += (self.i - self.j) == 0
+        self.check_ij()
 
     def test_mul(self):
 
-        try:
-            self.solver._post_constraint(self.x * self.y)
-        except NotImplementedError:
-            return
-        self.check_xy()
+        self.solver += (self.i * self.j) == 0
+        self.check_ij()
 
     def test_div(self):
-        try:
-            self.solver._post_constraint(self.x / self.y)
-        except NotImplementedError:
-            return
-        self.check_xy()
+
+        self.solver += (self.i / self.j) == 0
+        self.check_ij()
 
     def test_mod(self):
 
-        try:
-            self.solver._post_constraint(self.x % self.y)
-        except NotImplementedError:
-            return
-        self.check_xy()
+        self.solver += (self.i % self.j) == 0
+        self.check_ij()
 
     def test_pow(self):
 
-        try:
-            self.solver._post_constraint(self.x ** self.y)
-        except NotImplementedError:
-            return
-        self.check_xy()
+        self.solver += (self.i ** self.j) == 0
+        self.check_ij()
 
     def test_min(self):
 
-        try:
-            self.solver._post_constraint(- self.i)
-        except NotImplementedError:
-            return
+        self.solver += - self.i == 0
         self.assertIn(self.i, self.solver.user_vars)
 
     def test_abs(self):
-        #Todo fix with transformations
-        try:
-            self.solver._post_constraint(abs(self.i))
-        except NotImplementedError:
-            return
+
+        self.solver += abs(self.i) == 0
         self.assertIn(self.i, self.solver.user_vars)
 
 
