@@ -15,6 +15,8 @@
 
         CPM_ortools
 """
+import sys # for stdout checking
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -153,8 +155,8 @@ class CPM_ortools(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+        self.ort_model.ClearHints() # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
-            self.ort_model.ClearHints() # because add just appends
             self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
@@ -213,9 +215,12 @@ class CPM_ortools(SolverInterface):
         for (kw, val) in kwargs.items():
             setattr(self.ort_solver.parameters, kw, val)
 
-        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback"):
+        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback") \
+           and (sys.stdout != sys.__stdout__):
             # ortools>9.0, for IPython use, force output redirecting
             # see https://github.com/google/or-tools/issues/1903
+            # but only if a nonstandard stdout, otherwise duplicate output
+            # see https://github.com/CPMpy/cpmpy/issues/84
             self.ort_solver.log_callback = print
 
         if solution_callback is None:
@@ -596,9 +601,13 @@ class CPM_ortools(SolverInterface):
 
         # sum or (to be implemented: wsum)
         if isinstance(cpm_expr, Operator):
-            args = [self.ort_var(v) for v in cpm_expr.args]
             if cpm_expr.name == 'sum':
+                args = [self.ort_var(v) for v in cpm_expr.args]
                 return sum(args) # OR-Tools supports this
+            elif cpm_expr.name == 'wsum':
+                w = cpm_expr.args[0]
+                x = [self.ort_var(v) for v in cpm_expr.args[1]]
+                return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
 
@@ -606,9 +615,7 @@ class CPM_ortools(SolverInterface):
 # even if ortools is not installed...
 try:
   from ortools.sat.python import cp_model as ort
-  from cpmpy import cpm_array
   import time
-
   class OrtSolutionCounter(ort.CpSolverSolutionCallback):
     """
         Native or-tools callback for solution counting.

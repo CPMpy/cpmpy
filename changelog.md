@@ -1,5 +1,45 @@
 # Change log
 
+## 0.9.6
+* Added tutorial video and used notebooks
+    https://www.youtube.com/watch?v=A4mmmDAdusQ
+
+* Added to examples/:
+    - LP/CP contest 2021, first problem
+    - wolf-goat-cabbage and n-puzzle rework
+    - palindrome day problem
+    - graph coloring australia (with actual map)
+
+* Added to examples/advanced/:
+    - CPMpy versions of visual examples from A. Schiendorfer
+    - visual sudoku example with pytorch neural network classification
+    - cost-optimal unsatisfiable subset search example
+    - step-wise explanations of satisfiable problems
+    - smart predict + optimize with integrated pytorch training
+    - counterfactual explanations of optimisation problems
+    - VRP by learning from historical data
+
+* API change:
+    - m.solve() now only returns True/False, also for optimisation
+    - new: m.objective\_value(), to get the objective after solving
+    - new: SolverLookup.get(solvername, model) for easy solver getting
+        names also allow e.g. 'minizinc:chuffed' and 'pysat:glucose4'
+
+* pysat: better checking of correct package installed
+* pysat: automatic encoding of cardinality constraints like sum(x) >= v
+* to\_cnf: more testing, some bugfixes
+* ort: basic support for 'power' operator
+* ort: added installation instructions for or-tools on Apple M1
+* ort: bugfix in solution hinting, clear hints once
+* ort: fix log callback duplicate printing
+* mzn: generic fix for offset 1/0 errors
+* model: better handle empty constraints and non-standard lists
+* model: can now save\_to/load\_from pickle files
+* bugfixes in bounds computations for modulo operator
+* get\_vars: ensure the transformation returns unique elements
+* requirements included minizinc, no longer the case (it is optional)
+* many documentation updates
+
 ## 0.9.5
 * fix bug in ort limitation check for 'modulo' operator
 * mzn: better doc and check on single solution output

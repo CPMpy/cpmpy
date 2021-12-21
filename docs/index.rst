@@ -9,12 +9,15 @@ CPMpy allows to model search problems in a high-level manner, by defining decisi
    
 Source code and bug reports at https://github.com/CPMpy/cpmpy
 
+Getting started:
+
 .. toctree::
    :maxdepth: 1
    :caption: Getting started:
 
-   installation_instructions
+   Youtube tutorial video <https://www.youtube.com/watch?v=A4mmmDAdusQ>
    beginner_tutorial
+   installation_instructions
    Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
    More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
 

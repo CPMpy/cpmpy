@@ -22,4 +22,4 @@ from .variables import boolvar, intvar, cpm_array
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import AllDifferent, AllEqual, Circuit, Table, Minimum, Maximum, Element
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
-from .python_builtins import all, any, max, min
+from .python_builtins import all, any, max, min, sum

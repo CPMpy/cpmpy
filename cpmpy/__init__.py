@@ -14,7 +14,7 @@
 """
 # Tias Guns, 2019-2021
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 
 from .expressions import *
