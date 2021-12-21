@@ -43,7 +43,7 @@ class CPM_template(SolverInterface):
     See detailed installation instructions at:
     <URL to detailed solver installation instructions, if any>
 
-    Creates the following attributes (see also parent constructor):
+    Creates the following attributes (see parent constructor for more):
     tpl_model: object, TEMPLATE's model object
     """
 
@@ -62,18 +62,20 @@ class CPM_template(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model(), optional
-        - subsolver: str, name of a subsolver, optional
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
             raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy'")
+
+        import TEMPLATEpy
+
         assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
         self.tpl_model = TEMPLATEpy.Model("cpmpy")
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
@@ -109,13 +111,13 @@ class CPM_template(SolverInterface):
         elif my_status is None:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else: # another?
-            raise NotImplementedError(my_status) # a new status type was introduced, please report on github
+        else:  # another?
+            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
         # True/False depending on self.cpm_status
-        has_sol = self._solve_return()
+        has_sol = self._solve_return(self.cpm_status)
 
-        # translate solution values (of user vars only)
+        # translate solution values (of user specified variables only)
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -133,9 +135,6 @@ class CPM_template(SolverInterface):
             or returns from cache if previously created
         """
         # TODO: add `solver_vars(self, cpm_vars)` to SolverInterface class
-
-        if is_num(cpm_var):
-            return cpm_var
 
         # special case, negative-bool-view
         # work directly on var inside the view
@@ -233,7 +232,7 @@ class CPM_template(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(set(get_variables(cpm_con)))
+        self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
@@ -259,3 +258,6 @@ class CPM_template(SolverInterface):
             self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
         else:
             raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+
+    # Other functions from SolverInterface that you can overwrite:
+    # solveAll, solution_hint, get_core
