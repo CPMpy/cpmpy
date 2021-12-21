@@ -119,7 +119,7 @@ class Model(object):
         # instatiate solver with this model
         if isinstance(solver, str) and ':' in solver:
             # solver is a name that contains a subsolver
-            s = solver_class(self, solver=solver)
+            s = solver_class(self, subsolver=solver)
         else:
             # no subsolver
             s = solver_class(self)

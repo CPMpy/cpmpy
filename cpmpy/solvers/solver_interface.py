@@ -50,15 +50,23 @@ class SolverInterface(object):
         """
         return False
 
-    # REQUIRED functions to mimic `Model` interface:
-
-    def __init__(self, cpm_model=None, solver=None, name="dummy"):
+    def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
             Initalize solver interface
 
-            - cpm_model: CPMpy Model() object: ignored in this superclass
-            - solver: string: ignored in this superclass
+            - name: str: name of this solver
+            - subsolver: string: not used/allowed here
+            - cpm_model: CPMpy Model() object, optional: will post its constraints/objective
+
+            Creates the following attributes:
+            - name: str, name of the solver
+            - cpm_status: SolverStatus(), the CPMpy status after a `solve()`
+            - user_vars: set(), variables in the original (non-transformed) model,
+                           for reverse mapping the values after `solve()`
+            - _varmap: dict(), maps cpmpy variables to native solver variables
         """
+        assert(subsolver is None)
+
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
 
@@ -77,6 +85,8 @@ class SolverInterface(object):
                     self.maximize(cpm_model.objective)
                 else:
                     self.minimize(cpm_model.objective)
+
+    # REQUIRED functions to mimic `Model` interface:
 
     def __add__(self, cpm_cons):
         """

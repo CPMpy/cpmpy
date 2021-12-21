@@ -48,7 +48,8 @@ class CPM_ortools(SolverInterface):
         except ImportError as e:
             return False
 
-    def __init__(self, cpm_model=None, solver=None, name="ortools"):
+
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the solver object
 
@@ -64,13 +65,15 @@ class CPM_ortools(SolverInterface):
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(name))
+        assert(subsolver is None)
         from ortools.sat.python import cp_model as ort
 
         # Initialize solver specific variables
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
-        super().__init__(cpm_model, solver=solver, name=name)
+        super().__init__(name="ortools", cpm_model=cpm_model)
+
 
     def __add__(self, cons):
         """

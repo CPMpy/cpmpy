@@ -86,7 +86,7 @@ class CPM_pysat(SolverInterface):
         return names
 
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
@@ -108,19 +108,19 @@ class CPM_pysat(SolverInterface):
         from pysat.formula import IDPool
         from pysat.solvers import Solver
 
-        # determine solvername, set cpmpy name
-        solvername = solver
-        if solver is None or solvername == 'pysat':
+        # determine subsolver
+        if subsolver is None or subsolver == 'pysat':
             # default solver
-            solvername = "glucose4" # something recent...
-        elif solvername.startswith('pysat:'):
-            solvername = solvername[6:] # strip 'pysat:'
+            subsolver = "glucose4" # something recent...
+        elif subsolver.startswith('pysat:'):
+            subsolver = subsolver[6:] # strip 'pysat:'
 
         # Create solver specific objects
         self.pysat_vpool = IDPool()
-        self.pysat_solver = Solver(use_timer=True, name=solvername)
+        self.pysat_solver = Solver(use_timer=True, name=subsolver)
 
-        super().__init__(cpm_model, solver=solver, name=solvername)
+        super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
+
 
     def __add__(self, cpm_con):
         """

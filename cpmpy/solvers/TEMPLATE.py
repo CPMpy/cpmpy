@@ -43,14 +43,8 @@ class CPM_template(SolverInterface):
     See detailed installation instructions at:
     <URL to detailed solver installation instructions, if any>
 
-    Creates the following attributes:
+    Creates the following attributes (see also parent constructor):
     tpl_model: object, TEMPLATE's model object
-    And in the constructor of the superclass:
-    user_vars: set(), variables in the original (non-transformed) model,
-                    for reverse mapping the values after `solve()`
-    cpm_status: SolverStatus(), the CPMpy status after a `solve()`
-    tpl_model: object, TEMPLATE's model object
-    _varmap: dict(), maps cpmpy variables to native solver variables
     """
 
     @staticmethod
@@ -63,44 +57,24 @@ class CPM_template(SolverInterface):
             return False
 
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
+        - cpm_model: a CPMpy Model(), optional
+        - subsolver: str, name of a subsolver, optional
         """
         if not self.supported():
             raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy'")
-
-        self.name = "TEMPLATE" # solver's name
+        assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
         self.tpl_model = TEMPLATEpy.Model("cpmpy")
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
-        super().__init__(cpm_model, solver)
-
-        # TODO: these 4 in super()
-        self.cpm_status = SolverStatus(self.name)
-
-        # initialise variable handling
-        self.user_vars = set() # variables in the original (non-transformed) model
-        self._varmap = dict() # maps cpmpy variables to native solver variables
-
-        # rest uses own API
-        # TODO: can be in super() as well? if we built tpl_model first? allowed idd...
-        if cpm_model is not None:
-            # post all constraints at once, implemented in __add__()
-            self += cpm_model.constraints
-
-            # post objective
-            if cpm_model.objective is not None:
-                if cpm_model.objective_max:
-                    self.maximize(cpm_model.objective)
-                else:
-                    self.minimize(cpm_model.objective)
+        super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
     def solve(self, time_limit=None, **kwargs):
