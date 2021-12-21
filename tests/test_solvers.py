@@ -30,6 +30,20 @@ class TestSolvers(unittest.TestCase):
                     # its OK I guess... MiniZinc error
                     pass
 
+    def test_installed_solvers_solveAll(self):
+        # basic model
+        v = cp.boolvar(3)
+        x,y,z = v
+
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z
+                )
+
+        for solvern,s in cp.SolverLookup.base_solvers():
+            if s.supported(): # only supported solvers in test suite
+                self.assertEqual(model.solveAll(solver=solvern), 4)
+
     # should move this test elsewhere later
     def test_tsp(self):
         N = 6
