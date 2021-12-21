@@ -30,6 +30,20 @@ class TestSolvers(unittest.TestCase):
                     # its OK I guess... MiniZinc error
                     pass
 
+    def test_installed_solvers_solveAll(self):
+        # basic model
+        v = cp.boolvar(3)
+        x,y,z = v
+
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z
+                )
+
+        for solvern,s in cp.SolverLookup.base_solvers():
+            if s.supported(): # only supported solvers in test suite
+                self.assertEqual(model.solveAll(solver=solvern), 4)
+
     # should move this test elsewhere later
     def test_tsp(self):
         N = 6
@@ -195,6 +209,16 @@ class TestSolvers(unittest.TestCase):
             s += [ cp.any(x != x.value()) ]
         self.assertEqual(solcount, 6)
 
+        # native all solutions
+        s = CPM_ortools(m)
+        n = s.solveAll()
+        self.assertEqual(n, 6)
+
+        n = s.solveAll(display=x)
+        self.assertEqual(n, 6)
+
+        n = s.solveAll(cp_model_probing_level=0)
+        self.assertEqual(n, 6)
 
         # assumptions
         bv = cp.boolvar(shape=3)

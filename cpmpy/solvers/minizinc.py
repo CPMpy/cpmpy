@@ -33,6 +33,7 @@
 """
 
 import numpy as np
+import sys
 from datetime import timedelta # for mzn's timeout
 from .solver_interface import SolverInterface, ExitStatus, SolverStatus
 from ..transformations.get_variables import get_variables_model
@@ -126,6 +127,23 @@ class CPM_minizinc(SolverInterface):
             self.mzn_model.add_string(mzn_txt)
             # do NOT add self.mzn_txt_solve yet, so that it can be overwritten later
 
+    def _pre_solve(self, time_limit=None, **kwargs):
+        """ shared by solve() and solveAll() """
+        import minizinc
+
+        # set time limit?
+        if time_limit is not None:
+            kwargs['timeout'] = timedelta(seconds=time_limit)
+
+        # hack, we need to add the objective in a way that it can be changed
+        # later, so make copy of the mzn_model
+        copy_model = self.mzn_model.__copy__() # it is implemented
+        copy_model.add_string(self.mzn_txt_solve)
+        # Transform Model into an instance
+        mzn_inst = minizinc.Instance(self.mzn_solver, copy_model)
+
+        kwargs['output-time'] = True # required for time getting
+        return (kwargs, mzn_inst)
 
     def solve(self, time_limit=None, **kwargs):
         """
@@ -142,7 +160,6 @@ class CPM_minizinc(SolverInterface):
             be forwarded to the solver. Examples include:
                 - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
                 - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
-                - all_solutions=True            Computes all solutions. WARNING CPMpy only gives you access to the values of the last solution... so not very useful.
                 - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
 
             example:
@@ -150,25 +167,39 @@ class CPM_minizinc(SolverInterface):
 
             Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
         """
+        # make mzn_inst
+        (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
+        mzn_result = mzn_inst.solve(**mzn_kwargs)
+
+        # translate solution values (of original vars only)
+        self.objective_value_ = None
+        if mzn_result.status.has_solution():
+            # runtime
+            mznsol = mzn_result.solution
+            if is_any_list(mznsol):
+                print("Warning: multiple solutions found, only returning last one")
+                mznsol = mznsol[-1]
+
+            # fill in variables
+            for var in self.user_vars:
+                varname = self.clean_varname(var.name)
+                if hasattr(mznsol, varname):
+                    var._value = getattr(mznsol, varname)
+                else:
+                    print("Warning, no value for ",varname)
+
+            # translate objective (if any, otherwise None)
+            self.objective_value_ = mzn_result.objective
+
+        # handle status
+        self._post_solve(mzn_result)
+        return self._solve_return(self.cpm_status)
+
+    def _post_solve(self, mzn_result):
+        """ shared by solve() and solveAll() """
         import minizinc
-
-        # set time limit?
-        if time_limit is not None:
-            kwargs['timeout'] = timedelta(seconds=time_limit)
-
-        # hack, we need to add the objective in a way that it can be changed
-        # later, so make copy of the mzn_model
-        copy_model = self.mzn_model.__copy__() # it is implemented
-        copy_model.add_string(self.mzn_txt_solve)
-        # Transform Model into an instance
-        mzn_inst = minizinc.Instance(self.mzn_solver, copy_model)
-
-        # Solve the instance
-        kwargs['output-time'] = True # required for time getting
-        mzn_result = mzn_inst.solve(**kwargs)#all_solutions=True)
-
+        
         mzn_status = mzn_result.status
-
         # translate status
         self.cpm_status = SolverStatus(self.name)
         if mzn_status == minizinc.result.Status.SATISFIED:
@@ -192,28 +223,52 @@ class CPM_minizinc(SolverInterface):
         if 'time' in mzn_result.statistics:
             self.cpm_status.runtime = mzn_result.statistics['time'] # --output-time
 
-        # translate solution values (of original vars only)
-        self.objective_value_ = None
-        if mzn_status.has_solution():
-            # runtime
-            mznsol = mzn_result.solution
-            if is_any_list(mznsol):
-                print("Warning: multiple solutions found, only returning last one")
-                mznsol = mznsol[-1]
-            self.cpm_status.runtime = mzn_result.statistics['time'].total_seconds()
+        return self.cpm_status
 
-            # fill in variables
-            for var in self.user_vars:
-                varname = self.clean_varname(var.name)
-                if hasattr(mznsol, varname):
-                    var._value = getattr(mznsol, varname)
+    async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        """ Special 'async' function because mzn.solutions() is async """
+        # make mzn_inst
+        (kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
+        kwargs['all_solutions'] = True
+
+        solution_count = 0
+        # has an asynchronous generator
+        async for mzn_result in mzn_inst.solutions(**kwargs):
+            # was the last one
+            if mzn_result.solution is None:
+                break
+
+            # display (and reverse-map first) if needed
+            if display:
+                mznsol = mzn_result.solution
+                # fill in variables
+                for var in self.user_vars:
+                    varname = self.clean_varname(var.name)
+                    if hasattr(mznsol, varname):
+                        var._value = getattr(mznsol, varname)
+                    else:
+                        print("Warning, no value for ",varname)
+            
+                # and the actual displaying
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print([v.value() for v in display])
                 else:
-                    print("Warning, no value for ",varname)
+                    display() # callback
 
-            # translate objective (if any, otherwise None)
-            self.objective_value_ = mzn_result.objective
+            # count and stop
+            solution_count += 1
+            if solution_count == solution_limit:
+                break
 
-        return self._solve_return(self.cpm_status)
+            # add nogood on the user variables
+            self += any([v != v.value() for v in self.user_vars])
+
+        # status handling
+        self._post_solve(mzn_result)
+
+        return solution_count
 
     def objective_value(self):
         """
@@ -417,3 +472,43 @@ class CPM_minizinc(SolverInterface):
         
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
+
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            MiniZinc-specific implementation
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+        # XXX: check that no objective function??
+        import asyncio
+        
+        # HAD TO DEFINE OUR OWN ASYNC HANDLER
+        coroutine = self._solveAll(display=display, time_limit=time_limit,
+                                    solution_limit=solution_limit, **kwargs)
+        # THE FOLLOWING IS STRAIGHT FROM `minizinc.instance.solve()`
+        # LETS HOPE IT DOES NOT DIVERGE FROM UPSTREAM
+        if sys.version_info >= (3, 7):
+            if sys.platform == "win32":
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            return asyncio.run(coroutine)
+        else:
+            if sys.platform == "win32":
+                loop = asyncio.ProactorEventLoop()
+            else:
+                loop = asyncio.events.new_event_loop()
+
+            try:
+                asyncio.events.set_event_loop(loop)
+                return loop.run_until_complete(coroutine)
+            finally:
+                asyncio.events.set_event_loop(None)
+                loop.close()
