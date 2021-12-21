@@ -230,6 +230,24 @@ class CPM_ortools(SolverInterface):
 
         return self._solve_return(self.cpm_status)
 
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
+
+            It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - solution_limit: stop after this many solutions (default: None)
+
+            Returns: number of solutions found
+        """
+        # XXX: check that no objective function??
+        cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
+        self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
+        return cb.solution_count()
+
     def objective_value(self):
         """
             Returns the value of the objective function of the latste solver run on this model
@@ -357,7 +375,7 @@ class CPM_ortools(SolverInterface):
                         # example: x*y > 10 :: x*y == aux, aux > 10
                         # creat the equality (will handle appropriate bounds)
                         (newvar, cons) = get_or_make_var(lhs)
-                        _ = self.solver_var(newvar) # Pretty ugly, but gets the job done...
+                        _ = self.solver_var(newvar)
                         for con in cons:
                             # post the flattened constraints, including the 'lhs == newvar' one
                             # if this contains new auxiliary variables we will crash
@@ -500,6 +518,10 @@ class CPM_ortools(SolverInterface):
             args = [self.solver_var(v) for v in cpm_expr.args]
             if cpm_expr.name == 'sum':
                 return sum(args)  # OR-Tools supports this
+            elif cpm_expr.name == 'wsum':
+                w = cpm_expr.args[0]
+                x = [self.solver_var(v) for v in cpm_expr.args[1]]
+                return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
 
         raise NotImplementedError("Not a know supported ORTools expression {}".format(cpm_expr))
 
@@ -547,5 +569,74 @@ try:
         def solution_count(self):
             """Returns the number of solutions found."""
             return self.__solution_count
+    def solution_count(self):
+        """Returns the number of solutions found."""
+        return self.__solution_count
+
+  class OrtSolutionPrinter(OrtSolutionCounter):
+    """
+        Native or-tools callback for solution printing.
+
+        Subclasses OrtSolutionCounter, see those docs too
+
+        use with CPM_ortools as follows:
+        `cb = OrtSolutionPrinter(s, display=vars)`
+        `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
+
+        for multiple variabes (single or NDVarArray), use:
+        `cb = OrtSolutionPrinter(s, display=[v, x, z])`
+
+        for a custom print function, use for example:
+        ```def myprint():
+    print(f"x0={x[0].value()}, x1={x[1].value()}")
+cb = OrtSolutionPrinter(s, printer=myprint)```
+
+        optionally retrieve the solution count with `cb.solution_count()`
+
+        Arguments:
+            - verbose: whether to print info on every solution found (bool, default: False)
+            - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+            - solution_limit: stop after this many solutions (default: None)
+    """
+    def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        super().__init__(verbose)
+        self._solution_limit = solution_limit
+        # we only need the cpmpy->solver varmap from the solver
+        self._varmap = solver.varmap
+        # identify which variables to populate with their values
+        self._cpm_vars = []
+        self._display = display
+        if isinstance(display, (list,Expression)):
+            self._cpm_vars = get_variables(display)
+        elif callable(display):
+            # might use any, so populate all (user) variables with their values
+            self._cpm_vars = solver.user_vars
+
+    def on_solution_callback(self):
+        """Called on each new solution."""
+        super().on_solution_callback()
+        if len(self._cpm_vars):
+            # populate values before printing
+            for cpm_var in self._cpm_vars:
+                # it might be an NDVarArray
+                if hasattr(cpm_var, "flat"):
+                    for cpm_subvar in cpm_var.flat:
+                        cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
+                else:
+                    cpm_var._value = self.Value(self._varmap[cpm_var])
+
+            if isinstance(self._display, Expression):
+                print(self._display.value())
+            elif isinstance(self._display, list):
+                # explicit list of expressions to display
+                print([v.value() for v in self._display])
+            else: # callable
+                self._display()
+
+        # check for count limit
+        if self.solution_count() == self._solution_limit:
+            self.StopSearch()
+
 except ImportError:
     pass  # Ok, no ortools installed...
