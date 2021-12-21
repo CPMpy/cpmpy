@@ -26,7 +26,7 @@ class TestInterface(unittest.TestCase):
 
         self.assertIsNotNone(self.solver.status())
         self.assertEqual(self.solver.status().exitstatus, ExitStatus.NOT_RUN)
-        self.assertNotEquals(self.solver.status().solver_name, "dummy")
+        self.assertNotEqual(self.solver.status().solver_name, "dummy")
 
     def test_constructor(self):
 
@@ -35,7 +35,7 @@ class TestInterface(unittest.TestCase):
 
         self.assertIsNotNone(solver.status())
         self.assertEqual(solver.status().exitstatus, ExitStatus.NOT_RUN)
-        self.assertNotEquals(solver.status().solver_name, "dummy")
+        self.assertNotEqual(solver.status().solver_name, "dummy")
 
     def test_add_var(self):
 
