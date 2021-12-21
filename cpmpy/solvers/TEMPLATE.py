@@ -6,8 +6,9 @@
     The functions are ordered in a way that could be convenient to 
     start from the top and continue in that order
 
-    TODO: smth about testing as you progress...
-    TODO: I guess we should add a __main__ that runs some tests?
+    WARNING: do not include the python package at the top of the file,
+    as CPMpy should also work without this solver installed.
+    To ensure that, include it inside supported() and other functions that need it...
 """
 """
     Interface to TEMPLATE's API
@@ -43,6 +44,8 @@ class CPM_template(SolverInterface):
     <URL to detailed solver installation instructions, if any>
 
     Creates the following attributes:
+    tpl_model: object, TEMPLATE's model object
+    And in the constructor of the superclass:
     user_vars: set(), variables in the original (non-transformed) model,
                     for reverse mapping the values after `solve()`
     cpm_status: SolverStatus(), the CPMpy status after a `solve()`

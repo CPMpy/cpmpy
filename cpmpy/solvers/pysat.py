@@ -6,8 +6,19 @@
 """
     Interface to PySAT's API
 
+    PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
+    interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
+    to a variety of cardinality and pseudo-Boolean encodings.
+    https://pysathq.github.io/
+
     This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,xor,implies,==,!=)
+    and only logical constraints (and,or,xor,implies,==,!=) or cardinality constraints.
+
+    Documentation of the solver's own Python API:
+    https://pysathq.github.io/docs/html/api/solvers.html
+
+    WARNING: CPMpy uses 'model' to refer to a constraint specification,
+    the PySAT docs use 'model' to refer to a solution.
 
     ===============
     List of classes
@@ -18,9 +29,6 @@
 
         CPM_pysat
 """
-import pysat.formula
-from pysat.card import CardEnc
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
@@ -39,14 +47,19 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation.html
 
     Creates the following attributes:
-    user_vars: variables in the original (unflattened) model (for reverse mapping the values after solve)
     pysat_vpool: a pysat.formula.IDPool for the variable mapping
     pysat_solver: a pysat.solver.Solver() (default: glucose4)
-    cpm_status: the corresponding CPMpy status
+    And in the constructor of the superclass:
+    user_vars: set(), variables in the original (non-transformed) model,
+                    for reverse mapping the values after `solve()`
+    cpm_status: SolverStatus(), the CPMpy status after a `solve()`
+    tpl_model: object, TEMPLATE's model object
+    _varmap: dict(), maps cpmpy variables to native solver variables
     """
 
     @staticmethod
     def supported():
+        # try to import the package
         try:
             import pysat
             # there is actually a non-related 'pysat' package
@@ -56,6 +69,7 @@ class CPM_pysat(SolverInterface):
             return True
         except ImportError as e:
             return False
+
 
     @staticmethod
     def solvernames():
@@ -71,21 +85,19 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
+
     def __init__(self, cpm_model=None, solver=None):
         """
-        Constructor of the solver object
+        Constructor of the native solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         PySAT clauses and solver object
 
-        WARNING: CPMpy uses 'model' to refer to a constraint specification,
-        the PySAT docs use 'model' to refer to a solution.
-
         Only supports satisfaction problems (no objective)
 
         Arguments:
-        - cpm_model: a CPMpy Model()
-        - solver: name of the pysat solver, e.g. glucose4
+        - cpm_model: Model(), a CPMpy Model()
+        - solver: str, name of the pysat solver, e.g. glucose4
             see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
