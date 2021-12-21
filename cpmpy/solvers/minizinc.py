@@ -103,8 +103,6 @@ class CPM_minizinc(SolverInterface):
                 "Install the python 'minizinc-python' package to use this 'minizinc' solver interface")
         import minizinc
 
-        super().__init__()
-
         # determine solvername, set cpmpy name
         solvername = solver
         if solvername is None or solvername == 'minizinc':
@@ -124,7 +122,7 @@ class CPM_minizinc(SolverInterface):
         # Solver text
         self.mzn_txt_solve = "solve satisfy;"
 
-        super().__init__(cpm_model, solver=solver, name=solvername)
+        super().__init__(cpm_model=cpm_model, solver=solver, name=solvername)
 
     def __add__(self, cons):
         """
@@ -135,6 +133,13 @@ class CPM_minizinc(SolverInterface):
 
         if not is_any_list(cons):
             cons = [cons]
+
+        # we can't unpack lists in convert_expression, so must do it upfront
+        # and can't make assumptions on '.flat' existing either...
+        cons = flatlist(cons)
+        for con in cons:
+            self._post_constraint(con)
+        return self
 
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
@@ -346,7 +351,7 @@ class CPM_minizinc(SolverInterface):
     def clean_varname(self, varname):
         return varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
 
-    def _convert_expression(self, expr):
+    def _convert_expression(self, expr) -> str:
         """
             Convert a CPMpy expression into a minizinc-compatible string
 
@@ -373,7 +378,7 @@ class CPM_minizinc(SolverInterface):
             # default
             if isinstance(expr, NegBoolView):
                 return "not " + self.solver_var(expr._bv)
-            return self.solver_var(expr)
+            return str(self.solver_var(expr))
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
