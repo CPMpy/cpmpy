@@ -28,9 +28,11 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
+from ..transformations.linearize import linearize
 
 class CPM_gurobi(SolverInterface):
     """
@@ -73,7 +75,7 @@ class CPM_gurobi(SolverInterface):
         import gurobipy as gp
 
         # initialise the native solver object
-        self.tpl_model = gp.Model()
+        self.gbi_model = gp.Model()
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
@@ -101,7 +103,7 @@ class CPM_gurobi(SolverInterface):
 
         return self
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
             Call the gurobi solver
 
@@ -119,11 +121,13 @@ class CPM_gurobi(SolverInterface):
             raise NotImplementedError("TEMPLATE: TODO, implement time_limit")
 
         # call the solver, with parameters
-        my_status = self.TEMPLATE_solver.solve(**kwargs)
+        for param, val in kwargs.items():
+            self.gbi_model.setParam(param, val)
+        my_status = self.gbi_model.optimize(callback=solution_callback)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TEMPLATE_solver.time()
+        self.cpm_status.runtime = self.gbi_model.time()
 
         # translate exit status
         if my_status is True:
@@ -156,7 +160,7 @@ class CPM_gurobi(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        # TODO: add `solver_vars(self, cpm_vars)` to SolverInterface class
+        from gurobipy import GRB
 
         if is_num(cpm_var):
             return cpm_var
@@ -164,20 +168,22 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
+            return -self.solver_var(cpm_var._bv)
 
         # create if it does not exit
-        if not cpm_var in self.varmap:
+        if not cpm_var in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
+                revar = self.gbi_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.gbi_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self.varmap[cpm_var] = revar
+            self._varmap[cpm_var] = revar
+            # Update model to make new vars visible for constraints
+            self.gbi_model.update()
 
         # return from cache
-        return self.varmap[cpm_var]
+        return self._varmap[cpm_var]
 
 
     # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
@@ -245,7 +251,7 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
 
 
-     def _post_constraint(self, cpm_con):
+    def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
 
@@ -254,10 +260,35 @@ class CPM_gurobi(SolverInterface):
 
             Solvers do not need to support all constraints.
         """
-        if isinstance(cpm_con, _BoolVarImpl):
-            # base case, just var or ~var
-            self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
-        elif isinstance(cpm_con, Operator) and con.name == 'or':
-            self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
+        from gurobipy import GRB
+        import gurobipy as gp
+
+        #Base case
+        if isinstance(cpm_expr, _BoolVarImpl):
+            self.gbi_model.addConstr(self.solver_var(cpm_expr) >= 1)
+            return
+
+        #Comparisons
+        elif isinstance(cpm_expr, Comparison) and cpm_expr.name in ("<=", ">=", "=="):
+            # Native mapping to gurobi API
+            lhs, rhs = cpm_expr.args
+            if isinstance(lhs, Operator):
+                raise NotImplementedError("TODO: implement operators on lhs of comp")
+            else:
+                # Add lhs >=< rhs to model
+                self.gbi_model.addLConstr(self.solver_var(lhs), cpm_expr.name[0], self.solver_var(rhs))
+                return
+
+
+
+        #Operators
+        elif isinstance(cpm_expr, Operator):
+            raise NotImplementedError("TODO: implement operators")
+
+
         else:
-            raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+            for lin_cons in linearize(cpm_expr):
+                self._post_constraint(lin_cons)
+
+            return self._post_constraint(linearize(cpm_expr))
+        raise NotImplementedError("gurobi: constraint not (yet) supported", cpm_expr)

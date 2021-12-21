@@ -60,7 +60,7 @@ class CPM_template(SolverInterface):
             return False
 
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, solver=None, name="TEMPLATE"):
         """
         Constructor of the native solver object
 
@@ -77,27 +77,7 @@ class CPM_template(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
-        super().__init__(cpm_model, solver)
-
-        # TODO: these 4 in super()
-        self.cpm_status = SolverStatus(self.name)
-
-        # initialise variable handling
-        self.user_vars = set() # variables in the original (non-transformed) model
-        self._varmap = dict() # maps cpmpy variables to native solver variables
-
-        # rest uses own API
-        # TODO: can be in super() as well? if we built tpl_model first? allowed idd...
-        if cpm_model is not None:
-            # post all constraints at once, implemented in __add__()
-            self += cpm_model.constraints
-
-            # post objective
-            if cpm_model.objective is not None:
-                if cpm_model.objective_max:
-                    self.maximize(cpm_model.objective)
-                else:
-                    self.minimize(cpm_model.objective)
+        super().__init__(cpm_model, solver, name)
 
 
     def solve(self, time_limit=None, **kwargs):
@@ -155,7 +135,6 @@ class CPM_template(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        # TODO: add `solver_vars(self, cpm_vars)` to SolverInterface class
 
         if is_num(cpm_var):
             return cpm_var
@@ -166,7 +145,7 @@ class CPM_template(SolverInterface):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
         # create if it does not exit
-        if not cpm_var in self.varmap:
+        if not cpm_var in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
