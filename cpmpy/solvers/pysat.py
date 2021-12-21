@@ -234,53 +234,48 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.add_clause([self.solver_var(var) for var in cpm_expr.args])
             else:
                 raise NotImplementedError(
-                    f"Automatic conversion of Operator {cpm_expr} to CNF not supported yet, please report on github.")
+                    f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         elif isinstance(cpm_expr, Comparison):
             # only handle cardinality encodings (for now)
             if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum" and all(
                     isinstance(v, _BoolVarImpl) for v in cpm_expr.args[0].args):
                 lits = [self.solver_var(var) for var in cpm_expr.args[0].args]
                 bound = cpm_expr.args[1]
-                # TODO: Edge case where sum(x) < 0: Raises error
+
+                clauses = []
                 if cpm_expr.name == "<":
-                    atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(atmost.clauses)
+                    clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "<=":
-                    atmost = CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(atmost.clauses)
+                    clauses += CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == ">=":
-                    atleast = CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(atleast.clauses)
+                    clauses += CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == ">":
-                    atleast = CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool)
-                    # self.pysat_solver.add_clause(atleast.clauses)
-                    self.pysat_solver.append_formula(atleast)
+                    clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "==":
-                    equals = CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(equals.clauses)
-                # special cases with bounding 'hardcoded' for clarity
-                elif cpm_expr.name == "!=" and bound <= 0:
-                    atleast = CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(atleast.clauses)
-                elif cpm_expr.name == "!=" and bound >= len(lits):
-                    atmost = CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool)
-                    self.pysat_solver.append_formula(atmost.clauses)
+                    clauses += CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "!=":
-                    ## add implication literal
-                    is_atleast = self.solver_var(boolvar())
-                    atleast = [cl + [-is_atleast] for cl in
-                               CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
-                    self.pysat_solver.append_formula(atleast)
+                    # special cases with bounding 'hardcoded' for clarity
+                    if bound <= 0:
+                        clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
+                    elif bound >= len(lits):
+                        clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
+                    else:
+                        ## add implication literal to atleast/atmost
+                        is_atleast = self.solver_var(boolvar())
+                        clauses += [atl + [-is_atleast] for atl in
+                                    CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
 
-                    is_atmost = self.solver_var(boolvar())
-                    atmost = [cl + [-is_atmost] for cl in
-                              CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
-                    self.pysat_solver.append_formula(atmost)
+                        is_atmost = self.solver_var(boolvar())
+                        clauses += [atm + [-is_atmost] for atm in
+                                    CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
 
-                    ## add is_atleast or is_atmost
-                    self.pysat_solver.add_clause([is_atleast, is_atmost])
+                        ## add is_atleast or is_atmost
+                        clauses.append([is_atleast, is_atmost])
                 else:
                     raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+
+                # post the clauses
+                self.pysat_solver.append_formula(clauses)
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
