@@ -180,7 +180,7 @@ class SolverInterface(object):
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
             # display if needed
-            if display:
+            if display is not None:
                 if isinstance(display, Expression):
                     print(display.value())
                 elif isinstance(display, list):
