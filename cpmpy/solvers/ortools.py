@@ -4,7 +4,15 @@
 ## ortools.py
 ##
 """
-    Interface to ortools' Python API
+    Interface to ortools' CP-SAT Python API
+
+    Google OR-Tools is open source software for combinatorial optimization, which seeks
+    to find the best solution to a problem out of a very large set of possible solutions.
+    The OR-Tools CP-SAT solver is an award-winning constraint programming solver
+    that uses SAT (satisfiability) methods and lazy-clause generation.
+
+    Documentation of the solver's own Python API:
+    https://google.github.io/or-tools/python/ortools/sat/python/cp_model.html
 
     ===============
     List of classes
@@ -27,21 +35,23 @@ from ..transformations.reification import only_bv_implies
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the python 'ortools' API
+    Interface to the python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
 
-    Creates the following attributes:
-    user_vars: variables in the original (unflattened) model, incl objective
+    See detailed installation instructions at:
+    https://developers.google.com/optimization/install
+    and if you are on Apple M1: https://cpmpy.readthedocs.io/en/latest/installation_M1.html
+
+    Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
     ort_solver: the ortools cp_model.CpSolver() instance used in solve()
-    ort_status: the ortools 'status' instance returned by ort_solver.Solve()
-    cpm_status: the corresponding CPMpy status
     """
 
     @staticmethod
     def supported():
+        # try to import the package
         try:
             import ortools
             return True
@@ -51,27 +61,30 @@ class CPM_ortools(SolverInterface):
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
-        Constructor of the solver object
+        Constructor of the native solver object
 
         Requires a CPMpy model as input, and will create the corresponding
         or-tools model and solver object (ort_model and ort_solver)
 
-            - cpm_model: CPMpy Model() object
-            - solver: string
-            - name: string
-
         ort_model and ort_solver can both be modified externally before
         calling solve(), a prime way to use more advanced solver features
+
+        Arguments:
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: None
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(name))
-        assert(subsolver is None)
+
         from ortools.sat.python import cp_model as ort
 
-        # Initialize solver specific variables
+        assert(subsolver is None)
+
+        # initialise the native solver objects
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
+        # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
 
 

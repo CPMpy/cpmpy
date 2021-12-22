@@ -30,7 +30,7 @@
         CPM_pysat
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables
