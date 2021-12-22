@@ -239,7 +239,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # display (and reverse-map first) if needed
-            if display:
+            if display is not None:
                 mznsol = mzn_result.solution
                 # fill in variables
                 for var in self.user_vars:
