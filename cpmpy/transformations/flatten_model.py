@@ -114,7 +114,6 @@ def flatten_model(orig_model):
         else:
             return Model(*basecons, minimize=newobj)
 
-
 def flatten_constraint(expr):
     """
         input is any expression; except is_num(), pure _NumVarImpl,

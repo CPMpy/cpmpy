@@ -28,11 +28,13 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize
+from ..transformations.linearize import no_global_constraints, linearize_constraint
+
 
 class CPM_gurobi(SolverInterface):
     """
@@ -76,6 +78,7 @@ class CPM_gurobi(SolverInterface):
 
         # initialise the native solver object
         self.gbi_model = gp.Model()
+        self._objective_value = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
@@ -97,7 +100,11 @@ class CPM_gurobi(SolverInterface):
 
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
-        cpm_cons = flatten_constraint(cpm_con)
+
+        cpm_cons = no_global_constraints(cpm_con)
+        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = linearize_constraint(cpm_cons)
+
         for con in cpm_cons:
             self._post_constraint(con)
 
@@ -116,6 +123,7 @@ class CPM_gurobi(SolverInterface):
              for example: log_output=True, var_ordering=3, num_cores=8, ...>
             <Add link to documentation of all solver parameters>
         """
+        from gurobipy import GRB
 
         if time_limit is not None:
             raise NotImplementedError("TEMPLATE: TODO, implement time_limit")
@@ -123,34 +131,37 @@ class CPM_gurobi(SolverInterface):
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.gbi_model.setParam(param, val)
-        my_status = self.gbi_model.optimize(callback=solution_callback)
+
+        _ = self.gbi_model.optimize(callback=solution_callback)
+        my_status = self.gbi_model.Status
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.gbi_model.time()
+        self.cpm_status.runtime = self.gbi_model.runtime
+
 
         # translate exit status
-        if my_status is True:
+        if my_status == GRB.OPTIMAL and self._objective_value is None:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status is False:
+        elif my_status == GRB.OPTIMAL and self._objective_value is not None:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif my_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status is None:
-            # can happen when timeout is reached...
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else: # another?
-            raise NotImplementedError(my_status) # a new status type was introduced, please report on github
+        else:  # another?
+            raise NotImplementedError(f"Translation of gurobi status {my_status} to CPMpy status not implemented") # a new status type was introduced, please report on github
 
         # True/False depending on self.cpm_status
-        has_sol = self._solve_return()
+        has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user vars only)
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                sol_var = self.solver_var(cpm_var)
-                cpm_var._value = None # if not in solution
-                #cpm_var._value = self.TEMPLATEpy.value(sol_var)
-                raise NotImplementedError("TEMPLATE: back-translating the solution values")
+                solver_val = self.solver_var(cpm_var).X
+                if cpm_var.is_bool():
+                    cpm_var._value = bool(solver_val)
+                else:
+                    cpm_var._value = int(solver_val)
 
         return has_sol
 
@@ -177,7 +188,7 @@ class CPM_gurobi(SolverInterface):
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.gbi_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
             else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
             # Update model to make new vars visible for constraints
             self.gbi_model.update()
@@ -263,32 +274,55 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
         import gurobipy as gp
 
+        native_operators = {"sum", "sub", "mul", "div", "->"}
+        native_comps = {"<=", ">=", "=="}
+
+
+
         #Base case
         if isinstance(cpm_expr, _BoolVarImpl):
             self.gbi_model.addConstr(self.solver_var(cpm_expr) >= 1)
-            return
+
 
         #Comparisons
-        elif isinstance(cpm_expr, Comparison) and cpm_expr.name in ("<=", ">=", "=="):
+        elif isinstance(cpm_expr, Comparison) and cpm_expr.name in native_comps:
             # Native mapping to gurobi API
             lhs, rhs = cpm_expr.args
+            sense = cpm_expr.name[0]
             if isinstance(lhs, Operator):
-                raise NotImplementedError("TODO: implement operators on lhs of comp")
+                if lhs.name in native_operators:
+                    lvars = [self.solver_var(var) for var in lhs.args]
+                    if lhs.name == "sum":
+                        self.gbi_model.addLConstr(gp.quicksum(lvars), sense, self.solver_var(rhs))
+                    if lhs.name == "wsum":
+                        self.gbi_model.addLConstr(gp.LinExpr(lhs.args[0], lhs.args[1]), sense, self.solver_var(rhs))
+                    if lhs.name == "sub":
+                        self.gbi_model.addLconstr(lvars[0] - lvars[1], sense, self.solver_var(rhs))
+                    if lhs.name == "mul":
+                        self.gbi_model.addQConstr(np.prod(lvars), sense, self.solver_var(rhs))
+                    if lhs.name == "div":
+                        if isinstance(lhs.args[1], _NumVarImpl):
+                            raise NotImplementedError("Gurobi does not support division by an variable. If you need this, please report on github.")
+                        self.gbi_model.addLConstr(lvars[0] / lvars[1], sense, self.solver_var(rhs))
+                else:
+                    raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi")
+
+            # Comparisons on left hand side of comparison (e.g. (a >= b) <= c)
+            elif isinstance(lhs, Comparison):
+                # Todo: check if there is a better way to post these constraints
+                llhs, lrhs = [self.solver_var(arg) for arg in lhs.args]
+                self.gbi_model.addLConstr(gp.LinExpr(llhs, lhs.name[0], lrhs), sense, self.solver_var(rhs))
             else:
                 # Add lhs >=< rhs to model
-                self.gbi_model.addLConstr(self.solver_var(lhs), cpm_expr.name[0], self.solver_var(rhs))
-                return
+                self.gbi_model.addLConstr(self.solver_var(lhs), sense, self.solver_var(rhs))
 
 
 
         #Operators
-        elif isinstance(cpm_expr, Operator):
-            raise NotImplementedError("TODO: implement operators")
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name  in native_operators:
+            args = [self.solver_var(var) for var in cpm_expr.args]
 
+            raise NotImplementedError(f"TODO: implement operators, raised by adding constaint {cpm_expr} to the model")
 
         else:
-            for lin_cons in linearize(cpm_expr):
-                self._post_constraint(lin_cons)
-
-            return self._post_constraint(linearize(cpm_expr))
-        raise NotImplementedError("gurobi: constraint not (yet) supported", cpm_expr)
+            raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi optimizer")

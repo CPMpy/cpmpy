@@ -20,6 +20,8 @@
 """
 
 import warnings # for deprecation warning
+
+from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
@@ -67,6 +69,7 @@ class SolverLookup():
         return [("ortools", CPM_ortools),
                 ("minizinc", CPM_minizinc),
                 ("pysat", CPM_pysat),
+                ("gurobi", CPM_gurobi)
                ]
 
     @staticmethod

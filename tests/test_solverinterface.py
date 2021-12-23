@@ -1,5 +1,6 @@
 import unittest
 
+from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc, CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy import *
@@ -196,8 +197,47 @@ class TestInterface(unittest.TestCase):
         self.assertIn(self.i, self.solver.user_vars)
 
 
+class AdvancedInterfaceTest(unittest.TestCase):
+
+    solver_class = CPM_gurobi
+
+    def make_and_add(self, constr, solve=True):
+        solver = self.solver_class(Model(constr))
+        if solve:
+            solver.solve()
+
+    def test_base_constraints(self):
+        # Int variables
+        i,j,k = [intvar(0,3, name=n) for n in "ijk"]
+        x,y,z = [boolvar(name=n) for n in "xyz"]
+
+        operators = Operator.allowed
+        comparisons = Comparison.allowed
+
+        const = 1
+        # Test all possible outcomes of flatten_constraint
+        eval_map = {"and": "&", "or":"|", "xor":"^"}
 
 
+        # Base constraints
+        for name, (card, is_bool) in operators.items():
+            if not is_bool:
+                continue
+            string = "True"
+            infix = eval_map[name]
+            if card == 1:
+                self.make_and_add(Operator(name, x))
+                string = f"{infix}({x.value()})"
 
+            if card == 2:
+                self.make_and_add(Operator(name, [x,y]))
+                string = f"{x.value()} {infix} {y.value()}"
+
+            elif card == 0: # Unlimited nuber of args, try 3
+                self.make_and_add(Operator(name, [x,y,z]))
+                string = f"{x.value()} {infix} {y.value()} {infix} {z.value()}"
+
+            print(string)
+            self.assertTrue(eval(string))
 
 
