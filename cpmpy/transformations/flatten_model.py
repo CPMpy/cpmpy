@@ -272,7 +272,15 @@ def flatten_objective(expr):
                 newexpr = Operator(expr.name, flatvars)
                 return (newexpr, [c for con in flatcons for c in con])
         elif expr.name == 'wsum':
-            raise NotImplementedError(expr) # TODO, wsum
+            w, x = expr.args
+            if all(__is_flat_var(arg) for arg in x):
+                return (expr, [])
+            else:
+                # one of the arguments is not flat, flatten all
+                flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in x])
+                # one of the expressions in x is not flat, flatten all
+                newexpr = Operator(expr.name, (w, flatvars))
+                return (newexpr, [c for con in flatcons for c in con])
     
     # any other numeric expression
     return get_or_make_var(expr)
@@ -315,11 +323,19 @@ def get_or_make_var(expr):
     # includes estimating appropriate bounds for intvar...
 
     # special case, -var... 
-    # XXX until we do weighted sum, turn into -1*args[0]
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return get_or_make_var(-1*expr.args[0])
 
-    if isinstance(expr, Operator):
+    elif isinstance(expr, Operator) and expr.name == "wsum":
+        weights, sub_exprs  = expr.args
+        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
+        lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
+        ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
+        ivar = _IntVarImpl(lb, ub)
+        newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
+        return (ivar, [newexpr]+[c for con in flatcons for c in con])
+
+    elif isinstance(expr, Operator):
         # TODO: more like above, call normalized_numexpr() on expr, then equate...
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args]) # also bool, reified...
         lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
@@ -363,7 +379,6 @@ def get_or_make_var(expr):
             ivar = _IntVarImpl(min(bnds), max(bnds))
         elif expr.name == 'sum': # n-ary
             ivar = _IntVarImpl(sum(lbs), sum(ubs)) 
-        # TODO: weighted sum
         elif expr.is_bool(): # Boolean
             ivar = _BoolVarImpl() # TODO: we can support Bool? check, update docs
         else:
@@ -570,6 +585,12 @@ def normalized_numexpr(expr):
     # XXX until we do weighted sum, turn into -1*args[0]
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return normalized_numexpr(-1*expr.args[0])
+
+    elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
+        weights, sub_exprs  = expr.args
+        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
+        newexpr = Operator(expr.name, (weights, flatvars))
+        return (newexpr, [c for con in flatcons for c in con])
 
     if isinstance(expr, Operator):
         if all(__is_flat_var(arg) for arg in expr.args):

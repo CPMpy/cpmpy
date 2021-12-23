@@ -105,20 +105,10 @@ class Model(object):
         self.objective = expr
         self.objective_max = True
 
-    
-    # solver: name of supported solver or any SolverInterface object
-    def solve(self, solver=None, time_limit=None):
-        """ Send the model to a solver and get the result
+    def _create_solver(self, solver):
+        """ Creates appropriate solver object
 
         :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
-        :type string: None (default) or in SolverLookup.solvernames() or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
-
-        :param time_limit: optional, time limit in seconds
-        :type time_limit: int or float
-
-        :return: Bool: the computed output:
-            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
-            - False     if no solution is found
         """
         if isinstance(solver, SolverInterface):
             solver_class = solver
@@ -134,8 +124,45 @@ class Model(object):
             # no subsolver
             s = solver_class(self)
 
+        return s
+
+    # solver: name of supported solver or any SolverInterface object
+    def solve(self, solver=None, time_limit=None):
+        """ Send the model to a solver and get the result
+
+        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
+        :type string: None (default) or in SolverLookup.solvernames() or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
+
+        :param time_limit: optional, time limit in seconds
+        :type time_limit: int or float
+
+        :return: Bool: the computed output:
+            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - False     if no solution is found
+        """
+        s = self._create_solver(solver)
         # call solver
         ret = s.solve(time_limit=time_limit)
+        # store CPMpy status (s object has no further use)
+        self.cpm_status = s.status()
+        return ret
+
+    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            Delegated to the solver, who might implement this efficiently
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - solution_limit: stop after this many solutions (default: None)
+
+            Returns: number of solutions found
+        """
+        s = self._create_solver(solver)
+        # call solver
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret

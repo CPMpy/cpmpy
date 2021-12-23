@@ -301,6 +301,17 @@ class _BoolVarImpl(_IntVarImpl):
         if (isinstance(other, int) and other == 0) or other is False:
             return ~self
         return super().__eq__(other)
+    def __ne__(self, other):
+        # (BV == 0) <-> BV
+        # if other == 1: XXX: dangerous because "=="" is overloaded 
+        if (isinstance(other, int) and other == 1) or other is True:
+            return ~self
+        if (isinstance(other, int) and other == 0) or other is False:
+            return self
+        return super().__ne__(other)
+
+    def __abs__(self):
+        return self
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
@@ -329,9 +340,6 @@ class NegBoolView(_BoolVarImpl):
 
     def __invert__(self):
         return self._bv
-
-    def __abs__(self):
-        return self
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
@@ -483,8 +491,11 @@ class NDVarArray(Expression, np.ndarray):
     def implies(self, other):
         return self._vectorized(other, 'implies') 
 
-    # TODO?
     #in	  __contains__(self, value) 	Check membership
+    # CANNOT meaningfully overwrite, python always returns True/False
+    # regardless of what you return in the __contains__ function
+
+    # TODO?
     #object.__matmul__(self, other)
 
 
