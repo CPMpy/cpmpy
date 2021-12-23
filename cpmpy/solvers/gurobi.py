@@ -59,8 +59,10 @@ class CPM_gurobi(SolverInterface):
         # try to import the package
         try:
             import gurobipy as gp
-            #TODO somehow check if gurobi licence is activated
-            return True
+            from datetime import datetime
+            valid_until = gp.Model().LicenseExpiration
+            today = datetime.today()
+            return today.year * 1e4 + today.month * 1e2 + today.day <= valid_until
         except ImportError as e:
             return False
 
@@ -274,7 +276,7 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
         import gurobipy as gp
 
-        native_operators = {"sum", "sub", "mul", "div", "->"}
+        native_operators = {"sum", "wsum", "sub", "mul", "div", "->"}
         native_comps = {"<=", ">=", "=="}
 
 
@@ -307,11 +309,6 @@ class CPM_gurobi(SolverInterface):
                 else:
                     raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi")
 
-            # Comparisons on left hand side of comparison (e.g. (a >= b) <= c)
-            elif isinstance(lhs, Comparison):
-                # Todo: check if there is a better way to post these constraints
-                llhs, lrhs = [self.solver_var(arg) for arg in lhs.args]
-                self.gbi_model.addLConstr(gp.LinExpr(llhs, lhs.name[0], lrhs), sense, self.solver_var(rhs))
             else:
                 # Add lhs >=< rhs to model
                 self.gbi_model.addLConstr(self.solver_var(lhs), sense, self.solver_var(rhs))
