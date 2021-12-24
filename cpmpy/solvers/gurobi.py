@@ -79,7 +79,12 @@ class CPM_gurobi(SolverInterface):
         import gurobipy as gp
 
         # initialise the native solver object
-        self.gbi_model = gp.Model()
+        self.env = gp.Env()
+        self.env.setParam("LogToConsole", 0)
+        self.env.setParam("OutputFlag", 0)
+        self.env.start()
+
+        self.gbi_model = gp.Model(env=self.env)
         self._objective_value = None
 
         # initialise everything else and post the constraints/objective
@@ -103,8 +108,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
 
-        cpm_cons = no_global_constraints(cpm_con)
-        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = linearize_constraint(cpm_cons)
 
         for con in cpm_cons:
@@ -276,50 +280,40 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
         import gurobipy as gp
 
-        native_operators = {"sum", "wsum", "sub", "mul", "div", "->"}
-        native_comps = {"<=", ">=", "=="}
-
-
-
         #Base case
         if isinstance(cpm_expr, _BoolVarImpl):
             self.gbi_model.addConstr(self.solver_var(cpm_expr) >= 1)
 
 
         #Comparisons
-        elif isinstance(cpm_expr, Comparison) and cpm_expr.name in native_comps:
+        elif isinstance(cpm_expr, Comparison):
             # Native mapping to gurobi API
             lhs, rhs = cpm_expr.args
             sense = cpm_expr.name[0]
             if isinstance(lhs, Operator):
-                if lhs.name in native_operators:
-                    lvars = [self.solver_var(var) for var in lhs.args]
-                    if lhs.name == "sum":
-                        self.gbi_model.addLConstr(gp.quicksum(lvars), sense, self.solver_var(rhs))
-                    if lhs.name == "wsum":
-                        self.gbi_model.addLConstr(gp.LinExpr(lhs.args[0], lhs.args[1]), sense, self.solver_var(rhs))
-                    if lhs.name == "sub":
-                        self.gbi_model.addLconstr(lvars[0] - lvars[1], sense, self.solver_var(rhs))
-                    if lhs.name == "mul":
-                        self.gbi_model.addQConstr(np.prod(lvars), sense, self.solver_var(rhs))
-                    if lhs.name == "div":
-                        if isinstance(lhs.args[1], _NumVarImpl):
-                            raise NotImplementedError("Gurobi does not support division by an variable. If you need this, please report on github.")
-                        self.gbi_model.addLConstr(lvars[0] / lvars[1], sense, self.solver_var(rhs))
+                if lhs.name == "wsum":
+                    weights = lhs.args[0]
+                    vars = [self.solver_var(var) for var in lhs.args[1]]
+                    self.gbi_model.addLConstr(gp.LinExpr(weights, vars), sense, self.solver_var(rhs))
+                    return
+
+                lvars = [self.solver_var(var) for var in lhs.args]
+                if lhs.name == "sum":
+                    self.gbi_model.addLConstr(gp.quicksum(lvars), sense, self.solver_var(rhs))
+                elif lhs.name == "sub":
+                    self.gbi_model.addLConstr(lvars[0] - lvars[1], sense, self.solver_var(rhs))
+                elif lhs.name == "mul":
+                    raise NotImplementedError("Multiplications not yet implemented") # TODO
+                elif lhs.name == "div":
+                    if isinstance(lhs.args[1], _NumVarImpl):
+                        raise NotImplementedError("Gurobi does not support division by an variable. If you need this, please report on github.")
+                    self.gbi_model.addLConstr(lvars[0] / lvars[1], sense, self.solver_var(rhs))
                 else:
                     raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi")
 
             else:
                 # Add lhs >=< rhs to model
                 self.gbi_model.addLConstr(self.solver_var(lhs), sense, self.solver_var(rhs))
-
-
-
-        #Operators
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name  in native_operators:
-            args = [self.solver_var(var) for var in cpm_expr.args]
-
-            raise NotImplementedError(f"TODO: implement operators, raised by adding constaint {cpm_expr} to the model")
 
         else:
             raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi optimizer")
