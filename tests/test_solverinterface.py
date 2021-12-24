@@ -1,24 +1,25 @@
 import unittest
 
+import pytest
+
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc, CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
 
+SOLVER_CLASS = CPM_gurobi  # Replace by your own solver class
+
 
 class TestInterface(unittest.TestCase):
 
-    # Replace by your own solver class
-    solver_class = CPM_gurobi
-
     def setUp(self) -> None:
-        self.solver = TestInterface.solver_class()
+        self.solver = SOLVER_CLASS()
 
         self.bvar = boolvar(shape=3)
         self.x, self.y, self.z = self.bvar
 
-        ivar = intvar(1,10, shape=2)
+        ivar = intvar(1, 10, shape=2)
         self.i, self.j = ivar
 
     def test_empty_constructor(self):
@@ -31,8 +32,8 @@ class TestInterface(unittest.TestCase):
 
     def test_constructor(self):
 
-        model = Model([self.x & self.y])
-        solver = TestInterface.solver_class(model)
+        m = Model([self.x & self.y])
+        solver = SOLVER_CLASS(m)
 
         self.assertIsNotNone(solver.status())
         self.assertEqual(solver.status().exitstatus, ExitStatus.NOT_RUN)
@@ -45,15 +46,14 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(1, len(self.solver.user_vars))
         self.assertEqual(1, len(self.solver._varmap))
 
-
     def test_add_constraint(self):
 
         self.solver += [self.x & self.y]
         self.assertEqual(2, len(self.solver.user_vars))
 
         self.solver += [sum(self.bvar) >= 2]
-        self.assertEqual(3,len(self.solver.user_vars))
-        self.assertGreaterEqual(3, len(self.solver._varmap)) # Possible that solver requires extra intermediate vars
+        self.assertEqual(3, len(self.solver.user_vars))
+        self.assertGreaterEqual(3, len(self.solver._varmap))  # Possible that solver requires extra intermediate vars
 
     def test_solve(self):
 
@@ -63,14 +63,14 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(self.solver.solve())
         self.assertEqual(ExitStatus.FEASIBLE, self.solver.status().exitstatus)
 
-        self.assertListEqual([0,1,0], [self.x.value(), self.y.value(), self.z.value()])
+        self.assertListEqual([0, 1, 0], [self.x.value(), self.y.value(), self.z.value()])
 
     def test_objective(self):
 
         try:
             self.solver.minimize(self.i)
         except NotImplementedError:
-            #TODO: assert false or just ignore and return?
+            # TODO: assert false or just ignore and return?
             return
 
         self.assertFalse(hasattr(self.solver, "objective_value_"))
@@ -78,10 +78,9 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(1, self.solver.objective_value())
         self.assertEqual(ExitStatus.OPTIMAL, self.solver.status().exitstatus)
 
-
-#########################
-#    Test operators     #
-#########################
+    #########################
+    #    Test operators     #
+    #########################
 
     def check_xy(self):
         self.assertIn(self.x, self.solver.user_vars)
@@ -106,48 +105,40 @@ class TestInterface(unittest.TestCase):
         self.solver += self.x < self.y
         self.check_xy()
 
-
     def test_leq(self):
 
         self.solver += self.x <= self.y
         self.check_xy()
-
 
     def test_gt(self):
 
         self.solver += self.x > self.y
         self.check_xy()
 
-
     def test_geq(self):
 
         self.solver += self.x >= self.y
         self.check_xy()
-
 
     def test_and(self):
 
         self.solver += self.x & self.y
         self.check_xy()
 
-
     def test_or(self):
 
         self.solver += self.x | self.y
         self.check_xy()
-
 
     def test_xor(self):
 
         self.solver += self.x ^ self.y
         self.check_xy()
 
-
     def test_impl(self):
 
         self.solver += self.x.implies(self.y)
         self.check_xy()
-
 
     # Test non-boolean operators, checked by directly posting constraints
     def check_ij(self):
@@ -195,49 +186,3 @@ class TestInterface(unittest.TestCase):
 
         self.solver += abs(self.i) == 0
         self.assertIn(self.i, self.solver.user_vars)
-
-
-class AdvancedInterfaceTest(unittest.TestCase):
-
-    solver_class = CPM_gurobi
-
-    def make_and_add(self, constr, solve=True):
-        solver = self.solver_class(Model(constr))
-        if solve:
-            solver.solve()
-
-    def test_base_constraints(self):
-        # Int variables
-        i,j,k = [intvar(0,3, name=n) for n in "ijk"]
-        x,y,z = [boolvar(name=n) for n in "xyz"]
-
-        operators = Operator.allowed
-        comparisons = Comparison.allowed
-
-        const = 1
-        # Test all possible outcomes of flatten_constraint
-        eval_map = {"and": "&", "or":"|", "xor":"^"}
-
-
-        # Base constraints
-        for name, (card, is_bool) in operators.items():
-            if not is_bool:
-                continue
-            string = "True"
-            infix = eval_map[name]
-            if card == 1:
-                self.make_and_add(Operator(name, x))
-                string = f"{infix}({x.value()})"
-
-            if card == 2:
-                self.make_and_add(Operator(name, [x,y]))
-                string = f"{x.value()} {infix} {y.value()}"
-
-            elif card == 0: # Unlimited nuber of args, try 3
-                self.make_and_add(Operator(name, [x,y,z]))
-                string = f"{x.value()} {infix} {y.value()} {infix} {z.value()}"
-
-            print(string)
-            self.assertTrue(eval(string))
-
-
