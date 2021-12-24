@@ -383,8 +383,6 @@ class Operator(Expression):
                 i += 1
 
         super().__init__(name, arg_list)
-        self.lb, self.ub = self._lb(), self._ub()
-
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -442,78 +440,6 @@ class Operator(Expression):
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
         
         return None # default
-
-    def _lb(self):
-        """
-            Recursively Computes the lower bound of the value the expression can take based on bounds
-        """
-        if self.is_bool():
-            return 0
-
-        # arity 0
-        if self.name == "sum":
-            return sum(arg if is_num(arg) else arg.lb for arg in self.args)
-        if self.name == "wsum":
-            return sum(x * (arg if is_num(arg) else (arg.lb if x > 0 else arg.ub)) for x, arg in zip(self.args[0], self.args[1]))
-        if self.name == "mul":
-            return np.prod([arg if is_num(arg) else arg.lb for arg in self.args])
-
-        # arity 1
-        if self.name == "-":
-            return -self.args[0].ub
-        if self.name == "abs":
-            arg = self.args[0]
-            return arg if is_num(arg) else min(abs(arg.lb), abs(arg.ub))
-
-        # arity 2
-        lhs, rhs = self.args
-        lub, rub = map(lambda x: x if is_num(x) else x.ub, (lhs, rhs))
-        llb, rlb = map(lambda x: x if is_num(x) else x.lb, (lhs, rhs))
-        if self.name == "sub":
-            return llb - rub
-        if self.name == "div":
-            return min([llb / rub, lub / rub, llb / rlb, lub / rlb])  # Account for negative values
-        if self.name == "mod":
-            return 0
-        if self.name == "pow":
-            return llb ** rlb
-
-    def _ub(self):
-        """
-            Recursively Computes the upper bound of the value the expression can take based on bounds
-        """
-        if self.is_bool():
-            return 1
-
-        # arity 0
-        if self.name == "sum":
-            return sum(arg if is_num(arg) else arg.ub for arg in self.args)
-        if self.name == "wsum":
-            return sum(x * (arg if is_num(arg) else (arg.ub if x > 0 else arg.lb)) for x, arg in zip(self.args[0], self.args[1]))
-        if self.name == "mul":
-            return np.prod([arg if is_num(arg) else arg.ub for arg in self.args])
-
-        # arity 1
-        if self.name == "-":
-            return -self.args[0].lb
-        if self.name == "abs":
-            arg = self.args[0]
-            return arg if is_num(arg) else max(abs(arg.lb), abs(arg.ub))
-
-        # arity 2
-        lhs, rhs = self.args
-        lub, rub = map(lambda x : x if is_num(x) else x.ub, (lhs,rhs))
-        llb, rlb = map(lambda x : x if is_num(x) else x.lb, (lhs, rhs))
-        if self.name == "sub":
-            return lub - rlb
-        if self.name == "div":
-            return max([llb / rub, lub / rub, llb / rlb, lub / rlb])  # Account for negative values
-        if self.name == "mod":
-            return rub - 1
-        if self.name == "pow":
-            return lub ** rub
-
-
 
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum """
