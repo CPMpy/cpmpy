@@ -336,7 +336,7 @@ class CPM_ortools(SolverInterface):
             here regroup the implementation per CPMpy class
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
-            e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.ort_var(bvar))
+            e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
             
             - reifiable: ensures only constraints that support reification are returned
         """
@@ -400,7 +400,7 @@ class CPM_ortools(SolverInterface):
                         if lhs.name == 'abs':
                             return self.ort_model.AddAbsEquality(rvar, self.solver_var(lhs.args[0]))
                         elif lhs.name == 'mul':
-                            return self.ort_model.AddMultiplicationEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMultiplicationEquality(rvar, self.solver_vars(lhs.args))
                         elif lhs.name == 'mod':
                             # catch tricky-to-find ortools limitation
                             divisor = lhs.args[1]
@@ -408,7 +408,7 @@ class CPM_ortools(SolverInterface):
                                 if divisor.lb <= 0 and divisor.ub >= 0:
                                     raise Exception(
                                         f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                            return self.ort_model.AddModuloEquality(rvar, *self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddModuloEquality(rvar, *self.solver_vars(lhs.args))
                         elif lhs.name == 'pow':
                             # translate to multiplications
                             x = self.solver_var(lhs.args[0])
@@ -422,15 +422,15 @@ class CPM_ortools(SolverInterface):
                             # mul([x,x,x,...]) with 'y' elements
                             return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
                         elif lhs.name == 'div':
-                            return self.ort_model.AddDivisionEquality(rvar, *self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddDivisionEquality(rvar, *self.solver_vars(lhs.args))
                         elif lhs.name == 'min':
-                            return self.ort_model.AddMinEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
                         elif lhs.name == 'max':
-                            return self.ort_model.AddMaxEquality(rvar, self.ort_var_or_list(lhs.args))
+                            return self.ort_model.AddMaxEquality(rvar, self.solver_vars(lhs.args))
                         elif lhs.name == 'element':
                             # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
                             return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                             self.ort_var_or_list(lhs.args[0]), rvar)
+                                                             self.solver_vars(lhs.args[0]), rvar)
                         else:
                             raise NotImplementedError(
                                 "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
@@ -459,7 +459,7 @@ class CPM_ortools(SolverInterface):
 
         # rest: base (Boolean) global constraints
         else:
-            args = [self.ort_var_or_list(v) for v in cpm_expr.args]
+            args = [self.solver_vars(v) for v in cpm_expr.args]
 
             if cpm_expr.name == 'alldifferent':
                 return self.ort_model.AddAllDifferent(args)
@@ -486,19 +486,6 @@ class CPM_ortools(SolverInterface):
                     return None  # will throw error if used in reification...
                 else:
                     raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
-
-    def ort_var_or_list(self, cpm_expr):
-        """
-            like ort_var() but also works on lists of variables
-
-            Typically only needed for internal use
-
-            TODO, replace by solver_vars() in superclass?
-        """
-        if is_any_list(cpm_expr):
-            return [self.ort_var_or_list(sub) for sub in cpm_expr]
-        return self.solver_var(cpm_expr)
 
 
     def solution_hint(self, cpm_vars, vals):

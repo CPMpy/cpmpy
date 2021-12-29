@@ -21,6 +21,7 @@
 
 """
 from ..expressions.core import Expression
+from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
 #
 #==============================================================================
@@ -149,9 +150,11 @@ class SolverInterface(object):
 
     def solver_vars(self, cpm_vars):
         """
-           Like `solver_var()` but for a list of variables
+           Like `solver_var()` but for arbitrary shaped lists/tensors
         """
-        return [self.solver_var(v) for v in cpm_vars]
+        if is_any_list(cpm_vars):
+            return [self.solver_vars(v) for v in cpm_vars]
+        return self.solver_var(cpm_vars)
 
     def _post_constraint(self, cpm_expr):
         """
