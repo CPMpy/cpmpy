@@ -338,7 +338,7 @@ class CPM_ortools(SolverInterface):
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
             
-            - reifiable: ensures only constraints that support reification are returned
+            - reifiable: if True, will throw an error if cpm_expr can not be reified
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -346,34 +346,37 @@ class CPM_ortools(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == '->' and \
-                    isinstance(cpm_expr.args[0], _BoolVarImpl) and \
-                    not isinstance(cpm_expr.args[1], _BoolVarImpl):
-                # var -> boolexpr, natively supported by or-tools
-                bvar = self.solver_var(cpm_expr.args[0])
-                # Special case for 'xor', which is not natively reifiable in ortools
-                if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
-                    if len(cpm_expr.args) == 2:
-                        return self._post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(bvar)
-                    else:
-                        raise NotImplementedError("ORT: reified n-ary XOR not yet supported, make an issue on github if you need it")
-                return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(bvar)
-
-            else:
-                # base 'and'/n, 'or'/n, 'xor'/n, '->'/2
-                args = [self.solver_var(v) for v in cpm_expr.args]
-
-                if cpm_expr.name == 'and':
-                    return self.ort_model.AddBoolAnd(args)
-                elif cpm_expr.name == 'or':
-                    return self.ort_model.AddBoolOr(args)
-                elif cpm_expr.name == 'xor':
-                    return self.ort_model.AddBoolXOr(args)
-                elif cpm_expr.name == '->':
-                    return self.ort_model.AddImplication(args[0], args[1])
+            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            if cpm_expr.name == 'and':
+                return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'or':
+                return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'xor':
+                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == '->':
+                assert(isinstance(cpm_expr.args[0], _BoolVarImpl)) # lhs must be boolvar
+                lhs = self.solver_var(cpm_expr.args[0])
+                if isinstance(cpm_expr.args[1], _BoolVarImpl):
+                    # bv -> bv
+                    return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr.args[1]))
                 else:
-                    raise NotImplementedError(
-                        "Not a know supported ORTools Operator '{}' {}".format(cpm_expr.name, cpm_expr))
+                    # bv -> boolexpr, natively supported by or-tools
+                    # actually, only supported for and, or, and linear expression (not xor nor any global)
+                    # XXX should we check/assert that here??
+                    # TODO: and if rhs is a global, first decompose it and reify that??
+                    assert(cpm_expr.args[1].is_bool())
+                    # Special case for 'xor', which is not natively reifiable in ortools
+                    # TODO: make xor a global constraint (so it can be decomposed generally) and get rid of this special case here
+                    if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
+                        if len(cpm_expr.args) == 2:
+                            return self._post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(lhs)
+                        else:
+                            raise NotImplementedError("ORT: reified n-ary XOR not yet supported, make an issue on github if you need it")
+                    return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
+            else:
+                raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
+                        cpm_expr.name, cpm_expr))
+
 
         # Comparisons: including base (vars), numeric comparison and reify/imply comparison
         elif isinstance(cpm_expr, Comparison):
