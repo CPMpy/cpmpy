@@ -124,7 +124,8 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(x[1].value(), 2)
 
 
-
+        # TODO: these tests our outdated, there are more
+        # direct ways of setting params/sol enum now
         # advanced solver params
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
@@ -150,8 +151,7 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
-        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
-        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        cpm_status = s.solve(solution_callback=cb)
         self.assertGreater(x[0], x[1])
         self.assertEqual(cb.solcount, 6)
 
@@ -178,8 +178,7 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([x[0] > x[1]])
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
-        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
-        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        cpm_status = s.solve(solution_callback=cb)
         self.assertGreater(x[0], x[1])
         self.assertEqual(cb.solcount, 6)
 
@@ -187,8 +186,7 @@ class TestSolvers(unittest.TestCase):
         # intermediate solutions
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
-        ort_status = s.ort_solver.Solve(s.ort_model, solution_callback=cb)
-        self.assertTrue(s._after_solve(ort_status)) # post-process after solve() call...
+        cpm_status = s.solve(solution_callback=cb)
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])

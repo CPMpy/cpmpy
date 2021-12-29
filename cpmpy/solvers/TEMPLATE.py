@@ -126,7 +126,20 @@ class CPM_template(SolverInterface):
                 #cpm_var._value = self.TEMPLATEpy.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
+        # translate objective, for optimisation problems only
+        self.objective_value_ = None
+        if self.TEMPLATE_solver.HasObjective():
+            self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+
         return has_sol
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return self.objective_value_
 
 
     def solver_var(self, cpm_var):
@@ -142,17 +155,16 @@ class CPM_template(SolverInterface):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
         # create if it does not exit
-        if not cpm_var in self.varmap:
+        if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self.varmap[cpm_var] = revar
+            self._varmap[cpm_var] = revar
 
-        # return from cache
-        return self.varmap[cpm_var]
+        return self._varmap[cpm_var]
 
 
     # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
@@ -201,7 +213,7 @@ class CPM_template(SolverInterface):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.solver_var(cpm_expr)
 
         # if the solver only supports a decision variable as argument to its minimize/maximize then
@@ -216,6 +228,10 @@ class CPM_template(SolverInterface):
         #    args = self.solver_vars(cpm_expr.args) # TODO: soon
         #    if cpm_expr.name == 'sum':
         #        return sum(args) # if TEMPLATEpy supports this
+        #    elif cpm_expr.name == 'wsum':
+        #        w = cpm_expr.args[0]
+        #        x = [self.solver_var(v) for v in cpm_expr.args[1]]
+        #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
 
         raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
 
