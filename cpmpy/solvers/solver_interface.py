@@ -147,6 +147,12 @@ class SolverInterface(object):
         """
         return None
 
+    def solver_vars(self, cpm_vars):
+        """
+           Like `solver_var()` but for a list of variables
+        """
+        return [self.solver_var(v) for v in cpm_vars]
+
     def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
