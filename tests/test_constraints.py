@@ -6,37 +6,37 @@ import pytest
 
 SOLVER_CLASS = CPM_gurobi
 
-def test_base_constraints(self):
+def test_base_constraints():
     # Bool variables
     x, y, z = [boolvar(name=n) for n in "xyz"]
 
     # Test var
     SOLVER_CLASS(Model(x)).solve()
-    self.assertTrue(x.value())
+    assert x.value()
 
     # Test and
     SOLVER_CLASS(Model(Operator("and", [x, y, z]))).solve()
-    self.assertTrue(x.value() & y.value() & z.value())
+    assert (x.value() & y.value() & z.value())
 
     # Test or
     SOLVER_CLASS(Model(Operator("or", [x, y, z]))).solve()
-    self.assertTrue(x.value() | y.value() | z.value())
+    assert (x.value() | y.value() | z.value())
 
     # Test xor
     SOLVER_CLASS(Model(Operator("xor", [x, y, z]))).solve()
-    self.assertTrue(x.value() ^ y.value() ^ z.value())
+    assert (x.value() ^ y.value() ^ z.value())
 
     # Test implies
     SOLVER_CLASS(Model(x.implies(y))).solve()
-    self.assertTrue(~x.value() | y.value())
+    assert (~x.value() | y.value())
 
     # Test eq
-    SOLVER_CLASS(x == y)
-    self.assertTrue(x.value() == y.value())
+    SOLVER_CLASS(Model(x == y)).solve()
+    assert (x.value() == y.value())
 
     # Test neq
-    SOLVER_CLASS(x != y)
-    self.assertTrue(x.value() != y.value())
+    SOLVER_CLASS(Model(x != y)).solve()
+    assert (x.value() != y.value())
 
 
 @pytest.mark.parametrize("cname", Comparison.allowed)
@@ -76,12 +76,15 @@ def test_operator_comp_constraints(o_name, c_name):
 
     elif o_name == "wsum":
         args = [[1, 2, 3], [i, j, k]]
-        SOLVER_CLASS(Model(Comparison(c_name, Operator(o_name, args), l))).solve()
+        constraint = Comparison(c_name, Operator(o_name, args), l)
+        SOLVER_CLASS(Model(constraint)).solve()
         string = f"{sum([a * b.value() for a, b in zip(args[0], args[1])])} {c_name} {l.value()}"
 
     else:
         args = [i, j] if arity == 2 else [i, j, k]
-        SOLVER_CLASS(Model(Comparison(c_name, Operator(o_name, args), l))).solve()
+        constraint = Comparison(c_name, Operator(o_name, args), l)
+        print(constraint)
+        SOLVER_CLASS(Model(constraint)).solve()
         if infix:
             string = Operator.printmap[o_name].join([str(a.value()) for a in args]) + f" {c_name} {l.value()}"
         else:
