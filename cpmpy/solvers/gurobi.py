@@ -28,12 +28,10 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import no_global_constraints, linearize_constraint
+from ..transformations.linearize import linearize_constraint
 
 
 class CPM_gurobi(SolverInterface):
@@ -66,7 +64,6 @@ class CPM_gurobi(SolverInterface):
         except ImportError as e:
             return False
 
-
     def __init__(self, cpm_model=None, solver=None, name="gurobi"):
         """
         Constructor of the native solver object
@@ -75,7 +72,8 @@ class CPM_gurobi(SolverInterface):
         - cpm_model: a CPMpy Model()
         """
         if not self.supported():
-            raise Exception("CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+            raise Exception(
+                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
         # initialise the native solver object
@@ -145,7 +143,6 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gbi_model.runtime
 
-
         # translate exit status
         if my_status == GRB.OPTIMAL and self._objective_value is None:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -154,7 +151,8 @@ class CPM_gurobi(SolverInterface):
         elif my_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         else:  # another?
-            raise NotImplementedError(f"Translation of gurobi status {my_status} to CPMpy status not implemented") # a new status type was introduced, please report on github
+            raise NotImplementedError(
+                f"Translation of gurobi status {my_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -170,7 +168,6 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
 
         return has_sol
-
 
     def solver_var(self, cpm_var):
         """
@@ -202,7 +199,6 @@ class CPM_gurobi(SolverInterface):
         # return from cache
         return self._varmap[cpm_var]
 
-
     # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
     def minimize(self, expr):
         """
@@ -213,13 +209,15 @@ class CPM_gurobi(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
         """
+        from gurobipy import GRB
+
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
+        (flat_obj, flat_cons) = (flatten_objective(expr))
+        self += linearize_constraint(flat_cons)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        TEMPLATEpy.Minimize(obj)
+        self.gbi_model.setObjective(obj, sense=GRB.MINIMIZE)
 
     def maximize(self, expr):
         """
@@ -230,13 +228,15 @@ class CPM_gurobi(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
         """
+        from gurobipy import GRB
+
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
+        (flat_obj, flat_cons) = (flatten_objective(expr))
+        self += linearize_constraint(flat_cons)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        TEMPLATEpy.Maximize(obj)
+        self.gbi_model.setObjective(obj, sense=GRB.MAXIMIZE)
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -245,28 +245,25 @@ class CPM_gurobi(SolverInterface):
 
             Used especially to post an expression as objective function
         """
+        import gurobipy as gp
+
         if is_num(cpm_expr):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.solver_var(cpm_expr)
 
-        # if the solver only supports a decision variable as argument to its minimize/maximize then
-        # well, smth generic like
-        #(obj_var, obj_cons) = get_or_make_var(cpm_expr)
-        #self += obj_cons
-        #return self.solver_var(obj_var)
+        # sum
+        if cpm_expr.name == "sum":
+            return gp.quicksum([self.solver_var(var) for var in cpm_expr.args])
 
-        # else if the solver support e.g. a linear expression as objective, built it here
-        # something like
-        #if isinstance(cpm_expr, Operator):
-        #    args = self.solver_vars(cpm_expr.args) # TODO: soon
-        #    if cpm_expr.name == 'sum':
-        #        return sum(args) # if TEMPLATEpy supports this
+        if cpm_expr.name == "wsum":
+            weights, cpm_vars = cpm_expr.args
+            gbi_vars = [self.solver_var(var) for var in cpm_vars]
+            return gp.LinExpr(weights, gbi_vars)
 
-        raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
-
+        raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
     def _post_constraint(self, cpm_expr):
         """
@@ -277,24 +274,23 @@ class CPM_gurobi(SolverInterface):
 
             Solvers do not need to support all constraints.
         """
-        from gurobipy import GRB
         import gurobipy as gp
 
-        #Base case
+        # Base case
         if isinstance(cpm_expr, _BoolVarImpl):
             self.gbi_model.addConstr(self.solver_var(cpm_expr) >= 1)
 
 
-        #Comparisons
+        # Comparisons
         elif isinstance(cpm_expr, Comparison):
             # Native mapping to gurobi API
             lhs, rhs = cpm_expr.args
             sense = cpm_expr.name[0]
             if isinstance(lhs, Operator):
                 if lhs.name == "wsum":
-                    weights = lhs.args[0]
-                    vars = [self.solver_var(var) for var in lhs.args[1]]
-                    self.gbi_model.addLConstr(gp.LinExpr(weights, vars), sense, self.solver_var(rhs))
+                    weights, cpm_vars = lhs.args
+                    gbi_vars = [self.solver_var(var) for var in cpm_vars]
+                    self.gbi_model.addLConstr(gp.LinExpr(weights, gbi_vars), sense, self.solver_var(rhs))
                     return
 
                 lvars = [self.solver_var(var) for var in lhs.args]
@@ -303,10 +299,15 @@ class CPM_gurobi(SolverInterface):
                 elif lhs.name == "sub":
                     self.gbi_model.addLConstr(lvars[0] - lvars[1], sense, self.solver_var(rhs))
                 elif lhs.name == "mul":
-                    raise NotImplementedError("Multiplications not yet implemented") # TODO
+                    if len(cpm_expr.args) == 2:
+                        lhs, rhs = cpm_expr.args
+                        self.gbi_model.addQConstr(lhs * rhs, sense, self.solver_var(rhs))
+                    else:
+                        raise NotImplementedError("Non-binary multiplications not yet implemented")  # TODO
                 elif lhs.name == "div":
                     if isinstance(lhs.args[1], _NumVarImpl):
-                        raise NotImplementedError("Gurobi does not support division by an variable. If you need this, please report on github.")
+                        raise NotImplementedError(
+                            "Gurobi does not support division by an variable. If you need this, please report on github.")
                     self.gbi_model.addLConstr(lvars[0] / lvars[1], sense, self.solver_var(rhs))
                 else:
                     raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi")
