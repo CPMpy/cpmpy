@@ -6,8 +6,9 @@
     The functions are ordered in a way that could be convenient to 
     start from the top and continue in that order
 
-    TODO: smth about testing as you progress...
-    TODO: I guess we should add a __main__ that runs some tests?
+    WARNING: do not include the python package at the top of the file,
+    as CPMpy should also work without this solver installed.
+    To ensure that, include it inside supported() and other functions that need it...
 """
 """
     Interface to TEMPLATE's API
@@ -27,7 +28,7 @@
         CPM_template
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables
@@ -42,12 +43,8 @@ class CPM_template(SolverInterface):
     See detailed installation instructions at:
     <URL to detailed solver installation instructions, if any>
 
-    Creates the following attributes:
-    user_vars: set(), variables in the original (non-transformed) model,
-                    for reverse mapping the values after `solve()`
-    cpm_status: SolverStatus(), the CPMpy status after a `solve()`
+    Creates the following attributes (see parent constructor for more):
     tpl_model: object, TEMPLATE's model object
-    _varmap: dict(), maps cpmpy variables to native solver variables
     """
 
     @staticmethod
@@ -60,24 +57,26 @@ class CPM_template(SolverInterface):
             return False
 
 
-    def __init__(self, cpm_model=None, solver=None, name="TEMPLATE"):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
             raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy'")
 
-        self.name = "TEMPLATE" # solver's name
+        import TEMPLATEpy
+
+        assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
         self.tpl_model = TEMPLATEpy.Model("cpmpy")
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
-        super().__init__(cpm_model, solver, name)
+        super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
     def solve(self, time_limit=None, **kwargs):
@@ -112,13 +111,13 @@ class CPM_template(SolverInterface):
         elif my_status is None:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else: # another?
-            raise NotImplementedError(my_status) # a new status type was introduced, please report on github
+        else:  # another?
+            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
         # True/False depending on self.cpm_status
-        has_sol = self._solve_return()
+        has_sol = self._solve_return(self.cpm_status)
 
-        # translate solution values (of user vars only)
+        # translate solution values (of user specified variables only)
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -127,7 +126,20 @@ class CPM_template(SolverInterface):
                 #cpm_var._value = self.TEMPLATEpy.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
+        # translate objective, for optimisation problems only
+        self.objective_value_ = None
+        if self.TEMPLATE_solver.HasObjective():
+            self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+
         return has_sol
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the latste solver run on this model
+
+        :return: an integer or 'None' if it is not run, or a satisfaction problem
+        """
+        return self.objective_value_
 
 
     def solver_var(self, cpm_var):
@@ -135,9 +147,7 @@ class CPM_template(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-
-        if is_num(cpm_var):
-            return cpm_var
+        # TODO: add `solver_vars(self, cpm_vars)` to SolverInterface class
 
         # special case, negative-bool-view
         # work directly on var inside the view
@@ -145,17 +155,16 @@ class CPM_template(SolverInterface):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
         # create if it does not exit
-        if not cpm_var in self._varmap:
+        if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self.varmap[cpm_var] = revar
+            self._varmap[cpm_var] = revar
 
-        # return from cache
-        return self.varmap[cpm_var]
+        return self._varmap[cpm_var]
 
 
     # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
@@ -204,7 +213,7 @@ class CPM_template(SolverInterface):
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl): # _BoolVarImpl is subclass of _NumVarImpl
+        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.solver_var(cpm_expr)
 
         # if the solver only supports a decision variable as argument to its minimize/maximize then
@@ -219,6 +228,10 @@ class CPM_template(SolverInterface):
         #    args = self.solver_vars(cpm_expr.args) # TODO: soon
         #    if cpm_expr.name == 'sum':
         #        return sum(args) # if TEMPLATEpy supports this
+        #    elif cpm_expr.name == 'wsum':
+        #        w = cpm_expr.args[0]
+        #        x = [self.solver_var(v) for v in cpm_expr.args[1]]
+        #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
 
         raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -235,7 +248,7 @@ class CPM_template(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(set(get_variables(cpm_con)))
+        self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
@@ -261,3 +274,6 @@ class CPM_template(SolverInterface):
             self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
         else:
             raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+
+    # Other functions from SolverInterface that you can overwrite:
+    # solveAll, solution_hint, get_core

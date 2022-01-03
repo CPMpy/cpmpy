@@ -21,6 +21,7 @@
 
 """
 from ..expressions.core import Expression
+from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
 #
 #==============================================================================
@@ -50,15 +51,23 @@ class SolverInterface(object):
         """
         return False
 
-    # REQUIRED functions to mimic `Model` interface:
-
-    def __init__(self, cpm_model=None, solver=None, name="dummy"):
+    def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
             Initalize solver interface
 
-            - cpm_model: CPMpy Model() object: ignored in this superclass
-            - solver: string: ignored in this superclass
+            - name: str: name of this solver
+            - subsolver: string: not used/allowed here
+            - cpm_model: CPMpy Model() object, optional: will post its constraints/objective
+
+            Creates the following attributes:
+            - name: str, name of the solver
+            - cpm_status: SolverStatus(), the CPMpy status after a `solve()`
+            - user_vars: set(), variables in the original (non-transformed) model,
+                           for reverse mapping the values after `solve()`
+            - _varmap: dict(), maps cpmpy variables to native solver variables
         """
+        assert(subsolver is None)
+
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
 
@@ -77,6 +86,8 @@ class SolverInterface(object):
                     self.maximize(cpm_model.objective)
                 else:
                     self.minimize(cpm_model.objective)
+
+    # REQUIRED functions to mimic `Model` interface:
 
     def __add__(self, cpm_cons):
         """
@@ -137,6 +148,14 @@ class SolverInterface(object):
         """
         return None
 
+    def solver_vars(self, cpm_vars):
+        """
+           Like `solver_var()` but for arbitrary shaped lists/tensors
+        """
+        if is_any_list(cpm_vars):
+            return [self.solver_vars(v) for v in cpm_vars]
+        return self.solver_var(cpm_vars)
+
     def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
@@ -170,7 +189,7 @@ class SolverInterface(object):
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
             # display if needed
-            if display:
+            if display is not None:
                 if isinstance(display, Expression):
                     print(display.value())
                 elif isinstance(display, list):
