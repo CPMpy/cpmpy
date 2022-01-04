@@ -8,7 +8,8 @@ from ..expressions.core import Comparison
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
 from ..expressions.utils import is_any_list
 from ..expressions.variables import _BoolVarImpl, boolvar
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+
 
 def linearize_constraint(cpm_expr):
 
@@ -19,8 +20,7 @@ def linearize_constraint(cpm_expr):
     if cpm_expr.name == "and":
         if all(arg.is_bool() for arg in cpm_expr.args):
             return [sum(cpm_expr.args) == len(cpm_expr.args)]
-        else:
-            raise Exception("Numeric constants or numeric variables not allowed as base constraint")
+        raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     if cpm_expr.name == "or":
         if all(arg.is_bool() for arg in cpm_expr.args):
@@ -35,15 +35,30 @@ def linearize_constraint(cpm_expr):
     #Binary operators
     if cpm_expr.name == "<":
         lhs, rhs = cpm_expr.args
-        return [lhs + 1 <= rhs]
+        rhs_minus_1, cons = get_or_make_var(rhs - 1)
+        return cons + [lhs <= rhs_minus_1]
 
     if cpm_expr.name == ">":
         lhs, rhs = cpm_expr.args
-        return [rhs + 1 <= lhs]
+        rhs_plus_1, cons = get_or_make_var(rhs + 1)
+        return cons + [lhs >= rhs_plus_1]
 
     if cpm_expr.name == "!=":
-        # TODO implement this --> Ignace
-        raise NotImplementedError("!= is not implemented yet: TODO")
+        lhs, rhs = cpm_expr.args
+        if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
+            return [lhs + rhs == 1]
+        M = 1e20 # Arbitrary VERY large number
+        z = boolvar()
+
+        rhs_plus_1, cons_plus = get_or_make_var(rhs + 1)
+        rhs_minus_1, cons_minus = get_or_make_var(rhs - 1)
+
+        c1 = M * z + lhs >= rhs_plus_1
+        c2 = -M(1-z) + lhs <= rhs_minus_1
+        return [M * z + lhs >= y]
+
+        # TODO fix this, very ugly and inefficient
+        return flatten_constraint(linearize_constraint(lhs + 1 <= rhs or lhs >= 1 + rhs))
 
     if cpm_expr.name == "->":
         lhs, rhs = cpm_expr.args
@@ -79,7 +94,7 @@ def linearize_constraint(cpm_expr):
         constraints += [sum(col) <= 1 for col in sigma.T] # All diff values
 
         for arg, row in zip(cpm_expr.args, sigma):
-            constraints += [arg == sum(np.arange(lb, ub+1) * row)]
+            constraints += [sum(np.arange(lb, ub+1) * row) == arg]
 
         return constraints
 

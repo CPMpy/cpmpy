@@ -1,10 +1,11 @@
 from cpmpy import boolvar, intvar, Model
 from cpmpy.expressions.core import Comparison, Operator
-from cpmpy.solvers import CPM_gurobi
+from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc
 
 import pytest
 
 SOLVER_CLASS = CPM_gurobi
+
 
 def test_base_constraints():
     # Bool variables
@@ -59,35 +60,51 @@ def test_operator_comp_constraints(o_name, c_name):
     """
 
     # Integer variables
-    i, j, k, l = [intvar(0, 3, name=n) for n in "ijkl"]
+    i, j, k, l = [intvar(-3, 3, name=n) for n in "ijkl"]
 
-    is_bool, arity = Operator.allowed[o_name]
+    arity, is_bool = Operator.allowed[o_name]
     if is_bool:
         return
 
-    infix = o_name in Operator.printmap
+    eval_map = {key: val for key, val in Operator.printmap.items()}
+    eval_map.update({"mod": "%"})
+    infix = o_name in eval_map
 
-    if arity == 1:
-        SOLVER_CLASS(Model(Comparison(c_name, Operator(o_name, i), l))).solve()
-        if infix:
-            string = f"{Operator.printmap[o_name]} {i.value()} {c_name} {l.value()}"
-        else:
-            string = f"{o_name}({i.value()}) {c_name} {l.value()}"
 
-    elif o_name == "wsum":
+    if o_name == "wsum":
         args = [[1, 2, 3], [i, j, k]]
         constraint = Comparison(c_name, Operator(o_name, args), l)
         SOLVER_CLASS(Model(constraint)).solve()
         string = f"{sum([a * b.value() for a, b in zip(args[0], args[1])])} {c_name} {l.value()}"
 
-    else:
-        args = [i, j] if arity == 2 else [i, j, k]
+    elif o_name == "->":
+        args = [i, j]
         constraint = Comparison(c_name, Operator(o_name, args), l)
-        print(constraint)
+        SOLVER_CLASS(Model(constraint)).solve()
+        string = f"not {i.value()} or {j.value()} {c_name} {l.value()}"
+
+    elif arity == 1:
+        constraint = Comparison(c_name, Operator(o_name, [i]), l)
+        SOLVER_CLASS(Model(constraint)).solve()
+        string = f"{o_name}({i.value()}) {c_name} {l.value()}"
+
+    elif arity == 2:
+        args = [i, j]
+        constraint = Comparison(c_name, Operator(o_name, args), l)
         SOLVER_CLASS(Model(constraint)).solve()
         if infix:
-            string = Operator.printmap[o_name].join([str(a.value()) for a in args]) + f" {c_name} {l.value()}"
+            string = f"({args[0]} {eval_map[o_name]} {args[1]}) {c_name} {l.value()}"
+        else:
+            string = f"{o_name}({args[0]},{args[1]}) {c_name} {l.value()}"
+
+    else:
+        args = [i, j, k]
+        constraint = Comparison(c_name, Operator(o_name, args), l)
+        SOLVER_CLASS(Model(constraint)).solve()
+        if infix:
+            string = eval_map[o_name].join([str(a.value()) for a in args]) + f" {c_name} {l.value()}"
         else:
             string = f"{o_name}({[a.value() for a in args]}) {c_name} {l.value()}"
 
+    print(string)
     assert eval(string)

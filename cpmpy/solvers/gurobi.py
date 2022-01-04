@@ -28,7 +28,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint
@@ -289,40 +289,44 @@ class CPM_gurobi(SolverInterface):
             sense = cpm_expr.name[0]
 
             if isinstance(lhs, Operator):
-                gbi_vars = [self.solver_var(var) for var in lhs.args]
-
-                if cpm_expr.name == "==" and lhs.name in gen_constraints:
-                    if lhs.name == "and":
-                        self.gbi_model.addGenConstrAnd(self.solver_var(rhs), gbi_vars)
-                    if lhs.name == "or":
-                        self.gbi_model.addGenConstrOr(self.solver_var(rhs), gbi_vars)
-                    if lhs.name == "abs":
-                        self.gbi_model.addGenConstrAbs(self.solver_var(rhs), gbi_vars[0])
-                    if lhs.name == "pow":
-                        self.gbi_model.addGenConstrPow(self.solve(rhs), gbi_vars[0])
-
-                elif lhs.name == "wsum":
+                if lhs.name == "wsum":
                     weights, cpm_vars = lhs.args
                     gbi_vars = [self.solver_var(var) for var in cpm_vars]
                     self.gbi_model.addLConstr(gp.LinExpr(weights, gbi_vars), sense, self.solver_var(rhs))
+                    return
+
+                gbi_vars = [self.solver_var(var) for var in lhs.args]
+                resvar = self.solver_var(rhs)
+                if cpm_expr.name == "==" and lhs.name in gen_constraints:
+                    if lhs.name == "and":
+                        self.gbi_model.addGenConstrAnd(resvar, gbi_vars)
+                    if lhs.name == "or":
+                        self.gbi_model.addGenConstrOr(resvar, gbi_vars)
+                    if lhs.name == "abs":
+                        if isinstance(resvar, int):
+                            resvar = self.solver_var(intvar(resvar, resvar))
+                        self.gbi_model.addGenConstrAbs(resvar, gbi_vars[0])
+                    if lhs.name == "pow":
+                        self.gbi_model.addGenConstrPow(self.solve(rhs), gbi_vars[0])
+
 
                 elif lhs.name == "sum":
                     self.gbi_model.addLConstr(gp.quicksum(gbi_vars), sense, self.solver_var(rhs))
                 elif lhs.name == "sub":
                     self.gbi_model.addLConstr(gbi_vars[0] - gbi_vars[1], sense, self.solver_var(rhs))
                 elif lhs.name == "mul":
-                    raise NotImplementedError("Non-binary multiplications not yet implemented")  # TODO
+                    raise NotImplementedError("Multiplications not yet implemented")  # TODO
                 elif lhs.name == "div":
                     if isinstance(lhs.args[1], _NumVarImpl):
-                        raise NotImplementedError(
+                        raise Exception(
                             "Gurobi does not support division by an variable. If you need this, please report on github.")
                     self.gbi_model.addLConstr(gbi_vars[0] / gbi_vars[1], sense, self.solver_var(rhs))
                 else:
-                    raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi")
+                    raise Exception(f"Cannot post constraint {cpm_expr} to gurobi")
 
             else:
                 # Add lhs >=< rhs to model
                 self.gbi_model.addLConstr(self.solver_var(lhs), sense, self.solver_var(rhs))
 
         else:
-            raise NotImplementedError(f"Cannot post constraint {cpm_expr} to gurobi optimizer")
+            raise Exception(f"Cannot post constraint {cpm_expr} to gurobi optimizer")
