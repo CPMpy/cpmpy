@@ -6,6 +6,9 @@ import pytest
 
 SOLVER_CLASS = CPM_gurobi
 
+EXCLUDE_MAP = {CPM_ortools : ("sub","div","mod","pow"),
+               CPM_gurobi : ("sub")}
+
 
 def test_base_constraints():
     # Bool variables
@@ -58,6 +61,9 @@ def test_operator_comp_constraints(o_name, c_name):
     """
         Tests all allowed combinations of operators and combinations
     """
+
+    if o_name in EXCLUDE_MAP[SOLVER_CLASS] or c_name in EXCLUDE_MAP[SOLVER_CLASS]:
+        return
 
     # Integer variables
     i, j, k, l = [intvar(-3, 3, name=n) for n in "ijkl"]

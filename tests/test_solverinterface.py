@@ -59,6 +59,7 @@ class TestInterface(unittest.TestCase):
 
         self.solver += self.x.implies(self.y & self.z)
         self.solver += self.y | self.z
+        self.solver += ~ self.z
 
         self.assertTrue(self.solver.solve())
         self.assertEqual(ExitStatus.FEASIBLE, self.solver.status().exitstatus)
