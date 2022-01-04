@@ -216,7 +216,7 @@ class CPM_ortools(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var):
+        if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
         # special case, negative-bool-view
@@ -372,93 +372,92 @@ class CPM_ortools(SolverInterface):
                             return self._post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(lhs)
                         else:
                             raise NotImplementedError("ORT: reified n-ary XOR not yet supported, make an issue on github if you need it")
+                    # TODO: and if something like b.implies(min(x) >= 10) that it splits up in
+                    # b.implies( aux >= 10) & (min(x) == aux)
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
                 raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
 
-        # Comparisons: including base (vars), numeric comparison and reify/imply comparison
+        # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
+        # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
+            lhs = cpm_expr.args[0]
+            rvar = self.solver_var(cpm_expr.args[1])
 
-            if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == '==':
-                # base: bvar == bvar|const
-                lvar, rvar = map(self.solver_var, (lhs, rhs))
-                return self.ort_model.Add(lvar == rvar)
+            # TODO: this should become a transformation!!
+            if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
+                # a BoundedLinearExpression LHS, special case, like in objective
+                lhs = self._make_numexpr(lhs)
+                # assumes that ortools accepts sum(x) >= y without further simplification
+            elif cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
+                # functional globals only exist for equality in ortools
+                # example: min(x) > 10 :: min(x) == aux, aux > 10
+                # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
+                (lhs, cons) = get_or_make_var(lhs)
+                self += cons
 
-            else:
-                # numeric (non-reify) comparison case
-                rvar = self.solver_var(rhs)
-                # lhs can be numexpr
-                if isinstance(lhs, _NumVarImpl):
-                    # simplest LHS case, a var
-                    newlhs = self.solver_var(lhs)
-                else:
-                    if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
-                        # a BoundedLinearExpression LHS, special case, like in objective
-                        newlhs = self._make_numexpr(lhs)
-                    elif cpm_expr.name == '==' and not reifiable:
-                        newlhs = None
-                        if lhs.name == 'abs':
-                            return self.ort_model.AddAbsEquality(rvar, self.solver_var(lhs.args[0]))
-                        elif lhs.name == 'mul':
-                            return self.ort_model.AddMultiplicationEquality(rvar, self.solver_vars(lhs.args))
-                        elif lhs.name == 'mod':
-                            # catch tricky-to-find ortools limitation
-                            divisor = lhs.args[1]
-                            if not is_num(divisor):
-                                if divisor.lb <= 0 and divisor.ub >= 0:
-                                    raise Exception(
-                                        f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                            return self.ort_model.AddModuloEquality(rvar, *self.solver_vars(lhs.args))
-                        elif lhs.name == 'pow':
-                            # translate to multiplications
-                            x = self.solver_var(lhs.args[0])
-                            y = lhs.args[1]
-                            assert is_num(y), f"Ort: 'pow' only supports constants as power, not {y}"
-                            if y == 0:
-                                return 1
-                            elif y == 1:
-                                return self.ort_model.Add(x == rvar)
-                            assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
-                            # mul([x,x,x,...]) with 'y' elements
-                            return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
-                        elif lhs.name == 'div':
-                            return self.ort_model.AddDivisionEquality(rvar, *self.solver_vars(lhs.args))
-                        elif lhs.name == 'min':
-                            return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
-                        elif lhs.name == 'max':
-                            return self.ort_model.AddMaxEquality(rvar, self.solver_vars(lhs.args))
-                        elif lhs.name == 'element':
-                            # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                            return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                             self.solver_vars(lhs.args[0]), rvar)
-                        else:
-                            raise NotImplementedError(
-                                "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
-                    else:
-                        # other equality than == 
-                        # example: x*y > 10 :: x*y == aux, aux > 10
-                        # creat the equality (will handle appropriate bounds)
-                        (newvar, cons) = get_or_make_var(lhs)
-                        newlhs = self.solver_var(newvar)
-                        self += cons
+            # all but '==' now have as lhs: const|ivar|sum|wsum; and ivar still needs translation
+            if cpm_expr.name != '==' and isinstance(lhs, _NumVarImpl):
+                lhs = self.solver_var(lhs)
 
-                if newlhs is None:
-                    pass  # is already posted directly, eg a '=='
-                elif cpm_expr.name == '==':
-                    return self.ort_model.Add(newlhs == rvar)
-                elif cpm_expr.name == '!=':
-                    return self.ort_model.Add(newlhs != rvar)
-                elif cpm_expr.name == '<=':
-                    return self.ort_model.Add(newlhs <= rvar)
-                elif cpm_expr.name == '<':
-                    return self.ort_model.Add(newlhs < rvar)
-                elif cpm_expr.name == '>=':
-                    return self.ort_model.Add(newlhs >= rvar)
-                elif cpm_expr.name == '>':
-                    return self.ort_model.Add(newlhs > rvar)
+            # post the comparison
+            if cpm_expr.name == '<=':
+                return self.ort_model.Add(lhs <= rvar)
+            elif cpm_expr.name == '<':
+                return self.ort_model.Add(lhs < rvar)
+            elif cpm_expr.name == '>=':
+                return self.ort_model.Add(lhs >= rvar)
+            elif cpm_expr.name == '>':
+                return self.ort_model.Add(lhs > rvar)
+            elif cpm_expr.name == '!=':
+                return self.ort_model.Add(lhs != rvar)
+            elif cpm_expr.name == '==':
+                if not isinstance(lhs, Expression):
+                    # const or a _make_numexpr
+                    return self.ort_model.Add(lhs == rvar)
+                elif isinstance(lhs, _NumVarImpl):
+                    # base: bvar == bvar|const
+                    return self.ort_model.Add(self.solver_var(lhs) == rvar)
+                elif lhs.name == 'min':
+                    return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'max':
+                    return self.ort_model.AddMaxEquality(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'abs':
+                    return self.ort_model.AddAbsEquality(rvar, self.solver_var(lhs.args[0]))
+                elif lhs.name == 'mul':
+                    return self.ort_model.AddMultiplicationEquality(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'div':
+                    return self.ort_model.AddDivisionEquality(rvar, *self.solver_vars(lhs.args))
+                elif lhs.name == 'element':
+                    # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
+                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
+                                                     self.solver_vars(lhs.args[0]), rvar)
+                elif lhs.name == 'mod':
+                    # catch tricky-to-find ortools limitation
+                    divisor = lhs.args[1]
+                    if not is_num(divisor):
+                        if divisor.lb <= 0 and divisor.ub >= 0:
+                            raise Exception(
+                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                    return self.ort_model.AddModuloEquality(rvar, *self.solver_vars(lhs.args))
+                elif lhs.name == 'pow':
+                    # translate to multiplications
+                    # TODO: perhaps this should be a transformation too? pow to (binary) mult
+                    x = self.solver_var(lhs.args[0])
+                    y = lhs.args[1]
+                    assert is_num(y), f"Ort: 'pow' only supports constants as power, not {y}"
+                    if y == 0:
+                        return 1
+                    elif y == 1:
+                        return self.ort_model.Add(x == rvar)
+                    # mul([x,x,x,...]) with 'y' elements
+                    assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
+                    return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
+            raise NotImplementedError(
+                        "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+
 
         # rest: base (Boolean) global constraints
         else:
