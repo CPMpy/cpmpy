@@ -387,20 +387,21 @@ class CPM_ortools(SolverInterface):
             rvar = self.solver_var(cpm_expr.args[1])
 
             # TODO: this should become a transformation!!
-            if isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
-                # a BoundedLinearExpression LHS, special case, like in objective
-                lhs = self._make_numexpr(lhs)
-                # assumes that ortools accepts sum(x) >= y without further simplification
-            elif cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
+            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
                 # functional globals only exist for equality in ortools
                 # example: min(x) > 10 :: min(x) == aux, aux > 10
                 # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
                 (lhs, cons) = get_or_make_var(lhs)
                 self += cons
 
-            # all but '==' now have as lhs: const|ivar|sum|wsum; and ivar still needs translation
-            if cpm_expr.name != '==' and isinstance(lhs, _NumVarImpl):
+            # all but '==' now only have as lhs: const|ivar|sum|wsum
+            # translate ivar|sum|wsum so they can be posted directly below
+            if isinstance(lhs, _NumVarImpl):
                 lhs = self.solver_var(lhs)
+            elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
+                # a BoundedLinearExpression LHS, special case, like in objective
+                lhs = self._make_numexpr(lhs)
+                # assumes that ortools accepts sum(x) >= y without further simplification
 
             # post the comparison
             if cpm_expr.name == '<=':
@@ -414,12 +415,9 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == '!=':
                 return self.ort_model.Add(lhs != rvar)
             elif cpm_expr.name == '==':
-                if not isinstance(lhs, Expression):
-                    # const or a _make_numexpr
+                if not isinstance(lhs, Expression): 
+                    # base cases: const|ivar|sum|wsum with prepped lhs above
                     return self.ort_model.Add(lhs == rvar)
-                elif isinstance(lhs, _NumVarImpl):
-                    # base: bvar == bvar|const
-                    return self.ort_model.Add(self.solver_var(lhs) == rvar)
                 elif lhs.name == 'min':
                     return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
@@ -460,34 +458,23 @@ class CPM_ortools(SolverInterface):
 
 
         # rest: base (Boolean) global constraints
+        elif cpm_expr.name == 'alldifferent':
+            return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
+        elif cpm_expr.name == 'table':
+            assert (len(cpm_expr.args) == 2)  # args = [array, table]
+            array, table = self.solver_vars(cpm_expr.args)
+            return self.ort_model.AddAllowedAssignments(array, table)
         else:
-            args = [self.solver_vars(v) for v in cpm_expr.args]
-
-            if cpm_expr.name == 'alldifferent':
-                return self.ort_model.AddAllDifferent(args)
-            elif cpm_expr.name == 'table':
-                assert (len(args) == 2)  # args = [array, table]
-                return self.ort_model.AddAllowedAssignments(args[0], args[1])
             # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
-            else:
-                # global constraint not known, try generic decomposition
-                dec = cpm_expr.decompose()
-                if not dec is None:
-                    flatdec = only_bv_implies(flatten_constraint(dec))
-
-                    # collect and create new variables
-                    for var in get_variables(flatdec):
-                        self.solver_var(var)
-                    # post decomposition
-                    for con in flatdec:
-                        self._post_constraint(con)
-                    # XXX how to deal with reification of such a global??
-                    # TODO: we would have to catch this at the time of the reification... (outer call)
-                    return None  # will throw error if used in reification...
-                else:
-                    raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+            
+            # global constraint not known, try posting generic decomposition
+            # TODO: maybe this should be part of the transformations too? to decompose unsupported globals?
+            self += cpm_expr.decompose() # assumes a decomposition exists...
+            return None # will throw error if used in reification
+        
+        raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
     def solution_hint(self, cpm_vars, vals):
