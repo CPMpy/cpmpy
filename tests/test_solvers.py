@@ -11,7 +11,8 @@ class TestSolvers(unittest.TestCase):
 
         model = cp.Model(
                     x.implies(y & z),
-                    y | z
+                    y | z,
+                    ~ z
                 )
 
         for solvern,s in cp.SolverLookup.base_solvers():
