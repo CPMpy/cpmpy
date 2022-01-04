@@ -470,8 +470,8 @@ class CPM_ortools(SolverInterface):
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            # TODO: maybe this should be part of the transformations too? to decompose unsupported globals?
             self += cpm_expr.decompose() # assumes a decomposition exists...
+            # TODO: dynamic mapping of cpm_expr.name to API call? see #74
             return None # will throw error if used in reification
         
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
