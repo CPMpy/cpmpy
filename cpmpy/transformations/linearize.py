@@ -10,6 +10,7 @@ from ..expressions.utils import is_any_list
 from ..expressions.variables import _BoolVarImpl, boolvar
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 
+M = int(10e10)  # Arbitrary VERY large number
 
 def linearize_constraint(cpm_expr):
 
@@ -61,7 +62,6 @@ def linearize_constraint(cpm_expr):
         lhs, rhs = cpm_expr.args
         if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
             return [lhs + rhs == 1]
-        M = int(10e10) # Arbitrary VERY large number
         z = boolvar()
 
         Mz, cons_Mz = get_or_make_var(M * z)
@@ -83,6 +83,32 @@ def linearize_constraint(cpm_expr):
             constraints += cons
 
         return constraints + [Comparison(cpm_expr.name, var, rhs)]
+
+
+    if cpm_expr.name == "==" and isinstance(cpm_expr.args[0], Comparison):
+        lhs, rhs = cpm_expr.args
+        llhs, lrhs = lhs.args
+
+        if lhs.name == ">=":
+            Mz, cons_Mz = get_or_make_var(M * rhs)
+            Mmz, cons_Mmz = get_or_make_var(M * (1 - rhs))
+            return [llhs - lrhs <= Mz, lrhs - llhs - 1 <= Mmz]
+
+        elif lhs.name == "<=":
+            Mz, cons_Mz = get_or_make_var(M * rhs)
+            Mmz, cons_Mmz = get_or_make_var(M * (1 - rhs))
+            return [llhs - lrhs >= Mz, lrhs - llhs - 1 >= Mmz]
+
+        elif lhs.name == "==":
+            # Model as <= & >=
+            z1, z2 = boolvar(shape=2)
+            cons = linearize_constraint((llhs >= lrhs) == z1)
+            cons += linearize_constraint((llhs <= lrhs) == z2)
+
+            cons += [rhs <= z1, rhs <= z2, z1 + z1 -1 <= rhs]
+            return cons
+        raise Exception(f"Not a supported expression to linearize {cpm_expr}")
+
 
 
     if cpm_expr.name == "alldifferent":
