@@ -7,7 +7,7 @@ import pytest
 SOLVER_CLASS = CPM_gurobi
 
 EXCLUDE_MAP = {CPM_ortools : ("sub","div","mod","pow"),
-               CPM_gurobi : ("sub")}
+               CPM_gurobi : ("sub", "mod")}
 
 
 def test_base_constraints():
@@ -59,14 +59,16 @@ COMBOS = [(op, comp) for comp in Comparison.allowed for op in Operator.allowed]
 @pytest.mark.parametrize("o_name,c_name", COMBOS)
 def test_operator_comp_constraints(o_name, c_name):
     """
-        Tests all allowed combinations of operators and combinations
+        Test all flattened expressions.
+        See cpmpy/transformations/flatten_model
     """
 
     if o_name in EXCLUDE_MAP[SOLVER_CLASS] or c_name in EXCLUDE_MAP[SOLVER_CLASS]:
         return
 
     # Integer variables
-    i, j, k, l = [intvar(-3, 3, name=n) for n in "ijkl"]
+    i, j = [intvar(-3, 3, name=n) for n in "ij"]
+    k, l = [intvar(0, 3, name=n) for n in "kl"]
 
     arity, is_bool = Operator.allowed[o_name]
     if is_bool:
@@ -95,7 +97,7 @@ def test_operator_comp_constraints(o_name, c_name):
         string = f"{o_name}({i.value()}) {c_name} {l.value()}"
 
     elif arity == 2:
-        args = [i, j]
+        args = [k, 2] if o_name in ("div", "pow") else [i,k]
         constraint = Comparison(c_name, Operator(o_name, args), l)
         SOLVER_CLASS(Model(constraint)).solve()
         if infix:
