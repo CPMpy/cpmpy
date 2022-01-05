@@ -64,16 +64,13 @@ def linearize_constraint(cpm_expr):
         M = int(10e10) # Arbitrary VERY large number
         z = boolvar()
 
-        rhs_plus_1, cons_plus = get_or_make_var(rhs + 1)
-        rhs_minus_1, cons_minus = get_or_make_var(rhs - 1)
-
         Mz, cons_Mz = get_or_make_var(M * z)
-        Mmz, cons_Mmz = get_or_make_var(-M * (1-z))
+        Mmz, cons_Mmz = get_or_make_var(M * (z-1))
 
-        c1 = Mz + lhs >= rhs_plus_1
-        c2 = Mmz + lhs <= rhs_minus_1
+        c1 = Mz + lhs - 1 >= rhs
+        c2 = Mmz + lhs + 1 <= rhs
 
-        return cons_plus + cons_minus + cons_Mz + cons_Mmz + [c1, c2]
+        return cons_Mz + cons_Mmz + [c1, c2]
 
     if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
