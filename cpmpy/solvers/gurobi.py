@@ -184,7 +184,7 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return -self.solver_var(cpm_var._bv)
+            return 1-self.solver_var(cpm_var._bv)
 
         # create if it does not exit
         if not cpm_var in self._varmap:
@@ -280,7 +280,7 @@ class CPM_gurobi(SolverInterface):
 
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
-            return self.gbi_model.addConstr(self.solver_var(cpm_expr) >= 1)
+            return self.gbi_model.addLConstr(self.solver_var(cpm_expr), ">", 1)
 
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
