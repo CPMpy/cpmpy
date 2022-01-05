@@ -276,7 +276,6 @@ class CPM_gurobi(SolverInterface):
 
             Solvers do not need to support all constraints.
         """
-        from gurobipy import abs_
 
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -362,6 +361,7 @@ class CPM_gurobi(SolverInterface):
 
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
+                    assert not isinstance(a, _NumVarImpl) or a.lb >= 0, f"Gurobi only supports power expressions with positive exponents."
                     return self.gbi_model.addGenConstrPow(x, rvar, a)
 
             raise NotImplementedError(
