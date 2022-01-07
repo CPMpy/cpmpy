@@ -98,37 +98,46 @@ class CPM_gurobi(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-            <Please document key solver arguments that the user might wish to change
-             for example: log_output=True, var_ordering=3, num_cores=8, ...>
-            <Add link to documentation of all solver parameters>
+            Examples of gurobi supported arguments include:
+                - Threads : int
+                - MIPFocus: int
+                - ImproveStartTime : bool
+                - FlowCoverCuts: int
+
+            For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
+        import gurobipy as gp
         from gurobipy import GRB
 
         if time_limit is not None:
-            raise NotImplementedError("TEMPLATE: TODO, implement time_limit")
+            self.grb_model.setParam("TimeLimit", time_limit)
 
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
         _ = self.grb_model.optimize(callback=solution_callback)
+        grb_objective = self.grb_model.getObjective()
 
-        my_status = self.grb_model.Status
+        is_optimization_problem = grb_objective.size() == 0 # TODO: check if better way to do this...
+
+        grb_status = self.grb_model.Status
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if my_status == GRB.OPTIMAL and self._objective_value is None:
+        if grb_status == GRB.OPTIMAL and is_optimization_problem:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status == GRB.OPTIMAL and self._objective_value is not None:
+        elif grb_status == GRB.OPTIMAL and not is_optimization_problem:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-        elif my_status == GRB.INFEASIBLE:
+        elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         else:  # another?
             raise NotImplementedError(
-                f"Translation of gurobi status {my_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
+                f"Translation of gurobi status {grb_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
+        # TODO: what about interrupted solves? Gurobi can return sub-optimal values too
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -136,13 +145,15 @@ class CPM_gurobi(SolverInterface):
         # translate solution values (of user vars only)
         if has_sol:
             # fill in variable values
-            # set _
             for cpm_var in self.user_vars:
                 solver_val = self.solver_var(cpm_var).X
                 if cpm_var.is_bool():
-                    cpm_var._value = bool(solver_val)
+                    cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = int(solver_val)
+            # set _objective_value
+            if is_optimization_problem:
+                self._objective_value = grb_objective.getValue()
 
         return has_sol
 
@@ -159,7 +170,7 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return 1-self.solver_var(cpm_var._bv)
+            return 1 - self.solver_var(cpm_var._bv) # TODO transform ~BV to 1 - BV in new transformation
 
         # create if it does not exit
         if not cpm_var in self._varmap:
@@ -170,52 +181,31 @@ class CPM_gurobi(SolverInterface):
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
-            # Update model to make new vars visible for constraints
-            self.grb_model.update()
 
         # return from cache
         return self._varmap[cpm_var]
 
-    # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
-    def minimize(self, expr):
+    def objective(self, expr, minimize=True):
         """
-            Minimize the given objective function
+            Post the expression to optimize to the solver.
 
-            `minimize()` can be called multiple times, only the last one is used
+            'objective()' can be called multiple times, onlu the last one is used.
 
             (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
+                are premanently posted to the solver)
         """
+
         from gurobipy import GRB
 
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += linearize_constraint(flat_cons)  # add potentially created constraints
+        self += flat_cons  # add potentially created constraints
 
-        # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
-
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is used
-
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
-        """
-        from gurobipy import GRB
-
-        # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += linearize_constraint(flat_cons)  # add potentially created constraints
-
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
-        self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
-
-    def
+        if minimize:
+            self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
+        else:
+            self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -256,10 +246,10 @@ class CPM_gurobi(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(set(get_variables(cpm_con)))
+        self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
-        # XXX chose the transformations your solver needs, see cpmpy/transformations/
+        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
 
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = linearize_constraint(cpm_cons)
@@ -345,7 +335,7 @@ class CPM_gurobi(SolverInterface):
                     if isinstance(cpm_expr.args[1], _NumVarImpl):
                         return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
                     # right side is a constant, not support by gurobi, so add new
-                    self += abs(lhs.args[0]) == intvar(rvar,rvar)
+                    self += abs(lhs.args[0]) == intvar(rvar, rvar)
                     return
 
 
@@ -363,11 +353,12 @@ class CPM_gurobi(SolverInterface):
 
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
-                    assert not isinstance(a, _NumVarImpl) or a.lb >= 0, f"Gurobi only supports power expressions with positive exponents."
+                    assert not isinstance(a,
+                                          _NumVarImpl) or a.lb >= 0, f"Gurobi only supports power expressions with positive exponents."
                     return self.grb_model.addGenConstrPow(x, rvar, a)
 
             raise NotImplementedError(
-                        "Not a know supported gurobi left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                "Not a know supported gurobi left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
         # Global constraints
         else:
@@ -375,4 +366,3 @@ class CPM_gurobi(SolverInterface):
             return
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-

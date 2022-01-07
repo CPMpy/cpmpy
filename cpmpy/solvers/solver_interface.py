@@ -103,13 +103,22 @@ class SolverInterface(object):
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        raise NotImplementedError("Solver does not support objective functions")
+        return self.objective(expr, minimize=True)
+
 
     def maximize(self, expr):
         """
             Maximize the given objective function
 
             `maximize()` can be called multiple times, only the last one is stored
+        """
+        return self.objective(expr, minimize=False)
+
+    def objective(self, expr, minimize=True):
+        """
+            Post the given expression to the solver as objective to minimize/maximize
+
+            'objective()' can be called multiple times, only the last one is stored
         """
         raise NotImplementedError("Solver does not support objective functions")
 
