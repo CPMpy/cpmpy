@@ -73,7 +73,9 @@ class SolverInterface(object):
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self._varmap = dict()   # maps cpmpy variables to native solver variables
+
+        self._objective_value = None
 
         # rest uses own API
         if cpm_model is not None:
@@ -139,7 +141,7 @@ class SolverInterface(object):
 
         :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
-        return None
+        return self._objective_value
 
     def solver_var(self, cpm_var):
         """

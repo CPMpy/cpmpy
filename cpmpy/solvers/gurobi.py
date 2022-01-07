@@ -83,37 +83,11 @@ class CPM_gurobi(SolverInterface):
         self.env.setParam("OutputFlag", 0)
         self.env.start()
 
-        self.gbi_model = gp.Model(env=self.env)
-        self._objective_value = None
+        self.grb_model = gp.Model(env=self.env)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
-
-    def __add__(self, cpm_con):
-        """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
-
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
-
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
-        """
-        # add new user vars to the set
-        self.user_vars.update(set(get_variables(cpm_con)))
-
-        # apply transformations, then post internally
-        # XXX chose the transformations your solver needs, see cpmpy/transformations/
-
-        cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = linearize_constraint(cpm_cons)
-
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
@@ -135,15 +109,15 @@ class CPM_gurobi(SolverInterface):
 
         # call the solver, with parameters
         for param, val in kwargs.items():
-            self.gbi_model.setParam(param, val)
+            self.grb_model.setParam(param, val)
 
-        _ = self.gbi_model.optimize(callback=solution_callback)
+        _ = self.grb_model.optimize(callback=solution_callback)
 
-        my_status = self.gbi_model.Status
+        my_status = self.grb_model.Status
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.gbi_model.runtime
+        self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
         if my_status == GRB.OPTIMAL and self._objective_value is None:
@@ -162,6 +136,7 @@ class CPM_gurobi(SolverInterface):
         # translate solution values (of user vars only)
         if has_sol:
             # fill in variable values
+            # set _
             for cpm_var in self.user_vars:
                 solver_val = self.solver_var(cpm_var).X
                 if cpm_var.is_bool():
@@ -189,14 +164,14 @@ class CPM_gurobi(SolverInterface):
         # create if it does not exit
         if not cpm_var in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.gbi_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
+                revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.gbi_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
+                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
             # Update model to make new vars visible for constraints
-            self.gbi_model.update()
+            self.grb_model.update()
 
         # return from cache
         return self._varmap[cpm_var]
@@ -219,7 +194,7 @@ class CPM_gurobi(SolverInterface):
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        self.gbi_model.setObjective(obj, sense=GRB.MINIMIZE)
+        self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
 
     def maximize(self, expr):
         """
@@ -238,7 +213,9 @@ class CPM_gurobi(SolverInterface):
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        self.gbi_model.setObjective(obj, sense=GRB.MAXIMIZE)
+        self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+
+    def
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -267,6 +244,31 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
+    def __add__(self, cpm_con):
+        """
+        Post a (list of) CPMpy constraints(=expressions) to the solver
+
+        Note that we don't store the constraints in a cpm_model,
+        we first transform the constraints into primitive constraints,
+        then post those primitive constraints directly to the native solver
+
+        :param cpm_con CPMpy constraint, or list thereof
+        :type cpm_con (list of) Expression(s)
+        """
+        # add new user vars to the set
+        self.user_vars.update(set(get_variables(cpm_con)))
+
+        # apply transformations, then post internally
+        # XXX chose the transformations your solver needs, see cpmpy/transformations/
+
+        cpm_cons = flatten_constraint(cpm_con)
+        cpm_cons = linearize_constraint(cpm_cons)
+
+        for con in cpm_cons:
+            self._post_constraint(con)
+
+        return self
+
     def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
@@ -279,7 +281,7 @@ class CPM_gurobi(SolverInterface):
 
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
-            return self.gbi_model.addLConstr(self.solver_var(cpm_expr), ">", 1)
+            return self.grb_model.addLConstr(self.solver_var(cpm_expr), ">", 1)
 
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -317,11 +319,11 @@ class CPM_gurobi(SolverInterface):
 
             # post the comparison
             if cpm_expr.name == '<=':
-                return self.gbi_model.addLConstr(lhs, "<", rvar)
+                return self.grb_model.addLConstr(lhs, "<", rvar)
             elif cpm_expr.name == '<':
                 raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
             elif cpm_expr.name == '>=':
-                return self.gbi_model.addLConstr(lhs, ">", rvar)
+                return self.grb_model.addLConstr(lhs, ">", rvar)
             elif cpm_expr.name == '>':
                 raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
             elif cpm_expr.name == '!=':
@@ -329,19 +331,19 @@ class CPM_gurobi(SolverInterface):
             elif cpm_expr.name == '==':
                 if not isinstance(lhs, Expression):
                     # base cases: const|ivar|sum|wsum with prepped lhs above
-                    return self.gbi_model.addLConstr(lhs, "=", rvar)
+                    return self.grb_model.addLConstr(lhs, "=", rvar)
                 elif lhs.name == "and":
-                    return self.gbi_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
+                    return self.grb_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == "or":
-                    return self.gbi_model.addGenConstrOr(rvar, self.solver_vars(lhs.args))
+                    return self.grb_model.addGenConstrOr(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == 'min':
-                    return self.gbi_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
+                    return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.gbi_model.addGenConstrMax(rvar, self.solver_vars(lhs.args))
+                    return self.grb_model.addGenConstrMax(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
                     # TODO put this in the correct place
                     if isinstance(cpm_expr.args[1], _NumVarImpl):
-                        return self.gbi_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
+                        return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
                     # right side is a constant, not support by gurobi, so add new
                     self += abs(lhs.args[0]) == intvar(rvar,rvar)
                     return
@@ -350,19 +352,19 @@ class CPM_gurobi(SolverInterface):
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
                     a, b = self.solver_vars(lhs.args)
-                    self.gbi_model.setParam("NonConvex",2)
-                    return self.gbi_model.addConstr(a * b == rvar)
+                    self.grb_model.setParam("NonConvex", 2)
+                    return self.grb_model.addConstr(a * b == rvar)
 
                 elif lhs.name == 'div':
                     if not isinstance(lhs.args[1], _NumVarImpl):
                         a, b = self.solver_vars(lhs.args)
-                        return self.gbi_model.addLConstr(a / b, "=", rvar)
+                        return self.grb_model.addLConstr(a / b, "=", rvar)
                     raise Exception("Gurobi only supports division by constants")
 
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
                     assert not isinstance(a, _NumVarImpl) or a.lb >= 0, f"Gurobi only supports power expressions with positive exponents."
-                    return self.gbi_model.addGenConstrPow(x, rvar, a)
+                    return self.grb_model.addGenConstrPow(x, rvar, a)
 
             raise NotImplementedError(
                         "Not a know supported gurobi left-hand-side '{}' {}".format(lhs.name, cpm_expr))
