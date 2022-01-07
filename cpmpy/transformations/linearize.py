@@ -19,7 +19,7 @@ def linearize_constraint(cpm_expr):
         return [c for l in lin_cons for c in l]
 
     if isinstance(cpm_expr, _BoolVarImpl):
-        return [cpm_expr]
+        return [cpm_expr >= 1]
 
     if cpm_expr.name == "and":
         if all(arg.is_bool() for arg in cpm_expr.args):

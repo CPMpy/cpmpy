@@ -268,31 +268,18 @@ class CPM_gurobi(SolverInterface):
 
             Solvers do not need to support all constraints.
         """
-
-        # Base case: Boolean variable
-        if isinstance(cpm_expr, _BoolVarImpl):
-            return self.grb_model.addLConstr(self.solver_var(cpm_expr), ">", 1)
-
-
-        # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
-        elif isinstance(cpm_expr, Operator):
-            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
-            if cpm_expr.name in ["and", "or", "xor", "->"]:
-                raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
-            else:
-                raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
-                    cpm_expr.name, cpm_expr))
-
+        from gurobipy import GRB
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
-        elif isinstance(cpm_expr, Comparison):
+        if isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
             rvar = self.solver_var(cpm_expr.args[1])
 
+
             # TODO: this should become a transformation!!
             if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
-                # functional globals only exist for equality in ortools
+                # functional globals only exist for equality in gurobi
                 # example: min(x) > 10 :: min(x) == aux, aux > 10
                 # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
                 (lhs, cons) = get_or_make_var(lhs)
@@ -309,11 +296,11 @@ class CPM_gurobi(SolverInterface):
 
             # post the comparison
             if cpm_expr.name == '<=':
-                return self.grb_model.addLConstr(lhs, "<", rvar)
+                return self.grb_model.addLConstr(lhs, GRB.LESS_EQUAL, rvar)
             elif cpm_expr.name == '<':
                 raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
             elif cpm_expr.name == '>=':
-                return self.grb_model.addLConstr(lhs, ">", rvar)
+                return self.grb_model.addLConstr(lhs, GRB.GREATER_EQUAL, rvar)
             elif cpm_expr.name == '>':
                 raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
             elif cpm_expr.name == '!=':
@@ -321,7 +308,7 @@ class CPM_gurobi(SolverInterface):
             elif cpm_expr.name == '==':
                 if not isinstance(lhs, Expression):
                     # base cases: const|ivar|sum|wsum with prepped lhs above
-                    return self.grb_model.addLConstr(lhs, "=", rvar)
+                    return self.grb_model.addLConstr(lhs, GRB.EQUAL, rvar)
                 elif lhs.name == "and":
                     return self.grb_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == "or":
@@ -337,7 +324,6 @@ class CPM_gurobi(SolverInterface):
                     # right side is a constant, not support by gurobi, so add new
                     self += abs(lhs.args[0]) == intvar(rvar, rvar)
                     return
-
 
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"

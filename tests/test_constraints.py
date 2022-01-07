@@ -70,12 +70,16 @@ def test_operator_comp_constraints(o_name, c_name):
     i, j = [intvar(-3, 3, name=n) for n in "ij"]
     k, l = [intvar(0, 3, name=n) for n in "kl"]
 
+    a,b,c = [boolvar(name=n) for n in "abc"]
+
     arity, is_bool = Operator.allowed[o_name]
     if is_bool:
+        # Can never be the outcome of flatten. See /tranformations/flatten_model
         return
 
+
     eval_map = {key: val for key, val in Operator.printmap.items()}
-    eval_map.update({"mod": "%"})
+    eval_map.update({"mod": "%" , "and":"&", "or":"|","xor":"^"})
     infix = o_name in eval_map
 
 
@@ -86,7 +90,7 @@ def test_operator_comp_constraints(o_name, c_name):
         string = f"{sum([a * b.value() for a, b in zip(args[0], args[1])])} {c_name} {l.value()}"
 
     elif o_name == "->":
-        args = [i, j]
+        args = [a, b]
         constraint = Comparison(c_name, Operator(o_name, args), l)
         SOLVER_CLASS(Model(constraint)).solve()
         string = f"not {i.value()} or {j.value()} {c_name} {l.value()}"
@@ -106,7 +110,7 @@ def test_operator_comp_constraints(o_name, c_name):
             string = f"{o_name}({args[0]},{args[1]}) {c_name} {l.value()}"
 
     else:
-        args = [i, j, k]
+        args = [a,b,c] if is_bool else [i,j,k]
         constraint = Comparison(c_name, Operator(o_name, args), l)
         SOLVER_CLASS(Model(constraint)).solve()
         if infix:
