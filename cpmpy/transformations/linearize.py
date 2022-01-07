@@ -7,7 +7,7 @@ import numpy as np
 from ..expressions.core import Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
 from ..expressions.utils import is_any_list
-from ..expressions.variables import _BoolVarImpl, boolvar
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 
 M = int(10e10)  # Arbitrary VERY large number
@@ -144,3 +144,83 @@ def linearize_constraint(cpm_expr):
         return constraints
 
     return [cpm_expr]
+
+
+def no_negation(cpm_expr):
+    """
+        Replaces all occurences of ~BV with 1 - BV in the expression.
+        cpm_expr is expected to be linearized.
+    """
+
+    if is_any_list(cpm_expr):
+        nn_cons = [no_negation(expr) for expr in cpm_expr]
+        return [c for l in nn_cons for c in l]
+
+
+    def simplify(cpm_var):
+        # TODO: come up with a better name for this function
+        if isinstance(cpm_var, NegBoolView):
+            return 1 - cpm_var._bv
+        return cpm_var
+
+
+    if isinstance(cpm_expr, NegBoolView):
+        # Base case
+        return [1 - cpm_expr._bv]
+
+
+    if isinstance(cpm_expr, Comparison):
+
+        lhs, rhs = cpm_expr.args
+        nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+
+        if isinstance(lhs, Operator):
+            # sum, wsum, and, or, min, max, abs, mul, div, pow
+            cons_l = []
+            if lhs.name == "wsum":
+                vars, weights = lhs.args
+                nn_args = []
+                for nn_expr in map(simplify,vars):
+                    nn_var, cons =  get_or_make_var(nn_expr)
+                    cons_l += cons
+                    nn_args.append(nn_var)
+                nn_lhs = Operator("wsum", [vars,weights])
+
+            else:
+                nn_args = []
+                for nn_expr in map(simplify, lhs.args):
+                    nn_var, cons = get_or_make_var(nn_expr)
+                    cons_l += cons
+                    nn_args.append(nn_var)
+
+                nn_lhs = Operator(lhs.name, nn_args)
+
+        else:
+            nn_lhs , cons_l = get_or_make_var(simplify(lhs))
+
+        return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
+
+
+
+    return [cpm_expr] # Constant or non negative _BoolVarImpl
+
+
+
+
+
+if __name__ == "__main__":
+
+    a, b, c = [boolvar(name=n) for n in "abc"]
+    i,j,k = [intvar(lb=0, ub=5, name=n) for n in "ijk"]
+
+    expr = a & ~b >= i
+    print(expr, no_negation(expr))
+
+    expr = a.implies(~b) >= i
+    print(expr, no_negation(expr))
+
+    expr = a <= ~i
+    print(expr, no_negation(expr))
+
+    expr = a & ~b >= ~c
+    print(expr, no_negation(expr))
