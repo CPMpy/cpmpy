@@ -51,7 +51,7 @@ class TestInterface(unittest.TestCase):
         self.solver += [self.x & self.y]
         self.assertEqual(2, len(self.solver.user_vars))
 
-        self.solver += [sum(self.bvar) >= 2]
+        self.solver += [sum(self.bvar) == 2]
         self.assertEqual(3, len(self.solver.user_vars))
         self.assertGreaterEqual(3, len(self.solver._varmap))  # Possible that solver requires extra intermediate vars
 
@@ -165,8 +165,9 @@ class TestInterface(unittest.TestCase):
 
     def test_div(self):
 
-        self.solver += (self.i / self.j) == 0
-        self.check_ij()
+        self.solver += (self.i / 2) == 0
+        self.assertIn(self.i, self.solver.user_vars)
+        self.assertIn(self.i, self.solver._varmap)
 
     def test_mod(self):
 
@@ -175,13 +176,14 @@ class TestInterface(unittest.TestCase):
 
     def test_pow(self):
 
-        self.solver += (self.i ** self.j) == 0
-        self.check_ij()
+        self.solver += (self.i ** 2) == 0
+        self.assertIn(self.i, self.solver.user_vars)
 
     def test_min(self):
 
         self.solver += - self.i == 0
         self.assertIn(self.i, self.solver.user_vars)
+        self.assertIn(self.i, self.solver._varmap)
 
     def test_abs(self):
 
