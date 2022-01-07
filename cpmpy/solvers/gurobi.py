@@ -31,7 +31,7 @@ from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint
+from ..transformations.linearize import linearize_constraint, no_negation
 from ..transformations.reification import only_bv_implies
 
 
@@ -119,7 +119,7 @@ class CPM_gurobi(SolverInterface):
         _ = self.grb_model.optimize(callback=solution_callback)
         grb_objective = self.grb_model.getObjective()
 
-        is_optimization_problem = grb_objective.size() == 0 # TODO: check if better way to do this...
+        is_optimization_problem = grb_objective.size() != 0 # TODO: check if better way to do this...
 
         grb_status = self.grb_model.Status
 
@@ -128,9 +128,9 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and is_optimization_problem:
+        if grb_status == GRB.OPTIMAL and not is_optimization_problem:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and not is_optimization_problem:
+        elif grb_status == GRB.OPTIMAL and is_optimization_problem:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -170,7 +170,7 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return 1 - self.solver_var(cpm_var._bv) # TODO transform ~BV to 1 - BV in new transformation
+            raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
 
         # create if it does not exit
         if not cpm_var in self._varmap:
@@ -253,6 +253,7 @@ class CPM_gurobi(SolverInterface):
 
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = linearize_constraint(cpm_cons)
+        cpm_cons = no_negation(cpm_cons)
 
         for con in cpm_cons:
             self._post_constraint(con)
@@ -309,21 +310,6 @@ class CPM_gurobi(SolverInterface):
                 if not isinstance(lhs, Expression):
                     # base cases: const|ivar|sum|wsum with prepped lhs above
                     return self.grb_model.addLConstr(lhs, GRB.EQUAL, rvar)
-                elif lhs.name == "and":
-                    return self.grb_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
-                elif lhs.name == "or":
-                    return self.grb_model.addGenConstrOr(rvar, self.solver_vars(lhs.args))
-                elif lhs.name == 'min':
-                    return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
-                elif lhs.name == 'max':
-                    return self.grb_model.addGenConstrMax(rvar, self.solver_vars(lhs.args))
-                elif lhs.name == 'abs':
-                    # TODO put this in the correct place
-                    if isinstance(cpm_expr.args[1], _NumVarImpl):
-                        return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
-                    # right side is a constant, not support by gurobi, so add new
-                    self += abs(lhs.args[0]) == intvar(rvar, rvar)
-                    return
 
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
@@ -337,10 +323,24 @@ class CPM_gurobi(SolverInterface):
                         return self.grb_model.addLConstr(a / b, "=", rvar)
                     raise Exception("Gurobi only supports division by constants")
 
+                # General constraints
+                # rvar should be a variable, not a constant
+                if not isinstance(cpm_expr.args[1], _NumVarImpl):
+                    rvar = self.solver_var(intvar(lb=cpm_expr.args[1], ub=cpm_expr.args[1]))
+
+                if lhs.name == "and":
+                    return self.grb_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == "or":
+                    return self.grb_model.addGenConstrOr(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'min':
+                    return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'max':
+                    return self.grb_model.addGenConstrMax(rvar, self.solver_vars(lhs.args))
+                elif lhs.name == 'abs':
+                    return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
-                    assert not isinstance(a,
-                                          _NumVarImpl) or a.lb >= 0, f"Gurobi only supports power expressions with positive exponents."
+                    assert not isinstance(a, _NumVarImpl), f"Gurobi only supports power expressions with positive exponents."
                     return self.grb_model.addGenConstrPow(x, rvar, a)
 
             raise NotImplementedError(
