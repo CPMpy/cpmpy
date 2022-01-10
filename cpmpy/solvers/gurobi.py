@@ -352,3 +352,59 @@ class CPM_gurobi(SolverInterface):
             return
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            This is the generic implementation, solvers can overwrite this with
+            a more efficient native implementation
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+
+        if time_limit is not None:
+            self.grb_model.setParam("TimeLimit", time_limit)
+
+        # Force gurobi to keep searching in the tree for optimal solutions
+        self.grb_model.setParam("PoolSearchMode", 2)
+        if solution_limit is not None:
+            self.grb_model.setParam("PoolSolutions", solution_limit)
+
+        for param, val in kwargs.items():
+            self.grb_model.setParam(param, val)
+        # Solve the model
+        self.grb_model.optimize()
+
+
+        solution_count = self.grb_model.SolCount
+        for i in range(solution_count):
+            # Specify which solution to query
+            self.grb_model.setParam("SolutionNumber", i)
+            # Translate solution to variables
+            for cpm_var in self.user_vars:
+                solver_val = self.solver_var(cpm_var).Xn
+                if cpm_var.is_bool():
+                    cpm_var._value = solver_val >= 0.5
+                else:
+                    cpm_var._value = int(solver_val)
+            # Translate objective
+            if self.grb_model.getObjective().size() != 0:                # TODO: check if better way to do this...
+                self._objective_value = self.grb_model.getObjective().getValue()
+
+            if display is not None:
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print([v.value() for v in display])
+                else:
+                    display()  # callback
+
+        return solution_count
