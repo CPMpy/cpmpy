@@ -69,7 +69,10 @@ class Model(object):
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
-        
+
+        # solution hint
+        self.hint = None
+
     def __add__(self, con):
         """
             Add one or more constraints to the model
@@ -126,6 +129,13 @@ class Model(object):
 
         return s
 
+    def set_solution_hint(self, hint):
+        """ Set a solution hint
+
+            :param hint: a tuple of a list of variables and a list of suggested values: (cpm_vars, values)
+        """
+        self.hint = hint
+
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
@@ -141,6 +151,10 @@ class Model(object):
             - False     if no solution is found
         """
         s = self._create_solver(solver)
+
+        if self.hint is not None:
+            s.solution_hint(*self.hint)
+
         # call solver
         ret = s.solve(time_limit=time_limit)
         # store CPMpy status (s object has no further use)
