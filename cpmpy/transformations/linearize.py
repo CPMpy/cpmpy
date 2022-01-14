@@ -60,17 +60,22 @@ def linearize_constraint(cpm_expr):
 
     if cpm_expr.name == "!=":
         lhs, rhs = cpm_expr.args
+        # Special case: BV != BV
         if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
             return [lhs + rhs == 1]
+
+        # Normal case: big M implementation
         z = boolvar()
 
         Mz, cons_Mz = get_or_make_var(M * z)
-        Mmz, cons_Mmz = get_or_make_var(M * (z-1))
+        Mmz, cons_Mmz = get_or_make_var(M - Mz)
+
+        lhs, cons_lhs = get_or_make_var(lhs)
 
         c1 = Mz + lhs - 1 >= rhs
         c2 = Mmz + lhs + 1 <= rhs
 
-        return cons_Mz + cons_Mmz + [c1, c2]
+        return cons_Mz + cons_Mmz + cons_lhs + [c1, c2]
 
     if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
