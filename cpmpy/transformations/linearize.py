@@ -73,9 +73,9 @@ def linearize_constraint(cpm_expr):
         lhs, cons_lhs = get_or_make_var(lhs)
 
         c1 = Mz + lhs - 1 >= rhs
-        c2 = Mmz + lhs + 1 <= rhs
+        c2 = M - Mz + lhs + 1 <= rhs
 
-        return cons_Mz + cons_Mmz + cons_lhs + [c1, c2]
+        return cons_Mz + cons_lhs + [c1, c2]
 
     if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
