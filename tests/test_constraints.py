@@ -6,7 +6,7 @@ from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc
 
 import pytest
 
-SOLVER_CLASS = CPM_ortools
+SOLVER_CLASS = CPM_gurobi
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
@@ -14,44 +14,12 @@ EXCLUDE_MAP = {CPM_ortools: ("sub", "div", "mod", "pow"),
                CPM_gurobi: ("sub", "mod")}
 
 # Variables to use in the rest of the test script
-NUM_ARGS = [intvar(-3, 3, name=n) for n in "xyz"]   # Numerical variables
-NUM_VAR = intvar(-3,3, name="l")                    # A numerical variable
+NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NN_VAR = intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
+NUM_VAR = intvar(0, 10, name="l")                   # A numerical variable
 
 BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = boolvar(name="p")                        # A boolean variable
-
-
-def test_base_constraints():
-    # Bool variables
-    x, y, z = [boolvar(name=n) for n in "xyz"]
-
-    # Test var
-    SOLVER_CLASS(Model(x)).solve()
-    assert x.value()
-
-    # Test and
-    SOLVER_CLASS(Model(Operator("and", [x, y, z]))).solve()
-    assert (x.value() & y.value() & z.value())
-
-    # Test or
-    SOLVER_CLASS(Model(Operator("or", [x, y, z]))).solve()
-    assert (x.value() | y.value() | z.value())
-
-    # Test xor
-    SOLVER_CLASS(Model(Operator("xor", [x, y, z]))).solve()
-    assert (x.value() ^ y.value() ^ z.value())
-
-    # Test implies
-    SOLVER_CLASS(Model(x.implies(y))).solve()
-    assert (~x.value() | y.value())
-
-    # Test eq
-    SOLVER_CLASS(Model(x == y)).solve()
-    assert (x.value() == y.value())
-
-    # Test neq
-    SOLVER_CLASS(Model(x != y)).solve()
-    assert (x.value() != y.value())
 
 
 def numexprs():
@@ -68,6 +36,8 @@ def numexprs():
     for name, arity in names:
         if name == "wsum":
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
+        elif name == "div" or name == "pow":
+            operator_args = [NN_VAR,2]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
@@ -109,13 +79,14 @@ def bool_exprs():
             operator_args = BOOL_ARGS
 
         yield Operator(name, operator_args)
+        # Negated boolean values
+        yield Operator(name, [~ arg for arg in operator_args])
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
 
     # TODO global constraints
 
-# Generate all reify/imply constraints
 def reify_imply_exprs():
     """
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
@@ -133,9 +104,17 @@ def reify_imply_exprs():
         yield comp_expr.implies(BOOL_VAR)
         yield BOOL_VAR.implies(comp_expr)
 
+@pytest.mark.parametrize("constraint", bool_exprs(), ids=lambda c: str(c))
+def test_bool_constaints(constraint):
+    """
+        Tests boolean constraint by posting it to the solver and checking the value after solve.
+    """
+    assert SOLVER_CLASS(Model(constraint)).solve()
+    assert constraint.value()
+
 
 @pytest.mark.parametrize("constraint", comp_constraints(), ids=lambda c: str(c))
-def test_comparisons(constraint):
+def test_comparison_constraints(constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
     """
@@ -144,7 +123,7 @@ def test_comparisons(constraint):
 
 
 @pytest.mark.parametrize("constraint", reify_imply_exprs(), ids=lambda c: str(c))
-def test_reify_imply(constraint):
+def test_reify_imply_constraints(constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
     """
