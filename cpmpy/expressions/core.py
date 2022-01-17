@@ -441,6 +441,7 @@ class Operator(Expression):
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
         elif self.name == "xor": return sum(arg_vals) % 2 == 1
+        elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
 
         return None # default
 
