@@ -124,6 +124,12 @@ class CPM_ortools(SolverInterface):
         if len(flat_cons) != 0:
             self += flat_cons
 
+        # store new user vars in flat_obj and add to varmap
+        new_user_vars = get_variables(flat_obj)
+        for v in frozenset(new_user_vars)-frozenset(self.user_vars):
+            self.user_vars.append(v)
+            self.add_to_varmap(v)
+
         obj = self.ort_numexpr(flat_obj)
         self.ort_model.Minimize(obj)
 
@@ -139,6 +145,12 @@ class CPM_ortools(SolverInterface):
         # add constraints if needed
         if len(flat_cons) != 0:
             self += flat_cons
+
+        # store new user vars in flat_obj and add to varmap
+        new_user_vars = get_variables(flat_obj)
+        for v in frozenset(new_user_vars)-frozenset(self.user_vars):
+            self.user_vars.append(v)
+            self.add_to_varmap(v)
 
         obj = self.ort_numexpr(flat_obj)
         self.ort_model.Maximize(obj)
