@@ -357,23 +357,22 @@ class CPM_gurobi(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(rhs, Comparison), "Implication must have linear constraints on right hand side"
-            lhs = self.solver_var(lhs)
+            if isinstance(lhs, NegBoolView):
+                lhs, bool_val = self.solver_var(lhs._bv), False
+            else:
+                lhs, bool_val = self.solver_var(lhs), True
+
             lrhs, rrhs = rhs.args
-            if isinstance(lrhs, _BoolVarImpl):
-                lin_expr = self.solver_var(lrhs)
-            elif lrhs.name == "wsum":
-                lin_expr = LinExpr(lrhs.args[0], self.solver_vars(lrhs.args[1]))
-            elif lrhs.name == "sum":
-                lin_expr = LinExpr(np.ones(shape=len(lrhs.args[1])), self.solver_vars(lrhs.args[1]))
+            if isinstance(lrhs, _BoolVarImpl) or lrhs.name == "sum" or lrhs.name == "wsum":
+                lin_expr = self._make_numexpr(lrhs)
             else:
                 raise Exception(f"Unknown linear expression {lrhs} on right side of indicator constraint: {cpm_expr}")
-            # TODO check if lhs is NegBoolView -> adapt no_negation tranformation
             if rhs.name == "<=":
-                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.LESS_EQUAL, self.solver_var(rrhs))
+                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rrhs))
             if rhs.name == ">=":
-                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rrhs))
-            if rhs.name == "<=":
-                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.EQUAL, self.solver_var(rrhs))
+                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rrhs))
+            if rhs.name == "==":
+                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rrhs))
 
 
 

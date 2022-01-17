@@ -66,14 +66,29 @@ def linearize_constraint(cpm_expr):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     if cpm_expr.name == "->":
-        lhs, rhs = cpm_expr.args
-        if not lhs.is_bool() or not rhs.is_bool():
+        cond, expr = cpm_expr.args
+        if not cond.is_bool() or not expr.is_bool():
             raise Exception(
                 f"Numeric constants or numeric variables not allowed as base constraint, cannot linearize {cpm_expr}")
-        if isinstance(rhs, _BoolVarImpl):
-            return [lhs <= rhs]
-        if isinstance(lhs, _BoolVarImpl):
-            return [rhs >= lhs]
+        if isinstance(cond, _BoolVarImpl) and isinstance(expr, _BoolVarImpl):
+            return [cond.implies(expr >= 1)]
+
+        if isinstance(cond, _BoolVarImpl):
+            if isinstance(expr, Comparison):
+                lhs, rhs = expr.args
+                raise NotImplementedError("Not implemented yet, TODO") # TODO
+            if isinstance(expr, Operator):
+                lin_expr = linearize_constraint(expr)
+                assert len(lin_expr) == 1, f"Not a supported operator to linearize: {expr} in constraint {cpm_expr}"
+                return [cond.implies(lin_expr[0])]
+
+
+            return [cpm_expr]
+
+        if isinstance(expr, _BoolVarImpl):
+            return linearize_constraint((~expr).implies(negated_normal(cond)))
+
+
         raise Exception(f"{cpm_expr} should be of the form Var -> BoolExpr or BoolExpr -> Var")
 
     # Binary operators
