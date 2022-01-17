@@ -6,10 +6,19 @@ from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc
 
 import pytest
 
-SOLVER_CLASS = CPM_gurobi
+SOLVER_CLASS = CPM_ortools
 
-EXCLUDE_MAP = {CPM_ortools : ("sub","div","mod","pow"),
-               CPM_gurobi : ("sub", "mod")}
+# Exclude certain operators for solvers.
+# Not all solvers support all operators in CPMpy
+EXCLUDE_MAP = {CPM_ortools: ("sub", "div", "mod", "pow"),
+               CPM_gurobi: ("sub", "mod")}
+
+# Variables to use in the rest of the test script
+NUM_ARGS = [intvar(-3, 3, name=n) for n in "xyz"]   # Numerical variables
+NUM_VAR = intvar(-3,3, name="l")                    # A numerical variable
+
+BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
+BOOL_VAR = boolvar(name="p")                        # A boolean variable
 
 
 def test_base_constraints():
@@ -45,60 +54,99 @@ def test_base_constraints():
     assert (x.value() != y.value())
 
 
-@pytest.mark.parametrize("cname", Comparison.allowed)
-def test_comp_constraints(cname):
-    # Integer variables
-    i, j, k = [intvar(0, 3, name=n) for n in "ijk"]
-
-    SOLVER_CLASS(Model(Comparison(cname, i, j))).solve()
-    string = f"{i.value()} {cname} {j.value()}"
-    assert eval(string)
-
-
-COMBOS = [(op, comp) for comp in Comparison.allowed for op in Operator.allowed]
-
-
-@pytest.mark.parametrize("o_name,c_name", COMBOS)
-def test_operator_comp_constraints(o_name, c_name):
+def numexprs():
     """
-        Test all flattened expressions.
-        See cpmpy/transformations/flatten_model
+    Generate all numerical expressions
+    Numexpr:
+        - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
+                                                           (CPMpy class 'Operator', not is_bool())
+        - Global constraint (non-Boolean) (examples: Max,Min,Element)
+                                                           (CPMpy class 'GlobalConstraint', not is_bool()))
+    """
+    names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if not is_bool]
+    names = [(name, arity) for name, arity in names if name not in EXCLUDE_MAP[SOLVER_CLASS]]
+    for name, arity in names:
+        if name == "wsum":
+            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
+        elif arity != 0:
+            operator_args = NUM_ARGS[:arity]
+        else:
+            operator_args = NUM_ARGS
+
+        yield Operator(name, operator_args)
+
+
+# Generate all possible comparison constraints
+def comp_constraints():
+    """
+        Generate all comparison constraints
+        - Numeric equality:  Numexpr == Var                (CPMpy class 'Comparison')
+                         Numexpr == Constant               (CPMpy class 'Comparison')
+        - Numeric disequality: Numexpr != Var              (CPMpy class 'Comparison')
+                           Numexpr != Constant             (CPMpy class 'Comparison')
+        - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
+    """
+    for comp_name in Comparison.allowed:
+        for numexpr in numexprs():
+            for rhs in [NUM_VAR, 1]:
+                yield Comparison(comp_name, numexpr, rhs)
+
+
+# Generate all possible boolean expressions
+def bool_exprs():
+    """
+        Generate all boolean expressions:
+         - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
+    """
+    names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if is_bool]
+    names = [(name, arity) for name, arity in names if name not in EXCLUDE_MAP[SOLVER_CLASS]]
+
+    for name, arity in names:
+        if arity != 0:
+            operator_args = BOOL_ARGS[:arity]
+        else:
+            operator_args = BOOL_ARGS
+
+        yield Operator(name, operator_args)
+
+    for eq_name in ["==", "!="]:
+        yield Comparison(eq_name, *BOOL_ARGS[:2])
+
+    # TODO global constraints
+
+# Generate all reify/imply constraints
+def reify_imply_exprs():
+    """
+    - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
+    - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
+                   Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
     """
 
-    if o_name in EXCLUDE_MAP[SOLVER_CLASS] or c_name in EXCLUDE_MAP[SOLVER_CLASS]:
-        return
+    for bool_expr in bool_exprs():
+        yield bool_expr == BOOL_VAR
+        yield bool_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(bool_expr)
 
-    # Integer variables
-    i, j = [intvar(-3, 3, name=n) for n in "ij"]
-    k, l = [intvar(0, 3, name=n) for n in "kl"]
+    for comp_expr in comp_constraints():
+        yield comp_expr == BOOL_VAR
+        yield comp_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(comp_expr)
 
-    a,b,c = [boolvar(name=n) for n in "abc"]
 
-    arity, is_bool = Operator.allowed[o_name]
-    if is_bool:
-        # Can never be the outcome of flatten. See /tranformations/flatten_model
-        return
-    if o_name == "wsum":
-        args = [[1, 2, 3], [i, j, k]]
-    elif arity == 1:
-        args = [i]
-    elif arity == 2:
-        args = [k, 2] if o_name in ("div", "pow") else [i,k]
-    else:
-        args = [a,b,c] if is_bool else [i,j,k]
-
-    constraint = Comparison(c_name, Operator(o_name, args), l)
-    SOLVER_CLASS(Model(constraint)).solve()
+@pytest.mark.parametrize("constraint", comp_constraints(), ids=lambda c: str(c))
+def test_comparisons(constraint):
+    """
+        Tests comparison constraint by posting it to the solver and checking the value after solve.
+    """
+    assert SOLVER_CLASS(Model(constraint)).solve()
     assert constraint.value()
 
-class test_reify_contraints(unittest.TestCase):
 
-    def setUp(self) -> None:
-        self.a,self.b,self.c = [boolvar(name=n) for n in "abc"]
-        self.solver = SOLVER_CLASS()
-
-    def test_and(self):
-        constr = self.a & self.b == self.c
-        self.solver += constr
-        assert self.solver.solve()
-        self.assertTrue(constr.value())
+@pytest.mark.parametrize("constraint", reify_imply_exprs(), ids=lambda c: str(c))
+def test_reify_imply(constraint):
+    """
+        Tests boolean expression by posting it to solver and checking the value after solve.
+    """
+    assert SOLVER_CLASS(Model(constraint)).solve()
+    assert constraint.value()
