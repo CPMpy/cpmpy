@@ -429,6 +429,7 @@ class Operator(Expression):
         arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
 
         if any(a is None for a in arg_vals): return None
+        # non-boolean
         elif self.name == "sum": return sum(arg_vals)
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
@@ -438,7 +439,12 @@ class Operator(Expression):
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
-        
+        # boolean
+        elif self.name == "and": return all(arg_vals)
+        elif self.name == "or" : return any(arg_vals)
+        elif self.name == "xor": return sum(arg_vals) % 2 == 1
+        elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
+
         return None # default
 
 def _wsum_should(arg):
