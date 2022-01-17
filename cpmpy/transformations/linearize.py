@@ -1,18 +1,46 @@
 """
-Linearization of constraints to use in MIP-like solvers
+Transformations regarding linearization of constraints.
+
+Linearized constraints have one of the following forms:
+
+NumExpr >=< Constant
+NumExpr >=< Var
+
+(NumExpr >=< Constant) == Var
+(NumExpr >=< Var) == Var
+
+Var -> Boolexpr
+
+Numexpr:
+
+        - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
+                                                           (CPMpy class 'Operator', not is_bool())
+        - Global constraint (non-Boolean) (examples: Max,Min,Element)
+                                                           (CPMpy class 'GlobalConstraint', not is_bool()))
+
+
+This file implements:
+    - linearize_constraint
+    - no_negation
+
 
 """
 import numpy as np
 
-from ..expressions.core import Comparison, Operator
+from ..expressions.core import Comparison, Operator, Expression
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
 from ..expressions.utils import is_any_list
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
 M = int(10e10)  # Arbitrary VERY large number
 
+
 def linearize_constraint(cpm_expr):
+    """
+    Transforms all constraints to a linear form.
+    This function assumes all constraints are in 'flat normal form'. Hence only apply after 'flatten()'.
+    """
 
     if is_any_list(cpm_expr):
         lin_cons = [linearize_constraint(expr) for expr in cpm_expr]
@@ -32,6 +60,7 @@ def linearize_constraint(cpm_expr):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     if cpm_expr.name == "xor":
+        assert len(cpm_expr.args) == 2, "Only suports xor with 2 vars"
         if all(arg.is_bool() for arg in cpm_expr.args):
             return [sum(cpm_expr.args) == 1]
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
@@ -47,7 +76,7 @@ def linearize_constraint(cpm_expr):
             return [rhs >= lhs]
         raise Exception(f"{cpm_expr} should be of the form Var -> BoolExpr or BoolExpr -> Var")
 
-    #Binary operators
+    # Binary operators
     if cpm_expr.name == "<":
         lhs, rhs = cpm_expr.args
         rhs_minus_1, cons = get_or_make_var(rhs - 1)
@@ -63,13 +92,9 @@ def linearize_constraint(cpm_expr):
         # Special case: BV != BV
         if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
             return [lhs + rhs == 1]
-
         # Normal case: big M implementation
         z = boolvar()
-
         Mz, cons_Mz = get_or_make_var(M * z)
-        Mmz, cons_Mmz = get_or_make_var(M - Mz)
-
         lhs, cons_lhs = get_or_make_var(lhs)
 
         c1 = Mz + lhs - 1 >= rhs
@@ -77,7 +102,7 @@ def linearize_constraint(cpm_expr):
 
         return cons_Mz + cons_lhs + [c1, c2]
 
-    if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "mul":
+    if cpm_expr.name in [">=", "<=", "=="] and isinstance(cpm_expr, Operator) and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
             return [Comparison(cpm_expr.name, sum(cpm_expr.args[0].args), cpm_expr.args[1])]
 
@@ -89,32 +114,17 @@ def linearize_constraint(cpm_expr):
 
         return constraints + [Comparison(cpm_expr.name, var, rhs)]
 
-
-    if cpm_expr.name == "==" and isinstance(cpm_expr.args[0], Comparison):
+    gen_constr = ["and","or","min","max","abs","pow"] #General constraints supported by gurobi, TODO: make composable for other solvers
+    if cpm_expr.name == '==':
         lhs, rhs = cpm_expr.args
-        llhs, lrhs = lhs.args
-
-        if lhs.name == ">=":
-            Mz, cons_Mz = get_or_make_var(M * rhs)
-            Mmz, cons_Mmz = get_or_make_var(M * (1 - rhs))
-            return [llhs - lrhs <= Mz, lrhs - llhs - 1 <= Mmz]
-
-        elif lhs.name == "<=":
-            Mz, cons_Mz = get_or_make_var(M * rhs)
-            Mmz, cons_Mmz = get_or_make_var(M * (1 - rhs))
-            return [llhs - lrhs >= Mz, lrhs - llhs - 1 >= Mmz]
-
-        elif lhs.name == "==":
-            # Model as <= & >=
-            z1, z2 = boolvar(shape=2)
-            cons = linearize_constraint((llhs >= lrhs) == z1)
-            cons += linearize_constraint((llhs <= lrhs) == z2)
-
-            cons += [rhs <= z1, rhs <= z2, z1 + z1 -1 <= rhs]
-            return cons
-        raise Exception(f"Not a supported expression to linearize {cpm_expr}")
-
-
+        if lhs.is_bool() and isinstance(lhs, _BoolVarImpl) and not isinstance(rhs, _BoolVarImpl):
+            # BE == BV :: ~BV -> ~BE, BV -> BE
+            if lhs in gen_constr:
+                return [cpm_expr]
+            else:
+                c1 = (~rhs).implies(negated_normal(lhs))
+                c2 = rhs.implies(lhs)
+                return linearize_constraint([c1,c2])
 
     if cpm_expr.name == "alldifferent":
         """
@@ -140,11 +150,11 @@ def linearize_constraint(cpm_expr):
 
         sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
 
-        constraints = [sum(row) == 1 for row in sigma] # Exactly one value
-        constraints += [sum(col) <= 1 for col in sigma.T] # All diff values
+        constraints = [sum(row) == 1 for row in sigma]  # Exactly one value
+        constraints += [sum(col) <= 1 for col in sigma.T]  # All diff values
 
         for arg, row in zip(cpm_expr.args, sigma):
-            constraints += [sum(np.arange(lb, ub+1) * row) == arg]
+            constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
 
         return constraints
 
@@ -161,35 +171,43 @@ def no_negation(cpm_expr):
         nn_cons = [no_negation(expr) for expr in cpm_expr]
         return [c for l in nn_cons for c in l]
 
-
     def simplify(cpm_var):
         # TODO: come up with a better name for this function
         if isinstance(cpm_var, NegBoolView):
             return 1 - cpm_var._bv
         return cpm_var
 
-
     if isinstance(cpm_expr, NegBoolView):
         # Base case
         return [1 - cpm_expr._bv]
 
-
     if isinstance(cpm_expr, Comparison):
 
         lhs, rhs = cpm_expr.args
-        nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+        cons_l, cons_r = [], []
 
         if isinstance(lhs, Operator):
             # sum, wsum, and, or, min, max, abs, mul, div, pow
-            cons_l = []
-            if lhs.name == "wsum":
-                vars, weights = lhs.args
-                nn_args = []
-                for nn_expr in map(simplify,vars):
-                    nn_var, cons =  get_or_make_var(nn_expr)
-                    cons_l += cons
-                    nn_args.append(nn_var)
-                nn_lhs = Operator("wsum", [vars,weights])
+            if lhs.name == "sum":
+                # Aggregate 1's and add to sum
+                const = sum(isinstance(x,NegBoolView) for x in lhs.args)
+                nn_lhs = sum([-x._bv if isinstance(x,NegBoolView) else x for x in lhs.args]) + const
+                if isinstance(rhs, NegBoolView):
+                    nn_rhs = -rhs._bv
+                    nn_lhs -= 1
+                else:
+                    nn_rhs = rhs
+
+            elif lhs.name == "wsum":
+                const = sum(w for var, w in zip(*lhs.args) if isinstance(var, NegBoolView))
+                nn_lhs = sum([-w * var._bv if isinstance(var, NegBoolView) else w * var for var,w in zip(*lhs.args)])
+
+                if isinstance(rhs, NegBoolView):
+                    nn_rhs, cons_r = get_or_make_var(-rhs._bv - (const - 1))
+                elif isinstance(rhs,Expression):
+                    nn_rhs, cons_r = get_or_make_var(rhs - const)
+                else:
+                    nn_rhs = rhs - const
 
             else:
                 nn_args = []
@@ -199,33 +217,36 @@ def no_negation(cpm_expr):
                     nn_args.append(nn_var)
 
                 nn_lhs = Operator(lhs.name, nn_args)
+                nn_rhs, cons_r = get_or_make_var(simplify(rhs))
 
         else:
-            nn_lhs , cons_l = get_or_make_var(simplify(lhs))
+            nn_lhs, cons_l = get_or_make_var(simplify(lhs))
+            nn_rhs, cons_r = get_or_make_var(simplify(rhs))
 
         return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
 
+    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        lhs, rhs = cpm_expr.args
+
+        if isinstance(rhs, _BoolVarImpl):
+            # bvar -> bvar
+            if isinstance(lhs, NegBoolView) and isinstance(rhs, NegBoolView):
+                # ~A -> ~B  ==> B -> A
+                return [rhs._bv.implies(lhs._bv)]
+            if isinstance(lhs, NegBoolView) and not isinstance(rhs, NegBoolView):
+                # ~A -> B ==> A or B
+                return [lhs._bv + rhs._bv >= 1]
+            if not isinstance(lhs, NegBoolView) and isinstance(rhs, NegBoolView):
+                # A -> ~B == not (A and B)
+                return [lhs._bv + rhs._bv <= 1]
+            if not isinstance(lhs, NegBoolView) and not isinstance(rhs, NegBoolView):
+                # A -> B
+                return [cpm_expr]
+        else:
+            # bvar -> NumExpr >=< Var
+            bvar, cons = get_or_make_var(simplify(lhs))
+            return cons + [bvar.implies(rhs)]
+
+    return [cpm_expr]  # Constant or non negative _BoolVarImpl
 
 
-    return [cpm_expr] # Constant or non negative _BoolVarImpl
-
-
-
-
-
-if __name__ == "__main__":
-
-    a, b, c = [boolvar(name=n) for n in "abc"]
-    i,j,k = [intvar(lb=0, ub=5, name=n) for n in "ijk"]
-
-    expr = a & ~b >= i
-    print(expr, no_negation(expr))
-
-    expr = a.implies(~b) >= i
-    print(expr, no_negation(expr))
-
-    expr = a <= ~i
-    print(expr, no_negation(expr))
-
-    expr = a & ~b >= ~c
-    print(expr, no_negation(expr))
