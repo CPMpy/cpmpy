@@ -270,6 +270,7 @@ class CPM_gurobi(SolverInterface):
             Solvers do not need to support all constraints.
         """
         from gurobipy import GRB
+        from gurobipy import LinExpr
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -279,7 +280,10 @@ class CPM_gurobi(SolverInterface):
 
 
             # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
+            if cpm_expr.name != '==' and not is_num(lhs) and \
+                    not isinstance(lhs, _NumVarImpl) and \
+                    not lhs.name == "sum" and \
+                    not lhs.name == "wsum":
                 # functional globals only exist for equality in gurobi
                 # example: min(x) > 10 :: min(x) == aux, aux > 10
                 # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
@@ -340,11 +344,38 @@ class CPM_gurobi(SolverInterface):
                     return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
+                    assert a == 2, "Only support quadratic constraints"
                     assert not isinstance(a, _NumVarImpl), f"Gurobi only supports power expressions with positive exponents."
                     return self.grb_model.addGenConstrPow(x, rvar, a)
 
             raise NotImplementedError(
                 "Not a know supported gurobi left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            # Indicator constraints
+            # Take form bvar -> sum(x,y,z) >= rvar
+            lhs, rhs = cpm_expr.args
+            assert isinstance(lhs, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+            assert isinstance(rhs, Comparison), "Implication must have linear constraints on right hand side"
+            lhs = self.solver_var(lhs)
+            lrhs, rrhs = rhs.args
+            if isinstance(lrhs, _BoolVarImpl):
+                lin_expr = self.solver_var(lrhs)
+            elif lrhs.name == "wsum":
+                lin_expr = LinExpr(lrhs.args[0], self.solver_vars(lrhs.args[1]))
+            elif lrhs.name == "sum":
+                lin_expr = LinExpr(np.ones(shape=len(lrhs.args[1])), self.solver_vars(lrhs.args[1]))
+            else:
+                raise Exception(f"Unknown linear expression {lrhs} on right side of indicator constraint: {cpm_expr}")
+            # TODO check if lhs is NegBoolView -> adapt no_negation tranformation
+            if rhs.name == "<=":
+                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.LESS_EQUAL, self.solver_var(rrhs))
+            if rhs.name == ">=":
+                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rrhs))
+            if rhs.name == "<=":
+                return self.grb_model.addGenConstrIndicator(lhs, True, lin_expr, GRB.EQUAL, self.solver_var(rrhs))
+
+
 
         # Global constraints
         else:
