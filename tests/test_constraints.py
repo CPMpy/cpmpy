@@ -11,7 +11,7 @@ SOLVER_CLASS = CPM_gurobi
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_MAP = {CPM_ortools: ("sub", "div", "mod", "pow"),
-               CPM_gurobi: ("sub", "mod")}
+               CPM_gurobi: ("sub", "mod", "xor")} # TODO remove xor from list
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
