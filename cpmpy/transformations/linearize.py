@@ -29,8 +29,8 @@ import numpy as np
 
 from ..expressions.core import Comparison, Operator, Expression
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
-from ..expressions.utils import is_any_list
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar
+from ..expressions.utils import is_any_list, is_num
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
 M = int(10e10)  # Arbitrary VERY large number
@@ -74,6 +74,7 @@ def linearize_constraint(cpm_expr):
             return [cond.implies(expr >= 1)]
 
         if isinstance(cond, _BoolVarImpl):
+            # BV -> BE
             if isinstance(expr, Comparison):
                 lhs, rhs = expr.args
                 raise NotImplementedError("Not implemented yet, TODO") # TODO
@@ -179,7 +180,7 @@ def linearize_constraint(cpm_expr):
 def no_negation(cpm_expr):
     """
         Replaces all occurences of ~BV with 1 - BV in the expression.
-        cpm_expr is expected to be linearized.
+        cpm_expr is expected to be linearized. Hence, only apply after applying linearize_constraint(cpm_expr)
     """
 
     if is_any_list(cpm_expr):
@@ -192,14 +193,22 @@ def no_negation(cpm_expr):
             return 1 - cpm_var._bv
         return cpm_var
 
-    if isinstance(cpm_expr, NegBoolView):
-        # Base case
-        return [1 - cpm_expr._bv]
-
     if isinstance(cpm_expr, Comparison):
         # >!=<
         lhs, rhs = cpm_expr.args
         cons_l, cons_r = [], []
+
+        if isinstance(lhs, _BoolVarImpl):
+            # ~BV1 >=< ~BV2 => BV2 >=< BV1
+            if isinstance(lhs, NegBoolView) and isinstance(rhs, NegBoolView):
+                return [Comparison(cpm_expr.name, rhs._bv, lhs._bv)]
+            # ~BV1 >=< BV2 => BV1 + BV2 >=< 1
+            if isinstance(lhs, NegBoolView):
+                return [Comparison(cpm_expr.name, lhs._bv + rhs, 1)]
+            if isinstance(rhs, NegBoolView):
+                return [Comparison(cpm_expr.name, lhs + rhs._bv, 1)]
+            return [cpm_expr]
+
 
         if isinstance(lhs, Operator):
             # sum, wsum, and, or, min, max, abs, mul, div, pow
@@ -234,12 +243,88 @@ def no_negation(cpm_expr):
                 nn_lhs = Operator(lhs.name, nn_args)
                 nn_rhs, cons_r = get_or_make_var(simplify(rhs))
 
+                return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
+
+    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        cond, expr = cpm_expr.args
+        assert isinstance(cond, _BoolVarImpl), f"Left hand side of implication {cpm_expr} should be boolvar"
+        assert isinstance(expr, Comparison), f"Right hand side of implication {cpm_expr} should be comparison"
+        lhs, rhs = expr.args
+
+        if isinstance(lhs, _NumVarImpl):
+            if is_num(rhs):
+                return [cpm_expr]
+            cons, neg_rhs = get_or_make_var(-rhs)
+            return cons + [cond.implies(Comparison(expr.name, lhs + neg_rhs, 0))]
+
+        if isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum"):
+            if lhs.name == "sum":
+                new_lhs = sum(arg for arg in lhs.args if not isinstance(arg, NegBoolView))
+                neg_vars = [arg._bv for arg in lhs.args if isinstance(arg, NegBoolView)]
+                new_var, cons = get_or_make_var(-sum(neg_vars))
+                new_lhs += new_var
+                new_lhs += len(neg_vars)
+
+            if lhs.name == "wsum":
+                new_lhs = sum(w * arg for w, arg in zip(*lhs.args) if not isinstance(arg, NegBoolView))
+                neg_vars = [(w,arg._bv) for w,arg in zip(lhs.args) if isinstance(arg, NegBoolView)]
+                new_var, cons = get_or_make_var(-sum(w * v for w,v in neg_vars))
+                new_lhs += new_var
+                new_lhs += sum(w for w,_ in neg_vars)
+
+            new_rhs = rhs
+            if not is_num(rhs):
+                pass # TODO: bring right hand side to left
+
+            return cons + [cond.implies(Comparison(expr.name, new_lhs, new_rhs))]
         else:
-            nn_lhs, cons_l = get_or_make_var(simplify(lhs))
-            nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+            raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
 
-        return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
 
-    return [cpm_expr]  # Constant or non negative _BoolVarImpl
+    raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
