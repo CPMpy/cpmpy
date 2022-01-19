@@ -47,6 +47,8 @@ def linearize_constraint(cpm_expr):
         return [c for l in lin_cons for c in l]
 
     if isinstance(cpm_expr, _BoolVarImpl):
+        if isinstance(cpm_expr, NegBoolView):
+            return [cpm_expr._bv <= 0]
         return [cpm_expr >= 1]
 
     if cpm_expr.name == "and":
@@ -70,27 +72,19 @@ def linearize_constraint(cpm_expr):
         if not cond.is_bool() or not expr.is_bool():
             raise Exception(
                 f"Numeric constants or numeric variables not allowed as base constraint, cannot linearize {cpm_expr}")
-        if isinstance(cond, _BoolVarImpl) and isinstance(expr, _BoolVarImpl):
-            return [cond.implies(expr >= 1)]
-
-        if isinstance(cond, _BoolVarImpl):
-            # BV -> BE
-            if isinstance(expr, Comparison):
-                lhs, rhs = expr.args
-                raise NotImplementedError("Not implemented yet, TODO") # TODO
-            if isinstance(expr, Operator):
-                lin_expr = linearize_constraint(expr)
-                assert len(lin_expr) == 1, f"Not a supported operator to linearize: {expr} in constraint {cpm_expr}"
-                return [cond.implies(lin_expr[0])]
-
-
-            return [cpm_expr]
-
-        if isinstance(expr, _BoolVarImpl):
+        if isinstance(expr, _BoolVarImpl) and not isinstance(cond, _BoolVarImpl):
+            # BE -> BV => ~BV -> BE
             return linearize_constraint((~expr).implies(negated_normal(cond)))
 
+        lin_expr = linearize_constraint(expr)
+        assert len(lin_expr) == 1, f"Not a supported operator to linearize: {expr} in constraint {cpm_expr}"
+        lin_expr = lin_expr[0]
 
-        raise Exception(f"{cpm_expr} should be of the form Var -> BoolExpr or BoolExpr -> Var")
+        # Bring all variables to left side of expr
+        lhs, rhs = lin_expr.args
+        new_var, cons = get_or_make_var(-rhs)
+        return cons + [cond.implies(Comparison(lin_expr.name, lhs+new_var, 0))]
+
 
     # Binary operators
     if cpm_expr.name == "<":
@@ -272,11 +266,7 @@ def no_negation(cpm_expr):
                 new_lhs += new_var
                 new_lhs += sum(w for w,_ in neg_vars)
 
-            new_rhs = rhs
-            if not is_num(rhs):
-                pass # TODO: bring right hand side to left
-
-            return cons + [cond.implies(Comparison(expr.name, new_lhs, new_rhs))]
+            return cons + [cond.implies(Comparison(expr.name, new_lhs, rhs))]
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
 
