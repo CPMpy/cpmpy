@@ -66,6 +66,15 @@ class TestInterface(unittest.TestCase):
 
         self.assertListEqual([0, 1, 0], [self.x.value(), self.y.value(), self.z.value()])
 
+    def test_solve_infeasible(self):
+
+        self.solver += self.x.implies(self.y & self.z)
+        self.solver += ~ self.z
+        self.solver += self.x
+
+        self.assertFalse(self.solver.solve())
+        self.assertEqual(ExitStatus.UNSATISFIABLE, self.solver.status().exitstatus)
+
     def test_objective(self):
 
         try:
