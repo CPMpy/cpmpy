@@ -89,11 +89,17 @@ def linearize_constraint(cpm_expr):
     # Binary operators
     if cpm_expr.name == "<":
         lhs, rhs = cpm_expr.args
+        if lhs.name == "sum":
+            new_var, cons = get_or_make_var(-rhs)
+            return cons + [lhs + new_var <= -1]
         rhs_minus_1, cons = get_or_make_var(rhs - 1)
         return cons + [lhs <= rhs_minus_1]
 
     if cpm_expr.name == ">":
         lhs, rhs = cpm_expr.args
+        if lhs.name == "sum":
+            new_var, cons = get_or_make_var(-rhs)
+            return cons + [lhs + new_var >= 1]
         rhs_plus_1, cons = get_or_make_var(rhs + 1)
         return cons + [lhs >= rhs_plus_1]
 
@@ -261,7 +267,7 @@ def no_negation(cpm_expr):
 
             if lhs.name == "wsum":
                 new_lhs = sum(w * arg for w, arg in zip(*lhs.args) if not isinstance(arg, NegBoolView))
-                neg_vars = [(w,arg._bv) for w,arg in zip(lhs.args) if isinstance(arg, NegBoolView)]
+                neg_vars = [(w,arg._bv) for w,arg in zip(*lhs.args) if isinstance(arg, NegBoolView)]
                 new_var, cons = get_or_make_var(-sum(w * v for w,v in neg_vars))
                 new_lhs += new_var
                 new_lhs += sum(w for w,_ in neg_vars)
