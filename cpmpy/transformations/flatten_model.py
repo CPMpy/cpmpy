@@ -331,6 +331,7 @@ def get_or_make_var(expr):
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
         lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
         ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
+        lb, ub = min(lb,ub), max(lb,ub)
         ivar = _IntVarImpl(lb, ub)
         newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
