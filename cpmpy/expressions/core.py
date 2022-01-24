@@ -426,7 +426,11 @@ class Operator(Expression):
 
     def value(self):
         # if self.name ==
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        if self.name == "wsum":
+            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+        else:
+            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+
 
         if any(a is None for a in arg_vals): return None
         # non-boolean
