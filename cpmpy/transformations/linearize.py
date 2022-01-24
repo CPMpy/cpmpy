@@ -202,6 +202,9 @@ def linearize_constraint(cpm_expr):
 
         return constraints
 
+    if isinstance(cpm_expr, GlobalConstraint):
+        return linearize_constraint(only_bv_implies(flatten_constraint(cpm_expr.decompose())))
+
     return [cpm_expr]
 
 
@@ -254,47 +257,57 @@ def no_negation(cpm_expr):
         if isinstance(lhs, _NumVarImpl):
             return [cpm_expr]
 
-        if isinstance(lhs, Operator):
-            # sum, wsum, and, or, min, max, abs, mul, div, pow
-            if lhs.name == "sum" or lhs.name == "wsum":
-                if lhs.name == "sum":
-                    if not any(isinstance(arg, NegBoolView) for arg in lhs.args):
-                        # No NegBoolViews in sum, return
-                        return [cpm_expr]
-                    # Convert to wsum
-                    lhs = Operator("wsum", [[1] * len(lhs.args), lhs.args])
+        if isinstance(lhs, Operator) and lhs.name == "sum" or lhs.name == "wsum":
+            # sum, wsum
+            if lhs.name == "sum":
+                if not any(isinstance(arg, NegBoolView) for arg in lhs.args):
+                    # No NegBoolViews in sum, return
+                    return [cpm_expr]
+                # Convert to wsum
+                lhs = Operator("wsum", [[1] * len(lhs.args), lhs.args])
 
-                if lhs.name == "wsum":
-                    # TODO: can be optimized with sum/wsum improvements, see: https://github.com/CPMpy/cpmpy/issues/97
-                    weights, vars = [],[]
-                    for w, arg in zip(*lhs.args):
-                        if isinstance(arg, NegBoolView):
-                            weights += [w,-w]
-                            vars += [1, arg._bv]
-                        else:
-                            weights += [w]
-                            vars += [arg]
-                    new_lhs = Operator("wsum", [weights, vars])
+            if lhs.name == "wsum":
+                # TODO: can be optimized with sum/wsum improvements, see: https://github.com/CPMpy/cpmpy/issues/97
+                weights, vars = [],[]
+                for w, arg in zip(*lhs.args):
+                    if isinstance(arg, NegBoolView):
+                        weights += [w,-w]
+                        vars += [1, arg._bv]
+                    else:
+                        weights += [w]
+                        vars += [arg]
+                new_lhs = Operator("wsum", [weights, vars])
 
-                if isinstance(rhs, NegBoolView):
-                    new_lhs += 1 * rhs._bv
-                    new_rhs = 1
-                else:
-                    new_rhs = rhs
-
-                return [Comparison(cpm_expr.name, new_lhs, new_rhs)]
-
+            if isinstance(rhs, NegBoolView):
+                new_lhs += 1 * rhs._bv
+                new_rhs = 1
             else:
-                nn_args = []
-                for nn_expr in map(simplify, lhs.args):
-                    nn_var, cons = get_or_make_var(nn_expr)
-                    cons_l += cons
-                    nn_args.append(nn_var)
+                new_rhs = rhs
 
-                nn_lhs = Operator(lhs.name, nn_args)
-                nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+            return [Comparison(cpm_expr.name, new_lhs, new_rhs)]
 
-                return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
+        if isinstance(lhs, Operator):
+            # min, max
+            simplied_args = [simplify(arg) for arg in lhs.args]
+            nn_args, cons_l = zip(*[get_or_make_var(arg) for arg in simplied_args])
+
+            nn_lhs = Operator(lhs.name, nn_args)
+            nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+
+            var_cons = [c for con in cons_l for c in con] + [c for con in cons_r for c in con]
+            return var_cons + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
+
+        if isinstance(lhs, GlobalConstraint):
+            # min, max
+            simplied_args = [simplify(arg) for arg in lhs.args]
+            nn_args, cons_l = zip(*[get_or_make_var(arg) for arg in simplied_args])
+
+            nn_lhs = GlobalConstraint(lhs.name, nn_args)
+            nn_rhs, cons_r = get_or_make_var(simplify(rhs))
+
+            var_cons = [c for con in cons_l for c in con] + [c for con in cons_r for c in con]
+            return var_cons + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
+
 
     if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
 
@@ -315,7 +328,6 @@ def no_negation(cpm_expr):
             return linearize_constraint([cond.implies(nn_expr) for nn_expr in nn_subsexpr])
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
-
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
