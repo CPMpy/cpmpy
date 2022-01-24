@@ -251,6 +251,8 @@ def no_negation(cpm_expr):
                 return [Comparison(cpm_expr.name, lhs + rhs._bv, 1)]
             return [cpm_expr]
 
+        if isinstance(lhs, _NumVarImpl):
+            return [cpm_expr]
 
         if isinstance(lhs, Operator):
             # sum, wsum, and, or, min, max, abs, mul, div, pow
