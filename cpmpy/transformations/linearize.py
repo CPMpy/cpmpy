@@ -9,9 +9,9 @@ Linear comparison:
 - LinExpr == Constant/Var
 - LinExpr >= Constant/Var
 - LinExpr <= Constant/Var
-# TODO: do we want to put all vars on lhs?
+# TODO: do we want to put all vars on lhs (so rhs = 0)?
 
-    LinExpr can be any of  NumVarImpl, sum or wsum
+    LinExpr can be any of  NumVarImpl, div, mul, sum or wsum
 
 
 Indicator constraints
@@ -29,7 +29,7 @@ GenExpr == var
 import numpy as np
 
 from .reification import only_bv_implies
-from ..expressions.core import Comparison, Operator, Expression
+from ..expressions.core import Comparison, Operator, Expression, _wsum_should, _wsum_make
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
 from ..expressions.utils import is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar, _NumVarImpl
@@ -70,14 +70,18 @@ def linearize_constraint(cpm_expr):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     if cpm_expr.name == "->":
-        cond, expr = cpm_expr.args
-        if not cond.is_bool() or not expr.is_bool():
+        cond, sub_expr = cpm_expr.args
+        var_cons = []
+        if not cond.is_bool() or not sub_expr.is_bool():
             raise Exception(
                 f"Numeric constants or numeric variables not allowed as base constraint, cannot linearize {cpm_expr}")
-        lin_exprs = linearize_constraint(expr)
-        sub_exprs = []
-        for l_expr in lin_exprs:
+        lin_comps = linearize_constraint(sub_expr)
+        lin_exprs = []
+        for l_expr in lin_comps:
             lhs, rhs = l_expr.args
+            if lhs.name == "mul" and _wsum_should(lhs):
+                lhs = Operator("wsum", _wsum_make(lhs))
+
             if isinstance(rhs, _NumVarImpl):
                 # Vars on rhs of linexpr not supported in indicator constraints
                 if isinstance(lhs, _NumVarImpl):
@@ -87,22 +91,32 @@ def linearize_constraint(cpm_expr):
                 elif lhs.name == "wsum":
                     new_lhs = lhs + (-1 * rhs)
                 else:
-                    raise Exception(f"Unsupported expression {lhs} on right hand side of implication {cpm_expr}")
-                sub_exprs += [Comparison(l_expr.name, new_lhs, 0)]
+                    raise Exception(f"Unsupported expression {lhs} on right hand side of implication {l_expr}, resulting from linearization of {cpm_expr}")
+                lin_exprs += [Comparison(l_expr.name, new_lhs, 0)]
             else:
-                sub_exprs += [l_expr]
+                lin_exprs += [l_expr]
 
-        return [cond.implies(l_expr) for l_expr in sub_exprs]
+        return var_cons + [cond.implies(l_expr) for l_expr in lin_exprs]
 
     # Binary operators
     if cpm_expr.name == "<":
-        cons = cpm_expr.args[0] + 1 <= cpm_expr.args[1]
+        # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
+        lhs, rhs = cpm_expr.args
+        if lhs.name == "wsum":
+            return [Operator("wsum", [lhs.args[0] + [1], lhs.args[1] + [1]]) <= rhs]
+        else:
+            cons = lhs + 1 <= rhs
         cons = flatten_constraint(cons)
         cons = linearize_constraint(cons)
         return cons
 
     if cpm_expr.name == ">":
-        cons = cpm_expr.args[0] - 1 >= cpm_expr.args[1]
+        # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
+        lhs, rhs = cpm_expr.args
+        if lhs.name == "wsum":
+            return [Operator("wsum", [lhs.args[0] + [-1], lhs.args[1] + [1]]) >= rhs]
+        else:
+            cons = lhs - 1 >= rhs
         cons = flatten_constraint(cons)
         cons = linearize_constraint(cons)
         return cons
@@ -118,15 +132,22 @@ def linearize_constraint(cpm_expr):
         Mz, cons_Mz = get_or_make_var(M * z)
         lhs, cons_lhs = get_or_make_var(lhs)
 
-        c1 = M + lhs - 1 >= rhs
-        c2 = - Mz + lhs + 1 + M <= rhs
+        c1 = M + lhs + -1 >= rhs
+        c2 = - Mz + lhs + 1 <= rhs
 
         return cons_Mz + cons_lhs + flatten_constraint([c1, c2])
 
     if cpm_expr.name in [">=", "<=", "=="] and \
-            isinstance(cpm_expr, Operator) and cpm_expr.args[0].name == "mul":
+            isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
             return [Comparison(cpm_expr.name, sum(cpm_expr.args[0].args), cpm_expr.args[1])]
+
+        lhs, rhs = cpm_expr.args
+        if len(lhs.args) == 2:
+            if _wsum_should(lhs):
+                # Convert to wsum
+                return [Comparison(cpm_expr.name, Operator("wsum", _wsum_make(lhs)), rhs)]
+            return [cpm_expr]
 
         lhs, rhs = cpm_expr.args
         var, constraints = get_or_make_var(lhs.args[0] * lhs.args[1])
