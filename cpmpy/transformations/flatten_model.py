@@ -332,6 +332,7 @@ def get_or_make_var(expr):
         lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
         ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
         lb, ub = min(lb,ub), max(lb,ub)
+        # TODO, check if there are other cases where lb  and ub should be different... Negative weights/bounds?
         ivar = _IntVarImpl(lb, ub)
         newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
@@ -589,7 +590,7 @@ def normalized_numexpr(expr):
 
     elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
         weights, sub_exprs  = expr.args
-        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
+        flatvars, flatcons = map(list, zip(*[get_or_make_var(arg) for arg in sub_exprs])) # also bool, reified...
         newexpr = Operator(expr.name, (weights, flatvars))
         return (newexpr, [c for con in flatcons for c in con])
 
