@@ -77,13 +77,9 @@ class CPM_gurobi(SolverInterface):
                 "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
-        # initialise the native solver object
-        self.env = gp.Env()
-        self.env.setParam("LogToConsole", 0)
-        self.env.setParam("OutputFlag", 0)
-        self.env.start()
-
-        self.grb_model = gp.Model(env=self.env)
+        # initialise the native gurobi model object
+        self.grb_model = gp.Model()
+        self.grb_model.setParam("OutputFlag", 0)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
