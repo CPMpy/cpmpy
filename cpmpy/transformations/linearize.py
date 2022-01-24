@@ -3,30 +3,32 @@ Transformations regarding linearization of constraints.
 
 Linearized constraints have one of the following forms:
 
-NumExpr >=< Constant
-NumExpr >=< Var
 
-(NumExpr >=< Constant) == Var
-(NumExpr >=< Var) == Var
+Linear comparison:
+--------------------------
+- LinExpr == Constant/Var
+- LinExpr >= Constant/Var
+- LinExpr <= Constant/Var
+# TODO: do we want to put all vars on lhs?
 
-Var -> Boolexpr
-
-Numexpr:
-
-        - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
-                                                           (CPMpy class 'Operator', not is_bool())
-        - Global constraint (non-Boolean) (examples: Max,Min,Element)
-                                                           (CPMpy class 'GlobalConstraint', not is_bool()))
+    LinExpr can be any of  NumVarImpl, sum or wsum
 
 
-This file implements:
-    - linearize_constraint
-    - no_negation
+Indicator constraints
+--------------------------
+- Boolvar -> LinExpr
 
+
+General Constraints
+---------------------------
+GenExpr == var
+
+    GenExpr can be any of: min, max, pow, abs
 
 """
 import numpy as np
 
+from .reification import only_bv_implies
 from ..expressions.core import Comparison, Operator, Expression
 from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
 from ..expressions.utils import is_any_list, is_num
@@ -53,7 +55,7 @@ def linearize_constraint(cpm_expr):
 
     if cpm_expr.name == "and":
         if all(arg.is_bool() for arg in cpm_expr.args):
-            return [sum(cpm_expr.args) == len(cpm_expr.args)]
+            return [sum(cpm_expr.args) >= len(cpm_expr.args)]
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
     if cpm_expr.name == "or":
@@ -72,36 +74,38 @@ def linearize_constraint(cpm_expr):
         if not cond.is_bool() or not expr.is_bool():
             raise Exception(
                 f"Numeric constants or numeric variables not allowed as base constraint, cannot linearize {cpm_expr}")
-        if isinstance(expr, _BoolVarImpl) and not isinstance(cond, _BoolVarImpl):
-            # BE -> BV => ~BV -> BE
-            return linearize_constraint((~expr).implies(negated_normal(cond)))
+        lin_exprs = linearize_constraint(expr)
+        sub_exprs = []
+        for l_expr in lin_exprs:
+            lhs, rhs = l_expr.args
+            if isinstance(rhs, _NumVarImpl):
+                # Vars on rhs of linexpr not supported in indicator constraints
+                if isinstance(lhs, _NumVarImpl):
+                    new_lhs = lhs + (-1) * rhs
+                elif lhs.name == "sum":
+                    new_lhs = Operator("wsum", [[1]*len(lhs.args) + [-1], lhs.args + [rhs]])
+                elif lhs.name == "wsum":
+                    new_lhs = lhs + (-1 * rhs)
+                else:
+                    raise Exception(f"Unsupported expression {lhs} on right hand side of implication {cpm_expr}")
+                sub_exprs += [Comparison(l_expr.name, new_lhs, 0)]
+            else:
+                sub_exprs += [l_expr]
 
-        lin_expr = linearize_constraint(expr)
-        assert len(lin_expr) == 1, f"Not a supported operator to linearize: {expr} in constraint {cpm_expr}"
-        lin_expr = lin_expr[0]
-
-        # Bring all variables to left side of expr
-        lhs, rhs = lin_expr.args
-        new_var, cons = get_or_make_var(-rhs)
-        return cons + [cond.implies(Comparison(lin_expr.name, lhs+new_var, 0))]
-
+        return [cond.implies(l_expr) for l_expr in sub_exprs]
 
     # Binary operators
     if cpm_expr.name == "<":
-        lhs, rhs = cpm_expr.args
-        if lhs.name == "sum":
-            new_var, cons = get_or_make_var(-rhs)
-            return cons + [lhs + new_var <= -1]
-        rhs_minus_1, cons = get_or_make_var(rhs - 1)
-        return cons + [lhs <= rhs_minus_1]
+        cons = cpm_expr.args[0] + 1 <= cpm_expr.args[1]
+        cons = flatten_constraint(cons)
+        cons = linearize_constraint(cons)
+        return cons
 
     if cpm_expr.name == ">":
-        lhs, rhs = cpm_expr.args
-        if lhs.name == "sum":
-            new_var, cons = get_or_make_var(-rhs)
-            return cons + [lhs + new_var >= 1]
-        rhs_plus_1, cons = get_or_make_var(rhs + 1)
-        return cons + [lhs >= rhs_plus_1]
+        cons = cpm_expr.args[0] - 1 >= cpm_expr.args[1]
+        cons = flatten_constraint(cons)
+        cons = linearize_constraint(cons)
+        return cons
 
     if cpm_expr.name == "!=":
         lhs, rhs = cpm_expr.args
@@ -110,6 +114,7 @@ def linearize_constraint(cpm_expr):
             return [lhs + rhs == 1]
         # Normal case: big M implementation
         z = boolvar()
+        # TODO: dynamically calculate M!!
         Mz, cons_Mz = get_or_make_var(M * z)
         lhs, cons_lhs = get_or_make_var(lhs)
 
@@ -118,7 +123,8 @@ def linearize_constraint(cpm_expr):
 
         return cons_Mz + cons_lhs + flatten_constraint([c1, c2])
 
-    if cpm_expr.name in [">=", "<=", "=="] and isinstance(cpm_expr, Operator) and cpm_expr.args[0].name == "mul":
+    if cpm_expr.name in [">=", "<=", "=="] and \
+            isinstance(cpm_expr, Operator) and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
             return [Comparison(cpm_expr.name, sum(cpm_expr.args[0].args), cpm_expr.args[1])]
 
@@ -130,7 +136,7 @@ def linearize_constraint(cpm_expr):
 
         return constraints + [Comparison(cpm_expr.name, var, rhs)]
 
-    gen_constr = ["and","or","min","max","abs","pow"] #General constraints supported by gurobi, TODO: make composable for other solvers
+    gen_constr = ["min","max","abs","pow"] #General constraints supported by gurobi, TODO: make composable for other solvers
     if cpm_expr.name == '==':
         lhs, rhs = cpm_expr.args
         if lhs.is_bool() and not isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -141,6 +147,7 @@ def linearize_constraint(cpm_expr):
                 c1 = (~rhs).implies(negated_normal(lhs))
                 c2 = rhs.implies(lhs)
                 return linearize_constraint([c1,c2])
+
 
     if cpm_expr.name == "alldifferent":
         """
@@ -175,6 +182,20 @@ def linearize_constraint(cpm_expr):
         return constraints
 
     return [cpm_expr]
+
+
+def is_lin(cpm_expr):
+    """
+        Returns whether cmp_expr is a linear constraint.
+    """
+
+    if isinstance(cpm_expr, Comparison):
+        lhs, rhs = cpm_expr.args
+        return isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum"
+
+    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        cond, subsexpr = cpm_expr.args
+        return isinstance(cond, _BoolVarImpl) and is_lin(subsexpr) and is_num(subsexpr.args[1])
 
 
 def no_negation(cpm_expr):
@@ -214,24 +235,31 @@ def no_negation(cpm_expr):
             # sum, wsum, and, or, min, max, abs, mul, div, pow
             if lhs.name == "sum" or lhs.name == "wsum":
                 if lhs.name == "sum":
-                    # Bring negative variables to other side
-                    new_lhs = sum(arg for arg in lhs.args if not isinstance(arg, NegBoolView))
-                    new_rhs = sum(arg._bv for arg in lhs.args if isinstance(arg, NegBoolView))
-                else: #wsum
-                    new_lhs = sum((weight * var) for weight, var in zip(*lhs.args) if not isinstance(var, NegBoolView))
-                    new_rhs = sum((weight * var._bv) for weight, var in zip(*lhs.args) if isinstance(var, NegBoolView))
+                    if not any(isinstance(arg, NegBoolView) for arg in lhs.args):
+                        # No NegBoolViews in sum, return
+                        return [cpm_expr]
+                    # Convert to wsum
+                    lhs = Operator("wsum", [[1] * len(lhs.args), lhs.args])
+
+                if lhs.name == "wsum":
+                    # TODO: can be optimized with sum/wsum improvements, see: https://github.com/CPMpy/cpmpy/issues/97
+                    weights, vars = [],[]
+                    for w, arg in zip(*lhs.args):
+                        if isinstance(arg, NegBoolView):
+                            weights += [w,-w]
+                            vars += [1, arg._bv]
+                        else:
+                            weights += [w]
+                            vars += [arg]
+                    new_lhs = Operator("wsum", [weights, vars])
 
                 if isinstance(rhs, NegBoolView):
-                    new_lhs += rhs._bv
+                    new_lhs += 1 * rhs._bv
+                    new_rhs = 1
                 else:
-                    new_rhs += rhs
+                    new_rhs = rhs
 
-                if (not isinstance(new_rhs, Operator) or len(new_rhs.args) > 1) \
-                        and (not isinstance(new_lhs, Operator) or len(new_lhs.args) <= 1):
-                    # Left hand side only contained negative values
-                    return [Comparison(cpm_expr.name, new_rhs, new_lhs)]
-                new_var, cons = get_or_make_var(new_rhs)
-                return cons + [Comparison(cpm_expr.name, new_lhs, new_var)]
+                return [Comparison(cpm_expr.name, new_lhs, new_rhs)]
 
             else:
                 nn_args = []
@@ -246,33 +274,22 @@ def no_negation(cpm_expr):
                 return cons_l + cons_r + [Comparison(cpm_expr.name, nn_lhs, nn_rhs)]
 
     if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-        cond, expr = cpm_expr.args
+
+        cond, subexpr = cpm_expr.args
         assert isinstance(cond, _BoolVarImpl), f"Left hand side of implication {cpm_expr} should be boolvar"
-        assert isinstance(expr, Comparison), f"Right hand side of implication {cpm_expr} should be comparison"
-        lhs, rhs = expr.args
+        assert isinstance(subexpr, Comparison), f"Right hand side of implication {cpm_expr} should be comparison"
+        lhs, rhs = subexpr.args
 
         if isinstance(lhs, _NumVarImpl):
             if is_num(rhs):
                 return [cpm_expr]
-            cons, neg_rhs = get_or_make_var(-rhs)
-            return cons + [cond.implies(Comparison(expr.name, lhs + neg_rhs, 0))]
+            new_lhs = lhs + -1 * rhs
+            return [cond.implies(Comparison(subexpr.name, new_lhs, 0))]
 
         if isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum"):
-            if lhs.name == "sum":
-                new_lhs = sum(arg for arg in lhs.args if not isinstance(arg, NegBoolView))
-                neg_vars = [arg._bv for arg in lhs.args if isinstance(arg, NegBoolView)]
-                new_var, cons = get_or_make_var(-sum(neg_vars))
-                new_lhs += new_var
-                new_lhs += len(neg_vars)
 
-            if lhs.name == "wsum":
-                new_lhs = sum(w * arg for w, arg in zip(*lhs.args) if not isinstance(arg, NegBoolView))
-                neg_vars = [(w,arg._bv) for w,arg in zip(*lhs.args) if isinstance(arg, NegBoolView)]
-                new_var, cons = get_or_make_var(-sum(w * v for w,v in neg_vars))
-                new_lhs += new_var
-                new_lhs += sum(w for w,_ in neg_vars)
-
-            return cons + [cond.implies(Comparison(expr.name, new_lhs, rhs))]
+            nn_subsexpr = no_negation(subexpr)
+            return linearize_constraint([cond.implies(nn_expr) for nn_expr in nn_subsexpr])
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
 
