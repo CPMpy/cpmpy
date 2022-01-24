@@ -357,7 +357,7 @@ class CPM_gurobi(SolverInterface):
                 lhs, bool_val = self.solver_var(lhs), True
 
             lrhs, rrhs = rhs.args
-            if isinstance(lrhs, _BoolVarImpl) or lrhs.name == "sum" or lrhs.name == "wsum":
+            if isinstance(lrhs, _NumVarImpl) or lrhs.name == "sum" or lrhs.name == "wsum":
                 lin_expr = self._make_numexpr(lrhs)
             else:
                 raise Exception(f"Unknown linear expression {lrhs} on right side of indicator constraint: {cpm_expr}")
