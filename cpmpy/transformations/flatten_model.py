@@ -590,7 +590,7 @@ def normalized_numexpr(expr):
 
     elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
         weights, sub_exprs  = expr.args
-        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
+        flatvars, flatcons = map(list, zip(*[get_or_make_var(arg) for arg in sub_exprs])) # also bool, reified...
         newexpr = Operator(expr.name, (weights, flatvars))
         return (newexpr, [c for con in flatcons for c in con])
 
