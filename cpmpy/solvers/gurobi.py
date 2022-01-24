@@ -225,12 +225,10 @@ class CPM_gurobi(SolverInterface):
 
         # sum
         if cpm_expr.name == "sum":
-            return gp.quicksum([self.solver_var(var) for var in cpm_expr.args])
+            return gp.quicksum(self.solver_vars(cpm_expr.args))
 
         if cpm_expr.name == "wsum":
-            weights, cpm_vars = cpm_expr.args
-            gbi_vars = [self.solver_var(var) for var in cpm_vars]
-            return gp.LinExpr(weights, gbi_vars)
+            return sum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
         raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -252,6 +250,7 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
 
         cpm_cons = flatten_constraint(cpm_con)
+        cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
         cpm_cons = no_negation(cpm_cons)
 
@@ -270,7 +269,6 @@ class CPM_gurobi(SolverInterface):
             Solvers do not need to support all constraints.
         """
         from gurobipy import GRB
-        from gurobipy import LinExpr
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -333,9 +331,9 @@ class CPM_gurobi(SolverInterface):
                     rvar = self.solver_var(intvar(lb=cpm_expr.args[1], ub=cpm_expr.args[1]))
 
                 if lhs.name == "and":
-                    return self.grb_model.addGenConstrAnd(rvar, self.solver_vars(lhs.args))
+                    raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
                 elif lhs.name == "or":
-                    return self.grb_model.addGenConstrOr(rvar, self.solver_vars(lhs.args))
+                    raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
                 elif lhs.name == 'min':
                     return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
