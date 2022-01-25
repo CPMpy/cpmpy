@@ -192,6 +192,7 @@ def linearize_constraint(cpm_expr):
                 return linearize_constraint(cpm_expr.decompose())
             lb, ub = 0, 1
 
+        # Linear decomposition of alldifferent using bipartite matching
         sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
 
         constraints = [sum(row) == 1 for row in sigma]  # Exactly one value
@@ -201,6 +202,31 @@ def linearize_constraint(cpm_expr):
             constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
 
         return constraints
+
+    if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "element":
+        """
+            Decomposition of element constraint according to:
+            ```
+            Refalo, P. (2000, September). Linear formulation of constraint programming models and hybrid solvers. 
+            In International Conference on Principles and Practice of Constraint Programming (pp. 369-383). Springer, Berlin, Heidelberg.
+            ```            
+        """
+        arr, idx = cpm_expr.args[0].args
+        # Assuming 1-d array
+        assert len(arr.shape) == 1, f"Only support 1-d element constraints, not {cpm_expr} which has shape {cpm_expr.shape}"
+
+        n = len(arr)
+        sigma = boolvar(shape=n)
+
+        constraints  = [sum(sigma) == 1]
+        constraints += [sum(np.arange(n) * sigma) == idx]
+        constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
+
+        return linearize_constraint(flatten_constraint(constraints))
+
+
+
+
 
     if isinstance(cpm_expr, GlobalConstraint):
         return linearize_constraint(only_bv_implies(flatten_constraint(cpm_expr.decompose())))
