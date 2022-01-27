@@ -35,9 +35,6 @@ from ..expressions.utils import is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
-M = int(10e10)  # Arbitrary VERY large number
-
-
 def linearize_constraint(cpm_expr):
     """
     Transforms all constraints to a linear form.
@@ -128,14 +125,26 @@ def linearize_constraint(cpm_expr):
             return [lhs + rhs == 1]
         # Normal case: big M implementation
         z = boolvar()
-        # TODO: dynamically calculate M!!
-        Mz, cons_Mz = get_or_make_var(M * z)
-        lhs, cons_lhs = get_or_make_var(lhs)
 
-        c1 = M + lhs + -1 >= rhs
-        c2 = - Mz + lhs + 1 <= rhs
+        # Calculate bounds of M = |lhs - rhs| + 1
+        bound1, _ = get_or_make_var(1 + lhs - rhs)
+        bound2, _ = get_or_make_var(1 + rhs - lhs)
+        M = max(bound1.ub, bound2.ub)
 
-        return cons_Mz + cons_lhs + flatten_constraint([c1, c2])
+        if lhs.name == "sum":
+            lhs = Operator("wsum", [[1]*len(lhs.args), lhs.args])
+            cons_lhs = []
+        if _wsum_should(lhs):
+            lhs, cons_lhs = Operator("wsum",_wsum_make(lhs)), []
+        if lhs.name != "wsum":
+            lhs, cons_lhs = get_or_make_var(lhs)
+        # Rewrite of constraints:
+        #   c1 = lhs - rhs <= Mz - 1
+        #   c2 = lhs - rhs >= -M(1-z) + 1
+        c1 = Operator("wsum", [[-M, 1],       [z, 1]]) + lhs <= rhs      # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
+        c2 = Operator("wsum", [[-M, (M - 1)], [z, 1]]) + lhs >= rhs  # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
+
+        return cons_lhs + [c1, c2]
 
     if cpm_expr.name in [">=", "<=", "=="] and \
             isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "mul":
