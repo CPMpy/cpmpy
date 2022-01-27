@@ -43,5 +43,6 @@ model += sum(node_fuel) < fuelLimit
 gold = sum( (s != range(nHouses))*data['goldInHouse'] )
 model.maximize(gold)
 
-print("Gold:", model.solve()) # solve returns objective value
+assert model.solve(), "Model is UNSAT!"
+print("Gold:", gold.value()) # solve returns objective value
 print("successor vars:",s.value())
