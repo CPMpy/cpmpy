@@ -188,19 +188,7 @@ def linearize_constraint(cpm_expr):
         """
         # TODO check performance of implementation
         # Boolean variables
-        if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args):
-            lb, ub = 0, 1
-        elif all(not isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args):
-            # All intvars, check lower and upper bounds
-            lb, ub = cpm_expr.args[0].lb, cpm_expr.args[0].ub
-            if not all(arg.lb == lb and arg.ub == ub for arg in cpm_expr.args):
-                return linearize_constraint(cpm_expr.decompose())
-        else:
-            # Mix of ints and bools, check lower and upper bounds of ints
-            if not all(arg.is_bool() or (arg.lb == 0 and arg.ub == 1) for arg in cpm_expr.args):
-                return linearize_constraint(cpm_expr.decompose())
-            lb, ub = 0, 1
-
+        lb, ub = min(arg.lb for arg in cpm_expr.args), max(arg.ub for arg in cpm_expr.args)
         # Linear decomposition of alldifferent using bipartite matching
         sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
 
