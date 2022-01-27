@@ -222,9 +222,9 @@ class CPM_gurobi(SolverInterface):
         # sum
         if cpm_expr.name == "sum":
             return gp.quicksum(self.solver_vars(cpm_expr.args))
-
+        # wsum
         if cpm_expr.name == "wsum":
-            return sum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+            return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
         raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -269,8 +269,8 @@ class CPM_gurobi(SolverInterface):
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         if isinstance(cpm_expr, Comparison):
-            lhs = cpm_expr.args[0]
-            rvar = self.solver_var(cpm_expr.args[1])
+            lhs, rhs = cpm_expr.args
+            rvar = self.solver_var(rhs)
 
 
             # TODO: this should become a transformation!!
@@ -287,7 +287,7 @@ class CPM_gurobi(SolverInterface):
             # all but '==' now only have as lhs: const|ivar|sum|wsum
             # translate ivar|sum|wsum so they can be posted directly below
             if isinstance(lhs, _NumVarImpl):
-                lhs = self.solver_var(lhs)
+                lhs = self.solver_var(lhs) # Case can be omitted -> handled in _make_num_expr
             elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
                 # a BoundedLinearExpression LHS, special case, like in objective
                 lhs = self._make_numexpr(lhs)
@@ -318,13 +318,13 @@ class CPM_gurobi(SolverInterface):
                 elif lhs.name == 'div':
                     if not isinstance(lhs.args[1], _NumVarImpl):
                         a, b = self.solver_vars(lhs.args)
-                        return self.grb_model.addLConstr(a / b, "=", rvar)
+                        return self.grb_model.addLConstr(a / b, GRB.EQUAL, rvar)
                     raise Exception("Gurobi only supports division by constants")
 
                 # General constraints
                 # rvar should be a variable, not a constant
-                if not isinstance(cpm_expr.args[1], _NumVarImpl):
-                    rvar = self.solver_var(intvar(lb=cpm_expr.args[1], ub=cpm_expr.args[1]))
+                if not isinstance(rhs, _NumVarImpl):
+                    rvar = self.solver_var(intvar(lb=rhs, ub=rhs))
 
                 if lhs.name == "and":
                     raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
