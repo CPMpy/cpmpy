@@ -1,5 +1,12 @@
 # Change log
 
+## 0.9.7
+* New: s.solveAll(): convenient (efficient) solution enumeration
+* New: added sum() to python\_builtins, behaves like np.sum
+* Behind the scenes: add 'wsum' weighted sum operator
+* bugfix for sum: always create new expression, do not modify inplace
+* bugfix: allow model with only an objective
+
 ## 0.9.6
 * Added tutorial video and used notebooks
     https://www.youtube.com/watch?v=A4mmmDAdusQ
