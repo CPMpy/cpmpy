@@ -249,6 +249,7 @@ class CPM_ortools(SolverInterface):
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -266,6 +267,7 @@ class CPM_ortools(SolverInterface):
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)

@@ -170,6 +170,7 @@ class CPM_minizinc(SolverInterface):
 
             `minimize()` can be called multiple times, only the last one is stored
         """
+        self.user_vars.update(get_variables(expr)) # may only be in objective
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve minimize {};\n".format(self._convert_expression(expr))
 
@@ -179,6 +180,7 @@ class CPM_minizinc(SolverInterface):
 
             `maximize()` can be called multiple times, only the last one is stored
         """
+        self.user_vars.update(get_variables(expr)) # may only be in objective
         # do not add it to the model, support only one 'solve' entry
         self.mzn_txt_solve = "solve maximize {};\n".format(self._convert_expression(expr))
 
