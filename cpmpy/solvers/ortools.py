@@ -476,7 +476,6 @@ class CPM_ortools(SolverInterface):
         
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
-
     def solution_hint(self, cpm_vars, vals):
         """
         or-tools supports warmstarting the solver with a feasible solution
@@ -488,9 +487,9 @@ class CPM_ortools(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        self.ort_model.ClearHints()  # because add just appends
+        self.ort_model.ClearHints() # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
-            self.ort_model.AddHint(self.solver_var(cpm_var), val)
+            self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
     def get_core(self):
