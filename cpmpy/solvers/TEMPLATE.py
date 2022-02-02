@@ -118,6 +118,7 @@ class CPM_template(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user specified variables only)
+        self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -126,10 +127,9 @@ class CPM_template(SolverInterface):
                 #cpm_var._value = self.TEMPLATEpy.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
-        # translate objective, for optimisation problems only
-        self.objective_value_ = None
-        if self.TEMPLATE_solver.HasObjective():
-            self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+            # translate objective, for optimisation problems only
+            if self.TEMPLATE_solver.HasObjective():
+                self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
 
         return has_sol
 
