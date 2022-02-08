@@ -84,6 +84,9 @@ class CPM_ortools(SolverInterface):
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
+        # initialize assumption dict to None
+        self.assumption_dict = None
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
 
@@ -126,7 +129,9 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
-            ort_assum_vars = [self.solver_var(v) for v in assumptions]
+            ort_assum_vars = self.solver_vars(assumptions)
+            # dict mapping ortools vars to CPMpy vars
+            self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
             self.ort_model.ClearAssumptions()  # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
             # workaround for a presolve with assumptions bug in ortools
@@ -508,12 +513,13 @@ class CPM_ortools(SolverInterface):
             Requires or-tools >= 8.2!!!
         """
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
+        assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
         assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
 
-        # return [self.assumption_dict[i] for i in assum_idx]
-        return [self.ort_model.VarIndexToVarProto(i) for i in assum_idx]
+        # return cpm_variables corresponding to ort_assum vars in UNSAT core
+        return [self.assumption_dict[i] for i in assum_idx]
 
 
 
