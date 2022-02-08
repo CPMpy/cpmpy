@@ -263,7 +263,7 @@ def only_positive_bv(cpm_expr):
     """
 
     if is_any_list(cpm_expr):
-        nn_cons = [no_negation(expr) for expr in cpm_expr]
+        nn_cons = [only_positive_bv(expr) for expr in cpm_expr]
         return [c for l in nn_cons for c in l]
 
     def simplify(cpm_var):
@@ -357,7 +357,7 @@ def only_positive_bv(cpm_expr):
 
         if isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum"):
 
-            nn_subsexpr = no_negation(subexpr)
+            nn_subsexpr = only_positive_bv(subexpr)
             return linearize_constraint([cond.implies(nn_expr) for nn_expr in nn_subsexpr])
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")

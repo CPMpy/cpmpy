@@ -31,7 +31,7 @@ from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, no_negation
+from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies
 
 
@@ -249,7 +249,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
-        cpm_cons = no_negation(cpm_cons)
+        cpm_cons = only_positive_bv(cpm_cons)
 
         for con in cpm_cons:
             self._post_constraint(con)
