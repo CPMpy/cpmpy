@@ -11,12 +11,20 @@ Linear comparison:
 - LinExpr <= Constant/Var
 # TODO: do we want to put all vars on lhs (so rhs = 0)?
 
-    LinExpr can be any of  NumVarImpl, div, mul, sum or wsum
+    LinExpr can be any of:
+        - NumVarImpl
+        - div               (is_num(Operator.args[1])
+        - mul               (len(Operator.args) == 2)
+        - sum
+        - wsum
+
 
 
 Indicator constraints
 --------------------------
-- Boolvar -> LinExpr
+- Boolvar -> LinExpr == Constant
+- Boolvar -> LinExpr >= Constant
+- Boolvar -> LinExpr <= Constant
 
 
 General Constraints
@@ -38,7 +46,8 @@ from ..transformations.flatten_model import flatten_constraint, get_or_make_var,
 def linearize_constraint(cpm_expr):
     """
     Transforms all constraints to a linear form.
-    This function assumes all constraints are in 'flat normal form'. Hence only apply after 'flatten()'.
+    This function assumes all constraints are in 'flat normal form'.
+    Only apply after 'flatten()'.
     """
 
     if is_any_list(cpm_expr):
@@ -215,7 +224,7 @@ def linearize_constraint(cpm_expr):
         n = len(arr)
         sigma = boolvar(shape=n)
 
-        constraints  = [sum(sigma) == 1]
+        constraints = [sum(sigma) == 1]
         constraints += [sum(np.arange(n) * sigma) == idx]
         constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
 
@@ -245,10 +254,12 @@ def is_lin(cpm_expr):
         return isinstance(cond, _BoolVarImpl) and is_lin(subsexpr) and is_num(subsexpr.args[1])
 
 
-def no_negation(cpm_expr):
+def only_positive_bv(cpm_expr):
     """
-        Replaces all occurences of ~BV with 1 - BV in the expression.
-        cpm_expr is expected to be linearized. Hence, only apply after applying linearize_constraint(cpm_expr)
+        Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
+        cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
+
+        Resulting expression is linear.
     """
 
     if is_any_list(cpm_expr):
@@ -264,15 +275,14 @@ def no_negation(cpm_expr):
     if isinstance(cpm_expr, Comparison):
         # >!=<
         lhs, rhs = cpm_expr.args
-        cons_l, cons_r = [], []
-
         if isinstance(lhs, _BoolVarImpl):
             # ~BV1 >=< ~BV2 => BV2 >=< BV1
             if isinstance(lhs, NegBoolView) and isinstance(rhs, NegBoolView):
                 return [Comparison(cpm_expr.name, rhs._bv, lhs._bv)]
-            # ~BV1 >=< BV2 => BV1 + BV2 >=< 1
+            # ~BV1 >=< IV => BV1 + IV >=< 1
             if isinstance(lhs, NegBoolView):
                 return [Comparison(cpm_expr.name, lhs._bv + rhs, 1)]
+            # BV1 >=< ~BV2 => BV1 + BV2 >=< 1
             if isinstance(rhs, NegBoolView):
                 return [Comparison(cpm_expr.name, lhs + rhs._bv, 1)]
             return [cpm_expr]
