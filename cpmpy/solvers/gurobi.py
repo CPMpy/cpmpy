@@ -393,6 +393,10 @@ class CPM_gurobi(SolverInterface):
                 - any other keyword argument
 
             Returns: number of solutions found
+
+            By default, gurobi searches for 10 optimal solutions.
+            Searching for all optimal solutions is not supported by gurobi.
+            If you really need all solutions, try setting solution limit to a large number and set time_limit to be not None.
         """
 
         if time_limit is not None:
@@ -431,5 +435,8 @@ class CPM_gurobi(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # Reset pool search mode to default
+        self.grb_model.setParam("PoolSearchMode", 0)
 
         return solution_count
