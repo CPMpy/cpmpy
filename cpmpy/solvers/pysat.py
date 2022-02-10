@@ -96,7 +96,7 @@ class CPM_pysat(SolverInterface):
         """
         if not self.supported():
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface (NOT the 'pysat' package!)")
-        if cpm_model and cpm_model.objective is not None:
+        if cpm_model and cpm_model.objective_ is not None:
             raise Exception("CPM_pysat: only satisfaction, does not support an objective function")
 
         from pysat.formula import IDPool
