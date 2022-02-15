@@ -374,7 +374,8 @@ class CPM_ortools(SolverInterface):
             rvar = self.solver_var(cpm_expr.args[1])
 
             # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
+            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl)\
+                    and not lhs.name == "wsum" and not lhs.name == "sum":
                 # functional globals only exist for equality in ortools
                 # example: min(x) > 10 :: min(x) == aux, aux > 10
                 # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
