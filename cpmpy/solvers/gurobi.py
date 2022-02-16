@@ -149,7 +149,7 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if is_optimization_problem:
-                self._objective_value = grb_objective.getValue()
+                self.objective_value_ = grb_objective.getValue()
 
         return has_sol
 
@@ -424,7 +424,7 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # Translate objective
             if self.grb_model.getObjective().size() != 0:                # TODO: check if better way to do this...
-                self._objective_value = self.grb_model.getObjective().getValue()
+                self.objective_value_ = self.grb_model.getObjective().getValue()
 
             if display is not None:
                 if isinstance(display, Expression):

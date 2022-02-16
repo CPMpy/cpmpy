@@ -150,7 +150,7 @@ class SolverInterface(object):
 
         :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
-        return self._objective_value
+        return self.objective_value_
 
     def solver_var(self, cpm_var):
         """
