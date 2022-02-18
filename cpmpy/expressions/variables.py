@@ -296,17 +296,25 @@ class _BoolVarImpl(_IntVarImpl):
     def __eq__(self, other):
         # (BV == 1) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (isinstance(other, int) and other == 1) or other is True:
+        if (is_int(other) and other == 1) or \
+                other is True or \
+                other is np.bool_(True):
             return self
-        if (isinstance(other, int) and other == 0) or other is False:
+        if (is_int(other) and other == 0) or \
+                other is False or \
+                other is np.bool_(False):
             return ~self
         return super().__eq__(other)
     def __ne__(self, other):
         # (BV == 0) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (isinstance(other, int) and other == 1) or other is True:
+        if (is_int(other) and other == 1) or \
+                other is True or \
+                other is np.bool_(True):
             return ~self
-        if (isinstance(other, int) and other == 0) or other is False:
+        if (is_int(other) and other == 0) or \
+                other is False or \
+                other is np.bool_(False):
             return self
         return super().__ne__(other)
 

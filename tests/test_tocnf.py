@@ -65,6 +65,9 @@ class TestToCnf(unittest.TestCase):
         m = CPM_ortools(Model(cons))
         while m.solve():
             sols.append(vs.value())
+            print("vs",vs)
+            print("vs.v",vs.value())
+            print(~all(vs == vs.value()))
             m += ~all(vs == vs.value())
 
         return np.array(sols)
