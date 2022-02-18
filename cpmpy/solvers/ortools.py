@@ -182,6 +182,8 @@ class CPM_ortools(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                if isinstance(cpm_var, _BoolVarImpl):
+                    cpm_var._value = bool(cpm_var._value) # ort value is always an int
 
             # translate objective
             if self.ort_model.HasObjective():
