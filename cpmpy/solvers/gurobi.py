@@ -349,26 +349,25 @@ class CPM_gurobi(SolverInterface):
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints
             # Take form bvar -> sum(x,y,z) >= rvar
-            lhs, rhs = cpm_expr.args
-            assert isinstance(lhs, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
-            assert isinstance(rhs, Comparison), "Implication must have linear constraints on right hand side"
-            if isinstance(lhs, NegBoolView):
-                lhs, bool_val = self.solver_var(lhs._bv), False
+            cond, sub_expr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+            assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
+            if isinstance(cond, NegBoolView):
+                cond, bool_val = self.solver_var(cond._bv), False
             else:
-                lhs, bool_val = self.solver_var(lhs), True
+                cond, bool_val = self.solver_var(cond), True
 
-            lrhs, rrhs = rhs.args
-            if isinstance(lrhs, _NumVarImpl) or lrhs.name == "sum" or lrhs.name == "wsum":
-                lin_expr = self._make_numexpr(lrhs)
+            lhs, rhs = sub_expr.args
+            if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
+                lin_expr = self._make_numexpr(lhs)
             else:
-                raise Exception(f"Unknown linear expression {lrhs} on right side of indicator constraint: {cpm_expr}")
-            if rhs.name == "<=":
-                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rrhs))
-            if rhs.name == ">=":
-                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rrhs))
-            if rhs.name == "==":
-                return self.grb_model.addGenConstrIndicator(lhs, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rrhs))
-
+                raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+            if sub_expr.name == "<=":
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
+            if sub_expr.name == ">=":
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
+            if sub_expr.name == "==":
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
 
         # Global constraints
