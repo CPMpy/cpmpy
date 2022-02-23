@@ -111,8 +111,7 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         self.assertTrue(m.solve())
-        self.assertEqual(x[0].value(), 3)
-        self.assertEqual(x[1].value(), 0)
+        self.assertGreater(x[0], x[1])
 
         # direct use
         o = CPM_ortools()
@@ -135,9 +134,7 @@ class TestSolvers(unittest.TestCase):
         s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
         s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
         self.assertTrue(s.solve())
-        self.assertEqual(x[0].value(), 3)
-        self.assertEqual(x[1].value(), 0)
-
+        self.assertGreater(x[0], x[1])
 
         # all solution counting
         class ORT_solcount(ort.CpSolverSolutionCallback):
