@@ -13,7 +13,7 @@ class TestTransLineariez(unittest.TestCase):
 
         # and
         cons = linearize_constraint(a & b)[0]
-        self.assertEqual("(a) + (b) == 2", str(cons))
+        self.assertEqual("(a) + (b) >= 2", str(cons))
 
         # or
         cons = linearize_constraint(a | b)[0]
