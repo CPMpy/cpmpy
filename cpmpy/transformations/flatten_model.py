@@ -104,15 +104,15 @@ def flatten_model(orig_model):
         basecons += flatten_constraint(con)
 
     # the objective
-    if orig_model.objective is None:
+    if orig_model.objective_ is None:
         return Model(*basecons) # no objective, satisfaction problem
     else:
-        (newobj, newcons) = flatten_objective(orig_model.objective)
+        (newobj, newcons) = flatten_objective(orig_model.objective_)
         basecons += newcons
-        if orig_model.objective_max:
-            return Model(*basecons, maximize=newobj)
-        else:
+        if orig_model.objective_is_min:
             return Model(*basecons, minimize=newobj)
+        else:
+            return Model(*basecons, maximize=newobj)
 
 def flatten_constraint(expr):
     """

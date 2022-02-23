@@ -118,6 +118,7 @@ class CPM_template(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user specified variables only)
+        self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -126,20 +127,11 @@ class CPM_template(SolverInterface):
                 #cpm_var._value = self.TEMPLATEpy.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
-        # translate objective, for optimisation problems only
-        self.objective_value_ = None
-        if self.TEMPLATE_solver.HasObjective():
-            self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+            # translate objective, for optimisation problems only
+            if self.TEMPLATE_solver.HasObjective():
+                self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
 
         return has_sol
-
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
-
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
-        """
-        return self.objective_value_
 
 
     def solver_var(self, cpm_var):
@@ -167,12 +159,12 @@ class CPM_template(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    # if TEMPLATE does not support objective functions, you can delete minimize()/maximize()/_make_numexpr()
-    def minimize(self, expr):
+    # if TEMPLATE does not support objective functions, you can delete objective()/_make_numexpr()
+    def objective(self, expr, minimize=True):
         """
-            Minimize the given objective function
+            Post the given expression to the solver as objective to minimize/maximize
 
-            `minimize()` can be called multiple times, only the last one is used
+            'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
@@ -180,27 +172,14 @@ class CPM_template(SolverInterface):
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        TEMPLATEpy.Minimize(obj)
-
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is used
-
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
-        """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
-        TEMPLATEpy.Maximize(obj)
+        if minimize:
+            TEMPLATEpy.Minimize(obj)
+        else:
+            TEMPLATEpy.Maximize(obj)
 
     def _make_numexpr(self, cpm_expr):
         """

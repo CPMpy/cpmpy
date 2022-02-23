@@ -20,7 +20,7 @@ def get_variables_model(model):
 
     # then append to it from objective
     seen = frozenset(vars_)
-    vars_ += [x for x in get_variables(model.objective) if not x in seen]
+    vars_ += [x for x in get_variables(model.objective_) if not x in seen]
 
     return vars_
 

@@ -62,6 +62,7 @@ class SolverInterface(object):
             Creates the following attributes:
             - name: str, name of the solver
             - cpm_status: SolverStatus(), the CPMpy status after a `solve()`
+            - objective_value_: the value of the objective function after solving (or None)
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
             - _varmap: dict(), maps cpmpy variables to native solver variables
@@ -70,12 +71,11 @@ class SolverInterface(object):
 
         self.name = name
         self.cpm_status = SolverStatus(self.name) # status of solving this model
+        self.objective_value_ = None
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()   # maps cpmpy variables to native solver variables
-
-        self._objective_value = None
+        self._varmap = dict()  # maps cpmpy variables to native solver variables
 
         # rest uses own API
         if cpm_model is not None:
@@ -83,13 +83,41 @@ class SolverInterface(object):
             self += cpm_model.constraints
 
             # post objective
-            if cpm_model.objective is not None:
-                if cpm_model.objective_max:
-                    self.maximize(cpm_model.objective)
+            if cpm_model.objective_ is not None:
+                if cpm_model.objective_is_min:
+                    self.minimize(cpm_model.objective_)
                 else:
-                    self.minimize(cpm_model.objective)
+                    self.maximize(cpm_model.objective_)
+
+    # instead of overloading minimize/maximize, better just overload 'objective()'
+    def minimize(self, expr):
+        """
+            Post the given expression to the solver as objective to minimize
+
+            `minimize()` can be called multiple times, only the last one is stored
+        """
+        return self.objective(expr, minimize=True)
+
+    def maximize(self, expr):
+        """
+            Post the given expression to the solver as objective to maximize
+
+            `maximize()` can be called multiple times, only the last one is stored
+        """
+        return self.objective(expr, minimize=False)
 
     # REQUIRED functions to mimic `Model` interface:
+
+    def objective(self, expr, minimize):
+        """
+            Post the given expression to the solver as objective to minimize/maximize
+
+            - expr: Expression, the CPMpy expression that represents the objective function
+            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+
+            'objective()' can be called multiple times, only the last one is stored
+        """
+        raise NotImplementedError("Solver does not support objective functions")
 
     def __add__(self, cpm_cons):
         """
@@ -97,30 +125,6 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Solver does not support eagerly adding constraints")
 
-    def minimize(self, expr):
-        """
-            Minimize the given objective function
-
-            `minimize()` can be called multiple times, only the last one is stored
-        """
-        return self.objective(expr, minimize=True)
-
-
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is stored
-        """
-        return self.objective(expr, minimize=False)
-
-    def objective(self, expr, minimize=True):
-        """
-            Post the given expression to the solver as objective to minimize/maximize
-
-            'objective()' can be called multiple times, only the last one is stored
-        """
-        raise NotImplementedError("Solver does not support objective functions")
 
     def status(self):
         return self.cpm_status
