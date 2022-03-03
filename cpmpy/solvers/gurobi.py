@@ -34,6 +34,14 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies
 
+try:
+    import gurobipy as gp
+    GRB_env = gp.Env()
+    GRB_env.setParam("OutputFlag",0)
+    GRB_env.start()
+except ImportError as e:
+    pass
+
 
 class CPM_gurobi(SolverInterface):
     """
@@ -78,8 +86,7 @@ class CPM_gurobi(SolverInterface):
         import gurobipy as gp
 
         # initialise the native gurobi model object
-        self.grb_model = gp.Model()
-        self.grb_model.setParam("OutputFlag", 0)
+        self.grb_model = gp.Model(env=GRB_env)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
