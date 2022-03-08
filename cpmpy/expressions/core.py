@@ -122,6 +122,9 @@ class Expression(object):
                 strargs.append( f"{arg}" )
         return "{}({})".format(self.name, ",".join(strargs))
 
+    def __hash__(self):
+        return hash(self.__str__())
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
@@ -130,6 +133,23 @@ class Expression(object):
 
     def value(self):
         return None # default
+
+    def _copy_args(self, memodict={}):
+        copied = []
+        for arg in self.args:
+            if arg not in memodict:
+                if isinstance(arg, Expression):
+                    memodict[arg] = arg.copy(memodict)
+                elif is_num(arg) or isinstance(arg, bool):
+                    memodict[arg] = arg
+                else:
+                    raise ValueError(f"Not a supported argument to copy: {arg}")
+            copied.append(memodict[arg])
+        return copied
+
+    def copy(self, memodict = {}):
+        copied_args = self._copy_args(memodict)
+        return type(self)(self.name, copied_args)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -296,6 +316,10 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
+
     # a comparison itself is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -314,6 +338,11 @@ class Comparison(Expression):
         elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
+
+    def copy(self, memodict={}):
+        copied_args = self._copy_args(memodict)
+        return Comparison(self.name, *copied_args)
+
 
 
 class Operator(Expression):
@@ -414,6 +443,10 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
+
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
 
     # if self is bool, special case
     def __eq__(self, other):

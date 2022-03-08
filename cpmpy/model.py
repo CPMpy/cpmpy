@@ -231,4 +231,18 @@ class Model(object):
         """
         with open(fname, "rb") as f:
             return pickle.load(f)
-    
+
+    def copy(self, memodict={}):
+        """
+            Copies a the model to a new instance.
+            :return: an object of :class: 'Model' with equivalent constraints as the current model
+        """
+        copied_cons = [cpm_cons.copy(memodict) for cpm_cons in self.constraints]
+        if self.objective_ is not None:
+            copied_obj = self.objective_.copy(memodict)
+
+        copied_model = Model(copied_cons)
+        if self.objective_ is not None:
+            copied_model.objective(copied_obj, self.objective_is_min)
+
+        return copied_model

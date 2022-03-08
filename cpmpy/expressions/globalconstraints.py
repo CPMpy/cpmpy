@@ -138,6 +138,10 @@ class GlobalConstraint(Expression):
         """
         return None
 
+    def copy(self, memodict={}):
+        copied_args = self._copy_args(memodict)
+        return type(self)(self.name, copied_args, self._is_bool)
+
 
 # Global Constraints (with Boolean return type)
 
@@ -156,6 +160,9 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
+    def copy(self, memodict={}):
+        copied_args = self._copy_args(memodict)
+        return AllDifferent(*copied_args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -170,6 +177,10 @@ class AllEqual(GlobalConstraint):
         """Returns the decomposition
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+
+    def copy(self, memdict={}):
+        copied_args = self._copy_args(memdict)
+        return AllEqual(*copied_args)
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -203,6 +214,11 @@ class Circuit(GlobalConstraint):
             # others: ith one is successor of i-1
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
+    def copy(self, memdict={}):
+        copied_args = self._copy_args(memdict)
+        return Circuit(*copied_args)
+
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -212,6 +228,9 @@ class Table(GlobalConstraint):
     def decompose(self):
         raise NotImplementedError("TODO: table decomposition")
 
+    def copy(self, memodict={}):
+        array, table = self._copy_args(memodict)
+        return Table(array, table)
 
 # Numeric Global Constraints (with integer-valued return type)
 
@@ -228,6 +247,10 @@ class Minimum(GlobalConstraint):
     def value(self):
         return min([argval(a) for a in self.args])
 
+    def copy(self, memodict={}):
+        copied_args = self._copy_args(self.args)
+        return Table(copied_args)
+
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -239,6 +262,10 @@ class Maximum(GlobalConstraint):
 
     def value(self):
         return max([argval(a) for a in self.args])
+
+    def copy(self, memodict={}):
+        copied_args = self._copy_args(memodict)
+        return Maximum(copied_args)
 
 def element(arg_list):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -270,3 +297,6 @@ class Element(GlobalConstraint):
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
 
+    def copy(self, memodict={}):
+        arr, idx = self._copy_args(memodict)
+        return Element(arr, idx)
