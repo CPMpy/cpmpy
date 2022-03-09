@@ -11,7 +11,7 @@ Given some rectangular 2D items, the program finds the (minimum) 2D area to pack
 import builtins
 from cpmpy import *
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # pip install pillow
 
 def run():
     # 2D dimensions of the items to be packed
