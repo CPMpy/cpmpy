@@ -1,22 +1,18 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
-##
-## minizinc.py
-##
 """
-    Interface to the python 'minizinc' package
+    Interface to MiniZinc's Python API
 
-    Requires that the 'minizinc' python package is installed:
+    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
 
-        $ pip install minizinc
-    
-    as well as the MiniZinc bundled binary packages, downloadable from:
-    https://www.minizinc.org/software.html
+    MiniZinc is a free and open-source constraint modeling language.
+    MiniZinc is used to model constraint satisfaction and optimization problems in
+    a high-level, solver-independent way, taking advantage of a large library of
+    pre-defined constraints. The model is then compiled into FlatZinc, a solver input
+    language that is understood by a wide range of solvers.
+    https://www.minizinc.org
 
-    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
-    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
-    You can overcome this by `pip install nest_asyncio`
-    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
+    Documentation of the solver's own Python API:
+    https://minizinc-python.readthedocs.io/
 
     ===============
     List of classes
@@ -26,38 +22,44 @@
         :nosignatures:
 
         CPM_minizinc
-
-    ==============
-    Module details
-    ==============
 """
-
 import numpy as np
 import sys
 from datetime import timedelta # for mzn's timeout
-from .solver_interface import SolverInterface, ExitStatus, SolverStatus
-from ..transformations.get_variables import get_variables_model
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.utils import is_num, is_any_list, flatlist
+from ..transformations.get_variables import get_variables_model, get_variables
 
 class CPM_minizinc(SolverInterface):
     """
-    Creates the following attributes:
+    Interface to MiniZinc's Python API
 
-    user_vars: variables used in the model (without auxiliaries),
-               these variables' .value() will be backpopulated on solve
-    mzn_solve: the minizinc.Solver instance
-    mzn_model: the minizinc.Model instance
-    mzn_txt_solve: the 'solve' item in text form, so it can be overwritten
+    Requires that the 'minizinc' python package is installed:
+    $ pip install minizinc
+    
+    as well as the MiniZinc bundled binary packages, downloadable from:
+    https://www.minizinc.org/software.html
+
+    See detailed installation instructions at:
+    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
+
+    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
+    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
+    You can overcome this by `pip install nest_asyncio`
+    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
+
+
+    Creates the following attributes (see parent constructor for more):
+    mzn_model: object, the minizinc.Model instance
+    mzn_solve: object, the minizinc.Solver instance
+    mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
     """
 
     @staticmethod
     def supported():
-        """
-            Make sure you installed the minizinc distribution from minizinc.org
-            as well as installing the 'minizinc-python' package (e.g. pip install minizinc)
-        """
+        # try to import the package
         try:
             import minizinc
             return True
@@ -82,56 +84,49 @@ class CPM_minizinc(SolverInterface):
         solvers = []
         for s in out_lst:
             name = s["id"].split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']: # not actually solvers
+            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
                 solvers.append(name)
         return solvers
 
 
-    def __init__(self, cpm_model=None, solver=None):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
-        Constructor of the solver object
+        Constructor of the native solver object
 
-        Requires a CPMpy model as input, and will create the corresponding
-        minizinc model and solver object (mzn_model and mzn_solver)
-
-        solver has to be one of solvernames() [str, default: None]
+        Arguments:
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: str, name of a subsolver (optional)
+                          has to be one of solvernames()
         """
         if not self.supported():
-            raise Exception("Install the python 'minizinc-python' package to use this '{}' solver interface".format(self.name))
+            raise Exception("CPM_minizinc: Install the python package 'minizinc'")
+
         import minizinc
 
-        super().__init__()
-
-        solvername = solver
-        if solvername is None or solvername == 'minizinc':
+        # determine subsolver
+        if subsolver is None or subsolver == 'minizinc':
             # default solver
-            solvername = "gecode"
-        elif solvername.startswith('minizinc:'):
-            # strip prepended 'minizinc:'
-            solvername = solvername[9:]
-        self.name = "minizinc:"+solvername
+            subsolver = "gecode"
+        elif subsolver.startswith('minizinc:'):
+            subsolver = subsolver[9:] # strip 'minizinc:'
 
-        import minizinc
-        self.mzn_solver = minizinc.Solver.lookup(solvername)
-
-        # minizinc-python API
-        # Create a MiniZinc model
+        # initialise the native solver object
+        # (so its params can still be changed before calling solve)
+        self.mzn_solver = minizinc.Solver.lookup(subsolver)
+        # It is the model object that contains the constraints for minizinc
         self.mzn_model = minizinc.Model()
-        if cpm_model is None:
-            self.user_vars = []
-            self.mzn_txt_solve = "solve satisfy;"
-        else:
-            # store original vars and objective (before flattening)
-            self.user_vars = get_variables_model(cpm_model)
-            (mzn_txt, self.mzn_txt_solve) = self.make_model(cpm_model)
-            self.mzn_model.add_string(mzn_txt)
-            # do NOT add self.mzn_txt_solve yet, so that it can be overwritten later
+        self.mzn_model.add_string("% Generated by CPMpy\ninclude \"globals.mzn\";\n\n")
+        # Prepare solve statement, so it can be overwritten on demand
+        self.mzn_txt_solve = "solve satisfy;"
+
+        # initialise everything else and post the constraints/objective
+        super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
+
 
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
         import minizinc
 
-        # set time limit?
         if time_limit is not None:
             kwargs['timeout'] = timedelta(seconds=time_limit)
 
@@ -147,61 +142,67 @@ class CPM_minizinc(SolverInterface):
 
     def solve(self, time_limit=None, **kwargs):
         """
-            Create and call an Instance with the already created mzn_model and mzn_solver
+            Call the MiniZinc solver
+            
+            Creates and calls an Instance with the already created mzn_model and mzn_solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - kwargs:      any keyword argument, sets parameters of solver object
 
-            Additional keyword arguments:
-            The minizinc solver parameters are partly defined in its API:
-            https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
-
-            You can use any of these parameters as keyword argument to `solve()` and they will
-            be forwarded to the solver. Examples include:
+            Arguments that correspond to solver parameters:
                 - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
                 - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
                 - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            The minizinc solver parameters are partly defined in its API:
+            https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 
-            example:
-            o.solve(free_search=True, optimisation_level=0)
-
-            Does not store the minizinc.Instance() or minizinc.Result() (can be deleted)
+            Does not store the minizinc.Instance() or minizinc.Result()
         """
         # make mzn_inst
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
+        
+        # call the solver, with parameters
         mzn_result = mzn_inst.solve(**mzn_kwargs)
 
-        # translate solution values (of original vars only)
+        # new status, translate runtime
+        self.cpm_status = self._post_solve(mzn_result)
+
+        # True/False depending on self.cpm_status
+        has_sol = self._solve_return(self.cpm_status)
+
+        # translate solution values (of user specified variables only)
         self.objective_value_ = None
-        if mzn_result.status.has_solution():
-            # runtime
+        if has_sol: #mzn_result.status.has_solution():
             mznsol = mzn_result.solution
             if is_any_list(mznsol):
                 print("Warning: multiple solutions found, only returning last one")
                 mznsol = mznsol[-1]
 
-            # fill in variables
-            for var in self.user_vars:
-                varname = self.clean_varname(var.name)
-                if hasattr(mznsol, varname):
-                    var._value = getattr(mznsol, varname)
+            # fill in variable values
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
                 else:
-                    print("Warning, no value for ",varname)
+                    print("Warning, no value for ", sol_var)
 
-            # translate objective (if any, otherwise None)
+            # translate objective, for optimisation problems only (otherwise None)
             self.objective_value_ = mzn_result.objective
-
-        # handle status
-        self._post_solve(mzn_result)
-        return self._solve_return(self.cpm_status)
+        
+        return has_sol
 
     def _post_solve(self, mzn_result):
         """ shared by solve() and solveAll() """
         import minizinc
-        
-        mzn_status = mzn_result.status
-        # translate status
+
+        # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
+        if 'time' in mzn_result.statistics:
+            self.cpm_status.runtime = mzn_result.statistics['time']  # --output-time
+
+        # translate exit status
+        mzn_status = mzn_result.status
         if mzn_status == minizinc.result.Status.SATISFIED:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
@@ -217,11 +218,7 @@ class CPM_minizinc(SolverInterface):
             # means, no solution was found (e.g. within timeout?)...
             self.cpm_status.exitstatus = ExitStatus.ERROR
         else:
-            raise NotImplementedError # a new status type was introduced, please report on github
-
-        # translate runtime
-        if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = mzn_result.statistics['time'] # --output-time
+            raise NotImplementedError  # a new status type was introduced, please report on github
 
         return self.cpm_status
 
@@ -241,14 +238,15 @@ class CPM_minizinc(SolverInterface):
             # display (and reverse-map first) if needed
             if display is not None:
                 mznsol = mzn_result.solution
-                # fill in variables
-                for var in self.user_vars:
-                    varname = self.clean_varname(var.name)
-                    if hasattr(mznsol, varname):
-                        var._value = getattr(mznsol, varname)
+
+                # fill in variable values
+                for cpm_var in self.user_vars:
+                    sol_var = self.solver_var(cpm_var)
+                    if hasattr(mznsol, sol_var):
+                        cpm_var._value = getattr(mznsol, sol_var)
                     else:
-                        print("Warning, no value for ",varname)
-            
+                        print("Warning, no value for ", sol_var)
+
                 # and the actual displaying
                 if isinstance(display, Expression):
                     print(display.value())
@@ -270,144 +268,133 @@ class CPM_minizinc(SolverInterface):
 
         return solution_count
 
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
 
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
+    def solver_var(self, cpm_var) -> str:
         """
-        return self.objective_value_
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
 
-    def __add__(self, cons):
+            Returns minizinc-friendly 'string' name of var
+
+            XXX WARNING, this assumes it is never given a 'NegBoolView'
+            might not be true... e.g. in revar after solve?
         """
-            Add an additional (list of) constraints to the model
+        if is_num(cpm_var):
+            return str(cpm_var)
+
+        if cpm_var not in self._varmap:
+            # clean the varname
+            varname = cpm_var.name
+            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+
+            if isinstance(cpm_var, _BoolVarImpl):
+                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
+            elif isinstance(cpm_var, _IntVarImpl):
+                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
+            self._varmap[cpm_var] = mzn_var
+
+        return self._varmap[cpm_var]
+
+
+    def objective(self, expr, minimize):
         """
-        if not is_any_list(cons):
-            cons = [cons]
+            Post the given expression to the solver as objective to minimize/maximize
 
-        txt_cons = ""
-        for con in cons:
-            txt_cons += "constraint {};\n".format(self.convert_expression(con))
+            - expr: Expression, the CPMpy expression that represents the objective function
+            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
-        self.mzn_model.add_string(txt_cons)
+            'objective()' can be called multiple times, only the last one is stored
+        """
+        self.user_vars.update(get_variables(expr)) # add objvars to vars
+
+        # make objective function or variable and post
+        obj = self._convert_expression(expr)
+        # do not add it to the mzn_model yet, supports only one 'solve' entry
+        if minimize:
+            self.mzn_txt_solve = "solve minimize {};\n".format(obj)
+        else:
+            self.mzn_txt_solve = "solve maximize {};\n".format(obj)
+
+
+    def __add__(self, cpm_con):
+        """
+        Post a (list of) CPMpy constraints(=expressions) to the solver
+
+        :param cpm_con CPMpy constraint, or list thereof
+        :type cpm_con (list of) Expression(s)
+        """
+        # add new user vars to the set
+        self.user_vars.update(get_variables(cpm_con))
+
+        # we can't unpack lists in _post_constraint, so must do it upfront
+        # and can't make assumptions on '.flat' existing either
+        if is_any_list(cpm_con):
+            cpm_con = flatlist(cpm_con)
+        else:
+            cpm_con = [cpm_con]
+
+        # no transformations
+        for con in cpm_con:
+            self._post_constraint(con)
+
         return self
 
-    def minimize(self, expr):
+    def _post_constraint(self, cpm_expr):
         """
-            Minimize the given objective function
-
-            `minimize()` can be called multiple times, only the last one is stored
+            Post a CPMpy constraint to the native solver API
         """
-        # do not add it to the model, support only one 'solve' entry
-        self.mzn_txt_solve = "solve minimize {};\n".format(self.convert_expression(expr))
+        # Get text expression, add to the solver
+        txt_cons = f"constraint {self._convert_expression(cpm_expr)};\n"
+        self.mzn_model.add_string(txt_cons)
 
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is stored
-        """
-        # do not add it to the model, support only one 'solve' entry
-        self.mzn_txt_solve = "solve maximize {};\n".format(self.convert_expression(expr))
-
-    def clean_varname(self, varname):
-        return varname.replace(',','_').replace('.','_').replace(' ','_').replace('[','_').replace(']','')
-
-    def make_model(self, cpm_model):
-        """
-            Makes the MiniZinc text formulation out of a CPMpy model
-
-            We do not do any flattening, but try to express the expressions (with subexpressions) directly.
-
-            Luckily, the textual output of many operators etc is close to the input minizinc expects
-            (well, maybe that is not a coincidence)
-
-            Typically only needed for internal use, or if you want to inspect the generated minizinc text
-
-            returns (txt_model, txt_objective)
-            txt_objective separate (you can just concatenate it), so that we can change it later
-            (the minizinc API does not support changing it later natively)
-        """
-        txt_vars = "% Generated by CPMpy\ninclude \"globals.mzn\";\n\n"
-        for var in get_variables_model(cpm_model):
-            if isinstance(var, _BoolVarImpl):
-                txt_vars += "var bool: {};\n".format(self.clean_varname(var.name))
-            elif isinstance(var, _IntVarImpl):
-                txt_vars += "var {}..{}: {};\n".format(var.lb, var.ub, self.clean_varname(var.name))
-
-        # we can't unpack lists in convert_expression, so must do it upfront
-        # and can't make assumptions on '.flat' existing either...
-        # this is dirty code that should not be reused, keeping it hidden in this function...
-        def flatlist(lst):
-            flatlst = []
-            for elem in lst:
-                if is_any_list(elem):
-                    flatlst += flatlist(elem)
-                else:
-                    flatlst.append(elem)
-            return flatlst
-
-        txt_cons = ""
-        for con in flatlist(cpm_model.constraints):
-            txt_cons += f"constraint {self.convert_expression(con)};\n"
-
-        txt_obj = "solve satisfy;"
-        if cpm_model.objective is not None:
-            if cpm_model.objective_max:
-                txt_obj = "solve maximize "
-            else:
-                txt_obj = "solve minimize "
-            txt_obj += "{};\n".format(self.convert_expression(cpm_model.objective))
-                
-        return (txt_vars+"\n"+txt_cons, txt_obj)
-
-    def convert_expression(self, expr):
+    def _convert_expression(self, expr) -> str:
         """
             Convert a CPMpy expression into a minizinc-compatible string
 
-            recursive: also converts nested subexpressions
+            recursive: also converts nested subexpressions, so we need a
+            function that returns strings
         """
         if is_any_list(expr):
-            if isinstance(expr, np.ndarray):
-                # must flatten
-                expr_str = [self.convert_expression(e) for e in expr.flat]
-            else:
-                expr_str = [self.convert_expression(e) for e in expr]
-            if len(expr_str) == 1:
+            if len(expr) == 1:
                 # unary special case, don't put in list
-                return expr_str[0]
+                # continue with later code
+                expr = expr[0]
             else:
+                if isinstance(expr, np.ndarray):
+                    # must flatten
+                    expr_str = [self._convert_expression(e) for e in expr.flat]
+                else:
+                    expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
         if not isinstance(expr, Expression) or \
-           isinstance(expr, _NumVarImpl):
+                isinstance(expr, _NumVarImpl):
             if expr is True:
                 return "true"
             if expr is False:
                 return "false"
             # default
             if isinstance(expr, NegBoolView):
-                return "not "+self.clean_varname(str(expr._bv))
-            return self.clean_varname(str(expr))
+                return "not " + self.solver_var(expr._bv)
+            return self.solver_var(expr)
 
         # table(vars, tbl): no [] nesting of args, and special table output...
         if expr.name == "table":
-            str_vars = self.convert_expression(expr.args[0])
-            str_tbl = "[|\n" # opening
+            str_vars = self._convert_expression(expr.args[0])
+            str_tbl = "[|\n"  # opening
             for row in expr.args[1]:
-                str_tbl += ",".join(map(str,row)) + " |" # rows
-            str_tbl += "\n|]" # closing
+                str_tbl += ",".join(map(str, row)) + " |"  # rows
+            str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
-        
-        args_str = [self.convert_expression(e) for e in expr.args]
+
+        args_str = [self._convert_expression(e) for e in expr.args]
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
-            # pretty printing: add () if nested comp/op
-            for e in expr.args:
-                if isinstance(e, (Comparison,Operator)):
-                    for i in [0,1]:
-                        args_str[i] = "({})".format(args_str[i])
+            # wrap args that are a subexpression in ()
+            for i, arg_str in enumerate(args_str):
+                if isinstance(expr.args[i], Expression): #(Comparison, Operator)
+                    args_str[i] = "(" + args_str[i] + ")"
             # infix notation
             return "{} {} {}".format(args_str[0], expr.name, args_str[1])
 
@@ -429,16 +416,17 @@ class CPM_minizinc(SolverInterface):
             # very special case: weighted sum (before 2-ary)
             if expr.name == 'wsum':
                 # I don't think there is a more direct way unfortunately
-                w = [self.convert_expression(wi) for wi in expr.args[0]]
-                x = [self.convert_expression(xi) for xi in expr.args[1]]
+                w = [self._convert_expression(wi) for wi in expr.args[0]]
+                x = [self._convert_expression(xi) for xi in expr.args[1]]
                 args_str = [f"{wi}*{xi}" for wi,xi in zip(w,x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
             # special case, infix: two args
             if len(args_str) == 2:
-                for i,arg_str in enumerate(args_str):
+                # wrap args that are a subexpression in ()
+                for i, arg_str in enumerate(args_str):
                     if isinstance(expr.args[i], Expression):
-                        args_str[i] = "("+args_str[i]+")"
+                        args_str[i] = "(" + args_str[i] + ")"
                 return "{} {} {}".format(args_str[0], op_str, args_str[1])
 
             # special case: n-ary (non-binary): rename operator
@@ -454,22 +442,24 @@ class CPM_minizinc(SolverInterface):
             subtype = "int"
             if all(isinstance(v, bool) or \
                    (isinstance(v, Expression) and v.is_bool()) \
-                     for v in expr.args[0]):
+                   for v in expr.args[0]):
                 subtype = "bool"
             idx = args_str[1]
             # minizinc is offset 1, which can be problematic for element...
             # thx Hakan, fix by using array1d(0..len, []), issue #54
-            txt  = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0, len(expr.args[0])-1, args_str[0])
+            txt = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0,
+                                                                                             len(expr.args[0]) - 1,
+                                                                                             args_str[0])
             txt += f"      arr[{idx}]"
             return txt
-        
+
         # rest: global constraints
-        elif expr.name.endswith('circuit'): # circuit, subcircuit
+        elif expr.name.endswith('circuit'):  # circuit, subcircuit
             # minizinc is offset 1, which can be problematic here...
             if any(isinstance(e, _IntVarImpl) and e.lb == 0 for e in expr.args):
                 # redo args_str[0]
-                args_str = ["{}+1".format(self.convert_expression(e)) for e in expr.args]
-        
+                args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
@@ -490,7 +480,7 @@ class CPM_minizinc(SolverInterface):
         """
         # XXX: check that no objective function??
         import asyncio
-        
+
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
         coroutine = self._solveAll(display=display, time_limit=time_limit,
                                     solution_limit=solution_limit, **kwargs)

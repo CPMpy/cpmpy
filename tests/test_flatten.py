@@ -21,8 +21,8 @@ class TestFlattenModel(unittest.TestCase):
         obj = self.ivars.sum()
         model = cp.Model(self.constraints, maximize=obj)
         model2 = flatten_model(model)
-        self.assertTrue(model2.objective is not None)
-        self.assertTrue(model2.objective_max)
+        self.assertTrue(model2.objective_ is not None)
+        self.assertFalse(model2.objective_is_min)
 
     def test_abs(self):
         l = cp.intvar(0,9, shape=3)
