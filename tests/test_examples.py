@@ -7,7 +7,7 @@ import importlib.machinery
 import pytest
 from cpmpy import *
 
-EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.py"))
+EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.py")) + glob(join(".", "examples/advanced", "*.py"))
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples(example):
@@ -18,6 +18,9 @@ class TestExamples(unittest.TestCase):
     Args:
         example ([string]): Loaded with parametrized example filename
     """
+    # do not run, dependency local to that folder
+    if example.endswith('explain_satisfaction.py'):
+        return
     loader = importlib.machinery.SourceFileLoader("example", example)
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)

@@ -347,7 +347,7 @@ class Operator(Expression):
         arity, is_bool = Operator.allowed[name]
         if arity == 0:
             arg_list = flatlist(arg_list)
-            assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
+            assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 

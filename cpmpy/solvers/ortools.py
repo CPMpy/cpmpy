@@ -84,6 +84,9 @@ class CPM_ortools(SolverInterface):
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
+        # initialize assumption dict to None
+        self.assumption_dict = None
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
 
@@ -126,7 +129,9 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
-            ort_assum_vars = [self.solver_var(v) for v in assumptions]
+            ort_assum_vars = self.solver_vars(assumptions)
+            # dict mapping ortools vars to CPMpy vars
+            self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
             self.ort_model.ClearAssumptions()  # because add just appends
             self.ort_model.AddAssumptions(ort_assum_vars)
             # workaround for a presolve with assumptions bug in ortools
@@ -172,25 +177,19 @@ class CPM_ortools(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user specified variables only)
+        self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
                 cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                if isinstance(cpm_var, _BoolVarImpl):
+                    cpm_var._value = bool(cpm_var._value) # ort value is always an int
 
-        # translate objective
-        self.objective_value_ = None
-        if self.ort_model.HasObjective():
-            self.objective_value_ = self.ort_solver.ObjectiveValue()
+            # translate objective
+            if self.ort_model.HasObjective():
+                self.objective_value_ = self.ort_solver.ObjectiveValue()
 
         return has_sol
-
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
-
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
-        """
-        return self.objective_value_
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """
@@ -237,11 +236,14 @@ class CPM_ortools(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    def minimize(self, expr):
+    def objective(self, expr, minimize):
         """
-            Minimize the given objective function
+            Post the given expression to the solver as objective to minimize/maximize
 
-            `minimize()` can be called multiple times, only the last one is used
+            - expr: Expression, the CPMpy expression that represents the objective function
+            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+
+            'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
@@ -249,27 +251,14 @@ class CPM_ortools(SolverInterface):
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        self.ort_model.Minimize(obj)
-
-    def maximize(self, expr):
-        """
-            Maximize the given objective function
-
-            `maximize()` can be called multiple times, only the last one is used
-
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
-        """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
-        self.ort_model.Maximize(obj)
+        if minimize:
+            self.ort_model.Minimize(obj)
+        else:
+            self.ort_model.Maximize(obj)
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -293,11 +282,10 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                args = [self.solver_var(v) for v in cpm_expr.args]
-                return sum(args)  # OR-Tools supports this
+                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
-                x = [self.solver_var(v) for v in cpm_expr.args[1]]
+                x = self.solver_vars(cpm_expr.args[1])
                 return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
 
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
@@ -387,7 +375,8 @@ class CPM_ortools(SolverInterface):
             rvar = self.solver_var(cpm_expr.args[1])
 
             # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl):
+            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl)\
+                    and not lhs.name == "wsum" and not lhs.name == "sum":
                 # functional globals only exist for equality in ortools
                 # example: min(x) > 10 :: min(x) == aux, aux > 10
                 # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
@@ -488,9 +477,9 @@ class CPM_ortools(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        self.ort_model.ClearHints()  # because add just appends
+        self.ort_model.ClearHints() # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
-            self.ort_model.AddHint(self.solver_var(cpm_var), val)
+            self.ort_model.AddHint(self.ort_var(cpm_var), val)
 
 
     def get_core(self):
@@ -507,12 +496,13 @@ class CPM_ortools(SolverInterface):
             Requires or-tools >= 8.2!!!
         """
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
+        assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
         assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
 
-        # return [self.assumption_dict[i] for i in assum_idx]
-        return [self.ort_model.VarIndexToVarProto(i) for i in assum_idx]
+        # return cpm_variables corresponding to ort_assum vars in UNSAT core
+        return [self.assumption_dict[i] for i in assum_idx]
 
 
 

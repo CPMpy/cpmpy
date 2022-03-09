@@ -104,15 +104,15 @@ def flatten_model(orig_model):
         basecons += flatten_constraint(con)
 
     # the objective
-    if orig_model.objective is None:
+    if orig_model.objective_ is None:
         return Model(*basecons) # no objective, satisfaction problem
     else:
-        (newobj, newcons) = flatten_objective(orig_model.objective)
+        (newobj, newcons) = flatten_objective(orig_model.objective_)
         basecons += newcons
-        if orig_model.objective_max:
-            return Model(*basecons, maximize=newobj)
-        else:
+        if orig_model.objective_is_min:
             return Model(*basecons, minimize=newobj)
+        else:
+            return Model(*basecons, maximize=newobj)
 
 def flatten_constraint(expr):
     """
@@ -329,10 +329,9 @@ def get_or_make_var(expr):
     elif isinstance(expr, Operator) and expr.name == "wsum":
         weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
-        lb = sum(weight * fvar.lb for fvar, weight in zip(flatvars, weights))
-        ub = sum(weight * fvar.ub for fvar, weight in zip(flatvars, weights))
-        lb, ub = min(lb,ub), max(lb,ub)
-        # TODO, check if there are other cases where lb  and ub should be different... Negative weights/bounds?
+        bounds = np.array([[w * fvar.lb for w, fvar in zip(weights, flatvars)],
+                           [w * fvar.ub for w, fvar in zip(weights, flatvars)]])
+        lb, ub = bounds.min(axis=1).sum(), bounds.max(axis=1).sum()
         ivar = _IntVarImpl(lb, ub)
         newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])

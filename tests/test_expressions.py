@@ -42,6 +42,12 @@ class TestSum(unittest.TestCase):
         self.assertEqual(expr.name, 'sum')
         self.assertEqual(len(expr.args), 3)
 
+    def test_sum_unary(self):
+        v = cp.intvar(1,9)
+        model = cp.Model(v>=1, minimize=sum([v]))
+        self.assertTrue(model.solve())
+        self.assertEqual(v.value(), 1)
+
 class TestWeightedSum(unittest.TestCase):
     def setUp(self) -> None:
         self.ivs = cp.intvar(lb=0, ub=5, shape=4)

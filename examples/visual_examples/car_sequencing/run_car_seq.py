@@ -12,7 +12,7 @@ the program finds a feasible sequencing of the different cars for a timetable.
 
 import builtins
 from cpmpy import *
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # pip install pillow
 import datetime
 
 def run():
@@ -34,9 +34,11 @@ def run():
         for (name, var) in vars.items():
             print(f"{name}:\n{var.value()}")
         visualize_sequence(vars, requires, demand, at_most, per_slots)
+    else:
+        print("No solution")
 
 def model_sequence(demand, per_slots, at_most, requires):
-    nSlots = sum(demand) # The amount of timeslots to be filled
+    nSlots = sum(demand).value() # The amount of timeslots to be filled
     nOptions = len(at_most) # The amount of different options
     nCarConfigs = len(demand) # The amount of different car types
 
@@ -65,7 +67,7 @@ def model_sequence(demand, per_slots, at_most, requires):
 # The remaining code below is exclusively focused on the visualization of the solution
 def visualize_sequence(vars, requires, demand, at_most, per_slots):
     nSlots = len(demand)
-    nCars = sum(demand)
+    nCars = sum(demand).values()
     nOptions = len(at_most)
     nCarConfigs = len(demand)
 

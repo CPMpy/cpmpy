@@ -83,7 +83,7 @@ class TestInterface(unittest.TestCase):
             # TODO: assert false or just ignore and return?
             return
 
-        self.assertFalse(hasattr(self.solver, "objective_value_"))
+        self.assertTrue(hasattr(self.solver, "objective_value_"))
         self.assertTrue(self.solver.solve())
         self.assertEqual(1, self.solver.objective_value())
         self.assertEqual(ExitStatus.OPTIMAL, self.solver.status().exitstatus)
