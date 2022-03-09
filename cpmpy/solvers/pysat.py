@@ -135,7 +135,7 @@ class CPM_pysat(SolverInterface):
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
-            pysat_assum_vars = [self.solver_var(v) for v in assumptions]
+            pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
         # call the solver, with parameters
@@ -172,7 +172,6 @@ class CPM_pysat(SolverInterface):
                 else:
                     # not specified...
                     cpm_var._value = None
-                    pass
 
         return has_sol
 
@@ -231,7 +230,7 @@ class CPM_pysat(SolverInterface):
             self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'or':
-                self.pysat_solver.add_clause([self.solver_var(var) for var in cpm_expr.args])
+                self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
             else:
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
@@ -239,7 +238,7 @@ class CPM_pysat(SolverInterface):
             # only handle cardinality encodings (for now)
             if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum" and all(
                     isinstance(v, _BoolVarImpl) for v in cpm_expr.args[0].args):
-                lits = [self.solver_var(var) for var in cpm_expr.args[0].args]
+                lits = self.solver_vars(cpm_expr.args[0].args)
                 bound = cpm_expr.args[1]
 
                 clauses = []

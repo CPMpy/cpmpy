@@ -139,7 +139,8 @@ class CPM_template(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        # TODO: add `solver_vars(self, cpm_vars)` to SolverInterface class
+        if is_num(cpm_var): # shortcut, eases posting constraints
+            return cpm_var
 
         # special case, negative-bool-view
         # work directly on var inside the view
@@ -204,12 +205,11 @@ class CPM_template(SolverInterface):
         # else if the solver support e.g. a linear expression as objective, built it here
         # something like
         #if isinstance(cpm_expr, Operator):
-        #    args = self.solver_vars(cpm_expr.args) # TODO: soon
         #    if cpm_expr.name == 'sum':
-        #        return sum(args) # if TEMPLATEpy supports this
+        #        return sum(self.solver_vars(cpm_expr.args)) # if TEMPLATEpy supports this
         #    elif cpm_expr.name == 'wsum':
         #        w = cpm_expr.args[0]
-        #        x = [self.solver_var(v) for v in cpm_expr.args[1]]
+        #        x = self.solver_vars(cpm_expr.args[1])
         #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
 
         raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
