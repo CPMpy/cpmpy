@@ -107,7 +107,6 @@ class SolverInterface(object):
         return self.objective(expr, minimize=False)
 
     # REQUIRED functions to mimic `Model` interface:
-
     def objective(self, expr, minimize):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -150,7 +149,7 @@ class SolverInterface(object):
 
     def objective_value(self):
         """
-            Returns the value of the objective function of the latste solver run on this model
+            Returns the value of the objective function of the latest solver run on this model
 
         :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
