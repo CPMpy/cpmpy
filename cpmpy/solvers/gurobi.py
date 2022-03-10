@@ -2,15 +2,15 @@
 """
     Interface to the python 'gurobi' package
 
-    Requires that the 'gurobipy' python package is installed:
+    Gurobi is a very efficient commerical solver for LP, QP and MIP problems.
+    It calls itself "the fastest and most powerful mathematical programming
+    solver available"
 
-        $ pip install gurobipy
-    
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
-    
-    In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
+    In contrast to other solvers in CPMpy, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/9.5/refman/py_python_api_details.html
 
     ===============
     List of classes
@@ -20,14 +20,9 @@
         :nosignatures:
 
         CPM_gurobi
-
-    ==============
-    Module details
-    ==============
 """
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
@@ -42,15 +37,13 @@ class CPM_gurobi(SolverInterface):
     Requires that the 'gurobipy' python package is installed:
     $ pip install gurobipy
 
+    ALSO REQUIRES A VALID LICENSE! (academic licenses available)
+
     See detailed installation instructions at:
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
-    Creates the following attributes:
-    user_vars: set(), variables in the original (non-transformed) model,
-                    for reverse mapping the values after `solve()`
-    cpm_status: SolverStatus(), the CPMpy status after a `solve()`
-    tpl_model: object, TEMPLATE's model object
-    _varmap: dict(), maps cpmpy variables to native solver variables
+    Creates the following attributes (see parent constructor for more):
+    grb_model: object, a gurobipy `Model()` object
     """
 
     @staticmethod
@@ -65,25 +58,30 @@ class CPM_gurobi(SolverInterface):
         except ImportError as e:
             return False
 
+
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: None
         """
         if not self.supported():
             raise Exception(
                 "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+
         import gurobipy as gp
+
+        assert(subsolver is None) # not used
 
         # initialise the native gurobi model object
         self.grb_model = gp.Model()
         self.grb_model.setParam("OutputFlag", 0)
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
+
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
@@ -138,7 +136,8 @@ class CPM_gurobi(SolverInterface):
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
-        # translate solution values (of user vars only)
+        # translate solution values (of user specified variables only)
+        self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -149,9 +148,10 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if is_optimization_problem:
-                self._objective_value = grb_objective.getValue()
+                self.objective_value_ = grb_objective.getValue()
 
         return has_sol
+
 
     def solver_var(self, cpm_var):
         """
@@ -169,7 +169,7 @@ class CPM_gurobi(SolverInterface):
             raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
 
         # create if it does not exit
-        if not cpm_var in self._varmap:
+        if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
@@ -178,26 +178,26 @@ class CPM_gurobi(SolverInterface):
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
 
-        # return from cache
         return self._varmap[cpm_var]
+
 
     def objective(self, expr, minimize=True):
         """
-            Post the expression to optimize to the solver.
+            Post the given expression to the solver as objective to minimize/maximize
 
-            'objective()' can be called multiple times, onlu the last one is used.
+            'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver)
         """
-
         from gurobipy import GRB
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons  # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj))
+        (flat_obj, flat_cons) = flatten_objective(expr)
+        self += flat_cons # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
+        # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
         if minimize:
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
@@ -220,12 +220,11 @@ class CPM_gurobi(SolverInterface):
         if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.solver_var(cpm_expr)
 
-        # sum
-        if cpm_expr.name == "sum":
-            return gp.quicksum(self.solver_vars(cpm_expr.args))
-        # wsum
-        if cpm_expr.name == "wsum":
-            return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+        if isinstance(cpm_expr, Operator):
+            if cpm_expr.name == "sum":
+                return gp.quicksum(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == "wsum":
+                return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
         raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -244,8 +243,7 @@ class CPM_gurobi(SolverInterface):
         self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
-        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-
+        # expressions have to be linearized to fit in MIP model. See cpmpy/transformations/linearize
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
@@ -377,6 +375,7 @@ class CPM_gurobi(SolverInterface):
             return
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """
