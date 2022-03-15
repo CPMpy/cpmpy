@@ -334,9 +334,7 @@ class CPM_gurobi(SolverInterface):
                 if not isinstance(rhs, _NumVarImpl):
                     rvar = self.solver_var(intvar(lb=rhs, ub=rhs))
 
-                if lhs.name == "and":
-                    raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
-                elif lhs.name == "or":
+                if lhs.name == "and" or lhs.name == "or":
                     raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
                 elif lhs.name == 'min':
                     return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
