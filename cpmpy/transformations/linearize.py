@@ -87,6 +87,7 @@ def linearize_constraint(cpm_expr):
         for l_expr in lin_comps:
             lhs, rhs = l_expr.args
             if lhs.name == "mul" and _wsum_should(lhs):
+                # multiplication with var and constant, convert to wsum
                 lhs = Operator("wsum", _wsum_make(lhs))
 
             if isinstance(rhs, _NumVarImpl):
@@ -129,6 +130,7 @@ def linearize_constraint(cpm_expr):
         return cons
 
     if cpm_expr.name == "!=":
+        # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/pull/93/files#r824163315
         lhs, rhs = cpm_expr.args
         # Special case: BV != BV
         if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -152,7 +154,7 @@ def linearize_constraint(cpm_expr):
         #   c1 = lhs - rhs <= Mz - 1
         #   c2 = lhs - rhs >= -M(1-z) + 1
         c1 = Operator("wsum", [[-M, 1],       [z, 1]]) + lhs <= rhs      # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
-        c2 = Operator("wsum", [[-M, (M - 1)], [z, 1]]) + lhs >= rhs  # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
+        c2 = Operator("wsum", [[-M, (M - 1)], [z, 1]]) + lhs >= rhs      # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
 
         return cons_lhs + [c1, c2]
 
@@ -160,16 +162,16 @@ def linearize_constraint(cpm_expr):
             isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "mul":
         if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
             return [Comparison(cpm_expr.name, sum(cpm_expr.args[0].args), cpm_expr.args[1])]
-
         lhs, rhs = cpm_expr.args
         if len(lhs.args) == 2:
+            # multiplication of var and constant
             if _wsum_should(lhs):
-                # Convert to wsum
                 return [Comparison(cpm_expr.name, Operator("wsum", _wsum_make(lhs)), rhs)]
             return [cpm_expr]
 
         lhs, rhs = cpm_expr.args
         var, constraints = get_or_make_var(lhs.args[0] * lhs.args[1])
+        # decompose long multiplication in several multiplications with two args
         for arg in lhs.args[2:]:
             var, cons = get_or_make_var(var * arg)
             constraints += cons
@@ -230,9 +232,6 @@ def linearize_constraint(cpm_expr):
         constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
 
         return linearize_constraint(flatten_constraint(constraints))
-
-
-
 
 
     if isinstance(cpm_expr, GlobalConstraint):
