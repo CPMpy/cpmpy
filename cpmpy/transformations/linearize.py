@@ -37,17 +37,18 @@ GenExpr == var
 import numpy as np
 
 from .reification import only_bv_implies
-from ..expressions.core import Comparison, Operator, Expression, _wsum_should, _wsum_make
-from ..expressions.globalconstraints import GlobalConstraint, AllDifferent
+from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
+
+from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_any_list, is_num
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, intvar, _NumVarImpl
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var, negated_normal
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
 def linearize_constraint(cpm_expr):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form'.
-    Only apply after 'flatten()'.
+    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()'.
     """
 
     if is_any_list(cpm_expr):
