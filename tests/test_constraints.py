@@ -1,7 +1,8 @@
 import unittest
 
-from cpmpy import boolvar, intvar, Model
+from cpmpy import boolvar, intvar, Model, cpm_array
 from cpmpy.expressions.core import Comparison, Operator
+from cpmpy.expressions.globalconstraints import *
 from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc
 
 import pytest
@@ -61,6 +62,12 @@ def comp_constraints():
             for rhs in [NUM_VAR, 1]:
                 yield Comparison(comp_name, numexpr, rhs)
 
+    for comp_name in Comparison.allowed:
+        for glob_expr in global_constraints():
+            if not glob_expr.is_bool():
+                for rhs in [NUM_VAR, 1]:
+                    yield Comparison(comp_name, glob_expr, rhs)
+
 
 # Generate all possible boolean expressions
 def bool_exprs():
@@ -84,6 +91,22 @@ def bool_exprs():
 
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
+
+    for cpm_cons in global_constraints():
+        if cpm_cons.is_bool():
+            yield cpm_cons
+
+def global_constraints():
+    """
+        Generate all global constraints
+        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element
+    """
+    yield AllDifferent(NUM_ARGS)
+    yield AllEqual(NUM_ARGS)
+    yield Circuit(*NUM_ARGS)
+    yield min(NUM_ARGS)
+    yield max(NUM_ARGS)
+    yield cpm_array(NUM_ARGS)[NUM_VAR]
 
     # TODO global constraints
 

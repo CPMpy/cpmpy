@@ -317,7 +317,7 @@ def only_positive_bv(cpm_expr):
             simplied_args = [simplify(arg) for arg in lhs.args]
             nn_args, cons_l = zip(*[get_or_make_var(arg) for arg in simplied_args])
 
-            nn_lhs = GlobalConstraint(lhs.name, nn_args)
+            nn_lhs = type(lhs)(lhs.name, nn_args)
             nn_rhs, cons_r = get_or_make_var(simplify(rhs))
 
             var_cons = [c for con in cons_l for c in con] + [c for con in cons_r for c in con]
@@ -343,6 +343,9 @@ def only_positive_bv(cpm_expr):
             return linearize_constraint([cond.implies(nn_expr) for nn_expr in nn_subsexpr])
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
+
+    if isinstance(cpm_expr, GlobalConstraint):
+        return [cpm_expr]
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
