@@ -233,25 +233,7 @@ def linearize_constraint(cpm_expr):
 
         return linearize_constraint(flatten_constraint(constraints))
 
-
-    if isinstance(cpm_expr, GlobalConstraint):
-        return linearize_constraint(only_bv_implies(flatten_constraint(cpm_expr.decompose())))
-
     return [cpm_expr]
-
-
-def is_lin(cpm_expr):
-    """
-        Returns whether cmp_expr is a linear constraint.
-    """
-
-    if isinstance(cpm_expr, Comparison):
-        lhs, rhs = cpm_expr.args
-        return isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum"
-
-    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-        cond, subsexpr = cpm_expr.args
-        return isinstance(cond, _BoolVarImpl) and is_lin(subsexpr) and is_num(subsexpr.args[1])
 
 
 def only_positive_bv(cpm_expr):

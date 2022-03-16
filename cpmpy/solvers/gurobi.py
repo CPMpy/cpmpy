@@ -374,7 +374,6 @@ class CPM_gurobi(SolverInterface):
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
-
         # Global constraints
         else:
             self += cpm_expr.decompose()
