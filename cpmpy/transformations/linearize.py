@@ -156,7 +156,7 @@ def linearize_constraint(cpm_expr):
         c1 = Operator("wsum", [[-M, 1],       [z, 1]]) + lhs <= rhs      # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
         c2 = Operator("wsum", [[-M, (M - 1)], [z, 1]]) + lhs >= rhs      # TODO: this can be optimized, see https://github.com/CPMpy/cpmpy/issues/97
 
-        return cons_lhs + [c1, c2]
+        return linearize_constraint(flatten_constraint(cons_lhs)) + [c1, c2]
 
     if cpm_expr.name in [">=", "<=", "=="] and \
             isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "mul":
@@ -317,7 +317,7 @@ def only_positive_bv(cpm_expr):
             simplied_args = [simplify(arg) for arg in lhs.args]
             nn_args, cons_l = zip(*[get_or_make_var(arg) for arg in simplied_args])
 
-            nn_lhs = type(lhs)(lhs.name, nn_args)
+            nn_lhs = type(lhs)(nn_args)
             nn_rhs, cons_r = get_or_make_var(simplify(rhs))
 
             var_cons = [c for con in cons_l for c in con] + [c for con in cons_r for c in con]
