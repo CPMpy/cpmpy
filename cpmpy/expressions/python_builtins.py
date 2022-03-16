@@ -96,6 +96,7 @@ def sum(iterable):
         checks if all constants and computes np.sum() in that case
         otherwise, makes a sum Operator directly on `iterable`
     """
+    iterable = list(iterable) # Fix generator polling
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.sum(iterable)
     return Operator("sum", iterable)
