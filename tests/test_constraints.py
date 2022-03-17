@@ -9,10 +9,28 @@ import pytest
 
 SOLVER_CLASS = CPM_gurobi
 
+
+# Exclude some global constaints for all solvers
+# Can be used when .value() method is not implemented/contains bugs
+EXCLUDE_GLOBAL = {"circuit"}
+
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_MAP = {CPM_ortools: ("sub", "div", "mod", "pow"),
-               CPM_gurobi: ("sub", "mod", "xor")} # TODO remove xor from list
+EXCLUDE_OPERATORS = {CPM_ortools: {"sub", "div", "mod", "pow"},
+                     CPM_gurobi: {"sub", "mod", "xor"},
+                     CPM_minizinc: {}} # TODO remove xor from list
+
+# Some solvers only support a subset of operators in imply-constraints
+# This subset can differ between left and right hand side of the implication
+EXCLUDE_IMPL_LHS = {CPM_ortools: {"alldifferent", "allequal","element", "max", "min", "xor", "abs", "mul", "-"},
+                    CPM_gurobi:  {"alldifferent", "allequal","element", "max", "min", "div", "abs", "mul", "pow"},
+                    CPM_minizinc: {}}
+
+EXCLUDE_IMPL_RHS = {CPM_ortools: {"alldifferent", "allequal","min", "max", "element", "abs", "mul","-"},
+                    CPM_gurobi: {"allequal", "element", "max","min", "abs", "mul", "div", "pow"},
+                    CPM_minizinc: {}}
+
+EXCLUDE_IMPL_EQ = {solver : EXCLUDE_IMPL_LHS[solver] | EXCLUDE_IMPL_RHS[solver] for solver in EXCLUDE_OPERATORS.keys()}
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
@@ -33,7 +51,7 @@ def numexprs():
                                                            (CPMpy class 'GlobalConstraint', not is_bool()))
     """
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if not is_bool]
-    names = [(name, arity) for name, arity in names if name not in EXCLUDE_MAP[SOLVER_CLASS]]
+    names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[SOLVER_CLASS]]
     for name, arity in names:
         if name == "wsum":
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
@@ -77,7 +95,7 @@ def bool_exprs():
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
     """
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if is_bool]
-    names = [(name, arity) for name, arity in names if name not in EXCLUDE_MAP[SOLVER_CLASS]]
+    names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[SOLVER_CLASS]]
 
     for name, arity in names:
         if arity != 0:
@@ -101,14 +119,16 @@ def global_constraints():
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element
     """
-    yield AllDifferent(NUM_ARGS)
-    yield AllEqual(NUM_ARGS)
-    yield Circuit(*NUM_ARGS)
-    yield min(NUM_ARGS)
-    yield max(NUM_ARGS)
-    yield cpm_array(NUM_ARGS)[NUM_VAR]
+    global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
+    # TODO: add Circuit
+    for global_type in global_cons:
+        cons = global_type(NUM_ARGS)
+        if cons.name not in EXCLUDE_OPERATORS[SOLVER_CLASS]:
+            yield cons
 
-    # TODO global constraints
+    if "element" not in EXCLUDE_OPERATORS[SOLVER_CLASS]:
+        yield cpm_array(NUM_ARGS)[NUM_VAR]
+
 
 def reify_imply_exprs():
     """
@@ -118,14 +138,31 @@ def reify_imply_exprs():
     """
 
     for bool_expr in bool_exprs():
-        yield bool_expr == BOOL_VAR
-        yield bool_expr.implies(BOOL_VAR)
-        yield BOOL_VAR.implies(bool_expr)
+        if bool_expr.name not in EXCLUDE_IMPL_LHS[SOLVER_CLASS]:
+            yield bool_expr.implies(BOOL_VAR)
+        if bool_expr.name not in EXCLUDE_IMPL_RHS[SOLVER_CLASS]:
+            yield BOOL_VAR.implies(bool_expr)
+        if bool_expr.name not in EXCLUDE_IMPL_EQ[SOLVER_CLASS]:
+            yield bool_expr == BOOL_VAR
 
     for comp_expr in comp_constraints():
-        yield comp_expr == BOOL_VAR
-        yield comp_expr.implies(BOOL_VAR)
-        yield BOOL_VAR.implies(comp_expr)
+        lhs, rhs = comp_expr.args
+        if (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL_LHS[SOLVER_CLASS]) \
+            and (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL_LHS[SOLVER_CLASS]):
+
+            yield comp_expr.implies(BOOL_VAR)
+
+        if (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL_RHS[SOLVER_CLASS]) \
+            and (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL_RHS[SOLVER_CLASS]):
+
+            yield BOOL_VAR.implies(comp_expr)
+
+
+        if (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL_EQ[SOLVER_CLASS]) \
+                and (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL_EQ[SOLVER_CLASS]):
+
+            yield comp_expr == BOOL_VAR
+
 
 @pytest.mark.parametrize("constraint", bool_exprs(), ids=lambda c: str(c))
 def test_bool_constaints(constraint):
