@@ -25,4 +25,4 @@ class TestTransLineariez(unittest.TestCase):
 
         # implies
         cons = linearize_constraint(a.implies(b))[0]
-        self.assertEqual("(a) <= (b)", str(cons))
+        self.assertEqual("(a) -> (b >= 1)", str(cons))
