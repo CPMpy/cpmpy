@@ -16,8 +16,10 @@
         any
         max
         min
+        sum
 """
 import numpy as np
+from .variables import NDVarArray
 from .core import Expression, Operator
 from .globalconstraints import Minimum, Maximum
 
@@ -29,6 +31,7 @@ def all(iterable):
         if iterable contains an `Expression`, then returns an Operator("and", iterable)
         otherwise returns whether all of the arguments is true
     """
+    if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
         if elem is False:
@@ -52,6 +55,7 @@ def any(iterable):
         if iterable contains an `Expression`, then returns an Operator("or", iterable)
         otherwise returns whether any of the arguments is true
     """
+    if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
         if elem is True:
@@ -86,4 +90,13 @@ def min(iterable):
         return np.min(iterable)
     return Minimum(iterable)
 
-
+def sum(iterable):
+    """
+        sum() overwrites python built-in,
+        checks if all constants and computes np.sum() in that case
+        otherwise, makes a sum Operator directly on `iterable`
+    """
+    iterable = list(iterable) # Fix generator polling
+    if not any(isinstance(elem, Expression) for elem in iterable):
+        return np.sum(iterable)
+    return Operator("sum", iterable)

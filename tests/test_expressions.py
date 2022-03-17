@@ -24,7 +24,7 @@ class TestSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
         self.assertEqual(len(expr.args), 3)
-
+    
     def test_add_iv(self):
         expr = self.iv + cp.intvar(2,4)
         self.assertIsInstance(expr, Operator)
@@ -41,3 +41,71 @@ class TestSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
         self.assertEqual(len(expr.args), 3)
+
+    def test_sum_unary(self):
+        v = cp.intvar(1,9)
+        model = cp.Model(v>=1, minimize=sum([v]))
+        self.assertTrue(model.solve())
+        self.assertEqual(v.value(), 1)
+
+class TestWeightedSum(unittest.TestCase):
+    def setUp(self) -> None:
+        self.ivs = cp.intvar(lb=0, ub=5, shape=4)
+
+    def test_weightedadd_int(self):
+        expr = self.ivs[0] * 4 + 3
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'sum')
+        expr2 = 3 + self.ivs[0] * 4
+        self.assertIsInstance(expr2, Operator)
+        self.assertEqual(expr2.name, 'sum')
+
+    def test_weightedadd_iv(self):
+
+        expr = self.ivs[0] * 4 + self.ivs[1]
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+
+        expr2 = self.ivs[1] + self.ivs[0] * 4
+        self.assertIsInstance(expr2, Operator)
+        self.assertEqual(expr2.name, 'wsum')
+
+        expr3 = self.ivs[0] * 4 - self.ivs[1]
+        self.assertIsInstance(expr3, Operator)
+        self.assertEqual(expr3.name, 'wsum')
+
+        expr4 = - self.ivs[1] + self.ivs[0] * 4
+        self.assertIsInstance(expr4, Operator)
+        self.assertEqual(expr4.name, 'wsum')
+
+    def test_weightedadd_weighted_iv(self):
+        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6 * self.ivs[2]
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+
+        expr2 = 5 * self.ivs[0] + self.ivs[1] * 4
+        self.assertIsInstance(expr2, Operator)
+        self.assertEqual(expr2.name, 'wsum')
+
+        expr3 = self.ivs[0] * 4 - self.ivs[1] * 3
+        self.assertIsInstance(expr3, Operator)
+        self.assertEqual(expr3.name, 'wsum')
+
+        expr4 = - self.ivs[0] + self.ivs[1] * 4 - 6 * self.ivs[2]
+        self.assertIsInstance(expr4, Operator)
+        self.assertEqual(expr4.name, 'wsum')
+
+    def test_weightedadd_int(self):
+        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'sum')
+    
+    def test_weighted_nested_epxressions(self):
+        expr = self.ivs[0] * 4 + 5 * (self.ivs[1] + 6 * self.ivs[2])
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+        print(expr)
+        
+
+if __name__ == '__main__':
+    unittest.main()

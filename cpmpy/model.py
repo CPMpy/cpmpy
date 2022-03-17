@@ -63,8 +63,8 @@ class Model(object):
             self.constraints = list(args) # instead of tuple
 
         # objective: an expresion or None
-        self.objective = None
-        self.objective_max = None
+        self.objective_ = None
+        self.objective_is_min = None
         if maximize is not None:
             self.maximize(maximize)
         if minimize is not None:
@@ -87,14 +87,26 @@ class Model(object):
         self.constraints.append(con)
         return self
 
+
+    def objective(self, expr, minimize):
+        """
+            Post the given expression to the solver as objective to minimize/maximize
+
+            - expr: Expression, the CPMpy expression that represents the objective function
+            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+
+            'objective()' can be called multiple times, only the last one is stored
+        """
+        self.objective_ = expr
+        self.objective_is_min = minimize
+
     def minimize(self, expr):
         """
             Minimize the given objective function
 
             `minimize()` can be called multiple times, only the last one is stored
         """
-        self.objective = expr
-        self.objective_max = False
+        self.objective(expr, minimize=True)
 
     def maximize(self, expr):
         """
@@ -102,10 +114,29 @@ class Model(object):
 
             `maximize()` can be called multiple times, only the last one is stored
         """
-        self.objective = expr
-        self.objective_max = True
+        self.objective(expr, minimize=False)
 
-    
+    def _create_solver(self, solver):
+        """ Creates appropriate solver object
+
+        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
+        """
+        if isinstance(solver, SolverInterface):
+            solver_class = solver
+        else:
+            solver_class = SolverLookup.lookup(solver)
+        assert(solver_class is not None)
+                
+        # instatiate solver with this model
+        if isinstance(solver, str) and ':' in solver:
+            # solver is a name that contains a subsolver
+            s = solver_class(self, subsolver=solver)
+        else:
+            # no subsolver
+            s = solver_class(self)
+
+        return s
+
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
@@ -120,22 +151,29 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
-        if isinstance(solver, SolverInterface):
-            solver_class = solver
-        else:
-            solver_class = SolverLookup.lookup(solver)
-        assert(solver_class is not None)
-                
-        # instatiate solver with this model
-        if isinstance(solver, str) and ':' in solver:
-            # solver is a name that contains a subsolver
-            s = solver_class(self, solver=solver)
-        else:
-            # no subsolver
-            s = solver_class(self)
-
+        s = self._create_solver(solver)
         # call solver
         ret = s.solve(time_limit=time_limit)
+        # store CPMpy status (s object has no further use)
+        self.cpm_status = s.status()
+        return ret
+
+    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None):
+        """
+            Compute all solutions and optionally display the solutions.
+
+            Delegated to the solver, who might implement this efficiently
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - solution_limit: stop after this many solutions (default: None)
+
+            Returns: number of solutions found
+        """
+        s = self._create_solver(solver)
+        # call solver
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
@@ -156,7 +194,7 @@ class Model(object):
 
         :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
-        return self.objective.value()
+        return self.objective_.value()
 
     def __repr__(self):
         cons_str = ""
@@ -164,12 +202,12 @@ class Model(object):
             cons_str += "    {}\n".format(c)
 
         obj_str = ""
-        if not self.objective is None:
-            if self.objective_max:
-                obj_str = "maximize "
-            else:
+        if not self.objective_ is None:
+            if self.objective_is_min:
                 obj_str = "minimize "
-        obj_str += str(self.objective)
+            else:
+                obj_str = "maximize "
+        obj_str += str(self.objective_)
             
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
 

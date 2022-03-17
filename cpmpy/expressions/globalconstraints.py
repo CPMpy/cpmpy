@@ -156,6 +156,12 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
+    def value(self):
+        val_list = [var1 != var2
+                    and var1 is not None
+                    and var2 is not None
+                            for var1, var2 in all_pairs(self.args)]
+        return all(val_list)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -170,6 +176,13 @@ class AllEqual(GlobalConstraint):
         """Returns the decomposition
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        val_list = [var1 == var2
+                    and var1 is not None
+                    and var2 is not None
+                    for var1, var2 in all_pairs(self.args)]
+        return all(val_list)
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -203,6 +216,8 @@ class Circuit(GlobalConstraint):
             # others: ith one is successor of i-1
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
+    # TODO: value()
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -212,7 +227,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         raise NotImplementedError("TODO: table decomposition")
 
-
+    # TODO: value()
 # Numeric Global Constraints (with integer-valued return type)
 
 

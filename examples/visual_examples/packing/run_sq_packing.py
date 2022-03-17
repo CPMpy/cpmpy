@@ -9,7 +9,7 @@ Given n squares with the i-th square having side i, the program finds the (minim
 """
 
 from cpmpy import *
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # pip install pillow
 
 def run():
     # Number of squares we want to pack

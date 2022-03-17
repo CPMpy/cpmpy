@@ -26,6 +26,7 @@
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
+    - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
     - x - y         Operator("sum", [x,-y])
     - x * y         Operator("mul", [x,y])
     - x / y         Operator("div", [x,y])
@@ -75,6 +76,7 @@
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
+
 from .utils import is_num, is_any_list, flatlist
 
 class Expression(object):
@@ -294,7 +296,7 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
-    # is bool, check special case
+    # a comparison itself is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
             return self
@@ -328,6 +330,7 @@ class Operator(Expression):
         'xor': (0, True),
         '->':  (2, True),
         'sum': (0, False),
+        'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
         'div': (2, False),
@@ -343,18 +346,32 @@ class Operator(Expression):
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool = Operator.allowed[name]
         if arity == 0:
-            assert (len(arg_list) >= 2), "Operator: n-ary operators require at least two arguments"
             arg_list = flatlist(arg_list)
+            assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
+
+        # should we convert the sum into a wsum?
+        if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
+                not any(is_num(a) for a in arg_list):
+            w,x = [], []
+            for a in arg_list:
+                w1,x1 = _wsum_make(a)
+                w += w1
+                x += x1
+            name = 'wsum'
+            arg_list = [w,x]
 
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        if name == 'wsum':
+            # we also have the convention that weighted sums are [weights, vars]
+            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
 
-        # merge same operators for n-ary ones
+        # args of same operator are merged in for n-ary ones
         if arity == 0:
             i = 0 # length can change
             while i < len(arg_list):
@@ -381,6 +398,10 @@ class Operator(Expression):
         if self.name == '-': # unary -
             return "-({})".format(self.args[0])
 
+        # weighted sum
+        if self.name == 'wsum':
+            return f"sum({self.args[0]} * {self.args[1]})"
+
         # infix printing of two arguments
         if len(self.args) == 2:
             # bracketed printing of non-constants
@@ -394,83 +415,7 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
-    # associative operations {'and', 'or', 'xor', 'sum', 'mul'} are chained
-    # + special case for weighted sum (sum of mul)
-
-    def __and__(self, other):
-        if self.name == 'and':
-            self.args.append(other)
-            return self
-        return super().__and__(other)
-    def __rand__(self, other):
-        if self.name == 'and':
-            self.args.insert(0,other)
-            return self
-        return super().__rand__(other)
-
-    def __or__(self, other):
-        if self.name == 'or':
-            self.args.append(other)
-            return self
-        return super().__or__(other)
-    def __ror__(self, other):
-        if self.name == 'or':
-            self.args.insert(0,other)
-            return self
-        return super().__ror__(other)
-
-    def __xor__(self, other):
-        if self.name == 'xor':
-            self.args.append(other)
-            return self
-        return super().__xor__(other)
-    def __rxor__(self, other):
-        if self.name == 'xor':
-            self.args.insert(0,other)
-            return self
-        return super().__rxor__(other)
-
-    def __add__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            if not isinstance(other, Iterable):
-                self.args.append(other)
-            else: # vector
-                self.args.extend(other)
-            return self
-        return super().__add__(other)
-
-    def __radd__(self, other):
-        # only for constants
-        if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            if not isinstance(other, Iterable):
-                self.args.insert(0, other)
-            else: # vector
-                self.args[:0] = other # prepend an array
-            return self
-        return super().__radd__(other)
-
-    # substraction; in case of sum or wsum, add
-    def __sub__(self, other):
-        if is_num(other) and other == 0:
-            return self
-
-        if self.name == 'sum':
-            self.args.append(-other)
-            return self
-        return super().__sub__(other)
-    def __rsub__(self, other):
-        if is_num(other) and other == 0:
-            return -self
-
-        return (-self).__radd__(other)
-
-    # is bool, check special case
+    # if self is bool, special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
             # check if bool operator, do not add == 1
@@ -480,9 +425,17 @@ class Operator(Expression):
         return super().__eq__(other)
 
     def value(self):
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        # if self.name ==
+        if self.name == "wsum":
+            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+        else:
+            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+
+
         if any(a is None for a in arg_vals): return None
-        if   self.name == "sum": return sum(arg_vals)
+        # non-boolean
+        elif self.name == "sum": return sum(arg_vals)
+        elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "div": return arg_vals[0] / arg_vals[1]
@@ -490,5 +443,29 @@ class Operator(Expression):
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        # boolean
+        elif self.name == "and": return all(arg_vals)
+        elif self.name == "or" : return any(arg_vals)
+        elif self.name == "xor": return sum(arg_vals) % 2 == 1
+        elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
+
         return None # default
 
+def _wsum_should(arg):
+    """ Internal helper: should the arg be in a wsum instead of sum """
+    # Undecided: -x + y, -x + -y?
+    return isinstance(arg, Operator) and \
+           (arg.name == 'wsum' or \
+            arg.name == 'mul' and is_num(arg.args[0]))
+def _wsum_make(arg):
+    """ Internal helper: prep the arg for wsum """
+    # returns ([weights], [vars])
+    # call only if arg is Operator
+    if arg.name == 'wsum':
+        return arg.args
+    elif arg.name == 'mul':
+        return [arg.args[0]], [arg.args[1]]
+    elif arg.name == '-':
+        return [-1], [arg.args[0]]
+    else:
+        return [1], [arg]

@@ -89,7 +89,12 @@ class SolverLookup():
             This is the preferred way to initialise a solver from its name
         """
         cls = SolverLookup.lookup(name=name)
-        return cls(model, solver=name) # repeat name in case contains a subname
+
+        # check for a 'solver:subsolver' name
+        subname = None
+        if ':' in name:
+            _,subname = name.split(':',maxsplit=1)
+        return cls(model, subsolver=subname)
 
     @staticmethod
     def lookup(name=None):
@@ -107,7 +112,7 @@ class SolverLookup():
         solvername = name
         subname = None
         if ':' in solvername:
-            solvername,subname = solvername.split(':',maxsplit=1)
+            solvername,_ = solvername.split(':',maxsplit=1)
 
         # find CPM_slv
         CPM_slv = None
