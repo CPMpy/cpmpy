@@ -65,6 +65,7 @@ class TestPySATInterrupt(unittest.TestCase):
     def test_large_instance_interrup(self):
         from pysat.examples.genhard import PHP
         from collections import defaultdict
+        import time
         lit_cpmvar = defaultdict(lambda: boolvar())
         cpm_clauses = []
         m  = Model()
@@ -76,11 +77,12 @@ class TestPySATInterrupt(unittest.TestCase):
             m +=any(c for c in new_clause)
         s = CPM_pysat(m)
         assumption = [lit_cpmvar[1]]
-        status = s.solve(assumptions=assumption, time_limit=5)
-        print(status)
-#         with Solver(bootstrap_with=cnf.clauses, use_timer=True) as s:
-# ...         print(s.solve(assumptions=[1]))
-#         # print(var_state2)
+        # offset for additional stuff done by cpmpy after solving
+        time_limit, time_offset = 1, 0.5
+        tstart_solving = time.time()
+        s.solve(assumptions=assumption, time_limit=1)
+        tend_solving = time.time()
+        self.assertLessEqual(tend_solving - tstart_solving, time_limit + time_offset)
 
 if __name__ == '__main__':
     unittest.main()
