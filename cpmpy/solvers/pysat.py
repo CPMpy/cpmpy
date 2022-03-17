@@ -133,11 +133,17 @@ class CPM_pysat(SolverInterface):
             pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
+        import time
         # set time limit?
         if time_limit is not None:
             from threading import Timer
-            Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver]).start()
+            t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
+            t.start()
             my_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
+            # ensure timer is stopped if early stopping
+            t.cancel()
+            ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
+            self.pysat_solver.clear_interrupt()
         else:
             my_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
 
