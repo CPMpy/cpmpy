@@ -116,7 +116,7 @@ class CPM_pysat(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
-    def solve(self, assumptions=None, time_limit=None):
+    def solve(self, time_limit=None, assumptions=None):
         """
             Call the PySAT solver
 
