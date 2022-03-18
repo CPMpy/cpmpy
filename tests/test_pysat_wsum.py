@@ -57,7 +57,7 @@ class TestEncodeLinearConstraint(unittest.TestCase):
             # self.bv[0] - self.bv[2] > 0,
             -self.bv[0] + self.bv[2] > 0,
             self.bv[0] - 3 * self.bv[2] > 0,
-            self.bv[0] - 3 * self.bv[2] + 2 * self.bv[1]> 0,
+            self.bv[0] - 3 * (self.bv[2] + self.bv[1]) + 2 * self.bv[1]> 0,
         ]
 
         for expression in expressions:
