@@ -11,7 +11,8 @@ class TestSolvers(unittest.TestCase):
 
         model = cp.Model(
                     x.implies(y & z),
-                    y | z
+                    y | z,
+                    ~ z
                 )
 
         for solvern,s in cp.SolverLookup.base_solvers():
@@ -42,7 +43,9 @@ class TestSolvers(unittest.TestCase):
 
         for solvern,s in cp.SolverLookup.base_solvers():
             if s.supported(): # only supported solvers in test suite
-                self.assertEqual(model.solveAll(solver=solvern), 4)
+                # some solvers do not support searching for all solutions...
+                # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
+                self.assertEqual(model.solveAll(solver=solvern, solution_limit=4), 4)
 
     # should move this test elsewhere later
     def test_tsp(self):
