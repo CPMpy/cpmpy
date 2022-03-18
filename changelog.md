@@ -1,5 +1,15 @@
 # Change log
 
+## 0.9.8
+An exciting 'technical' release that opens the door to
+add many more solvers
+
+* API change: unified interfaces of solvers/
+* New: the gurobi MIP solver
+* New: transformations/linearisation/
+* More extensive testing
+* PySAT: support time\_limit argument to solve
+
 ## 0.9.7
 * New: s.solveAll(): convenient (efficient) solution enumeration
 * New: added sum() to python\_builtins, behaves like np.sum
