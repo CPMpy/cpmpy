@@ -80,7 +80,7 @@ class TestPySATInterrupt(unittest.TestCase):
         # offset for additional stuff done by cpmpy after solving
         time_limit, time_offset = 1, 0.5
         tstart_solving = time.time()
-        s.solve(assumptions=assumption, time_limit=1)
+        s.solve(assumptions=assumption, time_limit=time_limit)
         tend_solving = time.time()
         self.assertLessEqual(tend_solving - tstart_solving, time_limit + time_offset)
 
