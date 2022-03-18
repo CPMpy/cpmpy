@@ -32,6 +32,27 @@ class TestEncodeLinearConstraint(unittest.TestCase):
         ps = CPM_pysat(ls)
         ps.solve()
 
+    def test_pysat_complex_expressions(self):
+        ls = cp.Model(
+            2 * self.bv[0] + 3 * self.bv[1] <= 3,
+            self.bv[1] == 1,
+            self.bv[2] == 0
+        )
+
+        ps = CPM_pysat(ls)
+        ps.solve()
+
+
+    def test_pysat_unsat(self):
+        ls = cp.Model(
+            2 * self.bv[0] + 3 * self.bv[1] <= 3,
+            self.bv[0] == 1,
+            self.bv[1] == 1
+        )
+
+        ps = CPM_pysat(ls)
+        solved = ps.solve()
+        self.assertFalse(solved)
 
     def test_encode_linear_expressions(self):
         expressions = [
