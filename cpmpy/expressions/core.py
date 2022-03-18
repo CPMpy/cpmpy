@@ -214,18 +214,14 @@ class Expression(object):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
-        print(f"add: {self=} {other=}")
         return Operator("sum", [self, other])
     def __radd__(self, other):
         if is_num(other) and other == 0:
             return self
-        print(f"radd: {self=} {other=}")
         return Operator("sum", [other, self])
 
     # substraction
     def __sub__(self, other):
-        print("self", self)
-        print("other:", other)
         # if is_num(other) and other == 0:
         #     return self
         # return Operator("sub", [self, other])
@@ -356,11 +352,6 @@ class Operator(Expression):
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
         # should we convert the sum into a wsum?
-        if name=="sum":
-            print(f"{name=} {arg_list=}")
-            print("\t", any(_wsum_should(a) for a in arg_list), [(a, _wsum_should(a)) for a in arg_list] )
-            print("\t", not any(is_num(a) for a in arg_list), [(a, is_num(a)) for a in arg_list] )
-
         if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
                 not any(is_num(a) for a in arg_list):
 
@@ -464,11 +455,6 @@ class Operator(Expression):
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum """
     # Undecided: -x + y, -x + -y?
-    print("\t\t_wsum_should")
-    if isinstance(arg, Operator):
-        print("\t\t", type(arg), arg.name, arg.args)
-    else:
-        print("\t\t", arg)
     if isinstance(arg, Operator) and arg.name == "-":
         return True
     return isinstance(arg, Operator) and \
@@ -482,6 +468,10 @@ def _wsum_make(arg):
         return arg.args
     elif arg.name == 'mul':
         return [arg.args[0]], [arg.args[1]]
+    elif arg.name == "-" and isinstance(arg.args[0], Operator):
+        # - (3 * y)
+        w, x = _wsum_make(arg.args[0])
+        return [-i for i in w], x
     elif arg.name == '-':
         return [-1], [arg.args[0]]
     else:
