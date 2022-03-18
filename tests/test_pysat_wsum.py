@@ -12,9 +12,9 @@ class TestEncodeLinearConstraint(unittest.TestCase):
 
         atmost = cp.Model(
             ## < This does not work
-            2 * self.bv[0] < 3,
+            - 2 * self.bv[0] < 3,
             ## <=
-            3 * self.bv[1] <= 3,
+            - 3 * self.bv[1] <= 3,
             ## >
             2 * self.bv[2] > 1,
             ## >=
@@ -40,11 +40,12 @@ class TestEncodeLinearConstraint(unittest.TestCase):
             self.bv[0] - self.bv[2] > 0,
             -self.bv[0] + self.bv[2] > 0,
             self.bv[0] - 3 * self.bv[2] > 0,
+            2 * self.bv[0] - 3 * self.bv[2] > 0,
             self.bv[0] - 3 * (self.bv[2]) + 2 * self.bv[1]> 0,
         ]
 
+        ## check all types of linear constraints are handled
         for expression in expressions:
-            print(expression, to_cnf(expression))
             ps = CPM_pysat(Model(
                 expression
             ))

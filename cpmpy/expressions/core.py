@@ -301,7 +301,7 @@ class Comparison(Expression):
         if is_num(other) and other == 1:
             return self
         return super().__eq__(other)
-        
+
     # return the value of the expression
     # optional, default: None
     def value(self):
@@ -470,7 +470,7 @@ def _wsum_make(arg):
         return [arg.args[0]], [arg.args[1]]
     elif arg.name == "-" and isinstance(arg.args[0], Operator):
         # - (3 * y)
-        w, x = _wsum_make(arg.args[0])
+        w, x = _wsum_make(arg.args[0]) 
         return [-i for i in w], x
     elif arg.name == '-':
         return [-1], [arg.args[0]]
