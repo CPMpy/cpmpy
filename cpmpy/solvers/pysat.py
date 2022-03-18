@@ -271,7 +271,7 @@ class CPM_pysat(SolverInterface):
                         lits += [self.solver_var(arg.args[0].args[1])]
                         weights += [-arg.args[0].args[0]]
                     else:
-                        raise NotImplementedError(f"Other type of sum arg constraint {con} not supported by CPM_pysat")
+                        raise NotImplementedError(f"Other type of sum arg constraint {cpm_expr} not supported by CPM_pysat")
             # WEIGHTED !
             elif isinstance(left, Operator) and left.name == "wsum" and is_int(right):
                 weights, lits = left.args[0], [self.solver_var(var) for var in left.args[1]]
@@ -282,7 +282,7 @@ class CPM_pysat(SolverInterface):
                 lits = [self.solver_var(left.args[1])]
                 bound = right
             else:
-                raise NotImplementedError(f"Comparison constraint {con} not supported by CPM_pysat")
+                raise NotImplementedError(f"Comparison constraint {cpm_expr} not supported by CPM_pysat")
             if cpm_expr.name == "<":
                 atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool)
                 if len(atmost.clauses) > 0:
@@ -337,7 +337,7 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.append_formula([is_atleast, is_atmost])
 
             else:
-                raise NotImplementedError(f"Comparison: {con} operator not supported by CPM_pysat")
+                raise NotImplementedError(f"Comparison: {cpm_expr} operator not supported by CPM_pysat")
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 

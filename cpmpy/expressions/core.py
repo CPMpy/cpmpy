@@ -214,14 +214,18 @@ class Expression(object):
     def __add__(self, other):
         if is_num(other) and other == 0:
             return self
+        print(f"add: {self=} {other=}")
         return Operator("sum", [self, other])
     def __radd__(self, other):
         if is_num(other) and other == 0:
             return self
+        print(f"radd: {self=} {other=}")
         return Operator("sum", [other, self])
 
     # substraction
     def __sub__(self, other):
+        print("self", self)
+        print("other:", other)
         # if is_num(other) and other == 0:
         #     return self
         # return Operator("sub", [self, other])
@@ -352,11 +356,17 @@ class Operator(Expression):
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
         # should we convert the sum into a wsum?
+        if name=="sum":
+            print(f"{name=} {arg_list=}")
+            print("\t", any(_wsum_should(a) for a in arg_list), [(a, _wsum_should(a)) for a in arg_list] )
+            print("\t", not any(is_num(a) for a in arg_list), [(a, is_num(a)) for a in arg_list] )
+
         if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
                 not any(is_num(a) for a in arg_list):
-            w,x = [], []
+
+            w, x = [], []
             for a in arg_list:
-                w1,x1 = _wsum_make(a)
+                w1, x1 = _wsum_make(a)
                 w += w1
                 x += x1
             name = 'wsum'
@@ -454,6 +464,13 @@ class Operator(Expression):
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum """
     # Undecided: -x + y, -x + -y?
+    print("\t\t_wsum_should")
+    if isinstance(arg, Operator):
+        print("\t\t", type(arg), arg.name, arg.args)
+    else:
+        print("\t\t", arg)
+    if isinstance(arg, Operator) and arg.name == "-":
+        return True
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
             arg.name == 'mul' and is_num(arg.args[0]))
