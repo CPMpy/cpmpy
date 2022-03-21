@@ -10,7 +10,7 @@ the program finds a schedule that satisfies all priority constraints while minim
 """
 
 from cpmpy import *
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont # pip install pillow
 
 def run():
     # All data related to the scheduling

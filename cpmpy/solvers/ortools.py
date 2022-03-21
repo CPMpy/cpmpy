@@ -98,7 +98,8 @@ class CPM_ortools(SolverInterface):
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
+                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
+                           get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
@@ -282,11 +283,10 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                args = [self.solver_var(v) for v in cpm_expr.args]
-                return sum(args)  # OR-Tools supports this
+                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
-                x = [self.solver_var(v) for v in cpm_expr.args[1]]
+                x = self.solver_vars(cpm_expr.args[1])
                 return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
 
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
@@ -465,6 +465,7 @@ class CPM_ortools(SolverInterface):
             return None # will throw error if used in reification
         
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
 
     def solution_hint(self, cpm_vars, vals):
         """
