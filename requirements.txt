@@ -1,2 +1,2 @@
 numpy
-ortools
+ortools >= 9.0

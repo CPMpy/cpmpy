@@ -3,7 +3,7 @@
 Google does not provide a binary distribution for the or-tools package to use on Apple Silicon yet. Therefore, installation of cpmpy using the pip package manager will run into a compatibilty error like shown below.
 
 ```console
-$ pip install cpmpy
+$ pip3 install cpmpy
 ERROR: Could not find a version that satisfies the requirement ortools>=5.0 (from cpmpy) (from versions: none)
 ERROR: No matching distribution found for ortools>=5.0
 ```
@@ -43,7 +43,7 @@ $ git clone https://github.com/google/or-tools && cd or-tools
 
 In some cases it might be required to manually install the protobuffer package:
 ```console
-$ pip install protobuffer
+$ pip3 install protobuffer
 ```
 
 Build from source
@@ -56,5 +56,5 @@ The provided tests to validate the python install can be run with the following 
 
 This should allow you to install cpmpy using the pip package manager as normal.
 ```console
-pip install cpmpy
+pip3 install cpmpy
 ```
