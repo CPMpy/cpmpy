@@ -255,34 +255,15 @@ class CPM_pysat(SolverInterface):
         """
 
         # flatten constraints and to cnf
-        cnf_cons = to_cnf(cpm_con)
-
-        con_vars = get_variables(cnf_cons)
-
-        # new variables should be added to user variables
-        self.user_vars += [var for var in con_vars if var not in self.user_vars and var.is_bool()]
-
-        new_constraints = []
-
-        for constraint in cnf_cons:
-            if not is_boolvar_constraint(constraint):
-                new_bool_constraints, new_ivarmap = to_bool_constraint(constraint, self.ivarmap)
-                new_constraints += new_bool_constraints
-                self.user_vars += extract_boolvar(new_ivarmap)
-                self.ivarmap.update(new_ivarmap)
-            else:
-                new_constraints.append(constraint)
-
-        cnf = self._to_pysat_cnf(new_constraints)
-        self.pysat_solver.append_formula(cnf)
-
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
-        # apply transformations, then post internally
         cpm_cons = to_cnf(cpm_con)
         for con in cpm_cons:
-            self._post_constraint(con)
+            if not is_boolvar_constraint(con):
+                new_bool_constraints, new_ivarmap = to_bool_constraint(con, self.ivarmap)
+                self.ivarmap.update(new_ivarmap)
+                for new_bool_constraint in new_bool_constraints:
+                    self._post_constraint(new_bool_constraint)
+            else:
+                self._post_constraint(con)
 
         return self
 
