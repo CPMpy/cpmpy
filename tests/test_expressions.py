@@ -105,6 +105,14 @@ class TestWeightedSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'wsum')
         print(expr)
+
+    def test_sum_generator(self):
+        expr1 = sum(self.ivs)
+        expr2 = sum([x for x in self.ivs])
+        expr3 = sum(x for x in self.ivs)
+        assert(str(expr1) == str(expr2))
+        assert(str(expr1) == str(expr3))
+
         
 
 if __name__ == '__main__':
