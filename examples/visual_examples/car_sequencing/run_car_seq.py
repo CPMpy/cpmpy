@@ -38,7 +38,7 @@ def run():
         print("No solution")
 
 def model_sequence(demand, per_slots, at_most, requires):
-    nSlots = sum(demand).value() # The amount of timeslots to be filled
+    nSlots = sum(demand) # The amount of timeslots to be filled
     nOptions = len(at_most) # The amount of different options
     nCarConfigs = len(demand) # The amount of different car types
 
@@ -67,7 +67,7 @@ def model_sequence(demand, per_slots, at_most, requires):
 # The remaining code below is exclusively focused on the visualization of the solution
 def visualize_sequence(vars, requires, demand, at_most, per_slots):
     nSlots = len(demand)
-    nCars = sum(demand).values()
+    nCars = sum(demand)
     nOptions = len(at_most)
     nCarConfigs = len(demand)
 
