@@ -135,6 +135,11 @@ class Expression(object):
         return None # default
 
     def _copy_args(self, memodict={}):
+        """
+            Create and return a deep copy of the arguments of the expression
+            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied = []
         for arg in self.args:
             if arg not in memodict:
@@ -148,6 +153,10 @@ class Expression(object):
         return copied
 
     def copy(self, memodict = {}):
+        """
+            Return a deep copy of the Expression
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memodict)
         return type(self)(self.name, copied_args)
 
@@ -340,6 +349,10 @@ class Comparison(Expression):
         return None # default
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Comparison
+            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memodict)
         return Comparison(self.name, *copied_args)
 

@@ -161,6 +161,10 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Alldifferent global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memodict)
         return AllDifferent(*copied_args)
 
@@ -186,6 +190,10 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
     def copy(self, memdict={}):
+        """
+            Return a deep copy of the AllEqual global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memdict)
         return AllEqual(*copied_args)
 
@@ -231,6 +239,10 @@ class Circuit(GlobalConstraint):
 
 
     def copy(self, memdict={}):
+        """
+            Return a deep copy of the Circuit global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memdict)
         return Circuit(*copied_args)
 
@@ -249,6 +261,10 @@ class Table(GlobalConstraint):
 
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Table global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         array, table = self._copy_args(memodict)
         return Table(array, table)
 
@@ -270,8 +286,12 @@ class Minimum(GlobalConstraint):
         return min([argval(a) for a in self.args])
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Minimum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(self.args)
-        return Table(copied_args)
+        return Minimum(copied_args)
 
 class Maximum(GlobalConstraint):
     """
@@ -286,6 +306,10 @@ class Maximum(GlobalConstraint):
         return max([argval(a) for a in self.args])
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Maximum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied_args = self._copy_args(memodict)
         return Maximum(copied_args)
 
@@ -320,5 +344,9 @@ class Element(GlobalConstraint):
         return "{}[{}]".format(self.args[0], self.args[1])
 
     def copy(self, memodict={}):
+        """
+            Return a deep copy of the Element global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         arr, idx = self._copy_args(memodict)
         return Element(arr, idx)

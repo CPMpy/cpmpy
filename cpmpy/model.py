@@ -234,8 +234,8 @@ class Model(object):
 
     def copy(self, memodict={}):
         """
-            Copies a the model to a new instance.
-            :return: an object of :class: 'Model' with equivalent constraints as the current model
+            Deep copies a the model to a new instance.
+            :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
         """
         copied_cons = [cpm_cons.copy(memodict) for cpm_cons in self.constraints]
         if self.objective_ is not None:
