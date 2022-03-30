@@ -460,6 +460,9 @@ class CPM_minizinc(SolverInterface):
                 # redo args_str[0]
                 args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
+        elif expr.name == "allequal":
+            # allequal minizinc is all_equal
+            return "all_equal([{}])".format(",".join(args_str))
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
