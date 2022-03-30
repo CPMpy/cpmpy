@@ -361,14 +361,12 @@ def get_or_make_var(expr):
             bnds = [num[i]/denom[j] for i in [0,1] for j in [0,1]]
             # the above can give fractional values, tighten bounds to integer
             ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds))) 
-        elif expr.name == 'mod': # binary 
-            # check all possibilities...
+        elif expr.name == 'mod': # binary
             l = np.arange(lbs[0], ubs[0]+1)
-            lb = np.min(np.mod(l, lbs[1]))
-            ub = np.max(np.mod(l, lbs[1]))
-            for m in range(lbs[1]+1, lbs[1]+1):
-                lb = np.min(lb, np.min(np.mod(l, m)))
-                ub = np.max(lb, np.max(np.mod(l, m)))
+            r = np.arange(lbs[1], ubs[1]+1)
+            # check all possibilities
+            remainders = np.mod(l[:,None],r)
+            lb, ub = np.min(remainders), np.max(remainders)
             ivar = _IntVarImpl(lb,ub)
         elif expr.name == 'pow': # binary
             base = [lbs[0], ubs[0]]
