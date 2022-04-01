@@ -238,6 +238,7 @@ class Expression(object):
             return self
         return Operator("mul", [self, other])
     def __rmul__(self, other):
+
         if is_num(other) and other == 1:
             return self
         return Operator("mul", [other, self])
@@ -350,11 +351,9 @@ class Operator(Expression):
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
-
         # should we convert the sum into a wsum?
         if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
                 not any(is_num(a) for a in arg_list):
-
             w, x = [], []
             for a in arg_list:
                 w1, x1 = _wsum_make(a)
@@ -455,8 +454,6 @@ class Operator(Expression):
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum """
     # Undecided: -x + y, -x + -y?
-    if isinstance(arg, Operator) and arg.name == "-":
-        return True
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
             arg.name == 'mul' and is_num(arg.args[0]))
@@ -468,10 +465,6 @@ def _wsum_make(arg):
         return arg.args
     elif arg.name == 'mul':
         return [arg.args[0]], [arg.args[1]]
-    elif arg.name == "-" and isinstance(arg.args[0], Operator):
-        # - (3 * y)
-        w, x = _wsum_make(arg.args[0]) 
-        return [-i for i in w], x
     elif arg.name == '-':
         return [-1], [arg.args[0]]
     else:
