@@ -185,6 +185,34 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
+        left, right = expr.args[0], expr.args[1]
+
+        if isinstance(left, Operator) and left.name == "wsum" and any(_should_wsum(xi) for xi in left.args[1]):
+            w, x = left.args[0], left.args[1]
+            w_new, x_new = [], []
+            for wi, xi in zip(w, x):
+                if _should_wsum(xi):
+                    wni, xni = _wsum_make(xi)
+                    wni = [wnij * wi for wnij in wni]
+                    w_new += wni
+                    x_new += xni
+                else:
+                    w_new.append(wi)
+                    x_new.append(xi)
+
+            return flatten_constraint(
+                Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)
+            )
+
+        if isinstance(left, Operator) and any(_should_wsum(sub_expr) for sub_expr in left.args):
+            w, x = [], []
+            for subexpr in left.args:
+                wi, xi = _wsum_make(subexpr)
+                w += wi
+                x += xi
+            return flatten_constraint(
+                Comparison(expr.name, Operator("wsum",[w, x] ),right)
+            )
 
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
@@ -326,7 +354,7 @@ def get_or_make_var(expr):
     # special case, -var... 
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return get_or_make_var(-1*expr.args[0])
-
+    
     elif isinstance(expr, Operator) and expr.name == "wsum":
         weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
@@ -449,7 +477,7 @@ def normalized_boolexpr(expr):
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
-
+    #print(f"\nnormalized_boolexpr: {expr=}" )
     if isinstance(expr, Operator):
         # and, or, xor, ->
 
@@ -597,7 +625,7 @@ def normalized_numexpr(expr):
     if isinstance(expr, Operator):
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
-        
+
         # recursively flatten all children
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
 
@@ -675,3 +703,23 @@ def negated_normal(expr):
         #raise NotImplementedError("negate_normal {}".format(expr))
         return expr == 0 # can't do better than this...
 
+def _should_wsum(sub_expr):
+    if isinstance(sub_expr, Operator) and sub_expr.name == "-":
+        return True
+    return isinstance(sub_expr, Operator) and \
+            (sub_expr.name == 'wsum' or \
+            sub_expr.name == 'mul' and is_num(sub_expr.args[0]))
+
+def _wsum_make(sub_expr):
+    if sub_expr.name == 'wsum':
+        return sub_expr.args
+    elif sub_expr.name == 'mul':
+        return [sub_expr.args[0]], [sub_expr.args[1]]
+    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
+        # - (3 * y)
+        w, x = _wsum_make(sub_expr.args[0])
+        return [-i for i in w], x
+    elif sub_expr.name == '-':
+        return [-1], [sub_expr.args[0]]
+    else:
+        return [1], [sub_expr]
