@@ -128,25 +128,6 @@ class CPM_pysat(SolverInterface):
         self.pysat_vpool = IDPool()
         self.ivarmap = dict()
 
-        if cpm_model is None:
-            self.user_vars = []
-            from pysat.formula import CNF
-            cnf = CNF()
-        # Model is bool variable based, there is no need for intvar transformations
-        elif is_bool_model(cpm_model):
-            # store original vars
-            self.user_vars = get_variables_model(cpm_model)
-
-            # create constraint model (list of clauses)
-            cnf = self.make_cnf(cpm_model)
-        # Model has int variables and needs to be encoded with boolean variables
-        else:
-            (self.ivarmap, bool_constraints) = int2bool_onehot(cpm_model)
-
-            self.user_vars = get_variables(bool_constraints)
-
-            # create constraint model (list of clauses)
-            cnf = self._to_pysat_cnf(bool_constraints)
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
 
         # initialise everything else and post the constraints/objective
@@ -217,6 +198,12 @@ class CPM_pysat(SolverInterface):
                     # not specified...
                     cpm_var._value = None
 
+        if len(self.ivarmap) > 0:
+            for iv, value_dict in self.ivarmap.items():
+                n_val_assigned = sum(1 if bv.value() else 0 for _, bv in value_dict.items())
+                assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
+                iv._value = sum(bv.value() * iv_val for iv_val, bv in value_dict.items())
+
         return has_sol
 
 
@@ -253,16 +240,19 @@ class CPM_pysat(SolverInterface):
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
-
         # flatten constraints and to cnf
         cpm_cons = to_cnf(cpm_con)
         for con in cpm_cons:
             if not is_boolvar_constraint(con):
                 new_bool_constraints, new_ivarmap = to_bool_constraint(con, self.ivarmap)
                 self.ivarmap.update(new_ivarmap)
+
                 for new_bool_constraint in new_bool_constraints:
                     self._post_constraint(new_bool_constraint)
+
+                self.user_vars.update(extract_boolvar(new_ivarmap))
             else:
+                self.user_vars.update(get_variables(con))
                 self._post_constraint(con)
 
         return self

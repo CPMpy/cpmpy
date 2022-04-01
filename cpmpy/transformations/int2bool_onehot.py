@@ -171,6 +171,7 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
+            # print("decomposed - bool_constraints", to_unit_comparison(con, ivarmap))
     elif isinstance(constraint, GlobalConstraint):
         raise NotImplementedError(f"Global Constraint {constraint} not supported...")
 
@@ -412,7 +413,7 @@ def to_unit_comparison(con, ivarmap):
             # [2, 6[
             for j in range(largest_lb.lb, smallest_ub.ub+1):
                 if i != j:
-                    bool_constraints.append( ~(ivarmap[left][i] & ivarmap[right][j]))
+                    bool_constraints.append( (~ivarmap[left][i] | ~ivarmap[right][j]))
 
         return bool_constraints
 
@@ -427,7 +428,7 @@ def to_unit_comparison(con, ivarmap):
         for i in range(left.lb, left.ub+1):
             for j in range(right.lb, right.ub+1):
                 if i == j:
-                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+                    bool_constraints.append((~ivarmap[left][i] | ~ivarmap[right][j]))
     # x1  != 3
     elif operator == "!=" and any(True if isinstance(arg, (int, np.integer)) else False for arg in con.args):
         value, var = (left, right) if is_int(left) else  (right, left)
@@ -439,7 +440,7 @@ def to_unit_comparison(con, ivarmap):
         for i in range(left.lb, left.ub+1):
             for j in range(right.lb, right.ub+1):
                 if i >= j:
-                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+                    bool_constraints.append((~ivarmap[left][i] | ~ivarmap[right][j]))
 
     # 5 < x1 ------> x1 != 5, x1!=4, ...
     elif operator == '<' and is_int(left) and isinstance(right, _IntVarImpl):
@@ -458,7 +459,7 @@ def to_unit_comparison(con, ivarmap):
         for i in range(left.lb, left.ub+1):
             for j in range(right.lb, right.ub+1):
                 if i > j:
-                    bool_constraints.append(~(ivarmap[left][i] & ivarmap[right][j]))
+                    bool_constraints.append((~ivarmap[left][i] | ~ivarmap[right][j]))
         # 5 <= x1
     elif operator == '<=' and is_int(left) and isinstance(right, _IntVarImpl):
         for i in range(right.lb, right.ub+1):
