@@ -235,9 +235,6 @@ class CPM_pysat(SolverInterface):
             Post a primitive CPMpy constraint to the native solver API
         """
         from pysat.card import CardEnc
-        if not CPM_pysat.pb_supported():
-            raise ImportError("Please install PyPBLib: pip install pypblib")
-        from pysat.pb import PBEnc
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -250,92 +247,94 @@ class CPM_pysat(SolverInterface):
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         elif isinstance(cpm_expr, Comparison):
             left, right = cpm_expr.args[0], cpm_expr.args[1]
-            bound = None
-            lits, weights = None, None
+
             # only handle cardinality encodings (for now)
             if isinstance(left, Operator) and left.name == "sum" and is_int(right):
+                lits = self.solver_vars(left.args)
                 bound = right
-                lits, weights = [], []
-                for arg in left.args:
-                    if isinstance(arg, _BoolVarImpl):
-                    # unweighted
-                        lits += [self.solver_var(arg)]
-                        weights += [1]
-                    elif isinstance(arg, Operator) and arg.name == "mul":
-                        lits += [self.solver_var(arg.args[1])]
-                        weights += [arg.args[0]]
-                    elif isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], _BoolVarImpl):
-                        lits += [self.solver_var(arg.args[0])]
-                        weights += [-1]
-                    elif isinstance(arg, Operator) and arg.name == "-" and isinstance(arg.args[0], Operator) and arg.args[0].name == "mul":
-                        lits += [self.solver_var(arg.args[0].args[1])]
-                        weights += [-arg.args[0].args[0]]
+
+                clauses = []
+                if cpm_expr.name == "<":
+                    clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == "<=":
+                    clauses += CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == ">=":
+                    clauses += CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == ">":
+                    clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == "==":
+                    clauses += CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == "!=":
+                    # special cases with bounding 'hardcoded' for clarity
+                    if bound <= 0:
+                        clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
+                    elif bound >= len(lits):
+                        clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
                     else:
-                        raise NotImplementedError(f"Other type of sum arg constraint {cpm_expr} not supported by CPM_pysat")
+                        ## add implication literal to atleast/atmost
+                        is_atleast = self.solver_var(boolvar())
+                        clauses += [atl + [-is_atleast] for atl in
+                                    CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
+
+                        is_atmost = self.solver_var(boolvar())
+                        clauses += [atm + [-is_atmost] for atm in
+                                    CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
+
+                        ## add is_atleast or is_atmost
+                        clauses.append([is_atleast, is_atmost])
+                else:
+                    raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+
+                # post the clauses
+                self.pysat_solver.append_formula(clauses)
+
             # WEIGHTED !
-            elif isinstance(left, Operator) and left.name == "wsum" and is_int(right):
-                weights, lits = left.args[0], [self.solver_var(var) for var in left.args[1]]
+            elif isinstance(left, Operator) and (left.name in ["wsum", "mul"]) and is_int(right):
+
+                if not CPM_pysat.pb_supported():
+                    raise ImportError("Please install PyPBLib: pip install pypblib")
+                from pysat.pb import PBEnc
+
+                if left.name == "mul":
+                    weights = [left.args[0]]
+                    lits = [self.solver_var(left.args[1])]
+                else:
+                    weights, lits = left.args[0], [self.solver_var(var) for var in left.args[1]]
+
                 bound = right
 
-            elif isinstance(left, Operator) and left.name == "mul" and is_int(right):
-                weights = [left.args[0]]
-                lits = [self.solver_var(left.args[1])]
-                bound = right
-            else:
-                raise NotImplementedError(f"Comparison constraint {cpm_expr} not supported by CPM_pysat")
-            if cpm_expr.name == "<":
-                atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool)
-                if len(atmost.clauses) > 0:
-                    self.pysat_solver.append_formula(atmost.clauses)
-            elif cpm_expr.name == "<=":
-                atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool)
+                clauses = []
 
-                if len(atmost.clauses) > 0:
-                    self.pysat_solver.append_formula(atmost.clauses)
-            elif cpm_expr.name == ">":
-                atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool)
+                if cpm_expr.name == "<" or (cpm_expr.name == "!=" and bound >= len(lits)):
+                    clauses += PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == "<=":
+                    clauses += PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == ">" or (cpm_expr.name == "!=" and bound <= 0):
+                    clauses += PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == ">=":
+                    clauses += PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool).clauses
+                elif cpm_expr.name == "==":
+                    clauses +=PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
 
-                if len(atleast.clauses) > 0:
-                    self.pysat_solver.append_formula(atleast.clauses)
-            elif cpm_expr.name == ">=":
-                atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool)
+                elif cpm_expr.name == "!=":
+                    # BUG with pblib solved in Pysat dev 0.1.7.dev12
+                    is_atleast = self.solver_var(boolvar())
+                    clauses += [atl + [-is_atleast] for atl in
+                                PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses]
+                    is_atmost = self.solver_var(boolvar())
+                    clauses += [atm + [-is_atmost] for atm in
+                                PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses]
 
-                if len(atleast.clauses) > 0:
-                    self.pysat_solver.append_formula(atleast.clauses)
-            elif cpm_expr.name == "==":
-                equals = PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
+                    ## add is_atleast or is_atmost
+                    clauses.append([is_atleast, is_atmost])
+                else:
+                    raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-                if len(equals.clauses) > 0:
-                    self.pysat_solver.append_formula(equals.clauses)
-            elif cpm_expr.name == "!=" and bound <= 0:
-                atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool)
-
-                if len(atleast.clauses) > 0:
-                    self.pysat_solver.append_formula(atleast.clauses)
-            elif cpm_expr.name == "!=" and bound >= len(lits):
-                atmost = PBEnc.leq(lits=lits, weights=weights, bound=bound - 1, vpool=self.pysat_vpool)
-
-                if len(atmost.clauses) > 0:
-                    self.pysat_solver.append_formula(atmost.clauses)
-
-            elif cpm_expr.name == "!=":
-                # BUG with pblib solved in Pysat dev 0.1.7.dev12
-                is_atleast = self.solver_var(boolvar())
-                is_atmost = self.solver_var(boolvar())
-
-                atleast = PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
-                atleast_clauses = [cl + [-is_atleast] for cl in atleast]
-                if len(atleast) > 0:
-                    self.pysat_solver.append_formula(atleast_clauses)
-
-                atmost =  PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
-                atmost_clauses = [cl + [-is_atmost] for cl in atmost]
-                if len(atmost_clauses) > 0:
-                    self.pysat_solver.append_formula(atmost_clauses)
-
-                ## add is_atleast or is_atmost
-                self.pysat_solver.append_formula([is_atleast, is_atmost])
-
+                self.pysat_solver.append_formula(clauses)
+            # elif isinstance(left, Operator) and left.name == "mul" and is_int(right):
+            #     weights = [left.args[0]]
+            #     lits = [self.solver_var(left.args[1])]
+            #     bound = right
             else:
                 raise NotImplementedError(f"Comparison: {cpm_expr} operator not supported by CPM_pysat")
         else:
