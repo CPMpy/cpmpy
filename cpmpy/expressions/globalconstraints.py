@@ -102,12 +102,14 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression
+from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval
+from .utils import flatlist, all_pairs, argval, is_num
 
 
 # Base class GlobalConstraint
+from ..transformations.flatten_model import get_or_make_var
+
 
 class GlobalConstraint(Expression):
     """
@@ -284,4 +286,32 @@ class Element(GlobalConstraint):
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
+
+class XOR(GlobalConstraint):
+    """
+        The 'xor' constraint for more then 2 arguments.
+        Acts like cascaded xor operators with two inputs
+    """
+
+    def __init__(self, args):
+        if len(args) == 2 and is_num(args[1]):
+            args[0], args[1] = args[1], args[0]
+        super().__init__("xor", args)
+
+    def decompose(self):
+        if len(self.args) == 2:
+            return (self.args[0] + self.args[1]) == 1
+        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        for arg in self.args[2:]:
+            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
+            cons += new_cons
+        return cons + [prev_var]
+
+    def value(self):
+        return sum(argval(a) for a in self.args) % 2 == 1
+
+    def __repr__(self):
+        if len(self.args) == 2:
+            return "{} xor {}".format(*self.args)
+        return "xor({})".format(self.args)
 
