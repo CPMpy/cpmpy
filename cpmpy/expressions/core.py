@@ -193,21 +193,24 @@ class Expression(object):
         return Operator("or", [other, self])
 
     def __xor__(self, other):
+        # avoid cyclic import
+        from .globalconstraints import XOR
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
+        return XOR([self, other])
 
-        return Operator("xor", [self, other])
     def __rxor__(self, other):
+        # avoid cyclic import
+        from .globalconstraints import XOR
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
-
-        return Operator("xor", [other, self])
+        return XOR([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -287,7 +290,7 @@ class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
-        assert (name in Comparison.allowed), "Symbol not allowed"
+        assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
     def __repr__(self):
@@ -327,7 +330,6 @@ class Operator(Expression):
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
         'and': (0, True),
         'or':  (0, True),
-        'xor': (0, True),
         '->':  (2, True),
         'sum': (0, False),
         'wsum': (2, False),
@@ -446,7 +448,6 @@ class Operator(Expression):
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
-        elif self.name == "xor": return sum(arg_vals) % 2 == 1
         elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
 
         return None # default
