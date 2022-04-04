@@ -3,28 +3,32 @@ import unittest
 from cpmpy import boolvar, intvar, Model, cpm_array
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import *
-from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc
+from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat
 
 import pytest
 
-SOLVER_CLASS = CPM_gurobi
+SOLVER_CLASS = CPM_pysat
 
-
-# Exclude some global constaints for all solvers
+# Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"circuit"}
+EXCLUDE_GLOBAL = {CPM_ortools: {"circuit"},
+                  CPM_gurobi: {"circuit"},
+                  CPM_minizinc: {"circuit"},
+                  CPM_pysat: {"circuit", "element","min","max", "allequal", "alldifferent"}}
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {CPM_ortools: {"sub","xor"},
+EXCLUDE_OPERATORS = {CPM_ortools: {"sub"},
                      CPM_gurobi: {"sub", "mod"},
-                     CPM_minizinc: {}} # TODO remove xor from list once it is added as a global constraint, see issue #113
+                     CPM_minizinc: {},
+                     CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {CPM_ortools: {},
-                CPM_gurobi:  {},
-                CPM_minizinc: {}}
+EXCLUDE_IMPL = {CPM_ortools: {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","-","xor"}, # TODO this will become emtpy after resolving issue #105
+                CPM_gurobi:  {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","xor"},
+                CPM_minizinc: {},
+                CPM_pysat: {}}
 
 
 # Variables to use in the rest of the test script
@@ -130,11 +134,14 @@ def global_constraints():
     # TODO: add Circuit
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
-        if cons.name not in EXCLUDE_OPERATORS[SOLVER_CLASS]:
+        if cons.name not in EXCLUDE_GLOBAL[SOLVER_CLASS]:
             yield cons
 
-    if "element" not in EXCLUDE_OPERATORS[SOLVER_CLASS]:
+    if "element" not in EXCLUDE_GLOBAL[SOLVER_CLASS]:
         yield cpm_array(NUM_ARGS)[NUM_VAR]
+
+    if "xor" not in EXCLUDE_GLOBAL[SOLVER_CLASS]:
+        yield XOR(BOOL_ARGS)
 
 
 def reify_imply_exprs():
@@ -154,7 +161,8 @@ def reify_imply_exprs():
 
     for comp_expr in comp_constraints():
         lhs, rhs = comp_expr.args
-        if (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL[SOLVER_CLASS]):
+        if (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL[SOLVER_CLASS]) and \
+                (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL[SOLVER_CLASS]):
             yield comp_expr.implies(BOOL_VAR)
             yield BOOL_VAR.implies(comp_expr)
             yield comp_expr == BOOL_VAR
