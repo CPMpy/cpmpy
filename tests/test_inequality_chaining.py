@@ -1,18 +1,21 @@
+import pdb
+from cpmpy import *
+# from cpmpy.solvers import CPM_pysat
 import unittest
-import tempfile
-import os
-from os.path import join
-
-from numpy import logaddexp
-import cpmpy as cp
-from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
-
 
 class TestInequalityChaining(unittest.TestCase):
-    def test_single_inequality(self):
-        pass
+    # def test_single_inequality(self):
+    #     bv1, bv2 = boolvar(shape=2)
+    #     print(bv1 < bv2)
+    #     pass
     def test_chaining_lt(self):
-        pass
+
+        bv1, bv2, bv3 = boolvar(shape=3)
+        # pdb.set_trace()
+        c1  = (bv1 > bv2) and (bv2 < bv3)
+        c2  = (bv1 < bv2 < bv3)
+        self.assertEqual(str(c1), str(c2))
+
     def test_chaining_lte(self):
         pass
     def test_chaining_gt(self):
@@ -21,5 +24,7 @@ class TestInequalityChaining(unittest.TestCase):
         pass
     def test_chaining_mix_inequalities(self):
         pass
+
+
 if __name__ == '__main__':
     unittest.main()
