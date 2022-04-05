@@ -49,7 +49,30 @@ class TestModel(unittest.TestCase):
         m = cp.Model([cons1, cons2])
 
         memodict = dict()
-        m_dcopy = m.copy(memodict)
+        m_dcopy = m.copy()
+        print(memodict)
+        m_dcopy.solve()
+
+        self.assertTrue(cons1.value())
+        self.assertTrue(cons2.value())
+
+        m.solve()
+
+        m2 = m.copy()
+
+        self.assertTrue(m2.constraints[0].value())
+        self.assertTrue(m2.constraints[1].value())
+
+
+    def test_deepcopy(self):
+        x,y,z = [cp.boolvar(name=n) for n in "xyz"]
+
+        cons1 = x > y
+        cons2 = x + y == 1
+        m = cp.Model([cons1, cons2])
+
+        memodict = dict()
+        m_dcopy = m.deepcopy(memodict)
         print(memodict)
         m_dcopy.solve()
 
@@ -58,7 +81,7 @@ class TestModel(unittest.TestCase):
 
         m.solve()
 
-        m2 = m.copy()
+        m2 = m.deepcopy()
 
         self.assertTrue(m2.constraints[0].value())
         self.assertTrue(m2.constraints[1].value())
