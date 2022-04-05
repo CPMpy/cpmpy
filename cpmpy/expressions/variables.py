@@ -242,9 +242,10 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         return hash(str(self))
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         copied = type(self)(self.lb, self.ub, self.name)
         copied._value = self.value()
+        return copied
 
 class _IntVarImpl(_NumVarImpl):
     """
@@ -354,8 +355,8 @@ class NegBoolView(_BoolVarImpl):
     def __invert__(self):
         return self._bv
 
-    def copy(self, memodict={}):
-        return NegBoolView(self._bv.copy(memodict))
+    def deepcopy(self, memodict={}):
+        return NegBoolView(self._bv.deepcopy(memodict))
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
@@ -379,8 +380,8 @@ class NDVarArray(Expression, np.ndarray):
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)
 
-    def copy(self, memodict={}):
-        copied = [arg.copy(memodict) if isinstance(arg, Expression) else arg for arg in self]
+    def deepcopy(self, memodict={}):
+        copied = [arg.deepcopy(memodict) if isinstance(arg, Expression) else arg for arg in self]
         return cpm_array(copied)
     
     def __repr__(self):
