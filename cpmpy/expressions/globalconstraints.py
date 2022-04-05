@@ -138,8 +138,8 @@ class GlobalConstraint(Expression):
         """
         return None
 
-    def copy(self, memodict={}):
-        copied_args = self._copy_args(memodict)
+    def deepcopy(self, memodict={}):
+        copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args, self._is_bool)
 
 
@@ -160,12 +160,12 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         """
             Return a deep copy of the Alldifferent global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        copied_args = self._copy_args(memodict)
+        copied_args = self._deepcopy_args(memodict)
         return AllDifferent(*copied_args)
 
     def value(self):
@@ -189,12 +189,12 @@ class AllEqual(GlobalConstraint):
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
-    def copy(self, memdict={}):
+    def deepcopy(self, memdict={}):
         """
             Return a deep copy of the AllEqual global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        copied_args = self._copy_args(memdict)
+        copied_args = self._deepcopy_args(memdict)
         return AllEqual(*copied_args)
 
     def value(self):
@@ -238,12 +238,12 @@ class Circuit(GlobalConstraint):
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 
-    def copy(self, memdict={}):
+    def deepcopy(self, memdict={}):
         """
             Return a deep copy of the Circuit global constraint
            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        copied_args = self._copy_args(memdict)
+        copied_args = self._deepcopy_args(memdict)
         return Circuit(*copied_args)
 
 
@@ -260,12 +260,12 @@ class Table(GlobalConstraint):
         raise NotImplementedError("TODO: table decomposition")
 
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         """
             Return a deep copy of the Table global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        array, table = self._copy_args(memodict)
+        array, table = self._deepcopy_args(memodict)
         return Table(array, table)
 
     # TODO: value()
@@ -285,12 +285,12 @@ class Minimum(GlobalConstraint):
     def value(self):
         return min([argval(a) for a in self.args])
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         """
             Return a deep copy of the Minimum global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        copied_args = self._copy_args(self.args)
+        copied_args = self._deepcopy_args(self.args)
         return Minimum(copied_args)
 
 class Maximum(GlobalConstraint):
@@ -305,12 +305,12 @@ class Maximum(GlobalConstraint):
     def value(self):
         return max([argval(a) for a in self.args])
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         """
             Return a deep copy of the Maximum global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        copied_args = self._copy_args(memodict)
+        copied_args = self._deepcopy_args(memodict)
         return Maximum(copied_args)
 
 def element(arg_list):
@@ -343,10 +343,10 @@ class Element(GlobalConstraint):
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
 
-    def copy(self, memodict={}):
+    def deepcopy(self, memodict={}):
         """
             Return a deep copy of the Element global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        arr, idx = self._copy_args(memodict)
+        arr, idx = self._deepcopy_args(memodict)
         return Element(arr, idx)
