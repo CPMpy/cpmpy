@@ -13,6 +13,8 @@
 
         ortools
         pysat
+        minizinc
+        gurobi
         utils
 
     ===============
@@ -23,7 +25,10 @@
 
         CPM_ortools
         CPM_pysat
+        CPM_minizinc
         CPM_gurobi
+
+        SolverLookup
 
     =================
     List of functions
@@ -31,7 +36,10 @@
     .. autosummary::
         :nosignatures:
 
+        get_supported_solvers
+        builtin_solvers
         param_combinations
+      
 """
 
 from .utils import builtin_solvers, get_supported_solvers, param_combinations

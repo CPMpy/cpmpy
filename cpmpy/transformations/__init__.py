@@ -17,4 +17,7 @@
 
         flatten_model
         get_variables
+        linearize
+        reification
+        to_cnf
 """
