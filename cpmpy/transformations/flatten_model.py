@@ -662,13 +662,11 @@ def negated_normal(expr):
             return expr == 0 # can't do better than this...
 
     elif expr.name == 'xor':
-        assert (len(expr.args) == 2)
-        # not xor: must be equal to each other
-        return (expr.args[0] == expr.args[1])
-        # one could also stay in xor-space:
-        # doesn't matter which one is negated
-        # return expr.args[0] ^ negated_normal(expr.args[1])
-
+        # avoid circular import
+        from ..expressions.globalconstraints import XOR
+        # stay in xor space
+        # only negated last element
+        return XOR(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
     else:
         # global...
