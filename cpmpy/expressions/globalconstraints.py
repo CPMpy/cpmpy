@@ -293,10 +293,17 @@ class XOR(GlobalConstraint):
         Acts like cascaded xor operators with two inputs
     """
 
-    def __init__(self, args):
-        if len(args) == 2 and is_num(args[1]):
-            args[0], args[1] = args[1], args[0]
-        super().__init__("xor", args)
+    def __init__(self, arg_list):
+        if len(arg_list) == 2 and is_num(arg_list[1]):
+            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        i = 0  # length can change
+        while i < len(arg_list):
+            if isinstance(arg_list[i], GlobalConstraint) and arg_list[i].name == "xor":
+                # merge args in at this position
+                arg_list[i:i + 1] = arg_list[i].args
+            else:
+                i += 1
+        super().__init__("xor", arg_list)
 
     def decompose(self):
         if len(self.args) == 2:
