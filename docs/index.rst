@@ -20,7 +20,6 @@ Getting started:
    installation_instructions
    Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
    More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
-   tutorial_ijcai_2022
 
 .. toctree::
    :maxdepth: 1
