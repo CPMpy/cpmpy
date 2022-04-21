@@ -402,7 +402,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*', 'div': '/', 'pow': '^'}
+                        'mul': '*', 'pow': '^'}
             op_str = expr.name
             if op_str in printmap:
                 op_str = printmap[op_str]
