@@ -157,11 +157,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
     def value(self):
-        val_list = [var1 != var2
-                    and var1 is not None
-                    and var2 is not None
-                            for var1, var2 in all_pairs(self.args)]
-        return all(val_list)
+        return all(c.value() for c in self.decompose())
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -178,11 +174,7 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
     def value(self):
-        val_list = [var1 == var2
-                    and var1 is not None
-                    and var2 is not None
-                    for var1, var2 in all_pairs(self.args)]
-        return all(val_list)
+        return all(c.value() for c in self.decompose())
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
