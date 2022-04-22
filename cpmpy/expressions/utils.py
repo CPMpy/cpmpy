@@ -28,11 +28,11 @@ from itertools import chain, combinations
 def is_int(arg):
     """ is it an integer? (incl numpy variants)
     """
-    return isinstance(arg, (int, np.integer))
+    return isinstance(arg, (int, np.integer, np.bool_))
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return isinstance(arg, (int, np.integer, float, np.float64))
+    return isinstance(arg, (int, np.integer, float, np.float64, np.bool_))
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
