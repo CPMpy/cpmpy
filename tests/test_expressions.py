@@ -1,5 +1,6 @@
 import unittest
-import cpmpy as cp 
+import cpmpy as cp
+import numpy as np
 from cpmpy.expressions import *
 from cpmpy.expressions.core import Operator
 
@@ -24,7 +25,7 @@ class TestSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
         self.assertEqual(len(expr.args), 3)
-    
+
     def test_add_iv(self):
         expr = self.iv + cp.intvar(2,4)
         self.assertIsInstance(expr, Operator)
@@ -99,7 +100,7 @@ class TestWeightedSum(unittest.TestCase):
         expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
-    
+
     def test_weighted_nested_epxressions(self):
         expr = self.ivs[0] * 4 + 5 * (self.ivs[1] + 6 * self.ivs[2])
         self.assertIsInstance(expr, Operator)
@@ -113,7 +114,51 @@ class TestWeightedSum(unittest.TestCase):
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
 
-        
+class TestMul(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.bvar = boolvar(name="bv")
+        self.ivar = boolvar(name="iv")
+
+    def test_mul_const(self):
+        expr = self.ivar * 10
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, "mul")
+        self.assertIn(self.ivar, expr.args)
+
+        expr = self.ivar * True
+        self.assertEqual(expr.name, self.ivar.name)
+        # same for numpy true
+        expr = self.ivar * np.True_
+        self.assertEqual(expr.name, self.ivar.name)
+
+        expr = self.ivar * False
+        self.assertEqual(0, expr)
+        # same for numpy false
+        expr = self.ivar * np.False_
+        self.assertEqual(0, expr)
+
+
+
+    def test_mul_var(self):
+        #ivar and bvar
+        expr = self.ivar * self.bvar
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, "mul")
+        self.assertIn(self.ivar, expr.args)
+        self.assertIn(self.bvar, expr.args)
+
+        #ivar and ivar
+        expr = self.ivar * self.ivar
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, "mul")
+        self.assertIn(self.ivar, expr.args)
+
+        #bvar and bvar
+        expr = self.bvar * self.bvar
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, "mul")
+        self.assertIn(self.bvar, expr.args)
 
 if __name__ == '__main__':
     unittest.main()
