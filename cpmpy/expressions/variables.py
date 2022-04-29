@@ -201,7 +201,7 @@ def cpm_array(arr):
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
-    return NDVarArray(shape=arr.shape, dtype=type(arr.flat[0]), buffer=arr)
+    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr)
 
 
 class NullShapeError(Exception):
