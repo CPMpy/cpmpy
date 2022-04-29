@@ -2,7 +2,9 @@ import unittest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions import *
-from cpmpy.expressions.core import Operator
+from cpmpy.expressions.variables import NDVarArray
+from cpmpy.expressions.core import Operator, Expression
+
 
 class TestSum(unittest.TestCase):
 
@@ -159,6 +161,21 @@ class TestMul(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, "mul")
         self.assertIn(self.bvar, expr.args)
+
+    def test_nullarg_mul(self):
+        x = intvar(0,5,shape=3, name="x")
+        a = np.array([0,1,1], dtype=bool)
+
+        prod = x * a
+
+        self.assertIsInstance(prod, NDVarArray)
+        for expr in prod.args:
+            self.assertTrue(isinstance(expr, Expression) or expr == 0)
+
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
