@@ -1,4 +1,4 @@
-CPMpy ortools interace (:mod:`cpmpy.solvers.ortools`)
+CPMpy ortools interface (:mod:`cpmpy.solvers.ortools`)
 =====================================================
 
 .. automodule:: cpmpy.solvers.ortools
