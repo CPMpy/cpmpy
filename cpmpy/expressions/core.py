@@ -265,10 +265,14 @@ class Expression(object):
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
+        if is_num(other) and other == 0:
+            return 0
         return Operator("mul", [self, other])
     def __rmul__(self, other):
         if is_num(other) and other == 1:
             return self
+        if is_num(other) and other == 0:
+            return 0
         return Operator("mul", [other, self])
 
     # matrix multipliciation TODO?
