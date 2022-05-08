@@ -122,6 +122,9 @@ class Expression(object):
                 strargs.append( f"{arg}" )
         return "{}({})".format(self.name, ",".join(strargs))
 
+    def __hash__(self):
+        return hash(self.__str__())
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
@@ -130,6 +133,32 @@ class Expression(object):
 
     def value(self):
         return None # default
+
+    def _deepcopy_args(self, memodict={}):
+        """
+            Create and return a deep copy of the arguments of the expression
+            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied = []
+        for arg in self.args:
+            if arg not in memodict:
+                if isinstance(arg, Expression):
+                    memodict[arg] = arg.deepcopy(memodict)
+                elif is_num(arg) or isinstance(arg, bool):
+                    memodict[arg] = arg
+                else:
+                    raise ValueError(f"Not a supported argument to copy: {arg}")
+            copied.append(memodict[arg])
+        return copied
+
+    def deepcopy(self, memodict = {}):
+        """
+            Return a deep copy of the Expression
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return type(self)(self.name, copied_args)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -296,6 +325,10 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
+
     # a comparison itself is bool, check special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -314,6 +347,15 @@ class Comparison(Expression):
         elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Comparison
+            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Comparison(self.name, *copied_args)
+
 
 
 class Operator(Expression):
@@ -414,6 +456,10 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
+
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
 
     # if self is bool, special case
     def __eq__(self, other):

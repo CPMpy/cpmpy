@@ -231,4 +231,29 @@ class Model(object):
         """
         with open(fname, "rb") as f:
             return pickle.load(f)
-    
+
+    def copy(self):
+        """
+            Makes a shallow copy of the model.
+            Constraints and variables are shared among the original and copied model.
+        """
+        if self.objective_is_min:
+            return Model(self.constraints, minimize=self.objective_)
+        else:
+            return Model(self.constraints, maximize=self.objective_)
+
+
+    def deepcopy(self, memodict={}):
+        """
+            Deep copies a the model to a new instance.
+            :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
+        """
+        copied_cons = [cpm_cons.deepcopy(memodict) for cpm_cons in self.constraints]
+        if self.objective_ is not None:
+            copied_obj = self.objective_.deepcopy(memodict)
+
+        copied_model = Model(copied_cons)
+        if self.objective_ is not None:
+            copied_model.objective(copied_obj, self.objective_is_min)
+
+        return copied_model
