@@ -105,12 +105,9 @@ import warnings # for deprecation warning
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num
-
-
-# Base class GlobalConstraint
 from ..transformations.flatten_model import get_or_make_var
 
-
+# Base class GlobalConstraint
 class GlobalConstraint(Expression):
     """
         Abstract superclass of GlobalConstraints
@@ -140,6 +137,10 @@ class GlobalConstraint(Expression):
         """
         return None
 
+    def deepcopy(self, memodict={}):
+        copied_args = self._deepcopy_args(memodict)
+        return type(self)(self.name, copied_args, self._is_bool)
+
 
 # Global Constraints (with Boolean return type)
 
@@ -158,12 +159,16 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Alldifferent global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferent(*copied_args)
+
     def value(self):
-        val_list = [var1 != var2
-                    and var1 is not None
-                    and var2 is not None
-                            for var1, var2 in all_pairs(self.args)]
-        return all(val_list)
+        return all(c.value() for c in self.decompose())
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -179,12 +184,17 @@ class AllEqual(GlobalConstraint):
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
+    def deepcopy(self, memdict={}):
+        """
+            Return a deep copy of the AllEqual global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memdict)
+        return AllEqual(*copied_args)
+
     def value(self):
-        val_list = [var1 == var2
-                    and var1 is not None
-                    and var2 is not None
-                    for var1, var2 in all_pairs(self.args)]
-        return all(val_list)
+        return all(c.value() for c in self.decompose())
+
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -218,7 +228,18 @@ class Circuit(GlobalConstraint):
             # others: ith one is successor of i-1
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
+
+    def deepcopy(self, memdict={}):
+        """
+            Return a deep copy of the Circuit global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memdict)
+        return Circuit(*copied_args)
+
+
     # TODO: value()
+
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
@@ -229,7 +250,17 @@ class Table(GlobalConstraint):
     def decompose(self):
         raise NotImplementedError("TODO: table decomposition")
 
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Table global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        array, table = self._deepcopy_args(memodict)
+        return Table(array, table)
+
     # TODO: value()
+
 # Numeric Global Constraints (with integer-valued return type)
 
 
@@ -245,6 +276,14 @@ class Minimum(GlobalConstraint):
     def value(self):
         return min([argval(a) for a in self.args])
 
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Minimum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(self.args)
+        return Minimum(copied_args)
+
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -256,6 +295,14 @@ class Maximum(GlobalConstraint):
 
     def value(self):
         return max([argval(a) for a in self.args])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Maximum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Maximum(copied_args)
 
 def element(arg_list):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -286,6 +333,15 @@ class Element(GlobalConstraint):
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Element global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        arr, idx = self._deepcopy_args(memodict)
+        return Element(arr, idx)
+
 
 class XOR(GlobalConstraint):
     """
