@@ -141,7 +141,7 @@ def global_constraints():
         yield cpm_array(NUM_ARGS)[NUM_VAR]
 
     if "xor" not in EXCLUDE_GLOBAL[SOLVER_CLASS]:
-        yield XOR(BOOL_ARGS)
+        yield Xor(BOOL_ARGS)
 
 
 def reify_imply_exprs():

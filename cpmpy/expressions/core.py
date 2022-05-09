@@ -223,23 +223,23 @@ class Expression(object):
 
     def __xor__(self, other):
         # avoid cyclic import
-        from .globalconstraints import XOR
+        from .globalconstraints import Xor
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
-        return XOR([self, other])
+        return Xor([self, other])
 
     def __rxor__(self, other):
         # avoid cyclic import
-        from .globalconstraints import XOR
+        from .globalconstraints import Xor
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
-        return XOR([other, self])
+        return Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition

@@ -343,18 +343,20 @@ class Element(GlobalConstraint):
         return Element(arr, idx)
 
 
-class XOR(GlobalConstraint):
+class Xor(GlobalConstraint):
     """
         The 'xor' constraint for more then 2 arguments.
         Acts like cascaded xor operators with two inputs
     """
 
     def __init__(self, arg_list):
+        # convention for commutative binary operators:
+        # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
         i = 0  # length can change
         while i < len(arg_list):
-            if isinstance(arg_list[i], GlobalConstraint) and arg_list[i].name == "xor":
+            if isinstance(arg_list[i], Xor):
                 # merge args in at this position
                 arg_list[i:i + 1] = arg_list[i].args
             else:
@@ -378,3 +380,10 @@ class XOR(GlobalConstraint):
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
 
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the xor global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Xor(copied_args)

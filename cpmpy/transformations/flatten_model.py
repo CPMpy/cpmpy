@@ -663,10 +663,10 @@ def negated_normal(expr):
 
     elif expr.name == 'xor':
         # avoid circular import
-        from ..expressions.globalconstraints import XOR
+        from ..expressions.globalconstraints import Xor
         # stay in xor space
         # only negated last element
-        return XOR(expr.args[:-1]) ^ negated_normal(expr.args[-1])
+        return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
     else:
         # global...
