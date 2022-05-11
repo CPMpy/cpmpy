@@ -36,9 +36,6 @@ from ..transformations.reification import only_bv_implies
 
 try:
     import gurobipy as gp
-    GRB_env = gp.Env()
-    GRB_env.setParam("OutputFlag",0)
-    GRB_env.start()
 except ImportError as e:
     pass
 
@@ -66,10 +63,7 @@ class CPM_gurobi(SolverInterface):
         # try to import the package
         try:
             import gurobipy as gp
-            from datetime import datetime
-            valid_until = gp.Model().LicenseExpiration
-            today = datetime.today()
-            return today.year * 1e4 + today.month * 1e2 + today.day <= valid_until
+            return True
         except ImportError as e:
             return False
 
@@ -86,7 +80,10 @@ class CPM_gurobi(SolverInterface):
         import gurobipy as gp
 
         # initialise the native gurobi model object
-        self.grb_model = gp.Model(env=GRB_env)
+        self._GRB_env = gp.Env()
+        self._GRB_env.setParam("OutputFlag", 0)
+        self._GRB_env.start()
+        self.grb_model = gp.Model(env=self._GRB_env)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
