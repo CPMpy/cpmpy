@@ -44,14 +44,14 @@ def solve(param):
         b = boolvar(param['b']+1)
         model += b[0] == 1
         model += b == ((matrix[r] <= matrix[r + 1]) &
-                       ((matrix[r] < matrix[r + 1])) | b[1:] == 1)
+                       ((matrix[r] < matrix[r + 1]) | b[1:] == 1))
         model += b[-1] == 0
     # lexicographic ordering of cols
     for c in range(param['b']-1):
         b = boolvar(param['v']+1)
         model += b[0] == 1
         model += b == ((matrix.T[c] <= matrix.T[c + 1]) &
-                       ((matrix.T[c] < matrix.T[c + 1])) | b[1:] == 1)
+                       ((matrix.T[c] < matrix.T[c + 1]) | b[1:] == 1))
         model += b[-1] == 0
 
     # find all solutions of model
