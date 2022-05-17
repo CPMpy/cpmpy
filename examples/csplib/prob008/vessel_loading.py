@@ -1,3 +1,13 @@
+"""
+    Vessel loading in CPMpy
+    Problem 008 in CSPlib
+
+    Model inspired by Essence implementation on CSPlib
+
+    Created by Ignace Bleukx
+
+"""
+
 import sys
 
 from cpmpy import *
