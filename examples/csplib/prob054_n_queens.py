@@ -21,12 +21,7 @@ import sys
 import numpy as np
 from cpmpy import *
 
-if __name__ == "__main__":
-
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 16
-    n_sols = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-    solver = sys.argv[3] if len(sys.argv) > 3 else None
-
+def n_queens(n=16):
 
     queens = intvar(1, n, shape=n)
 
@@ -37,8 +32,20 @@ if __name__ == "__main__":
         AllDifferent(queens + np.arange(n)),
     ])
 
-    num_solutions = model.solveAll(solution_limit=n_sols,
-                                   solver=solver,
-                                   display = lambda : print(queens.value(),end="\n\n"))
+    return model, (queens,)
 
-    print("num_solutions:", num_solutions)
+if __name__ == "__main__":
+
+    n = 16
+    n_sols = 0 # find all solutions
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        n_sols = int(sys.argv[2])
+
+    model, (queens,) = n_queens(n)
+
+    n_sols = model.solveAll(solution_limit=n_sols,
+                            display = lambda : print(queens.value(),end="\n\n"))
+
+    print("num_solutions:", n_sols)
