@@ -11,13 +11,7 @@ from cpmpy import *
 import numpy as np
 
 
-# periodic auto correlation
-def PAF(arr, s):
-    return sum(arr * np.roll(arr,-s))
-
-
-if __name__ == "__main__":
-    n = 16
+def auto_correlation(n=16):
 
     # bitarray of length n
     arr = intvar(-1,1,shape=n, name="arr")
@@ -32,11 +26,25 @@ if __name__ == "__main__":
         sum([PAF(arr,s) ** 2 for s in range(1,n)])
     )
 
-    model.solve()
+    return model, arr
 
-    # print using runlength notation
-    arr = arr.value()
-    pieces = np.split(arr, np.where(arr == -1)[0])
+# periodic auto correlation
+def PAF(arr, s):
+    return sum(arr * np.roll(arr,-s))
 
-    print("Run length encoding of solution:")
-    print("".join([str(len(p)) for p in pieces if len(p) != 0]))
+
+if __name__ == "__main__":
+
+    n = 16
+    model, arr = auto_correlation(n)
+
+    if model.solve():
+        # print using runlength notation
+        arr = arr.value()
+        pieces = np.split(arr, np.where(arr == -1)[0])
+
+        print("Run length encoding of solution:")
+        print("".join([str(len(p)) for p in pieces if len(p) != 0]))
+
+    else:
+        print("Model is unsatisfiable")
