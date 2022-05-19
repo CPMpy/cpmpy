@@ -5,21 +5,14 @@ Problem 044 on CSPlib
 
 Model created by Ignce Bleukx
 """
+import sys
+
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 
 import numpy as np
 
-
-def print_sol(sets):
-    for s in sets:
-        print(np.where(s)[0], end=" ")
-    print()
-
-if __name__ == "__main__":
-
-    n = 15
-    num_sols = 1
+def steiner(n=15):
     assert n % 6 == 1 or n % 6 == 3, "N must be (1|3) modulo 6"
 
     n_sets = int(n * (n - 1) // 6)
@@ -42,6 +35,25 @@ if __name__ == "__main__":
     # symmetry breaking
     model += (sets[(0, 0)] == 1)
 
+    return model, (sets,)
+
+def print_sol(sets):
+    for s in sets.value():
+        print(np.where(s)[0], end=" ")
+    print()
+
+
+if __name__ == "__main__":
+
+    n = 15
+    num_sols = 1
+
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        num_sols = int(sys.argv[2])
+
+    model, (sets,) = steiner(n)
     model.solveAll(solver="pysat",
                    solution_limit=num_sols,
-                   display=lambda : print_sol(sets.value()))
+                   display=lambda : print_sol(sets))
