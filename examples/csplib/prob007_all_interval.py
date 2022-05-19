@@ -33,11 +33,6 @@ import sys
 from cpmpy import *
 import numpy as np
 
-def print_solution(x, diffs):
-    print("x    :", x.value())
-    print("diffs:", diffs.value())
-
-
 def all_interval(n=12,num_sols=0):
 
   # data
@@ -61,13 +56,22 @@ def all_interval(n=12,num_sols=0):
   model += [x[0] < x[n - 1]]
   model += [diffs[0] < diffs[1]]
 
+  return model, (x, diffs)
 
-  model.solveAll(solution_limit=num_sols,
-                 display=lambda : print_solution(x, diffs))
+def print_solution(x, diffs):
+    print(f"x: {x.value()}")
+    print(f"diffs: {diffs.value()}")
 
+if __name__ == "__main__":
 
-n = 12
-num_sols = 0
-if len(sys.argv) > 1:
-  n = int(sys.argv[1])
-all_interval(n,num_sols)
+    n = 12
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+
+    num_sols = 0 # find all solutions
+
+    model, (x, diffs) = all_interval(n)
+    n = model.solveAll(solution_limit=num_sols,
+                   display=lambda: print_solution(x, diffs))
+
+    print(f"Found {n} solutions")
