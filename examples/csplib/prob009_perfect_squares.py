@@ -23,6 +23,34 @@ from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 
 
+def perfect_squares(base, sides, num_sols=0):
+    model = Model()
+
+    squares = range(len(sides))
+
+    # Ensure that the squares cover the base exactly
+    assert np.square(sides).sum() == base ** 2, "Squares do not cover the base exactly!"
+
+    # variables
+    x_coords = intvar(0, base, shape=len(squares), name="x_coords")
+    y_coords = intvar(0, base, shape=len(squares), name="y_coords")
+
+    # squares must be in bounds of big square
+    model += x_coords + sides <= base
+    model += y_coords + sides <= base
+
+    # no overlap between coordinates
+    for a, b in all_pairs(squares):
+        model += (
+            (x_coords[a] + sides[a] <= x_coords[b]) |
+            (x_coords[b] + sides[b] <= x_coords[a]) |
+            (y_coords[a] + sides[a] <= y_coords[b]) |
+            (y_coords[b] + sides[b] <= y_coords[a])
+        )
+
+    return model, (x_coords, y_coords)
+
+
 def get_data(name):
     if name == "problem1":
         base, sides =  4, [2,2,2,2]
@@ -52,6 +80,7 @@ def get_data(name):
     return base, np.array(sides)
 
 def print_sol(base, sides, x_coords,y_coords, alpha=False):
+    x_coords, y_coords = x_coords.value(), y_coords.value()
     big_square = np.zeros(dtype=int, shape=(base, base))
     for i, (x,y) in enumerate(zip(x_coords, y_coords)):
         big_square[x:x+sides[i],y:y+sides[i]] = i
@@ -61,47 +90,20 @@ def print_sol(base, sides, x_coords,y_coords, alpha=False):
         ], dtype=str).reshape(big_square.shape)
     print(big_square)
 
-
-def perfect_squares(base, sides, num_sols=0):
-    model = Model()
-
-    squares = range(len(sides))
-
-    # Ensure that the squares cover the base exactly
-    assert np.square(sides).sum() == base ** 2, "Squares do not cover the base exactly!"
-
-    # variables
-    x_coords = intvar(0, base, shape=len(squares), name="x_coords")
-    y_coords = intvar(0, base, shape=len(squares), name="y_coords")
-
-    # squares must be in bounds of big square
-    model += x_coords + sides <= base
-    model += y_coords + sides <= base
-
-    # no overlap between coordinates
-    for a, b in all_pairs(squares):
-        model += (
-            (x_coords[a] + sides[a] <= x_coords[b]) |
-            (x_coords[b] + sides[b] <= x_coords[a]) |
-            (y_coords[a] + sides[a] <= y_coords[b]) |
-            (y_coords[b] + sides[b] <= y_coords[a])
-        )
-
-    return model, x_coords, y_coords
-
-
 if __name__ == "__main__":
     num_sols = 1
-    alpha = True
+    problem_number = 4
 
-    for i in range(1, 9):
-        data = get_data(f"problem{i}")
-        model,*vars = perfect_squares(*data, num_sols=num_sols)
+    if len(sys.argv) > 1:
+        problem_number = int(sys.argv[1])
 
-        n = model.solveAll(
-            solution_limit=num_sols,
-            display=lambda : print_sol(*data,*[v.value() for v in vars], alpha=alpha)
-        )
+    data = get_data(f"problem{problem_number}")
+    model, vars = perfect_squares(*data, num_sols=num_sols)
 
-        print(f"Found {n} solutions")
+    n = model.solveAll(
+        solution_limit=num_sols,
+        display=lambda : print_sol(*data,*vars, alpha=True)
+    )
+
+    print(f"Found {n} solutions")
 
