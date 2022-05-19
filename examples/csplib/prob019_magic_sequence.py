@@ -20,12 +20,7 @@ import sys
 import numpy as np
 from cpmpy import *
 
-
-
-# def print_solution(a):
-#   print(a[0].value())
-
-def magic_sequence(n=10, num_sols=0):
+def magic_sequence(n=10):
     print("n:", n)
     model = Model()
 
@@ -39,17 +34,21 @@ def magic_sequence(n=10, num_sols=0):
     model += sum(x) == n
     model += sum(x * np.arange(n)) == n
 
-    # search for all solutions
-    model.solveAll(solution_limit=num_sols,
-                   display=[x])
+    return model, (x,)
+
+if __name__ == "__main__":
+
+    n = 10
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+
+    model, (x,) = magic_sequence(n)
+
+    if model.solve():
+        print(f"x: {x.value()}")
+    else:
+        print("Model is unsatisviable)")
 
 
-num_sols = 0
-n = 10
-if len(sys.argv) > 1:
-    n = int(sys.argv[1])
-if len(sys.argv) > 2:
-    num_sols = int(sys.argv[2])
 
-magic_sequence(n, num_sols)
 
