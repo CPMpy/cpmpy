@@ -64,13 +64,7 @@ import sys
 from cpmpy import *
 import numpy as np
 
-
-def print_solution(position, solution):
-    print(f"{position= }")
-    print(f"{solution= }")
-
-
-def langford(k=8, num_sols=0):
+def langford(k=8):
     model = Model()
 
     if not (k % 4 == 0 or k % 4 == 3):
@@ -99,17 +93,26 @@ def langford(k=8, num_sols=0):
         # symmetry breaking
     model += [solution[0] < solution[2 * k - 1]]
 
-    num_sols = model.solveAll(solution_limit=num_sols,
-                              display=lambda : print_solution(position.value(), solution.value()))
+    return model, (position, solution)
 
-    print(f"Found {num_sols} solutions.")
 
-k = 8
-num_sols = 0
+def print_solution(position, solution):
+    print(f"position: {position.value()}")
+    print(f"solution: {solution.value()}")
+
+
 if __name__ == "__main__":
+    k = 8
+    num_sols = 0 # search for all solutions
+
     if len(sys.argv) > 1:
         k = int(sys.argv[1])
     if len(sys.argv) > 2:
         num_sols = int(sys.argv[2])
 
-    langford(k, num_sols)
+    model, (position, solution) = langford(k)
+
+    num_sols = model.solveAll(solution_limit=num_sols,
+                              display=lambda: print_solution(position, solution))
+
+    print(f"Found {num_sols} solutions.")
