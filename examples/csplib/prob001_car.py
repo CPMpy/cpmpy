@@ -13,6 +13,36 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 import sys
 
+def car_sequence(n_cars, n_options, n_classes, capacity, block_size, n_cars_p_class, options):
+
+  # build model
+  model = Model()
+
+  # decision variables
+  slots = intvar(0, n_classes-1, shape=n_cars, name="slots")
+  setup = boolvar(shape=(n_cars, n_options), name="setup")
+  
+  # satisfy demand
+  model += [sum(slots == c) == n_cars_p_class[c] for c in range(n_classes)]
+
+  # car has correct options
+  # This can be written cleaner, see issue #117 on github
+  # m += [setup[s] == options[slots[s]] for s in range(n_cars)]
+  for s in range(n_cars):
+    model += [setup[s,o] == options[slots[s],o] for o in range(n_options)]
+
+  if capacity is not None:
+    # satisfy block capacity
+    for o in range(n_options):
+      setup_seq = setup[:,o]
+      blocks = sliding_window_view(setup_seq, block_size[o])
+      for block in blocks:
+        model += sum(block) <= capacity[o]
+
+
+  return model, slots, setup
+
+
 def get_data(fname):
   # read data
   with open(fname, "r") as data:
@@ -51,47 +81,17 @@ def get_data(fname):
            capacity, block_size,\
            n_cars_p_class, options
 
-
-
 if __name__ == "__main__":
-
   # get data
-  n_cars, n_options, n_classes, \
-  capacity, block_size,\
-  n_cars_p_class, options = get_data(sys.argv[1])
-
-  # build model
-  m = Model()
-
-  # decision variables
-  slots = intvar(0, n_classes-1, shape=n_cars, name="slots")
-  setup = boolvar(shape=(n_cars, n_options), name="setup")
-  
-  # satisfy demand
-  m += [sum(slots == c) == n_cars_p_class[c] for c in range(n_classes)]
-
-  # car has correct options
-  # This can be written cleaner, see issue #117 on github
-  # m += [setup[s] == options[slots[s]] for s in range(n_cars)]
-  for s in range(n_cars):
-    m += [setup[s,o] == options[slots[s],o] for o in range(n_options)]
-
-  if capacity is not None:
-    # satisfy block capacity
-    for o in range(n_options):
-      setup_seq = setup[:,o]
-      blocks = sliding_window_view(setup_seq, block_size[o])
-      for block in blocks:
-        m += sum(block) <= capacity[o]
-
+  data = get_data(sys.argv[1])
+  model, slots, setup = car_sequence(*data)
 
   # solve the model
-  if m.solve():
+  if model.solve():
     print("Class", "Options req.", sep="\t")
-    for i in range(n_cars):
+    for i in range(len(slots)):
       print(slots.value()[i],
             setup.value()[i].astype(int),
             sep="\t\t")
   else:
     print("Model is unsatisfiable!")
-
