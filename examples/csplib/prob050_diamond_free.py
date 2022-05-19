@@ -32,7 +32,7 @@ from cpmpy import *
 from cpmpy.solvers import *
 from itertools import combinations
 
-def get_model(N):
+def diamond_free(N):
     # By definition a and b will have the same cardinality:
     matrix = boolvar(shape=(N, N), name="matrix")
 
@@ -72,21 +72,27 @@ def get_model(N):
                        ((matrix.T[c] < matrix.T[c + 1]) | b[1:] == 1))
         model += b[-1] == 0
 
-    return matrix, model
+    return model, matrix
 
 def print_sol(matrix):
-    print(matrix)
+    print(matrix.value())
     print("Degree sequence:", end=" ")
-    print(matrix.sum(axis=0))
+    print(matrix.value().sum(axis=0))
     print()
 
-def solve(param):
-    N = param['N']
+if __name__ == "__main__":
 
-    matrix, model = get_model(N)
+    n = 10
+    num_sol = 0 # find all solutions
+    if len(sys.argv) > 1:
+        n = sys.argv[1]
+    if len(sys.argv) > 2:
+        num_sol = sys.argv[2]
 
-    num_solutions = model.solveAll(display=lambda : print_sol(matrix.value()))
-    print("num_solutions:",num_solutions)
 
-default = {'N': 10}
-solve(default)
+    model, matrix = diamond_free(n)
+    num_sol = model.solveAll(
+        solution_limit=num_sol
+        display=lambda : print_sol(matrix))
+    print("num_solutions:",num_sol)
+
