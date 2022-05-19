@@ -20,13 +20,7 @@ Modified by Ignace Bleukx
 import sys
 from cpmpy import *
 
-if __name__ == "__main__":
-
-    size = 10
-    if len(sys.argv) > 1:
-        size = int(sys.argv[1])
-
-    print("size:", size)
+def golomb(size=10):
 
     marks = intvar(0, size*size, shape=size, name="marks")
 
@@ -47,6 +41,13 @@ if __name__ == "__main__":
 
     # find optimal ruler
     model.minimize(marks[-1])
+
+    return model, (marks,)
+
+if __name__ == "__main__":
+    size = 10
+
+    model, (marks, ) = golomb(size)
 
     if model.solve():
         print(marks.value())
