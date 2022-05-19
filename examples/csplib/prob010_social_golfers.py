@@ -38,6 +38,47 @@ from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 import numpy as np
 
+def social_golfers(n_weeks, n_groups, group_size):
+
+    n_golfers = n_groups * group_size
+    print("n_golfers:", n_golfers, "n_weeks:", n_weeks, "group_size:", group_size, "groups:", n_groups)
+
+    golfers = np.arange(n_golfers)
+    weeks = np.arange(n_weeks)
+    groups = np.arange(n_groups)
+
+    #Possible configurations
+    assign = intvar(0, n_groups - 1, shape=(n_golfers, n_weeks), name="assign")
+
+    model = Model()
+
+    # C1: Each group has exactly groupSize players
+    for gr in groups:
+        # can be written cleaner, see issue #117
+        # model += sum(assign == gr, axis=1) == groupSize
+        for w in weeks:
+            model += sum(assign[:,w] == gr) == group_size
+
+    # C2: Each pair of players only meets at most once
+    for g1, g2 in all_pairs(golfers):
+        model += sum(assign[g1] == assign[g2]) <= 1
+
+
+    # SBSA: Symmetry-breaking by selective assignment
+    # On the first week, the first groupSize golfers play in group 1, the
+    # second groupSize golfers play in group 2, etc. On the second week,
+    # golfer 1 plays in group 1, golfer 2 plays in group 2, etc.
+    model += [assign[:,0] == (golfers // group_size)]
+
+    for g in golfers:
+        if g < group_size:
+            model += [assign[g, 1] == g]
+
+    # First golfer always in group 0
+    model += [assign[0, :] == 0]
+
+    return model, (assign,)
+
 def print_sol(assign, golfers):
     print("assign:")
     print(assign, end="\n\n")
@@ -63,47 +104,11 @@ def print_sol(assign, golfers):
         print(f"Golfer {g+1} meets:", sorted(meets[g]))
     print(flush=True)
 
-
 if __name__ == "__main__":
+    weeks, groups, group_size = 4, 3, 3
+    n_golfers = groups * group_size
 
-    weeks, groups, groupSize, num_sols = 4, 3, 3, 1
-
-    n_golfers = groups * groupSize
-    print("golfers:", n_golfers, "weeks:", weeks, "groupSize:", groupSize, "groups:", groups)
-
-    Golfer = np.arange(n_golfers)
-    Week = np.arange(weeks)
-    Group = np.arange(groups)
-
-    #Possible configurations
-    assign = intvar(0, groups - 1, shape=(n_golfers, weeks), name="assign")
-
-    model = Model()
-
-    # C1: Each group has exactly groupSize players
-    for gr in Group:
-        # can be written cleaner, see issue #117
-        # model += sum(assign == gr, axis=1) == groupSize
-        for w in Week:
-            model += sum(assign[:,w] == gr) == groupSize
-
-    # C2: Each pair of players only meets at most once
-    for g1, g2 in all_pairs(Golfer):
-        model += sum(assign[g1] == assign[g2]) <= 1
-
-
-    # SBSA: Symmetry-breaking by selective assignment
-    # On the first week, the first groupSize golfers play in group 1, the
-    # second groupSize golfers play in group 2, etc. On the second week,
-    # golfer 1 plays in group 1, golfer 2 plays in group 2, etc.
-    model += [assign[:,0] == (Golfer // groupSize)]
-
-    for g in Golfer:
-        if g < groupSize:
-            model += [assign[g, 1] == g]
-
-    # First golfer always in group 0
-    model += [assign[0, :] == 0]
-
+    model, (assign,) = social_golfers(weeks, groups, group_size)
     # print all solutions
-    model.solveAll(solution_limit=num_sols, display=lambda : print_sol(assign.value(), n_golfers))
+    model.solveAll(solution_limit=1,
+                   display=lambda : print_sol(assign.value(), n_golfers))
