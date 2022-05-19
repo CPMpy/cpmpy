@@ -10,9 +10,8 @@ from cpmpy.expressions.utils import all_pairs
 
 import numpy as np
 
-if __name__ == "__main__":
+def sport_scheduling(n_teams):
 
-    n_teams = 8
     n_weeks, n_periods, n_matches = n_teams - 1, n_teams // 2, (n_teams - 1) * n_teams // 2
 
     home = intvar(1,n_teams, shape=(n_weeks, n_periods), name="home")
@@ -40,6 +39,14 @@ if __name__ == "__main__":
         for p in range(n_periods):
             model += sum((home[p] == t) | (away[p] == t)) <= 2
 
+    return model, (home, away)
+
+if __name__ == "__main__":
+    n_teams = 8
+    n_weeks, n_periods, n_matches = n_teams - 1, n_teams // 2, (n_teams - 1) * n_teams // 2
+
+    model, (home, away) = sport_scheduling(n_teams)
+
     if model.solve():
         print(" " * 12, end ="")
         print(("{:^7} "*n_weeks).format(*[f"Week {w+1}" for w in range(n_weeks)]))
@@ -49,3 +56,5 @@ if __name__ == "__main__":
             for w in range(n_weeks):
                 print(f"{home.value()[w,p]} v {away.value()[w,p]}", end=" | ")
             print()
+    else:
+        print("Model is unsatisfiable")
