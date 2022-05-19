@@ -23,7 +23,7 @@ import numpy as np
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 
-def get_model(v, b, r, k, l):
+def bibd(v, b, r, k, l):
     matrix = boolvar(shape=(v, b),name="matrix")
 
     model = Model()
@@ -33,33 +33,35 @@ def get_model(v, b, r, k, l):
 
     # the scalar product of every pair of columns adds up to l
     model += [np.dot(row_i, row_j) == l for row_i, row_j in all_pairs(matrix)]
-    return matrix, model
 
-
-def solve(param):
-    matrix, model = get_model(param['v'], param['b'], param['r'], param['k'], param['l'])
     # break symmetry
     # lexicographic ordering of rows
-    for r in range(param['v']-1):
-        b = boolvar(param['b']+1)
-        model += b[0] == 1
-        model += b == ((matrix[r] <= matrix[r + 1]) &
-                       ((matrix[r] < matrix[r + 1]) | b[1:] == 1))
-        model += b[-1] == 0
+    for r in range(v - 1):
+        bvar = boolvar(shape=(b + 1))
+        model += bvar[0] == 1
+        model += bvar == ((matrix[r] <= matrix[r + 1]) &
+                       ((matrix[r] < matrix[r + 1]) | bvar[1:] == 1))
+        model += bvar[-1] == 0
     # lexicographic ordering of cols
-    for c in range(param['b']-1):
-        b = boolvar(param['v']+1)
-        model += b[0] == 1
-        model += b == ((matrix.T[c] <= matrix.T[c + 1]) &
-                       ((matrix.T[c] < matrix.T[c + 1]) | b[1:] == 1))
-        model += b[-1] == 0
+    for c in range(b - 1):
+        bvar = boolvar(shape=(v + 1))
+        model += bvar[0] == 1
+        model += bvar == ((matrix.T[c] <= matrix.T[c + 1]) &
+                       ((matrix.T[c] < matrix.T[c + 1]) | bvar[1:] == 1))
+        model += bvar[-1] == 0
+
+    return model, (matrix,)
+
+
+if __name__ == "__main__":
+    default = {'v': 7, 'b': 7, 'r': 3, 'k': 3, 'l': 1}
+
+    num_sols = 1
+
+    model, (matrix,) = bibd(**default)
 
     # find all solutions of model
-    num_solutions = model.solveAll(solution_limit=param['num_sols'],
+    num_solutions = model.solveAll(solution_limit=0,
                                    display = lambda: print(matrix.value(), end="\n\n"))
 
     print(f"{num_solutions=}")
-
-
-default = {'v': 7, 'b': 7, 'r': 3, 'k': 3, 'l': 1, 'num_sols':0}
-solve(default)
