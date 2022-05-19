@@ -51,7 +51,7 @@ Nr solutions: 1
 Num conflicts: 1149
 NumBranches: 192184
 WallTime: 2.8419967500000003
-python3 langford.py 159 1  5,06s user 1,37s system 155% cpu 4,124 total
+python3 prob024_langford.py 159 1  5,06s user 1,37s system 155% cpu 4,124 total
 '''
 
 
