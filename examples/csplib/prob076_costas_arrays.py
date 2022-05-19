@@ -49,7 +49,7 @@ import numpy as np
 import sys
 from cpmpy import *
 
-def costas_array(n=6, print_solutions=True):
+def costas_array(n=6):
     print(f"n: {n}")
     model = Model()
 
@@ -59,9 +59,8 @@ def costas_array(n=6, print_solutions=True):
 
     tril_idx = np.tril_indices(n, -1)
     triu_idx = np.triu_indices(n, 1)
-    #
+
     # constraints
-    #
 
     # Fix the values in the lower triangle in the
     # difference matrix to -n+1. This removes variants
@@ -95,17 +94,28 @@ def costas_array(n=6, print_solutions=True):
         model += [differences[k - 2, l - 1] + differences[k, l] ==
                   differences[k - 1, l - 1] + differences[k - 1, l]]
 
-    return model.solveAll()
+    return model, (costas, differences)
 
 
-n = 6
-print_solutions = True
-if len(sys.argv) > 1:
-    n = int(sys.argv[1])
-costas_array(n, print_solutions)
+def print_sol(costas, differences):
+    print("costas:", costas.value())
+    print("differences:")
+    print(differences.value())
 
-num_sols = []
-for n in range(2, 10):
-    num_sols.append(costas_array(n, False))
-    print()
-print(num_sols)
+
+if __name__ == "__main__":
+
+    n = 6
+    num_sols = 0 # find all solutions
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        n_sols = int(sys.argv[2])
+
+    model, (costas, differences) = costas_array(n)
+    num_sols = model.solveAll(
+        solution_limit=num_sols,
+        display = lambda: print_sol(costas, differences)
+    )
+
+    print(f"Found {num_sols} solutions")
