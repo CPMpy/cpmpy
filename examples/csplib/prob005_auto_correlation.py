@@ -26,7 +26,7 @@ def auto_correlation(n=16):
         sum([PAF(arr,s) ** 2 for s in range(1,n)])
     )
 
-    return model, arr
+    return model, (arr,)
 
 # periodic auto correlation
 def PAF(arr, s):
