@@ -74,7 +74,7 @@ class CPM_ortools(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(name))
+            raise Exception("Install the python 'ortools' package to use this solver interface")
 
         from ortools.sat.python import cp_model as ort
 
