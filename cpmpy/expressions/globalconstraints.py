@@ -102,13 +102,12 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression
+from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval
-
+from .utils import flatlist, all_pairs, argval, is_num
+from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
-
 class GlobalConstraint(Expression):
     """
         Abstract superclass of GlobalConstraints
@@ -342,3 +341,49 @@ class Element(GlobalConstraint):
         """
         arr, idx = self._deepcopy_args(memodict)
         return Element(arr, idx)
+
+
+class Xor(GlobalConstraint):
+    """
+        The 'xor' constraint for more then 2 arguments.
+        Acts like cascaded xor operators with two inputs
+    """
+
+    def __init__(self, arg_list):
+        # convention for commutative binary operators:
+        # swap if right is constant and left is not
+        if len(arg_list) == 2 and is_num(arg_list[1]):
+            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        i = 0  # length can change
+        while i < len(arg_list):
+            if isinstance(arg_list[i], Xor):
+                # merge args in at this position
+                arg_list[i:i + 1] = arg_list[i].args
+            else:
+                i += 1
+        super().__init__("xor", arg_list)
+
+    def decompose(self):
+        if len(self.args) == 2:
+            return (self.args[0] + self.args[1]) == 1
+        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        for arg in self.args[2:]:
+            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
+            cons += new_cons
+        return cons + [prev_var]
+
+    def value(self):
+        return sum(argval(a) for a in self.args) % 2 == 1
+
+    def __repr__(self):
+        if len(self.args) == 2:
+            return "{} xor {}".format(*self.args)
+        return "xor({})".format(self.args)
+
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the xor global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Xor(copied_args)

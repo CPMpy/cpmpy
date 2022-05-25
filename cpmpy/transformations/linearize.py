@@ -70,15 +70,11 @@ def linearize_constraint(cpm_expr):
             return [sum(cpm_expr.args) >= 1]
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
-    if cpm_expr.name == "xor":
-        assert len(cpm_expr.args) == 2, "Only supports xor with 2 vars"
-        if all(arg.is_bool() for arg in cpm_expr.args):
-            return [sum(cpm_expr.args) == 1]
-        raise Exception("Numeric constants or numeric variables not allowed as base constraint")
+    if cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
+        return [sum(cpm_expr.args) == 1]
 
     if cpm_expr.name == "->":
         cond, sub_expr = cpm_expr.args
-        var_cons = []
         if not cond.is_bool() or not sub_expr.is_bool():
             raise Exception(
                 f"Numeric constants or numeric variables not allowed as base constraint, cannot linearize {cpm_expr}")
@@ -104,7 +100,7 @@ def linearize_constraint(cpm_expr):
             else:
                 lin_exprs += [l_expr]
 
-        return var_cons + [cond.implies(l_expr) for l_expr in lin_exprs]
+        return [cond.implies(l_expr) for l_expr in lin_exprs]
 
     # Binary operators
     if cpm_expr.name == "<":
@@ -188,7 +184,7 @@ def linearize_constraint(cpm_expr):
             else:
                 c1 = (~rhs).implies(negated_normal(lhs))
                 c2 = rhs.implies(lhs)
-                return linearize_constraint([c1,c2])
+                return linearize_constraint(flatten_constraint([c1,c2]))
 
 
     if cpm_expr.name == "alldifferent":

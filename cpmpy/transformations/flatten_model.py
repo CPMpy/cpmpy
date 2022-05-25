@@ -657,16 +657,16 @@ def negated_normal(expr):
             return Operator('and', [negated_normal(arg) for arg in expr.args])
         elif expr.name == '->':
             return expr.args[0] & negated_normal(expr.args[1])
-        elif expr.name == 'xor':
-            assert (len(expr.args) == 2)
-            # not xor: must be equal to each other
-            return (expr.args[0] == expr.args[1])
-            # one could also stay in xor-space:
-            # doesn't matter which one is negated
-            #return expr.args[0] ^ negated_normal(expr.args[1])
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
             return expr == 0 # can't do better than this...
+
+    elif expr.name == 'xor':
+        # avoid circular import
+        from ..expressions.globalconstraints import Xor
+        # stay in xor space
+        # only negated last element
+        return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
     else:
         # global...
