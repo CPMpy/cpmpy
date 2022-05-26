@@ -387,3 +387,31 @@ class Xor(GlobalConstraint):
        """
         copied_args = self._deepcopy_args(memodict)
         return Xor(copied_args)
+
+class NativeConstraint(Expression):
+    """
+        A constraint whose name corresponds to a native solver API function,
+        and whose arguments match those of the solver function.
+
+        A solver interface will map the arguments to native solver variables
+        where possible, and will call the native API function.
+    """
+    # is_bool: whether this is normal constraint (True or False)
+    def __init__(self, name, arg_list, arg_novar=None):
+        """
+            arg_list: list of arguments to give to the function with name 'name'
+            arg_novar: list of arguments that contain no variables,
+                       that can be passed 'as is' without scanning for variables
+        """
+        super().__init__(name, arg_list)
+        self.arg_novar = arg_novar
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return True
+
+    def deepcopy(self, memodict={}):
+        copied_args = self._deepcopy_args(memodict)
+        return type(self)(self.name, copied_args)
+
