@@ -454,9 +454,9 @@ class CPM_ortools(SolverInterface):
         elif cpm_expr.name == 'alldifferent':
             return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
-            assert (len(cpm_expr.args) == 2)  # args = [array, table]
-            array, table = self.solver_vars(cpm_expr.args)
-            return self.ort_model.AddAllowedAssignments(array, table)
+            assert (len(cpm_expr.args) == 2)
+            array, table = cpm_expr.args
+            return self.ort_model.AddAllowedAssignments(self.solver_vars(array), table)
         else:
             # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
