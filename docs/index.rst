@@ -25,10 +25,12 @@ Getting started:
    :maxdepth: 1
    :caption: User Documentation:
 
-   solver_parameters
+   modeling
+   solvers
    multiple_solutions
-   unsat_core_extraction
    how_to_debug
+   solver_parameters
+   unsat_core_extraction
    behind_the_scenes
 
 
