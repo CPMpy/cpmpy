@@ -116,33 +116,12 @@ class Model(object):
         """
         self.objective(expr, minimize=False)
 
-    def _create_solver(self, solver):
-        """ Creates appropriate solver object
-
-        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
-        """
-        if isinstance(solver, SolverInterface):
-            solver_class = solver
-        else:
-            solver_class = SolverLookup.lookup(solver)
-        assert(solver_class is not None)
-                
-        # instatiate solver with this model
-        if isinstance(solver, str) and ':' in solver:
-            # solver is a name that contains a subsolver
-            s = solver_class(self, subsolver=solver)
-        else:
-            # no subsolver
-            s = solver_class(self)
-
-        return s
-
     # solver: name of supported solver or any SolverInterface object
     def solve(self, solver=None, time_limit=None):
         """ Send the model to a solver and get the result
 
         :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
-        :type string: None (default) or in SolverLookup.solvernames() or a SolverInterface class (Class, not object! e.g. CPMpyOrTools, not CPMpyOrTools()!)
+        :type string: None (default) or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!)
 
         :param time_limit: optional, time limit in seconds
         :type time_limit: int or float
@@ -151,7 +130,12 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
-        s = self._create_solver(solver)
+        if isinstance(solver, SolverInterface):
+            # for advanced use, call its constructor with this model
+            s = solver(self)
+        else:
+            s = SolverLookup.get(solver, self)
+
         # call solver
         ret = s.solve(time_limit=time_limit)
         # store CPMpy status (s object has no further use)
@@ -171,7 +155,12 @@ class Model(object):
 
             Returns: number of solutions found
         """
-        s = self._create_solver(solver)
+        if isinstance(solver, SolverInterface):
+            # for advanced use, call its constructor with this model
+            s = solver(self)
+        else:
+            s = SolverLookup.get(solver, self)
+
         # call solver
         ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
         # store CPMpy status (s object has no further use)

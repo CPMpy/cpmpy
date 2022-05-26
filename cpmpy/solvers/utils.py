@@ -95,7 +95,7 @@ class SolverLookup():
 
         # check for a 'solver:subsolver' name
         subname = None
-        if ':' in name:
+        if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
         return cls(model, subsolver=subname)
 
