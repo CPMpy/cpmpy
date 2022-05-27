@@ -74,7 +74,7 @@ class CPM_ortools(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'ortools' package to use this '{}' solver interface".format(name))
+            raise Exception("Install the python 'ortools' package to use this solver interface")
 
         from ortools.sat.python import cp_model as ort
 
@@ -480,7 +480,7 @@ class CPM_ortools(SolverInterface):
         """
         self.ort_model.ClearHints() # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
-            self.ort_model.AddHint(self.ort_var(cpm_var), val)
+            self.ort_model.AddHint(self.solver_var(cpm_var), val)
 
 
     def get_core(self):
