@@ -187,10 +187,8 @@ def flatten_constraint(expr):
         """
         left, right = expr.args[0], expr.args[1]
         if isinstance(left, Operator) and left.name == "wsum" and any(_should_wsum(xi) for xi in left.args[1]):
-            print(f"\nFlattening -input 1:\t{expr=}")
             w, x = left.args[0], left.args[1]
             w_new, x_new = [], []
-            print(f"\n\t\t{left=}\n\t\t\t{left.args=}\n\t\t\t{left.name}\n\t\t{right=}", )
             for wi, xi in zip(w, x):
                 if _should_wsum(xi):
                     wni, xni = _wsum_make(xi)
@@ -201,23 +199,14 @@ def flatten_constraint(expr):
                     w_new.append(wi)
                     x_new.append(xi)
 
-            print(f"\n\tFlattened1\n\t\t{w=} -> {w_new=}\n\t\t{x=} -> {x_new=}\n")
-
             return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
 
         if isinstance(left, Operator) and any(_should_wsum(sub_expr) for sub_expr in left.args):
-            print(f"\nFlattening -input 2:\t{expr=}")
-            print(f"\n\t{left=}\n\t\t{left.args=}\n\t\t\t{left.name}\n\t\t{right=}", )
             w, x = [], []
-            print("\n\t Subexprs:")
             for subexpr in left.args:
-                print(f"\n\t\t {subexpr}\n:")
                 wi, xi = _wsum_make(subexpr)
                 w += wi
                 x += xi
-                print(f"\t\t\t {wi=}")
-                print(f"\t\t\t {xi=}")
-            print(f"\n\tFlattened2\n\t\t{w=} \n\t\t{x=}\n")
             return [Comparison(expr.name, Operator("wsum",[w, x] ),right)]
 
         flatcons = []
@@ -483,7 +472,6 @@ def normalized_boolexpr(expr):
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
-    #print(f"\nnormalized_boolexpr: {expr=}" )
     if isinstance(expr, Operator):
         # and, or, xor, ->
 
