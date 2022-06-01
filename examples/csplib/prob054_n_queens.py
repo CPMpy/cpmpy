@@ -34,6 +34,13 @@ def n_queens(n=16):
 
     return model, (queens,)
 
+def print_sol(queens):
+    queens = queens.value()
+    board = np.zeros(shape=(len(queens), len(queens)), dtype=int)
+    for i,q in enumerate(queens):
+        board[i,q-1] = 1
+    print(board)
+
 if __name__ == "__main__":
 
     n = 16
@@ -46,6 +53,6 @@ if __name__ == "__main__":
     model, (queens,) = n_queens(n)
 
     n_sols = model.solveAll(solution_limit=n_sols,
-                            display = lambda : print(queens.value(),end="\n\n"))
+                            display = lambda : print_sol(queens))
 
     print("num_solutions:", n_sols)
