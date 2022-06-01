@@ -186,6 +186,7 @@ def flatten_constraint(expr):
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
         left, right = expr.args[0], expr.args[1]
+        # Flatten a complex weighted sum where any of the sub expressions is a sum, mul, neg, ...
         if isinstance(left, Operator) and left.name == "wsum" and any(_should_wsum(xi) for xi in left.args[1]):
             w, x = left.args[0], left.args[1]
             w_new, x_new = [], []
@@ -201,6 +202,8 @@ def flatten_constraint(expr):
 
             return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
 
+        # Flatten complex expressions that can be simplified into a single weighted sum
+        # e.g. bv0 - 3 * (bv2 + 2 * bv1)
         if isinstance(left, Operator) and any(_should_wsum(sub_expr) for sub_expr in left.args):
             w, x = [], []
             for subexpr in left.args:
