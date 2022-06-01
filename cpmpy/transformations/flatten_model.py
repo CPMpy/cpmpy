@@ -694,20 +694,20 @@ def _wsum_make_flatten(sub_expr):
     if sub_expr.name == 'wsum':
         w_new, x_new = [], []
         for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
-            wni, xni = _wsum_make(xi)
+            wni, xni = _wsum_make_flatten(xi)
             wni = [wnij * wi for wnij in wni]
             w_new += wni
             x_new += xni
         return w_new, x_new
     elif sub_expr.name == 'mul':
         w = sub_expr.args[0]
-        wi, x = _wsum_make(sub_expr.args[1])
+        wi, x = _wsum_make_flatten(sub_expr.args[1])
         wi_new = [wij*w for wij in wi]
         return wi_new, x
     elif sub_expr.name == "sum":
         w_new, x_new = [], []
         for xi in sub_expr.args:
-            wni, xni = _wsum_make(xi)
+            wni, xni = _wsum_make_flatten(xi)
             w_new += wni
             x_new += xni
         return w_new, x_new
