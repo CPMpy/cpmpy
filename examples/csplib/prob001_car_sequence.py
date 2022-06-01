@@ -1,5 +1,6 @@
 """
 Car sequencing in CPMpy (prob001 in CSPlib)
+https://www.csplib.org/Problems/prob001/
 
 Based on the Minizinc model car.mzn.
 
