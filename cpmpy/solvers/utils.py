@@ -23,6 +23,7 @@ import warnings # for deprecation warning
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
+from .z3 import CPM_z3
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -65,6 +66,7 @@ class SolverLookup():
             First one is default
         """
         return [("ortools", CPM_ortools),
+                ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
                 ("pysat", CPM_pysat),
                ]
@@ -115,13 +117,12 @@ class SolverLookup():
             solvername,_ = solvername.split(':',maxsplit=1)
 
         # find CPM_slv
-        CPM_slv = None
         for (basename, CPM_slv) in SolverLookup.base_solvers():
             if basename == solvername:
-                # CPM_slv is assigned the right one
-                break
+                return CPM_slv
 
-        return CPM_slv
+        # here means none found
+        raise Exception(f"Solver '{name}' not found")
 
 
 # using builtin_solvers is DEPRECATED
