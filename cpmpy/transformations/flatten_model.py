@@ -715,5 +715,6 @@ def _wsum_make_flatten(sub_expr):
         # - (3 * y)
         w, x = _wsum_make_flatten(sub_expr.args[0])
         return [-i for i in w], x
-    else:
-        return _wsum_make(sub_expr)
+
+    ## base case
+    return _wsum_make(sub_expr)
