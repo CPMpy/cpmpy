@@ -2,12 +2,13 @@
     CSP model for template design problem implemented in CPMpy.
     Model created by Ignace Bleukx and based on Minizinc implementation of CSPlib.
 """
-
+import sys
+import requests
+import json
 
 from cpmpy import *
-import sys
 
-def template_design(n_slots, n_templates, n_var, demand):
+def template_design(n_slots, n_templates, n_var, demand,**kwargs):
 
     ub = max(demand)
 
@@ -49,17 +50,33 @@ def template_design(n_slots, n_templates, n_var, demand):
     return model, (production, layout)
 
 
-def get_data(fname, data_name):
-
-    exec(open(fname).read())
-    return eval(f"{data_name}()")
+def get_data(data, pname):
+    for entry in data:
+        if pname in entry["name"]:
+            return entry
 
 
 if __name__ == "__main__":
 
-    # get data
-    data = get_data(*sys.argv[1:])
-    model, (production, layout) = template_design(*data)
+    fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob002_template_design.json"
+    problem_name = "catfood2"
+
+    data = None
+
+    if len(sys.argv) > 1:
+        fname = sys.argv[1]
+        with open(fname, "r") as f:
+            data = json.load(f)
+
+    if len(sys.argv) > 2:
+        problem_name = sys.argv[2]
+
+    if data is None:
+        data = requests.get(fname).json()
+
+    params = get_data(data, problem_name)
+
+    model, (production, layout) = template_design(**params)
 
     # solve model
     if model.solve(solver="ortools"):
