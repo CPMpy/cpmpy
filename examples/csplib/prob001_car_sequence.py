@@ -47,7 +47,7 @@ def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity
         model += sum(block) <= capacity[o]
 
 
-  return model, slots, setup
+  return model, (slots, setup)
 
 
 def get_data(data, pname):
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
   params = get_data(data, problem_name)
 
-  model, slots, setup = car_sequence(**params)
+  model, (slots, setup) = car_sequence(**params)
 
   # solve the model
   if model.solve():
