@@ -452,19 +452,37 @@ class Operator(Expression):
 
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum """
-    # Undecided: -x + y, -x + -y?
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
             arg.name == 'mul' and is_num(arg.args[0]))
-def _wsum_make(arg):
-    """ Internal helper: prep the arg for wsum """
-    # returns ([weights], [vars])
-    # call only if arg is Operator
-    if arg.name == 'wsum':
-        return arg.args
-    elif arg.name == 'mul':
-        return [arg.args[0]], [arg.args[1]]
-    elif arg.name == '-':
-        return [-1], [arg.args[0]]
+
+def _wsum_make(sub_expr):
+    if sub_expr.name == 'wsum':
+        w_new, x_new = [], []
+        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
+            wni, xni = _wsum_make(xi)
+            wni = [wnij * wi for wnij in wni]
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
+    elif sub_expr.name == 'mul':
+        w = sub_expr.args[0]
+        wi, x = _wsum_make(sub_expr.args[1])
+        wi_new = [wij*w for wij in wi]
+        return wi_new, x
+    elif sub_expr.name == "sum":
+        w_new, x_new = [], []
+        for xi in sub_expr.args:
+            wni, xni = _wsum_make(xi)
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
+    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
+        # - (3 * y)
+        w, x = _wsum_make(sub_expr.args[0])
+        return [-i for i in w], x
+    elif sub_expr.name == '-':
+
+        return [-1], [sub_expr.args[0]]
     else:
-        return [1], [arg]
+        return [1], [sub_expr]
