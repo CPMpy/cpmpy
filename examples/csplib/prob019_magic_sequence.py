@@ -1,20 +1,18 @@
 """
 Magic sequence in cpmpy.
 
-http://www.dcs.st-and.ac.uk/~ianm/CSPLib/prob/prob019/spec.html
-'''
+Problem 019 on CSPlib
+https://www.csplib.org/Problems/prob019/
+
 A magic sequence of length n is a sequence of integers x0 . . xn-1 between
 0 and n-1, such that for all i in 0 to n-1, the number i occurs exactly xi
 times in the sequence. For instance, 6,2,1,0,0,0,1,0,0,0 is a magic sequence
 since 0 occurs 6 times in it, 1 occurs twice, ...
-'''
-
-Cf autoref.py for a similar (but not identical) problem.
 
 Model created by Hakan Kjellerstrand, hakank@hakank.com
 See also my cpmpy page: http://www.hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 import sys
 import numpy as np
