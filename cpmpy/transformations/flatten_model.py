@@ -186,10 +186,11 @@ def flatten_constraint(expr):
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
         left, right = expr.args[0], expr.args[1]
-
         if isinstance(left, Operator) and left.name == "wsum" and any(_should_wsum(xi) for xi in left.args[1]):
+            print(f"\nFlattening -input 1:\t{expr=}")
             w, x = left.args[0], left.args[1]
             w_new, x_new = [], []
+            print(f"\n\t\t{left=}\n\t\t\t{left.args=}\n\t\t\t{left.name}\n\t\t{right=}", )
             for wi, xi in zip(w, x):
                 if _should_wsum(xi):
                     wni, xni = _wsum_make(xi)
@@ -200,19 +201,24 @@ def flatten_constraint(expr):
                     w_new.append(wi)
                     x_new.append(xi)
 
-            return flatten_constraint(
-                Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)
-            )
+            print(f"\n\tFlattened1\n\t\t{w=} -> {w_new=}\n\t\t{x=} -> {x_new=}\n")
+
+            return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
 
         if isinstance(left, Operator) and any(_should_wsum(sub_expr) for sub_expr in left.args):
+            print(f"\nFlattening -input 2:\t{expr=}")
+            print(f"\n\t{left=}\n\t\t{left.args=}\n\t\t\t{left.name}\n\t\t{right=}", )
             w, x = [], []
+            print("\n\t Subexprs:")
             for subexpr in left.args:
+                print(f"\n\t\t {subexpr}\n:")
                 wi, xi = _wsum_make(subexpr)
                 w += wi
                 x += xi
-            return flatten_constraint(
-                Comparison(expr.name, Operator("wsum",[w, x] ),right)
-            )
+                print(f"\t\t\t {wi=}")
+                print(f"\t\t\t {xi=}")
+            print(f"\n\tFlattened2\n\t\t{w=} \n\t\t{x=}\n")
+            return [Comparison(expr.name, Operator("wsum",[w, x] ),right)]
 
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
@@ -714,12 +720,16 @@ def _wsum_make(sub_expr):
     if sub_expr.name == 'wsum':
         return sub_expr.args
     elif sub_expr.name == 'mul':
-        return [sub_expr.args[0]], [sub_expr.args[1]]
+        w = sub_expr.args[0]
+        wi, x = _wsum_make(sub_expr.args[1])
+        wi_new = [wij*w for wij in wi]
+        return wi_new, x
     elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
         # - (3 * y)
         w, x = _wsum_make(sub_expr.args[0])
         return [-i for i in w], x
     elif sub_expr.name == '-':
+
         return [-1], [sub_expr.args[0]]
     else:
         return [1], [sub_expr]
