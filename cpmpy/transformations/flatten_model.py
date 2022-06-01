@@ -187,30 +187,13 @@ def flatten_constraint(expr):
         """
         left, right = expr.args[0], expr.args[1]
         # Flatten a complex weighted sum where any of the sub expressions is a sum, mul, neg, ...
-        if isinstance(left, Operator) and left.name == "wsum" and any(_should_wsum(xi) for xi in left.args[1]):
-            w, x = left.args[0], left.args[1]
-            w_new, x_new = [], []
-            for wi, xi in zip(w, x):
-                if _should_wsum(xi):
-                    wni, xni = _wsum_make(xi)
-                    wni = [wnij * wi for wnij in wni]
-                    w_new += wni
-                    x_new += xni
-                else:
-                    w_new.append(wi)
-                    x_new.append(xi)
-
-            return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
-
-        # Flatten complex expressions that can be simplified into a single weighted sum
         # e.g. bv0 - 3 * (bv2 + 2 * bv1)
-        if isinstance(left, Operator) and any(_should_wsum(sub_expr) for sub_expr in left.args):
-            w, x = [], []
-            for subexpr in left.args:
-                wi, xi = _wsum_make(subexpr)
-                w += wi
-                x += xi
-            return [Comparison(expr.name, Operator("wsum",[w, x] ),right)]
+        if isinstance(left, Operator) and (
+            left.name == "wsum" or
+            any(_should_wsum(sub_expr) for sub_expr in left.args)
+            ):
+            w_new, x_new = _wsum_make(left)
+            return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
 
         flatcons = []
         # zipcycle: unfolds 'arr1 == arr2' pairwise
@@ -709,12 +692,25 @@ def _should_wsum(sub_expr):
 
 def _wsum_make(sub_expr):
     if sub_expr.name == 'wsum':
-        return sub_expr.args
+        w_new, x_new = [], []
+        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
+            wni, xni = _wsum_make(xi)
+            wni = [wnij * wi for wnij in wni]
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
     elif sub_expr.name == 'mul':
         w = sub_expr.args[0]
         wi, x = _wsum_make(sub_expr.args[1])
         wi_new = [wij*w for wij in wi]
         return wi_new, x
+    elif sub_expr.name == "sum":
+        w_new, x_new = [], []
+        for xi in sub_expr.args:
+            wni, xni = _wsum_make(xi)
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
     elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
         # - (3 * y)
         w, x = _wsum_make(sub_expr.args[0])
