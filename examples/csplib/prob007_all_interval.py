@@ -1,9 +1,10 @@
 """
 All interval problem in cpmpy.
 
-CSPLib problem number 7
-http://www.cs.st-andrews.ac.uk/~ianm/CSPLib/prob/prob007/index.html
-'''
+CSPLib problem number 007
+https://www.csplib.org/Problems/prob007/
+
+
 Given the twelve standard pitch-classes (c, c , d, ...), represented by
 numbers 0,1,...,11, find a series in which each pitch-class occurs exactly
 once and in which the musical intervals between neighbouring notes cover
@@ -20,7 +21,6 @@ Z_n-{0} = {1,2,...,n-1}. A vector v satisfying these conditions is
 called an all-interval series of size n; the problem of finding such
 a series is the all-interval series problem of size n. We may also be
 interested in finding all possible series of a given size.
-'''
 
 
 Model created by Hakan Kjellerstrand, hakank@hakank.com
@@ -34,10 +34,6 @@ from cpmpy import *
 import numpy as np
 
 def all_interval(n=12,num_sols=0):
-
-  # data
-  print("n:", n)
-
 
   # Create the solver.
   model = Model()

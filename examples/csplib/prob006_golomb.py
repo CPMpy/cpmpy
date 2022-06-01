@@ -1,6 +1,9 @@
 """
 Golomb's ruler problem in cpmpy.
 
+Problem 006 on CSPlib
+https://www.csplib.org/Problems/prob006/
+
 A Golomb ruler is a set of integers (marks) a(1) < ...  < a(n) such
 that all the differences a(i)-a(j) (i > j) are distinct.  Clearly we
 may assume a(1)=0.  Then a(n) is the length of the Golomb ruler.
