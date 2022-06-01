@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     model, matrix = diamond_free(n)
     num_sol = model.solveAll(
-        solution_limit=num_sol
+        solution_limit=num_sol,
         display=lambda : print_sol(matrix))
     print("num_solutions:",num_sol)
 
