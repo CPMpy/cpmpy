@@ -23,7 +23,7 @@ CSPLib Problem 050 - http://www.csplib.org/Problems/prob050/
 Model created by Hakan Kjellerstrand, hakank@hakank.com
 See also my cpmpy page: http://www.hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 
 """
 import sys
@@ -32,7 +32,7 @@ from cpmpy import *
 from cpmpy.solvers import *
 from itertools import combinations
 
-def diamond_free(N):
+def diamond_free(N=10):
     # By definition a and b will have the same cardinality:
     matrix = boolvar(shape=(N, N), name="matrix")
 
