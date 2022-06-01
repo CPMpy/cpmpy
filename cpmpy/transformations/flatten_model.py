@@ -713,7 +713,7 @@ def _wsum_make_flatten(sub_expr):
         return w_new, x_new
     elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
         # - (3 * y)
-        w, x = _wsum_make(sub_expr.args[0])
+        w, x = _wsum_make_flatten(sub_expr.args[0])
         return [-i for i in w], x
     else:
         return _wsum_make(sub_expr)
