@@ -83,6 +83,8 @@ import copy
 import math
 import numpy as np
 from ..expressions.core import *
+from ..expressions.core import _wsum_should
+from ..expressions.core import _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 
@@ -190,7 +192,7 @@ def flatten_constraint(expr):
         # e.g. bv0 - 3 * (bv2 + 2 * bv1)
         if isinstance(left, Operator) and (
             left.name == "wsum" or
-            any(_should_wsum(sub_expr) for sub_expr in left.args)
+            any(_wsum_should_flatten(sub_expr) for sub_expr in left.args)
             ):
             w_new, x_new = _wsum_make(left)
             return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
@@ -683,40 +685,7 @@ def negated_normal(expr):
         #raise NotImplementedError("negate_normal {}".format(expr))
         return expr == 0 # can't do better than this...
 
-def _should_wsum(sub_expr):
-    if isinstance(sub_expr, Operator) and sub_expr.name == "-":
+def _wsum_should_flatten(arg):
+    if isinstance(arg, Operator) and arg.name == "-":
         return True
-    return isinstance(sub_expr, Operator) and \
-            (sub_expr.name == 'wsum' or \
-            sub_expr.name == 'mul' and is_num(sub_expr.args[0]))
-
-def _wsum_make(sub_expr):
-    if sub_expr.name == 'wsum':
-        w_new, x_new = [], []
-        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
-            wni, xni = _wsum_make(xi)
-            wni = [wnij * wi for wnij in wni]
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == 'mul':
-        w = sub_expr.args[0]
-        wi, x = _wsum_make(sub_expr.args[1])
-        wi_new = [wij*w for wij in wi]
-        return wi_new, x
-    elif sub_expr.name == "sum":
-        w_new, x_new = [], []
-        for xi in sub_expr.args:
-            wni, xni = _wsum_make(xi)
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
-        # - (3 * y)
-        w, x = _wsum_make(sub_expr.args[0])
-        return [-i for i in w], x
-    elif sub_expr.name == '-':
-
-        return [-1], [sub_expr.args[0]]
-    else:
-        return [1], [sub_expr]
+    return _wsum_should(arg)
