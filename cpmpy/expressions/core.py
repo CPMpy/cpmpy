@@ -238,7 +238,6 @@ class Expression(object):
             return self
         return Operator("mul", [self, other])
     def __rmul__(self, other):
-
         if is_num(other) and other == 1:
             return self
         return Operator("mul", [other, self])
