@@ -23,7 +23,7 @@ import numpy as np
 
 from cpmpy import *
 
-def nonogram(row_rules, col_rules):
+def nonogram(row_rules, col_rules,**kwargs):
 
     solver = SolverLookup.get("ortools")
 
@@ -75,14 +75,14 @@ def transition_function(pattern):
 
 def get_data(data, name):
     for entry in data:
-        if entry.name == name:
+        if name in entry["name"]:
             return entry
 
 
 if __name__ == "__main__":
 
     fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob012_nonogram.json"
-    problem_name = "lambda"
+    problem_name = "soccer_player"
 
     data = None
 
