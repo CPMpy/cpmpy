@@ -275,7 +275,11 @@ class Minimum(GlobalConstraint):
         super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return min([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return min(argvals)
 
     def deepcopy(self, memodict={}):
         """
@@ -295,7 +299,11 @@ class Maximum(GlobalConstraint):
         super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return max([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return max(argvals)
 
     def deepcopy(self, memodict={}):
         """
