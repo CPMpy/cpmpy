@@ -3,7 +3,7 @@
 
     Problem 005 on CSPlib
 
-    Model created by Ignace Bleukx
+    Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 
 
@@ -30,13 +30,14 @@ def auto_correlation(n=16):
 
 # periodic auto correlation
 def PAF(arr, s):
+    # roll the array 's' indices
     return sum(arr * np.roll(arr,-s))
 
 
 if __name__ == "__main__":
 
     n = 16
-    model, arr = auto_correlation(n)
+    model, (arr,) = auto_correlation(n)
 
     if model.solve():
         # print using runlength notation
