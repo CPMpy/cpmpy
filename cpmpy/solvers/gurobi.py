@@ -36,6 +36,7 @@ from ..transformations.reification import only_bv_implies
 
 try:
     import gurobipy as gp
+    GRB_ENV = None
 except ImportError as e:
     pass
 
@@ -79,11 +80,14 @@ class CPM_gurobi(SolverInterface):
                 "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
-        # initialise the native gurobi model object
-        self._GRB_env = gp.Env()
-        self._GRB_env.setParam("OutputFlag", 0)
-        self._GRB_env.start()
-        self.grb_model = gp.Model(env=self._GRB_env)
+        global GRB_ENV
+        if GRB_ENV is None:
+            # initialise the native gurobi model object
+            GRB_ENV = gp.Env()
+            GRB_ENV.setParam("OutputFlag", 0)
+            GRB_ENV.start()
+
+        self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below

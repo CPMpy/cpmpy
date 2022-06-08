@@ -340,8 +340,6 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
                 return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
-            elif cpm_expr.name == 'xor':
-                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == '->':
                 assert(isinstance(cpm_expr.args[0], _BoolVarImpl)) # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
@@ -355,12 +353,6 @@ class CPM_ortools(SolverInterface):
                     # TODO: and if rhs is a global, first decompose it and reify that??
                     assert(cpm_expr.args[1].is_bool())
                     # Special case for 'xor', which is not natively reifiable in ortools
-                    # TODO: make xor a global constraint (so it can be decomposed generally) and get rid of this special case here
-                    if isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name == 'xor':
-                        if len(cpm_expr.args) == 2:
-                            return self._post_constraint((sum(cpm_expr.args[1].args) == 1), reifiable=True).OnlyEnforceIf(lhs)
-                        else:
-                            raise NotImplementedError("ORT: reified n-ary XOR not yet supported, make an issue on github if you need it")
                     # TODO: and if something like b.implies(min(x) >= 10) that it splits up in
                     # b.implies( aux >= 10) & (min(x) == aux)
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
@@ -448,6 +440,8 @@ class CPM_ortools(SolverInterface):
 
 
         # rest: base (Boolean) global constraints
+        elif cpm_expr.name == 'xor':
+            return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'alldifferent':
             return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
