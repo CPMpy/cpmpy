@@ -37,7 +37,7 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Operator("xor", [x,y])
+    - x ^ y         Xor([x,y])  # a global constraint
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
