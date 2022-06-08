@@ -188,12 +188,12 @@ def flatten_constraint(expr):
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
         left, right = expr.args[0], expr.args[1]
+
         # Flatten a complex weighted sum where any of the sub expressions is a sum, mul, neg, ...
         # e.g. bv0 - 3 * (bv2 + 2 * bv1)
-        if isinstance(left, Operator) and (
-            left.name == "wsum" or
-            any(_wsum_should_flatten(sub_expr) for sub_expr in left.args)
-            ):
+        if isinstance(left, Operator) and \
+           (left.name == "wsum" or
+            any(_wsum_should_flatten(sub_expr) for sub_expr in left.args) ):
             w_new, x_new = _wsum_make_flatten(left)
             return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
 
@@ -337,7 +337,7 @@ def get_or_make_var(expr):
     # special case, -var... 
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return get_or_make_var(-1*expr.args[0])
-    
+
     elif isinstance(expr, Operator) and expr.name == "wsum":
         weights, sub_exprs  = expr.args
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
@@ -607,7 +607,7 @@ def normalized_numexpr(expr):
     if isinstance(expr, Operator):
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
-
+        
         # recursively flatten all children
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
 
@@ -686,11 +686,16 @@ def negated_normal(expr):
         return expr == 0 # can't do better than this...
 
 def _wsum_should_flatten(arg):
+    # in flatten we also turn negations (in sums) into weighted sums,
+    # for stronger expression simplification
     if isinstance(arg, Operator) and arg.name == "-":
         return True
     return _wsum_should(arg)
 
 def _wsum_make_flatten(sub_expr):
+    # Mixed operator weighted sums that can be flattened into one,
+    # where any of the sub expressions is a sum, mul, neg, ...
+    # e.g. bv0 - 3 * (bv2 + 2 * bv1)
     if sub_expr.name == 'wsum':
         w_new, x_new = [], []
         for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
