@@ -153,7 +153,7 @@ def flatten_constraint(expr):
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
         elif not expr.name == '->':
-            # and, or, xor
+            # and, or
             # recursively flatten all children
             flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
 
@@ -436,7 +436,7 @@ def normalized_boolexpr(expr):
         are valid expressions.
 
         Currently, this is the case for:
-        - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         - Comparison constraint (see elsewhere)                (CPMpy class 'Comparison')
@@ -449,7 +449,7 @@ def normalized_boolexpr(expr):
     assert(expr.is_bool()) 
 
     if isinstance(expr, Operator):
-        # and, or, xor, ->
+        # and, or, ->
 
         # apply De Morgan's transform for "implies"
         if expr.name == '->':
