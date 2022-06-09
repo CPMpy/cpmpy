@@ -31,7 +31,7 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
-from ..transformations.reification import only_bv_implies
+from ..transformations.reification import only_bv_implies, reify_rewrite
 
 class CPM_ortools(SolverInterface):
     """
@@ -307,7 +307,7 @@ class CPM_ortools(SolverInterface):
         self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
-        cpm_cons = only_bv_implies(flatten_constraint(cpm_con))
+        cpm_cons = only_bv_implies(reify_rewrite(flatten_constraint(cpm_con)))
         for con in cpm_cons:
             self._post_constraint(con)
 
