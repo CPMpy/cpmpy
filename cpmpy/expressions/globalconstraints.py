@@ -102,6 +102,7 @@
 
 """
 import warnings # for deprecation warning
+import numpy as np
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num
@@ -331,7 +332,12 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
-        super().__init__("element", [arr, idx], is_bool=False)
+        # detect if all in 'arr' are of Boolean type
+        # then our return type is Boolean too
+        is_bool = all(isinstance(e, (bool, np.bool_)) or \
+                      isinstance(e, Expression) and e.is_bool() for e in arr)
+
+        super().__init__("element", [arr, idx], is_bool=is_bool)
 
     def value(self):
         idxval = argval(self.args[1])
