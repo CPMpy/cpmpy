@@ -527,7 +527,7 @@ def normalized_boolexpr(expr):
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 if is_num(rexpr):
                     # BoolExpr == 0|False
-                    assert(not rexpr) # 'true' is preprocessed away
+                    assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
 
                     nnexpr = negated_normal(lexpr)
                     return normalized_boolexpr(nnexpr)
