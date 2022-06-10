@@ -26,13 +26,13 @@ from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
 
 def is_int(arg):
-    """ is it an integer? (incl numpy variants)
+    """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return isinstance(arg, (int, np.integer, np.bool_))
+    return isinstance(arg, (bool, np.bool_, int, np.integer))
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return isinstance(arg, (int, np.integer, float, np.float64, np.bool_))
+    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.float64))
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
