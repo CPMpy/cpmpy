@@ -373,7 +373,7 @@ class Xor(GlobalConstraint):
 
     def decompose(self):
         if len(self.args) == 2:
-            return (self.args[0] + self.args[1]) == 1
+            return [(self.args[0] + self.args[1]) == 1]
         prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
         for arg in self.args[2:]:
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)
