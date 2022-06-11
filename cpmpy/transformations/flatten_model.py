@@ -332,7 +332,8 @@ def get_or_make_var(expr):
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in sub_exprs]) # also bool, reified...
         bounds = np.array([[w * fvar.lb for w, fvar in zip(weights, flatvars)],
                            [w * fvar.ub for w, fvar in zip(weights, flatvars)]])
-        lb, ub = bounds.min(axis=1).sum(), bounds.max(axis=1).sum()
+        lb, ub = bounds.min(axis=0).sum(), bounds.max(axis=0).sum() # for every column is axis=0...
+        print(expr, lb, ub, bounds)
         ivar = _IntVarImpl(lb, ub)
         newexpr = (Operator(expr.name, (weights, flatvars)) == ivar)
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
