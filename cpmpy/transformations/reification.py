@@ -96,6 +96,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
             else:
                 pass  # both BV
         elif cpm_expr.name == '==' and \
+                cpm_expr.args[0].is_bool() and \
                 not isinstance(cpm_expr.args[0], _BoolVarImpl) and \
                 isinstance(cpm_expr.args[1], _BoolVarImpl):  # BE == BV
             boolexpr_index = 0
