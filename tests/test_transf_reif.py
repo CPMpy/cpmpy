@@ -25,3 +25,18 @@ class TestTransfReif(unittest.TestCase):
             self.assertEqual( str(only_bv_implies(expr)), strexpr )
             self.assertTrue(Model(expr).solve())
 
+    def test_reif_rewrite(self):
+        bvs = boolvar(shape=5)
+        iv = intvar(1,10)
+        rv = boolvar()
+
+        # have to be careful with Element, if an Element over
+        # Bools is treated as a BoolExpr then it would be treated as a
+        # reification... which is unwanted.
+        # so for now, it remains an IntExpr, but if that changes, the following
+        # will break
+        e1 = (bvs[iv] == rv)
+        e2 = (cpm_array([1,0,1,1])[iv] == rv)
+        for e in [e1,e2]:
+            self.assertTrue(Model(e).solve())
+
