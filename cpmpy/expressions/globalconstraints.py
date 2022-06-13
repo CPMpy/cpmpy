@@ -105,7 +105,6 @@ import warnings # for deprecation warning
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
-from .python_builtins import any
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -349,6 +348,8 @@ class Element(GlobalConstraint):
             That is what this function does
             (for now only used in transformations/reification.py)
         """
+        from .python_builtins import any
+
         arr,idx = self.args
         return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
 
