@@ -102,9 +102,10 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression, Operator
+from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from .python_builtins import any
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -135,7 +136,7 @@ class GlobalConstraint(Expression):
             and use other other global constraints as long as
             it does not create a circular dependency.
         """
-        return None
+        raise NotImplementedError("Decomposition for",self,"not available")
 
     def deepcopy(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)
@@ -338,6 +339,18 @@ class Element(GlobalConstraint):
         if not idxval is None:
             return argval(self.args[0][idxval])
         return None # default
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            It is not a constraint itself, so it can not have a decompose().
+            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+            That is what this function does
+            (for now only used in transformations/reification.py)
+        """
+        arr,idx = self.args
+        return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])

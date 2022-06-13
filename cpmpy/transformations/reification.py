@@ -1,7 +1,8 @@
 import copy
 from ..expressions.core import Operator, Comparison
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
+from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
 from .flatten_model import flatten_constraint, negated_normal, get_or_make_var
 
@@ -114,7 +115,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                 # Case 2, BE is a GlobalConstraint
                 # replace BE by its decomposition, then flatten
                 reifexpr = copy.copy(cpm_expr)
-                reifexpr.args[boolexpr_index] = Operator("and", boolexpr.decompose())  # decomp() returns list
+                reifexpr.args[boolexpr_index] = all(boolexpr.decompose())  # decomp() returns list
                 newcons += flatten_constraint(reifexpr)
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
@@ -123,6 +124,15 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                 #   at the very least, (iv1 == iv2) == bv has to be supported (or equivalently, sum: (iv1 - iv2 == 0) == bv)
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
+                elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= arr.size()):
+                    # special case: (Element(arr,idx) <OP> RHS) == BV (or -> in some way)
+                    # if the domain of 'idx' is larger than the range of 'arr', then 
+                    # this is allowed and BV should be false if it takes a value there
+                    # so we can not use Element (which would restruct the domain of idx)
+                    # and have to work with an element-wise decomposition instead
+                    reifexpr = copy.copy(cpm_expr)
+                    reifexpr.args[boolexpr_index] = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    newcons += flatten_constraint(reifexpr)
                 else:  #   other cases:
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
