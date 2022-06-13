@@ -133,7 +133,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                     reifexpr = copy.copy(cpm_expr)
                     reifexpr.args[boolexpr_index] = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
                     newcons += flatten_constraint(reifexpr)
-                else:  #   other cases:
+                else:  #   other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
                     (auxvar, cons) = get_or_make_var(lhs)
