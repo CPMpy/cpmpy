@@ -41,6 +41,10 @@ class TestTransfReif(unittest.TestCase):
         for e in [e1,e2]:
             self.assertTrue(Model(e).solve())
 
+
+        # Another case to be careful with:
+        # in reified context, the index variable can have a larger domain
+        # than the array range, needs a reified equality decomposition.
         idx = intvar(-1,3, name="idx")
         arr = cpm_array([0,1,2])
 
@@ -48,6 +52,7 @@ class TestTransfReif(unittest.TestCase):
         self.assertEqual(Model(e).solveAll(), 5)
 
         
+        # various reify_rewrite cases:
         cases = [(rv == (arr[idx] != 1), "[((BV2) or (BV3)) == (rv), (idx == 0) == (BV2), (idx == 2) == (BV3)]"),
                 ]
 
