@@ -19,6 +19,7 @@ Internal utilities for expression handling.
         flatlist
         all_pairs
         argval
+        eval_comparison
 """
 
 import numpy as np
@@ -66,3 +67,34 @@ def argval(a):
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     return a.value() if hasattr(a, "value") else a
+
+def eval_comparison(str_op, lhs, rhs):
+    """
+        Internal function: evaluates the textual `str_op` comparison operator
+        lhs <str_op> rhs
+
+        Valid str_op's:
+        * '=='
+        * '!='
+        * '>'
+        * '>='
+        * '<'
+        * '<='
+
+        Especially useful in decomposition and transformation functions that already involve a comparison.
+    """
+    if str_op == '==':
+        return lhs == rhs
+    elif str_op == '!=':
+        return lhs != rhs
+    elif str_op == '>':
+        return lhs > rhs
+    elif str_op == '>=':
+        return lhs >= rhs
+    elif str_op == '<':
+        return lhs < rhs
+    elif str_op == '<=':
+        return lhs <= rhs
+    else:
+        raise Exception("Not a known comparison:", str_op)
+
