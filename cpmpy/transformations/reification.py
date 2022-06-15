@@ -124,7 +124,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                 #   at the very least, (iv1 == iv2) == bv has to be supported (or equivalently, sum: (iv1 - iv2 == 0) == bv)
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
-                elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= arr.size()):
+                elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= len(lhs.args[0])):
                     # special case: (Element(arr,idx) <OP> RHS) == BV (or -> in some way)
                     # if the domain of 'idx' is larger than the range of 'arr', then 
                     # this is allowed and BV should be false if it takes a value there
