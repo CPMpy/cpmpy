@@ -5,10 +5,11 @@
 
     Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
+import argparse
 
+import numpy as np
 
 from cpmpy import *
-import numpy as np
 
 
 def auto_correlation(n=16):
@@ -36,7 +37,11 @@ def PAF(arr, s):
 
 if __name__ == "__main__":
 
-    n = 16
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--n", type=int, default=16, help="Length of bitarray")
+
+    n = parser.parse_args().n
+
     model, (arr,) = auto_correlation(n)
 
     if model.solve():
