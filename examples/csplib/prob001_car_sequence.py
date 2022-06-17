@@ -43,6 +43,7 @@ def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity
     # satisfy block capacity
     for o in range(n_options):
       setup_seq = setup[:,o]
+      # get all setups within block size of each other
       blocks = sliding_window_view(setup_seq, block_size[o])
       for block in blocks:
         model += sum(block) <= capacity[o]
@@ -58,24 +59,23 @@ def get_data(data, pname):
 
 
 if __name__ == "__main__":
-  # get data
-  fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob001_car_sequence.json"
-  problem_name = "Problem 4/72"
+  import argparse
 
-  data = None
+  url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob001_car_sequence.json"
+  parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+  parser.add_argument('--instance', default="Problem 4/72", help="Name of the problem instance found in file 'filename'")
+  parser.add_argument('--url', help="URL to a set of instances, serves the same purpose as the --filename argument", default=url)
+  parser.add_argument('--filename', help="File containing problem instances, overrides --url argument")
 
-  if len(sys.argv) > 1:
-    fname = sys.argv[1]
-    with open(fname,"r") as f:
-      data = json.load(f)
+  args = parser.parse_args()
 
-  if len(sys.argv) > 2:
-    problem_name = sys.argv[2]
+  if args.filename is None:
+    problem_data = requests.get(args.url)
+  else:
+    with open(args.filename,"r") as f:
+      problem_data = json.load(f)
 
-  if data is None:
-    data = requests.get(fname).json()
-
-  params = get_data(data, problem_name)
+  params = get_data(problem_data, args.instance)
 
   model, (slots, setup) = car_sequence(**params)
 
