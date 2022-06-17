@@ -151,14 +151,7 @@ def flatten_constraint(expr):
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
 
-        if not expr.name == '->':
-            # and, or
-            # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
-
-            newexpr = Operator(expr.name, flatvars)
-            return [newexpr]+[c for con in flatcons for c in con]
-        else:
+        if expr.name == '->':
             # ->, allows a boolexpr on one side
             if isinstance(expr.args[0], _BoolVarImpl):
                 # LHS is var, ensure RHS is normalized 'Boolexpr'
@@ -171,7 +164,12 @@ def flatten_constraint(expr):
                 flatcons = lcons+rcons
 
             newexpr = Operator(expr.name, (lhs,rhs))
-            return [newexpr]+[c for c in flatcons]
+            return [newexpr]+flatcons
+        else:
+            # a normalizable boolexpr
+            (con, flatcons) = normalized_boolexpr(expr)
+            return [con]+flatcons
+
 
     elif isinstance(expr, Comparison):
         """
@@ -195,8 +193,8 @@ def flatten_constraint(expr):
 
         if lexpr.is_bool() and is_num(rexpr):
             # a normalizable BoolExpr, such as And(v1,v2,v3) == 0
-            (c, cons) = normalized_boolexpr(expr)
-            return [c]+cons
+            (con, flatcons) = normalized_boolexpr(expr)
+            return [con]+flatcons
 
         # ensure rhs is var
         (rvar, rcons) = get_or_make_var(rexpr)
@@ -302,7 +300,6 @@ def get_or_make_var(expr):
         return (ivar, [newexpr]+[c for con in flatcons for c in con])
 
     elif isinstance(expr, Operator):
-        # TODO: more like above, call normalized_numexpr() on expr, then equate...
         flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args]) # also bool, reified...
         lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatvars]
         ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatvars]
