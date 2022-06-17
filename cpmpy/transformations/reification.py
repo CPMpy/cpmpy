@@ -18,6 +18,7 @@ from .flatten_model import flatten_constraint, negated_normal, get_or_make_var
 
   This file implements:
     - only_bv_implies():    transforms all reifications to BV -> BE form
+    - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
 def only_bv_implies(constraints):

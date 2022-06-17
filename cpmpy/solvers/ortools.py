@@ -32,6 +32,7 @@ from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
 from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
     """
@@ -311,6 +312,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = reify_rewrite(cpm_cons)
         cpm_cons = only_bv_implies(cpm_cons)
+        cpm_cons = only_numexpr_equality(cpm_cons)
         for con in cpm_cons:
             self._post_constraint(con)
 
@@ -364,15 +366,6 @@ class CPM_ortools(SolverInterface):
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
             rvar = self.solver_var(cpm_expr.args[1])
-
-            # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl)\
-                    and not lhs.name == "wsum" and not lhs.name == "sum":
-                # functional globals only exist for equality in ortools
-                # example: min(x) > 10 :: min(x) == aux, aux > 10
-                # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
-                (lhs, cons) = get_or_make_var(lhs)
-                self += cons
 
             # all but '==' now only have as lhs: const|ivar|sum|wsum
             # translate ivar|sum|wsum so they can be posted directly below
