@@ -130,12 +130,16 @@ def flatten_constraint(expr):
 
     # recursively flatten list of constraints
     if is_any_list(expr):
-        flatcons = [flatten_constraint(e) for e in expr]
-        return [c for con in flatcons for c in con]
+        flatcons = []
+        for e in expr:
+            flatcons += flatten_constraint(e)  # add all at end
+        return flatcons
     # recursively flatten top-level 'and'
     if isinstance(expr, Operator) and expr.name == 'and':
-        flatcons = [flatten_constraint(e) for e in expr.args]
-        return [c for con in flatcons for c in con]
+        flatcons = []
+        for e in expr.args:
+            flatcons += flatten_constraint(e)  # add all at end
+        return flatcons
 
     assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
 
