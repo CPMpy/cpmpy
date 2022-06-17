@@ -140,7 +140,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_objective( a )), f"({str(a)}, [])" )
         self.assertEqual( str(flatten_objective( a+b )), f"(({str(a)}) + ({str(b)}), [])" )
         self.assertEqual( str(flatten_objective( 2*a+3*b )), "(sum([2, 3] * [IV0, IV1]), [])" )
-        self.assertEqual( str(flatten_objective( 2*a+3*(b + c) )), "(sum([2, 3] * (IV0, IV5)), [((IV1) + (IV2)) == (IV5)])" )
+        self.assertEqual( str(flatten_objective( 2*a+3*(b + c) )), "(sum([2, 3] * [IV0, IV5]), [((IV1) + (IV2)) == (IV5)])" )
         self.assertEqual( str(flatten_objective( a/b+c )), f"((IV6) + ({str(c)}), [(({str(a)}) / ({str(b)})) == (IV6)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a] )), "(IV7, [([1 2 3][IV0]) == (IV7)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )), "((IV8) + (IV1), [([1 2 3][IV0]) == (IV8)])" )

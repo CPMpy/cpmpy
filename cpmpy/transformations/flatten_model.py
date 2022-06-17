@@ -233,42 +233,22 @@ def flatten_constraint(expr):
             return [newexpr]+[c for con in flatcons for c in con]
 
 
-def flatten_objective(expr):
+def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
     """
     - Decision variable: Var
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
               wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
     """
-    if __is_flat_var(expr):
-        return (expr, [])
-
     # lets be very explicit here
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
 
-    if isinstance(expr, Operator) and (expr.name == 'sum' or expr.name == 'wsum'):
-        if expr.name == 'sum':
-            if all(__is_flat_var(arg) for arg in expr.args):
-                return (expr, [])
-            else:
-                # one of the arguments is not flat, flatten all
-                flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
-                newexpr = Operator(expr.name, flatvars)
-                return (newexpr, [c for con in flatcons for c in con])
-        elif expr.name == 'wsum':
-            w, x = expr.args
-            if all(__is_flat_var(arg) for arg in x):
-                return (expr, [])
-            else:
-                # one of the arguments is not flat, flatten all
-                flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in x])
-                # one of the expressions in x is not flat, flatten all
-                newexpr = Operator(expr.name, (w, flatvars))
-                return (newexpr, [c for con in flatcons for c in con])
-    
-    # any other numeric expression
-    return get_or_make_var(expr)
+    if isinstance(expr, Expression) and expr.name in supported:
+        return normalized_numexpr(expr)
+    else:
+        # any other numeric expression
+        return get_or_make_var(expr)
 
 
 def __is_flat_var(arg):
