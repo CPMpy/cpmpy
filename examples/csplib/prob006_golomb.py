@@ -20,7 +20,8 @@ See also my cpmpy page: http://www.hakank.org/cpmpy/
 
 Modified by Ignace Bleukx
 """
-import sys
+from argparse import ArgumentParser
+
 from cpmpy import *
 
 def golomb(size=10):
@@ -48,7 +49,11 @@ def golomb(size=10):
     return model, (marks,)
 
 if __name__ == "__main__":
-    size = 10
+
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument("--size", type=int, default=10, help="Size of the ruler")
+
+    size = parser.parse_args().size
 
     model, (marks, ) = golomb(size)
 
