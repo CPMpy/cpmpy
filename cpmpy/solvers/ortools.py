@@ -400,18 +400,10 @@ class CPM_ortools(SolverInterface):
                                     f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
-                    # translate to multiplications
-                    # TODO: perhaps this should be a transformation too? pow to (binary) mult
-                    x = self.solver_var(lhs.args[0])
-                    y = lhs.args[1]
-                    assert is_num(y), f"Ort: 'pow' only supports constants as power, not {y}"
-                    if y == 0:
-                        return 1
-                    elif y == 1:
-                        return self.ort_model.Add(x == ortrhs)
-                    # mul([x,x,x,...]) with 'y' elements
-                    assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, [x] * y)
+                    # only `POW(b,2) == IV` supported, post as b*b == IV
+                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
+                    b = self.solver_var(lhs.args[0])
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
             raise NotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 

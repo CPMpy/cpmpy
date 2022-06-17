@@ -117,7 +117,7 @@ def flatten_model(orig_model):
 
 def flatten_constraint(expr):
     """
-        input is any expression; except is_num(), pure _NumVarImpl,
+        input is any expression; except bool, is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
         
         output: see definition of 'flat normal form' above.
@@ -126,7 +126,12 @@ def flatten_constraint(expr):
         TODO, what built-in python error is best?
     """
     # base cases
-    if isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
+    if isinstance(expr, bool):
+        if expr:
+            return []
+        else:
+            return [expr]  # not sure about this one... means False is a valid FNF expression
+    elif isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
         return [expr]
     elif is_num(expr) or isinstance(expr, _NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")

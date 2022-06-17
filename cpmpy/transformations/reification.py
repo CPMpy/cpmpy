@@ -1,5 +1,5 @@
 import copy
-from ..expressions.core import Operator, Comparison
+from ..expressions.core import Operator, Comparison, Expression
 from ..expressions.globalconstraints import GlobalConstraint, Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
@@ -88,6 +88,8 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
 
     newcons = []
     for cpm_expr in constraints:
+        if not isinstance(cpm_expr, Expression):
+            continue
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
         if cpm_expr.name == '->':
