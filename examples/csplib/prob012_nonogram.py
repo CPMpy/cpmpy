@@ -77,12 +77,13 @@ def get_data(data, name):
     for entry in data:
         if name in entry["name"]:
             return entry
+    raise ValueError(f"Instance {name} not found in data file!")
 
 
 if __name__ == "__main__":
 
     fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob012_nonogram.json"
-    problem_name = "soccer_player"
+    problem_name = "castle"
 
     data = None
 
@@ -102,6 +103,7 @@ if __name__ == "__main__":
     model, (board,) = nonogram(**rules)
 
     if model.solve():
+        np.set_printoptions(threshold=np.inf, linewidth=1024)
         f = {"int":lambda x : " " if x == 0 else "#"}
         print(np.array2string(board.value(), formatter=f))
     else:
