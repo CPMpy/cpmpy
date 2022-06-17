@@ -444,17 +444,15 @@ def normalized_boolexpr(expr):
                 flatcons += [Comparison(newname, lrich, rvar)]+lcons+rcons
             """
 
-            # XXX This is duplicate code from flatten_constraint!!! (except return)
-            # -> move into shared function??? or call this one there?
-            # But should support one 'less' level of nesting?
-
             # RHS must be var (or const)
-            lexpr,rexpr = expr.args
+            lexpr, rexpr = expr.args
             exprname = expr.name
+
             # ==,!=: can swap if lhs is var and rhs is not
             if (exprname == '==' or exprname == '!=') and \
                 not __is_flat_var(rexpr) and __is_flat_var(lexpr):
-                (lexpr,rexpr) = (rexpr,lexpr)
+                lexpr, rexpr = rexpr, lexpr
+
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
 
@@ -483,17 +481,16 @@ def normalized_boolexpr(expr):
         """
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         """
-        # XXX literal copy from flatten_cons... (except return)
         # just recursively flatten args, which can be lists
         if all(__is_flat_var_or_list(arg) for arg in expr.args):
             return (expr, [])
         else:
             # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
+            flatargs, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatvars
+            newexpr.args = flatargs
             return (newexpr, [c for con in flatcons for c in con])
 
 
@@ -516,8 +513,7 @@ def normalized_numexpr(expr):
     if __is_flat_var(expr):
         return (expr, [])
 
-    # special case, -var... 
-    # XXX until we do weighted sum, turn into -1*args[0]
+    # special case, -var, turn into -1*args[0]
     if isinstance(expr, Operator) and expr.name == '-': # unary
         return normalized_numexpr(-1*expr.args[0])
 
@@ -607,4 +603,3 @@ def negated_normal(expr):
         # global...
         #raise NotImplementedError("negate_normal {}".format(expr))
         return expr == 0 # can't do better than this...
-
