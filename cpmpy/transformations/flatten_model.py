@@ -465,8 +465,8 @@ def normalized_boolexpr(expr):
                     nnexpr = negated_normal(lexpr)
                     return normalized_boolexpr(nnexpr)
 
-                # Reification (double implication): Boolexpr == Var
-                (lhs, lcons) = normalized_boolexpr(lexpr)
+                # this is a reified constraint, so lhs must be var too to be in normal form
+                (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=':
                     # != not needed, negate RHS variable
                     rhs = ~rvar
