@@ -74,7 +74,6 @@ of the form specified above.
 The flattening does not promise to do common subexpression elimination or to automatically group
 commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
 
-TODO: remove zipcycle (no longer needed)
 TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
@@ -86,17 +85,11 @@ from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 
-from itertools import cycle
-def __zipcycle(vars1, vars2):
-    v1 = [vars1] if not is_any_list(vars1) else vars1
-    v2 = [vars2] if not is_any_list(vars2) else vars2
-    return zip(v1, cycle(v2)) if len(v2) < len(v1) else zip(cycle(v1), v2)
-
 def flatten_model(orig_model):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
-    from ..model import Model # otherwise circular dependency...
+    from ..model import Model  # otherwise circular dependency...
 
     # the top-level constraints
     basecons = []
@@ -105,7 +98,7 @@ def flatten_model(orig_model):
 
     # the objective
     if orig_model.objective_ is None:
-        return Model(*basecons) # no objective, satisfaction problem
+        return Model(*basecons)  # no objective, satisfaction problem
     else:
         (newobj, newcons) = flatten_objective(orig_model.objective_)
         basecons += newcons
@@ -131,7 +124,7 @@ def flatten_constraint(expr):
             return []
         else:
             return [expr]  # not sure about this one... means False is a valid FNF expression
-    elif isinstance(expr, _BoolVarImpl) or isinstance(expr, bool):
+    elif isinstance(expr, _BoolVarImpl):
         return [expr]
     elif is_num(expr) or isinstance(expr, _NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
@@ -149,15 +142,16 @@ def flatten_constraint(expr):
 
     if isinstance(expr, Operator):
         """
-            - Base Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
-            - Base Boolean impliciation: Var -> Var                     (CPMpy class 'Operator', is_bool())
+            - Base Boolean operators: and([Var]), or([Var])        (CPMpy class 'Operator', is_bool())
+            - Base Boolean impliciation: Var -> Var                (CPMpy class 'Operator', is_bool())
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
         """
         # does not type-check that arguments are bool... Could do now with expr.is_bool()!
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
-        elif not expr.name == '->':
+
+        if not expr.name == '->':
             # and, or
             # recursively flatten all children
             flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
@@ -190,52 +184,37 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
+        if all(__is_flat_var(arg) for arg in expr.args):
+            return [expr]
 
-        flatcons = []
-        # zipcycle: unfolds 'arr1 == arr2' pairwise
-        # XXX: zipcycle no longer needed, vectorized now handled at creation level!
-        for lexpr, rexpr in __zipcycle(expr.args[0], expr.args[1]):
-            if __is_flat_var(lexpr) and __is_flat_var(rexpr):
-                flatcons += [Comparison(expr.name, lexpr, rexpr)]
-            else:
-                # RHS must be var (or const)
-                lexpr,rexpr = expr.args
-                exprname = expr.name
-                # ==,!=: can swap if lhs is var and rhs is not
-                # TODO: this is very similar to (part of) normalize_boolexpr??
-                # XXX indeed, every case that is not 'reification' can be
-                # delegated to normalize_boolexpr... TODO
-                if (exprname == '==' or exprname == '!=') and \
-                    not __is_flat_var(rexpr) and __is_flat_var(lexpr):
-                    (lexpr,rexpr) = (rexpr,lexpr)
-                # ensure rhs is var
-                (rvar, rcons) = get_or_make_var(rexpr)
+        # swap 'Var == Expr' to normal 'Expr == Var'
+        lexpr, rexpr = expr.args
+        if (expr.name == '==' or expr.name == '!=') \
+                and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+            lexpr, rexpr = rexpr, lexpr
 
-                # LHS: check if Boolexpr == smth:
-                if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
-                    if is_num(rexpr):
-                        # BoolExpr == 0|False
-                        # special case, handled in normalized_boolexpr()
-                        (con, subs) = normalized_boolexpr(expr)
-                        flatcons += [con] + subs
-                        continue # ready with this one
+        if lexpr.is_bool() and is_num(rexpr):
+            # a normalizable BoolExpr, such as And(v1,v2,v3) == 0
+            (c, cons) = normalized_boolexpr(expr)
+            return [c]+cons
 
-                    # Reification (double implication): Boolexpr == Var
-                    if __is_flat_var(lexpr):
-                        (lhs, lcons) = (lexpr, [])
-                    else:
-                        (lhs, lcons) = normalized_boolexpr(lexpr)
-                    if expr.name == '!=':
-                        # != not needed, negate RHS variable
-                        rhs = ~rvar
-                        exprname = '=='
-                else:
-                    # other cases: LHS is numexpr
-                    (lhs, lcons) = normalized_numexpr(lexpr)
+        # ensure rhs is var
+        (rvar, rcons) = get_or_make_var(rexpr)
 
-                flatcons += [Comparison(exprname, lhs, rvar)]+lcons+rcons
+        exprname = expr.name  # so it can be modified
+        # 'BoolExpr != Rvar' to normal 'BoolExpr == ~Rvar'
+        if exprname == '!=' and lexpr.is_bool():  # negate rvar
+            exprname = '=='
+            rvar = ~rvar
 
-        return flatcons
+        # Reification (double implication): Boolexpr == Var
+        if exprname == '==' and lexpr.is_bool():
+            (lhs, lcons) = normalized_boolexpr(lexpr)
+        else:
+            # other cases: LHS is numexpr
+            (lhs, lcons) = normalized_numexpr(lexpr)
+
+        return [Comparison(exprname, lhs, rvar)]+lcons+rcons
 
     else:
         """
