@@ -74,7 +74,6 @@ of the form specified above.
 The flattening does not promise to do common subexpression elimination or to automatically group
 commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
 
-TODO: use normalized_boolexpr when possible in the flatten_cons operator case.
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
@@ -218,17 +217,8 @@ def flatten_constraint(expr):
         """
     - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         """
-        # just recursively flatten args, which can be lists
-        if all(__is_flat_var_or_list(arg) for arg in expr.args):
-            return [expr]
-        else:
-            # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
-
-            # take copy, replace args
-            newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatvars
-            return [newexpr]+[c for con in flatcons for c in con]
+        (con, flatcons) = normalized_boolexpr(expr)
+        return [con] + flatcons
 
 
 def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
