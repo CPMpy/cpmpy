@@ -84,7 +84,8 @@ class CPM_ortools(SolverInterface):
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
-        # initialize assumption dict to None
+        # for solving with assumption variables,
+        # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
 
         # initialise everything else and post the constraints/objective
@@ -216,7 +217,7 @@ class CPM_ortools(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if is_num(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
         # special case, negative-bool-view
@@ -251,8 +252,8 @@ class CPM_ortools(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
+        self += flat_cons  # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -287,7 +288,7 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
+                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
 
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -307,7 +308,9 @@ class CPM_ortools(SolverInterface):
         self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
-        cpm_cons = only_bv_implies(reify_rewrite(flatten_constraint(cpm_con)))
+        cpm_cons = flatten_constraint(cpm_con)
+        cpm_cons = reify_rewrite(cpm_cons)
+        cpm_cons = only_bv_implies(cpm_cons)
         for con in cpm_cons:
             self._post_constraint(con)
 
@@ -341,27 +344,22 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == '->':
-                assert(isinstance(cpm_expr.args[0], _BoolVarImpl)) # lhs must be boolvar
+                assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
                     return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr.args[1]))
                 else:
-                    # bv -> boolexpr, natively supported by or-tools
-                    # actually, only supported for and, or, and linear expression (not xor nor any global)
-                    # XXX should we check/assert that here??
-                    # TODO: and if rhs is a global, first decompose it and reify that??
-                    assert(cpm_expr.args[1].is_bool())
-                    # Special case for 'xor', which is not natively reifiable in ortools
-                    # TODO: and if something like b.implies(min(x) >= 10) that it splits up in
-                    # b.implies( aux >= 10) & (min(x) == aux)
+                    # bv -> boolexpr
+                    # the `reify_rewrite()` transformation ensures that only
+                    # the natively reifiable 'and', 'or' and 'sum' remain here
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
                 raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
-
-        # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
+        # Comparisons: only numeric ones as the `only_bv_implies()` transformation
+        # has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
@@ -449,13 +447,13 @@ class CPM_ortools(SolverInterface):
             array, table = self.solver_vars(cpm_expr.args)
             return self.ort_model.AddAllowedAssignments(array, table)
         else:
-            # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
+            # NOT (YET?) MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            self += cpm_expr.decompose() # assumes a decomposition exists...
-            # TODO: dynamic mapping of cpm_expr.name to API call? see #74
+            self += cpm_expr.decompose()  # assumes a decomposition exists...
+            # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
             return None # will throw error if used in reification
         
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
