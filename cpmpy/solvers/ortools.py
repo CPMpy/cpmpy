@@ -28,7 +28,7 @@ import sys  # for stdout checking
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -365,46 +365,32 @@ class CPM_ortools(SolverInterface):
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
-            rvar = self.solver_var(cpm_expr.args[1])
+            ortrhs = self.solver_var(cpm_expr.args[1])
 
-            # all but '==' now only have as lhs: const|ivar|sum|wsum
-            # translate ivar|sum|wsum so they can be posted directly below
             if isinstance(lhs, _NumVarImpl):
-                lhs = self.solver_var(lhs)
+                # both are variables, do python comparison over ORT variables
+                return self.ort_model.Add(eval_comparison(cpm_expr.name, self.solver_var(lhs), ortrhs))
             elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
                 # a BoundedLinearExpression LHS, special case, like in objective
-                lhs = self._make_numexpr(lhs)
-                # assumes that ortools accepts sum(x) >= y without further simplification
-
-            # post the comparison
-            if cpm_expr.name == '<=':
-                return self.ort_model.Add(lhs <= rvar)
-            elif cpm_expr.name == '<':
-                return self.ort_model.Add(lhs < rvar)
-            elif cpm_expr.name == '>=':
-                return self.ort_model.Add(lhs >= rvar)
-            elif cpm_expr.name == '>':
-                return self.ort_model.Add(lhs > rvar)
-            elif cpm_expr.name == '!=':
-                return self.ort_model.Add(lhs != rvar)
+                ortlhs = self._make_numexpr(lhs)
+                # ortools accepts sum(x) >= y over ORT variables
+                return self.ort_model.Add(eval_comparison(cpm_expr.name, ortlhs, ortrhs))
             elif cpm_expr.name == '==':
-                if not isinstance(lhs, Expression): 
-                    # base cases: const|ivar|sum|wsum with prepped lhs above
-                    return self.ort_model.Add(lhs == rvar)
-                elif lhs.name == 'min':
-                    return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
+                # NumExpr == IV, supported by ortools (thanks to `only_numexpr_equality()` transformation)
+                if lhs.name == 'min':
+                    return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.ort_model.AddMaxEquality(rvar, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
-                    return self.ort_model.AddAbsEquality(rvar, self.solver_var(lhs.args[0]))
+                    return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'mul':
-                    return self.ort_model.AddMultiplicationEquality(rvar, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'div':
-                    return self.ort_model.AddDivisionEquality(rvar, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
                     return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), rvar)
+                                                     self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     divisor = lhs.args[1]
@@ -412,7 +398,7 @@ class CPM_ortools(SolverInterface):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
                                     f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                    return self.ort_model.AddModuloEquality(rvar, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # translate to multiplications
                     # TODO: perhaps this should be a transformation too? pow to (binary) mult
@@ -422,10 +408,10 @@ class CPM_ortools(SolverInterface):
                     if y == 0:
                         return 1
                     elif y == 1:
-                        return self.ort_model.Add(x == rvar)
+                        return self.ort_model.Add(x == ortrhs)
                     # mul([x,x,x,...]) with 'y' elements
                     assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
-                    return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, [x] * y)
             raise NotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
