@@ -64,8 +64,14 @@ class CPM_gurobi(SolverInterface):
         # try to import the package
         try:
             import gurobipy as gp
+            global GRB_ENV
+            if GRB_ENV is None:
+                # initialise the native gurobi model object
+                GRB_ENV = gp.Env()
+                GRB_ENV.setParam("OutputFlag", 0)
+                GRB_ENV.start()
             return True
-        except ImportError as e:
+        except:
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -80,13 +86,7 @@ class CPM_gurobi(SolverInterface):
                 "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
-        global GRB_ENV
-        if GRB_ENV is None:
-            # initialise the native gurobi model object
-            GRB_ENV = gp.Env()
-            GRB_ENV.setParam("OutputFlag", 0)
-            GRB_ENV.start()
-
+        # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
