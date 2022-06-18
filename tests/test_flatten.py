@@ -98,10 +98,8 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var(x > y)), "(BV5, [((BV0) > (BV1)) == (BV5)])" )
         self.assertEqual( str(get_or_make_var(x <= y)), "(BV6, [((BV0) <= (BV1)) == (BV6)])" )
 
-        self.assertEqual( str(get_or_make_var((a > 10) == x)), "(BV7, [((IV0 > 10) == (BV0)) == (BV7)])" )
-        cp.boolvar() # increase counter
-        self.assertEqual( str(get_or_make_var( (a > 10) == (d > 5) )), "(BV10, [((IV0 > 10) == (BV9)) == (BV10), (IV3 > 5) == (BV9)])" )
-        cp.boolvar() # increase counter
+        self.assertEqual( str(get_or_make_var((a > 10) == x)), "(BV8, [((BV7) == (BV0)) == (BV8), (IV0 > 10) == (BV7)])" )
+        self.assertEqual( str(get_or_make_var( (a > 10) == (d > 5) )), "(BV11, [((BV10) == (BV9)) == (BV11), (IV0 > 10) == (BV10), (IV3 > 5) == (BV9)])" )
         self.assertEqual( str(get_or_make_var( a > c )), "(BV12, [((IV0) > (IV2)) == (BV12)])" )
         self.assertEqual( str(get_or_make_var( a + b > c )), "(BV13, [(((IV0) + (IV1)) > (IV2)) == (BV13)])" )
         cp.intvar(0,2) # increase counter
