@@ -514,36 +514,34 @@ def normalized_numexpr(expr):
     if __is_flat_var(expr):
         return (expr, [])
 
-    # special case, -var, turn into -1*args[0]
-    if isinstance(expr, Operator) and expr.name == '-': # unary
-        return normalized_numexpr(-1*expr.args[0])
-
-    elif isinstance(expr, Operator) and expr.name == 'wsum': # unary
-        weights, sub_exprs  = expr.args
-        flatvars, flatcons = map(list, zip(*[get_or_make_var(arg) for arg in sub_exprs])) # also bool, reified...
-        newexpr = Operator(expr.name, (weights, flatvars))
-        return (newexpr, [c for con in flatcons for c in con])
-
-    if isinstance(expr, Operator):
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return (expr, [])
-        
-        # recursively flatten all children
-        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
-
-        newexpr = Operator(expr.name, flatvars)
-        return (newexpr, [c for con in flatcons for c in con])
-
     elif expr.is_bool():
         # unusual case, but its truth-value is a valid numexpr
         # so reify and return the boolvar
         return get_or_make_var(expr)
 
+    elif isinstance(expr, Operator):
+        # special case, -var, turn into -1*args[0]
+        if expr.name == '-': # unary
+            return normalized_numexpr(-1*expr.args[0])
+
+        if all(__is_flat_var(arg) for arg in expr.args):
+            return (expr, [])
+
+        elif expr.name == 'wsum': # unary
+            weights, sub_exprs  = expr.args
+            flatvars, flatcons = map(list, zip(*[get_or_make_var(arg) for arg in sub_exprs])) # also bool, reified...
+            newexpr = Operator(expr.name, (weights, flatvars))
+            return (newexpr, [c for con in flatcons for c in con])
+
+        else: # generic operator
+            # recursively flatten all children
+            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+
+            newexpr = Operator(expr.name, flatvars)
+            return (newexpr, [c for con in flatcons for c in con])
     else:
-        """
-        - Global constraint (non-Boolean) (examples: Max,Min,Element)
-        """
-        # XXX literal copy from flatten_cons... (except return)
+        # Global constraint (non-Boolean) (examples: Max,Min,Element)
+
         # just recursively flatten args, which can be lists
         if all(__is_flat_var_or_list(arg) for arg in expr.args):
             return (expr, [])
