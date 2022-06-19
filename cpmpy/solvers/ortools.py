@@ -311,8 +311,9 @@ class CPM_ortools(SolverInterface):
         # apply transformations, then post internally
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = only_numexpr_equality(cpm_cons)
+        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
+                                             # reified expr must go before this
         for con in cpm_cons:
             self._post_constraint(con)
 
