@@ -194,11 +194,6 @@ def flatten_constraint(expr):
                 and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
             lexpr, rexpr = rexpr, lexpr
 
-        if lexpr.is_bool() and is_num(rexpr):
-            # a normalizable BoolExpr, such as And(v1,v2,v3) == 0
-            (con, flatcons) = normalized_boolexpr(expr)
-            return [con]+flatcons
-
         # ensure rhs is var
         (rvar, rcons) = get_or_make_var(rexpr)
 
@@ -210,7 +205,13 @@ def flatten_constraint(expr):
 
         # Reification (double implication): Boolexpr == Var
         if exprname == '==' and lexpr.is_bool():
-            (lhs, lcons) = normalized_boolexpr(lexpr)
+            if is_num(rexpr):
+                # shortcut, full original one is normalizable BoolExpr
+                # such as And(v1,v2,v3) == 0
+                (con, flatcons) = normalized_boolexpr(expr)
+                return [con]+flatcons
+            else:
+                (lhs, lcons) = normalized_boolexpr(lexpr)
         else:
             # other cases: LHS is numexpr
             (lhs, lcons) = normalized_numexpr(lexpr)
@@ -532,6 +533,11 @@ def normalized_numexpr(expr):
 
         newexpr = Operator(expr.name, flatvars)
         return (newexpr, [c for con in flatcons for c in con])
+
+    elif expr.is_bool():
+        # unusual case, but its truth-value is a valid numexpr
+        # so reify and return the boolvar
+        return get_or_make_var(expr)
 
     else:
         """

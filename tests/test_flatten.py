@@ -84,7 +84,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.ivars = cp.intvar(1, 10, shape=(5,))
         self.bvars = cp.boolvar((3,))
 
-    # not directly tested on its on, new functions 'normalized_boolexpr' and 'normalized_numexpr'
+    # not directly tested on its own, new functions 'normalized_boolexpr' and 'normalized_numexpr'
 
     def test_get_or_make_var__bool(self):
         (a,b,c,d,e) = self.ivars[:5]
@@ -195,3 +195,6 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
         self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((~BV2) or (BV1)) -> (BV13), ((~BV0) and (~BV1)) == (BV13)]" )
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
+
+        # boolexpr as numexpr
+        self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV14 <= 0, ((IV0) + (IV1) == 2) == (BV14)]" )
