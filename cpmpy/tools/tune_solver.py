@@ -23,7 +23,7 @@ class ParameterTuner:
         self._param_order = list(self.all_params.keys())
         self._best_config = self._params_to_np([self.best_params])
 
-    def tune(self, time_limit=None, max_tries=None):
+    def tune(self, time_limit=None, max_tries=None, fix_params={}):
         # TODO: support time_limit
 
         # Init solver
@@ -52,12 +52,11 @@ class ParameterTuner:
             combos_np = np.delete(combos_np, max_idx, axis=0)
             # Convert numpy array back to dictionary
             params_dict = self._np_to_params(params_np)
-
+            # set fixed params
+            params_dict |= fix_params
             # run solver
             solver.solve(**params_dict, time_limit=best_runtime)
-            if (solver.status().exitstatus == ExitStatus.OPTIMAL or
-                solver.status().exitstatus == ExitStatus.FEASIBLE) \
-                    and  solver.status().runtime < best_runtime:
+            if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < best_runtime:
                 best_runtime = solver.status().runtime
                 # update surrogate
                 self._best_config = params_np
@@ -65,6 +64,7 @@ class ParameterTuner:
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
+        self.best_params |= fix_params
         return self.best_params
 
     def _get_score(self, combos):
