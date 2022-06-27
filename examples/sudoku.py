@@ -4,22 +4,25 @@ Sudoku problem in CPMpy
 """
 
 # load the libraries
+import sys
+sys.path.append("/Users/emiliogamba/Documents/01_VUB/01_Research/01_Shared_Projects/07_CPMPY")
+
 import numpy as np
 from cpmpy import *
 
 e = 0 # value for empty cells
 given = np.array([
-    [e, e, e,  2, e, 5,  e, e, e],
-    [e, 9, e,  e, e, e,  7, 3, e],
-    [e, e, 2,  e, e, 9,  e, 6, e],
+    [6, 9, 4,  e, e, 1,  e, e, e],
+    [e, e, 3,  e, 2, e,  e, 4, 5],
+    [2, 7, e,  e, 6, e,  e, e, e],
 
-    [2, e, e,  e, e, e,  4, e, 9],
-    [e, e, e,  e, 7, e,  e, e, e],
-    [6, e, 9,  e, e, e,  e, e, 1],
+    [e, e, 1,  e, e, 4,  e, 7, e],
+    [e, 2, 6,  e, 8, 7,  e, 9, 3],
+    [3, 5, 7,  e, e, e,  4, e, 2],
 
-    [e, 8, e,  4, e, e,  1, e, e],
-    [e, 6, 3,  e, e, e,  e, 8, e],
-    [e, e, e,  6, e, 8,  e, e, e]])
+    [e, 6, 9,  e, e, e,  e, e, 1],
+    [1, 3, e,  6, e, e,  7, e, e],
+    [e, e, e,  1, e, 2,  e, e, e]])
 
 
 # Variables
