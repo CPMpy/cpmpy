@@ -402,7 +402,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*', 'div': '/', 'pow': '^'}
+                        'mul': '*', 'pow': '^'}
             op_str = expr.name
             if op_str in printmap:
                 op_str = printmap[op_str]
@@ -430,7 +430,7 @@ class CPM_minizinc(SolverInterface):
                 return "{} {} {}".format(args_str[0], op_str, args_str[1])
 
             # special case: n-ary (non-binary): rename operator
-            printnary = {'and': 'forall', 'or': 'exists', 'xor': 'xorall', 'sum': 'sum'}
+            printnary = {'and': 'forall', 'or': 'exists', 'sum': 'sum'}
             if expr.name in printnary:
                 op_str = printnary[expr.name]
                 return "{}([{}])".format(op_str, ",".join(args_str))
@@ -459,6 +459,10 @@ class CPM_minizinc(SolverInterface):
             if any(isinstance(e, _IntVarImpl) and e.lb == 0 for e in expr.args):
                 # redo args_str[0]
                 args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+
+        print_map = {"allequal":"all_equal", "xor":"xorall"}
+        if expr.name in print_map:
+            return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
 
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))

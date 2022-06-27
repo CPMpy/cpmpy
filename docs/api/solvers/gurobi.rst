@@ -1,7 +1,7 @@
-CPMpy ortools interface (:mod:`cpmpy.solvers.ortools`)
+CPMpy gurobi interface (:mod:`cpmpy.solvers.gurobi`)
 =====================================================
 
-.. automodule:: cpmpy.solvers.ortools
+.. automodule:: cpmpy.solvers.gurobi
     :members:
     :undoc-members:
     :inherited-members:

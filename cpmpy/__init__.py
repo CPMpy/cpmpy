@@ -12,9 +12,9 @@
     - `solvers`: CPMpy classes that translate a model into approriate calls of a solver's API
     - `transformations`: common methods for transforming expressions into other expressions, used by `solvers` modules to simplify/rewrite expressions
 """
-# Tias Guns, 2019-2021
+# Tias Guns, 2019-2022
 
-__version__ = "0.9.7"
+__version__ = "0.9.9"
 
 
 from .expressions import *

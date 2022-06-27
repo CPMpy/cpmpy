@@ -102,13 +102,12 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression
+from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval
-
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
-
 class GlobalConstraint(Expression):
     """
         Abstract superclass of GlobalConstraints
@@ -136,7 +135,11 @@ class GlobalConstraint(Expression):
             and use other other global constraints as long as
             it does not create a circular dependency.
         """
-        return None
+        raise NotImplementedError("Decomposition for",self,"not available")
+
+    def deepcopy(self, memodict={}):
+        copied_args = self._deepcopy_args(memodict)
+        return type(self)(self.name, copied_args, self._is_bool)
 
 
 # Global Constraints (with Boolean return type)
@@ -156,6 +159,16 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Alldifferent global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferent(*copied_args)
+
+    def value(self):
+        return all(c.value() for c in self.decompose())
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -170,6 +183,18 @@ class AllEqual(GlobalConstraint):
         """Returns the decomposition
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+
+    def deepcopy(self, memdict={}):
+        """
+            Return a deep copy of the AllEqual global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memdict)
+        return AllEqual(*copied_args)
+
+    def value(self):
+        return all(c.value() for c in self.decompose())
+
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -203,6 +228,19 @@ class Circuit(GlobalConstraint):
             # others: ith one is successor of i-1
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
+
+    def deepcopy(self, memdict={}):
+        """
+            Return a deep copy of the Circuit global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memdict)
+        return Circuit(*copied_args)
+
+
+    # TODO: value()
+
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -212,6 +250,16 @@ class Table(GlobalConstraint):
     def decompose(self):
         raise NotImplementedError("TODO: table decomposition")
 
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Table global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        array, table = self._deepcopy_args(memodict)
+        return Table(array, table)
+
+    # TODO: value()
 
 # Numeric Global Constraints (with integer-valued return type)
 
@@ -226,7 +274,19 @@ class Minimum(GlobalConstraint):
         super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return min([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return min(argvals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Minimum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(self.args)
+        return Minimum(copied_args)
 
 class Maximum(GlobalConstraint):
     """
@@ -238,7 +298,19 @@ class Maximum(GlobalConstraint):
         super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return max([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return max(argvals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Maximum global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Maximum(copied_args)
 
 def element(arg_list):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -267,6 +339,73 @@ class Element(GlobalConstraint):
             return argval(self.args[0][idxval])
         return None # default
 
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            It is not a constraint itself, so it can not have a decompose().
+            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+            That is what this function does
+            (for now only used in transformations/reification.py)
+        """
+        from .python_builtins import any
+
+        arr,idx = self.args
+        return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
+
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
 
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Element global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        arr, idx = self._deepcopy_args(memodict)
+        return Element(arr, idx)
+
+
+class Xor(GlobalConstraint):
+    """
+        The 'xor' constraint for more then 2 arguments.
+        Acts like cascaded xor operators with two inputs
+    """
+
+    def __init__(self, arg_list):
+        # convention for commutative binary operators:
+        # swap if right is constant and left is not
+        if len(arg_list) == 2 and is_num(arg_list[1]):
+            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        i = 0  # length can change
+        while i < len(arg_list):
+            if isinstance(arg_list[i], Xor):
+                # merge args in at this position
+                arg_list[i:i + 1] = arg_list[i].args
+            else:
+                i += 1
+        super().__init__("xor", arg_list)
+
+    def decompose(self):
+        if len(self.args) == 2:
+            return [(self.args[0] + self.args[1]) == 1]
+        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        for arg in self.args[2:]:
+            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
+            cons += new_cons
+        return cons + [prev_var]
+
+    def value(self):
+        return sum(argval(a) for a in self.args) % 2 == 1
+
+    def __repr__(self):
+        if len(self.args) == 2:
+            return "{} xor {}".format(*self.args)
+        return "xor({})".format(self.args)
+
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the xor global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Xor(copied_args)

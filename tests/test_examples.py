@@ -24,7 +24,21 @@ class TestExamples(unittest.TestCase):
     loader = importlib.machinery.SourceFileLoader("example", example)
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)
-    
+
+    # run again with gurobi
+    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
+        return
+
+    gbi_slv = SolverLookup.lookup("gurobi")
+    if gbi_slv.supported():
+        # temporarily brute-force overwrite SolverLookup.base_solvers
+        f = SolverLookup.base_solvers
+        try:
+            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]
+            loader.exec_module(mod)
+        finally:
+            SolverLookup.base_solvers = f
+
     # run again with minizinc, if installed on system
     if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py']:
         # except for these too slow ones

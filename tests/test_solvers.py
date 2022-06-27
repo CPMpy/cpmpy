@@ -11,7 +11,8 @@ class TestSolvers(unittest.TestCase):
 
         model = cp.Model(
                     x.implies(y & z),
-                    y | z
+                    y | z,
+                    ~ z
                 )
 
         for solvern,s in cp.SolverLookup.base_solvers():
@@ -42,7 +43,12 @@ class TestSolvers(unittest.TestCase):
 
         for solvern,s in cp.SolverLookup.base_solvers():
             if s.supported(): # only supported solvers in test suite
-                self.assertEqual(model.solveAll(solver=solvern), 4)
+                if solvern == "pysdd":
+                    self.assertEqual(model.solveAll(solver=solvern), 4)
+                else:
+                    # some solvers do not support searching for all solutions...
+                    # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
+                    self.assertEqual(model.solveAll(solver=solvern, solution_limit=4), 4)
 
     # should move this test elsewhere later
     def test_tsp(self):
@@ -110,8 +116,8 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0,3, shape=2)
         m = cp.Model([x[0] > x[1]])
         self.assertTrue(m.solve())
-        self.assertEqual(x[0].value(), 3)
-        self.assertEqual(x[1].value(), 0)
+        self.assertGreater(*x.value())
+
 
         # direct use
         o = CPM_ortools()
@@ -134,8 +140,7 @@ class TestSolvers(unittest.TestCase):
         s.ort_solver.parameters.linearization_level = 2 # more linearisation heuristics
         s.ort_solver.parameters.num_search_workers = 8 # nr of concurrent threads
         self.assertTrue(s.solve())
-        self.assertEqual(x[0].value(), 3)
-        self.assertEqual(x[1].value(), 0)
+        self.assertGreater(*x.value())
 
 
         # all solution counting

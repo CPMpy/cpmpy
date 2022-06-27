@@ -122,24 +122,32 @@ class CPM_pysat(SolverInterface):
             Call the PySAT solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
+            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
+                           runtime exceeds given time_limit.
+                           Warning: the time_limit is not very accurate at subsecond level
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
-
-        # set time limit?
-        if time_limit is not None:
-            raise NotImplementedError("Didn't get to it yet, see pysat.solver.interrupt() for an example of what to implement")
-
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
             pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
-        # call the solver, with parameters
-        my_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
+        import time
+        # set time limit?
+        if time_limit is not None:
+            from threading import Timer
+            t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
+            t.start()
+            my_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
+            # ensure timer is stopped if early stopping
+            t.cancel()
+            ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
+            self.pysat_solver.clear_interrupt()
+        else:
+            my_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)

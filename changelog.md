@@ -1,5 +1,36 @@
 # Change log
 
+## 0.9.9
+Stabilizing the core implementations and a knowledge compiler as solver
+
+New:
+* New example: ortools as propagator (only propagation)
+* Copy method for model and constraints (and hence hash functions)
+* Bools are now treated as numeric when needed
+* Xor is now a global constraint (with a decomposition)
+* the reify-rewrite transformation: most reifications automatically supported
+* the only-numexpr-equality transformation, now generic for all solvers that want
+* PySDD as solver: knowledge compiler for Boolean logic and solveAll model counting
+
+Changed:
+* Docs: many additions (direct solver access, solveAll, adding a solver guide) and improvements
+* Transformation flatten has cleaner implementation
+* Bugfixes in bound computations (modulo, weighted sum)
+* MiniZinc: fix allequal translation, use integer division
+* Reification of Elements now takes range of index variable into account
+* Examples: small fixes and improvements
+* Tests: more and better
+
+## 0.9.8
+An exciting 'technical' release that opens the door to
+add many more solvers
+
+* API change: unified interfaces of solvers/
+* New: the gurobi MIP solver
+* New: transformations/linearisation/
+* More extensive testing
+* PySAT: support time\_limit argument to solve
+
 ## 0.9.7
 * New: s.solveAll(): convenient (efficient) solution enumeration
 * New: added sum() to python\_builtins, behaves like np.sum
