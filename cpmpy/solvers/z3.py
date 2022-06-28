@@ -138,7 +138,11 @@ class CPM_z3(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
-                cpm_var._value = sol[sol_var]
+                if isinstance(cpm_var, _BoolVarImpl):
+                    cpm_var._value = bool(sol[sol_var])
+                elif isinstance(cpm_var, _NumVarImpl):
+                    cpm_var._value = sol[sol_var].as_long()
+                # cpm_var._value = sol[sol_var]
 
             # TODO
             # translate objective, for optimisation problems only
@@ -228,7 +232,12 @@ class CPM_z3(SolverInterface):
         else:
             # translate each expression tree, then post straight away
             #print("Doing",cpm_con,self._z3_expr(cpm_con))
-            self.z3_solver.add(self._z3_expr(cpm_con))
+            z3_cons = self._z3_expr(cpm_con)
+            if is_any_list(z3_cons):
+                for z3_con in z3_cons:
+                    self.z3_solver.add(z3_con)
+            else:
+                self.z3_solver.add(z3_cons)
 
     def _z3_expr(self, cpm_con):
         """
@@ -296,6 +305,9 @@ class CPM_z3(SolverInterface):
         # rest: base (Boolean) global constraints
         elif cpm_con.name == 'alldifferent':
             return z3.Distinct(self._z3_expr(cpm_con.args))
+
+        # global constraints
+        return self._z3_expr(cpm_con.decompose())
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 
