@@ -1,3 +1,17 @@
+"""
+    This file implements parameter tuning for constraint solvers based on SMBO and using adaptive capping.
+    Based on the paper "Model-Based Algorithm Configuration with Adaptive Capping and Prior Distributions by I. Bleukx, S. Berden et al.
+
+    DOI: https://doi.org/10.1007/978-3-031-08011-1_6
+    Link to paper: https://rdcu.be/cQyWR
+    Code used in original paper: https://github.com/ML-KULeuven/DeCaprio
+
+    This code currently only implements the author's 'Hamming' surrogate function.
+    The parameter tuner iteratively finds better hyperparameters close to the current best configuration during the search.
+    Searching and time-out start at the default configuration for a solver.
+"""
+import time
+
 import numpy as np
 
 from ..solvers.utils import SolverLookup, param_combinations
