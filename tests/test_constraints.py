@@ -3,32 +3,35 @@ import unittest
 from cpmpy import boolvar, intvar, Model, cpm_array
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import *
-from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat
+from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat, CPM_z3
 
 import pytest
 
-SOLVER_CLASS = CPM_pysat
+SOLVER_CLASS = CPM_z3
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {CPM_ortools: {"circuit"},
                   CPM_gurobi: {"circuit"},
                   CPM_minizinc: {"circuit"},
-                  CPM_pysat: {"circuit", "element","min","max", "allequal", "alldifferent"}}
+                  CPM_pysat: {"circuit", "element","min","max", "allequal", "alldifferent"},
+                  CPM_z3 : {}}
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {CPM_ortools: {"sub"},
                      CPM_gurobi: {"sub", "mod"},
                      CPM_minizinc: {},
-                     CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     CPM_z3: {}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {CPM_ortools: {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","-","xor"}, # TODO this will become emtpy after resolving issue #105
                 CPM_gurobi:  {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","xor"},
                 CPM_minizinc: {},
-                CPM_pysat: {}}
+                CPM_pysat: {},
+                CPM_z3: {}}
 
 
 # Variables to use in the rest of the test script
