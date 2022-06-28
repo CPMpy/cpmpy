@@ -80,7 +80,7 @@ class ParameterTuner:
             if time_limit is not None:
                 timeout = min(timeout, time_limit - (time.time() - start_time))
             # run solver
-            solver.solve(**params_dict, time_limit=best_runtime)
+            solver.solve(**params_dict, time_limit=timeout)
             if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < best_runtime:
                 best_runtime = solver.status().runtime
                 # update surrogate
@@ -92,6 +92,7 @@ class ParameterTuner:
 
         self.best_params = self._np_to_params(self._best_config)
         self.best_params |= fix_params
+        self.best_runtime = best_runtime
         return self.best_params
 
     def _get_score(self, combos):
