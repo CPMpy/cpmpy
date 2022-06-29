@@ -105,12 +105,17 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
+
+        z3_assum_vars = self.solver_vars(assumptions)
+        self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+
+
         # call the solver, with parameters
         for (key,value) in kwargs.items():
             self.z3_solver.set(key, value)
         # TODO: how to do optimisation?
-        # TODO: assumptions?
-        my_status = repr(self.z3_solver.check(assumptions))
+
+        my_status = repr(self.z3_solver.check(*z3_assum_vars))
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -313,3 +318,16 @@ class CPM_z3(SolverInterface):
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
+
+    def get_core(self):
+        """
+            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+
+            CPMpy will return only those variables that are False (in the UNSAT core)
+
+            Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+        """
+        assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "Can only extract core form UNSAT model"
+        assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
+
+        return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
