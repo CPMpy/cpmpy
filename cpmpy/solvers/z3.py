@@ -247,6 +247,8 @@ class CPM_z3(SolverInterface):
             else:
                 self.z3_solver.add(z3_cons)
 
+        return self
+
     def _z3_expr(self, cpm_con):
         """
             Z3 supports nested expressions,
