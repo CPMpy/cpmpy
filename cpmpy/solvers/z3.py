@@ -23,7 +23,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 
@@ -259,7 +259,11 @@ class CPM_z3(SolverInterface):
         import z3
 
         if is_num(cpm_con):
-            return cpm_con
+            # translate numpy to python native
+            if is_bool(cpm_con):
+                return bool(cpm_con)
+            return int(cpm_con)
+
         elif is_any_list(cpm_con):
             return [self._z3_expr(con) for con in cpm_con]
             
