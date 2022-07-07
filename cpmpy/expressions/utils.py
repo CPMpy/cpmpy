@@ -33,7 +33,7 @@ def is_int(arg):
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.float32, np.float64))
+    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.floating))
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
