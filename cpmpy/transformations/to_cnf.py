@@ -1,4 +1,5 @@
 from ..expressions.core import Operator, Comparison
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .flatten_model import flatten_constraint, negated_normal
 """
@@ -93,15 +94,14 @@ def flat2cnf(constraints):
             continue
 
         # xor() constraints
-        elif is_operator and expr.name == "xor":
+        elif isinstance(expr, GlobalConstraint) and expr.name == "xor":
             if len(expr.args) == 2:
                 a0,a1 = expr.args
                 cnf += flat2cnf([(a0|a1), (~a0|~a1)]) # one true and one false
                 continue
             else:
-                # xor(x,y,z) = (~x&y&z) | (x&~y~z) | (x&y&~z)
-                # need to flatten and tseitin that accordingly
-                raise NotImplementedError("TODO: nary xor")
+                cnf += to_cnf(expr.decompose())
+                continue
 
         # BE != BE (same as xor)
         elif isinstance(expr, Comparison) and expr.name == "!=" and expr.args[0].is_bool():

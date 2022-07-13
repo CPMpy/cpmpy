@@ -20,9 +20,12 @@
 """
 
 import warnings # for deprecation warning
+
+from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
+from .pysdd import CPM_pysdd
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -65,8 +68,10 @@ class SolverLookup():
             First one is default
         """
         return [("ortools", CPM_ortools),
-                ("minizinc", CPM_minizinc),
+                ("gurobi", CPM_gurobi),
                 ("pysat", CPM_pysat),
+                ("pysdd", CPM_pysdd),
+                ("minizinc", CPM_minizinc),
                ]
 
     @staticmethod
@@ -92,7 +97,7 @@ class SolverLookup():
 
         # check for a 'solver:subsolver' name
         subname = None
-        if ':' in name:
+        if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
         return cls(model, subsolver=subname)
 
@@ -124,9 +129,9 @@ class SolverLookup():
         return CPM_slv
 
 
-# using builtin_solvers is DEPRECATED
+# using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
 # Order matters! first is default, then tries second, etc...
-builtin_solvers=[CPM_ortools,CPM_minizinc,CPM_pysat]
+builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat]
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.

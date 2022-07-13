@@ -37,7 +37,7 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Operator("xor", [x,y])
+    - x ^ y         Xor([x,y])  # a global constraint
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -122,6 +122,9 @@ class Expression(object):
                 strargs.append( f"{arg}" )
         return "{}({})".format(self.name, ",".join(strargs))
 
+    def __hash__(self):
+        return hash(self.__str__())
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
@@ -130,6 +133,32 @@ class Expression(object):
 
     def value(self):
         return None # default
+
+    def _deepcopy_args(self, memodict={}):
+        """
+            Create and return a deep copy of the arguments of the expression
+            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied = []
+        for arg in self.args:
+            if arg not in memodict:
+                if isinstance(arg, Expression):
+                    memodict[arg] = arg.deepcopy(memodict)
+                elif is_num(arg) or isinstance(arg, bool):
+                    memodict[arg] = arg
+                else:
+                    raise ValueError(f"Not a supported argument to copy: {arg}")
+            copied.append(memodict[arg])
+        return copied
+
+    def deepcopy(self, memodict = {}):
+        """
+            Return a deep copy of the Expression
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return type(self)(self.name, copied_args)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -144,6 +173,9 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
+        # BoolExpr == 1|true, then simply BoolExpr
+        if self.is_bool() and is_num(other) and other == 1:
+            return self
         return Comparison("==", self, other)
     def __ne__(self, other):
         return Comparison("!=", self, other)
@@ -193,21 +225,24 @@ class Expression(object):
         return Operator("or", [other, self])
 
     def __xor__(self, other):
+        # avoid cyclic import
+        from .globalconstraints import Xor
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
+        return Xor([self, other])
 
-        return Operator("xor", [self, other])
     def __rxor__(self, other):
+        # avoid cyclic import
+        from .globalconstraints import Xor
         # some simple constant removal
         if other is True:
             return ~self
         if other is False:
             return self
-
-        return Operator("xor", [other, self])
+        return Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -236,10 +271,14 @@ class Expression(object):
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
+        if is_num(other) and other == 0:
+            return 0
         return Operator("mul", [self, other])
     def __rmul__(self, other):
         if is_num(other) and other == 1:
             return self
+        if is_num(other) and other == 0:
+            return 0
         return Operator("mul", [other, self])
 
     # matrix multipliciation TODO?
@@ -260,6 +299,10 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
+        if other == 0:
+            return 1
+        elif other == 1:
+            return self
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
@@ -287,7 +330,7 @@ class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
-        assert (name in Comparison.allowed), "Symbol not allowed"
+        assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
     def __repr__(self):
@@ -296,12 +339,10 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
-    # a comparison itself is bool, check special case
-    def __eq__(self, other):
-        if is_num(other) and other == 1:
-            return self
-        return super().__eq__(other)
-        
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
+
     # return the value of the expression
     # optional, default: None
     def value(self):
@@ -315,6 +356,15 @@ class Comparison(Expression):
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the Comparison
+            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Comparison(self.name, *copied_args)
+
+
 
 class Operator(Expression):
     """
@@ -327,7 +377,6 @@ class Operator(Expression):
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
         'and': (0, True),
         'or':  (0, True),
-        'xor': (0, True),
         '->':  (2, True),
         'sum': (0, False),
         'wsum': (2, False),
@@ -415,6 +464,10 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
+    def __hash__(self):
+        # __hash__ is None be default as __eq__ is overwritten
+        return super().__hash__()
+
     # if self is bool, special case
     def __eq__(self, other):
         if is_num(other) and other == 1:
@@ -446,7 +499,6 @@ class Operator(Expression):
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
-        elif self.name == "xor": return sum(arg_vals) % 2 == 1
         elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
 
         return None # default

@@ -23,17 +23,6 @@ CPMpy has regular small releases with updates and improvements, so it is a good 
 
     $ pip install -U cpmpy
 
-Installing on M1 Apple silicon
-------------------------------
-Google does not provide a binary distribution for the or-tools package to use on Apple Silicon yet, and you would get:
-
-.. code-block:: bash
-
-    ERROR: Could not find a version that satisfies the requirement ortools>=5.0 (from cpmpy) (from versions: none)
-    ERROR: No matching distribution found for ortools>=5.0
-
-Follow our `M1 installation instructions <installation_M1.html>`_ to build OR-tools from source instead.
-
 
 Installing from a git repository
 --------------------------------
