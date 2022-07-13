@@ -69,9 +69,7 @@ class CPM_pysat(SolverInterface):
         try:
             from pypblib import pblib
             from pysat.pb import PBEnc
-            from distutils.version import LooseVersion
             import pysat
-            assert LooseVersion(pysat.__version__) >= LooseVersion("0.1.7.dev12"), "Upgrade PySAT version with command: pip3 install -U python-sat"
             return True
         except ImportError as e:
             return False
