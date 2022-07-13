@@ -5,6 +5,7 @@ from cpmpy.solvers import CPM_ortools
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.core import Operator
+from cpmpy.expressions.globalconstraints import Xor
 
 class TestToCnf(unittest.TestCase):
     def test_tocnf(self):
@@ -13,7 +14,6 @@ class TestToCnf(unittest.TestCase):
         cases = [a,
                  a|b,
                  a&b,
-                 Operator("xor", [a,b]),
                  a!=b,
                  a==b,
                  a.implies(b),
@@ -27,6 +27,7 @@ class TestToCnf(unittest.TestCase):
                  (b!=c).implies(a),
                  (b==c).implies(a),
                  (b.implies(c)).implies(a),
+                 Xor([a,b]),
                 ]
 
         # test for equivalent solutions with/without to_cnf

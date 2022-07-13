@@ -26,7 +26,7 @@ class TestExamples(unittest.TestCase):
     loader.exec_module(mod)
 
     # run again with gurobi
-    if "npuzzle" in example or "tst_likevrp" in example:
+    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
         return
 
     gbi_slv = SolverLookup.lookup("gurobi")

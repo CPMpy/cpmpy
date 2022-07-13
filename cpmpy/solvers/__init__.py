@@ -13,6 +13,8 @@
 
         ortools
         pysat
+        gurobi
+        pysdd
         utils
 
     ===============
@@ -24,6 +26,7 @@
         CPM_ortools
         CPM_pysat
         CPM_gurobi
+        CPM_pysdd
 
     =================
     List of functions
@@ -39,3 +42,4 @@ from .ortools import CPM_ortools
 from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
+from .pysdd import CPM_pysdd

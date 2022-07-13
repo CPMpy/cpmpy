@@ -25,11 +25,13 @@ Getting started:
    :maxdepth: 1
    :caption: User Documentation:
 
-   solver_parameters
+   modeling
+   solvers
    multiple_solutions
-   unsat_core_extraction
    how_to_debug
-   behind_the_scenes
+   solver_parameters
+   unsat_core_extraction
+   adding_solver
 
 
 .. toctree::

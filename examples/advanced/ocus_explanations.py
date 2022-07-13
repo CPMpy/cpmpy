@@ -114,9 +114,9 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
         explain_one_step_ocus relies on the implicit hitting set duality between
         MUSes and MCSes for a given formula F [2, 3]:
 
-            - A set S \subseteq of F is an MCS of F iff it is a minimal hitting set
+            - A set S subseteq F is an MCS of F iff it is a minimal hitting set
              of MUSs(F).
-            - A set S \subseteq F is a MUS of F iff it is a minimal hitting set
+            - A set S subseteq F is a MUS of F iff it is a minimal hitting set
              of MCSs(F).
 
         Builds a MIP model for computing minimal (optimal) hitting sets. Repeatedly
@@ -136,13 +136,13 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
             - c_lj={0,1} is 1 (0) if the literal l is (not) present in the set-to-hit j.
 
         Objective:
-                min sum(x_l * w_l) over all l in I + (-Iend \ -I)
+                min sum(x_l * w_l) over all l in I + (-Iend setminus -I)
 
         Subject to:
             (1) sum x_l * c_lj >= 1 for all hitting sets j.
                 = The hitting set must hit all sets-to-hit.
 
-            (2) sum x_l == 1 for l in (-Iend \ -I)
+            (2) sum x_l == 1 for l in (-Iend setminus -I)
                 = exactly 1 literal explained at a time
 
         Args

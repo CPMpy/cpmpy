@@ -29,16 +29,15 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
-from ..transformations.reification import only_bv_implies
+from ..transformations.reification import only_bv_implies, reify_rewrite
 
 try:
     import gurobipy as gp
-    GRB_env = gp.Env()
-    GRB_env.setParam("OutputFlag",0)
-    GRB_env.start()
+    GRB_ENV = None
 except ImportError as e:
     pass
 
@@ -66,11 +65,14 @@ class CPM_gurobi(SolverInterface):
         # try to import the package
         try:
             import gurobipy as gp
-            from datetime import datetime
-            valid_until = gp.Model().LicenseExpiration
-            today = datetime.today()
-            return today.year * 1e4 + today.month * 1e2 + today.day <= valid_until
-        except ImportError as e:
+            global GRB_ENV
+            if GRB_ENV is None:
+                # initialise the native gurobi model object
+                GRB_ENV = gp.Env()
+                GRB_ENV.setParam("OutputFlag", 0)
+                GRB_ENV.start()
+            return True
+        except:
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -85,8 +87,8 @@ class CPM_gurobi(SolverInterface):
                 "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
-        # initialise the native gurobi model object
-        self.grb_model = gp.Model(env=GRB_env)
+        # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
+        self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
@@ -254,8 +256,10 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
 
         cpm_cons = flatten_constraint(cpm_con)
+        cpm_cons = reify_rewrite(cpm_cons)
         cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
+        cpm_cons = only_numexpr_equality(cpm_cons)
         cpm_cons = only_positive_bv(cpm_cons)
 
         for con in cpm_cons:
@@ -278,78 +282,51 @@ class CPM_gurobi(SolverInterface):
         # numexpr `comp` bvar|const
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            rvar = self.solver_var(rhs)
+            grbrhs = self.solver_var(rhs)
 
-
-            # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and \
-                    not isinstance(lhs, _NumVarImpl) and \
-                    not lhs.name == "sum" and \
-                    not lhs.name == "wsum":
-                # functional globals only exist for equality in gurobi
-                # example: min(x) > 10 :: min(x) == aux, aux > 10
-                # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
-                (lhs, cons) = get_or_make_var(lhs)
-                self += cons
-
-            # all but '==' now only have as lhs: const|ivar|sum|wsum
-            # translate ivar|sum|wsum so they can be posted directly below
-            if isinstance(lhs, _NumVarImpl):
-                lhs = self.solver_var(lhs) # Case can be omitted -> handled in _make_num_expr
-            elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
-                # a BoundedLinearExpression LHS, special case, like in objective
-                lhs = self._make_numexpr(lhs)
-                # assumes that gurobi accepts sum(x) >= y without further simplification
-
-            # post the comparison
+            # Thanks to `only_numexpr_equality()` only supported comparisons should remain
             if cpm_expr.name == '<=':
-                return self.grb_model.addLConstr(lhs, GRB.LESS_EQUAL, rvar)
-            elif cpm_expr.name == '<':
-                raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
+                grblhs = self._make_numexpr(lhs)
+                return self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs)
             elif cpm_expr.name == '>=':
-                return self.grb_model.addLConstr(lhs, GRB.GREATER_EQUAL, rvar)
-            elif cpm_expr.name == '>':
-                raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
-            elif cpm_expr.name == '!=':
-                raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
+                grblhs = self._make_numexpr(lhs)
+                return self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
             elif cpm_expr.name == '==':
-                if not isinstance(lhs, Expression):
-                    # base cases: const|ivar|sum|wsum with prepped lhs above
-                    return self.grb_model.addLConstr(lhs, GRB.EQUAL, rvar)
+                if isinstance(lhs, _NumVarImpl) \
+                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum')):
+                    # a BoundedLinearExpression LHS, special case, like in objective
+                    grblhs = self._make_numexpr(lhs)
+                    return self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
 
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.setParam("NonConvex", 2)
-                    return self.grb_model.addConstr(a * b == rvar)
+                    return self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
-                    if not isinstance(lhs.args[1], _NumVarImpl):
-                        a, b = self.solver_vars(lhs.args)
-                        return self.grb_model.addLConstr(a / b, GRB.EQUAL, rvar)
-                    raise Exception("Gurobi only supports division by constants")
+                    assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    a, b = self.solver_vars(lhs.args)
+                    return self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
                 # General constraints
-                # rvar should be a variable, not a constant
-                if not isinstance(rhs, _NumVarImpl):
-                    rvar = self.solver_var(intvar(lb=rhs, ub=rhs))
+                # grbrhs should be a variable for gurobi in the subsequent, fake it
+                if is_num(grbrhs):
+                    grbrhs = self.solver_var(intvar(lb=grbrhs, ub=grbrhs))
 
-                if lhs.name == "and" or lhs.name == "or":
-                    raise Exception(f"{cpm_expr} should have been linearized, see /transformations/linearize.py")
-                elif lhs.name == 'min':
-                    return self.grb_model.addGenConstrMin(rvar, self.solver_vars(lhs.args))
+                if lhs.name == 'min':
+                    return self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.grb_model.addGenConstrMax(rvar, self.solver_vars(lhs.args))
+                    return self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
-                    return self.grb_model.addGenConstrAbs(rvar, self.solver_var(lhs.args[0]))
+                    return self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'pow':
                     x, a = self.solver_vars(lhs.args)
-                    assert a == 2, "Only support quadratic constraints"
-                    assert not isinstance(a, _NumVarImpl), f"Gurobi only supports power expressions with positive exponents."
-                    return self.grb_model.addGenConstrPow(x, rvar, a)
+                    assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
+                    return self.grb_model.addGenConstrPow(x, grbrhs, a)
 
             raise NotImplementedError(
-                "Not a know supported gurobi left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                "Not a know supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints

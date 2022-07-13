@@ -19,6 +19,7 @@ Internal utilities for expression handling.
         flatlist
         all_pairs
         argval
+        eval_comparison
 """
 
 import numpy as np
@@ -26,13 +27,13 @@ from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
 
 def is_int(arg):
-    """ is it an integer? (incl numpy variants)
+    """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return isinstance(arg, (int, np.integer))
+    return isinstance(arg, (bool, np.bool_, int, np.integer))
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return isinstance(arg, (int, np.integer, float, np.float64))
+    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.floating))
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
@@ -66,3 +67,34 @@ def argval(a):
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     return a.value() if hasattr(a, "value") else a
+
+def eval_comparison(str_op, lhs, rhs):
+    """
+        Internal function: evaluates the textual `str_op` comparison operator
+        lhs <str_op> rhs
+
+        Valid str_op's:
+        * '=='
+        * '!='
+        * '>'
+        * '>='
+        * '<'
+        * '<='
+
+        Especially useful in decomposition and transformation functions that already involve a comparison.
+    """
+    if str_op == '==':
+        return lhs == rhs
+    elif str_op == '!=':
+        return lhs != rhs
+    elif str_op == '>':
+        return lhs > rhs
+    elif str_op == '>=':
+        return lhs >= rhs
+    elif str_op == '<':
+        return lhs < rhs
+    elif str_op == '<=':
+        return lhs <= rhs
+    else:
+        raise Exception("Not a known comparison:", str_op)
+

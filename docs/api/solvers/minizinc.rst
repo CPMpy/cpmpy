@@ -1,7 +1,7 @@
-CPMpy ortools interface (:mod:`cpmpy.solvers.ortools`)
+CPMpy minizinc interface (:mod:`cpmpy.solvers.minizinc`)
 =====================================================
 
-.. automodule:: cpmpy.solvers.ortools
+.. automodule:: cpmpy.solvers.minizinc
     :members:
     :undoc-members:
     :inherited-members:
