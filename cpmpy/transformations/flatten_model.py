@@ -626,6 +626,9 @@ def _wsum_should_flatten(arg):
     # in flatten we also turn negations (in sums) into weighted sums,
     # for stronger expression simplification
     if isinstance(arg, Operator) and arg.name == "-":
+        # TODO: HANDLE the ABS operator 
+        if any(isinstance(sub_arg, Operator) and sub_arg.name == "abs" for sub_arg in arg.args):
+            return False
         return True
     return _wsum_should(arg)
 
