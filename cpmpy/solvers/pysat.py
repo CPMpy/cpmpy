@@ -29,7 +29,7 @@
 
         CPM_pysat
 """
-from ..transformations.int2bool_onehot import int2bool_onehot, extract_boolvar, is_bool_model, to_bool_constraint, is_boolvar_constraint
+from ..transformations.int2bool_onehot import intvar_to_boolvar, to_bool_constraint, is_boolvar_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, boolvar
@@ -198,9 +198,10 @@ class CPM_pysat(SolverInterface):
                     # not specified...
                     cpm_var._value = None
 
+        # remapping the solution values (of user specified variables only)
         if len(self.ivarmap) > 0:
             for iv, value_dict in self.ivarmap.items():
-                n_val_assigned = sum(1 if bv.value() else 0 for _, bv in value_dict.items())
+                n_val_assigned = sum(1 if bv.value() else 0 for bv in value_dict.values())
                 assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
                 iv._value = sum(bv.value() * iv_val for iv_val, bv in value_dict.items())
 
@@ -244,13 +245,24 @@ class CPM_pysat(SolverInterface):
         cpm_cons = to_cnf(cpm_con)
         for con in cpm_cons:
             if not is_boolvar_constraint(con):
-                new_bool_constraints, new_ivarmap = to_bool_constraint(con, self.ivarmap)
+                ### encoding int vars
+                con_vars = get_variables(con)
+                assert all(~v.is_bool() for v in con_vars), "Mix of int and boolvar, not handled yet!"
+
+                bool_constraints = []
+
+                iv_not_mapped = [iv for iv in con_vars if iv not in self.ivarmap and not iv.is_bool()]
+                new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
+
                 self.ivarmap.update(new_ivarmap)
 
-                for new_bool_constraint in new_bool_constraints:
-                    self._post_constraint(new_bool_constraint)
+                bool_constraints += new_bool_constraints
+                bool_constraints += to_bool_constraint(con, self.ivarmap)
 
-                self.user_vars.update(extract_boolvar(new_ivarmap))
+                self.user_vars.update(get_variables(bool_constraints))
+
+                for bool_con in bool_constraints:
+                    self._post_constraint(bool_con)
             else:
                 self.user_vars.update(get_variables(con))
                 self._post_constraint(con)
