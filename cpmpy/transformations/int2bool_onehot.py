@@ -1,13 +1,18 @@
-
 from ..expressions.core import Comparison, Operator
 from ..expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Table
 from ..expressions.utils import is_any_list, is_int
+from ..transformations.to_cnf import to_cnf
 from ..transformations.get_variables import get_variables, get_variables_model
-from ..transformations.flatten_model import flatten_constraint
-from ..expressions.variables import  _BoolVarImpl, _IntVarImpl, boolvar, intvar
+from ..expressions.variables import  _BoolVarImpl, _IntVarImpl, boolvar
 import numpy as np
 
-def int2bool_onehot(model):
+def is_boolvar_constraint(constraint):
+    return all(var.is_bool() for var in get_variables(constraint))
+
+def is_bool_model(model):
+    return all(var.is_bool() for var in get_variables_model(model))
+
+def int2bool_model(model):
     '''
     Flatten model to ensure flat int variable-based constraints can be 
     encoded to a boolean version.
@@ -20,9 +25,9 @@ def int2bool_onehot(model):
 
     assert isinstance(model, Model), f"Input expected Cpmpy.Model got ({type(model)})"
 
-    return int2bool(model.constraints)
+    return int2bool_constraints(model.constraints)
 
-def int2bool(constraints, ivarmap=None):
+def int2bool_constraints(constraints, ivarmap=None):
     '''
     Encode the int variables-based constraints into their boolean encoding
     and keep track of int->bool variable mapping.
@@ -39,20 +44,26 @@ def int2bool(constraints, ivarmap=None):
         return (ivarmap, constraints)
 
     bool_constraints = []
+    ## added extra loop for debugging purposes during to_cnf
+    for constraint in constraints:
+        cpm_cons = to_cnf(constraint)
 
-    for constraint in flatten_constraint(constraints):
-        if not is_boolvar_constraint(constraint):
-            # # print(f"\nTo Bool Constraint: {constraint=}")
-            # # print('-'*len(f"\nTo Bool Constraint: {constraint=}"), "\n")
-            new_bool_cons, new_ivarmap = to_bool_constraint(constraint, ivarmap)
-            # # print(f"\nnew_bool_cons:")
-            # for con in new_bool_cons:
-            #     # print(f"\n\t{con=}")
-            ivarmap.update(new_ivarmap)
-            bool_constraints += new_bool_cons
-        else:
-            bool_constraints.append(constraint)
+        for cpm_con in cpm_cons:
+            con_vars = get_variables(cpm_con)
+            if not is_boolvar_constraint(cpm_con):
+                ### encoding int vars
+                iv_not_mapped = [iv for iv in con_vars if iv not in ivarmap and not iv.is_bool()]
+                new_ivarmap, iv_bool_constraints = intvar_to_boolvar(iv_not_mapped)
+                ivarmap.update(new_ivarmap)
+                bool_constraints += iv_bool_constraints
 
+                ### encoding constraints int -> bool
+                new_bool_cons = to_bool_constraint(cpm_con, ivarmap)
+                bool_constraints += new_bool_cons
+            else:
+                bool_constraints.append(constraint)
+
+    # raise NotImplementedError(f"Function not finished")
     return (ivarmap, bool_constraints)
 
 def intvar_to_boolvar(int_var):
@@ -116,15 +127,11 @@ def intvar_to_boolvar(int_var):
             d[v] = boolvar(name=f"i2b_{int_var.name}={v}")
 
         ivarmap[int_var] = d
-        constraints.append(sum(d.values()) == 1) # the created Boolean vars
+        # Only 1 Boolvar should be set to True
+        constraints.append(sum(d.values()) == 1) 
 
     return ivarmap, constraints
 
-def is_boolvar_constraint(constraint):
-    return all(var.is_bool() for var in get_variables(constraint))
-
-def is_bool_model(model):
-    return all(var.is_bool() for var in get_variables_model(model))
 
 def to_bool_constraint(constraint, ivarmap=dict()):
     '''
@@ -143,20 +150,11 @@ def to_bool_constraint(constraint, ivarmap=dict()):
         - False     if no solution is found
     '''
     bool_constraints = []
-    user_vars = get_variables(constraint)
-    iv_not_mapped = [iv for iv in user_vars if iv not in ivarmap and not iv.is_bool()]
-
-    if len(iv_not_mapped) > 0:
-        new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
-        ivarmap.update(new_ivarmap)
-        bool_constraints += new_bool_constraints
 
     # CASE 1: Decompose list of constraints and handle individually
     if is_any_list(constraint):
         for con in constraint:
-            new_bool_constraints, new_ivarmap = to_bool_constraint(con, ivarmap)
-            ivarmap.update(new_ivarmap)
-            bool_constraints += new_bool_constraints
+            bool_constraints += to_bool_constraint(con, ivarmap)
 
     # CASE 2: base comparison constraints + ensure only handling what it can
     elif isinstance(constraint, Comparison) and all(is_int(arg) or isinstance(arg, (_IntVarImpl)) for arg in constraint.args):
@@ -177,9 +175,9 @@ def to_bool_constraint(constraint, ivarmap=dict()):
 
     # assertion to be removed
     else:
-        assert all(isinstance(var, bool) or var.is_bool() for var in user_vars) or isinstance(constraint, bool), f"Operation not handled {constraint} yet"
+        assert all(isinstance(var, bool) or var.is_bool() for var in get_variables(constraint)) or isinstance(constraint, bool), f"Operation not handled {constraint} yet"
 
-    return bool_constraints, ivarmap
+    return bool_constraints
 
 def encode_var_comparison(constraint, ivarmap):
     # print("Enconding as var comparison!")
@@ -187,7 +185,7 @@ def encode_var_comparison(constraint, ivarmap):
     bool_constraints = []
     left, right = constraint.args
     if isinstance(left, Operator) and isinstance(right, _IntVarImpl):
-        cons, _ = to_bool_constraint(
+        cons = to_bool_constraint(
             Comparison(name=constraint.name, left=left-right, right=0),
             ivarmap
         )
@@ -474,9 +472,3 @@ def to_unit_comparison(con, ivarmap):
         raise NotImplementedError(f"Constraint {con} not supported...")
 
     return bool_constraints
-
-def extract_boolvar(ivarmap):
-    all_boolvars = []
-    for varmap in ivarmap.values():
-        all_boolvars += [bv for bv in varmap.values()]
-    return all_boolvars
