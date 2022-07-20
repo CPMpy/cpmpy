@@ -156,6 +156,8 @@ def to_bool_constraint(constraint, ivarmap=dict()):
         for con in constraint:
             bool_constraints += to_bool_constraint(con, ivarmap)
 
+    elif all(isinstance(var,_BoolVarImpl) for var in get_variables(constraint)):
+        bool_constraints.append(constraint)
     # CASE 2: base comparison constraints + ensure only handling what it can
     elif isinstance(constraint, Comparison) and all(is_int(arg) or isinstance(arg, (_IntVarImpl)) for arg in constraint.args):
         bool_constraints += to_unit_comparison(constraint, ivarmap)
@@ -165,17 +167,31 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     elif isinstance(constraint, Comparison) and isinstance(constraint.args[1], _IntVarImpl):
         bool_constraints += encode_var_comparison(constraint, ivarmap)
         # raise NotImplementedError(f"Comparison Constraint {constraint} not supported...")
-    # CASE 4: global constraints
+    # handling implication
+    elif isinstance(constraint, Operator) and constraint.name == "or":
+        if len(constraint.args) > 2:
+            raise NotImplementedError("Situation not handled yet")
+
+        bvs = [arg for arg in constraint.args if isinstance(arg, _BoolVarImpl)]
+        cons = [arg for arg in constraint.args if not isinstance(arg, _BoolVarImpl)]
+
+        assert len(bvs) == 1 and len(cons)== 1, "No other situation handlded ..."
+
+        for con in cons:
+            sub_cons = to_bool_constraint(con, ivarmap)
+            for sub_con in sub_cons:
+                bool_constraints += [Operator("or", bvs+ [sub_con])]
+
+    # CASE 5: global constraints
     elif isinstance(constraint, (AllDifferent, AllEqual, Circuit, Table)):
         for con in constraint.decompose():
             bool_constraints += to_unit_comparison(con, ivarmap)
             # print("decomposed - bool_constraints", to_unit_comparison(con, ivarmap))
     elif isinstance(constraint, GlobalConstraint):
         raise NotImplementedError(f"Global Constraint {constraint} not supported...")
-
     # assertion to be removed
     else:
-        assert all(isinstance(var, bool) or var.is_bool() for var in get_variables(constraint)) or isinstance(constraint, bool), f"Operation not handled {constraint} yet"
+        assert all(isinstance(var, bool) or var.is_bool() for var in get_variables(constraint)) or isinstance(constraint, bool), f"to bool: Operation {constraint=} of type {type(constraint)} not handled yet"
 
     return bool_constraints
 
@@ -212,7 +228,6 @@ def encode_linear_constraint(con, ivarmap):
     op, val = con.args[0].name, con.args[1]
     w, x = [], []
     # SUM CASE
-    # TODO: CASES need to be handled by weighted sum !
     if op == "sum":
         op_args = con.args[0].args
 
