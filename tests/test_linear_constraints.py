@@ -3,7 +3,6 @@ import cpmpy as cp
 from cpmpy.expressions import *
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.to_cnf import to_cnf
-from cpmpy.transformations.int2bool_onehot import int2bool_onehot
 from cpmpy.transformations.flatten_model import flatten_constraint
 
 class TestEncodeLinearConstraint(unittest.TestCase):
