@@ -243,6 +243,7 @@ class CPM_pysat(SolverInterface):
         """
         # flatten constraints and to cnf
         cpm_cons = to_cnf(cpm_con)
+
         for con in cpm_cons:
             if not is_boolvar_constraint(con):
                 ### encoding int vars
@@ -252,11 +253,11 @@ class CPM_pysat(SolverInterface):
                 bool_constraints = []
 
                 iv_not_mapped = [iv for iv in con_vars if iv not in self.ivarmap and not iv.is_bool()]
-                new_ivarmap, new_bool_constraints = intvar_to_boolvar(iv_not_mapped)
+                new_ivarmap, iv_constraints = intvar_to_boolvar(iv_not_mapped)
 
                 self.ivarmap.update(new_ivarmap)
 
-                bool_constraints += new_bool_constraints
+                bool_constraints += iv_constraints
                 bool_constraints += to_bool_constraint(con, self.ivarmap)
 
                 self.user_vars.update(get_variables(bool_constraints))
