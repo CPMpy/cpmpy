@@ -3,6 +3,7 @@ import cpmpy as cp
 from cpmpy.expressions import *
 from cpmpy.expressions.globalconstraints import AllDifferent
 from cpmpy.model import Model
+from cpmpy.solvers.ortools import CPM_ortools
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.int2bool_onehot import int2bool_model, intvar_to_boolvar
 import numpy as np
@@ -217,37 +218,56 @@ class TestInt2BoolPySAT(unittest.TestCase):
         bool_model.solve()
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
+    def test_or_constraint(self):
+        model = Model((self.iv_vector[0] > 3) | (self.iv_vector[0] < 3 ))
+
+        solved = CPM_pysat(model).solve()
+
+        self.assertTrue(solved)
+
+
+    def test_assumptions(self):
+        constraints = [
+            self.iv_vector[0] > 3,
+            self.iv_vector[1] < 2
+        ]
+
+        assum_model = Model(constraints)
+
+        ind = boolvar(shape=len(constraints), name="ind")
+        for i, bv in enumerate(ind):
+            assum_model += bv.implies(constraints[i])
+
+        assum_solver = CPM_pysat(assum_model)
+        assum_solver.solve(assumptions=ind)
+
+    def test_assumptions_vars(self):
+        constraints = [
+            self.iv_vector[0] > 4,
+            self.iv_vector[0] < 6,
+            # self.iv_vector[1] < 2
+            self.iv_vector[1] > self.iv_vector[0]
+        ]
+
+        assum_model = Model([])
+
+        ind = boolvar(shape=len(constraints), name="ind")
+        for i, bv in enumerate(ind):
+            assum_model += bv.implies(constraints[i])
+
+        assum_solver = CPM_pysat(assum_model)
+        assum_solver.solve(assumptions=ind)
+        sol1 = [self.iv_vector[0].value(), self.iv_vector[1].value()]
+
+        CPM_ortools(Model(constraints)).solve()
+        sol2 = [self.iv_vector[0].value(), self.iv_vector[1].value()]
+        self.assertEqual(sol1, sol2)
+
     def test_sudoku(self):
 
-        e = 0 # value for empty cells
-        given = np.array([
-            [e, e, e,  2, e, 5,  e, e, e],
-            [e, 9, e,  e, e, e,  7, 3, e],
-            [e, e, 2,  e, e, 9,  e, 6, e],
+        puzzle, constraints = model_sudoku_problem()
 
-            [2, e, e,  e, e, e,  4, e, 9],
-            [e, e, e,  e, 7, e,  e, e, e],
-            [6, e, 9,  e, e, e,  e, e, 1],
-
-            [e, 8, e,  4, e, e,  1, e, e],
-            [e, 6, 3,  e, e, e,  e, 8, e],
-            [e, e, e,  6, e, 8,  e, e, e]])
-
-        # Variables
-        puzzle = intvar(1,9, shape=given.shape, name="puzzle")
-
-        sudoku_iv_model = Model(
-            # Constraints on values (cells that are not empty)
-            puzzle[given!=e] == given[given!=e], # numpy's indexing, vectorized equality
-            # Constraints on rows and columns
-            [AllDifferent(row) for row in puzzle],
-            [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
-        )
-
-        # Constraints on blocks
-        for i in range(0,9, 3):
-            for j in range(0,9, 3):
-                sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
+        sudoku_iv_model = Model(constraints)
 
         bv_solved = CPM_pysat(sudoku_iv_model).solve()
         bv_solution = puzzle.value()
@@ -257,6 +277,17 @@ class TestInt2BoolPySAT(unittest.TestCase):
 
         self.assertTrue(bv_solved & iv_solved)
         self.assertTrue(np.all(bv_solution == iv_solution))
+
+    def test_sudoku_assumptions(self):
+        assum_model = Model()
+        puzzle, constraints  = model_sudoku_problem()
+
+        ind = boolvar(shape=len(constraints), name="ind")
+        for i, bv in enumerate(ind):
+            assum_model += bv.implies(constraints[i])
+
+        indmap = dict((v, i) for (i,v) in enumerate(ind))
+        assum_solver = CPM_pysat(assum_model).solve(assumptions=ind)
 
 class TestInt2BoolConstraints(unittest.TestCase):
     def setUp(self):
@@ -456,48 +487,48 @@ class TestInt2BoolConstraints(unittest.TestCase):
         self.assertEqual(extract_solution(ivarmap), set([(self.iv, self.iv.value())]))
 
 
-class TestInt2boolExamples(unittest.TestCase):
-    def test_sudoku(self):
+def model_sudoku_problem():
+    # Dimensions of the sudoku problem
+    e = 0 # value for empty cells
+    given = np.array([
+        [e, e, e,  2, e, 5,  e, e, e],
+        [e, 9, e,  e, e, e,  7, 3, e],
+        [e, e, 2,  e, e, 9,  e, 6, e],
 
-        e = 0 # value for empty cells
-        given = np.array([
-            [e, e, e,  2, e, 5,  e, e, e],
-            [e, 9, e,  e, e, e,  7, 3, e],
-            [e, e, 2,  e, e, 9,  e, 6, e],
+        [2, e, e,  e, e, e,  4, e, 9],
+        [e, e, e,  e, 7, e,  e, e, e],
+        [6, e, 9,  e, e, e,  e, e, 1],
 
-            [2, e, e,  e, e, e,  4, e, 9],
-            [e, e, e,  e, 7, e,  e, e, e],
-            [6, e, 9,  e, e, e,  e, e, 1],
+        [e, 8, e,  4, e, e,  1, e, e],
+        [e, 6, 3,  e, e, e,  e, 8, e],
+        [e, e, e,  6, e, 8,  e, e, e]])
 
-            [e, 8, e,  4, e, e,  1, e, e],
-            [e, 6, 3,  e, e, e,  e, 8, e],
-            [e, e, e,  6, e, 8,  e, e, e]])
+    # Dimensions of the sudoku problem
+    ncol = nrow = len(given)
+    n = int(ncol ** (1/2))
 
-        # Variables
-        puzzle = intvar(1,9, shape=given.shape, name="puzzle")
+    # Variables
+    cells = intvar(1,9, shape=given.shape, name="puzzle")
 
-        sudoku_iv_model = Model(
-            # Constraints on values (cells that are not empty)
-            puzzle[given!=e] == given[given!=e], # numpy's indexing, vectorized equality
-            # Constraints on rows and columns
-            [AllDifferent(row) for row in puzzle],
-            [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
-        )
+    # sudoku must start from initial clues
+    facts = list(cells[given != e] == given[given != e])
+    print(facts)
+    # rows constraint
+    row_cons = [AllDifferent(row) for row in cells]
+    # columns constraint
+    col_cons = [AllDifferent(col) for col in cells.T]
+    # blocks constraint
+    # Constraints on blocks
+    block_cons = []
 
-        # Constraints on blocks
-        for i in range(0,9, 3):
-            for j in range(0,9, 3):
-                sudoku_iv_model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
+    for i in range(0,ncol, n):
+        for j in range(0,nrow, n):
+            block_cons += [AllDifferent(cells[i:i+n, j:j+n])]
 
-        sudoku_iv_model.solve()
-        ivarmap, sudoku_bool_constraints = int2bool_model(sudoku_iv_model)
-        sudoku_bv_model = Model(sudoku_bool_constraints)
-        sudoku_bv_model.solve()
+    assert Model(facts + row_cons + col_cons + block_cons).solve()
 
-        self.assertEqual(
-            extract_solution(ivarmap),
-            set((iv, iv.value() ) for iv in puzzle.flat )
-        )
+    return cells, facts + row_cons + col_cons + block_cons
+
 
 def extract_solution(ivarmap):
 
