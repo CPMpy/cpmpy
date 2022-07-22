@@ -170,7 +170,7 @@ def to_bool_constraint(constraint, ivarmap=dict()):
     # handling implication
     elif isinstance(constraint, Operator) and constraint.name == "or":
         if len(constraint.args) > 2:
-            raise NotImplementedError("Situation not handled yet")
+            raise NotImplementedError(f"Or operation: {constraint} with > 2 args ({len(constraint.args)}) not handled")
 
         bvs = [arg for arg in constraint.args if isinstance(arg, _BoolVarImpl)]
         cons = [arg for arg in constraint.args if not isinstance(arg, _BoolVarImpl)]
