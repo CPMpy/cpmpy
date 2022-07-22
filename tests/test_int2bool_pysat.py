@@ -232,9 +232,10 @@ class TestInt2BoolPySAT(unittest.TestCase):
             self.iv_vector[1] < 2
         ]
 
-        assum_model = Model(constraints)
+        assum_model = Model([])
 
         ind = boolvar(shape=len(constraints), name="ind")
+
         for i, bv in enumerate(ind):
             assum_model += bv.implies(constraints[i])
 
@@ -262,6 +263,31 @@ class TestInt2BoolPySAT(unittest.TestCase):
         CPM_ortools(Model(constraints)).solve()
         sol2 = [self.iv_vector[0].value(), self.iv_vector[1].value()]
         self.assertEqual(sol1, sol2)
+
+    def test_assumptions_alldifferent(self):
+        constraints = [
+            self.iv_vector[0] == 2,
+            self.iv_vector[1] == 3,
+            self.iv_vector[2] == 4,
+            self.iv_vector[3] == 5,
+            AllDifferent(self.iv_vector)
+        ]
+
+        assum_model = Model([])
+
+        ind = boolvar(shape=len(constraints), name="ind")
+        for i, bv in enumerate(ind):
+            assum_model += bv.implies(constraints[i])
+
+        assum_solver = CPM_pysat(assum_model)
+        assum_solver.solve(assumptions=ind)
+        sol1 = self.iv_vector.value()
+
+        CPM_ortools(Model(constraints)).solve()
+        sol2 = self.iv_vector.value()
+        for s1, s2 in zip(sol1, sol2):
+            self.assertEqual(s1, s2)
+
 
     def test_sudoku(self):
 
