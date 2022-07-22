@@ -199,7 +199,7 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = None
 
         # remapping the solution values (of user specified variables only)
-        if len(self.ivarmap) > 0:
+        if len(self.ivarmap) > 0 and has_sol:
             for iv, value_dict in self.ivarmap.items():
                 n_val_assigned = sum(1 if bv.value() else 0 for bv in value_dict.values())
                 assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
@@ -258,8 +258,9 @@ class CPM_pysat(SolverInterface):
                 self.ivarmap.update(new_ivarmap)
 
                 bool_constraints += iv_constraints
+                
                 bool_constraints += to_bool_constraint(con, self.ivarmap)
-
+                
                 self.user_vars.update(get_variables(bool_constraints))
 
                 for bool_con in bool_constraints:
