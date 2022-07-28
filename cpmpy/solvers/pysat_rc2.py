@@ -103,7 +103,7 @@ class CPM_RC2(CPM_pysat):
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
-    def solve(self, assumptions=None):
+    def solve(self):
         """
             Call the PySAT solver
 
@@ -115,10 +115,11 @@ class CPM_RC2(CPM_pysat):
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
-        if assumptions is not None:
-            pysat_assum_vars = self.solver_vars(assumptions)
-            for pysat_assum_var in pysat_assum_vars:
-                self.pysat_solver.add_clause([pysat_assum_var])
+        ## TODO: adding assumptions to the solving !
+        # if assumptions is not None:
+        #     pysat_assum_vars = self.solver_vars(assumptions)
+        #     for pysat_assum_var in pysat_assum_vars:
+        #         self.pysat_solver.add_clause([pysat_assum_var])
 
         sol = self.pysat_solver.compute()
 
