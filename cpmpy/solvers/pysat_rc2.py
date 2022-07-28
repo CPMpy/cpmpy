@@ -58,7 +58,6 @@ class CPM_RC2(CPM_pysat):
             import pysat
             # there is actually a non-related 'pysat' package
             # while we need the 'python-sat' package, some more checks:
-            from pysat.formula import IDPool
             from pysat.solvers import Solver
             return True
         except ImportError as e:
@@ -103,7 +102,7 @@ class CPM_RC2(CPM_pysat):
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
-    def solve(self):
+    def solve(self, assumptions=None):
         """
             Call the PySAT solver
 
@@ -116,10 +115,11 @@ class CPM_RC2(CPM_pysat):
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
         ## TODO: adding assumptions to the solving !
-        # if assumptions is not None:
-        #     pysat_assum_vars = self.solver_vars(assumptions)
-        #     for pysat_assum_var in pysat_assum_vars:
-        #         self.pysat_solver.add_clause([pysat_assum_var])
+        if assumptions is not None:
+            print("[Warning] Assumption variables interpreted as hard clauses!")
+            pysat_assum_vars = self.solver_vars(assumptions)
+            for pysat_assum_var in pysat_assum_vars:
+                self.pysat_solver.add_clause([pysat_assum_var])
 
         sol = self.pysat_solver.compute()
 
@@ -166,7 +166,7 @@ class CPM_RC2(CPM_pysat):
             for weight, pysat_assum_var in zip(weights, pysat_assum_vars):
                 self.pysat_solver.add_clause([pysat_assum_var], weight=weight)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f"Expression {expr} not handled")
 
     def get_core(self):
         raise NotImplementedError("Does not work.")

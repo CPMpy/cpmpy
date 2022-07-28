@@ -27,11 +27,9 @@ class TestPySATInterrupt(unittest.TestCase):
         """Check if the instance still returns the expected results
         after adding interrupt to pysat solver.
         """
-        frietkot_model, assum_vars, variables = frietkot()
+        frietkot_model, _, _ = frietkot()
         s = CPM_RC2(frietkot_model)
-        status = s.solve()
-        print(assum_vars.value())
-        print(status)
+        self.assertTrue(s.solve(), "Problem solvable with current weights")
 
 if __name__ == '__main__':
     unittest.main()
