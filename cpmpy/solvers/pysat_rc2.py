@@ -154,8 +154,18 @@ class CPM_RC2(CPM_pysat):
     def objective(self, expr, minimize):
         if minimize:
             raise NotImplementedError()
-        
-        print(expr)
+
+        if isinstance(expr, Operator) and expr.name == "sum":
+            pysat_assum_vars = self.solver_vars(expr.args)
+            for pysat_assum_var in pysat_assum_vars:
+                self.pysat_solver.add_clause([pysat_assum_var], weight=1)
+        elif isinstance(expr, Operator) and expr.name == "wsum":
+            weights, vars = expr.args
+            pysat_assum_vars = self.solver_vars(vars)
+            for weight, pysat_assum_var in zip(weights, pysat_assum_vars):
+                self.pysat_solver.add_clause([pysat_assum_var], weight=weight)
+        else:
+            raise NotImplementedError()
 
     def get_core(self):
         raise NotImplementedError("Does not work.")
