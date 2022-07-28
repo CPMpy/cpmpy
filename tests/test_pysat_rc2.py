@@ -5,7 +5,7 @@ from cpmpy.solvers import CPM_pysat, CPM_RC2
 def frietkot():
     # Construct the model.
     (x1, x2, x3) = boolvar(3)
-    weights = [10, 20,]
+    weights = [10, 10, 1, 1, 40, 20]
 
     # Pure CNF
     c1 = ~x1 | ~x2 | x3
@@ -18,7 +18,7 @@ def frietkot():
     allwishes = cpm_array([c1, c2, c3, c4, c5, c6])
     assum_vars = boolvar(len(allwishes))
 
-    model = Model(assum_vars.implies(allwishes), maximize=)
+    model = Model(assum_vars.implies(allwishes), maximize=sum(x for w, x in zip(weights, assum_vars)))
     return model, assum_vars, [x1, x2, x3]
 
 
@@ -29,7 +29,8 @@ class TestPySATInterrupt(unittest.TestCase):
         """
         frietkot_model, assum_vars, variables = frietkot()
         s = CPM_RC2(frietkot_model)
-        status = s.solve(assumptions=assum_vars)
+        status = s.solve()
+        print(assum_vars.value())
         print(status)
 
 if __name__ == '__main__':
