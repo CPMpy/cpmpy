@@ -351,7 +351,7 @@ class Element(GlobalConstraint):
         from .python_builtins import any
 
         arr,idx = self.args
-        return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
+        return [any(eval_comparison(cmp_op, cmp_rhs, arr[j]) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
