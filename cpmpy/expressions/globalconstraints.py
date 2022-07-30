@@ -334,9 +334,10 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
-        idxval = argval(self.args[1])
-        if not idxval is None:
-            return argval(self.args[0][idxval])
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            return argval(arr[idxval])
         return None # default
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
@@ -351,7 +352,7 @@ class Element(GlobalConstraint):
         from .python_builtins import any
 
         arr,idx = self.args
-        return [any(eval_comparison(cmp_op, cmp_rhs, arr[j]) & (idx == j) for j in range(len(arr)))]
+        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
