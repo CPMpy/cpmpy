@@ -114,7 +114,6 @@ class CPM_RC2(CPM_pysat):
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
-        ## TODO: adding assumptions to the solving !
         if assumptions is not None:
             print("[Warning] Assumption variables interpreted as hard clauses!")
             pysat_assum_vars = self.solver_vars(assumptions)
