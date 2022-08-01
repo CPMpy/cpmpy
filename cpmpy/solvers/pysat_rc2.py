@@ -79,12 +79,12 @@ class CPM_RC2(CPM_pysat):
 
     def __init__(self, cpm_model=None, subsolver="glucose3"):
         """
-        Constructor of the native solver object
+        Constructor of the native RC2 solver object
 
         Requires a CPMpy model as input, and will create the corresponding
-        PySAT clauses and solver object
+        PySAT clauses and RC2 solver object.
 
-        Only supports satisfaction problems (no objective)
+        Only supports maximal satisfaction problems
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model(), optional
@@ -104,15 +104,12 @@ class CPM_RC2(CPM_pysat):
 
     def solve(self, assumptions=None):
         """
-            Call the PySAT solver
+            Call the MaxSAT RC2 solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
-                           runtime exceeds given time_limit.
-                           Warning: the time_limit is not very accurate at subsecond level
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
+                           MaxSAT solver does not support incremental solving and assumptions.
+                           CPM_rc2 adds the assumptions as hard clauses to the MaxSAT solver.
         """
         if assumptions is not None:
             print("[Warning] Assumption variables interpreted as hard clauses!")
@@ -152,8 +149,18 @@ class CPM_RC2(CPM_pysat):
         return has_sol
 
     def objective(self, expr, minimize):
+        """Push objective to maxsat solver
+
+        Args:
+            expr (_type_): _description_
+            minimize (_type_): _description_
+
+        Raises:
+            NotImplementedError: _description_
+            NotImplementedError: _description_
+        """
         if minimize:
-            raise NotImplementedError()
+            raise NotImplementedError("RC2 does not support minimizing the objective.")
 
         if isinstance(expr, Operator) and expr.name == "sum":
             pysat_assum_vars = self.solver_vars(expr.args)
@@ -168,4 +175,4 @@ class CPM_RC2(CPM_pysat):
             raise NotImplementedError(f"Expression {expr} not handled")
 
     def get_core(self):
-        raise NotImplementedError("Does not work.")
+        raise NotImplementedError("RC2 does not support unsat core extraction, check out the PySat solver for this functionality.")

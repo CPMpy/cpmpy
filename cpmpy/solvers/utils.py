@@ -70,9 +70,9 @@ class SolverLookup():
         """
         return [("ortools", CPM_ortools),
                 ("gurobi", CPM_gurobi),
-                ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("minizinc", CPM_minizinc),
+                ("pysat", CPM_pysat),
                 ("rc2", CPM_RC2)
                ]
 
