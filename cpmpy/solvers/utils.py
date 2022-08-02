@@ -25,6 +25,7 @@ from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
+from .pysat_rc2 import CPM_RC2
 from .pysdd import CPM_pysdd
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
@@ -72,6 +73,7 @@ class SolverLookup():
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("minizinc", CPM_minizinc),
+                ("rc2", CPM_RC2)
                ]
 
     @staticmethod
