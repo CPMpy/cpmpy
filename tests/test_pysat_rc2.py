@@ -1,4 +1,5 @@
 import unittest
+
 from cpmpy import *
 from cpmpy.solvers import CPM_pysat, CPM_RC2
 
@@ -22,8 +23,8 @@ def frietkot():
     return model, assum_vars, [x1, x2, x3]
 
 
-class TestPySATInterrupt(unittest.TestCase):
-    def test_maxsat(self):
+class TestPySATRC2(unittest.TestCase):
+    def test_frietkot(self):
         """Check if the instance still returns the expected results
         after adding interrupt to pysat solver.
         """
