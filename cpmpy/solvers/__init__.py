@@ -27,6 +27,7 @@
         CPM_pysat
         CPM_gurobi
         CPM_pysdd
+        CPM_RC2
 
     =================
     List of functions
