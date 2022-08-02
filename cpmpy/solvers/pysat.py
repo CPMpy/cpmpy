@@ -223,22 +223,27 @@ class CPM_pysat(SolverInterface):
         # apply transformations, then post internally
         cpm_cons = to_cnf(cpm_con)
         for con in cpm_cons:
-            self._post_constraint(con)
+            clauses = self._encode_constraint(con)
+            self._post_clauses(clauses)
 
         return self
 
-    def _post_constraint(self, cpm_expr):
+    def _post_clauses(self, clauses):
+        self.pysat_solver.append_formula(clauses)
+
+    def _enocde_constraints(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
         """
         from pysat.card import CardEnc
+        clauses = []
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
-            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
+            clauses.append([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'or':
-                self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
+                clauses.append(self.solver_vars(cpm_expr.args))
             else:
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
@@ -249,7 +254,6 @@ class CPM_pysat(SolverInterface):
                 lits = self.solver_vars(cpm_expr.args[0].args)
                 bound = cpm_expr.args[1]
 
-                clauses = []
                 if cpm_expr.name == "<":
                     clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "<=":
@@ -281,14 +285,13 @@ class CPM_pysat(SolverInterface):
                 else:
                     raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-                # post the clauses
-                self.pysat_solver.append_formula(clauses)
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
+        return clauses
 
     def solution_hint(self, cpm_vars, vals):
         """
