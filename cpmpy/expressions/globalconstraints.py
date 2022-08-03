@@ -168,7 +168,7 @@ class AllDifferent(GlobalConstraint):
         return AllDifferent(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -193,7 +193,7 @@ class AllEqual(GlobalConstraint):
         return AllEqual(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == 1
 
 
 def circuit(args):
