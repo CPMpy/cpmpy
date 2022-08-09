@@ -168,7 +168,7 @@ class AllDifferent(GlobalConstraint):
         return AllDifferent(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -193,7 +193,7 @@ class AllEqual(GlobalConstraint):
         return AllEqual(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == 1
 
 
 def circuit(args):
@@ -334,9 +334,10 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
-        idxval = argval(self.args[1])
-        if not idxval is None:
-            return argval(self.args[0][idxval])
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            return argval(arr[idxval])
         return None # default
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
@@ -351,7 +352,7 @@ class Element(GlobalConstraint):
         from .python_builtins import any
 
         arr,idx = self.args
-        return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
+        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
