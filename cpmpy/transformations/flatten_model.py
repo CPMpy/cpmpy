@@ -82,7 +82,7 @@ import math
 import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_int, is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list
 
 def flatten_model(orig_model):
     """
@@ -117,7 +117,6 @@ def flatten_constraint(expr):
         it will return 'Exception' if something is not supported
         TODO, what built-in python error is best?
     """
-    
     # base cases
     if isinstance(expr, bool):
         if expr:

@@ -27,6 +27,7 @@
 
         Model
 """
+import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
@@ -68,7 +69,7 @@ class Model(object):
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
-
+        
     def __add__(self, con):
         """
             Add one or more constraints to the model
@@ -196,7 +197,7 @@ class Model(object):
             else:
                 obj_str = "maximize "
         obj_str += str(self.objective_)
-
+            
         return "Constraints:\n{}Objective: {}".format(cons_str, obj_str)
 
 

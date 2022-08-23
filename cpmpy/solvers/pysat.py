@@ -29,12 +29,11 @@
 
         CPM_pysat
 """
-from ..transformations.int2bool_onehot import intvar_to_boolvar, to_bool_constraint, is_boolvar_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, boolvar
-from ..expressions.utils import is_any_list, is_int
-from ..transformations.get_variables import get_variables, get_variables_model
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.utils import is_any_list
+from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -61,19 +60,6 @@ class CPM_pysat(SolverInterface):
             # while we need the 'python-sat' package, some more checks:
             from pysat.formula import IDPool
             from pysat.solvers import Solver
-            from pysat.card import CardEnc
-            return True
-        except ImportError as e:
-            return False
-
-    @staticmethod
-    def pb_supported():
-        try:
-            from pypblib import pblib
-            from pysat.pb import PBEnc
-            from distutils.version import LooseVersion
-            import pysat
-            assert LooseVersion(pysat.__version__) >= LooseVersion("0.1.7.dev12"), "Upgrade PySAT version with command: pip3 install -U python-sat"
             return True
         except ImportError as e:
             return False
@@ -115,7 +101,6 @@ class CPM_pysat(SolverInterface):
 
         from pysat.formula import IDPool
         from pysat.solvers import Solver
-        from pysat.card import CardEnc
 
         # determine subsolver
         if subsolver is None or subsolver == 'pysat':
@@ -126,8 +111,6 @@ class CPM_pysat(SolverInterface):
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
-        self.ivarmap = dict()
-
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
 
         # initialise everything else and post the constraints/objective
@@ -198,13 +181,6 @@ class CPM_pysat(SolverInterface):
                     # not specified...
                     cpm_var._value = None
 
-        # remapping the solution values (of user specified variables only)
-        if len(self.ivarmap) > 0 and has_sol:
-            for iv, value_dict in self.ivarmap.items():
-                n_val_assigned = sum(1 if bv.value() else 0 for bv in value_dict.values())
-                assert n_val_assigned == 1, f"Expected: 1, Got: {n_val_assigned} value can be assigned!"
-                iv._value = sum(bv.value() * iv_val for iv_val, bv in value_dict.items())
-
         return has_sol
 
 
@@ -241,33 +217,13 @@ class CPM_pysat(SolverInterface):
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
-        # flatten constraints and to cnf
+        # add new user vars to the set
+        self.user_vars.update(get_variables(cpm_con))
+
+        # apply transformations, then post internally
         cpm_cons = to_cnf(cpm_con)
-
         for con in cpm_cons:
-            if not is_boolvar_constraint(con):
-                ### encoding int vars
-                con_vars = get_variables(con)
-                assert all(~v.is_bool() for v in con_vars), "Mix of int and boolvar, not handled yet!"
-
-                bool_constraints = []
-
-                iv_not_mapped = [iv for iv in con_vars if iv not in self.ivarmap and not iv.is_bool()]
-                new_ivarmap, iv_constraints = intvar_to_boolvar(iv_not_mapped)
-
-                self.ivarmap.update(new_ivarmap)
-
-                bool_constraints += iv_constraints
-                
-                bool_constraints += to_bool_constraint(con, self.ivarmap)
-                
-                self.user_vars.update(get_variables(bool_constraints))
-
-                for bool_con in bool_constraints:
-                    self._post_constraint(bool_con)
-            else:
-                self.user_vars.update(get_variables(con))
-                self._post_constraint(con)
+            self._post_constraint(con)
 
         return self
 
