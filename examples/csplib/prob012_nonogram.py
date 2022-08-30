@@ -73,38 +73,54 @@ def transition_function(pattern):
     # line can end with 0 or 1
     return func, [n_states-1,n_states]
 
-def get_data(data, name):
+
+# Helper functions
+def _get_instance(data, pname):
     for entry in data:
-        if name in entry["name"]:
+        if pname == entry["name"]:
             return entry
-    raise ValueError(f"Instance {name} not found in data file!")
+    raise ValueError(f"Problem instance with name '{pname}' not found, use --list-instances to get the full list.")
+
+
+def _print_instances(data):
+    import pandas as pd
+    df = pd.json_normalize(data)
+    df_str = df.to_string(columns=["name", "rows", "cols"], na_rep='-')
+    print(df_str)
 
 
 if __name__ == "__main__":
+    import argparse
+    import json
+    import requests
 
-    fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob012_nonogram.json"
-    problem_name = "castle"
+    # argument parsing
+    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob012_nonogram.json"
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-instance', nargs='?', default="turing", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
-    data = None
+    args = parser.parse_args()
 
-    if len(sys.argv) > 1:
-        fname = sys.argv[1]
-        with open(fname, "r") as f:
-            data = json.load(f)
+    if "http" in args.filename:
+        problem_data = requests.get(args.filename).json()
+    else:
+        with open(args.filename, "r") as f:
+            problem_data = json.load(f)
 
-    if len(sys.argv) > 2:
-        problem_name = sys.argv[2]
+    if args.list_instances:
+        _print_instances(problem_data)
+        exit(0)
 
-    if data is None:
-        data = requests.get(fname).json()
+    problem_params = _get_instance(problem_data, args.instance)
+    print("Problem name:", problem_params["name"])
 
-    rules = get_data(data, problem_name)
-
-    model, (board,) = nonogram(**rules)
+    model, (board,) = nonogram(**problem_params)
 
     if model.solve():
         np.set_printoptions(threshold=np.inf, linewidth=1024)
-        f = {"int":lambda x : " " if x == 0 else "#"}
+        f = {"int":lambda x : " " if x == 0 else chr(0x2588)}
         print(np.array2string(board.value(), formatter=f))
     else:
         print("Model is unsatisfiable!")
