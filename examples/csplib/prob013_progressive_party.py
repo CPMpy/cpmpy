@@ -56,46 +56,59 @@ def progressive_party(n_boats, n_periods, capacity, crew_size, **kwargs):
 
     return model, (visits,is_host)
 
-def get_data(data, pname):
-  for entry in data:
-    if pname in entry["name"]:
-      return entry
 
 
-def print_solution(visits, hosts):
-    n_periods, n_boats = visits.shape
-    fmt = "{:<4}"
-    for crew in range(n_boats):
-        print("Crew {:<3}".format(crew), end=" ")
-        print("(host) " if hosts[crew] else "(guest)", end=" ")
-        print("visits boats", end=" ")
-        print((fmt*n_periods).format(*visits[:,crew]))
+# Helper functions
+def _get_instance(data, pname):
+    for entry in data:
+        if pname == entry["name"]:
+            return entry
+    raise ValueError(f"Problem instance with name '{pname}' not found, use --list-instances to get the full list.")
 
+def _print_instances(data):
+    import pandas as pd
+    df = pd.json_normalize(data)
+    df_str = df.to_string(columns=["name", "n_boats", "n_periods", "note"], na_rep='-')
+    print(df_str)
 
 if __name__ == "__main__":
-    # get data
-    fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob013_progressive_party.json"
-    problem_name = "6"
+    import argparse
+    import json
+    import requests
 
-    data = None
+    # argument parsing
+    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob013_progressive_party.json"
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-instance', nargs='?', default="csplib_example", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
-    if len(sys.argv) > 1:
-        fname = sys.argv[1]
-        with open(fname,"r") as f:
-          data = json.load(f)
+    args = parser.parse_args()
 
-    if len(sys.argv) > 2:
-        problem_name = sys.argv[2]
+    if "http" in args.filename:
+        problem_data = requests.get(args.filename).json()
+    else:
+        with open(args.filename, "r") as f:
+            problem_data = json.load(f)
 
-    if data is None:
-        data = requests.get(fname).json()
+    if args.list_instances:
+        _print_instances(problem_data)
+        exit(0)
 
-    params = get_data(data, problem_name)
+    problem_params = _get_instance(problem_data, args.instance)
+    print("Problem name:", problem_params["name"])
 
-    model, (visits, is_host) = progressive_party(**params)
+    model, (visits, is_host) = progressive_party(**problem_params)
 
     if model.solve():
-        print_solution(visits.value(), is_host.value())
+        n_periods, n_boats = visits.shape
+        visits, is_host = visits.value(), is_host.value()
+        fmt = "{:<4}"
+        for crew in range(n_boats):
+            print("Crew {:<3}".format(crew), end=" ")
+            print("(host) " if is_host[crew] else "(guest)", end=" ")
+            print("visits boats", end=" ")
+            print((fmt * n_periods).format(*visits[:, crew]))
 
     else:
-        print("Model is unsatisfiable!")
+        raise ValueError("Model is unsatisfiable!")

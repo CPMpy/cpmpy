@@ -18,7 +18,7 @@ import sys
 import numpy as np
 from cpmpy import *
 
-def magic_sequence(n=10):
+def magic_sequence(n):
     print("n:", n)
     model = Model()
 
@@ -35,17 +35,19 @@ def magic_sequence(n=10):
     return model, (x,)
 
 if __name__ == "__main__":
+    import argparse
 
-    n = 10
-    if len(sys.argv) > 1:
-        n = int(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-length", type=int, default=10, help="Length of the sequence, default is 10")
 
-    model, (x,) = magic_sequence(n)
+    args = parser.parse_args()
+
+    model, (x,) = magic_sequence(args.length)
 
     if model.solve():
         print(f"x: {x.value()}")
     else:
-        print("Model is unsatisviable)")
+        raise ValueError("Model is unsatisfiable)")
 
 
 

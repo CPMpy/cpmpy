@@ -4,6 +4,7 @@ Sport scheduling in CPMpy
 
 Model created by Ignace Bleukx
 """
+import pandas as pd
 
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
@@ -42,19 +43,27 @@ def sport_scheduling(n_teams):
     return model, (home, away)
 
 if __name__ == "__main__":
-    n_teams = 8
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-n_teams", type=int, default=8, help="Number of teams to schedule")
+
+    args = parser.parse_args()
+
+    n_teams = args.n_teams
     n_weeks, n_periods, n_matches = n_teams - 1, n_teams // 2, (n_teams - 1) * n_teams // 2
 
     model, (home, away) = sport_scheduling(n_teams)
 
     if model.solve():
-        print(" " * 12, end ="")
-        print(("{:^7} "*n_weeks).format(*[f"Week {w+1}" for w in range(n_weeks)]))
+        import pandas as pd
+        home, away = home.value(), away.value()
+        matches = [[f"{h} v {a}" for h,a in zip(home[w], away[w])] for w in range(n_weeks)]
+        print(matches)
+        df = pd.DataFrame(matches,
+                          index=[f"Week {w+1}" for w in range(n_weeks)],
+                          columns=[f"Period {p+1}" for p in range(n_periods)])
+        print(df.T.to_string(col_space=8, justify="center"))
 
-        for p in range(n_periods):
-            print(f"Period {p+1}:", end=" || ")
-            for w in range(n_weeks):
-                print(f"{home.value()[w,p]} v {away.value()[w,p]}", end=" | ")
-            print()
     else:
-        print("Model is unsatisfiable")
+        raise ValueError("Model is unsatisfiable")

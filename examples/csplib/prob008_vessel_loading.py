@@ -53,44 +53,57 @@ def vessel_loading(deck_width, deck_length, n_containers, width, length, classes
 
     return model, (left, right, top, bottom)
 
-def get_data(data, pname):
-
+def _get_instance(data, pname):
     for entry in data:
-        if pname in entry["name"]:
+        if pname == entry["name"]:
             return entry
+    raise ValueError(f"Problem instance with name {pname} not found, use --list-instances to get the full list.")
+
+
+def _print_instances(data):
+    import pandas as pd
+    df = pd.json_normalize(data)
+    df_str = df.to_string(columns=["name", "deck_width", "deck_length", "n_containers", "n_classes"], na_rep='-')
+    print(df_str)
+
 
 if __name__ == "__main__":
+    import argparse
+    import json
+    import requests
 
-    fname = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob008_vessel_loading.json"
-    problem_name = "easy"
+    # argument parsing
+    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob008_vessel_loading.json"
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-instance', default="easy", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-filename', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
-    data = None
+    args = parser.parse_args()
 
-    if len(sys.argv) > 1:
-        fname = sys.argv[1]
-        with open(fname, "r") as f:
-            data = json.load(f)
+    if "http" in args.filename:
+        problem_data = requests.get(args.filename).json()
+    else:
+        with open(args.filename, "r") as f:
+            problem_data = json.load(f)
 
-    if len(sys.argv) > 2:
-        problem_name = sys.argv[2]
+    if args.list_instances:
+        _print_instances(problem_data)
+        exit(0)
 
-    if data is None:
-        data = requests.get(fname).json()
+    problem_params = _get_instance(problem_data, args.instance)
 
-    params = get_data(data, problem_name)
-
-    data = get_data(data, problem_name)
-    model, (left, right, top, bottom) = vessel_loading(**params)
+    model, (left, right, top, bottom) = vessel_loading(**problem_params)
 
     # solve the model
     if model.solve():
-        container_map = np.zeros(shape=(data["deck_length"], data["deck_width"]), dtype=int)
+        container_map = np.zeros(shape=(problem_params["deck_length"], problem_params["deck_width"]), dtype=int)
         l, r, t, b = left.value(), right.value(), top.value(), bottom.value()
-        for c in range(data["n_containers"]):
+        for c in range(problem_params["n_containers"]):
             container_map[b[c]:t[c], l[c]:r[c]] = c + 1
 
         print("Shipdeck layout (0 means no container in that spot):")
         print(np.flip(container_map, axis=0))
 
     else:
-        print("Model is unsatisfiable")
+        raise ValueError("Model is unsatisfiable")

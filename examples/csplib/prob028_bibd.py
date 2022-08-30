@@ -17,9 +17,10 @@ distinct rows.
 Model created by Hakan Kjellerstrand, hakank@hakank.com
 See also my cpmpy page: http://www.hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 import numpy as np
+
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 
@@ -54,14 +55,22 @@ def bibd(v, b, r, k, l):
 
 
 if __name__ == "__main__":
-    default = {'v': 7, 'b': 7, 'r': 3, 'k': 3, 'l': 1}
+    import argparse
 
-    num_sols = 1
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions to find, find all by default")
+
+    args = parser.parse_args()
+
+    default = {'v': 7, 'b': 7, 'r': 3, 'k': 3, 'l': 1}
 
     model, (matrix,) = bibd(**default)
 
     # find all solutions of model
-    num_solutions = model.solveAll(solution_limit=0,
+    num_solutions = model.solveAll(solution_limit=args.solution_limit,
                                    display = lambda: print(matrix.value(), end="\n\n"))
 
-    print(f"{num_solutions=}")
+    if num_solutions == 0:
+        raise ValueError("Model is unsatisfiable")
+    else:
+        print(f"Found {num_solutions} solutions")

@@ -18,9 +18,8 @@ Also, see:
 Model created by Hakan Kjellerstrand, hakank@hakank.com
 See also my cpmpy page: http://www.hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
-from argparse import ArgumentParser
 
 from cpmpy import *
 
@@ -49,9 +48,10 @@ def golomb(size=10):
     return model, (marks,)
 
 if __name__ == "__main__":
+    import argparse
 
-    parser = ArgumentParser(description=__doc__)
-    parser.add_argument("--size", type=int, default=10, help="Size of the ruler")
+    parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-size", type=int, default=10, help="Size of the ruler")
 
     size = parser.parse_args().size
 
@@ -60,6 +60,6 @@ if __name__ == "__main__":
     if model.solve():
         print(marks.value())
     else:
-        print("Model is unsatisfiable")
+        raise ValueError("Model is unsatisfiable")
 
 

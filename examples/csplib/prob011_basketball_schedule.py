@@ -177,7 +177,7 @@ if __name__ == "__main__":
     if model.solve():
         print_solution(config.value(), where.value())
     else:
-        print("Model is unsatisfiable")
+        raise ValueError("Model is unsatisfiable")
 
 
 

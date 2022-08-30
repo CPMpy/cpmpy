@@ -37,12 +37,12 @@ def PAF(arr, s):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n", type=int, default=16, help="Length of bitarray")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-length", nargs='?', type=int, default=16, help="Length of bitarray")
 
-    n = parser.parse_args().n
+    length = parser.parse_args().length
 
-    model, (arr,) = auto_correlation(n)
+    model, (arr,) = auto_correlation(length)
 
     if model.solve():
         # print using runlength notation
@@ -53,4 +53,4 @@ if __name__ == "__main__":
         print("".join([str(len(p)) for p in pieces if len(p) != 0]))
 
     else:
-        print("Model is unsatisfiable")
+        raise ValueError("Model is unsatisfiable")

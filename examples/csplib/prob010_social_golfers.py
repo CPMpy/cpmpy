@@ -32,13 +32,13 @@ http://www.dis.uniroma1.it/~tmancini/index.php?currItem=research.publications.we
 This cpmpy model was written by Hakan Kjellerstrand (hakank@gmail.com)
 See also my cpmpy page: http://hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 import numpy as np
 
-def social_golfers(n_weeks, n_groups, group_size):
+def social_golfers(n_weeks, n_groups, group_size, **kwargs):
 
     n_golfers = n_groups * group_size
     print("n_golfers:", n_golfers, "n_weeks:", n_weeks, "group_size:", group_size, "groups:", n_groups)
@@ -79,36 +79,41 @@ def social_golfers(n_weeks, n_groups, group_size):
 
     return model, (assign,)
 
-def print_sol(assign, golfers):
-    print("assign:")
-    print(assign, end="\n\n")
-
-    # print schedule
-    print("Schedule:")
-    for w in range(weeks):
-        print("week:", w + 1)
-        for gr in range(groups):
-            gs = np.where(assign[:,w] == gr)[0] + 1
-            print("group ", gr + 1, end=": ")
-            print("golfers:", "".join([f"{g:3d}" for g in gs]))
-    print()
-
-    # check which golfers meet each other
-    meets = {g: [] for g in range(golfers)}
-    for g1, g2 in all_pairs(range(golfers)):
-        if sum(assign[g1] == assign[g2]) >= 1:
-            meets[g1] += [g2+1]
-            meets[g2] += [g1+1]
-
-    for g in range(golfers):
-        print(f"Golfer {g+1} meets:", sorted(meets[g]))
-    print(flush=True)
 
 if __name__ == "__main__":
-    weeks, groups, group_size = 4, 3, 3
-    n_golfers = groups * group_size
+    import argparse
 
-    model, (assign,) = social_golfers(weeks, groups, group_size)
-    # print all solutions
-    model.solveAll(solution_limit=1,
-                   display=lambda : print_sol(assign.value(), n_golfers))
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-n_weeks", type=int, default=4, help="Number of weeks")
+    parser.add_argument("-n_groups", type=int, default=3, help="Number of groups")
+    parser.add_argument("-group_size", type=int, default=3, help="Size of groups")
+
+    args = parser.parse_args()
+
+    n_golfers = args.n_groups * args.group_size
+
+    model, (assign,) = social_golfers(**args.__dict__)
+
+    if model.solve():
+        assign = assign.value()
+        # print schedule
+        print("Schedule:")
+        for w in range(args.n_weeks):
+            print("week:", w + 1)
+            for gr in range(args.n_groups):
+                gs = np.where(assign[:, w] == gr)[0] + 1
+                print(f"golfers in group {gr+1}:", "".join([f"{g:3d}" for g in gs]))
+        print()
+
+        # check which golfers meet each other
+        meets = {g: [] for g in range(n_golfers)}
+        for g1, g2 in all_pairs(range(n_golfers)):
+            if sum(assign[g1] == assign[g2]) >= 1:
+                meets[g1] += [g2 + 1]
+                meets[g2] += [g1 + 1]
+
+        for g in range(n_golfers):
+            print(f"Golfer {g + 1} meets:", sorted(meets[g]))
+
+    else:
+        raise ValueError("Problem is unsatisfiable")
