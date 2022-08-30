@@ -2,7 +2,7 @@
 Hadamard matrix Legendre pairs in CPMpy.
 Problem 084 on CSPlib
 
-Model created by Ignace Bleukx
+Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 import sys
 
@@ -34,18 +34,17 @@ def hadmard_matrix(l=5):
     return model, (a,b)
 
 if __name__ == "__main__":
-    l = 5
-    if len(sys.argv) > 1:
-        l = int(sys.argv[1])
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-length", type=int, default=5, help="Length of sequence")
+
+    l = parser.parse_args().length
 
     model, (a,b) = hadmard_matrix(l)
 
     if model.solve():
-        print(f"{a.value()= }")
-        print(f"{b.value()= }")
+        print(f"A: {a.value()}")
+        print(f"B: {b.value()}")
     else:
-        print("Model is unsatisfiable")
-
-
-
-
+        raise ValueError("Model is unsatisfiable")

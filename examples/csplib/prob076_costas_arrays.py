@@ -1,49 +1,21 @@
 """
 Costas array in cpmpy.
+https://www.csplib.org/Problems/prob076/
 
 From http://mathworld.wolfram.com/CostasArray.html:
-'''
+
 An order-n Costas array is a permutation on {1,...,n} such
 that the distances in each row of the triangular difference
 table are distinct. For example, the permutation {1,3,4,2,5}
 has triangular difference table {2,1,-2,3}, {3,-1,1}, {1,2},
 and {4}. Since each row contains no duplications, the permutation
 is therefore a Costas array.
-'''
 
-Also see
-http://en.wikipedia.org/wiki/Costas_array
-
-About this model:
-This model is based on Barry O'Sullivan's model:
-http://www.g12.cs.mu.oz.au/mzn/costas_array/CostasArray.mzn
-
-and my small changes in
-http://hakank.org/minizinc/costas_array.mzn
-
-Since there is no symmetry breaking of the order of the Costas
-array it gives all the solutions for a specific length of
-the array, e.g. those listed in
-http://mathworld.wolfram.com/CostasArray.html
-
-1     1       (1)
-2     2       (1, 2), (2,1)
-3     4       (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2)
-4     12      (1, 2, 4, 3), (1, 3, 4, 2), (1, 4, 2, 3), (2, 1, 3, 4),
-              (2, 3, 1, 4), (2, 4, 3, 1), (3, 1, 2, 4), (3, 2, 4, 1),
-              (3, 4, 2, 1), (4, 1, 3, 2), (4, 2, 1, 3), (4, 3, 1, 2)
-....
-
-See http://www.research.att.com/~njas/sequences/A008404
-for the number of solutions for n=1..
-1, 2, 4, 12, 40, 116, 200, 444, 760, 2160, 4368, 7852, 12828,
-17252, 19612, 21104, 18276, 15096, 10240, 6464, 3536, 2052,
-872, 200, 88, 56, 204,...
 
 This cpmpy model was written by Hakan Kjellerstrand (hakank@gmail.com)
 See also my cpmpy page: http://hakank.org/cpmpy/
 
-Modified by Ignace Bleukx
+Modified by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 import numpy as np
 import sys
@@ -98,23 +70,25 @@ def costas_array(n=6):
 
 
 def print_sol(costas, differences):
+    n = len(costas)
     print("costas:", costas.value())
     print("differences:")
-    print(differences.value())
+    for i, row in enumerate(differences.value()[:-1]):
+        print(row[i+1:])
 
 
 if __name__ == "__main__":
+    import argparse
 
-    n = 6
-    num_sols = 0 # find all solutions
-    if len(sys.argv) > 1:
-        n = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        n_sols = int(sys.argv[2])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-size", type=int, default=6, help="Size of array")
+    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions, find all by default")
 
-    model, (costas, differences) = costas_array(n)
+    args = parser.parse_args()
+
+    model, (costas, differences) = costas_array(args.size)
     num_sols = model.solveAll(
-        solution_limit=num_sols,
+        solution_limit=args.solution_limit,
         display = lambda: print_sol(costas, differences)
     )
 

@@ -1,8 +1,9 @@
 """
 Diamond-free Degree Sequences in cpmpy.
 
-This is a port of the Numberjack example DiamondfreeDegreeSequences.py:
-'''
+CSPLib Problem 050
+http://www.csplib.org/Problems/prob050/
+
 Fill in a binary matrix of size n * n in such a way that
 - For every grouping of four rows, the sum of their non-symmetrical
   values is less than or equal to 4,
@@ -17,8 +18,7 @@ Since the matrix for this model will represent the adjacency
 matrix of the graph, we need to take into consideration the fact
 that the matrix will be symmetrical.
 
-CSPLib Problem 050 - http://www.csplib.org/Problems/prob050/
-'''
+This is a port of the Numberjack example DiamondfreeDegreeSequences.py:
 
 Model created by Hakan Kjellerstrand, hakank@hakank.com
 See also my cpmpy page: http://www.hakank.org/cpmpy/
@@ -56,7 +56,6 @@ def diamond_free(N=10):
     model += matrix == matrix.T
 
     # Symmetry breaking
-    # break symmetry
     # lexicographic ordering of rows
     for r in range(N - 1):
         b = boolvar(N + 1)
@@ -81,18 +80,17 @@ def print_sol(matrix):
     print()
 
 if __name__ == "__main__":
+    import argparse
 
-    n = 10
-    num_sol = 0 # find all solutions
-    if len(sys.argv) > 1:
-        n = sys.argv[1]
-    if len(sys.argv) > 2:
-        num_sol = sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-n", type=int, default=10, help="Size of diamond")
+    parser.add_argument("--solution-limit", type=int, default=0, help="Number of solutions to find, find all by default")
 
+    args = parser.parse_args()
 
-    model, matrix = diamond_free(n)
+    model, matrix = diamond_free(args.n)
     num_sol = model.solveAll(
-        solution_limit=num_sol,
+        solution_limit=args.solution_limit,
         display=lambda : print_sol(matrix))
     print("num_solutions:",num_sol)
 

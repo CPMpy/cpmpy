@@ -36,23 +36,24 @@ def n_queens(n=16):
 
 def print_sol(queens):
     queens = queens.value()
-    board = np.zeros(shape=(len(queens), len(queens)), dtype=int)
+    board = np.zeros(shape=(len(queens), len(queens)), dtype=str)
     for i,q in enumerate(queens):
-        board[i,q-1] = 1
-    print(board)
+        board[i,q-1] = chr(0x265B)
+    print(np.array2string(board,formatter={'str_kind':lambda x : x if len(x) != 0 else " "}))
+    print()
 
 if __name__ == "__main__":
+    import argparse
 
-    n = 16
-    n_sols = 0 # find all solutions
-    if len(sys.argv) > 1:
-        n = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        n_sols = int(sys.argv[2])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-n", type=int, default=16, help="Number of queens")
+    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions, find all by default")
 
-    model, (queens,) = n_queens(n)
+    args = parser.parse_args()
 
-    n_sols = model.solveAll(solution_limit=n_sols,
+    model, (queens,) = n_queens(args.n)
+
+    n_sols = model.solveAll(solution_limit=args.solution_limit,
                             display = lambda : print_sol(queens))
 
     print("num_solutions:", n_sols)

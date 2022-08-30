@@ -2,15 +2,22 @@
 Steiner triplets in CPMpy.
 
 Problem 044 on CSPlib
+csplib.org/Problems/prob044/
 
-Model created by Ignce Bleukx
+The ternary Steiner problem of order n consists of finding a set of n*(n−1)/6 triples of distinct integer elements in
+{1,…,n} such that any two triples have at most one common element. It is a hypergraph problem coming from combinatorial
+mathematics [luneburg1989tools] where n modulo 6 has to be equal to 1 or 3 [lindner2011topics].
+One possible solution for n=7 is {{1, 2, 3}, {1, 4, 5}, {1, 6, 7}, {2, 4, 6}, {2, 5, 7}, {3, 4, 7}, {3, 5, 6}}.
+The solution contains 7*(7−1)/6=7 triples.
+
+
+
+Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
-import sys
+import numpy as np
 
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
-
-import numpy as np
 
 def steiner(n=15):
     assert n % 6 == 1 or n % 6 == 3, "N must be (1|3) modulo 6"
@@ -44,16 +51,20 @@ def print_sol(sets):
 
 
 if __name__ == "__main__":
+    import argparse
 
-    n = 15
-    num_sols = 1
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-num_sets", type=int, default=15, help="Number of sets")
+    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions to find, find all by default")
 
-    if len(sys.argv) > 1:
-        n = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        num_sols = int(sys.argv[2])
+    args = parser.parse_args()
 
-    model, (sets,) = steiner(n)
-    model.solveAll(solver="pysat",
-                   solution_limit=num_sols,
-                   display=lambda : print_sol(sets))
+    model, (sets,) = steiner(args.num_sets)
+    n_sol = model.solveAll(solver="pysat:minisat22",
+                           solution_limit=args.solution_limit,
+                           display=lambda : print_sol(sets))
+
+    if n_sol == 0:
+        raise ValueError("Model is unsatisfiable")
+    else:
+        print(f"Found {n_sol} solutions")
