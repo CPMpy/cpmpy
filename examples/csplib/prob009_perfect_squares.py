@@ -14,8 +14,8 @@ that there is no spare capacity. A simple perfect square placement
 problem is a perfect square placement problem in which no subset of
 the squares (greater than one) are placed in a rectangle.
 '''
-
-Model created by Ignace Bleukx, inspired by implementation of Vessel Packing problem (008)
+Inspired by implementation of Vessel Packing problem (008)
+Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 import sys
 import numpy as np
@@ -23,8 +23,9 @@ from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
 
 
-def perfect_squares(base, sides, num_sols=0):
+def perfect_squares(base, sides, **kwargs):
     model = Model()
+    sides = np.array(sides)
 
     squares = range(len(sides))
 
@@ -50,60 +51,61 @@ def perfect_squares(base, sides, num_sols=0):
 
     return model, (x_coords, y_coords)
 
+def _get_instance(data, pname):
+    for entry in data:
+        if pname == entry["name"]:
+            return entry
+    raise ValueError(f"Problem instance with name '{pname}' not found, use --list-instances to get the full list.")
 
-def get_data(name):
-    if name == "problem1":
-        base, sides =  4, [2,2,2,2]
-    elif name == "problem2":
-        base, sides = 6, [3, 3, 3, 2, 1, 1, 1, 1, 1]
-    elif name == "problem3":
-        # tricky problem: should give no solution
-        # (we can not fit 2 3x3 squares in a 5x5 square)
-        base, sides = 5, [3, 3, 2, 1, 1, 1]
-    elif name == "problem4":
-        # Problem from Sam Loyd
-        # http://squaring.net/history_theory/sam_loyd.html
-        base, sides = 13, [1, 1, 2, 2, 2, 3, 3, 4, 6, 6, 7]
-    elif name == "problem5":
-        # Problem from
-        # http://www.maa.org/editorial/mathgames/mathgames_12_01_03.html
-        base, sides = 14,  [1, 1, 1, 1, 2, 3, 3, 3, 5, 6, 6, 8]
-    elif name == "problem6":
-        # Problem from
-        # http://www.maa.org/editorial/mathgames/mathgames_12_01_03.html
-        base, sides = 30,[1, 1, 1, 1, 2, 2, 3, 3, 4, 5, 7, 8, 8, 9, 9, 10, 10, 11, 13]
-    elif name == "problem7":
-        base, sides = 112, [2, 4, 6, 7, 8, 9, 11, 15, 16, 17, 18, 19, 24, 25, 27, 29, 33, 35, 37, 42, 50]
-    elif name == "problem8":
-        base, sides = 110, [2, 3, 4, 6, 7, 8, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 26, 27, 28, 50, 60]
 
-    return base, np.array(sides)
+def _print_instances(data):
+    import pandas as pd
+    df = pd.json_normalize(data)
+    df_str = df.to_string(columns=["name", "base", "sides", "note"], na_rep='-')
+    print(df_str)
 
-def print_sol(base, sides, x_coords,y_coords, alpha=False):
-    x_coords, y_coords = x_coords.value(), y_coords.value()
-    big_square = np.zeros(dtype=int, shape=(base, base))
-    for i, (x,y) in enumerate(zip(x_coords, y_coords)):
-        big_square[x:x+sides[i],y:y+sides[i]] = i
-    if alpha:
-        big_square = np.array([
-            chr(val) for row in big_square+65 for val in row
-        ], dtype=str).reshape(big_square.shape)
-    print(big_square)
 
 if __name__ == "__main__":
-    num_sols = 1
-    problem_number = 4
 
-    if len(sys.argv) > 1:
-        problem_number = int(sys.argv[1])
+    import argparse
+    import json
+    import requests
 
-    data = get_data(f"problem{problem_number}")
-    model, vars = perfect_squares(*data, num_sols=num_sols)
+    # argument parsing
+    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob009_perfect_squares.json"
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-instance', nargs='?', default="problem7", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
-    n = model.solveAll(
-        solution_limit=num_sols,
-        display=lambda : print_sol(*data,*vars, alpha=True)
-    )
+    args = parser.parse_args()
 
-    print(f"Found {n} solutions")
+    if "http" in args.filename:
+        problem_data = requests.get(args.filename).json()
+    else:
+        with open(args.filename, "r") as f:
+            problem_data = json.load(f)
+
+    if args.list_instances:
+        _print_instances(problem_data)
+        exit(0)
+
+    problem_params = _get_instance(problem_data, args.instance)
+    print("Problem name:", problem_params["name"])
+
+    model, (x_coords, y_coords) = perfect_squares(**problem_params)
+
+    if model.solve():
+        np.set_printoptions(linewidth=problem_params['base']*5, threshold=np.inf)
+
+        base, sides = problem_params['base'], problem_params['sides']
+        x_coords, y_coords = x_coords.value(), y_coords.value()
+        big_square = np.zeros(dtype=str, shape=(base, base))
+        for i, (x, y) in enumerate(zip(x_coords, y_coords)):
+            big_square[x:x + sides[i], y:y + sides[i]] = chr(i+65)
+
+        print(np.array2string(big_square,formatter={'str_kind': lambda v: v}))
+
+    else:
+        raise ValueError(f"Problem is unsatisfiable")
 
