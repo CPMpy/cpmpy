@@ -42,9 +42,19 @@ If you don't find it, report it on the CPMpy github Issues page and we'll help y
 
 You get an error either from CPMpy (e.g. the flattening, or the solver interface) or the solver itself is saying the model is invalid. This may be because you have modelled something impossible, or because you have a corner case that CPMpy does not yet capture.
 
-The two are hard to tell apart. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+If you have a model that fails in this way, try the following code snippet to see what constraint is causing the error:
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+```python
+model = ... # your code, a `Model()`
+`
+for c in model.constraints:
+    print("Trying",c)
+    Model(c).solve()
+```
+
+The last constraint printed before the exception is the curlpit... Please report on Github. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+
+Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on Github and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 

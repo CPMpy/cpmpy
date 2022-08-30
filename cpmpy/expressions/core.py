@@ -37,7 +37,7 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Operator("xor", [x,y])
+    - x ^ y         Xor([x,y])  # a global constraint
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -173,6 +173,9 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
+        # BoolExpr == 1|true, then simply BoolExpr
+        if self.is_bool() and is_num(other) and other == 1:
+            return self
         return Comparison("==", self, other)
     def __ne__(self, other):
         return Comparison("!=", self, other)
@@ -296,6 +299,10 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
+        if other == 0:
+            return 1
+        elif other == 1:
+            return self
         return Operator("pow", [self, other])
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
@@ -336,12 +343,6 @@ class Comparison(Expression):
         # __hash__ is None be default as __eq__ is overwritten
         return super().__hash__()
 
-    # a comparison itself is bool, check special case
-    def __eq__(self, other):
-        if is_num(other) and other == 1:
-            return self
-        return super().__eq__(other)
-        
     # return the value of the expression
     # optional, default: None
     def value(self):

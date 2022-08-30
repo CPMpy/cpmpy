@@ -28,10 +28,11 @@ import sys  # for stdout checking
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
-from ..transformations.reification import only_bv_implies
+from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
     """
@@ -84,7 +85,8 @@ class CPM_ortools(SolverInterface):
         self.ort_model = ort.CpModel()
         self.ort_solver = ort.CpSolver()
 
-        # initialize assumption dict to None
+        # for solving with assumption variables,
+        # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
 
         # initialise everything else and post the constraints/objective
@@ -216,7 +218,7 @@ class CPM_ortools(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if is_num(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
         # special case, negative-bool-view
@@ -251,8 +253,8 @@ class CPM_ortools(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
+        self += flat_cons  # add potentially created constraints
+        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -287,7 +289,7 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x)) # XXX is there more direct way?
+                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
 
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
 
@@ -307,7 +309,11 @@ class CPM_ortools(SolverInterface):
         self.user_vars.update(get_variables(cpm_con))
 
         # apply transformations, then post internally
-        cpm_cons = only_bv_implies(flatten_constraint(cpm_con))
+        cpm_cons = flatten_constraint(cpm_con)
+        cpm_cons = reify_rewrite(cpm_cons)
+        cpm_cons = only_numexpr_equality(cpm_cons)
+        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
+                                             # reified expr must go before this
         for con in cpm_cons:
             self._post_constraint(con)
 
@@ -341,79 +347,51 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == '->':
-                assert(isinstance(cpm_expr.args[0], _BoolVarImpl)) # lhs must be boolvar
+                assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
                     return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr.args[1]))
                 else:
-                    # bv -> boolexpr, natively supported by or-tools
-                    # actually, only supported for and, or, and linear expression (not xor nor any global)
-                    # XXX should we check/assert that here??
-                    # TODO: and if rhs is a global, first decompose it and reify that??
-                    assert(cpm_expr.args[1].is_bool())
-                    # Special case for 'xor', which is not natively reifiable in ortools
-                    # TODO: and if something like b.implies(min(x) >= 10) that it splits up in
-                    # b.implies( aux >= 10) & (min(x) == aux)
+                    # bv -> boolexpr
+                    # the `reify_rewrite()` transformation ensures that only
+                    # the natively reifiable 'and', 'or' and 'sum' remain here
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
                 raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
-
-        # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
+        # Comparisons: only numeric ones as the `only_bv_implies()` transformation
+        # has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
-            rvar = self.solver_var(cpm_expr.args[1])
+            ortrhs = self.solver_var(cpm_expr.args[1])
 
-            # TODO: this should become a transformation!!
-            if cpm_expr.name != '==' and not is_num(lhs) and not isinstance(lhs, _NumVarImpl)\
-                    and not lhs.name == "wsum" and not lhs.name == "sum":
-                # functional globals only exist for equality in ortools
-                # example: min(x) > 10 :: min(x) == aux, aux > 10
-                # create the equality and overwrite lhs with auxiliary (will handle appropriate bounds)
-                (lhs, cons) = get_or_make_var(lhs)
-                self += cons
-
-            # all but '==' now only have as lhs: const|ivar|sum|wsum
-            # translate ivar|sum|wsum so they can be posted directly below
             if isinstance(lhs, _NumVarImpl):
-                lhs = self.solver_var(lhs)
+                # both are variables, do python comparison over ORT variables
+                return self.ort_model.Add(eval_comparison(cpm_expr.name, self.solver_var(lhs), ortrhs))
             elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
                 # a BoundedLinearExpression LHS, special case, like in objective
-                lhs = self._make_numexpr(lhs)
-                # assumes that ortools accepts sum(x) >= y without further simplification
-
-            # post the comparison
-            if cpm_expr.name == '<=':
-                return self.ort_model.Add(lhs <= rvar)
-            elif cpm_expr.name == '<':
-                return self.ort_model.Add(lhs < rvar)
-            elif cpm_expr.name == '>=':
-                return self.ort_model.Add(lhs >= rvar)
-            elif cpm_expr.name == '>':
-                return self.ort_model.Add(lhs > rvar)
-            elif cpm_expr.name == '!=':
-                return self.ort_model.Add(lhs != rvar)
+                ortlhs = self._make_numexpr(lhs)
+                # ortools accepts sum(x) >= y over ORT variables
+                return self.ort_model.Add(eval_comparison(cpm_expr.name, ortlhs, ortrhs))
             elif cpm_expr.name == '==':
-                if not isinstance(lhs, Expression): 
-                    # base cases: const|ivar|sum|wsum with prepped lhs above
-                    return self.ort_model.Add(lhs == rvar)
-                elif lhs.name == 'min':
-                    return self.ort_model.AddMinEquality(rvar, self.solver_vars(lhs.args))
+                # NumExpr == IV, supported by ortools (thanks to `only_numexpr_equality()` transformation)
+                if lhs.name == 'min':
+                    return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.ort_model.AddMaxEquality(rvar, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
-                    return self.ort_model.AddAbsEquality(rvar, self.solver_var(lhs.args[0]))
+                    return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'mul':
-                    return self.ort_model.AddMultiplicationEquality(rvar, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'div':
-                    return self.ort_model.AddDivisionEquality(rvar, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
                     return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), rvar)
+                                                     self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     divisor = lhs.args[1]
@@ -421,20 +399,12 @@ class CPM_ortools(SolverInterface):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
                                     f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                    return self.ort_model.AddModuloEquality(rvar, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
-                    # translate to multiplications
-                    # TODO: perhaps this should be a transformation too? pow to (binary) mult
-                    x = self.solver_var(lhs.args[0])
-                    y = lhs.args[1]
-                    assert is_num(y), f"Ort: 'pow' only supports constants as power, not {y}"
-                    if y == 0:
-                        return 1
-                    elif y == 1:
-                        return self.ort_model.Add(x == rvar)
-                    # mul([x,x,x,...]) with 'y' elements
-                    assert (y == 2), "Ort: 'pow' with an exponent larger than 2 has lead to crashes..."
-                    return self.ort_model.AddMultiplicationEquality(rvar, [x] * y)
+                    # only `POW(b,2) == IV` supported, post as b*b == IV
+                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
+                    b = self.solver_var(lhs.args[0])
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
             raise NotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -449,13 +419,13 @@ class CPM_ortools(SolverInterface):
             array, table = self.solver_vars(cpm_expr.args)
             return self.ort_model.AddAllowedAssignments(array, table)
         else:
-            # TODO: NOT YET MAPPED: Automaton, Circuit, Cumulative,
+            # NOT (YET?) MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            self += cpm_expr.decompose() # assumes a decomposition exists...
-            # TODO: dynamic mapping of cpm_expr.name to API call? see #74
+            self += cpm_expr.decompose()  # assumes a decomposition exists...
+            # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
             return None # will throw error if used in reification
         
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
@@ -499,6 +469,31 @@ class CPM_ortools(SolverInterface):
         # return cpm_variables corresponding to ort_assum vars in UNSAT core
         return [self.assumption_dict[i] for i in assum_idx]
 
+    @classmethod
+    def tunable_params(cls):
+        return {
+            'cp_model_probing_level': [0, 1, 2],
+            'preferred_variable_order': [0, 1, 2],
+            'linearization_level': [0, 1, 2],
+            'symmetry_level': [0, 1, 2],
+            'minimization_algorithm': [0, 1, 2],
+            'search_branching': [0, 1, 2, 3, 4, 5, 6],
+            'optimize_with_core': [False, True],
+            'use_erwa_heuristic': [False, True]
+        }
+
+    @classmethod
+    def default_params(cls):
+        return {
+            'cp_model_probing_level': 2,
+            'preferred_variable_order': 0,
+            'linearization_level': 1,
+            'symmetry_level': 2,
+            'minimization_algorithm': 2,
+            'search_branching': 0,
+            'optimize_with_core': False,
+            'use_erwa_heuristic': False
+        }
 
 
 # solvers are optional, so this file should be interpretable

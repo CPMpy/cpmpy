@@ -102,9 +102,9 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression, Operator
+from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -135,7 +135,7 @@ class GlobalConstraint(Expression):
             and use other other global constraints as long as
             it does not create a circular dependency.
         """
-        return None
+        raise NotImplementedError("Decomposition for",self,"not available")
 
     def deepcopy(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)
@@ -168,7 +168,7 @@ class AllDifferent(GlobalConstraint):
         return AllDifferent(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -193,7 +193,7 @@ class AllEqual(GlobalConstraint):
         return AllEqual(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == 1
 
 
 def circuit(args):
@@ -334,10 +334,25 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
-        idxval = argval(self.args[1])
-        if not idxval is None:
-            return argval(self.args[0][idxval])
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            return argval(arr[idxval])
         return None # default
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            It is not a constraint itself, so it can not have a decompose().
+            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+            That is what this function does
+            (for now only used in transformations/reification.py)
+        """
+        from .python_builtins import any
+
+        arr,idx = self.args
+        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -373,7 +388,7 @@ class Xor(GlobalConstraint):
 
     def decompose(self):
         if len(self.args) == 2:
-            return (self.args[0] + self.args[1]) == 1
+            return [(self.args[0] + self.args[1]) == 1]
         prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
         for arg in self.args[2:]:
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)
