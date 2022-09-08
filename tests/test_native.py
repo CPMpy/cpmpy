@@ -28,6 +28,24 @@ class TestNativeORTools(unittest.TestCase):
 
         self.assertEqual(num_sols, 6)
 
+    def test_native_no_overlap(self):
+
+        interval1_args = intvar(3,10, shape=3)
+        interval2_args = intvar(2,10, shape=3)
+
+        interval1 = DirectVar("NewIntervalVar", interval1_args)
+        interval2 = DirectVar("NewIntervalVar", interval2_args)
+
+        solver = SolverLookup.get("ortools")
+
+        solver += NativeConstraint(name="AddNoOverlap",
+                                   arg_list=[[interval1, interval2]]
+                                   )
+
+        assert solver.solve()
+
+        print("Interval1: start:{}, size:{}, end:{}".format(*interval1_args.value()))
+        print("Interval2: start:{}, size:{}, end:{}".format(*interval2_args.value()))
 
 class TestNativeGurobi(unittest.TestCase):
 

@@ -18,7 +18,7 @@
 
 # we only import methods/classes that are used for modelling
 # others need to be imported by the developer explicitely
-from .variables import boolvar, intvar, cpm_array
+from .variables import boolvar, intvar, cpm_array, DirectVar
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import AllDifferent, AllEqual, Circuit, Table, Minimum, Maximum, Element, Xor, NativeConstraint
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated

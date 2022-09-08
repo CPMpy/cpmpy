@@ -359,6 +359,18 @@ class NegBoolView(_BoolVarImpl):
         return NegBoolView(self._bv.deepcopy(memodict))
 
 
+class DirectVar(_NumVarImpl):
+    """
+        Custom solver variable not supported by CPMpy
+    """
+    def __init__(self, name, args, arg_novar=[]):
+        self.name = name
+        self.args = args
+        self.arg_novar = arg_novar
+
+    def __str__(self):
+        return f"{self.name}({str(self.args)})"
+
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):
     """

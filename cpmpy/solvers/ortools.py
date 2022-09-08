@@ -28,7 +28,7 @@ import sys  # for stdout checking
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import NativeConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, DirectVar, NegBoolView
 from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
@@ -229,7 +229,13 @@ class CPM_ortools(SolverInterface):
 
         # create if it does not exit
         if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
+            if isinstance(cpm_var, DirectVar):
+                native_function = getattr(self.ort_model, cpm_var.name)
+                native_args = [a if cpm_var.arg_novar is not None and i in cpm_var.arg_novar
+                               else self.solver_vars(a) for i, a in enumerate(cpm_var.args)]
+                # len(native_args) should match nr of arguments of `native_function`
+                revar = native_function(*native_args, name=str(cpm_var))
+            elif isinstance(cpm_var, _BoolVarImpl):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
