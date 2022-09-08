@@ -31,7 +31,7 @@ Getting started:
    how_to_debug
    solver_parameters
    unsat_core_extraction
-   behind_the_scenes
+   adding_solver
 
 
 .. toctree::

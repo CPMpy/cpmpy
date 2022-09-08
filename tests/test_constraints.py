@@ -7,7 +7,7 @@ from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat
 
 import pytest
 
-SOLVER_CLASS = CPM_pysat
+SOLVER_CLASS = CPM_ortools
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -25,8 +25,8 @@ EXCLUDE_OPERATORS = {CPM_ortools: {"sub"},
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {CPM_ortools: {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","-","xor"}, # TODO this will become emtpy after resolving issue #105
-                CPM_gurobi:  {"alldifferent", "allequal", "element","max","min","abs","mod","pow", "mul", "sub","div","xor"},
+EXCLUDE_IMPL = {CPM_ortools: {"xor", "element"}, # TODO this will become emtpy after resolving issue #105
+                CPM_gurobi:  {},
                 CPM_minizinc: {},
                 CPM_pysat: {}}
 

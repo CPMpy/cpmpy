@@ -8,7 +8,7 @@ from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint
 
-SOLVER_CLASS = CPM_gurobi  # Replace by your own solver class
+SOLVER_CLASS = CPM_ortools  # Replace by your own solver class
 
 
 class TestInterface(unittest.TestCase):
@@ -62,7 +62,7 @@ class TestInterface(unittest.TestCase):
         self.solver += ~ self.z
 
         self.assertTrue(self.solver.solve())
-        self.assertEqual(ExitStatus.FEASIBLE, self.solver.status().exitstatus)
+        self.assertTrue(self.solver.status().exitstatus == ExitStatus.FEASIBLE or self.solver.status().exitstatus == ExitStatus.OPTIMAL)
 
         self.assertListEqual([0, 1, 0], [self.x.value(), self.y.value(), self.z.value()])
 
