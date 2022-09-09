@@ -330,6 +330,13 @@ class CPM_z3(SolverInterface):
                 arg = lhs.args[0]
                 return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
 
+            if isinstance(lhs, GlobalConstraint) and lhs.name == "element":
+                arr, idx = lhs.args
+                return self._z3_expr([(idx == i).implies(Comparison(cpm_con.name, arr[i], rhs)) for i in range(len(arr))])
+            if isinstance(rhs, GlobalConstraint) and rhs.name == "element":
+                arr, idx = rhs.args
+                return self._z3_expr([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))])
+
             if cpm_con.name == "==":
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
                     return [self._z3_expr(any(a == rhs for a in lhs.args))] + \
