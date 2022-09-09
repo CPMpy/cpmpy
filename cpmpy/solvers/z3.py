@@ -288,7 +288,32 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'wsum':
                 w = cpm_con.args[0]
                 x = self.solver_vars(cpm_con.args[1])
-                return z3.Sum(wi*xi for wi,xi in zip(w,x))
+                return z3.Sum([wi*xi for wi,xi in zip(w,x)])
+
+            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
+            elif cpm_con.name == 'sub':
+                lhs , rhs = self._z3_expr(cpm_con.args)
+                return lhs - rhs
+            elif cpm_con.name == "mul":
+                assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
+                lhs , rhs = self._z3_expr(cpm_con.args)
+                return lhs * rhs
+            elif cpm_con.name == "div":
+                lhs , rhs = self._z3_expr(cpm_con.args)
+                return lhs / rhs
+            elif cpm_con.name == "pow":
+                lhs , rhs = self._z3_expr(cpm_con.args)
+                return lhs ** rhs
+            elif cpm_con.name == "mod":
+                lhs , rhs = self._z3_expr(cpm_con.args)
+                return lhs % rhs
+
+            # '-'/1
+            elif cpm_con.name == "-":
+                return -self._z3_expr(cpm_con.args[0])
+
+            else:
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):

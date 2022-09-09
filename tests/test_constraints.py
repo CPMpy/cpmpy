@@ -23,7 +23,7 @@ EXCLUDE_OPERATORS = {CPM_ortools: {"sub"},
                      CPM_gurobi: {"sub", "mod"},
                      CPM_minizinc: {},
                      CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     CPM_z3: {}}
+                     CPM_z3: {"sub"}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
