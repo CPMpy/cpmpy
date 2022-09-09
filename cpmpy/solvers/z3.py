@@ -22,10 +22,12 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
+from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 
 class CPM_z3(SolverInterface):
     """
@@ -317,11 +319,45 @@ class CPM_z3(SolverInterface):
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
-            lhs = self._z3_expr(cpm_con.args[0])
-            rhs = self._z3_expr(cpm_con.args[1])
 
+            lhs, rhs = cpm_con.args
+
+            # 'abs'/1
+            if isinstance(rhs, Operator) and rhs.name == "abs":
+                arg = rhs.args[0]
+                return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
+            if isinstance(lhs, Operator) and lhs.name == "abs":
+                arg = lhs.args[0]
+                return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
+
+            if cpm_con.name == "==":
+                if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
+                    return [self._z3_expr(any(a == rhs for a in lhs.args))] + \
+                           self._z3_expr([a <= rhs for a in lhs.args])
+                if isinstance(rhs, GlobalConstraint) and rhs.name == "max":
+                    return [self._z3_expr(any(lhs == a for a in rhs.args))] + \
+                           self._z3_expr([lhs >= a for a in rhs.args])
+                if isinstance(lhs, GlobalConstraint) and lhs.name == "min":
+                    return [self._z3_expr(any(a == rhs for a in lhs.args))] + \
+                           self._z3_expr([a >= rhs for a in lhs.args])
+                if isinstance(rhs, GlobalConstraint) and rhs.name == "min":
+                    return [self._z3_expr(any(lhs == a for a in rhs.args))] + \
+                           self._z3_expr([lhs <= a for a in rhs.args])
+
+                lhs, rhs = self._z3_expr(cpm_con.args)
+                return (lhs == rhs)
+
+
+            if isinstance(lhs, GlobalConstraint) and lhs.name in ("min", "max"):
+                new_var, cons = get_or_make_var(lhs)
+                return self._z3_expr(cons) + self._z3_expr([Comparison(cpm_con.name, new_var, rhs)])
+            if isinstance(rhs, GlobalConstraint) and rhs.name in ("min", "max"):
+                new_var, cons = get_or_make_var(rhs)
+                return self._z3_expr(cons) + self._z3_expr([Comparison(cpm_con.name, lhs, new_var)])
+
+            # other comparisons
+            lhs, rhs = self._z3_expr(cpm_con.args)
             # post the comparison
-            # TODO: eval_comparison(cpm_con.name, lhs, rhs)
             if cpm_con.name == '<=':
                 return (lhs <= rhs)
             elif cpm_con.name == '<':
@@ -332,12 +368,9 @@ class CPM_z3(SolverInterface):
                 return (lhs > rhs)
             elif cpm_con.name == '!=':
                 return (lhs != rhs)
-            elif cpm_con.name == '==':
-                return (lhs == rhs)
-        
+
+
         # TODO:
-        # min/max
-        # abs/mul/div/mod/pow
         # element
         # table
 
