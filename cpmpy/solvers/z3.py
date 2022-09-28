@@ -53,7 +53,7 @@ class CPM_z3(SolverInterface):
             return False
 
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver="sat"):
         """
         Constructor of the native solver object
 
@@ -66,10 +66,13 @@ class CPM_z3(SolverInterface):
 
         import z3
 
-        assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
+        assert "sat" in subsolver or "opt" in subsolver, "Z3 only has a satisfaction or optimization sub-solver."
 
         # initialise the native solver object
-        self.z3_solver = z3.Solver()
+        if "sat" in subsolver:
+            self.z3_solver = z3.Solver()
+        if "opt" in subsolver:
+            self.z3_solver = z3.Optimize()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
@@ -102,6 +105,7 @@ class CPM_z3(SolverInterface):
             s.solve(**params)
             ```
         """
+        import z3
 
         if time_limit is not None:
             # z3 expects milliseconds in int
@@ -115,7 +119,6 @@ class CPM_z3(SolverInterface):
         # call the solver, with parameters
         for (key,value) in kwargs.items():
             self.z3_solver.set(key, value)
-        # TODO: how to do optimisation?
 
         my_status = repr(self.z3_solver.check(*z3_assum_vars))
 
@@ -130,6 +133,8 @@ class CPM_z3(SolverInterface):
         # translate exit status
         if my_status == "sat":
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if isinstance(self.z3_solver, z3.Optimize):
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif my_status == "unsat":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "unknown":
@@ -152,12 +157,14 @@ class CPM_z3(SolverInterface):
                     cpm_var._value = bool(sol[sol_var])
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
-                # cpm_var._value = sol[sol_var]
 
             # TODO
             # translate objective, for optimisation problems only
-            #if self.TEMPLATE_solver.HasObjective():
-            #    self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+            if isinstance(self.z3_solver, z3.Optimize) and \
+                    len(self.z3_solver.objectives()) != 0:
+                obj = self.z3_solver.objectives()[0]
+                self.objective_value_ = sol.evaluate(obj)
+
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None # XXX, maybe all solvers should do this...
@@ -208,12 +215,14 @@ class CPM_z3(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
         """
+        import z3
         # objective can be a nested expression for z3
+        assert isinstance(self.z3_solver, z3.Optimize), "Use the z3 optimizer for optimization problems"
         obj = self._z3_expr(expr)
         if minimize:
-            TEMPLATEpy.Minimize(obj)
+            self.z3_solver.minimize(obj)
         else:
-            TEMPLATEpy.Maximize(obj)
+            self.z3_solver.maximize(obj)
 
     def __add__(self, cpm_con):
         """
