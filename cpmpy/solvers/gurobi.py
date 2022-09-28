@@ -139,10 +139,14 @@ class CPM_gurobi(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif grb_status == GRB.TIME_LIMIT:
+            if self.grb_model.SolCount == 0:
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:  # another?
             raise NotImplementedError(
                 f"Translation of gurobi status {grb_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
-        # TODO: what about interrupted solves? Gurobi can return sub-optimal values too
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
