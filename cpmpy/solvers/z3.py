@@ -394,8 +394,12 @@ class CPM_z3(SolverInterface):
         # table
 
         # rest: base (Boolean) global constraints
-        elif cpm_con.name == 'xor' and len(cpm_con.args) == 2:
-            return z3.Xor(*self._z3_expr(cpm_con.args))
+        elif cpm_con.name == 'xor':
+            z3_args = self._z3_expr(cpm_con.args)
+            z3_cons = z3.Xor(z3_args[0], z3_args[1])
+            for a in z3_args[2:]:
+                z3_cons = z3.Xor(z3_cons, a)
+            return z3_cons
         elif cpm_con.name == 'alldifferent':
             return z3.Distinct(self._z3_expr(cpm_con.args))
 
