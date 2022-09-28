@@ -288,8 +288,6 @@ class CPM_z3(SolverInterface):
                 return z3.And(self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'or':
                 return z3.Or(self._z3_expr(cpm_con.args))
-            elif cpm_con.name == 'xor':
-                return z3.Xor(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
                 return z3.Implies(*self._z3_expr(cpm_con.args)) # 2 args, unfold
 
@@ -391,6 +389,8 @@ class CPM_z3(SolverInterface):
         # table
 
         # rest: base (Boolean) global constraints
+        elif cpm_con.name == 'xor' and len(cpm_con.args) == 2:
+            return z3.Xor(*self._z3_expr(cpm_con.args))
         elif cpm_con.name == 'alldifferent':
             return z3.Distinct(self._z3_expr(cpm_con.args))
 
