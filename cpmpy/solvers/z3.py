@@ -66,6 +66,8 @@ class CPM_z3(SolverInterface):
 
         import z3
 
+        if subsolver is None:
+            subsolver = "sat"
         assert "sat" in subsolver or "opt" in subsolver, "Z3 only has a satisfaction or optimization sub-solver."
 
         # initialise the native solver object
@@ -291,10 +293,7 @@ class CPM_z3(SolverInterface):
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
                 cond, expr = self._z3_expr(cpm_con.args)
-                # if is_any_list(cond):
-                #     cond = z3.And(cond)
-                # if is_any_list(expr):
-                #     expr = z3.And(expr)
+                # TODO: this does not work for edge cases like decompositions in cond or expr (cfr reify-rewrite transformation).
                 return z3.Implies(cond, expr)
 
             # 'sum'/n, 'wsum'/2
