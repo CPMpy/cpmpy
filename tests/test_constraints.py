@@ -3,32 +3,35 @@ import unittest
 from cpmpy import boolvar, intvar, Model, cpm_array
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import *
-from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat
+from cpmpy.solvers import CPM_gurobi, CPM_ortools, CPM_minizinc, CPM_pysat, CPM_scip
 
 import pytest
 
-SOLVER_CLASS = CPM_ortools
+SOLVER_CLASS = CPM_scip
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {CPM_ortools: {"circuit"},
                   CPM_gurobi: {"circuit"},
                   CPM_minizinc: {"circuit"},
-                  CPM_pysat: {"circuit", "element","min","max", "allequal", "alldifferent"}}
+                  CPM_pysat: {"circuit", "element","min","max", "allequal", "alldifferent"},
+                  CPM_scip: {"min", "max"}}
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {CPM_ortools: {"sub"},
                      CPM_gurobi: {"sub", "mod"},
                      CPM_minizinc: {},
-                     CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     CPM_pysat: {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     CPM_scip: {"sub", "mod"}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {CPM_ortools: {"xor", "element"}, # TODO this will become emtpy after resolving issue #105
                 CPM_gurobi:  {},
                 CPM_minizinc: {},
-                CPM_pysat: {}}
+                CPM_pysat: {},
+                CPM_scip: {}}
 
 
 # Variables to use in the rest of the test script
@@ -197,5 +200,5 @@ def test_reify_imply_constraints(constraint):
     """
     if SOLVER_CLASS is None:
         return
-    assert SOLVER_CLASS(Model(constraint)).solve()
+    assert SOLVER_CLASS(Model(constraint)).solve(time_limit=2, **{"lp/presolving":False})
     assert constraint.value()
