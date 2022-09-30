@@ -348,6 +348,10 @@ class CPM_gurobi(SolverInterface):
                 lin_expr = self._make_numexpr(lhs)
             else:
                 raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+            if not is_num(rhs):
+                # vars on rhs not supported, add to lhs
+                lin_expr -= self.solver_var(rhs)
+                rhs = 0
             if sub_expr.name == "<=":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
             if sub_expr.name == ">=":

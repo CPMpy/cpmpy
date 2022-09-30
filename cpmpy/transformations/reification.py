@@ -21,7 +21,7 @@ from .flatten_model import flatten_constraint, negated_normal, get_or_make_var
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
-def only_bv_implies(constraints):
+def only_bv_implies(constraints, supported_eq=frozenset()):
     """
         Transforms all reifications to BV -> BE form
 
@@ -53,7 +53,8 @@ def only_bv_implies(constraints):
         elif isinstance(cpm_expr, Comparison) and \
                 cpm_expr.name == '==' and \
                 cpm_expr.args[0].is_bool() and \
-                isinstance(cpm_expr.args[1], _BoolVarImpl):
+                isinstance(cpm_expr.args[1], _BoolVarImpl) and \
+                cpm_expr.args[0].name not in supported_eq:
             # BV == BV special case
             if isinstance(cpm_expr.args[0], _BoolVarImpl):
                 l,r = cpm_expr.args
@@ -109,7 +110,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
             newcons.append(cpm_expr)
         else:  # reification, check for rewrite
             boolexpr = cpm_expr.args[boolexpr_index]
-            if isinstance(boolexpr, Operator):
+            if isinstance(boolexpr, Operator) or boolexpr.name in supported:
                 # Case 1, BE is Operator (and, or, ->)
                 #   assume supported, return as is
                 newcons.append(cpm_expr)
