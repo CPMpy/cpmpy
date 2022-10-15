@@ -26,6 +26,7 @@ from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
 from .pysdd import CPM_pysdd
+from .glasgowconstraintsolver import CPM_glasgowconstraintsolver
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -72,6 +73,7 @@ class SolverLookup():
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("minizinc", CPM_minizinc),
+                ("glasgowconstraintsolver", CPM_glasgowconstraintsolver)
                ]
 
     @staticmethod
