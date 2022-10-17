@@ -137,3 +137,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 .DS_Store
+
+# VeriPB proof log files (for Glasgow Constraint solver)
+*.veripb 
+*.opb
