@@ -18,6 +18,9 @@ from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 
+import shutil # For renaming the proof file
+import os
+
 class CPM_glasgowconstraintsolver(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API
@@ -62,16 +65,35 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             Arguments:
             - time_limit:  #TODO maximum solve time in seconds (float, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
+            Additional keyword arguments:
+            - proof: filename/path for the two files ".opb" and ".veripb" necessary for proof verification
+            (if this argument is not supplied the proof files created by the solver are deleted).
+
             Arguments that correspond to solver parameters:
             #TODO document solver parameters (there are none at the moment)
-            #TODO <Add link to documentation of all solver parameters>
         """
 
         if time_limit is not None:
             raise NotImplementedError("Glasgow Constraint Solver does not currently support timeouts.")
+        
+        if "proof" in kwargs: # Don't pass the proof argument directly to the solver
+            new_proofname = kwargs["proof"]
+            kwargs = dict(kwargs)
+            del kwargs["proof"]
+        else:
+            new_proofname = None
+        old_proofname = self.gcs.get_proof_filename()
 
         # call the solver, with parameters
         gcs_stats = self.gcs.solve(**kwargs)
+
+        # Either rename or delete the proof files
+        if new_proofname is not None:
+            shutil.move(old_proofname + ".opb", new_proofname + ".opb")
+            shutil.move(old_proofname + ".veripb", new_proofname + ".veripb")
+        else:
+            os.remove(old_proofname + ".opb")
+            os.remove(old_proofname + ".veripb")
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -101,7 +123,9 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective:
                 self.objective_value_ = self.gcs.get_solution_value(self.objective_var)
+        
 
+        
         return has_sol
 
     def solver_var(self, cpm_var):

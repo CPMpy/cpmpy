@@ -1,0 +1,1498 @@
+pseudo-Boolean proof version 1.2
+f 2984 0
+# 1
+u 1 iv0_eq_1 >= 1 ;
+u 1 ~iv2_eq_1 >= 1 ;
+u 1 ~iv4_eq_1 >= 1 ;
+u 1 ~iv6_eq_2 >= 1 ;
+u 1 ~iv6_eq_3 >= 1 ;
+u 1 iv0_x[0]_b_0 2 iv0_x[0]_b_1 4 iv0_x[0]_b_2 8 iv0_x[0]_b_3 16 iv0_x[0]_b_4 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 >= 2 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 >= 2 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 2992 1 * + 1 d
+u 1 iv11_ge_5 >= 1 ;
+u -1 iv0_x[0]_b_0 -2 iv0_x[0]_b_1 -4 iv0_x[0]_b_2 -8 iv0_x[0]_b_3 -16 iv0_x[0]_b_4 >= -1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 >= -10 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 >= -10 ;
+p 1561 1 * 2995 1 * + 2996 1 * + 2997 1 * + 1 d
+u 1 ~iv11_ge_24 >= 1 ;
+u 1 iv9_b_b_0 >= 0 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 >= 5 ;
+p 2984 1 * 3000 100 * + 3001 1 * + 1 d
+u 1 iv13_ge_5 >= 1 ;
+u -1 iv9_b_b_0 >= -1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 >= -23 ;
+p 2983 1 * 3004 100 * + 3005 1 * + 1 d
+u 1 ~iv13_ge_126 >= 1 ;
+p 1561 1 * 2995 1 * + 2996 1 * + 2997 1 * + 1 d
+u 1 ~iv11_ge_22 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 >= -21 ;
+p 2983 1 * 3004 100 * + 3010 1 * + 1 d
+u 1 ~iv13_ge_122 >= 1 ;
+* guessing iv9_eq_0, decision stack is [ ]
+# 2
+u -1 iv9_b_b_0 2 ~iv9_eq_0 >= 0 ;
+p 2983 1 * 3013 100 * + 3010 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv13_ge_22 >= 1 ;
+* guessing iv2_eq_2, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_2 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv6_eq_20 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 34 ~iv9_eq_0 34 ~iv2_eq_2 >= 3 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3026 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 iv11_ge_6 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 33 ~iv9_eq_0 33 ~iv2_eq_2 >= -2 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv11_ge_15 >= 1 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv11_ge_14 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 69 ~iv9_eq_0 69 ~iv2_eq_2 >= 6 ;
+p 2984 1 * 3000 100 * + 3034 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 iv13_ge_6 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 76 ~iv9_eq_0 76 ~iv2_eq_2 >= -13 ;
+p 2983 1 * 3013 100 * + 3037 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv13_ge_15 >= 1 ;
+p 2983 1 * 3013 100 * + 3037 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv13_ge_14 >= 1 ;
+* guessing iv4_eq_3, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv6_eq_12 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 34 ~iv9_eq_0 34 ~iv2_eq_2 34 ~iv4_eq_3 >= -3 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3049 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv11_ge_7 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 69 ~iv9_eq_0 69 ~iv2_eq_2 69 ~iv4_eq_3 >= -6 ;
+p 2983 1 * 3013 100 * + 3052 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 1 ~iv13_ge_7 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -5 <== iv13_ge_-5 ; iv13_ge_-5 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 6 <== ~iv13_ge_-5 ; iv13_ge_-5 1
+u 1 iv13_ge_3 >= 1 ==> iv13_ge_-5 ;
+# 4
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -4 <== iv13_ge_-4 ; iv13_ge_-4 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 5 <== ~iv13_ge_-4 ; iv13_ge_-4 1
+u 1 iv13_ge_3 >= 1 ==> iv13_ge_-4 ;
+u 1 iv13_ge_-4 >= 1 ==> iv13_ge_-5 ;
+# 4
+# 0
+red 1 iv13_ge_-5 1 ~iv13_ge_-4 >= 2 <== iv13_eq_-5 ; iv13_eq_-5 0
+red 1 iv13_ge_-5 1 ~iv13_ge_-4 >= 1 ==> iv13_eq_-5 ; iv13_eq_-5 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_3 iv5_eq_2 iv6_eq_5 iv7_eq_3 iv8_eq_12 iv9_eq_0 iv10_eq_0 iv11_eq_6 iv12_eq_3 iv13_eq_6 iv14_eq_3 iv13_eq_6 ~iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-5 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_3 >= 1 ;
+w 4
+* guessing iv4_eq_4, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 35 ~iv9_eq_0 35 ~iv2_eq_2 35 ~iv4_eq_4 >= 4 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3074 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 iv11_ge_7 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 35 ~iv9_eq_0 35 ~iv2_eq_2 35 ~iv4_eq_4 >= -4 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3077 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv11_ge_9 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 71 ~iv9_eq_0 71 ~iv2_eq_2 71 ~iv4_eq_4 >= -8 ;
+p 2983 1 * 3013 100 * + 3080 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv13_ge_9 >= 1 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3077 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv11_ge_8 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 70 ~iv9_eq_0 70 ~iv2_eq_2 70 ~iv4_eq_4 >= -7 ;
+p 2983 1 * 3013 100 * + 3085 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv13_ge_8 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -6 <== iv13_ge_-6 ; iv13_ge_-6 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 7 <== ~iv13_ge_-6 ; iv13_ge_-6 1
+u 1 iv13_ge_-5 >= 1 ==> iv13_ge_-6 ;
+# 4
+# 0
+red 1 iv13_ge_-6 1 ~iv13_ge_-5 >= 2 <== iv13_eq_-6 ; iv13_eq_-6 0
+red 1 iv13_ge_-6 1 ~iv13_ge_-5 >= 1 ==> iv13_eq_-6 ; iv13_eq_-6 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_4 iv5_eq_3 iv6_eq_6 iv7_eq_4 iv8_eq_13 iv9_eq_0 iv10_eq_0 iv11_eq_7 iv12_eq_4 iv13_eq_7 iv14_eq_4 iv13_eq_7 iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-6 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_4 >= 1 ;
+w 4
+* guessing iv4_eq_5, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 36 ~iv9_eq_0 36 ~iv2_eq_2 36 ~iv4_eq_5 >= 5 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3103 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 iv11_ge_8 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 36 ~iv9_eq_0 36 ~iv2_eq_2 36 ~iv4_eq_5 >= -5 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3106 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv11_ge_11 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 73 ~iv9_eq_0 73 ~iv2_eq_2 73 ~iv4_eq_5 >= -10 ;
+p 2983 1 * 3013 100 * + 3109 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv13_ge_11 >= 1 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3106 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv11_ge_9 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 71 ~iv9_eq_0 71 ~iv2_eq_2 71 ~iv4_eq_5 >= -8 ;
+p 2983 1 * 3013 100 * + 3114 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv13_ge_9 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -7 <== iv13_ge_-7 ; iv13_ge_-7 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 8 <== ~iv13_ge_-7 ; iv13_ge_-7 1
+u 1 iv13_ge_-6 >= 1 ==> iv13_ge_-7 ;
+# 4
+# 0
+red 1 iv13_ge_-7 1 ~iv13_ge_-6 >= 2 <== iv13_eq_-7 ; iv13_eq_-7 0
+red 1 iv13_ge_-7 1 ~iv13_ge_-6 >= 1 ==> iv13_eq_-7 ; iv13_eq_-7 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_5 iv5_eq_4 iv6_eq_7 iv7_eq_5 iv8_eq_14 iv9_eq_0 iv10_eq_0 iv11_eq_8 iv12_eq_5 iv13_eq_8 iv14_eq_5 iv13_eq_8 ~iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-7 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_5 >= 1 ;
+w 4
+* guessing iv4_eq_6, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 37 ~iv9_eq_0 37 ~iv2_eq_2 37 ~iv4_eq_6 >= 6 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3132 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 iv11_ge_9 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 37 ~iv9_eq_0 37 ~iv2_eq_2 37 ~iv4_eq_6 >= -6 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3135 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv11_ge_13 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 75 ~iv9_eq_0 75 ~iv2_eq_2 75 ~iv4_eq_6 >= -12 ;
+p 2983 1 * 3013 100 * + 3138 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv13_ge_13 >= 1 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3135 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv11_ge_10 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 72 ~iv9_eq_0 72 ~iv2_eq_2 72 ~iv4_eq_6 >= -9 ;
+p 2983 1 * 3013 100 * + 3143 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv13_ge_10 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -8 <== iv13_ge_-8 ; iv13_ge_-8 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 9 <== ~iv13_ge_-8 ; iv13_ge_-8 1
+u 1 iv13_ge_-7 >= 1 ==> iv13_ge_-8 ;
+# 4
+# 0
+red 1 iv13_ge_-8 1 ~iv13_ge_-7 >= 2 <== iv13_eq_-8 ; iv13_eq_-8 0
+red 1 iv13_ge_-8 1 ~iv13_ge_-7 >= 1 ==> iv13_eq_-8 ; iv13_eq_-8 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_6 iv5_eq_5 iv6_eq_8 iv7_eq_6 iv8_eq_15 iv9_eq_0 iv10_eq_0 iv11_eq_9 iv12_eq_6 iv13_eq_9 iv14_eq_6 iv13_eq_9 iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-8 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_6 >= 1 ;
+w 4
+* guessing iv4_eq_7, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 38 ~iv9_eq_0 38 ~iv2_eq_2 38 ~iv4_eq_7 >= 7 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3161 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 iv11_ge_10 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 38 ~iv9_eq_0 38 ~iv2_eq_2 38 ~iv4_eq_7 >= -7 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3164 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv11_ge_11 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 73 ~iv9_eq_0 73 ~iv2_eq_2 73 ~iv4_eq_7 >= -10 ;
+p 2983 1 * 3013 100 * + 3167 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv13_ge_11 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -9 <== iv13_ge_-9 ; iv13_ge_-9 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 10 <== ~iv13_ge_-9 ; iv13_ge_-9 1
+u 1 iv13_ge_-8 >= 1 ==> iv13_ge_-9 ;
+# 4
+# 0
+red 1 iv13_ge_-9 1 ~iv13_ge_-8 >= 2 <== iv13_eq_-9 ; iv13_eq_-9 0
+red 1 iv13_ge_-9 1 ~iv13_ge_-8 >= 1 ==> iv13_eq_-9 ; iv13_eq_-9 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_7 iv5_eq_6 iv6_eq_9 iv7_eq_7 iv8_eq_16 iv9_eq_0 iv10_eq_0 iv11_eq_10 iv12_eq_7 iv13_eq_10 iv14_eq_7 iv13_eq_10 ~iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-9 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_7 >= 1 ;
+w 4
+* guessing iv4_eq_8, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 39 ~iv9_eq_0 39 ~iv2_eq_2 39 ~iv4_eq_8 >= 8 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3185 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 iv11_ge_11 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 39 ~iv9_eq_0 39 ~iv2_eq_2 39 ~iv4_eq_8 >= -8 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3188 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv11_ge_12 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 74 ~iv9_eq_0 74 ~iv2_eq_2 74 ~iv4_eq_8 >= -11 ;
+p 2983 1 * 3013 100 * + 3191 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv13_ge_12 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -10 <== iv13_ge_-10 ; iv13_ge_-10 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 11 <== ~iv13_ge_-10 ; iv13_ge_-10 1
+u 1 iv13_ge_-9 >= 1 ==> iv13_ge_-10 ;
+# 4
+# 0
+red 1 iv13_ge_-10 1 ~iv13_ge_-9 >= 2 <== iv13_eq_-10 ; iv13_eq_-10 0
+red 1 iv13_ge_-10 1 ~iv13_ge_-9 >= 1 ==> iv13_eq_-10 ; iv13_eq_-10 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_8 iv5_eq_7 iv6_eq_10 iv7_eq_8 iv8_eq_17 iv9_eq_0 iv10_eq_0 iv11_eq_11 iv12_eq_8 iv13_eq_11 iv14_eq_8 iv13_eq_11 iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-10 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_8 >= 1 ;
+w 4
+* guessing iv4_eq_9, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 40 ~iv9_eq_0 40 ~iv2_eq_2 40 ~iv4_eq_9 >= 9 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3209 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 iv11_ge_12 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 40 ~iv9_eq_0 40 ~iv2_eq_2 40 ~iv4_eq_9 >= -9 ;
+p 1561 1 * 2995 1 * + 3029 1 * + 3212 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv11_ge_13 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 75 ~iv9_eq_0 75 ~iv2_eq_2 75 ~iv4_eq_9 >= -12 ;
+p 2983 1 * 3013 100 * + 3215 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv13_ge_13 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -11 <== iv13_ge_-11 ; iv13_ge_-11 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 12 <== ~iv13_ge_-11 ; iv13_ge_-11 1
+u 1 iv13_ge_-10 >= 1 ==> iv13_ge_-11 ;
+# 4
+# 0
+red 1 iv13_ge_-11 1 ~iv13_ge_-10 >= 2 <== iv13_eq_-11 ; iv13_eq_-11 0
+red 1 iv13_ge_-11 1 ~iv13_ge_-10 >= 1 ==> iv13_eq_-11 ; iv13_eq_-11 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_9 iv5_eq_8 iv6_eq_11 iv7_eq_9 iv8_eq_18 iv9_eq_0 iv10_eq_0 iv11_eq_12 iv12_eq_9 iv13_eq_12 iv14_eq_9 iv13_eq_12 ~iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-11 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_9 >= 1 ;
+w 4
+* guessing iv4_eq_10, decision stack is [ iv9_eq_0 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_11 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 41 ~iv9_eq_0 41 ~iv2_eq_2 41 ~iv4_eq_10 >= 10 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3233 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 1 iv11_ge_13 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -12 <== iv13_ge_-12 ; iv13_ge_-12 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 13 <== ~iv13_ge_-12 ; iv13_ge_-12 1
+u 1 iv13_ge_-11 >= 1 ==> iv13_ge_-12 ;
+# 4
+# 0
+red 1 iv13_ge_-12 1 ~iv13_ge_-11 >= 2 <== iv13_eq_-12 ; iv13_eq_-12 0
+red 1 iv13_ge_-12 1 ~iv13_ge_-11 >= 1 ==> iv13_eq_-12 ; iv13_eq_-12 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_10 iv5_eq_9 iv6_eq_12 iv7_eq_10 iv8_eq_19 iv9_eq_0 iv10_eq_0 iv11_eq_13 iv12_eq_10 iv13_eq_13 iv14_eq_10 iv13_eq_13 iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-12 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 1 ~iv4_eq_10 >= 1 ;
+w 4
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_2 >= 1 ;
+w 3
+* guessing iv2_eq_3, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv4_eq_3 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 34 ~iv9_eq_0 34 ~iv2_eq_3 >= 3 ;
+p 1562 1 * 2990 1 * + 3255 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 iv11_ge_6 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 34 ~iv9_eq_0 34 ~iv2_eq_3 >= -3 ;
+p 1561 1 * 2995 1 * + 3258 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv11_ge_16 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 525 ~iv9_eq_0 525 ~iv2_eq_3 >= 14 ;
+p 2983 1 * 3013 100 * + 3261 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 iv11_ge_14 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 78 ~iv9_eq_0 78 ~iv2_eq_3 >= -15 ;
+p 2983 1 * 3013 100 * + 3264 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv13_ge_16 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 77 ~iv9_eq_0 77 ~iv2_eq_3 >= 14 ;
+p 1561 1 * 2995 1 * + 3258 1 * + 3267 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3258 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv11_ge_15 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 77 ~iv9_eq_0 77 ~iv2_eq_3 >= -14 ;
+p 2983 1 * 3013 100 * + 3272 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv13_ge_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 1 ~iv6_eq_12 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -13 <== iv13_ge_-13 ; iv13_ge_-13 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 14 <== ~iv13_ge_-13 ; iv13_ge_-13 1
+u 1 iv13_ge_-12 >= 1 ==> iv13_ge_-13 ;
+# 3
+# 0
+red 1 iv13_ge_-13 1 ~iv13_ge_-12 >= 2 <== iv13_eq_-13 ; iv13_eq_-13 0
+red 1 iv13_ge_-13 1 ~iv13_ge_-12 >= 1 ==> iv13_eq_-13 ; iv13_eq_-13 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_3 iv3_eq_2 iv4_eq_10 iv5_eq_9 iv6_eq_13 iv7_eq_11 iv8_eq_29 iv9_eq_0 iv10_eq_0 iv11_eq_14 iv12_eq_11 iv13_eq_14 iv14_eq_11 iv13_eq_14 ~iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-13 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_3 >= 1 ;
+w 3
+* guessing iv2_eq_4, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv4_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 35 ~iv9_eq_0 35 ~iv2_eq_4 >= 4 ;
+p 1562 1 * 2990 1 * + 3300 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 iv11_ge_7 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 35 ~iv9_eq_0 35 ~iv2_eq_4 >= -4 ;
+p 1561 1 * 2995 1 * + 3303 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv11_ge_18 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 526 ~iv9_eq_0 526 ~iv2_eq_4 >= 15 ;
+p 2983 1 * 3013 100 * + 3306 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 iv11_ge_15 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 80 ~iv9_eq_0 80 ~iv2_eq_4 >= -17 ;
+p 2983 1 * 3013 100 * + 3309 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv13_ge_18 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 78 ~iv9_eq_0 78 ~iv2_eq_4 >= 15 ;
+p 1561 1 * 2995 1 * + 3303 1 * + 3312 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3303 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv11_ge_16 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 78 ~iv9_eq_0 78 ~iv2_eq_4 >= -15 ;
+p 2983 1 * 3013 100 * + 3317 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv13_ge_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 1 ~iv6_eq_13 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -14 <== iv13_ge_-14 ; iv13_ge_-14 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 15 <== ~iv13_ge_-14 ; iv13_ge_-14 1
+u 1 iv13_ge_-13 >= 1 ==> iv13_ge_-14 ;
+# 3
+# 0
+red 1 iv13_ge_-14 1 ~iv13_ge_-13 >= 2 <== iv13_eq_-14 ; iv13_eq_-14 0
+red 1 iv13_ge_-14 1 ~iv13_ge_-13 >= 1 ==> iv13_eq_-14 ; iv13_eq_-14 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_4 iv3_eq_3 iv4_eq_10 iv5_eq_9 iv6_eq_14 iv7_eq_12 iv8_eq_39 iv9_eq_0 iv10_eq_0 iv11_eq_15 iv12_eq_12 iv13_eq_15 iv14_eq_12 iv13_eq_15 iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-14 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_4 >= 1 ;
+w 3
+* guessing iv2_eq_5, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv4_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 36 ~iv9_eq_0 36 ~iv2_eq_5 >= 5 ;
+p 1562 1 * 2990 1 * + 3345 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 iv11_ge_8 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 36 ~iv9_eq_0 36 ~iv2_eq_5 >= -5 ;
+p 1561 1 * 2995 1 * + 3348 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv11_ge_20 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 527 ~iv9_eq_0 527 ~iv2_eq_5 >= 16 ;
+p 2983 1 * 3013 100 * + 3351 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 iv11_ge_16 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 82 ~iv9_eq_0 82 ~iv2_eq_5 >= -19 ;
+p 2983 1 * 3013 100 * + 3354 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv13_ge_20 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 79 ~iv9_eq_0 79 ~iv2_eq_5 >= 16 ;
+p 1561 1 * 2995 1 * + 3348 1 * + 3357 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3348 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv11_ge_17 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 79 ~iv9_eq_0 79 ~iv2_eq_5 >= -16 ;
+p 2983 1 * 3013 100 * + 3362 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv13_ge_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 1 ~iv6_eq_14 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -15 <== iv13_ge_-15 ; iv13_ge_-15 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 16 <== ~iv13_ge_-15 ; iv13_ge_-15 1
+u 1 iv13_ge_-14 >= 1 ==> iv13_ge_-15 ;
+# 3
+# 0
+red 1 iv13_ge_-15 1 ~iv13_ge_-14 >= 2 <== iv13_eq_-15 ; iv13_eq_-15 0
+red 1 iv13_ge_-15 1 ~iv13_ge_-14 >= 1 ==> iv13_eq_-15 ; iv13_eq_-15 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_5 iv3_eq_4 iv4_eq_10 iv5_eq_9 iv6_eq_15 iv7_eq_13 iv8_eq_49 iv9_eq_0 iv10_eq_0 iv11_eq_16 iv12_eq_13 iv13_eq_16 iv14_eq_13 iv13_eq_16 ~iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-15 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_5 >= 1 ;
+w 3
+* guessing iv2_eq_6, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv4_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 37 ~iv9_eq_0 37 ~iv2_eq_6 >= 6 ;
+p 1562 1 * 2990 1 * + 3390 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 iv11_ge_9 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 528 ~iv9_eq_0 528 ~iv2_eq_6 >= 17 ;
+p 2983 1 * 3013 100 * + 3393 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 iv11_ge_17 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 37 ~iv9_eq_0 37 ~iv2_eq_6 >= -6 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 80 ~iv9_eq_0 80 ~iv2_eq_6 >= 17 ;
+p 1561 1 * 2995 1 * + 3396 1 * + 3397 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3396 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv11_ge_18 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 80 ~iv9_eq_0 80 ~iv2_eq_6 >= -17 ;
+p 2983 1 * 3013 100 * + 3402 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv13_ge_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 1 ~iv6_eq_15 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -16 <== iv13_ge_-16 ; iv13_ge_-16 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 17 <== ~iv13_ge_-16 ; iv13_ge_-16 1
+u 1 iv13_ge_-15 >= 1 ==> iv13_ge_-16 ;
+# 3
+# 0
+red 1 iv13_ge_-16 1 ~iv13_ge_-15 >= 2 <== iv13_eq_-16 ; iv13_eq_-16 0
+red 1 iv13_ge_-16 1 ~iv13_ge_-15 >= 1 ==> iv13_eq_-16 ; iv13_eq_-16 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_6 iv3_eq_5 iv4_eq_10 iv5_eq_9 iv6_eq_16 iv7_eq_14 iv8_eq_59 iv9_eq_0 iv10_eq_0 iv11_eq_17 iv12_eq_14 iv13_eq_17 iv14_eq_14 iv13_eq_17 iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-16 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_6 >= 1 ;
+w 3
+* guessing iv2_eq_7, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv4_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 38 ~iv9_eq_0 38 ~iv2_eq_7 >= 7 ;
+p 1562 1 * 2990 1 * + 3430 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 iv11_ge_10 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 529 ~iv9_eq_0 529 ~iv2_eq_7 >= 18 ;
+p 2983 1 * 3013 100 * + 3433 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 iv11_ge_18 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 38 ~iv9_eq_0 38 ~iv2_eq_7 >= -7 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 81 ~iv9_eq_0 81 ~iv2_eq_7 >= 18 ;
+p 1561 1 * 2995 1 * + 3436 1 * + 3437 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3436 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv11_ge_19 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 81 ~iv9_eq_0 81 ~iv2_eq_7 >= -18 ;
+p 2983 1 * 3013 100 * + 3442 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv13_ge_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 1 ~iv6_eq_16 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -17 <== iv13_ge_-17 ; iv13_ge_-17 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 18 <== ~iv13_ge_-17 ; iv13_ge_-17 1
+u 1 iv13_ge_-16 >= 1 ==> iv13_ge_-17 ;
+# 3
+# 0
+red 1 iv13_ge_-17 1 ~iv13_ge_-16 >= 2 <== iv13_eq_-17 ; iv13_eq_-17 0
+red 1 iv13_ge_-17 1 ~iv13_ge_-16 >= 1 ==> iv13_eq_-17 ; iv13_eq_-17 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_7 iv3_eq_6 iv4_eq_10 iv5_eq_9 iv6_eq_17 iv7_eq_15 iv8_eq_69 iv9_eq_0 iv10_eq_0 iv11_eq_18 iv12_eq_15 iv13_eq_18 iv14_eq_15 iv13_eq_18 ~iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-17 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_7 >= 1 ;
+w 3
+* guessing iv2_eq_8, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv4_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 39 ~iv9_eq_0 39 ~iv2_eq_8 >= 8 ;
+p 1562 1 * 2990 1 * + 3470 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 iv11_ge_11 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 530 ~iv9_eq_0 530 ~iv2_eq_8 >= 19 ;
+p 2983 1 * 3013 100 * + 3473 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 iv11_ge_19 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 39 ~iv9_eq_0 39 ~iv2_eq_8 >= -8 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 82 ~iv9_eq_0 82 ~iv2_eq_8 >= 19 ;
+p 1561 1 * 2995 1 * + 3476 1 * + 3477 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3476 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv11_ge_20 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 82 ~iv9_eq_0 82 ~iv2_eq_8 >= -19 ;
+p 2983 1 * 3013 100 * + 3482 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv13_ge_20 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 1 ~iv6_eq_17 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -18 <== iv13_ge_-18 ; iv13_ge_-18 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 19 <== ~iv13_ge_-18 ; iv13_ge_-18 1
+u 1 iv13_ge_-17 >= 1 ==> iv13_ge_-18 ;
+# 3
+# 0
+red 1 iv13_ge_-18 1 ~iv13_ge_-17 >= 2 <== iv13_eq_-18 ; iv13_eq_-18 0
+red 1 iv13_ge_-18 1 ~iv13_ge_-17 >= 1 ==> iv13_eq_-18 ; iv13_eq_-18 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_8 iv3_eq_7 iv4_eq_10 iv5_eq_9 iv6_eq_18 iv7_eq_16 iv8_eq_79 iv9_eq_0 iv10_eq_0 iv11_eq_19 iv12_eq_16 iv13_eq_19 iv14_eq_16 iv13_eq_19 iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-18 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_8 >= 1 ;
+w 3
+* guessing iv2_eq_9, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv4_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 40 ~iv9_eq_0 40 ~iv2_eq_9 >= 9 ;
+p 1562 1 * 2990 1 * + 3510 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 iv11_ge_12 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 531 ~iv9_eq_0 531 ~iv2_eq_9 >= 20 ;
+p 2983 1 * 3013 100 * + 3513 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 iv11_ge_20 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 40 ~iv9_eq_0 40 ~iv2_eq_9 >= -9 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 83 ~iv9_eq_0 83 ~iv2_eq_9 >= 20 ;
+p 1561 1 * 2995 1 * + 3516 1 * + 3517 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3516 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv11_ge_21 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 83 ~iv9_eq_0 83 ~iv2_eq_9 >= -20 ;
+p 2983 1 * 3013 100 * + 3522 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv13_ge_21 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 1 ~iv6_eq_17 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -19 <== iv13_ge_-19 ; iv13_ge_-19 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 20 <== ~iv13_ge_-19 ; iv13_ge_-19 1
+u 1 iv13_ge_-18 >= 1 ==> iv13_ge_-19 ;
+# 3
+# 0
+red 1 iv13_ge_-19 1 ~iv13_ge_-18 >= 2 <== iv13_eq_-19 ; iv13_eq_-19 0
+red 1 iv13_ge_-19 1 ~iv13_ge_-18 >= 1 ==> iv13_eq_-19 ; iv13_eq_-19 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_9 iv3_eq_8 iv4_eq_10 iv5_eq_9 iv6_eq_19 iv7_eq_17 iv8_eq_89 iv9_eq_0 iv10_eq_0 iv11_eq_20 iv12_eq_17 iv13_eq_20 iv14_eq_17 iv13_eq_20 ~iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 ~iv13_IV2_b_5 ~iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-19 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_9 >= 1 ;
+w 3
+* guessing iv2_eq_10, decision stack is [ iv9_eq_0 ]
+# 3
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv4_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_4 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_5 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 41 ~iv9_eq_0 41 ~iv2_eq_10 >= 10 ;
+p 1562 1 * 2990 1 * + 3550 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 iv11_ge_13 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 532 ~iv9_eq_0 532 ~iv2_eq_10 >= 21 ;
+p 2983 1 * 3013 100 * + 3553 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 1 iv11_ge_21 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 40 ~iv9_eq_0 40 ~iv2_eq_10 >= -9 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 84 ~iv9_eq_0 84 ~iv2_eq_10 >= 21 ;
+p 1561 1 * 2996 1 * + 3556 1 * + 3557 1 * + 1 d
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 >= 1 ;
+# 2
+* backtracking
+u 1 ~iv9_eq_0 1 ~iv2_eq_10 >= 1 ;
+w 3
+# 1
+* backtracking
+u 1 ~iv9_eq_0 >= 1 ;
+w 2
+* guessing iv9_eq_1, decision stack is [ ]
+# 2
+u 1 ~iv9_eq_1 1 iv6_ge_6 >= 1 ;
+u 1 iv9_b_b_0 2 ~iv9_eq_1 >= 1 ;
+p 2984 1 * 3563 100 * + 3001 1 * + 1 d
+u 1 ~iv9_eq_1 1 iv13_ge_105 >= 1 ;
+* guessing iv2_eq_2, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_2 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_3 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv6_eq_20 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 35 ~iv9_eq_1 35 ~iv2_eq_2 >= 4 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3576 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 iv11_ge_7 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 33 ~iv9_eq_1 33 ~iv2_eq_2 >= -2 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv11_ge_16 >= 1 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv11_ge_14 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 70 ~iv9_eq_1 70 ~iv2_eq_2 >= 7 ;
+p 2984 1 * 3563 100 * + 3584 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 iv13_ge_107 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 76 ~iv9_eq_1 76 ~iv2_eq_2 >= -13 ;
+p 2983 1 * 3004 100 * + 3587 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv13_ge_116 >= 1 ;
+p 2983 1 * 3004 100 * + 3587 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv13_ge_114 >= 1 ;
+* guessing iv4_eq_4, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv6_eq_12 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 35 ~iv9_eq_1 35 ~iv2_eq_2 35 ~iv4_eq_4 >= -4 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3598 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv11_ge_8 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 70 ~iv9_eq_1 70 ~iv2_eq_2 70 ~iv4_eq_4 >= -7 ;
+p 2983 1 * 3004 100 * + 3601 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 1 ~iv13_ge_108 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -106 <== iv13_ge_-106 ; iv13_ge_-106 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 107 <== ~iv13_ge_-106 ; iv13_ge_-106 1
+u 1 iv13_ge_-19 >= 1 ==> iv13_ge_-106 ;
+# 4
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -105 <== iv13_ge_-105 ; iv13_ge_-105 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 106 <== ~iv13_ge_-105 ; iv13_ge_-105 1
+u 1 iv13_ge_-19 >= 1 ==> iv13_ge_-105 ;
+u 1 iv13_ge_-105 >= 1 ==> iv13_ge_-106 ;
+# 4
+# 0
+red 1 iv13_ge_-106 1 ~iv13_ge_-105 >= 2 <== iv13_eq_-106 ; iv13_eq_-106 0
+red 1 iv13_ge_-106 1 ~iv13_ge_-105 >= 1 ==> iv13_eq_-106 ; iv13_eq_-106 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_4 iv5_eq_3 iv6_eq_6 iv7_eq_4 iv8_eq_13 iv9_eq_1 iv10_eq_1 iv11_eq_7 iv12_eq_4 iv13_eq_107 iv14_eq_104 iv13_eq_107 iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-106 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_4 >= 1 ;
+w 4
+* guessing iv4_eq_5, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 36 ~iv9_eq_1 36 ~iv2_eq_2 36 ~iv4_eq_5 >= 5 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3622 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 iv11_ge_8 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 36 ~iv9_eq_1 36 ~iv2_eq_2 36 ~iv4_eq_5 >= -5 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3625 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv11_ge_10 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 72 ~iv9_eq_1 72 ~iv2_eq_2 72 ~iv4_eq_5 >= -9 ;
+p 2983 1 * 3004 100 * + 3628 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv13_ge_110 >= 1 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3625 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv11_ge_9 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 71 ~iv9_eq_1 71 ~iv2_eq_2 71 ~iv4_eq_5 >= -8 ;
+p 2983 1 * 3004 100 * + 3633 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 1 ~iv13_ge_109 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -107 <== iv13_ge_-107 ; iv13_ge_-107 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 108 <== ~iv13_ge_-107 ; iv13_ge_-107 1
+u 1 iv13_ge_-106 >= 1 ==> iv13_ge_-107 ;
+# 4
+# 0
+red 1 iv13_ge_-107 1 ~iv13_ge_-106 >= 2 <== iv13_eq_-107 ; iv13_eq_-107 0
+red 1 iv13_ge_-107 1 ~iv13_ge_-106 >= 1 ==> iv13_eq_-107 ; iv13_eq_-107 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_5 iv5_eq_4 iv6_eq_7 iv7_eq_5 iv8_eq_14 iv9_eq_1 iv10_eq_1 iv11_eq_8 iv12_eq_5 iv13_eq_108 iv14_eq_105 iv13_eq_108 ~iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-107 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_5 >= 1 ;
+w 4
+* guessing iv4_eq_6, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 37 ~iv9_eq_1 37 ~iv2_eq_2 37 ~iv4_eq_6 >= 6 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3650 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 iv11_ge_9 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 37 ~iv9_eq_1 37 ~iv2_eq_2 37 ~iv4_eq_6 >= -6 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3653 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv11_ge_12 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 74 ~iv9_eq_1 74 ~iv2_eq_2 74 ~iv4_eq_6 >= -11 ;
+p 2983 1 * 3004 100 * + 3656 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv13_ge_112 >= 1 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3653 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv11_ge_10 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 72 ~iv9_eq_1 72 ~iv2_eq_2 72 ~iv4_eq_6 >= -9 ;
+p 2983 1 * 3004 100 * + 3661 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 1 ~iv13_ge_110 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -108 <== iv13_ge_-108 ; iv13_ge_-108 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 109 <== ~iv13_ge_-108 ; iv13_ge_-108 1
+u 1 iv13_ge_-107 >= 1 ==> iv13_ge_-108 ;
+# 4
+# 0
+red 1 iv13_ge_-108 1 ~iv13_ge_-107 >= 2 <== iv13_eq_-108 ; iv13_eq_-108 0
+red 1 iv13_ge_-108 1 ~iv13_ge_-107 >= 1 ==> iv13_eq_-108 ; iv13_eq_-108 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_6 iv5_eq_5 iv6_eq_8 iv7_eq_6 iv8_eq_15 iv9_eq_1 iv10_eq_1 iv11_eq_9 iv12_eq_6 iv13_eq_109 iv14_eq_106 iv13_eq_109 iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-108 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_6 >= 1 ;
+w 4
+* guessing iv4_eq_7, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 38 ~iv9_eq_1 38 ~iv2_eq_2 38 ~iv4_eq_7 >= 7 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3678 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 iv11_ge_10 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 38 ~iv9_eq_1 38 ~iv2_eq_2 38 ~iv4_eq_7 >= -7 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3681 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv11_ge_11 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 73 ~iv9_eq_1 73 ~iv2_eq_2 73 ~iv4_eq_7 >= -10 ;
+p 2983 1 * 3004 100 * + 3684 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 1 ~iv13_ge_111 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -109 <== iv13_ge_-109 ; iv13_ge_-109 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 110 <== ~iv13_ge_-109 ; iv13_ge_-109 1
+u 1 iv13_ge_-108 >= 1 ==> iv13_ge_-109 ;
+# 4
+# 0
+red 1 iv13_ge_-109 1 ~iv13_ge_-108 >= 2 <== iv13_eq_-109 ; iv13_eq_-109 0
+red 1 iv13_ge_-109 1 ~iv13_ge_-108 >= 1 ==> iv13_eq_-109 ; iv13_eq_-109 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_7 iv5_eq_6 iv6_eq_9 iv7_eq_7 iv8_eq_16 iv9_eq_1 iv10_eq_1 iv11_eq_10 iv12_eq_7 iv13_eq_110 iv14_eq_107 iv13_eq_110 ~iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-109 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_7 >= 1 ;
+w 4
+* guessing iv4_eq_8, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 39 ~iv9_eq_1 39 ~iv2_eq_2 39 ~iv4_eq_8 >= 8 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3701 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 iv11_ge_11 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 39 ~iv9_eq_1 39 ~iv2_eq_2 39 ~iv4_eq_8 >= -8 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3704 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv11_ge_12 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 74 ~iv9_eq_1 74 ~iv2_eq_2 74 ~iv4_eq_8 >= -11 ;
+p 2983 1 * 3004 100 * + 3707 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 1 ~iv13_ge_112 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -110 <== iv13_ge_-110 ; iv13_ge_-110 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 111 <== ~iv13_ge_-110 ; iv13_ge_-110 1
+u 1 iv13_ge_-109 >= 1 ==> iv13_ge_-110 ;
+# 4
+# 0
+red 1 iv13_ge_-110 1 ~iv13_ge_-109 >= 2 <== iv13_eq_-110 ; iv13_eq_-110 0
+red 1 iv13_ge_-110 1 ~iv13_ge_-109 >= 1 ==> iv13_eq_-110 ; iv13_eq_-110 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_8 iv5_eq_7 iv6_eq_10 iv7_eq_8 iv8_eq_17 iv9_eq_1 iv10_eq_1 iv11_eq_11 iv12_eq_8 iv13_eq_111 iv14_eq_108 iv13_eq_111 iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 iv13_IV2_b_3 ~iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-110 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_8 >= 1 ;
+w 4
+* guessing iv4_eq_9, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv6_eq_12 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 40 ~iv9_eq_1 40 ~iv2_eq_2 40 ~iv4_eq_9 >= 9 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3724 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 iv11_ge_12 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 40 ~iv9_eq_1 40 ~iv2_eq_2 40 ~iv4_eq_9 >= -9 ;
+p 1561 1 * 2995 1 * + 3579 1 * + 3727 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv11_ge_13 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 75 ~iv9_eq_1 75 ~iv2_eq_2 75 ~iv4_eq_9 >= -12 ;
+p 2983 1 * 3004 100 * + 3730 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 1 ~iv13_ge_113 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -111 <== iv13_ge_-111 ; iv13_ge_-111 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 112 <== ~iv13_ge_-111 ; iv13_ge_-111 1
+u 1 iv13_ge_-110 >= 1 ==> iv13_ge_-111 ;
+# 4
+# 0
+red 1 iv13_ge_-111 1 ~iv13_ge_-110 >= 2 <== iv13_eq_-111 ; iv13_eq_-111 0
+red 1 iv13_ge_-111 1 ~iv13_ge_-110 >= 1 ==> iv13_eq_-111 ; iv13_eq_-111 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_9 iv5_eq_8 iv6_eq_11 iv7_eq_9 iv8_eq_18 iv9_eq_1 iv10_eq_1 iv11_eq_12 iv12_eq_9 iv13_eq_112 iv14_eq_109 iv13_eq_112 ~iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-111 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_9 >= 1 ;
+w 4
+* guessing iv4_eq_10, decision stack is [ iv9_eq_1 iv2_eq_2 ]
+# 4
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 ~iv6_eq_11 >= 1 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 41 ~iv9_eq_1 41 ~iv2_eq_2 41 ~iv4_eq_10 >= 10 ;
+p 1562 1 * 2990 1 * + 2991 1 * + 3747 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 1 iv11_ge_13 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -112 <== iv13_ge_-112 ; iv13_ge_-112 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 113 <== ~iv13_ge_-112 ; iv13_ge_-112 1
+u 1 iv13_ge_-111 >= 1 ==> iv13_ge_-112 ;
+# 4
+# 0
+red 1 iv13_ge_-112 1 ~iv13_ge_-111 >= 2 <== iv13_eq_-112 ; iv13_eq_-112 0
+red 1 iv13_ge_-112 1 ~iv13_ge_-111 >= 1 ==> iv13_eq_-112 ; iv13_eq_-112 1
+# 4
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_2 iv3_eq_1 iv4_eq_10 iv5_eq_9 iv6_eq_12 iv7_eq_10 iv8_eq_19 iv9_eq_1 iv10_eq_1 iv11_eq_13 iv12_eq_10 iv13_eq_113 iv14_eq_110 iv13_eq_113 iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-112 >= 1 ;
+# 4
+# 3
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 1 ~iv4_eq_10 >= 1 ;
+w 4
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_2 >= 1 ;
+w 3
+* guessing iv2_eq_3, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv4_eq_3 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv4_eq_2 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 34 ~iv9_eq_1 34 ~iv2_eq_3 >= 3 ;
+u 1 iv4_x[2]_b_0 2 iv4_x[2]_b_1 4 iv4_x[2]_b_2 8 iv4_x[2]_b_3 16 iv4_x[2]_b_4 35 ~iv9_eq_1 35 ~iv2_eq_3 >= 4 ;
+p 1562 1 * 2990 1 * + 3769 1 * + 3770 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 iv11_ge_8 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 34 ~iv9_eq_1 34 ~iv2_eq_3 >= -3 ;
+p 1561 1 * 2995 1 * + 3773 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv11_ge_18 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 625 ~iv9_eq_1 625 ~iv2_eq_3 >= 114 ;
+p 2983 1 * 3004 100 * + 3776 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 iv11_ge_14 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 80 ~iv9_eq_1 80 ~iv2_eq_3 >= -17 ;
+p 2983 1 * 3004 100 * + 3779 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv13_ge_118 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 77 ~iv9_eq_1 77 ~iv2_eq_3 >= 14 ;
+p 1561 1 * 2995 1 * + 3773 1 * + 3782 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3773 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv11_ge_15 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 77 ~iv9_eq_1 77 ~iv2_eq_3 >= -14 ;
+p 2983 1 * 3004 100 * + 3787 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv13_ge_115 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 1 ~iv6_eq_12 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -113 <== iv13_ge_-113 ; iv13_ge_-113 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 114 <== ~iv13_ge_-113 ; iv13_ge_-113 1
+u 1 iv13_ge_-112 >= 1 ==> iv13_ge_-113 ;
+# 3
+# 0
+red 1 iv13_ge_-113 1 ~iv13_ge_-112 >= 2 <== iv13_eq_-113 ; iv13_eq_-113 0
+red 1 iv13_ge_-113 1 ~iv13_ge_-112 >= 1 ==> iv13_eq_-113 ; iv13_eq_-113 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_3 iv3_eq_2 iv4_eq_10 iv5_eq_9 iv6_eq_13 iv7_eq_11 iv8_eq_29 iv9_eq_1 iv10_eq_1 iv11_eq_14 iv12_eq_11 iv13_eq_114 iv14_eq_111 iv13_eq_114 ~iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-113 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_3 >= 1 ;
+w 3
+* guessing iv2_eq_4, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv4_eq_4 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 35 ~iv9_eq_1 35 ~iv2_eq_4 >= 4 ;
+p 1562 1 * 2990 1 * + 3812 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 iv11_ge_7 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 35 ~iv9_eq_1 35 ~iv2_eq_4 >= -4 ;
+p 1561 1 * 2995 1 * + 3815 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv11_ge_18 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 626 ~iv9_eq_1 626 ~iv2_eq_4 >= 115 ;
+p 2983 1 * 3004 100 * + 3818 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 iv11_ge_15 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 80 ~iv9_eq_1 80 ~iv2_eq_4 >= -17 ;
+p 2983 1 * 3004 100 * + 3821 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv13_ge_118 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 78 ~iv9_eq_1 78 ~iv2_eq_4 >= 15 ;
+p 1561 1 * 2995 1 * + 3815 1 * + 3824 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3815 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv11_ge_16 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 78 ~iv9_eq_1 78 ~iv2_eq_4 >= -15 ;
+p 2983 1 * 3004 100 * + 3829 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv13_ge_116 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 1 ~iv6_eq_13 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -114 <== iv13_ge_-114 ; iv13_ge_-114 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 115 <== ~iv13_ge_-114 ; iv13_ge_-114 1
+u 1 iv13_ge_-113 >= 1 ==> iv13_ge_-114 ;
+# 3
+# 0
+red 1 iv13_ge_-114 1 ~iv13_ge_-113 >= 2 <== iv13_eq_-114 ; iv13_eq_-114 0
+red 1 iv13_ge_-114 1 ~iv13_ge_-113 >= 1 ==> iv13_eq_-114 ; iv13_eq_-114 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_4 iv3_eq_3 iv4_eq_10 iv5_eq_9 iv6_eq_14 iv7_eq_12 iv8_eq_39 iv9_eq_1 iv10_eq_1 iv11_eq_15 iv12_eq_12 iv13_eq_115 iv14_eq_112 iv13_eq_115 iv13_IV2_b_0 iv13_IV2_b_1 ~iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-114 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_4 >= 1 ;
+w 3
+* guessing iv2_eq_5, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv4_eq_5 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 36 ~iv9_eq_1 36 ~iv2_eq_5 >= 5 ;
+p 1562 1 * 2990 1 * + 3855 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 iv11_ge_8 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 36 ~iv9_eq_1 36 ~iv2_eq_5 >= -5 ;
+p 1561 1 * 2995 1 * + 3858 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv11_ge_20 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 627 ~iv9_eq_1 627 ~iv2_eq_5 >= 116 ;
+p 2983 1 * 3004 100 * + 3861 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 iv11_ge_16 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 82 ~iv9_eq_1 82 ~iv2_eq_5 >= -19 ;
+p 2983 1 * 3004 100 * + 3864 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv13_ge_120 >= 1 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 79 ~iv9_eq_1 79 ~iv2_eq_5 >= 16 ;
+p 1561 1 * 2995 1 * + 3858 1 * + 3867 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3858 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv11_ge_17 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 79 ~iv9_eq_1 79 ~iv2_eq_5 >= -16 ;
+p 2983 1 * 3004 100 * + 3872 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv13_ge_117 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 1 ~iv6_eq_14 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -115 <== iv13_ge_-115 ; iv13_ge_-115 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 116 <== ~iv13_ge_-115 ; iv13_ge_-115 1
+u 1 iv13_ge_-114 >= 1 ==> iv13_ge_-115 ;
+# 3
+# 0
+red 1 iv13_ge_-115 1 ~iv13_ge_-114 >= 2 <== iv13_eq_-115 ; iv13_eq_-115 0
+red 1 iv13_ge_-115 1 ~iv13_ge_-114 >= 1 ==> iv13_eq_-115 ; iv13_eq_-115 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_5 iv3_eq_4 iv4_eq_10 iv5_eq_9 iv6_eq_15 iv7_eq_13 iv8_eq_49 iv9_eq_1 iv10_eq_1 iv11_eq_16 iv12_eq_13 iv13_eq_116 iv14_eq_113 iv13_eq_116 ~iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-115 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_5 >= 1 ;
+w 3
+* guessing iv2_eq_6, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv4_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_17 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 37 ~iv9_eq_1 37 ~iv2_eq_6 >= 6 ;
+p 1562 1 * 2990 1 * + 3898 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 iv11_ge_9 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 628 ~iv9_eq_1 628 ~iv2_eq_6 >= 117 ;
+p 2983 1 * 3004 100 * + 3901 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 iv11_ge_17 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 37 ~iv9_eq_1 37 ~iv2_eq_6 >= -6 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 80 ~iv9_eq_1 80 ~iv2_eq_6 >= 17 ;
+p 1561 1 * 2995 1 * + 3904 1 * + 3905 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3904 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv11_ge_18 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 80 ~iv9_eq_1 80 ~iv2_eq_6 >= -17 ;
+p 2983 1 * 3004 100 * + 3910 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv13_ge_118 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 1 ~iv6_eq_15 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -116 <== iv13_ge_-116 ; iv13_ge_-116 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 117 <== ~iv13_ge_-116 ; iv13_ge_-116 1
+u 1 iv13_ge_-115 >= 1 ==> iv13_ge_-116 ;
+# 3
+# 0
+red 1 iv13_ge_-116 1 ~iv13_ge_-115 >= 2 <== iv13_eq_-116 ; iv13_eq_-116 0
+red 1 iv13_ge_-116 1 ~iv13_ge_-115 >= 1 ==> iv13_eq_-116 ; iv13_eq_-116 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_6 iv3_eq_5 iv4_eq_10 iv5_eq_9 iv6_eq_16 iv7_eq_14 iv8_eq_59 iv9_eq_1 iv10_eq_1 iv11_eq_17 iv12_eq_14 iv13_eq_117 iv14_eq_114 iv13_eq_117 iv13_IV2_b_0 ~iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-116 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_6 >= 1 ;
+w 3
+* guessing iv2_eq_7, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv4_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 38 ~iv9_eq_1 38 ~iv2_eq_7 >= 7 ;
+p 1562 1 * 2990 1 * + 3936 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 iv11_ge_10 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 629 ~iv9_eq_1 629 ~iv2_eq_7 >= 118 ;
+p 2983 1 * 3004 100 * + 3939 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 iv11_ge_18 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 38 ~iv9_eq_1 38 ~iv2_eq_7 >= -7 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 81 ~iv9_eq_1 81 ~iv2_eq_7 >= 18 ;
+p 1561 1 * 2995 1 * + 3942 1 * + 3943 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3942 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv11_ge_19 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 81 ~iv9_eq_1 81 ~iv2_eq_7 >= -18 ;
+p 2983 1 * 3004 100 * + 3948 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv13_ge_119 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 1 ~iv6_eq_16 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -117 <== iv13_ge_-117 ; iv13_ge_-117 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 118 <== ~iv13_ge_-117 ; iv13_ge_-117 1
+u 1 iv13_ge_-116 >= 1 ==> iv13_ge_-117 ;
+# 3
+# 0
+red 1 iv13_ge_-117 1 ~iv13_ge_-116 >= 2 <== iv13_eq_-117 ; iv13_eq_-117 0
+red 1 iv13_ge_-117 1 ~iv13_ge_-116 >= 1 ==> iv13_eq_-117 ; iv13_eq_-117 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_7 iv3_eq_6 iv4_eq_10 iv5_eq_9 iv6_eq_17 iv7_eq_15 iv8_eq_69 iv9_eq_1 iv10_eq_1 iv11_eq_18 iv12_eq_15 iv13_eq_118 iv14_eq_115 iv13_eq_118 ~iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-117 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_7 >= 1 ;
+w 3
+* guessing iv2_eq_8, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv4_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_19 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 39 ~iv9_eq_1 39 ~iv2_eq_8 >= 8 ;
+p 1562 1 * 2990 1 * + 3974 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 iv11_ge_11 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 630 ~iv9_eq_1 630 ~iv2_eq_8 >= 119 ;
+p 2983 1 * 3004 100 * + 3977 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 iv11_ge_19 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 39 ~iv9_eq_1 39 ~iv2_eq_8 >= -8 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 82 ~iv9_eq_1 82 ~iv2_eq_8 >= 19 ;
+p 1561 1 * 2995 1 * + 3980 1 * + 3981 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 3980 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv11_ge_20 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 82 ~iv9_eq_1 82 ~iv2_eq_8 >= -19 ;
+p 2983 1 * 3004 100 * + 3986 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv13_ge_120 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 1 ~iv6_eq_17 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -118 <== iv13_ge_-118 ; iv13_ge_-118 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 119 <== ~iv13_ge_-118 ; iv13_ge_-118 1
+u 1 iv13_ge_-117 >= 1 ==> iv13_ge_-118 ;
+# 3
+# 0
+red 1 iv13_ge_-118 1 ~iv13_ge_-117 >= 2 <== iv13_eq_-118 ; iv13_eq_-118 0
+red 1 iv13_ge_-118 1 ~iv13_ge_-117 >= 1 ==> iv13_eq_-118 ; iv13_eq_-118 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_8 iv3_eq_7 iv4_eq_10 iv5_eq_9 iv6_eq_18 iv7_eq_16 iv8_eq_79 iv9_eq_1 iv10_eq_1 iv11_eq_19 iv12_eq_16 iv13_eq_119 iv14_eq_116 iv13_eq_119 iv13_IV2_b_0 iv13_IV2_b_1 iv13_IV2_b_2 ~iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-118 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_8 >= 1 ;
+w 3
+* guessing iv2_eq_9, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv4_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_18 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 40 ~iv9_eq_1 40 ~iv2_eq_9 >= 9 ;
+p 1562 1 * 2990 1 * + 4012 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 iv11_ge_12 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 631 ~iv9_eq_1 631 ~iv2_eq_9 >= 120 ;
+p 2983 1 * 3004 100 * + 4015 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 iv11_ge_20 >= 1 ;
+u -1 iv2_x[1]_b_0 -2 iv2_x[1]_b_1 -4 iv2_x[1]_b_2 -8 iv2_x[1]_b_3 -16 iv2_x[1]_b_4 40 ~iv9_eq_1 40 ~iv2_eq_9 >= -9 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 83 ~iv9_eq_1 83 ~iv2_eq_9 >= 20 ;
+p 1561 1 * 2995 1 * + 4018 1 * + 4019 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 iv4_ge_10 >= 1 ;
+p 1561 1 * 2995 1 * + 4018 1 * + 2997 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv11_ge_21 >= 1 ;
+u -1 iv11_IV1_b_0 -2 iv11_IV1_b_1 -4 iv11_IV1_b_2 -8 iv11_IV1_b_3 -16 iv11_IV1_b_4 -32 iv11_IV1_b_5 83 ~iv9_eq_1 83 ~iv2_eq_9 >= -20 ;
+p 2983 1 * 3004 100 * + 4024 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv13_ge_121 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_12 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_13 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_14 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_15 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_16 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 1 ~iv6_eq_17 >= 1 ;
+* solution
+# 0
+red 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 >= -119 <== iv13_ge_-119 ; iv13_ge_-119 0
+red -1 iv13_IV2_b_0 -2 iv13_IV2_b_1 -4 iv13_IV2_b_2 -8 iv13_IV2_b_3 -16 iv13_IV2_b_4 -32 iv13_IV2_b_5 -64 iv13_IV2_b_6 -128 iv13_IV2_b_7 -256 iv13_IV2_b_8 >= 120 <== ~iv13_ge_-119 ; iv13_ge_-119 1
+u 1 iv13_ge_-118 >= 1 ==> iv13_ge_-119 ;
+# 3
+# 0
+red 1 iv13_ge_-119 1 ~iv13_ge_-118 >= 2 <== iv13_eq_-119 ; iv13_eq_-119 0
+red 1 iv13_ge_-119 1 ~iv13_ge_-118 >= 1 ==> iv13_eq_-119 ; iv13_eq_-119 1
+# 3
+# 0
+o iv0_eq_1 iv1_eq_0 iv2_eq_9 iv3_eq_8 iv4_eq_10 iv5_eq_9 iv6_eq_19 iv7_eq_17 iv8_eq_89 iv9_eq_1 iv10_eq_1 iv11_eq_20 iv12_eq_17 iv13_eq_120 iv14_eq_117 iv13_eq_120 ~iv13_IV2_b_0 ~iv13_IV2_b_1 ~iv13_IV2_b_2 iv13_IV2_b_3 iv13_IV2_b_4 iv13_IV2_b_5 iv13_IV2_b_6 ~iv13_IV2_b_7 ~iv13_IV2_b_8
+# 0
+u 1 iv13_ge_-119 >= 1 ;
+# 3
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_9 >= 1 ;
+w 3
+* guessing iv2_eq_10, decision stack is [ iv9_eq_1 ]
+# 3
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv4_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_6 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_7 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_8 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_9 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_10 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_11 >= 1 ;
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 ~iv6_eq_20 >= 1 ;
+u 1 iv2_x[1]_b_0 2 iv2_x[1]_b_1 4 iv2_x[1]_b_2 8 iv2_x[1]_b_3 16 iv2_x[1]_b_4 41 ~iv9_eq_1 41 ~iv2_eq_10 >= 10 ;
+p 1562 1 * 2990 1 * + 4050 1 * + 2992 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 iv11_ge_13 >= 1 ;
+u 1 iv13_IV2_b_0 2 iv13_IV2_b_1 4 iv13_IV2_b_2 8 iv13_IV2_b_3 16 iv13_IV2_b_4 32 iv13_IV2_b_5 64 iv13_IV2_b_6 128 iv13_IV2_b_7 256 iv13_IV2_b_8 632 ~iv9_eq_1 632 ~iv2_eq_10 >= 121 ;
+p 2983 1 * 3004 100 * + 4053 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 1 iv11_ge_21 >= 1 ;
+u -1 iv4_x[2]_b_0 -2 iv4_x[2]_b_1 -4 iv4_x[2]_b_2 -8 iv4_x[2]_b_3 -16 iv4_x[2]_b_4 40 ~iv9_eq_1 40 ~iv2_eq_10 >= -9 ;
+u 1 iv11_IV1_b_0 2 iv11_IV1_b_1 4 iv11_IV1_b_2 8 iv11_IV1_b_3 16 iv11_IV1_b_4 32 iv11_IV1_b_5 84 ~iv9_eq_1 84 ~iv2_eq_10 >= 21 ;
+p 1561 1 * 2996 1 * + 4056 1 * + 4057 1 * + 1 d
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 >= 1 ;
+# 2
+* backtracking
+u 1 ~iv9_eq_1 1 ~iv2_eq_10 >= 1 ;
+w 3
+# 1
+* backtracking
+u 1 ~iv9_eq_1 >= 1 ;
+w 2
+# 0
+* backtracking
+u >= 1 ;
+w 1
+* asserting contradiction
+u >= 1 ;
+c 4063 0
