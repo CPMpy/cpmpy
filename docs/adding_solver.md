@@ -27,7 +27,7 @@ What remains is the difficult part of mapping an arbitrary CPMpy expression to C
 
 CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed and posted to the solver. That also allows it to be *incremental*, meaning that you can post some constraints, call `solve()` post some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
-The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs too. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
+The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
 
 That also makes them modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
 
@@ -42,7 +42,7 @@ With **functional** we mean that the API interface is for example a single class
 
 What we mean with **light-weight** is that it has none or few custom data-structures exposed at the Python level. That means that the arguments and return types of the API consist mostly of standard integers/strings/lists.
 
-Here is a fictive pseudo-code of such an API, which is heavily inspired on the Ortools CP-SAT interface:
+Here is fictional pseudo-code of such an API, which is heavily inspired on the OR-Tools CP-SAT interface:
 
 ```cpp
 class SolverX {
@@ -67,7 +67,7 @@ class SolverX {
     void postAllDifferent(vector<str> varIDs);
     void postSum(vector<str> varIds, str Operator, str varID);
     void postSum(vector<str> varIds, str Operator, int const);
-    // I think or-tools actually creates a map (unique ID) for both variables and constants, so they can be used in the same expression
+    // I think OR-Tools actually creates a map (unique ID) for both variables and constants, so they can be used in the same expression
     void postWeightedSum(vector<str> varIds, vector<int> weights, str Operator, str varID);
     ...
 
