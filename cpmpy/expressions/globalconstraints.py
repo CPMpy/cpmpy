@@ -415,6 +415,7 @@ class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
         Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
         super(Cumulative, self).__init__("cumulative",[start,
