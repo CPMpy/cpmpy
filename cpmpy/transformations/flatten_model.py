@@ -301,6 +301,10 @@ def get_or_make_var(expr):
                     lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
                 ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
                 ivar = _IntVarImpl(lb, ub)
+            elif flatexpr.name == "sub": # binary
+                lb = lbs[0] - ubs[1]
+                ub = ubs[0] - lbs[1]
+                ivar = _IntVarImpl(lb,ub)
             elif flatexpr.name == 'mul': # binary
                 v0 = [lbs[0], ubs[0]]
                 v1 = [lbs[1], ubs[1]]
