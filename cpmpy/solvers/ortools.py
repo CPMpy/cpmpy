@@ -421,6 +421,10 @@ class CPM_ortools(SolverInterface):
             assert (len(cpm_expr.args) == 2)  # args = [array, table]
             array, table = self.solver_vars(cpm_expr.args)
             return self.ort_model.AddAllowedAssignments(array, table)
+        elif cpm_expr.name == "cumulative":
+            start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
+            intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
+            return self.ort_model.AddCumulative(intervals, demand, cap)
         else:
             # NOT (YET?) MAPPED: Automaton, Circuit, Cumulative,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
