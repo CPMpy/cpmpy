@@ -428,7 +428,7 @@ class CPM_ortools(SolverInterface):
             intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
             return self.ort_model.AddCumulative(intervals, demand, cap)
         else:
-            # NOT (YET?) MAPPED: Automaton, Circuit, Cumulative,
+            # NOT (YET?) MAPPED: Automaton, Circuit,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             

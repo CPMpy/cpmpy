@@ -104,7 +104,7 @@
 import warnings # for deprecation warning
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -432,7 +432,9 @@ class Cumulative(GlobalConstraint):
         """
         from ..expressions.python_builtins import sum
 
-        start, duration, end, demand, capacity = self.args
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
         cons = []
 
         # set duration of tasks
