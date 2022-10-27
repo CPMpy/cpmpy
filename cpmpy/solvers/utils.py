@@ -74,7 +74,6 @@ class SolverLookup():
                 ("gurobi", CPM_gurobi),
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
-                ("minizinc", CPM_minizinc),
                ]
 
     @staticmethod

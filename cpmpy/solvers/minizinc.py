@@ -76,17 +76,14 @@ class CPM_minizinc(SolverInterface):
             the following are bundled in the bundle: chuffed, coin-bc, gecode
         """
         import minizinc
-        import json
-        # from minizinc.Solver.lookup()
-        out = minizinc.default_driver.run(["--solvers-json"])
-        out_lst = json.loads(out.stdout)
+        solver_dict = minizinc.default_driver.available_solvers()
 
-        solvers = []
-        for s in out_lst:
-            name = s["id"].split(".")[-1]
+        solver_names = set()
+        for full_name in solver_dict.keys():
+            name = full_name.split(".")[-1]
             if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solvers.append(name)
-        return solvers
+                solver_names.add(name)
+        return solver_names
 
 
     def __init__(self, cpm_model=None, subsolver=None):
