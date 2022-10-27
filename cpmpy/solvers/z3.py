@@ -236,30 +236,30 @@ class CPM_z3(SolverInterface):
         :param cpm_con CPMpy constraint, or list thereof
         :type cpm_con (list of) Expression(s)
         """
-        # Z3 supports nested expressions,
-        # so we recursively translate our expressions to theirs
-
+        # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        #self.user_vars.update(get_variables(cpm_con))
-
-        # only complication is that a list is implicitly an 'And' for us,
-        # as well as being a list of arguments, so top-level lists first
-        if is_any_list(cpm_con):
-            # recursively
-            for con in cpm_con:
-                self.__add__(con)
-        else:
-            # translate each expression tree, then post straight away
-            #print("Doing",cpm_con,self._z3_expr(cpm_con))
-            z3_cons = self._z3_expr(cpm_con)
-            if is_any_list(z3_cons):
-                for z3_con in z3_cons:
-                    self.z3_solver.add(z3_con)
-            else:
-                self.z3_solver.add(z3_cons)
+        self._post_constraint(cpm_con)
 
         return self
+
+    def _post_constraint(self, cpm_expr):
+        """
+            Post a primitive CPMpy constraint to the native solver API
+
+            Z3 supports nested expressions so translate expression tree and post to solver API directly
+        """
+        if is_any_list(cpm_expr):
+            for con in cpm_expr:
+                self._post_constraint(con)
+
+        # translate each expression tree, then post straight away
+        z3_cons = self._z3_expr(cpm_expr)
+        if is_any_list(z3_cons):
+            for z3_con in z3_cons:
+                self.z3_solver.add(z3_con)
+        else:
+            return self.z3_solver.add(z3_cons)
 
     def _z3_expr(self, cpm_con, reify=False):
         """
