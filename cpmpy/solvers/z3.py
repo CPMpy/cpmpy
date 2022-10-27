@@ -160,7 +160,6 @@ class CPM_z3(SolverInterface):
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
 
-            # TODO
             # translate objective, for optimisation problems only
             if isinstance(self.z3_solver, z3.Optimize) and \
                     len(self.z3_solver.objectives()) != 0:
