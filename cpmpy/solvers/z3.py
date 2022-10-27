@@ -262,7 +262,7 @@ class CPM_z3(SolverInterface):
 
         return self
 
-    def _z3_expr(self, cpm_con):
+    def _z3_expr(self, cpm_con, reify=False):
         """
             Z3 supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -299,7 +299,7 @@ class CPM_z3(SolverInterface):
                 return z3.Sum(self.solver_vars(cpm_con.args))
             elif cpm_con.name == 'wsum':
                 w = cpm_con.args[0]
-                x = self.solver_vars(cpm_con.args[1])
+                x = self._z3_expr(cpm_con.args[1])
                 return z3.Sum([wi*xi for wi,xi in zip(w,x)])
 
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
