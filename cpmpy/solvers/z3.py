@@ -292,9 +292,7 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'or':
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                cond, expr = self._z3_expr(cpm_con.args)
-                # TODO: this does not work for edge cases like decompositions in cond or expr (cfr reify-rewrite transformation).
-                return z3.Implies(cond, expr)
+                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -351,15 +349,23 @@ class CPM_z3(SolverInterface):
 
             if cpm_con.name == "==":
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
+                    if reify:
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
                                   self._z3_expr(all([a <= rhs for a in lhs.args])))
                 if isinstance(rhs, GlobalConstraint) and rhs.name == "max":
+                    if reify:
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs >= a for a in rhs.args])))
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "min":
+                    if reify:
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
                                   self._z3_expr(all([a >= rhs for a in lhs.args])))
                 if isinstance(rhs, GlobalConstraint) and rhs.name == "min":
+                    if reify:
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 

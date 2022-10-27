@@ -19,7 +19,8 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {"xor", "element"}} # TODO this will become emtpy after resolving issue #105
+EXCLUDE_IMPL = {"ortools": {"xor", "element"},
+                "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
