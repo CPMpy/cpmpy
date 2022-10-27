@@ -1,0 +1,30 @@
+[
+  {
+    "name": "easy",
+    "deck_width": 5,
+    "deck_length" : 5,
+    "n_containers" : 3,
+    "n_classes" : 2,
+
+    "width" : [5,2,3],
+    "length" :[1,4,4],
+
+    "classes" : [1,1,1],
+    "separation" : [[0,0],[0,0]]
+  },
+  {
+    "name": "hard",
+    "deck_width" : 16,
+    "deck_length" : 16,
+    "n_containers" : 10,
+    "n_classes" : 3,
+
+    "width" : [6, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    "length" : [8, 6, 4, 4, 4, 6, 8, 8, 6, 6],
+
+    "classes" : [1, 1, 1, 2, 2, 2, 3, 3, 3, 3],
+    "separation" : [[0, 0, 0],
+                    [0, 0, 2],
+                    [0, 2, 0]]
+  }
+]

@@ -55,7 +55,7 @@ Sub problem:
 from cpmpy import *
 import numpy as np
 
-INFINITY = np.iinfo(np.int32).max
+INFINITY = 10000
 verbose = True
 np.random.seed(0)
 
@@ -153,7 +153,7 @@ def extend_to_full_solution(values, weights, capacity, foil_idx, foil_vals):
         return xv.value()
 
 
-def make_master_problem(values, weights, capacity, x_d, foil_idx):
+def make_master_problem(values, foil_idx):
     """
     Creates the master problem.
     Returns both the model itself as well as the variables used in it.
@@ -161,18 +161,12 @@ def make_master_problem(values, weights, capacity, x_d, foil_idx):
     """
 
     d = intvar(0, INFINITY, values.shape, name="d")
-    x = boolvar(shape=len(x_d), name="x")
     # Minimize the change to the values vector
     m = Model(minimize=np.linalg.norm(values - d, ord=1))
 
-    # The ususal knapsack constraint
-    m += [sum(x * weights) <= capacity]
     # Ensure values are only modified at foil indices
     m += [d[i] == values[i] for i in range(len(values)) if i not in foil_idx]
-    # Ensure the foil values assigned by the user remain the same
-    m += [x[i] == bool(x_d[i]) for i in foil_idx]
-
-    return m, d, x
+    return m, d
 
 
 def make_sub_problem(values, weights, capacity):
@@ -199,8 +193,8 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
     if verbose:
         print(f"\n\n{'='*10} Solving the master problem {'='*10}")
 
-    master_model, d, x = make_master_problem(values, weights, capacity, x_d, foil_idx)
     sub_model, x_0 = make_sub_problem(values, weights, capacity)
+    master_model, d = make_master_problem(values, foil_idx)
 
     i = 1
     while master_model.solve() is not False:
@@ -216,7 +210,7 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
         if sum(d_star * x_d) >= sum(d_star * x_0.value()):
             return d_star
         else:
-            master_model += [sum(d * x) >= sum(d * x_0.value())]
+            master_model += [sum(d * x_d) >= sum(d * x_0.value())]
         i += 1
 
     raise ValueError("Master model is UNSAT!")
