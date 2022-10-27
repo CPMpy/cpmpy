@@ -138,6 +138,15 @@ def global_constraints():
             "xor" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         yield Xor(BOOL_ARGS)
 
+    if SOLVERNAME not in EXCLUDE_GLOBAL or \
+            "cumulative" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+        s = intvar(0,10,shape=3,name="start")
+        e = intvar(0,10,shape=3,name="end")
+        dur = [1,4,3]
+        demand = [4,5,7]
+        cap = 10
+        yield Cumulative(s, dur, e, demand, cap)
+
 
 def reify_imply_exprs():
     """

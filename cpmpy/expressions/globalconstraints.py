@@ -104,7 +104,7 @@
 import warnings # for deprecation warning
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -410,3 +410,58 @@ class Xor(GlobalConstraint):
        """
         copied_args = self._deepcopy_args(memodict)
         return Xor(copied_args)
+
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Supports both varying demand across tasks or equal demand for all jobs
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        super(Cumulative, self).__init__("cumulative",[start,
+                                                       duration,
+                                                       end,
+                                                       demand,
+                                                       capacity])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+        from ..expressions.python_builtins import sum
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [start[t] + duration[t] == end[t]]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        for t in range(lb,ub+1):
+            cons += [capacity >= sum(demand * ((start <= t) & (t < end)))]
+
+        return cons
+
+    def value(self):
+        start, dur, end, demand, cap = [argval(a) for a in self.args]
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if cap < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+
+
+
