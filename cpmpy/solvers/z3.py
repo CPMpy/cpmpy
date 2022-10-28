@@ -295,7 +295,7 @@ class CPM_z3(SolverInterface):
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
-                return z3.Sum(self.solver_vars(cpm_con.args))
+                return z3.Sum(self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'wsum':
                 w = cpm_con.args[0]
                 x = self._z3_expr(cpm_con.args[1])
