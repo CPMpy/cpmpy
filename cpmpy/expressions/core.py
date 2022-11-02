@@ -323,6 +323,10 @@ class Expression(object):
     def __invert__(self):
         return (self == 0)
 
+    def __contains__(self, item):
+        # print(f"contains: self={str(self)} item={str(item)}", str(item) in str(self))
+        return str(item) in str(self)
+
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
