@@ -57,9 +57,9 @@ class CPM_exact(SolverInterface):
         Constructor of the native solver object
 
         Requires a CPMpy model as input, and will create the corresponding
-        or-tools model and solver object (ort_model and ort_solver)
+        Exact solver object xct_solver.
 
-        ort_model and ort_solver can both be modified externally before
+        xct_solver can be modified externally before
         calling solve(), a prime way to use more advanced solver features
 
         Arguments:
@@ -71,13 +71,12 @@ class CPM_exact(SolverInterface):
 
         from exact import Exact as xct
 
-        assert(subsolver is None)
+        assert subsolver is None, "Exact does not allow subsolvers."
 
         # initialise the native solver object
         self.xct_solver = xct()
 
         # for solving with assumption variables,
-        # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
 
         # objective can only be set once, so keep track of this
@@ -87,6 +86,26 @@ class CPM_exact(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
 
+    def getSolAndObj(self):
+        if not self.xct_solver.hasSolution():
+            self.objective_value_ = None
+            return False
+
+        # fill in variable values
+        exact_vals = self.xct_solver.getLastSolutionFor([self.solver_var(cpm_var) for cpm_var in self.user_vars])
+        i = 0
+        for cpm_var in self.user_vars:
+            cpm_var._value = exact_vals[i]
+            if isinstance(cpm_var, _BoolVarImpl):
+                cpm_var._value = bool(cpm_var._value) # xct value is always an int
+            i+=1
+
+        # translate objective
+        self.objective_value_ = self.xct_solver.getObjectiveBounds()[1] # last upper bound to the objective
+        if not self.objective_minimize:
+            self.objective_value_ = -self.objective_value_
+
+        return True
 
     def solve(self, time_limit=None, assumptions=None, **kwargs):
         """
@@ -103,9 +122,18 @@ class CPM_exact(SolverInterface):
         """
         from exact import Exact as xct
 
+        if not self.has_objective:
+            self.has_objective=True
+            self.xct_solver.init([],[])
+
         # set time limit?
         if time_limit is not None:
             self.xct_solver.setOption("timeout",str(time_limit))
+        # set additional keyword arguments
+        for (kw, val) in kwargs.items():
+            print(kw,val)
+            print(type(self.xct_solver))
+            self.xct_solver.setOption(kw,str(val))
 
         if assumptions is not None:
             print("TODO: implement assumptions")
@@ -120,15 +148,8 @@ class CPM_exact(SolverInterface):
             ## still present in v9.0
             #self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
-        # set additional keyword arguments in sat_parameters.proto
-        for (kw, val) in kwargs.items():
-            print(kw,val)
-            print(type(self.xct_solver))
-            self.xct_solver.setOption(kw,str(val))
-
         # call the solver, with parameters
         my_status = self.xct_solver.runFull()
-        has_sol = self.xct_solver.hasSolution()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -136,7 +157,7 @@ class CPM_exact(SolverInterface):
 
         # translate exit status
         if my_status == 0:
-            if has_sol:
+            if self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -145,28 +166,57 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
-        # translate solution values (of user specified variables only)
-        self.objective_value_ = None
-        if has_sol:
-            # fill in variable values
-            exact_vals = self.xct_solver.getLastSolutionFor([self.solver_var(cpm_var) for cpm_var in self.user_vars])
-            i = 0
-            for cpm_var in self.user_vars:
-                cpm_var._value = exact_vals[i]
-                if isinstance(cpm_var, _BoolVarImpl):
-                    cpm_var._value = bool(cpm_var._value) # xct value is always an int
-            i+=1
-
-            # translate objective
-            self.objective_value_ = self.xct_solver.getObjectiveBounds()[1] # last upper bound to the objective
-            if not self.objective_minimize:
-                self.objective_value_ = -self.objective_value_
-
-        return has_sol
+        return self.getSolAndObj()
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
-        print("TODO: implement solveAll")
-        assert(False)
+        """
+            Compute all solutions and optionally display the solutions.
+
+            This is the generic implementation, solvers can overwrite this with
+            a more efficient native implementation
+
+            Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+
+        if not self.has_objective:
+            self.has_objective=True
+            self.xct_solver.init([],[])
+
+        # avoid adding upper bounds when enumerating solutions
+        self.xct_solver.setOption("opt-boundupper",str(0))
+        # set time limit?
+        if time_limit is not None:
+            self.xct_solver.setOption("timeout",str(time_limit))
+
+        # set additional keyword arguments
+        for (kw, val) in kwargs.items():
+            print(kw,val)
+            print(type(self.xct_solver))
+            self.xct_solver.setOption(kw,str(val))
+
+        solsfound = 0
+        while solution_limit == None or solsfound < solution_limit:
+            status = 3
+            while status == 3: # SolveState::INPROCESSED
+                # call the solver, with parameters
+                status = self.xct_solver.runOnce()
+            assert status == 0 or status == 1, "Unexpected status code for Exact."
+            if status == 0: # SolveState::UNSAT
+                break
+            else: # SolveState::SAT
+                solsfound += 1
+                self.getSolAndObj()
+                # TODO: call callback / display?
+                self.xct_solver.invalidateLastSol()
+
+        return solsfound
 
 
     def solver_var(self, cpm_var):
@@ -214,7 +264,7 @@ class CPM_exact(SolverInterface):
 
             'objective()' can only be called once
         """
-        assert(not self.has_objective)
+        assert not self.has_objective, "Exact accepts an objective function only once."
         self.has_objective = True
         self.objective_minimize = minimize
 

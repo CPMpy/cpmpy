@@ -20,7 +20,6 @@ def php(P,H):
         [sum(holes) == 1 for holes in p2h],
         [sum(pigeons) <= 1 for pigeons in p2h.T],
     )
-    m.minimize(sum(p2h))
     
     return (m, p2h)
 
@@ -31,7 +30,6 @@ def php2(P,H):
 
     # Constraints on incidence matrix
     m = Model()
-    m.minimize(sum(p2h))
     m += [sum(holes) == 1 for holes in p2h]
     for h in range(0,H):
         for p1 in range(0,P):
@@ -47,19 +45,20 @@ def solve(P,H, prettyprint=True):
     s = SolverLookup.get("exact",m)
 
     #if s.solve(num_search_workers=1, log_search_progress=True, symmetry_level=0, linearization_level=3):
-    if s.solve():
-        print(s.status())
+    print(s.solveAll())
+    #if s.solve():
+        #print(s.status())
 
-        if prettyprint:
-            # pretty print
-            for p in range(0,P):
-                line = ""
-                for h in range(0,H):
-                    line+=str(p2h[p,h].value())
-                print(line)
-    else:
-        print("No solution found")
+        #if prettyprint:
+            ## pretty print
+            #for p in range(0,P):
+                #line = ""
+                #for h in range(0,H):
+                    #line+=str(p2h[p,h].value())
+                #print(line)
+    #else:
+        #print("No solution found")
 
 if __name__ == "__main__":
     print(SolverLookup.solvernames())
-    solve(100,99)
+    solve(5,5)
