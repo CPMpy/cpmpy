@@ -8,7 +8,7 @@ Implementing the template consists of the following parts:
 
   * `supported()` where you check if the solver package is installed. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package.
   * `__init__()` where you initialize the underlying solver object
-  * `solver_var()` where you create new solver variables and map them CPMpy decision variables
+  * `solver_var()` where you create new solver variables and map them to CPMpy decision variables
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
   * `objective()` if your solver supports optimisation
   * `__add__()` where you call the necessary transformations to transform CPMpy expressions to those that the solver supports

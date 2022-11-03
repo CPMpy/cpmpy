@@ -181,7 +181,7 @@ class CPM_gurobi(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
 
-        # create if it does not exit
+        # create if it does not exist
         if not cpm_var in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
@@ -240,7 +240,7 @@ class CPM_gurobi(SolverInterface):
         if cpm_expr.name == "wsum":
             return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
-        raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
     def __add__(self, cpm_con):
         """
@@ -330,7 +330,7 @@ class CPM_gurobi(SolverInterface):
                     return self.grb_model.addGenConstrPow(x, grbrhs, a)
 
             raise NotImplementedError(
-                "Not a know supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+                "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints
