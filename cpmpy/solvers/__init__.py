@@ -43,3 +43,4 @@ from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
+from .exact import CPM_exact
