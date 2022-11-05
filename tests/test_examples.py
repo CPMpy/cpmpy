@@ -7,7 +7,11 @@ import importlib.machinery
 import pytest
 from cpmpy import *
 
-EXAMPLES = glob(join("..", "examples", "*.py")) + glob(join(".", "examples", "*.py")) + glob(join(".", "examples/advanced", "*.py"))
+EXAMPLES = glob(join("..", "examples", "*.py")) + \
+           glob(join(".", "examples", "*.py")) + \
+           glob(join("..", "examples/advanced", "*.py")) + \
+            glob(join("..", "examples/csplib", "*.py"))
+
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples(example):
