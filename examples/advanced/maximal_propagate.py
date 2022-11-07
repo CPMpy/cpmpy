@@ -48,7 +48,7 @@ def maximal_propagate_alt(vars=None, constraints=[], solvername="ortools"):
 
     # return values of variables reachable given the constraints
     return {
-        var : {val for val in range(var.lb, var.ub) if val not in domain_to_visit[var]}
+        var : {val for val in range(var.lb, var.ub+1) if val not in domain_to_visit[var]}
             for var in vars
     }
 
