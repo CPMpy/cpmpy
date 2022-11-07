@@ -286,6 +286,9 @@ class CPM_ortools(SolverInterface):
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
                 return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
+            elif cpm_expr.name == "sub":
+                a,b = self.solver_vars(cpm_expr.args)
+                return a - b
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
@@ -311,7 +314,7 @@ class CPM_ortools(SolverInterface):
         # apply transformations, then post internally
         cpm_cons = flatten_constraint(cpm_con)
         cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum","sub"})
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
         for con in cpm_cons:
@@ -371,7 +374,7 @@ class CPM_ortools(SolverInterface):
             if isinstance(lhs, _NumVarImpl):
                 # both are variables, do python comparison over ORT variables
                 return self.ort_model.Add(eval_comparison(cpm_expr.name, self.solver_var(lhs), ortrhs))
-            elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum'):
+            elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
                 # a BoundedLinearExpression LHS, special case, like in objective
                 ortlhs = self._make_numexpr(lhs)
                 # ortools accepts sum(x) >= y over ORT variables
@@ -418,8 +421,14 @@ class CPM_ortools(SolverInterface):
             assert (len(cpm_expr.args) == 2)  # args = [array, table]
             array, table = self.solver_vars(cpm_expr.args)
             return self.ort_model.AddAllowedAssignments(array, table)
+        elif cpm_expr.name == "cumulative":
+            start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
+            if is_num(demand):
+                demand = [demand] * len(start)
+            intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
+            return self.ort_model.AddCumulative(intervals, demand, cap)
         else:
-            # NOT (YET?) MAPPED: Automaton, Circuit, Cumulative,
+            # NOT (YET?) MAPPED: Automaton, Circuit,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             

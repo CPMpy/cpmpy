@@ -15,6 +15,7 @@
         pysat
         gurobi
         pysdd
+        z3
         utils
 
     ===============
@@ -27,6 +28,7 @@
         CPM_pysat
         CPM_gurobi
         CPM_pysdd
+        CPM_z3
 
     =================
     List of functions
@@ -43,4 +45,5 @@ from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
+from .z3 import CPM_z3
 from .exact import CPM_exact

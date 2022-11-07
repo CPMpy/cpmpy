@@ -86,3 +86,17 @@ class SolverX {
 If you have such a C++ API, then there exist automatic python packages that can make Python bindings, such as [CPPYY](https://cppyy.readthedocs.io/en/latest/).
 
 We have not done this ourselves yet, so get in touch to share your experience and advice!
+
+## Testing your solver
+The CPMpy package provides a large testsuite on which newly added solvers can be tested.
+Note that for this testsuite to work, you need to add your solver to the `SolverLookup` utility.
+This is done by adding an import statement in `/solvers/__init__.py` and adding an entry in the list of solvers in  `/solvers/utils.py`.
+
+To run the testsuite on your solver, go to `/tests/constraints.py` and set `SOLVERNAME` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
+As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
+The result your solver answers after posting the constraint is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
+
+## Tunable hyperparameters
+CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](solver_parameters.md)).
+Solver wanting to support this tool should add the following attributes to their solver interface: `tunable_params` and `default_params` (see [ortools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
+

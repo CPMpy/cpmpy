@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 import cpmpy as cp
-from cpmpy.solvers.utils import get_supported_solvers
+
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -314,6 +314,21 @@ class TestSolvers(unittest.TestCase):
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
+
+    def test_z3(self):
+
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("z3", m)
+        self.assertFalse(s.solve(assumptions=bv))
+        self.assertTrue(len(s.get_core()) > 0)
+
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
