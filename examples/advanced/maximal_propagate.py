@@ -8,9 +8,11 @@ from cpmpy import *
 from cpmpy.transformations.get_variables import get_variables
 
 
-def maximal_propagate(constraints, solvername="ortools"):
+def maximal_propagate(vars=None, constraints=[], solvername="ortools"):
     # For faster propagation, use incremental solver such as pysat, z3 or gurobi.
-    vars = get_variables(constraints)
+    if vars is None:
+        vars = get_variables(constraints)
+
     visisted_domain = {var: set() for var in vars}
 
     solver = SolverLookup.get(solvername)
