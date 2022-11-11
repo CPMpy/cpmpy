@@ -50,3 +50,24 @@ class TestSolvers(unittest.TestCase):
 
         c = cp.boolvar(shape=(2,3), name="c")
         self.assertEqual(str(c), "[[c[0,0] c[0,1] c[0,2]]\n [c[1,0] c[1,1] c[1,2]]]")
+
+    def test_clear(self):
+        def n_none(v):
+            return sum(v.value() == None)
+
+        iv = cp.intvar(1,9, shape=9)
+        m = cp.Model(cp.alldifferent(iv))
+        self.assertEqual(n_none(iv), 9)
+        m.solve()
+        self.assertEqual(n_none(iv), 0)
+        iv.clear()
+        self.assertEqual(n_none(iv), 9)
+
+        bv = cp.boolvar(9)
+        m = cp.Model(sum(bv) > 3)
+        self.assertEqual(n_none(bv), 9)
+        m.solve()
+        self.assertEqual(n_none(bv), 0)
+        bv.clear()
+        self.assertEqual(n_none(bv), 9)
+
