@@ -29,8 +29,18 @@ print("core:", s.get_core())
 print(bv.value())
 ```
 
-This opens the door to more advanced use cases, such as Minimal Unsatisfiable Subsets and QuickXplain-like tools to help debugging. We welcome any examples or additions that use CPMpy in this way!! Here is one example: the [MARCO algorithm for enumerating all MUS/MSSes](http://github.com/tias/cppy/tree/master/examples/advanced/marco_musmss_enumeration.py). Here is another: a [deletion-based MUS algorithm](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/musx.py), made to also work for non-reifable (global) constraints. Also useful to debug unsatisfiable models!
+This opens the door to more advanced use cases, such as Minimal Unsatisfiable Subsets (MUS) and QuickXplain-like tools to help debugging.
 
-One final caveat is that the or-tools Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!!
+In our tools we implemented a simple MUS deletion based algorithm, using assumption variables.
+
+```python
+from cpmpy.tools import mus
+
+print(mus(m.constraints))
+```
+
+We welcome any additional examples that use CPMpy in this way!! Here is one example: the [MARCO algorithm for enumerating all MUS/MSSes](http://github.com/tias/cppy/tree/master/examples/advanced/marco_musmss_enumeration.py). Here is another: a [stepwise explanation algorithm](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py) for SAT problems (implicit hitting-set based)
+
+One OR-TOOLS specific caveat is that this particular (default) solver its Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!!
 
 A final-final note is that you can manually warm-start or-tools with a previously found solution with s.solution\_hint(); see also the MARCO code linked above.
