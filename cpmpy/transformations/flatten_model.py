@@ -466,9 +466,11 @@ def normalized_boolexpr(expr):
                 if is_num(rexpr):
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
-
-                    nnexpr = negated_normal(lexpr)
-                    return normalized_boolexpr(nnexpr)
+                    if exprname == '==':
+                        nnexpr = negated_normal(lexpr)
+                        return normalized_boolexpr(nnexpr)
+                    else: # !=, should only be possible in dubble negation
+                        return normalized_boolexpr(lexpr)
 
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
