@@ -25,6 +25,7 @@ def mus(soft, hard=[], solver="ortools"):
         :param: soft: soft constraints, list of expressions
         :param: hard: hard constraints, optional, list of expressions
         :param: solver: name of a solver, see SolverLookup.solvernames()
+            "z3" and "gurobi" are incremental, "ortools" restarts the solver
     """
     # order so that constraints with many variables are tried and removed first
     candidates = sorted(soft, key=lambda c: -len(get_variables(c)))
