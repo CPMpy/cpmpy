@@ -82,6 +82,7 @@ import math
 import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
 
 def flatten_model(orig_model):
@@ -567,7 +568,7 @@ def negated_normal(expr):
 
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
-        Global: should call decompose and negate that?
+        Global: decompose and negate that
 
         This function only ensures 'negated normal' for the top-level
         constraint (negating arguments recursively as needed),
@@ -607,7 +608,8 @@ def negated_normal(expr):
         # only negated last element
         return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
+    elif isinstance(expr, GlobalConstraint):
+        # global... decompose and negate that
+        return negated_normal(Operator('and', expr.decompose()))
     else:
-        # global...
-        #raise NotImplementedError("negate_normal {}".format(expr))
-        return expr == 0 # can't do better than this...
+        raise NotImplementedError("negate_normal {}".format(expr))
