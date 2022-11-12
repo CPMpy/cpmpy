@@ -82,7 +82,6 @@ import math
 import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
 
 def flatten_model(orig_model):
@@ -608,8 +607,9 @@ def negated_normal(expr):
         # only negated last element
         return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
-    elif isinstance(expr, GlobalConstraint):
-        # global... decompose and negate that
-        return negated_normal(Operator('and', expr.decompose()))
-    else:
-        raise NotImplementedError("negate_normal {}".format(expr))
+    else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose"):
+            # global... decompose and negate that
+            return negated_normal(Operator('and', expr.decompose()))
+        else:
+            raise NotImplementedError("negate_normal {}".format(expr))
