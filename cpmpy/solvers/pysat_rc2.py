@@ -38,7 +38,8 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class CPM_RC2(CPM_pysat):
     """
-    Interface to PySAT's API
+    Interface to PySAT RC2 MaxSAT solver at:
+    https://pysathq.github.io/docs/html/api/examples/rc2.html
 
     Requires that the 'python-sat' python package is installed:
     $ pip install python-sat
@@ -48,7 +49,8 @@ class CPM_RC2(CPM_pysat):
 
     Creates the following attributes (see parent constructor for more):
     pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+    rc2_solver: a pysat.examples.rc2 (default: glucose4)
+    wcnf: keeping track of the weighted 
     """
 
     @staticmethod
@@ -98,15 +100,23 @@ class CPM_RC2(CPM_pysat):
 
         assert subsolver in CPM_RC2.solvernames(), f"Wrong solver ({subsolver}) selected from available: ({CPM_RC2.solvernames()})"
 
-        self.rc2_solver = RC2(formula=WCNF(), solver=subsolver)
+        # Keep track of transformed clauses in case the solving requires
+        # assumptions
+        self.wcnf = WCNF()
+
+        self.rc2_solver = RC2(formula=self.wcnf, solver=subsolver)
         self.pysat_vpool = self.rc2_solver.pool
 
-        # RESTARTS: keep track of subsovler
+        # RESTARTS: keep track of subsolver
         self.subsolver = subsolver
-        # RESTARTS: keep track of transformed clauses
-        self.wcnf = WCNF()
-        # RESTART only if assumptions are used !
+
+        # RESTARTS: Keep track of solving state
         self._solved_assumption = False
+
+        # Efficiency trick: If the solver is called incrementally
+        # where assumption variables are the same, then the solver
+        # does not need to be restarted.
+        self._prev_pysat_assum_vars = set()
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
@@ -139,19 +149,20 @@ class CPM_RC2(CPM_pysat):
             del self.rc2_solver
         self.rc2_solver = RC2(formula=wcnf, solver=self.subsolver)
 
-    def _add_assumptions(self, assumptions=None):
-        ## restart the solver in case it's solved with assumptions
-        if self._solved_assumption:
-            self._restart(self.wcnf)
-            self._solved_assumption = False
+        self._solved_assumption = False
+        self._prev_pysat_assum_vars = set()
 
-        pysat_assum_vars = self.solver_vars(assumptions)
-        ## only set to true if there are assumptions
-        if len(pysat_assum_vars) > 0:
-            self._solved_assumption = True
+    def _add_assumptions(self, assumptions=None):
+        pysat_assum_vars = set(self.solver_vars(assumptions))
+
+        # No need to restart if solved incrementally
+        if not set(self._prev_pysat_assum_vars).issubset(pysat_assum_var):
+            self._restart(self.wcnf)
 
         for pysat_assum_var in pysat_assum_vars:
             self.rc2_solver.add_clause([pysat_assum_var])
+
+        self._solved_assumption = True
 
     def solve(self, assumptions=None):
         """
@@ -168,7 +179,10 @@ class CPM_RC2(CPM_pysat):
                            CPM_rc2 adds the assumptions as hard clauses to the MaxSAT solver.
         """
         if assumptions is not None:
+            self._solved_assumption = True
             self._add_assumptions(assumptions)
+        elif self._solved_assumption:
+            self._restart(self.wcnf)
 
         sol = self.rc2_solver.compute()
 
@@ -179,7 +193,7 @@ class CPM_RC2(CPM_pysat):
         # translate exit status
         if sol is not None:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif sol is None:
+        else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
 
         # True/False depending on self.cpm_status
@@ -201,16 +215,10 @@ class CPM_RC2(CPM_pysat):
 
         return has_sol
 
-    def objective(self, expr, minimize):
-        """Push objective to maxsat solver
-
-        Args:
-            expr (_type_): _description_
-            minimize (_type_): _description_
-
-        Raises:
-            NotImplementedError: _description_
-            NotImplementedError: _description_
+    def objective(self, expr, minimize=False):
+        """
+        Push objective to maxsat solver.
+        Only linear sums are supported for the moment.
         """
         if minimize:
             raise NotImplementedError("RC2 does not support minimizing the objective.")
