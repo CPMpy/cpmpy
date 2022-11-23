@@ -76,17 +76,14 @@ class CPM_minizinc(SolverInterface):
             the following are bundled in the bundle: chuffed, coin-bc, gecode
         """
         import minizinc
-        import json
-        # from minizinc.Solver.lookup()
-        out = minizinc.default_driver.run(["--solvers-json"])
-        out_lst = json.loads(out.stdout)
+        solver_dict = minizinc.default_driver.available_solvers()
 
-        solvers = []
-        for s in out_lst:
-            name = s["id"].split(".")[-1]
+        solver_names = set()
+        for full_name in solver_dict.keys():
+            name = full_name.split(".")[-1]
             if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solvers.append(name)
-        return solvers
+                solver_names.add(name)
+        return solver_names
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -459,6 +456,11 @@ class CPM_minizinc(SolverInterface):
             if any(isinstance(e, _IntVarImpl) and e.lb == 0 for e in expr.args):
                 # redo args_str[0]
                 args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+
+        elif expr.name == "cumulative":
+            start, dur, end, _, _ = expr.args
+            self += (start + dur == end)
+            return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:

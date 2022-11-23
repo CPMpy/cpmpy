@@ -32,7 +32,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
@@ -253,6 +253,8 @@ class CPM_pysat(SolverInterface):
                     isinstance(v, _BoolVarImpl) for v in cpm_expr.args[0].args):
                 lits = self.solver_vars(cpm_expr.args[0].args)
                 bound = cpm_expr.args[1]
+                if not is_int(bound):
+                    raise NotImplementedError(f"PySAT sum: rhs `{bound}` type {type(bound)} not supported")
 
                 if cpm_expr.name == "<":
                     clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
