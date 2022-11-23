@@ -98,8 +98,8 @@ class CPM_RC2(CPM_pysat):
 
         assert subsolver in CPM_RC2.solvernames(), f"Wrong solver ({subsolver}) selected from available: ({CPM_RC2.solvernames()})"
 
-        self.pysat_solver = RC2(formula=WCNF(), solver=subsolver)
-        self.pysat_vpool = self.pysat_solver.pool
+        self.rc2_solver = RC2(formula=WCNF(), solver=subsolver)
+        self.pysat_vpool = self.rc2_solver.pool
 
         # RESTARTS: keep track of subsovler
         self.subsolver = subsolver
@@ -135,9 +135,9 @@ class CPM_RC2(CPM_pysat):
         return self
 
     def _restart(self, wcnf):
-        if self.pysat_solver is not None:
-            del self.pysat_solver
-        self.pysat_solver = RC2(formula=wcnf, solver=self.subsolver)
+        if self.rc2_solver is not None:
+            del self.rc2_solver
+        self.rc2_solver = RC2(formula=wcnf, solver=self.subsolver)
 
     def _add_assumptions(self, assumptions=None):
         ## restart the solver in case it's solved with assumptions
@@ -151,7 +151,7 @@ class CPM_RC2(CPM_pysat):
             self._solved_assumption = True
 
         for pysat_assum_var in pysat_assum_vars:
-            self.pysat_solver.add_clause([pysat_assum_var])
+            self.rc2_solver.add_clause([pysat_assum_var])
 
     def solve(self, assumptions=None):
         """
@@ -170,11 +170,11 @@ class CPM_RC2(CPM_pysat):
         if assumptions is not None:
             self._add_assumptions(assumptions)
 
-        sol = self.pysat_solver.compute()
+        sol = self.rc2_solver.compute()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.pysat_solver.oracle_time()
+        self.cpm_status.runtime = self.rc2_solver.oracle_time()
 
         # translate exit status
         if sol is not None:
@@ -218,13 +218,13 @@ class CPM_RC2(CPM_pysat):
         if isinstance(expr, Operator) and expr.name == "sum":
             pysat_assum_vars = self.solver_vars(expr.args)
             for pysat_assum_var in pysat_assum_vars:
-                self.pysat_solver.add_clause([pysat_assum_var], weight=1)
+                self.rc2_solver.add_clause([pysat_assum_var], weight=1)
                 self.wcnf.append([pysat_assum_var], weight=1)
         elif isinstance(expr, Operator) and expr.name == "wsum":
             weights, vars = expr.args
             pysat_assum_vars = self.solver_vars(vars)
             for weight, pysat_assum_var in zip(weights, pysat_assum_vars):
-                self.pysat_solver.add_clause([pysat_assum_var], weight=weight)
+                self.rc2_solver.add_clause([pysat_assum_var], weight=weight)
                 self.wcnf.append([pysat_assum_var], weight=1)
         else:
             raise NotImplementedError(f"Expression {expr} not handled")
