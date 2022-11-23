@@ -25,7 +25,7 @@ m.solve(solver="ortools")
 
 In this case, a model is a **lazy container**. It simply stores the constraints. Only when `solve()` is called will it instantiate a solver, and send the entire model to it at once. The last line above is equivalent to:
 ```python
-s = Solverlookup.get("ortools", m)
+s = SolverLookup.get("ortools", m)
 s.solve()
 ```
 
