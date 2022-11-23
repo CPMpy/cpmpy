@@ -76,3 +76,17 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual( solve_return(cp.Model([], minimize=ma)), 1)
         self.assertEqual( solve_return(cp.Model([], maximize=mi)), 9)
         self.assertEqual( solve_return(cp.Model([], maximize=ma)), 9)
+
+    def test_cumulative_deepcopy(self):
+        import numpy
+        m = cp.Model()
+        start = cp.intvar(0, 10, 4, "start")
+        duration = numpy.array([1, 2, 2, 1])
+        end = start + duration
+        demand = numpy.array([1, 1, 1, 1])
+        capacity = 2
+        m += cp.AllDifferent(start)
+        m += cp.Cumulative(start, duration, end, demand, capacity)
+        m2 = m.deepcopy()  # should not throw an exception
+        self.assertEqual(repr(m), repr(m2))  # should be True
+        
