@@ -418,10 +418,10 @@ class Cumulative(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
-        super(Cumulative, self).__init__("cumulative",[start,
-                                                       duration,
-                                                       end,
-                                                       demand,
+        super(Cumulative, self).__init__("cumulative",[flatlist(start),
+                                                       flatlist(duration),
+                                                       flatlist(end),
+                                                       flatlist(demand),
                                                        capacity])
 
     def decompose(self):
@@ -468,6 +468,12 @@ class Cumulative(GlobalConstraint):
 
         return True
 
-
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the cumulative global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Cumulative(*copied_args)
 
 
