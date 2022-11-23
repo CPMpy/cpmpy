@@ -120,29 +120,11 @@ class CPM_RC2(CPM_pysat):
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
-    def __add__(self, cpm_con):
-        """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+    def _post_clauses(self, clauses):
+        self.wcnf.extend(clauses)
 
-        Note that we store the constraints in a WCNF formula,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
-
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
-        """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
-        # apply transformations, then post internally
-        cpm_cons = to_cnf(cpm_con)
-        for con in cpm_cons:
-            clauses = self._encode_constraint(con)
-            self._post_clauses(clauses)
-            ## keep track of the transformed clauses
-            self.wcnf.extend(clauses)
-
-        return self
+        for clause in clauses:
+            self.rc2_solver.add_clause(clause)
 
     def _restart(self, wcnf):
         if self.rc2_solver is not None:
@@ -215,10 +197,56 @@ class CPM_RC2(CPM_pysat):
 
         return has_sol
 
+    def solveAll(self, assumptions=None, block=0, solution_limit=None, display=None):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
+
+            It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
+
+            Arguments:
+                - display: either a list of CPMpy expressions, called with the variables before value-mapping
+                        default/None: nothing displayed
+                - solution_limit: stop after this many solutions (default: None)
+
+            Returns: number of solutions found
+        """
+        if display:
+            pysat_rc2_vars = set()
+            for cpm_var in display:
+                pysat_var = self.solver_var(cpm_var)
+                pysat_rc2_vars.add(pysat_var)
+                pysat_rc2_vars.add(-pysat_var)
+
+        if assumptions is not None:
+            self._solved_assumption = True
+            self._add_assumptions(assumptions)
+        elif self._solved_assumption:
+            self._restart(self.wcnf)
+
+        max_cost = None
+        nbsols = 0
+        for model in self.rc2_solver.enumerate(block=block):
+            cost = self.rc2_solver.cost
+            if max_cost is None:
+                max_cost = cost
+            elif cost > max_cost:
+                return nbsols
+            elif solution_limit is not None and nbsols >= solution_limit:
+                return nbsols
+
+            if display:
+                sol = set(model) & pysat_rc2_vars
+                print(f'Solution {sol} with cost={cost}')
+            nbsols +=1
+
     def objective(self, expr, minimize=False):
         """
-        Push objective to maxsat solver.
-        Only linear sums are supported for the moment.
+        MaxSAT is usually modelled as a minimization problem where
+        the solution minimizes the total cost of the falsified clauses.
+        For a traditional constraint optimization problem this corresponds to maximizing
+        the objective function.
+
+        Only linear terms are handled by
         """
         if minimize:
             raise NotImplementedError("RC2 does not support minimizing the objective.")
@@ -233,9 +261,12 @@ class CPM_RC2(CPM_pysat):
             pysat_assum_vars = self.solver_vars(vars)
             for weight, pysat_assum_var in zip(weights, pysat_assum_vars):
                 self.rc2_solver.add_clause([pysat_assum_var], weight=weight)
-                self.wcnf.append([pysat_assum_var], weight=1)
+                self.wcnf.append([pysat_assum_var], weight=weight)
         else:
             raise NotImplementedError(f"Expression {expr} not handled")
+        print(self.wcnf.hard)
+        print(self.wcnf.soft)
+        print(self.wcnf.wght)
 
     def get_core(self):
         raise NotImplementedError("RC2 does not support unsat core extraction, check out the PySat solver for this functionality.")

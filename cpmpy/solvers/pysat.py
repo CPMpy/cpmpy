@@ -222,9 +222,12 @@ class CPM_pysat(SolverInterface):
 
         # apply transformations, then post internally
         cpm_cons = to_cnf(cpm_con)
+
+        clauses = []
         for con in cpm_cons:
-            clauses = self._encode_constraint(con)
-            self._post_clauses(clauses)
+            clauses += self._enocde_constraints(con)
+
+        self._post_clauses(clauses)
 
         return self
 
