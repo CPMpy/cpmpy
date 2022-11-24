@@ -202,6 +202,7 @@ class SolverInterface(object):
         # XXX: check that no objective function??
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
+            print("solve all ")
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
