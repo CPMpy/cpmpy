@@ -628,3 +628,46 @@ def negated_normal(expr):
             return negated_normal(Operator('and', expr.decompose()))
         else:
             raise NotImplementedError("negate_normal {}".format(expr))
+
+
+def _wsum_should_flatten(arg):
+    # in flatten we also turn negations (in sums) into weighted sums,
+    # for stronger expression simplification
+    if isinstance(arg, Operator) and arg.name == "-":
+        # TODO: HANDLE the ABS operator 
+        if any(isinstance(sub_arg, Operator) and sub_arg.name == "abs" for sub_arg in arg.args):
+            return False
+        return True
+    return _wsum_should(arg)
+
+def _wsum_make_flatten(sub_expr):
+    # Mixed operator weighted sums that can be flattened into one,
+    # where any of the sub expressions is a sum, mul, neg, ...
+    # e.g. bv0 - 3 * (bv2 + 2 * bv1)
+    if sub_expr.name == 'wsum':
+        w_new, x_new = [], []
+        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
+            wni, xni = _wsum_make_flatten(xi)
+            wni = [wnij * wi for wnij in wni]
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
+    elif sub_expr.name == 'mul':
+        w = sub_expr.args[0]
+        wi, x = _wsum_make_flatten(sub_expr.args[1])
+        wi_new = [wij*w for wij in wi]
+        return wi_new, x
+    elif sub_expr.name == "sum":
+        w_new, x_new = [], []
+        for xi in sub_expr.args:
+            wni, xni = _wsum_make_flatten(xi)
+            w_new += wni
+            x_new += xni
+        return w_new, x_new
+    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
+        # - (3 * y)
+        w, x = _wsum_make_flatten(sub_expr.args[0])
+        return [-i for i in w], x
+
+    ## base case
+    return _wsum_make(sub_expr)
