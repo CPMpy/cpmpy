@@ -93,6 +93,7 @@ def flatten_model(orig_model):
     # the top-level constraints
     basecons = []
     for con in orig_model.constraints:
+        print("CON to be flattenend=", con)
         basecons += flatten_constraint(con)
 
     # the objective
@@ -216,6 +217,7 @@ def flatten_constraint(expr):
             # other cases: LHS is numexpr
             (lhs, lcons) = normalized_numexpr(lexpr)
 
+        print(f"[Comparison({exprname}, {lhs}, {rvar})]+{lcons}+{rcons}")
         return [Comparison(exprname, lhs, rvar)]+lcons+rcons
 
     else:
@@ -386,7 +388,7 @@ def normalized_boolexpr(expr):
             base_cons: list of flat normal constraints
     """
     assert(not __is_flat_var(expr))
-    assert(expr.is_bool()) 
+    assert(expr.is_bool())
 
     if isinstance(expr, Operator):
         # and, or, ->
@@ -408,11 +410,11 @@ def normalized_boolexpr(expr):
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
+        print(f"\nExpr={expr} is a comparison\n")
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
             # LHS can be numexpr, RHS has to be variable
-
             # TODO: optimisations that swap directions instead when it can avoid to create vars
             """
             if expr.name == '==' or expr.name == '!=':
@@ -460,6 +462,7 @@ def normalized_boolexpr(expr):
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
+            rhs = rvar
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
@@ -478,6 +481,7 @@ def normalized_boolexpr(expr):
                     # != not needed, negate RHS variable
                     rhs = ~rvar
                     exprname = '=='
+                    return (Comparison(exprname, lhs, rhs), lcons+rcons)
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr)
