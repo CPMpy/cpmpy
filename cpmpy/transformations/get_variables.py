@@ -6,7 +6,7 @@ Variables are ordered by appearance, e.g. first encountered first
 import warnings # for deprecation warning
 from ..expressions.core import Expression
 from ..expressions.variables import _NumVarImpl,NegBoolView
-from ..expressions.utils import is_any_list, is_int
+from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
     """

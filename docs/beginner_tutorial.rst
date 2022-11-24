@@ -33,7 +33,7 @@ A typical CP problem is defined by the following elements:
 
 **Variables**: Variables represents the decisions to be made. Depending on the decisions to be made variables can be *Boolean*, whenever a Yes or No decision is needed to be made, or *Integer*, whenever an integer number is necessary to represent a decision. In the first case, we say the **domain** of a Boolean variable is the set {True, False}. For integer variables we represent this as an interval of integer numbers, [a,b].
 
-**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or `global constrains <https://github.com/tias/cppy/blob/master/docs/api/constraints.rst>`_.
+**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or `global constraints <https://cpmpy.readthedocs.io/en/latest/api/expressions/globalconstraints.html>`_.
 
 Moreover, if we want to model an constrained optimization problem we also need to specify an 
 

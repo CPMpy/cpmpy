@@ -42,7 +42,7 @@ def to_cnf(constraints):
     if not isinstance(constraints, (list,tuple)):
         # catch rest, single object to singleton object
         constraints = [constraints]
-    
+
     fnf = flatten_constraint(constraints)
     return flat2cnf(fnf)
 

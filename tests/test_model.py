@@ -3,7 +3,10 @@ import tempfile
 import os
 from os.path import join
 
+from numpy import logaddexp
 import cpmpy as cp
+from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
+
 
 class TestModel(unittest.TestCase):
     
