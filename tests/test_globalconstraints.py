@@ -28,6 +28,14 @@ class TestGlobal(unittest.TestCase):
                 # ensure all different values
                 self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
 
+    def test_not_alldifferent(self):
+        # from fuzztester of Ruben Kindt, #143
+        pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
+        m = cp.Model()
+        m += ~cp.AllDifferent(pos)
+        self.assertTrue(m.solve("ortools"))
+        self.assertFalse(cp.AllDifferent(pos).value())
+
     def test_circuit(self):
         """
         Circuit constraint unit tests the hamiltonian circuit on a

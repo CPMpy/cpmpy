@@ -256,8 +256,10 @@ class CPM_pysat(SolverInterface):
             bound = cpm_expr.args[1] # right-hand side, constant
 
             # only handle cardinality encodings (for now)
-            if isinstance(left, Operator) and left.name == "sum" and is_int(bound):
+            if isinstance(left, Operator) and left.name == "sum" and all(isinstance(v, _BoolVarImpl) for v in left.args):
                 lits = self.solver_vars(left.args)
+                if not is_int(bound):
+                    raise NotImplementedError(f"PySAT sum: rhs `{bound}` type {type(bound)} not supported")
 
                 clauses = []
                 if cpm_expr.name == "<":

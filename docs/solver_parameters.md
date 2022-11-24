@@ -19,22 +19,8 @@ a,b = boolvar(2)
 Model(a|b).solve(solver='minizinc:chuffed')
 ```
 
-
-## Direct solver access
-
-CPMpy also offers direct access to its solver API, as well as to the underlying native solver API. For most cases, including setting solver parameters, access to CPMpy's solver API will be sufficient.
-
-In the following, we will use the [or-tools CP-SAT solver](cpmpy/solvers/ortools.py). The corresponding CPMpy class is `CPM_ortools` and can be included as follows:
-
-```python
-   from cpmpy.solvers import CPM_ortools
-```
-
-The same principles will apply to the other solver interfaces too.
-
-
 ## Setting solver parameters
-or-tools has many solver parameters, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto).
+OR-tools has many solver parameters, [documented here](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto).
 
 CPMpy's interface to ortools accepts keyword arguments to `solve()`, and will set the corresponding or-tools parameters if the name matches. We documented some of the frequent once in our [CPM_ortools API](cpmpy/solvers/ortools.py).
 
@@ -48,22 +34,38 @@ s = CPM_ortools(model)
 s.solve(num_search_workers=8, log_search_progress=True)
 ```
 
+
 ## Hyperparameter search across different parameters
 Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
 
-The cpmpy.solvers module has a helper function `param_combinations` that generates all parameter combinations of an input, which can then be looped over.
+The tools directory contains a utility to efficiently search through the hyperparameter space defined by the solvers `tunable_params`.
+This utlity is based on the SMBO framework and speeds up the search by implementing adaptive capping.
 
-The example is in [examples/advanced/hyperparameter_search.py](examples/advanced/hyperparameter_search.py), the key part is:
+The parameter tuner is based on the following publication: 
+>Ignace Bleukx, Senne Berden, Lize Coenen, Nicholas Decleyre, Tias Guns (2022). Model-Based Algorithm
+>Configuration with Adaptive Capping and Prior Distributions. In: Schaus, P. (eds) Integration of Constraint
+>Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
+>vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
+
+Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
 
 ```python
-    from cpmpy.solvers import CPM_ortools, param_combinations
+from cpmpy import *
+from cpmpy.tools import ParameterTuner
 
-    params = {'cp_model_probing_level': [0,1,2,3],
-              'linearization_level': [0,1,2],
-              'symmetry_level': [0,1,2]}
+model = Model(...)
 
-    for params in param_combinations(all_params):
-        s = CPM_ortools(model)
-        s.solve(**params)
-        print(s.status().runtime, "seconds for config", params)
+tunables = {
+    "search_branching":[0,1,2],
+    "linearization_level":[0,1],
+    'symmetry_level': [0,1,2]}
+defaults = {
+    "search_branching": 0,
+    "linearization_level": 1,
+    'symmetry_level': 2
+}
+
+tuner = ParameterTuner("ortools", model, tunables, defaults)
+best_params = tuner.tune(max_tries=100)
+best_runtime = tuner.best_runtime
 ```

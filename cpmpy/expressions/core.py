@@ -508,7 +508,7 @@ def _wsum_should(arg):
     # Undecided: -x + y, -x + -y?
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
-            arg.name == 'mul' and is_num(arg.args[0]))
+            (arg.name == 'mul' and is_num(arg.args[0])) and len(arg.args) == 2)
 def _wsum_make(arg):
     """ Internal helper: prep the arg for wsum """
     # returns ([weights], [vars])

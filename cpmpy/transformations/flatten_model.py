@@ -315,6 +315,10 @@ def get_or_make_var(expr):
                     lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
                 ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
                 ivar = _IntVarImpl(lb, ub)
+            elif flatexpr.name == "sub": # binary
+                lb = lbs[0] - ubs[1]
+                ub = ubs[0] - lbs[1]
+                ivar = _IntVarImpl(lb,ub)
             elif flatexpr.name == 'mul': # binary
                 v0 = [lbs[0], ubs[0]]
                 v1 = [lbs[1], ubs[1]]
@@ -475,9 +479,11 @@ def normalized_boolexpr(expr):
                 if is_num(rexpr):
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
-
-                    nnexpr = negated_normal(lexpr)
-                    return normalized_boolexpr(nnexpr)
+                    if exprname == '==':
+                        nnexpr = negated_normal(lexpr)
+                        return normalized_boolexpr(nnexpr)
+                    else: # !=, should only be possible in dubble negation
+                        return normalized_boolexpr(lexpr)
 
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
@@ -576,7 +582,7 @@ def negated_normal(expr):
 
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
-        Global: should call decompose and negate that?
+        Global: decompose and negate that
 
         This function only ensures 'negated normal' for the top-level
         constraint (negating arguments recursively as needed),
@@ -616,52 +622,9 @@ def negated_normal(expr):
         # only negated last element
         return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
-    else:
-        # global...
-        #raise NotImplementedError("negate_normal {}".format(expr))
-        return expr == 0 # can't do better than this...
-# <<<<<<< HEAD
-
-def _wsum_should_flatten(arg):
-    # in flatten we also turn negations (in sums) into weighted sums,
-    # for stronger expression simplification
-    if isinstance(arg, Operator) and arg.name == "-":
-        # TODO: HANDLE the ABS operator 
-        if any(isinstance(sub_arg, Operator) and sub_arg.name == "abs" for sub_arg in arg.args):
-            return False
-        return True
-    return _wsum_should(arg)
-
-def _wsum_make_flatten(sub_expr):
-    # Mixed operator weighted sums that can be flattened into one,
-    # where any of the sub expressions is a sum, mul, neg, ...
-    # e.g. bv0 - 3 * (bv2 + 2 * bv1)
-    if sub_expr.name == 'wsum':
-        w_new, x_new = [], []
-        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
-            wni, xni = _wsum_make_flatten(xi)
-            wni = [wnij * wi for wnij in wni]
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == 'mul':
-        w = sub_expr.args[0]
-        wi, x = _wsum_make_flatten(sub_expr.args[1])
-        wi_new = [wij*w for wij in wi]
-        return wi_new, x
-    elif sub_expr.name == "sum":
-        w_new, x_new = [], []
-        for xi in sub_expr.args:
-            wni, xni = _wsum_make_flatten(xi)
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
-        # - (3 * y)
-        w, x = _wsum_make_flatten(sub_expr.args[0])
-        return [-i for i in w], x
-
-    ## base case
-    return _wsum_make(sub_expr)
-# =======
-# >>>>>>> master
+    else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose"):
+            # global... decompose and negate that
+            return negated_normal(Operator('and', expr.decompose()))
+        else:
+            raise NotImplementedError("negate_normal {}".format(expr))

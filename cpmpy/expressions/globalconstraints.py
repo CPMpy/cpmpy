@@ -104,7 +104,7 @@
 import warnings # for deprecation warning
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -168,7 +168,7 @@ class AllDifferent(GlobalConstraint):
         return AllDifferent(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -193,7 +193,7 @@ class AllEqual(GlobalConstraint):
         return AllEqual(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == 1
 
 
 def circuit(args):
@@ -334,9 +334,10 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
-        idxval = argval(self.args[1])
-        if not idxval is None:
-            return argval(self.args[0][idxval])
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            return argval(arr[idxval])
         return None # default
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
@@ -351,7 +352,7 @@ class Element(GlobalConstraint):
         from .python_builtins import any
 
         arr,idx = self.args
-        return [any(eval_comparison(cmp_op, cmp_rhs, j) & (idx == j) for j in range(len(arr)))]
+        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -409,3 +410,64 @@ class Xor(GlobalConstraint):
        """
         copied_args = self._deepcopy_args(memodict)
         return Xor(copied_args)
+
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Supports both varying demand across tasks or equal demand for all jobs
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        super(Cumulative, self).__init__("cumulative",[start,
+                                                       duration,
+                                                       end,
+                                                       demand,
+                                                       capacity])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+        from ..expressions.python_builtins import sum
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [start[t] + duration[t] == end[t]]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        for t in range(lb,ub+1):
+            demand_at_t = 0
+            for job in range(len(start)):
+                if is_num(demand):
+                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                else:
+                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+            cons += [capacity >= demand_at_t]
+
+        return cons
+
+    def value(self):
+        start, dur, end, demand, cap = [argval(a) for a in self.args]
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if cap < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+
+
+
