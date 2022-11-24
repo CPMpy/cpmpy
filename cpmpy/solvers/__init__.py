@@ -45,8 +45,5 @@ from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
-<<<<<<< HEAD
 from .pysat_rc2 import CPM_RC2
-=======
 from .z3 import CPM_z3
->>>>>>> master
