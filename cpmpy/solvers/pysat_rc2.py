@@ -256,9 +256,6 @@ class CPM_RC2(CPM_pysat):
                 self.wcnf.append([pysat_assum_var], weight=weight)
         else:
             raise NotImplementedError(f"Expression {expr} not handled")
-        print(self.wcnf.hard)
-        print(self.wcnf.soft)
-        print(self.wcnf.wght)
 
     def get_core(self):
         raise NotImplementedError("RC2 does not support unsat core extraction, check out the PySat solver for this functionality.")
