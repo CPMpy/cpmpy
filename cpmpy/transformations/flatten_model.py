@@ -478,12 +478,11 @@ def normalized_boolexpr(expr):
                     # != not needed, negate RHS variable
                     rhs = ~rvar
                     exprname = '=='
-                    return (Comparison(exprname, lhs, rhs), lcons+rcons)
             else:
                 # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
-            return (Comparison(exprname, lhs, rvar), lcons+rcons)
+            return (Comparison(exprname, lhs, rhs), lcons+rcons)
 
     else:
         """
