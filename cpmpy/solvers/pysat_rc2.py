@@ -4,21 +4,13 @@
 ## pysat_rc2.py
 ##
 """
-    Interface to PySAT's API
+    Interface to PySAT RC2 MaxSAT API.
 
-    PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
-    interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
-    to a variety of cardinality and pseudo-Boolean encodings.
-    https://pysathq.github.io/
+    RC2 is an efficient core-guided MaxSAT solver part of the PySAT package
+    for solving the (weighted) (partial) Maximum Satisfiability problem.
 
-    This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,xor,implies,==,!=) or cardinality constraints.
-
-    Documentation of the solver's own Python API:
-    https://pysathq.github.io/docs/html/api/solvers.html
-
-    WARNING: CPMpy uses 'model' to refer to a constraint specification,
-    the PySAT docs use 'model' to refer to a solution.
+    Documentation is available at:
+    https://pysathq.github.io/docs/html/api/examples/rc2.html
 
     ===============
     List of classes
