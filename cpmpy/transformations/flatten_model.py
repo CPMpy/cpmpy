@@ -93,7 +93,6 @@ def flatten_model(orig_model):
     # the top-level constraints
     basecons = []
     for con in orig_model.constraints:
-        print("CON to be flattenend=", con)
         basecons += flatten_constraint(con)
 
     # the objective
@@ -217,7 +216,6 @@ def flatten_constraint(expr):
             # other cases: LHS is numexpr
             (lhs, lcons) = normalized_numexpr(lexpr)
 
-        print(f"[Comparison({exprname}, {lhs}, {rvar})]+{lcons}+{rcons}")
         return [Comparison(exprname, lhs, rvar)]+lcons+rcons
 
     else:
@@ -410,7 +408,6 @@ def normalized_boolexpr(expr):
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
-        print(f"\nExpr={expr} is a comparison\n")
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
