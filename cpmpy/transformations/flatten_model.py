@@ -476,7 +476,7 @@ def normalized_boolexpr(expr):
                 (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=':
                     # != not needed, negate RHS variable
-                    rhs = ~rvar
+                    rvar = ~rvar
                     exprname = '=='
             else:
                 # other cases: LHS is numexpr
