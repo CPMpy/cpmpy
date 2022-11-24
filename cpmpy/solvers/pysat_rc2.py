@@ -1,24 +1,16 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## pysat.py
+## pysat_rc2.py
 ##
 """
-    Interface to PySAT's API
+    Interface to PySAT RC2 MaxSAT API.
 
-    PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
-    interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
-    to a variety of cardinality and pseudo-Boolean encodings.
-    https://pysathq.github.io/
+    RC2 is an efficient core-guided MaxSAT solver part of the PySAT package
+    for solving the (weighted) (partial) Maximum Satisfiability problem.
 
-    This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,xor,implies,==,!=) or cardinality constraints.
-
-    Documentation of the solver's own Python API:
-    https://pysathq.github.io/docs/html/api/solvers.html
-
-    WARNING: CPMpy uses 'model' to refer to a constraint specification,
-    the PySAT docs use 'model' to refer to a solution.
+    Documentation is available at:
+    https://pysathq.github.io/docs/html/api/examples/rc2.html
 
     ===============
     List of classes
@@ -27,19 +19,16 @@
     .. autosummary::
         :nosignatures:
 
-        CPM_rc2
+        CPM_RC2
 """
-from cpmpy.expressions.utils import is_int
-from ..expressions.core import Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, boolvar
-from ..transformations.to_cnf import to_cnf
-from ..transformations.get_variables import get_variables
+from ..expressions.core import Operator
 from .pysat import CPM_pysat
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 
 class CPM_RC2(CPM_pysat):
     """
-    Interface to PySAT's API
+    Interface to PySAT RC2 MaxSAT solver at:
+    https://pysathq.github.io/docs/html/api/examples/rc2.html
 
     Requires that the 'python-sat' python package is installed:
     $ pip install python-sat
@@ -49,7 +38,8 @@ class CPM_RC2(CPM_pysat):
 
     Creates the following attributes (see parent constructor for more):
     pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+    rc2_solver: a pysat.examples.rc2 (default: glucose4)
+    wcnf: keeping track of the weighted 
     """
 
     @staticmethod
@@ -80,12 +70,13 @@ class CPM_RC2(CPM_pysat):
 
     def __init__(self, cpm_model=None, subsolver="glucose3"):
         """
-        Constructor of the native solver object
+        Constructor of the native RC2 solver object.
+        We keep track of the built cnf clauses to reinitliase the solver when assumptions are added to the maxsat solver as hard clauses.
 
         Requires a CPMpy model as input, and will create the corresponding
-        PySAT clauses and solver object
+        PySAT clauses and RC2 solver object.
 
-        Only supports satisfaction problems (no objective)
+        Only supports maximal satisfaction problems
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model(), optional
@@ -98,40 +89,101 @@ class CPM_RC2(CPM_pysat):
 
         assert subsolver in CPM_RC2.solvernames(), f"Wrong solver ({subsolver}) selected from available: ({CPM_RC2.solvernames()})"
 
-        self.pysat_solver = RC2(formula=WCNF(), solver=subsolver)
-        self.ivarmap = dict()
-        self.pysat_vpool = self.pysat_solver.pool
+        # Keep track of transformed clauses in case the solving requires
+        # assumptions
+        self.wcnf = WCNF()
+
+        self.rc2_solver = RC2(formula=self.wcnf, solver=subsolver)
+        self.pysat_vpool = self.rc2_solver.pool
+
+        # RESTARTS: keep track of subsolver
+        self.subsolver = subsolver
+
+        # RESTARTS: Keep track of solving state
+        self._solved_assumption = False
+
+        # Efficiency trick: If the solver is called incrementally
+        # where assumption variables are the same, then the solver
+        # does not need to be restarted.
+        self._prev_pysat_assum_vars = set()
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
+    def _post_clauses(self, clauses):
+        """
+        Post the CPMpy constraints transformed into Boolean SAT clauses
+        to the RC2 solver.
+        """
+        self.wcnf.extend(clauses)
+
+        for clause in clauses:
+            self.rc2_solver.add_clause(clause)
+
+    def _restart(self, wcnf):
+        """
+        Restart RC2 solver if assumptions were used during the solving.
+        """
+        if self.rc2_solver is not None:
+            del self.rc2_solver
+
+        self.rc2_solver = RC2(formula=wcnf, solver=self.subsolver)
+
+        self._solved_assumption = False
+        self._prev_pysat_assum_vars = set()
+
+    def _add_assumptions(self, assumptions=None):
+        """
+        Assumptions are added as hard clauses to the RC2 solver.
+        To improve efficiency, given assumptions are compared to the
+        assumptions (`self._prev_pysat_assum_vars`) used in the previous
+        solve call.
+
+        RC2 is called incrementally if `_prev_pysat_assum_vars' is a subset
+        of the given assumptions. There is no need to restart RC2 solver.
+
+        Otherwhise, restart RC2.
+        """
+        pysat_assum_vars = set(self.solver_vars(assumptions))
+
+        # No need to restart if solved incrementally
+        if not set(self._prev_pysat_assum_vars).issubset(pysat_assum_var):
+            self._restart(self.wcnf)
+
+        for pysat_assum_var in pysat_assum_vars:
+            self.rc2_solver.add_clause([pysat_assum_var])
+
+        self._solved_assumption = True
+
     def solve(self, assumptions=None):
         """
-            Call the PySAT solver
+            Call the MaxSAT RC2 solver.
+            1. In case, a new solve call is executed without changing the assumptions
+               then the rc2 is not restarted and computes a solution
+
+            2. In case new assumptions are added, then the solver is restarted with the
+               base constraints of the input model.
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
-                           runtime exceeds given time_limit.
-                           Warning: the time_limit is not very accurate at subsecond level
             - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
+                           MaxSAT solver does not support incremental solving and assumptions.
+                           CPM_rc2 adds the assumptions as hard clauses to the MaxSAT solver.
         """
         if assumptions is not None:
-            print("[Warning] Assumption variables interpreted as hard clauses!")
-            pysat_assum_vars = self.solver_vars(assumptions)
-            for pysat_assum_var in pysat_assum_vars:
-                self.pysat_solver.add_clause([pysat_assum_var])
+            self._solved_assumption = True
+            self._add_assumptions(assumptions)
+        elif self._solved_assumption:
+            self._restart(self.wcnf)
 
-        sol = self.pysat_solver.compute()
+        sol = self.rc2_solver.compute()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.pysat_solver.oracle_time()
+        self.cpm_status.runtime = self.rc2_solver.oracle_time()
 
         # translate exit status
         if sol is not None:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif sol is None:
+        else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
 
         # True/False depending on self.cpm_status
@@ -153,128 +205,74 @@ class CPM_RC2(CPM_pysat):
 
         return has_sol
 
-    def objective(self, expr, minimize):
+    def solveAll(self, assumptions=None, block=0, solution_limit=None, display=None):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
+
+            It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
+
+            Arguments:
+                - display: either a list of CPMpy expressions, called with the variables before value-mapping
+                        default/None: nothing displayed
+                - solution_limit: stop after this many solutions (default: None)
+
+            Returns: number of solutions found
+        """
+        if display:
+            pysat_rc2_vars = set()
+            for cpm_var in display:
+                pysat_var = self.solver_var(cpm_var)
+                pysat_rc2_vars.add(pysat_var)
+                pysat_rc2_vars.add(-pysat_var)
+
+        ## Previous call was made with assumptions or not
+        if assumptions is not None:
+            self._solved_assumption = True
+            self._add_assumptions(assumptions)
+        elif self._solved_assumption:
+            self._restart(self.wcnf)
+
+        max_cost = None
+        nbsols = 0
+        for model in self.rc2_solver.enumerate(block=block):
+            cost = self.rc2_solver.cost
+            if max_cost is None:
+                max_cost = cost
+            elif cost > max_cost:
+                return nbsols
+            elif solution_limit is not None and nbsols >= solution_limit:
+                return nbsols
+
+            if display:
+                sol = set(model) & pysat_rc2_vars
+                print(f'Solution {sol} with cost={cost}')
+            nbsols +=1
+
+    def objective(self, expr, minimize=False):
+        """
+        MaxSAT is usually modelled as a minimization problem where
+        the solution minimizes the total cost of the falsified clauses.
+        For a traditional constraint optimization problem this corresponds to maximizing
+        the objective function.
+
+        Only linear terms are handled by
+        """
         if minimize:
-            raise NotImplementedError()
+            raise NotImplementedError("RC2 does not support minimizing the objective.")
 
         if isinstance(expr, Operator) and expr.name == "sum":
             pysat_assum_vars = self.solver_vars(expr.args)
             for pysat_assum_var in pysat_assum_vars:
-                self.pysat_solver.add_clause([pysat_assum_var], weight=1)
+                self.rc2_solver.add_clause([pysat_assum_var], weight=1)
+                self.wcnf.append([pysat_assum_var], weight=1)
         elif isinstance(expr, Operator) and expr.name == "wsum":
             weights, vars = expr.args
             pysat_assum_vars = self.solver_vars(vars)
             for weight, pysat_assum_var in zip(weights, pysat_assum_vars):
-                self.pysat_solver.add_clause([pysat_assum_var], weight=weight)
+                self.rc2_solver.add_clause([pysat_assum_var], weight=weight)
+                self.wcnf.append([pysat_assum_var], weight=weight)
         else:
             raise NotImplementedError(f"Expression {expr} not handled")
 
-    def _post_constraint(self, cpm_expr):
-        """
-            Post a primitive CPMpy constraint to the native solver API
-        """
-        from pysat.card import CardEnc
-
-        if isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
-        elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'or':
-                self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
-            else:
-                raise NotImplementedError(
-                    f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
-        elif isinstance(cpm_expr, Comparison):
-            left = cpm_expr.args[0] # left-hand side, sum/wsum/mul
-            bound = cpm_expr.args[1] # right-hand side, constant
-
-            # only handle cardinality encodings (for now)
-            if isinstance(left, Operator) and left.name == "sum" and is_int(bound):
-                lits = self.solver_vars(left.args)
-
-                clauses = []
-                if cpm_expr.name == "<":
-                    clauses += CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "<=":
-                    clauses += CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">=":
-                    clauses += CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">":
-                    clauses += CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "==":
-                    clauses += CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "!=":
-                    # special cases with bounding 'hardcoded' for clarity
-                    if bound <= 0:
-                        clauses += CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
-                    elif bound >= len(lits):
-                        clauses += CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
-                    else:
-                        ## add implication literal to atleast/atmost
-                        is_atleast = self.solver_var(boolvar())
-                        clauses += [atl + [-is_atleast] for atl in
-                                    CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
-
-                        is_atmost = self.solver_var(boolvar())
-                        clauses += [atm + [-is_atmost] for atm in
-                                    CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
-
-                        ## add is_atleast or is_atmost
-                        clauses.append([is_atleast, is_atmost])
-                else:
-                    raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
-
-                # post the clauses
-                for cl in clauses:
-                    self.pysat_solver.add_clause(cl)
-
-            # WEIGHTED !
-            elif isinstance(left, Operator) and (left.name in ["wsum", "mul"]) and is_int(bound):
-
-                if not CPM_pysat.pb_supported():
-                    raise ImportError("Please install PyPBLib: pip install pypblib")
-                from pysat.pb import PBEnc
-
-                if left.name == "mul":
-                    # single weight,value pair, in list
-                    weights = [left.args[0]]
-                    lits = [self.solver_var(left.args[1])]
-                else: # wsum
-                    weights = left.args[0]
-                    lits = self.solver_vars(left.args[1])
-
-                clauses = []
-                if cpm_expr.name == "<" or (cpm_expr.name == "!=" and bound >= len(lits)):
-                    clauses += PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "<=":
-                    clauses += PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">" or (cpm_expr.name == "!=" and bound <= 0):
-                    clauses += PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">=":
-                    clauses += PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "==":
-                    clauses +=PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
-
-                elif cpm_expr.name == "!=":
-                    # BUG with pblib solved in Pysat dev 0.1.7.dev12
-                    is_atleast = self.solver_var(boolvar())
-                    clauses += [atl + [-is_atleast] for atl in
-                                PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses]
-                    is_atmost = self.solver_var(boolvar())
-                    clauses += [atm + [-is_atmost] for atm in
-                                PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses]
-
-                    ## add is_atleast or is_atmost
-                    clauses.append([is_atleast, is_atmost])
-                else:
-                    raise NotImplementedError(f"Comparison: {cpm_expr} not supported by CPM_pysat")
-
-                for cl in clauses:
-                    self.pysat_solver.add_clause(cl)
-            else:
-                raise NotImplementedError(f"Comparison: {cpm_expr} not supported by CPM_pysat")
-        else:
-            raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
-
     def get_core(self):
-        raise NotImplementedError("Does not work.")
+        raise NotImplementedError("RC2 does not support unsat core extraction, check out the PySat solver for this functionality.")

@@ -31,7 +31,7 @@
 """
 from ..transformations.int2bool_onehot import intvar_to_boolvar, to_bool_constraint, is_boolvar_constraint
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables
@@ -255,31 +255,37 @@ class CPM_pysat(SolverInterface):
                 self.ivarmap.update(new_ivarmap)
 
                 bool_constraints += iv_constraints
-                
+
                 bool_constraints += to_bool_constraint(con, self.ivarmap)
-                
+
                 self.user_vars.update(get_variables(bool_constraints))
 
                 for bool_con in bool_constraints:
-                    self._post_constraint(bool_con)
+                    clauses = self._enocde_constraints(bool_con)
+                    self._post_clauses(clauses)
             else:
                 self.user_vars.update(get_variables(con))
-                self._post_constraint(con)
+                clauses = self._enocde_constraints(con)
+                self._post_clauses(clauses)
 
         return self
 
-    def _post_constraint(self, cpm_expr):
+    def _post_clauses(self, clauses):
+        self.pysat_solver.append_formula(clauses)
+
+    def _enocde_constraints(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
         """
         from pysat.card import CardEnc
+        clauses = []
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
-            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
+            clauses.append([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'or':
-                self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
+                clauses.append(self.solver_vars(cpm_expr.args))
             else:
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
@@ -291,7 +297,6 @@ class CPM_pysat(SolverInterface):
             if isinstance(left, Operator) and left.name == "sum" and is_int(bound):
                 lits = self.solver_vars(left.args)
 
-                clauses = []
                 if cpm_expr.name == "<":
                     clauses += CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "<=":
@@ -323,12 +328,8 @@ class CPM_pysat(SolverInterface):
                 else:
                     raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-                # post the clauses
-                self.pysat_solver.append_formula(clauses)
-
             # WEIGHTED !
             elif isinstance(left, Operator) and (left.name in ["wsum", "mul"]) and is_int(bound):
-
                 if not CPM_pysat.pb_supported():
                     raise ImportError("Please install PyPBLib: pip install pypblib")
                 from pysat.pb import PBEnc
@@ -373,6 +374,7 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
+        return clauses
 
     def solution_hint(self, cpm_vars, vals):
         """

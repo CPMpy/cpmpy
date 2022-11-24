@@ -15,6 +15,7 @@
         pysat
         gurobi
         pysdd
+        pysat_rc2
         z3
         utils
 
@@ -28,6 +29,7 @@
         CPM_pysat
         CPM_gurobi
         CPM_pysdd
+        CPM_RC2
         CPM_z3
 
     =================
@@ -41,9 +43,9 @@
 
 from .utils import builtin_solvers, get_supported_solvers, param_combinations
 from .ortools import CPM_ortools
-from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
+from .pysat import CPM_pysat
 from .pysat_rc2 import CPM_RC2
 from .z3 import CPM_z3

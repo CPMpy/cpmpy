@@ -73,9 +73,9 @@ class SolverLookup():
                 ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
                 ("gurobi", CPM_gurobi),
-                ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("minizinc", CPM_minizinc),
+                ("pysat", CPM_pysat),
                 ("rc2", CPM_RC2)
                ]
 
