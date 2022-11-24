@@ -187,7 +187,7 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
-        # <<<<<<< HEAD
+
         left, right = expr.args[0], expr.args[1]
 
         # Flatten a complex weighted sum where any of the sub expressions is a sum, mul, neg, ...
@@ -197,10 +197,9 @@ def flatten_constraint(expr):
             any(_wsum_should_flatten(sub_expr) for sub_expr in left.args) ):
             w_new, x_new = _wsum_make_flatten(left)
             return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
-        # =======
+
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
-        # >>>>>>> master
 
         # swap 'Var == Expr' to normal 'Expr == Var'
         lexpr, rexpr = expr.args
