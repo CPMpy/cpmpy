@@ -113,20 +113,39 @@ class CPM_RC2(CPM_pysat):
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
     def _post_clauses(self, clauses):
+        """
+        Post the CPMpy constraints transformed into Boolean SAT clauses
+        to the RC2 solver.
+        """
         self.wcnf.extend(clauses)
 
         for clause in clauses:
             self.rc2_solver.add_clause(clause)
 
     def _restart(self, wcnf):
+        """
+        Restart RC2 solver if assumptions were used during the solving.
+        """
         if self.rc2_solver is not None:
             del self.rc2_solver
+
         self.rc2_solver = RC2(formula=wcnf, solver=self.subsolver)
 
         self._solved_assumption = False
         self._prev_pysat_assum_vars = set()
 
     def _add_assumptions(self, assumptions=None):
+        """
+        Assumptions are added as hard clauses to the RC2 solver.
+        To improve efficiency, given assumptions are compared to the
+        assumptions (`self._prev_pysat_assum_vars`) used in the previous
+        solve call.
+
+        RC2 is called incrementally if `_prev_pysat_assum_vars' is a subset
+        of the given assumptions. There is no need to restart RC2 solver.
+
+        Otherwhise, restart RC2.
+        """
         pysat_assum_vars = set(self.solver_vars(assumptions))
 
         # No need to restart if solved incrementally
@@ -209,6 +228,7 @@ class CPM_RC2(CPM_pysat):
                 pysat_rc2_vars.add(pysat_var)
                 pysat_rc2_vars.add(-pysat_var)
 
+        ## Previous call was made with assumptions or not
         if assumptions is not None:
             self._solved_assumption = True
             self._add_assumptions(assumptions)
