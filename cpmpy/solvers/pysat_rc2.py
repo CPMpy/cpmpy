@@ -22,9 +22,6 @@
         CPM_RC2
 """
 from ..expressions.core import Operator
-from ..expressions.variables import _BoolVarImpl
-from ..transformations.to_cnf import to_cnf
-from ..transformations.get_variables import get_variables
 from .pysat import CPM_pysat
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 
