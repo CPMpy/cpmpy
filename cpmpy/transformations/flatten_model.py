@@ -412,6 +412,7 @@ def normalized_boolexpr(expr):
             return (expr, [])
         else:
             # LHS can be numexpr, RHS has to be variable
+
             # TODO: optimisations that swap directions instead when it can avoid to create vars
             """
             if expr.name == '==' or expr.name == '!=':
