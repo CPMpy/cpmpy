@@ -386,7 +386,7 @@ def normalized_boolexpr(expr):
             base_cons: list of flat normal constraints
     """
     assert(not __is_flat_var(expr))
-    assert(expr.is_bool())
+    assert(expr.is_bool()) 
 
     if isinstance(expr, Operator):
         # and, or, ->
