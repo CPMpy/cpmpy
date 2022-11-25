@@ -89,4 +89,14 @@ class TestGlobal(unittest.TestCase):
         m += cp.Cumulative(start, duration, end, demand, capacity)
         m2 = m.deepcopy()  # should not throw an exception
         self.assertEqual(repr(m), repr(m2))  # should be True
-        
+
+    def test_cumulative_single_demand(self):
+        import numpy
+        m = cp.Model()
+        start = cp.intvar(0, 10, 4, "start")
+        duration = numpy.array([1, 2, 2, 1])
+        end = start + duration
+        demand = 1
+        capacity = 1
+        m += cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertTrue(m.solve())

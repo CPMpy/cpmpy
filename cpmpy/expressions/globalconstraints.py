@@ -421,7 +421,7 @@ class Cumulative(GlobalConstraint):
         super(Cumulative, self).__init__("cumulative",[flatlist(start),
                                                        flatlist(duration),
                                                        flatlist(end),
-                                                       flatlist(demand),
+                                                       demand if is_num(demand) else flatlist(demand),
                                                        capacity])
 
     def decompose(self):
