@@ -151,7 +151,7 @@ class Expression(object):
         copied = []
         for arg in arglist:
             if is_any_list(arg):
-                copied.append(self._deepcopy_arg_list(arg, memodict))
+                copied += [self._deepcopy_arg_list(arg, memodict)]
                 continue
 
             if arg not in memodict:
@@ -161,7 +161,7 @@ class Expression(object):
                     memodict[arg] = arg
                 else:
                     raise ValueError(f"Not a supported argument to copy: {arg}")
-            copied.append(memodict[arg])
+            copied += [memodict[arg]]
         return copied
 
     def deepcopy(self, memodict = {}):
