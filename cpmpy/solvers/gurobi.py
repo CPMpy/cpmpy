@@ -396,8 +396,6 @@ class CPM_gurobi(SolverInterface):
         self.grb_model.optimize()
 
         optimal_val = None
-        # minimize or maximize?
-        obj_is_min = self.grb_model.ModelSense == 1
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
         for i in range(solution_count):
@@ -408,9 +406,7 @@ class CPM_gurobi(SolverInterface):
                 optimal_val = sol_obj_val
             if optimal_val is not None:
                 # sub-optimal solutions
-                if obj_is_min is True and sol_obj_val > optimal_val:
-                    break
-                if obj_is_min is False and sol_obj_val < optimal_val:
+                if sol_obj_val != optimal_val:
                     break
             opt_sol_count += 1
 
