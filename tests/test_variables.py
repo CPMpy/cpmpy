@@ -1,4 +1,7 @@
 import unittest
+
+import pytest
+
 import cpmpy as cp
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
 
@@ -33,6 +36,15 @@ class TestSolvers(unittest.TestCase):
             iv = cp.intvar(0, i, i)
             self.assertEqual(iv.shape, (i,), f"Shape should be equal size: expected {(i, )} got {iv.shape}")
             self.assertIsInstance(iv, NDVarArray, f"Instance not {NDVarArray} got {type(iv)}")
+
+    def test_intvar_float_bounds(self):
+        with pytest.raises(AssertionError):
+            cp.intvar(0.5, 5)
+        # zero fractional part is fine
+        self.assertIsNotNone(cp.intvar(0.0,10))
+        self.assertIsNotNone(cp.intvar(0.0,10.0))
+
+
 
     def test_array_intvar(self):
         for i in range(2, 10):
