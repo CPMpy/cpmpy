@@ -455,7 +455,15 @@ class Cumulative(GlobalConstraint):
         return cons
 
     def value(self):
-        start, dur, end, demand, cap = [argval(a) for a in self.args]
+        import numpy as np
+
+        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
+
+        if any(a is None for a in argvals):
+            return None
+
+        start, dur, end, demand, cap = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
