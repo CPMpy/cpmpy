@@ -29,7 +29,8 @@ from itertools import chain, combinations
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_, int, np.integer))
+    return isinstance(arg, (bool, np.bool_, int, np.integer)) or \
+            int(arg) == arg # allows for floats with zero fractional part
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
