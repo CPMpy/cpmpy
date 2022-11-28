@@ -386,6 +386,10 @@ class CPM_gurobi(SolverInterface):
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
 
+        if solution_limit is None:
+            raise Exception(
+                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
+
         # Force gurobi to keep searching in the tree for optimal solutions
         self.grb_model.setParam("PoolSearchMode", 2)
         self.grb_model.setParam("PoolSolutions", solution_limit)
