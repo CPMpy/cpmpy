@@ -164,7 +164,7 @@ class CPM_z3(SolverInterface):
             if isinstance(self.z3_solver, z3.Optimize) and \
                     len(self.z3_solver.objectives()) != 0:
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj)
+                self.objective_value_ = sol.evaluate(obj).as_long()
 
         else:
             for cpm_var in self.user_vars:
