@@ -199,6 +199,8 @@ class SolverInterface(object):
 
             Returns: number of solutions found
         """
+        # TODO raise warning solver obj will be invalid? Or add assumption variables?
+
         optimal_val = None
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
