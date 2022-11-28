@@ -3,7 +3,10 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
-SOLVERNAME = None
+# CHANGE THIS if you want test a different solver
+#   make sure that `SolverLookup.get(SOLVERNAME)` works
+# also add exclusions to the 3 EXCLUDE_* below as needed
+SOLVERNAME = "ortools"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -21,6 +24,8 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {"xor", "element"},
                 "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
+
+
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
