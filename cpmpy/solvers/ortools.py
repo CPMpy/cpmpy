@@ -208,7 +208,7 @@ class CPM_ortools(SolverInterface):
             Returns: number of solutions found
         """
         if self.ort_model.HasObjective():
-            raise ValueError("OR-tools does not support finding all optimal solutions.")
+            raise Exception("OR-tools does not support finding all optimal solutions.")
 
         cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
         self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
