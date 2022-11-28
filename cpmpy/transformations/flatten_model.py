@@ -317,12 +317,17 @@ def get_or_make_var(expr):
                 # the above can give fractional values, tighten bounds to integer
                 ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds)))
             elif flatexpr.name == 'mod': # binary
-                l = np.arange(lbs[0], ubs[0]+1)
-                r = np.arange(lbs[1], ubs[1]+1)
-                # check all possibilities
-                remainders = np.mod(l[:,None],r)
-                lb, ub = np.min(remainders), np.max(remainders)
-                ivar = _IntVarImpl(lb,ub)
+
+                if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
+                    ivar = _IntVarImpl(-2147483648, 2147483647)
+                else:
+                    l = np.arange(lbs[0], ubs[0]+1)
+                    r = np.arange(lbs[1], ubs[1]+1)
+                    # check all possibilities
+                    remainders = np.mod(l[:,None],r)
+                    lb, ub = np.min(remainders), np.max(remainders)
+                    ivar = _IntVarImpl(lb,ub)
+
             elif flatexpr.name == 'pow': # binary
                 base = [lbs[0], ubs[0]]
                 exp = [lbs[1], ubs[1]]
