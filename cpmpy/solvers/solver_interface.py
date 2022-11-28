@@ -199,9 +199,15 @@ class SolverInterface(object):
 
             Returns: number of solutions found
         """
-        # XXX: check that no objective function??
+        optimal_val = None
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
+            # check obj value
+            if optimal_val is None:
+                optimal_val = self.objective_value_
+            if optimal_val != self.objective_value_:
+                break # sub-optimal value
+
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
