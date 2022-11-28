@@ -395,11 +395,25 @@ class CPM_gurobi(SolverInterface):
         # Solve the model
         self.grb_model.optimize()
 
-
+        optimal_val = None
+        # minimize or maximize?
+        obj_is_min = self.grb_model.ModelSense == 1
         solution_count = self.grb_model.SolCount
+        opt_sol_count = 0
         for i in range(solution_count):
             # Specify which solution to query
             self.grb_model.setParam("SolutionNumber", i)
+            sol_obj_val = self.grb_model.PoolObjVal
+            if optimal_val is None:
+                optimal_val = sol_obj_val
+            if optimal_val is not None:
+                # sub-optimal solutions
+                if obj_is_min is True and sol_obj_val > optimal_val:
+                    break
+                if obj_is_min is False and sol_obj_val < optimal_val:
+                    break
+            opt_sol_count += 1
+
             # Translate solution to variables
             for cpm_var in self.user_vars:
                 solver_val = self.solver_var(cpm_var).Xn
@@ -407,9 +421,10 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = int(solver_val)
+
             # Translate objective
             if self.grb_model.getObjective().size() != 0:                # TODO: check if better way to do this...
-                self.objective_value_ = self.grb_model.getObjective().getValue()
+                self.objective_value_ = self.grb_model.PoolObjVal
 
             if display is not None:
                 if isinstance(display, Expression):
@@ -422,4 +437,4 @@ class CPM_gurobi(SolverInterface):
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
 
-        return solution_count
+        return opt_sol_count
