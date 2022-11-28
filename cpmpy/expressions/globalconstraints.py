@@ -215,6 +215,10 @@ class Circuit(GlobalConstraint):
         """
         succ = cpm_array(self.args)
         n = len(succ)
+
+        if n <= 1:
+            return None
+
         order = intvar(0,n-1, shape=n)
         return [
             # different successors
