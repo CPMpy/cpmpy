@@ -219,7 +219,27 @@ class Model(object):
             :return: an object of :class: `Model`
         """
         with open(fname, "rb") as f:
-            return pickle.load(f)
+            m = pickle.load(f)
+            # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
+            from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+            vs = get_variables_model(m)
+            bv_counter = 0
+            iv_counter = 0
+            for v in vs:
+                if v.name.startswith("BV"):
+                    try:
+                        bv_counter = max(bv_counter, int(v.name[2:])+1)
+                    except:
+                        pass
+                elif v.name.startswith("IV"):
+                    try:
+                        iv_counter = max(iv_counter, int(v.name[2:])+1)
+                    except:
+                        pass
+            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl  # avoid circular import
+            _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
+            _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
+            return m
 
     def copy(self):
         """
