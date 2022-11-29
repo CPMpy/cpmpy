@@ -415,6 +415,8 @@ class Operator(Expression):
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
         # should we convert the sum into a wsum?
+        # if at least one them should, but none is a constant
+        # XXX this is a bit brittle, proceed with care
         if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
                 not any(is_num(a) for a in arg_list):
             w,x = [], []
@@ -425,14 +427,17 @@ class Operator(Expression):
             name = 'wsum'
             arg_list = [w,x]
 
+        if name == 'wsum':
+            # we have the requirement that weighted sums are [weights, vars]
+            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
+
         # convention for commutative binary operators:
         # swap if right is constant and left is not
+        # this eases weighted sum detection (on 'mul')
+        # (not sure that is a good motivation, could do in _wsum_make too)
         if len(arg_list) == 2 and is_num(arg_list[1]) and \
            name in {'sum', 'mul', 'and', 'or', 'xor'}:
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        if name == 'wsum':
-            # we also have the convention that weighted sums are [weights, vars]
-            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
 
         # args of same operator are merged in for n-ary ones
         if arity == 0:
