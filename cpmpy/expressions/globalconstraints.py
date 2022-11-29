@@ -420,11 +420,20 @@ class Cumulative(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
-        super(Cumulative, self).__init__("cumulative",[flatlist(start),
-                                                       flatlist(duration),
-                                                       flatlist(end),
-                                                       demand if is_num(demand) else flatlist(demand),
-                                                       capacity])
+        assert is_any_list(start), "start should be a list"
+        start = flatlist(start)
+        assert is_any_list(duration), "duration should be a list"
+        duration = flatlist(duration)
+        assert is_any_list(end), "end should be a list"
+        end = flatlist(end)
+        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
+
+
+        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -463,6 +472,7 @@ class Cumulative(GlobalConstraint):
         if any(a is None for a in argvals):
             return None
 
+        # start, dur, end are np arrays
         start, dur, end, demand, cap = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
