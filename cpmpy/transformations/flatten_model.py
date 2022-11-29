@@ -319,6 +319,7 @@ def get_or_make_var(expr):
             elif flatexpr.name == 'mod': # binary
 
                 if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
+                    # special check: if the bounds are too loose we can not check all possibilities below
                     ivar = _IntVarImpl(-2147483648, 2147483647)
                 else:
                     l = np.arange(lbs[0], ubs[0]+1)
@@ -351,7 +352,7 @@ def get_or_make_var(expr):
             - Global constraint (non-Boolean) (examples: Max,Min,Element)
             """
             # we don't currently have a generic way to get bounds from non-Boolean globals...
-            # XXX Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
+            # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
             ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
             return (ivar, [flatexpr == ivar]+flatcons)
