@@ -3,7 +3,7 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
-SOLVERNAME = "ortools"
+SOLVERNAME = None
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
