@@ -102,6 +102,8 @@
 
 """
 import warnings # for deprecation warning
+import numpy as np
+
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -455,8 +457,6 @@ class Cumulative(GlobalConstraint):
         return cons
 
     def value(self):
-        import numpy as np
-
         argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
