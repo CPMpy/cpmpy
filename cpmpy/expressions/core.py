@@ -420,6 +420,7 @@ class Operator(Expression):
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
+        # automatic weighted sum (wsum) creation:
         # if all args are an expression (not a constant)
         #    and one of the args is a wsum,
         #                    or a product of a constant and an expression,
@@ -435,19 +436,13 @@ class Operator(Expression):
             name = 'wsum'
             arg_list = [w,e]
 
+        # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
-            # we have the requirement that weighted sums are [weights, vars]
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
 
-        # convention for commutative binary operators:
-        # swap if right is constant and left is not
-        # this eases weighted sum detection (on 'mul')
-        # (not sure that is a good motivation, could do in _wsum_make too)
-        if len(arg_list) == 2 and is_num(arg_list[1]) and \
-           name in {'sum', 'mul', 'and', 'or', 'xor'}:
-            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-
-        # args of same operator are merged in for n-ary ones
+        # small cleanup: nested n-ary operators are merged into the toplevel
+        # (this is actually against our design principle of creating
+        #  expressions the way the user wrote them)
         if arity == 0:
             i = 0 # length can change
             while i < len(arg_list):
@@ -505,8 +500,8 @@ class Operator(Expression):
         return super().__eq__(other)
 
     def value(self):
-        # if self.name ==
         if self.name == "wsum":
+            # wsum: arg0 is list of constants, no .value() use as is
             arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
         else:
             arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
