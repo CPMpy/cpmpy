@@ -420,18 +420,20 @@ class Operator(Expression):
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
-        # should we convert the sum into a wsum?
-        # if at least one them should, but none is a constant
-        # XXX this is a bit brittle, proceed with care
-        if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
-                not any(is_num(a) for a in arg_list):
-            w,x = [], []
+        # if all args are an expression (not a constant)
+        #    and one of the args is a wsum,
+        #                    or a product of a constant and an expression,
+        # then create a wsum of weights,expressions over all
+        if name == 'sum' and \
+                all(not is_num(a) for a in arg_list) and \
+                any(_wsum_should(a) for a in arg_list):
+            w,e = [], []
             for a in arg_list:
-                w1,x1 = _wsum_make(a)
+                w1,e1 = _wsum_make(a)
                 w += w1
-                x += x1
+                e += e1
             name = 'wsum'
-            arg_list = [w,x]
+            arg_list = [w,e]
 
         if name == 'wsum':
             # we have the requirement that weighted sums are [weights, vars]
@@ -529,20 +531,34 @@ class Operator(Expression):
         return None # default
 
 def _wsum_should(arg):
-    """ Internal helper: should the arg be in a wsum instead of sum """
-    # Undecided: -x + y, -x + -y?
+    """ Internal helper: should the arg be in a wsum instead of sum
+
+    True if the arg is already a wsum,
+    or if it is a product of a constant and an expression 
+    (negation '-' does not mean it SHOULD be a wsum, because then
+     all substractions are transformed into less readable wsums)
+    """
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
-            (arg.name == 'mul' and is_num(arg.args[0])) and len(arg.args) == 2)
+            (arg.name == 'mul' and len(arg.args) == 2 and \
+             any(is_num(a) for a in arg.args)
+            ) )
+
 def _wsum_make(arg):
-    """ Internal helper: prep the arg for wsum """
-    # returns ([weights], [vars])
-    # call only if arg is Operator
+    """ Internal helper: prep the arg for wsum
+
+    returns ([weights], [expressions]) where 'weights' are constants
+    call only if arg is Operator
+    """
     if arg.name == 'wsum':
         return arg.args
     elif arg.name == 'mul':
-        return [arg.args[0]], [arg.args[1]]
+        if is_num(arg.args[0]):
+            return [arg.args[0]], [arg.args[1]]
+        elif is_num(arg.args[1]):
+            return [arg.args[1]], [arg.args[0]]
+        # else falls through to default below
     elif arg.name == '-':
         return [-1], [arg.args[0]]
-    else:
-        return [1], [arg]
+    # default
+    return [1], [arg]
