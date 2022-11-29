@@ -108,6 +108,15 @@ class TestWeightedSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'wsum')
 
+    def test_negated_weightedadd(self):
+        expr = self.ivs[0] * 4 - 5 *  self.ivs[1]
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+        expr = -expr # negate, every arg should be negated
+        self.assertEqual(expr.name, 'wsum')
+        self.assertListEqual([-4, 5], expr.args[0])
+
+
     def test_weighted_nested_epxressions(self):
         expr = self.ivs[0] * 4 + 5 * (self.ivs[1] + 6 * self.ivs[2])
         self.assertIsInstance(expr, Operator)
