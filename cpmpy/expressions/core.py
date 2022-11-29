@@ -332,7 +332,8 @@ class Expression(object):
         if self.name == 'mul' and is_num(self.args[0]):
             return Operator(self.name, [-self.args[0], self.args[1]])
         elif self.name == 'wsum':
-            return Operator(self.name, [-self.args[0], self.args[1]])
+            # negate the constant weights
+            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
         return Operator("-", [self])
     def __pos__(self):
         return self
