@@ -23,6 +23,8 @@
 
         CPM_minizinc
 """
+import re
+
 import numpy as np
 import sys
 from datetime import timedelta # for mzn's timeout
@@ -283,6 +285,22 @@ class CPM_minizinc(SolverInterface):
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+
+            #test if the name is a valid minizinc identifier
+            #name must be of this form
+            regex = '^[A-Za-z][A-Za-z0-9_]*$'
+            #name can not be any of these keywords
+            keywords = ['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
+                        'elseif', 'endif', 'enum', 'false', 'float', 'function', 'if', 'in', 'include', 'int',
+                        'intersect', 'let', 'list', 'maximize', 'minimize', 'mod', 'not', 'of', 'op', 'opt', 'output',
+                        'par', 'predicate', 'record', 'satisfy', 'set', 'solve', 'string', 'subset', 'superset',
+                        'symdiff', 'test', 'then', 'true', 'tuple', 'type', 'union', 'var', 'where', 'xor']
+
+            if not re.search(regex, mzn_var):
+                raise Exception("Minizinc only accept names with alphabetic characters, digits and underscores. "
+                                "First character must be an alphabetic character")
+            if mzn_var in keywords:
+                raise Exception(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
 
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
