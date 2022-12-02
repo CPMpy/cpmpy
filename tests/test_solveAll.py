@@ -23,12 +23,9 @@ class TestSolveAll(unittest.TestCase):
         x = cp.intvar(0, 3, shape=3)
         m = cp.Model(minimize=cp.sum(x))
 
-        for name, solver in cp.SolverLookup.base_solvers():
-            if not solver.supported():
-                continue
-
+        for name in cp.SolverLookup.solvernames():
             try:
-                solver = cp.SolverLookup.get(name, model=m)
-                self.assertEqual(1, solver.solveAll(solution_limit=1000))
-            except (Exception, NotImplementedError):
+                count = m.solveAll(solver=name, solution_limit=1000)
+                self.assertEqual(1, count)
+            except Exception as e:
                 pass # solver does not support finding all optimal solutions
