@@ -18,11 +18,12 @@ Model was created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 
 from numpy.lib.stride_tricks import sliding_window_view
 
+import cpmpy
 from cpmpy import *
 
-def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity=None, block_size=None, **kwargs):
+def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity=None, blocks=None, **kwargs):
     # build model
-    model = Model()
+    model = cpmpy.SolverLookup.get()
 
     # decision variables
     slots = intvar(0, n_classes - 1, shape=n_cars, name="slots")
@@ -40,13 +41,13 @@ def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity
     for s in range(n_cars):
         model += [setup[s, o] == options[slots[s], o] for o in range(n_options)]
 
-    if capacity is not None:
+    if capacity is not None and blocks is not None:
         # satisfy block capacity
         for o in range(n_options):
             setup_seq = setup[:, o]
             # get all setups within block size of each other
-            blocks = sliding_window_view(setup_seq, block_size[o])
-            for block in blocks:
+            windows = zip(*[setup_seq[b:] for b in range(blocks[o])])
+            for block in windows:
                 model += sum(block) <= capacity[o]
 
     return model, (slots, setup)
