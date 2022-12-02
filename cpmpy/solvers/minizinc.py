@@ -485,6 +485,9 @@ class CPM_minizinc(SolverInterface):
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
+        if self.mzn_txt_solve != "solve satisfy":
+            raise Exception("Minizinc Python does not support finding all optimal solutions (yet)")
+
         import asyncio
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
