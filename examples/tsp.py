@@ -48,7 +48,7 @@ model.minimize(travel_distance)
 
 # print(model)
 
-val = model.solve()
+model.solve()
 print(model.status())
 
 print("Total Cost of solution", travel_distance.value())
