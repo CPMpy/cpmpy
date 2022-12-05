@@ -165,8 +165,8 @@ class CPM_minizinc(SolverInterface):
         try:
             mzn_result = mzn_inst.solve(**mzn_kwargs)
         except minizinc.error.MiniZincError as e:
-            path = os.environ["path"]
-            if "MiniZinc" in path:
+            path = os.environ.get("path")
+            if "MiniZinc" in str(path):
                 raise Exception('You might have the wrong minizinc PATH set (windows user Environment Variables')
             else:
                 raise Exception("Please add your minizinc installation folder to the user Environment PATH variable")
