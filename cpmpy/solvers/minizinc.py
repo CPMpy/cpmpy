@@ -31,6 +31,8 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
+import minizinc.error
+import os
 
 class CPM_minizinc(SolverInterface):
     """
@@ -160,8 +162,14 @@ class CPM_minizinc(SolverInterface):
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         
         # call the solver, with parameters
-        mzn_result = mzn_inst.solve(**mzn_kwargs)
-
+        try:
+            mzn_result = mzn_inst.solve(**mzn_kwargs)
+        except minizinc.error.MiniZincError as e:
+            path = os.environ["path"]
+            if "MiniZinc" in path:
+                raise Exception('You might have the wrong minizinc PATH set (windows user Environment Variables')
+            else:
+                raise Exception("Please add your minizinc installation folder to the user Environment PATH variable")
         # new status, translate runtime
         self.cpm_status = self._post_solve(mzn_result)
 
