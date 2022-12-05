@@ -51,7 +51,7 @@ model.minimize(travel_distance)
 val = model.solve()
 print(model.status())
 
-print("Total Cost of solution",val)
+print("Total Cost of solution", travel_distance.value())
 def display(sol):
     x = 0
     msg = "0"
