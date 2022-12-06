@@ -109,15 +109,14 @@ class CPM_RC2(CPM_pysat):
 
         SolverInterface.__init__(self, name="rc2", cpm_model=cpm_model)
 
-    def _post_clauses(self, clauses):
+    def _post_constraint(self, clause):
         """
         Post the CPMpy constraints transformed into Boolean SAT clauses
         to the RC2 solver.
         """
-        self.wcnf.extend(clauses)
+        self.wcnf.append(clause)
 
-        for clause in clauses:
-            self.rc2_solver.add_clause(clause)
+        self.rc2_solver.add_clause(clause)
 
     def _restart(self, wcnf):
         """
