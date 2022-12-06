@@ -56,7 +56,7 @@ class TestSolvers(unittest.TestCase):
             return sum(v.value() == None)
 
         iv = cp.intvar(1,9, shape=9)
-        m = cp.Model(cp.alldifferent(iv))
+        m = cp.Model(cp.AllDifferent(iv))
         self.assertEqual(n_none(iv), 9)
         m.solve()
         self.assertEqual(n_none(iv), 0)
