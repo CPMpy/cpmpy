@@ -282,10 +282,8 @@ class CPM_RC2(CPM_pysat):
 
 
 class RC2SolutionPrinter:
-    def __init__(self, solver, display=None, solution_limit=None, verbose=False):
-        self._solution_limit = solution_limit
-        # we only need the cpmpy->solver varmap from the solver
-        self._varmap = solver._varmap
+    def __init__(self, solver, display=None, verbose=False):
+        self.solver = solver
         # identify which variables to populate with their values
         self._cpm_vars = []
         self._display = display
@@ -304,7 +302,7 @@ class RC2SolutionPrinter:
                 # it might be an NDVarArray
                 if hasattr(cpm_var, "flat"):
                     for cpm_subvar in cpm_var.flat:
-                        lit = self.solver_var(cpm_subvar)
+                        lit = self.solver.solver_var(cpm_subvar)
                         if lit in sol:
                             cpm_var._value = True
                         elif -lit in sol:
@@ -314,7 +312,7 @@ class RC2SolutionPrinter:
                             cpm_var._value = None
 
                 else:
-                    lit = self.solver_var(cpm_subvar)
+                    lit = self.solver.solver_var(cpm_subvar)
                     if lit in sol:
                         cpm_var._value = True
                     elif -lit in sol:
@@ -331,6 +329,3 @@ class RC2SolutionPrinter:
             else: # callable
                 self._display()
 
-        # check for count limit
-        if self.solution_count() == self._solution_limit:
-            self.StopSearch()
