@@ -25,7 +25,7 @@ m.solve(solver="ortools")
 
 In this case, a model is a **lazy container**. It simply stores the constraints. Only when `solve()` is called will it instantiate a solver, and send the entire model to it at once. The last line above is equivalent to:
 ```python
-s = Solverlookup.get("ortools", m)
+s = SolverLookup.get("ortools", m)
 s.solve()
 ```
 
@@ -63,7 +63,7 @@ s.solve(cp_model_probing_level = 2,
         symmetry_level = 1)
 ```
 
-See [the API documentation of the solvers](api/solvers.html) for information and links on the parameters supported. See our documentation page on [solver parameters](solver_parameters.md) if you want to tune your hyperparameters automatically. 
+See [the API documentation of the solvers](api/solvers.html) for information and links on the parameters supported. See our documentation page on [solver parameters](solver_parameters.html) if you want to tune your hyperparameters automatically. 
 
 ## Using solver-specific CPMpy functions
 
@@ -81,7 +81,7 @@ s.solve()
 print(x.value())
 ```
 
-`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](unsat_core_extraction.md).
+`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
 
 See [the API documentation of the solvers](api/solvers.html) to learn about their special functions.
 

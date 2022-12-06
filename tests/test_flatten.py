@@ -201,3 +201,6 @@ class TestFlattenExpr(unittest.TestCase):
 
         # boolexpr as numexpr
         self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV14 <= 0, ((IV0) + (IV1) == 2) == (BV14)]" )
+
+        # != in boolexpr, bug #170
+        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV15) == (~BV0), [(IV0 == 1) == (BV15)])" )

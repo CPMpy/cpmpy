@@ -317,12 +317,18 @@ def get_or_make_var(expr):
                 # the above can give fractional values, tighten bounds to integer
                 ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds)))
             elif flatexpr.name == 'mod': # binary
-                l = np.arange(lbs[0], ubs[0]+1)
-                r = np.arange(lbs[1], ubs[1]+1)
-                # check all possibilities
-                remainders = np.mod(l[:,None],r)
-                lb, ub = np.min(remainders), np.max(remainders)
-                ivar = _IntVarImpl(lb,ub)
+
+                if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
+                    # special check: if the bounds are too loose we can not check all possibilities below
+                    ivar = _IntVarImpl(-2147483648, 2147483647)
+                else:
+                    l = np.arange(lbs[0], ubs[0]+1)
+                    r = np.arange(lbs[1], ubs[1]+1)
+                    # check all possibilities
+                    remainders = np.mod(l[:,None],r)
+                    lb, ub = np.min(remainders), np.max(remainders)
+                    ivar = _IntVarImpl(lb,ub)
+
             elif flatexpr.name == 'pow': # binary
                 base = [lbs[0], ubs[0]]
                 exp = [lbs[1], ubs[1]]
@@ -346,7 +352,7 @@ def get_or_make_var(expr):
             - Global constraint (non-Boolean) (examples: Max,Min,Element)
             """
             # we don't currently have a generic way to get bounds from non-Boolean globals...
-            # XXX Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
+            # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
             ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
             return (ivar, [flatexpr == ivar]+flatcons)
@@ -476,7 +482,7 @@ def normalized_boolexpr(expr):
                 (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=':
                     # != not needed, negate RHS variable
-                    rhs = ~rvar
+                    rvar = ~rvar
                     exprname = '=='
             else:
                 # other cases: LHS is numexpr
