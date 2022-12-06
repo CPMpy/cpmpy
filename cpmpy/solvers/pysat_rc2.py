@@ -219,7 +219,9 @@ class CPM_RC2(CPM_pysat):
                 - display: either a list of CPMpy expressions, called with the variables before value-mapping
                         default/None: nothing displayed
                 - solution_limit: stop after this many solutions (default: None)
-                - block: 
+                - block: To block MSSes, one should set the block parameter to 1.
+                         To block MCSes, set it to -1.
+                         By the default (for blocking MaxSAT models), block is set to 0.
 
             Returns: number of solutions found
         """
