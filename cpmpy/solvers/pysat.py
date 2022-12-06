@@ -33,7 +33,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
-from ..transformations.get_variables import get_variables
+from ..transformations.get_variables import get_variables, get_variables_model
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -123,6 +123,7 @@ class CPM_pysat(SolverInterface):
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
 
         # initialise everything else and post the constraints/objective
+        assert all(v.is_bool() for v in get_variables_model(cpm_model)), "Only support boolean variables in model"
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
 
