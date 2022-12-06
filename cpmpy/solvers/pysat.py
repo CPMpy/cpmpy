@@ -227,12 +227,13 @@ class CPM_pysat(SolverInterface):
         for con in cpm_cons:
             clauses += self._enocde_constraints(con)
 
-        self._post_clauses(clauses)
+        for clause in clauses:
+            self._post_constraint(clause)
 
         return self
 
-    def _post_clauses(self, clauses):
-        self.pysat_solver.append_formula(clauses)
+    def _post_constraint(self, clause):
+        self.pysat_solver.add_clause(clause)
 
     def _enocde_constraints(self, cpm_expr):
         """
