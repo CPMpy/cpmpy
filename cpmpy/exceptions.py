@@ -10,3 +10,4 @@ class CPMpyException(Exception):
 
 class MinizincPathException(CPMpyException):
     pass
+
