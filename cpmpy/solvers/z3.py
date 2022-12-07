@@ -368,7 +368,11 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-                lhs, rhs = self._z3_expr(cpm_con.args)
+                st = str(rhs)
+                if str(rhs) == '0' and self.lhs_evaluates_to_bool(cpm_con):
+                    return z3.Not(self._z3_expr(lhs))
+                else:
+                    lhs, rhs = self._z3_expr(cpm_con.args)
                 return (lhs == rhs)
 
 
@@ -427,3 +431,21 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
+
+
+    '''
+    Checks if lhs of a comparison evaluates to a boolean expression or a numerical one
+    '''
+    def lhs_evaluates_to_bool(self, cpm_con):
+        assert isinstance(cpm_con, Comparison) and cpm_con.name == "==", "only use this function for == comparisons"
+        lhs, rhs = cpm_con.args
+        # base cases
+        if isinstance(lhs, _BoolVarImpl):
+            return True
+        elif isinstance(lhs, _NumVarImpl):
+            return False
+        elif isinstance(lhs, Operator):
+            return lhs.is_bool()
+        elif isinstance(lhs, Comparison):
+            return True
+

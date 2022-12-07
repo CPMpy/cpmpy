@@ -329,6 +329,17 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
