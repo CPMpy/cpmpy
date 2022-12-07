@@ -329,7 +329,10 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
-
+        x = cp.intvar(0, 1)
+        m1 = cp.Model((x >= 0.1) & (x != 1))
+        s = cp.SolverLookup.get("z3", m1)
+        self.assertFalse(s.solve())
     def test_pow(self):
         iv1 = cp.intvar(2,9)
         for i in [0,1,2]:
