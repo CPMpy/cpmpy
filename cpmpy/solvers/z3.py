@@ -28,6 +28,7 @@ from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from z3 import BoolRef
 
 class CPM_z3(SolverInterface):
     """
@@ -368,7 +369,6 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-                st = str(rhs)
                 if str(rhs) == '0' and self.lhs_evaluates_to_bool(cpm_con):
                     return z3.Not(self._z3_expr(lhs))
                 else:
@@ -385,17 +385,37 @@ class CPM_z3(SolverInterface):
 
             # other comparisons
             lhs, rhs = self._z3_expr(cpm_con.args)
-            # post the comparison
-            if cpm_con.name == '<=':
-                return (lhs <= rhs)
-            elif cpm_con.name == '<':
-                return (lhs < rhs)
-            elif cpm_con.name == '>=':
-                return (lhs >= rhs)
-            elif cpm_con.name == '>':
-                return (lhs > rhs)
-            elif cpm_con.name == '!=':
-                return (lhs != rhs)
+
+            # Z3 does not support some comparisons on boolrefs. Introduce an intvar to solve this problem
+            if isinstance(lhs, BoolRef):
+                if cpm_con.name == '!=':  #this is supported between boolrefs, just post the constraint
+                    return (lhs != rhs)
+
+                iv = _IntVarImpl(0,1) #0,1 is the valid domain, as this represents true or false
+                mhs = self._z3_expr(iv) #turn into z3 expression
+                if cpm_con.name == '<=':
+                    return [(lhs <= mhs), (rhs == mhs)]
+                elif cpm_con.name == '<':
+                    return [(lhs < mhs), (rhs == mhs)]
+                elif cpm_con.name == '>=':
+                    return [(lhs >= mhs), (rhs == mhs)]
+                elif cpm_con.name == '>':
+                    return [(lhs > mhs),(rhs == mhs)]
+
+
+
+            else:
+                # post the comparison
+                if cpm_con.name == '<=':
+                    return (lhs <= rhs)
+                elif cpm_con.name == '<':
+                    return (lhs < rhs)
+                elif cpm_con.name == '>=':
+                    return (lhs >= rhs)
+                elif cpm_con.name == '>':
+                    return (lhs > rhs)
+                elif cpm_con.name == '!=':
+                    return (lhs != rhs)
 
 
         # TODO:
