@@ -74,9 +74,11 @@ if __name__ == "__main__":
     import requests
 
     # argument parsing
-    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob001_car_sequence.json"
+    #url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob001_car_sequence.json"
+    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/151-prob001_car_sequencepy-sliding_window_view-only-numpy-1200%2B/examples/csplib/prob001_car_sequence.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-instance', nargs='?', default="Problem 4/72  (Regin & Puget #1)", help="Name of the problem instance found in file 'filename'")
+    #parser.add_argument('-instance', nargs='?', default="Problem 4/72  (Regin & Puget #1)", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-instance', nargs='?', default="Problem 60-04", help="Name of the problem instance found in file 'filename'")
     parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
