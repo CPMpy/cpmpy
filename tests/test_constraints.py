@@ -1,9 +1,10 @@
 from cpmpy import Model, SolverLookup
 from cpmpy.expressions.globalconstraints import *
+from cpmpy.expressions.variables import _NumVarImpl
 
 import pytest
 
-SOLVERNAME = None
+SOLVERNAME = "pysat"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -15,7 +16,10 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum:int", "wsum:int", "mul:int", "sub", "mod", "div", "pow", "abs","-"}}
+
+# exclude certain bounds for comparisons
+EXCLUDE_COMP_BOUNDS = {"pysat": {_NumVarImpl}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
@@ -47,19 +51,40 @@ def numexprs():
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if not is_bool]
     if SOLVERNAME in EXCLUDE_OPERATORS:
         names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[SOLVERNAME]]
+
+    to_delete = set()
+    for (name, arity) in list(names):
+        if name in {"wsum", "sum", "mul"}:
+            # add int and bool version
+            if SOLVERNAME not in EXCLUDE_OPERATORS or name+":int" not in EXCLUDE_OPERATORS[SOLVERNAME]:
+                names += [(name+":int", arity)]
+                to_delete |= {(name, arity)}
+            if SOLVERNAME not in EXCLUDE_OPERATORS or name+":bool" not in EXCLUDE_OPERATORS[SOLVERNAME]:
+                names += [(name + ":bool", arity)]
+                to_delete |= {(name, arity)}
+
+    for td in to_delete: names.remove(td)
+
+
     for name, arity in names:
-        if name == "wsum":
-            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
+
+        if name.split(":")[-1] == "bool":
+            args = BOOL_ARGS
+        else:
+            args = NUM_ARGS
+
+        if name.startswith("wsum"):
+            operator_args = [list(range(len(args))), args]
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,2]
         elif name == "mod":
-            operator_args = [NUM_ARGS[0],POS_VAR]
+            operator_args = [args[0],POS_VAR]
         elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
+            operator_args = args[:arity]
         else:
-            operator_args = NUM_ARGS
+            operator_args = args
 
-        yield Operator(name, operator_args)
+        yield Operator(name.split(":")[0], operator_args)
 
 
 # Generate all possible comparison constraints
@@ -75,13 +100,15 @@ def comp_constraints():
     for comp_name in Comparison.allowed:
         for numexpr in numexprs():
             for rhs in [NUM_VAR, 1]:
-                yield Comparison(comp_name, numexpr, rhs)
+                if SOLVERNAME in EXCLUDE_COMP_BOUNDS and not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                    yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints():
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, 1]:
-                    yield Comparison(comp_name, glob_expr, rhs)
+                    if SOLVERNAME in EXCLUDE_COMP_BOUNDS and not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                        yield Comparison(comp_name, glob_expr, rhs)
 
 
 # Generate all possible boolean expressions
@@ -182,8 +209,13 @@ def test_bool_constaints(constraint):
     """
     if SOLVERNAME is None:
         return
-    assert SolverLookup.get(SOLVERNAME, Model(constraint)).solve()
-    assert constraint.value()
+    try:
+        res = SolverLookup.get(SOLVERNAME, Model(constraint)).solve()
+        assert res
+        assert constraint.value()
+    except NotImplementedError as e:
+        # specific version of constraint is not supported by solver
+        pass
 
 
 @pytest.mark.parametrize("constraint", comp_constraints(), ids=lambda c: str(c))
@@ -193,8 +225,13 @@ def test_comparison_constraints(constraint):
     """
     if SOLVERNAME is None:
         return
-    assert SolverLookup.get(SOLVERNAME,Model(constraint)).solve()
-    assert constraint.value()
+    try:
+        res = SolverLookup.get(SOLVERNAME, Model(constraint)).solve()
+        assert res
+        assert constraint.value()
+    except NotImplementedError as e:
+        # specific version of constraint is not supported by solver
+        pass
 
 
 @pytest.mark.parametrize("constraint", reify_imply_exprs(), ids=lambda c: str(c))
@@ -204,5 +241,10 @@ def test_reify_imply_constraints(constraint):
     """
     if SOLVERNAME is None:
         return
-    assert SolverLookup.get(SOLVERNAME, Model(constraint)).solve()
-    assert constraint.value()
+    try:
+        res = SolverLookup.get(SOLVERNAME, Model(constraint)).solve()
+        assert res
+        assert constraint.value()
+    except NotImplementedError as e:
+        # specific version of constraint is not supported by solver
+        pass
