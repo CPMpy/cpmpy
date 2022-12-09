@@ -23,6 +23,7 @@ jobs:
           pip install python-sat
           pip install pandas
           pip install z3-solver
+          python setup.py sdist bdist_wheel
       - run: |
           ls
 
