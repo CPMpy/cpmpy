@@ -31,6 +31,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
+from ..exceptions import MinizincPathException
 import minizinc.error
 import os
 
@@ -167,9 +168,9 @@ class CPM_minizinc(SolverInterface):
         except minizinc.error.MiniZincError as e:
             path = os.environ.get("path")
             if "MiniZinc" in str(path):
-                raise Exception('You might have the wrong minizinc PATH set (windows user Environment Variables')
+                raise MinizincPathException('You might have the wrong minizinc PATH set (windows user Environment Variables')
             else:
-                raise Exception("Please add your minizinc installation folder to the user Environment PATH variable")
+                raise MinizincPathException("Please add your minizinc installation folder to the user Environment PATH variable")
         # new status, translate runtime
         self.cpm_status = self._post_solve(mzn_result)
 
