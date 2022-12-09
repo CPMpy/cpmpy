@@ -22,6 +22,7 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install cpmpy
           pip install python-sat
+          pip install pandas
       - run: |
           ls
 
