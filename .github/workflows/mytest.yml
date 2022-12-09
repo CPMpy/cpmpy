@@ -23,6 +23,7 @@ jobs:
           pip install cpmpy
           pip install python-sat
           pip install pandas
+          pip install z3-solver
       - run: |
           ls
 
