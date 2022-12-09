@@ -1,5 +1,5 @@
 """
-    All forms of expression objects that allow you to specify constraints and objectives over variables
+    Classes and functions that represent and create expressions (constraints and objectives)
 
     ==================
     List of submodules

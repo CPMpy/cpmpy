@@ -156,8 +156,6 @@ def linearize_constraint(cpm_expr):
 
     if cpm_expr.name in [">=", "<=", "=="] and \
             isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "mul":
-        if all(isinstance(arg, _BoolVarImpl) for arg in cpm_expr.args[0].args):
-            return [Comparison(cpm_expr.name, sum(cpm_expr.args[0].args), cpm_expr.args[1])]
         lhs, rhs = cpm_expr.args
         if len(lhs.args) == 2:
             # multiplication of var and constant
