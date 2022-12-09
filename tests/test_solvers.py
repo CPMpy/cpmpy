@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 import cpmpy as cp
+from cpmpy.exceptions import MinizincNameException
 
 
 class TestSolvers(unittest.TestCase):
@@ -314,6 +315,18 @@ class TestSolvers(unittest.TestCase):
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
+
+
+    def test_minizinc_names(self):
+        a = cp.boolvar(name='5var')#has to start with alphabetic character
+        b = cp.boolvar(name='va+r')#no special characters
+        c = cp.boolvar(name='solve')#no keywords
+        with self.assertRaises(MinizincNameException):
+            cp.Model(a == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(b == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(c == 0).solve(solver="minizinc")
 
     def test_z3(self):
 

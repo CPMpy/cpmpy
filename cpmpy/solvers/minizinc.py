@@ -29,6 +29,7 @@ import numpy as np
 import sys
 from datetime import timedelta # for mzn's timeout
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import MinizincNameException
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
@@ -297,10 +298,10 @@ class CPM_minizinc(SolverInterface):
                         'symdiff', 'test', 'then', 'true', 'tuple', 'type', 'union', 'var', 'where', 'xor']
 
             if not re.search(regex, mzn_var):
-                raise Exception("Minizinc only accept names with alphabetic characters, digits and underscores. "
+                raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores. "
                                 "First character must be an alphabetic character")
             if mzn_var in keywords:
-                raise Exception(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
 
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
