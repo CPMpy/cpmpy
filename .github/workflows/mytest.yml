@@ -19,7 +19,6 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install python-sat
           pip install pandas
-          pip install z3-solver
           pip install -e /home/runner/work/cpmpy/cpmpy
       - run: |
           ls
