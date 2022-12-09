@@ -20,7 +20,7 @@ jobs:
           pip install flake8 pytest
           pip install setuptools wheel twine 
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python setup.py sdist bdist_wheel
+          pip install cpmpy
       - run: |
           ls
 
