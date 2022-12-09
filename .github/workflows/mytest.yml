@@ -23,7 +23,7 @@ jobs:
           pip install python-sat
           pip install pandas
           pip install z3-solver
-          pip install -e
+          pip install -e /home/runner/work/cpmpy/cpmpy
       - run: |
           ls
 
