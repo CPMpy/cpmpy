@@ -13,7 +13,7 @@ jobs:
 
     steps:
     # Checks out a copy of your repository on the ubuntu-latest machine
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     # Runs Setup python action
     - name: Install dependencies
       run: |
