@@ -369,8 +369,13 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-                if (str(rhs) == '0') and lhs.is_bool():
-                    return z3.Not(self._z3_expr(lhs))
+
+                #comparing a boolexpr with an integer or float:
+                if is_num(rhs) and not is_bool(rhs) and lhs.is_bool():
+                    iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
+                    mhs = self._z3_expr(iv)  # turn into z3 expression
+                    lhs, rhs = self._z3_expr(cpm_con.args)
+                    return [lhs == mhs, mhs == rhs]
                 else:
                     lhs, rhs = self._z3_expr(cpm_con.args)
                 return (lhs == rhs)
@@ -388,19 +393,21 @@ class CPM_z3(SolverInterface):
 
             # Z3 does not support some comparisons on boolrefs. Introduce an intvar to solve this problem
             if isinstance(lhs, BoolRef):
-                if cpm_con.name == '!=':  #this is supported between boolrefs, just post the constraint
-                    return (lhs != rhs)
-
-                iv = _IntVarImpl(0,1) #0,1 is the valid domain, as this represents true or false
-                mhs = self._z3_expr(iv) #turn into z3 expression
+                iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
+                mhs = self._z3_expr(iv)  # turn into z3 expression
+                if cpm_con.name == '!=':  #this is supported between boolrefs, not between boolref and int
+                    if isinstance(rhs, BoolRef):
+                        return (lhs != rhs)
+                    else:
+                        return [lhs == mhs, mhs != rhs]
                 if cpm_con.name == '<=':
-                    return [(lhs == mhs), (rhs >= mhs)]
+                    return [(lhs == mhs), (mhs <= rhs)]
                 elif cpm_con.name == '<':
-                    return [(lhs == mhs), (rhs > mhs)]
+                    return [(lhs == mhs), (mhs < rhs)]
                 elif cpm_con.name == '>=':
-                    return [(lhs == mhs), (rhs <= mhs)]
+                    return [(lhs == mhs), (mhs >= rhs)]
                 elif cpm_con.name == '>':
-                    return [(lhs == mhs),(rhs < mhs)]
+                    return [(lhs == mhs), (mhs > rhs)]
 
 
 
