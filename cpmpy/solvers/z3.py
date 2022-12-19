@@ -369,7 +369,7 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-                if str(rhs) == '0' and lhs.is_bool:
+                if (str(rhs) == '0') and lhs.is_bool():
                     return z3.Not(self._z3_expr(lhs))
                 else:
                     lhs, rhs = self._z3_expr(cpm_con.args)
