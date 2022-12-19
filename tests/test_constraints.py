@@ -100,8 +100,14 @@ def comp_constraints():
     for comp_name in Comparison.allowed:
         for numexpr in numexprs():
             for rhs in [NUM_VAR, 1]:
+                # special case
+                if numexpr.name == "mul" and all(isinstance(arg, Expression) and arg.is_bool() for arg in numexpr.args) \
+                        and comp_name == ">" and is_num(rhs) and rhs == 1:
+                    rhs = 0
                 if SOLVERNAME not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
                     yield Comparison(comp_name, numexpr, rhs)
+
+
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints():
