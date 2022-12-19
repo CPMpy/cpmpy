@@ -100,14 +100,14 @@ def comp_constraints():
     for comp_name in Comparison.allowed:
         for numexpr in numexprs():
             for rhs in [NUM_VAR, 1]:
-                if SOLVERNAME in EXCLUDE_COMP_BOUNDS and not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                if SOLVERNAME not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
                     yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints():
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, 1]:
-                    if SOLVERNAME in EXCLUDE_COMP_BOUNDS and not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                    if SOLVERNAME not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
                         yield Comparison(comp_name, glob_expr, rhs)
 
 
