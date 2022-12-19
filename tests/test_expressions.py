@@ -125,7 +125,8 @@ class TestWeightedSum(unittest.TestCase):
         # issue #137
         x = boolvar()
         expr = 100 * (x < 5) * (5 - x) + 10 * (x - 5)
-        self.assertEqual(str(expr), "sum([1, 10] * [(100 * (BV0 < 5)) * (5 + (-(BV0))), (BV0) + -5])")
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
         # (if this surprises you, note that the first one is (100*(x<5))*(5-x) in Python
 
     def test_sum_generator(self):
