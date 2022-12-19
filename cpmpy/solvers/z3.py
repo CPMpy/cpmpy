@@ -394,13 +394,13 @@ class CPM_z3(SolverInterface):
                 iv = _IntVarImpl(0,1) #0,1 is the valid domain, as this represents true or false
                 mhs = self._z3_expr(iv) #turn into z3 expression
                 if cpm_con.name == '<=':
-                    return [(lhs <= mhs), (rhs == mhs)]
+                    return [(lhs == mhs), (rhs >= mhs)]
                 elif cpm_con.name == '<':
-                    return [(lhs < mhs), (rhs == mhs)]
+                    return [(lhs == mhs), (rhs > mhs)]
                 elif cpm_con.name == '>=':
-                    return [(lhs >= mhs), (rhs == mhs)]
+                    return [(lhs == mhs), (rhs <= mhs)]
                 elif cpm_con.name == '>':
-                    return [(lhs > mhs),(rhs == mhs)]
+                    return [(lhs == mhs),(rhs < mhs)]
 
 
 
