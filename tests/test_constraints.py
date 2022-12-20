@@ -83,10 +83,11 @@ def comp_constraints():
                 for rhs in [NUM_VAR, 1]:
                     yield Comparison(comp_name, glob_expr, rhs)
 
-    for comp_name in Comparison.allowed:
-        for boolexpr in bool_exprs():
-            for rhs in [NUM_VAR, 1]:
-                yield Comparison(comp_name, boolexpr, rhs)
+    if SOLVERNAME == "z3":
+        for comp_name in Comparison.allowed:
+            for boolexpr in bool_exprs():
+                for rhs in [NUM_VAR, 1]:
+                    yield Comparison(comp_name, boolexpr, rhs)
 
 
 # Generate all possible boolean expressions
