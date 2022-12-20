@@ -23,6 +23,7 @@ class MusTests(TestCase):
 
     def test_bug_191(self):
         """
+        Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
         """
         bv = boolvar(name="x")
