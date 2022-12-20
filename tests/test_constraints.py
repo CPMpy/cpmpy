@@ -3,7 +3,7 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
-SOLVERNAME = None
+SOLVERNAME = "z3"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -82,6 +82,11 @@ def comp_constraints():
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, 1]:
                     yield Comparison(comp_name, glob_expr, rhs)
+
+    for comp_name in Comparison.allowed:
+        for boolexpr in bool_exprs():
+            for rhs in [NUM_VAR, 1]:
+                yield Comparison(comp_name, boolexpr, rhs)
 
 
 # Generate all possible boolean expressions

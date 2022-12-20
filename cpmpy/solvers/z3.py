@@ -286,13 +286,37 @@ class CPM_z3(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_con, Operator):
+            #arguments kan be lists because of auxiliary intvars. first element is assignments, just add those with and
             # 'and'/n, 'or'/n, 'xor'/n, '->'/2
             if cpm_con.name == 'and':
-                return z3.And(self._z3_expr(cpm_con.args))
+                z3args = self._z3_expr(cpm_con.args)
+                olhs = None
+                for i in range(len(z3args)):
+                    if is_any_list(z3args[i]):
+                        z3args[i] = z3.And(z3args[i])
+                return z3.And(z3args)
             elif cpm_con.name == 'or':
-                return z3.Or(self._z3_expr(cpm_con.args))
+                z3args = self._z3_expr(cpm_con.args)
+                olhs = None
+                for i in range(len(z3args)):
+                    if is_any_list(z3args[i]):
+                        olhs = z3args[i][0]
+                        z3args[i] = z3args[i][1]
+                if olhs is None:
+                    return z3.Or(z3args)
+                else:
+                    return z3.And(z3.Or(z3args), olhs)
             elif cpm_con.name == '->':
-                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
+                z3args = self._z3_expr(cpm_con.args, reify=True)
+                olhs = None
+                for i in range(len(z3args)):
+                    if is_any_list(z3args[i]):
+                        olhs = z3args[i][0]
+                        z3args[i] = z3args[i][1]
+                if olhs is None:
+                    return z3.Implies(*z3args)
+                else:
+                    return z3.And(z3.Implies(*z3args), olhs)
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -384,6 +408,8 @@ class CPM_z3(SolverInterface):
                         return [lhs == mhs, mhs == rhs]
                 else:
                     lhs, rhs = self._z3_expr(cpm_con.args)
+                if is_any_list(lhs):
+                    return z3.And(lhs[1] == rhs, lhs[0])
                 return (lhs == rhs)
 
 
