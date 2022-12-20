@@ -21,6 +21,20 @@ class MusTests(TestCase):
         self.assertEqual(mus(cons), cons[:3])
         self.assertEqual(mus_naive(cons), cons[:3])
 
+    def test_bug_191(self):
+        """Source of the error is assum.implies(candidates). 
+        When assum is a single boolvar and candidates is a list (of length 1), it fails.
+
+        We should check when invoking bv.implies(rhs) rhs is either a single expression
+        or a list of length 1, and extract this value I think. Or change to all(candidates)
+        in the mus tool, but this might have some side effect by itself... to check.
+        """
+        bv = boolvar()
+        hard = [~bv]
+        soft = [bv, bv]
+        mus_cons = mus(soft=soft, hard=hard) # crashes
+        # self.assertEqual(set(mus(cons)), set(cons[1:3]))
+
     def test_wglobal(self):
         x = intvar(-9, 9, name="x")
         y = intvar(-9, 9, name="y")
@@ -40,3 +54,4 @@ class MusTests(TestCase):
 
         self.assertEqual(set(mus(cons)), set(cons[1:3]))
         self.assertEqual(set(mus_naive(cons)), set(cons[1:3]))
+
