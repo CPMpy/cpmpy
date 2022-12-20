@@ -22,12 +22,8 @@ class MusTests(TestCase):
         self.assertEqual(mus_naive(cons), cons[:3])
 
     def test_bug_191(self):
-        """Source of the error is assum.implies(candidates). 
+        """
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
-
-        We should check when invoking bv.implies(rhs) rhs is either a single expression
-        or a list of length 1, and extract this value I think. Or change to all(candidates)
-        in the mus tool, but this might have some side effect by itself... to check.
         """
         bv = boolvar(name="x")
         hard = [~bv]
@@ -37,12 +33,9 @@ class MusTests(TestCase):
         self.assertEqual(set(mus_cons), set(soft))
 
     def test_bug_191_many_soft(self):
-        """Source of the error is assum.implies(candidates). 
-        When assum is a single boolvar and candidates is a list (of length 1), it fails.
-
-        We should check when invoking bv.implies(rhs) rhs is either a single expression
-        or a list of length 1, and extract this value I think. Or change to all(candidates)
-        in the mus tool, but this might have some side effect by itself... to check.
+        """
+        Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
+        when the number of soft constraints > 1.
         """
         x = intvar(-9, 9, name="x")
         y = intvar(-9, 9, name="y")
