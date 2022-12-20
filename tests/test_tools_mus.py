@@ -1,4 +1,4 @@
-import time
+import unittest
 from unittest import TestCase
 
 from cpmpy import *
@@ -31,9 +31,10 @@ class MusTests(TestCase):
         """
         bv = boolvar()
         hard = [~bv]
-        soft = [bv, bv]
+        soft = [bv]
+
         mus_cons = mus(soft=soft, hard=hard) # crashes
-        # self.assertEqual(set(mus(cons)), set(cons[1:3]))
+        self.assertEqual(set(mus_cons), set(soft))
 
     def test_wglobal(self):
         x = intvar(-9, 9, name="x")
@@ -55,3 +56,5 @@ class MusTests(TestCase):
         self.assertEqual(set(mus(cons)), set(cons[1:3]))
         self.assertEqual(set(mus_naive(cons)), set(cons[1:3]))
 
+if __name__ == '__main__':
+    unittest.main()
