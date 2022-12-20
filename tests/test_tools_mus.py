@@ -31,6 +31,8 @@ class MusTests(TestCase):
 
         mus_cons = mus(soft=soft, hard=hard) # crashes
         self.assertEqual(set(mus_cons), set(soft))
+        mus_naive_cons = mus_naive(soft=soft, hard=hard) # crashes
+        self.assertEqual(set(mus_naive_cons), set(soft))
 
     def test_bug_191_many_soft(self):
         """
@@ -47,6 +49,8 @@ class MusTests(TestCase):
 
         mus_cons = mus(soft=soft, hard=hard) # crashes
         self.assertEqual(set(mus_cons), set(soft))
+        mus_naive_cons = mus_naive(soft=soft, hard=hard) # crashes
+        self.assertEqual(set(mus_naive_cons), set(soft))
 
     def test_wglobal(self):
         x = intvar(-9, 9, name="x")
