@@ -48,18 +48,12 @@ class MusTests(TestCase):
         y = intvar(-9, 9, name="y")
         hard = [x > 2]
         soft = [
-            x < 0,
-            x == 4,
-            y == 4,
-            (x + y > 0) | (y < 0),
-            (y >= 0) | (x >= 0),
-            (y < 0) | (x < 0),
-            (y > 0) | (x < 0),
-            AllDifferent(x,y) # invalid for musx_assum
+            x + y < 6,
+            y == 4
         ]
 
         mus_cons = mus(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_cons), set(soft[:1]))
+        self.assertEqual(set(mus_cons), set(soft))
 
     def test_wglobal(self):
         x = intvar(-9, 9, name="x")
