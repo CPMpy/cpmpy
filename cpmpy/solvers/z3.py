@@ -375,7 +375,7 @@ class CPM_z3(SolverInterface):
                     iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
                     mhs = self._z3_expr(iv)  # turn into z3 expression
                     lhs, rhs = self._z3_expr(cpm_con.args)
-                    return [lhs == mhs, mhs == rhs]
+                    return z3.And(lhs == mhs, mhs == rhs)
                 else:
                     lhs, rhs = self._z3_expr(cpm_con.args)
                 return (lhs == rhs)
@@ -399,15 +399,15 @@ class CPM_z3(SolverInterface):
                     if isinstance(rhs, BoolRef):
                         return (lhs != rhs)
                     else:
-                        return [lhs == mhs, mhs != rhs]
+                        return z3.And(lhs == mhs, mhs != rhs)
                 if cpm_con.name == '<=':
-                    return [(lhs == mhs), (mhs <= rhs)]
+                    return z3.And((lhs == mhs), (mhs <= rhs))
                 elif cpm_con.name == '<':
-                    return [(lhs == mhs), (mhs < rhs)]
+                    return z3.And((lhs == mhs), (mhs < rhs))
                 elif cpm_con.name == '>=':
-                    return [(lhs == mhs), (mhs >= rhs)]
+                    return z3.And((lhs == mhs), (mhs >= rhs))
                 elif cpm_con.name == '>':
-                    return [(lhs == mhs), (mhs > rhs)]
+                    return z3.And((lhs == mhs), (mhs > rhs))
 
 
 
