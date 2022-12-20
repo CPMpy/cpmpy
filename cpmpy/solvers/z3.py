@@ -375,7 +375,13 @@ class CPM_z3(SolverInterface):
                     iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
                     mhs = self._z3_expr(iv)  # turn into z3 expression
                     lhs, rhs = self._z3_expr(cpm_con.args)
-                    return [lhs == mhs, mhs == rhs]
+                    if is_any_list(lhs):
+                        olhs = lhs[0]
+                        orhs = lhs[1]
+                        #keep auxiliary assignments in the first element of the list
+                        return [z3.And(olhs, orhs == mhs), mhs == rhs]
+                    else:
+                        return [lhs == mhs, mhs == rhs]
                 else:
                     lhs, rhs = self._z3_expr(cpm_con.args)
                 return (lhs == rhs)
@@ -409,7 +415,25 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == '>':
                     return [(lhs == mhs), (mhs > rhs)]
 
-
+            #if nested comparisons
+            elif is_any_list(lhs):
+                olhs = lhs[0]
+                orhs = lhs[1]
+                iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
+                mhs = self._z3_expr(iv)  # turn into z3 expression
+                if cpm_con.name == '!=':  #this is supported between boolrefs, not between boolref and int
+                    if isinstance(rhs, BoolRef):
+                        return [olhs, (orhs != rhs)]
+                    else:
+                        return [z3.And(olhs, orhs == mhs), mhs != rhs]
+                if cpm_con.name == '<=':
+                    return [z3.And(olhs, orhs == mhs), mhs <= rhs]
+                elif cpm_con.name == '<':
+                    return [z3.And(olhs, orhs == mhs), mhs < rhs]
+                elif cpm_con.name == '>=':
+                    return [z3.And(olhs, orhs == mhs), mhs >= rhs]
+                elif cpm_con.name == '>':
+                    return [z3.And(olhs, orhs == mhs), mhs > rhs]
 
             else:
                 # post the comparison
