@@ -457,7 +457,7 @@ class Cumulative(GlobalConstraint):
     def value(self):
         start, dur, end, demand, cap = [argval(a) for a in self.args]
         # start and end seperated by duration
-        if not (start + dur == end):
+        if not (start + dur == end).all():
             return False
 
         # demand doesn't exceed capacity
