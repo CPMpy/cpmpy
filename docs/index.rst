@@ -32,6 +32,7 @@ Getting started:
    solver_parameters
    unsat_core_extraction
    adding_solver
+   developers
 
 
 .. toctree::

@@ -141,7 +141,8 @@ class CPM_gurobi(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:
             if self.grb_model.SolCount == 0:
-                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                # can be sat or unsat
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:  # another?

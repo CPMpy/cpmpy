@@ -140,8 +140,20 @@ class Expression(object):
             Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
+        return self._deepcopy_arg_list(self.args)
+
+    def _deepcopy_arg_list(self, arglist, memodict={}):
+        """
+            Create and return a deep copy of the arguments in `arglist`.
+            Recursively deep copy nested lists.
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
         copied = []
-        for arg in self.args:
+        for arg in arglist:
+            if is_any_list(arg):
+                copied += [self._deepcopy_arg_list(arg, memodict)]
+                continue
+
             if arg not in memodict:
                 if isinstance(arg, Expression):
                     memodict[arg] = arg.deepcopy(memodict)
@@ -149,7 +161,7 @@ class Expression(object):
                     memodict[arg] = arg
                 else:
                     raise ValueError(f"Not a supported argument to copy: {arg}")
-            copied.append(memodict[arg])
+            copied += [memodict[arg]]
         return copied
 
     def deepcopy(self, memodict = {}):
