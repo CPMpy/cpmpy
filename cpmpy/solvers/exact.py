@@ -29,6 +29,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
+import numpy as np
 
 class CPM_exact(SolverInterface):
     """
@@ -298,7 +299,7 @@ class CPM_exact(SolverInterface):
             xcoefs += [-1]
             xvars += [self.solver_var(rhs)]
         else:
-            raise NotImplementedError("Exact: Unexpected rhs expr {}".format(rhs))
+            raise NotImplementedError("Exact: Unexpected rhs {} expr {}".format(rhs.name,rhs))
 
         if is_num(lhs):
             xrhs -= lhs
@@ -306,13 +307,26 @@ class CPM_exact(SolverInterface):
             xcoefs += [1]
             xvars += [self.solver_var(lhs)]
         elif lhs.name == "sum":
-            xcoefs += [1]*len(lhs.args)
-            xvars += [self.solver_var(x) for x in lhs.args]
-        elif lhs.expr_name == "wsum":
-            xcoefs += [x[0] for x in lhs.args]
-            xvars += [self.solver_var(x[1]) for x in lhs.args]
+            for x in lhs.args:
+                if is_num(x):
+                    xrhs -= x
+                else:
+                    xcoefs += [1]
+                    xvars += [self.solver_var(x)]
+        elif lhs.name == "wsum":
+            for c,x in zip(*lhs.args):
+                assert is_num(c)
+                if is_num(x):
+                    xrhs -= c*x
+                else:
+                    xcoefs += [c]
+                    xvars += [self.solver_var(x)]
+        elif lhs.name == "sub":
+            assert len(lhs.args)==2
+            xcoefs += [1, -1]
+            xvars += [self.solver_var(lhs.args[0]), self.solver_var(lhs.args[1])]
         else:
-            raise NotImplementedError("Exact: Unexpected lhs expr {}".format(lhs))
+            raise NotImplementedError("Exact: Unexpected lhs {} expr {}".format(lhs.name,lhs))
 
         return xcoefs,xvars,xrhs
 
@@ -346,19 +360,37 @@ class CPM_exact(SolverInterface):
 
         return self
 
+    @staticmethod
+    def fix(o):
+        return o.item() if isinstance(o, np.generic) else o
+
     def _add_xct_constr(self, xct_coefs,xct_vars,uselb,lb,useub,ub):
         maximum = max([max([abs(x) for x in xct_coefs]),abs(lb if uselb else 0),abs(ub if useub else 0)])
         if maximum > 1e18:
             self.xct_solver.addConstraint([str(x) for x in xct_coefs],xct_vars,uselb,str(lb),useub,str(ub))
         else:
-            self.xct_solver.addConstraint(xct_coefs,xct_vars,uselb,lb,useub,ub)
+            self.xct_solver.addConstraint([self.fix(x) for x in xct_coefs],xct_vars,uselb,self.fix(lb),useub,self.fix(ub))
 
     def _add_xct_reif(self,head,xct_coefs,xct_vars,lb):
         maximum = max([max([abs(x) for x in xct_coefs]),abs(lb)])
         if maximum > 1e18:
-            self.xct_solver.addReification(head,[str(x) for x in xct_coefs],xct_vars,lb)
+            self.xct_solver.addReification(head,[str(x) for x in xct_coefs],xct_vars,str(lb))
         else:
-            self.xct_solver.addReification(head,xct_coefs,xct_vars,lb)
+            self.xct_solver.addReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(lb))
+
+    def _add_xct_reif_right(self,head, xct_coefs,xct_vars,xct_rhs):
+        maximum = max([max([abs(x) for x in xct_coefs]),abs(xct_rhs)])
+        if maximum > 1e18:
+            self.xct_solver.addRightReification(head,[str(x) for x in xct_coefs],xct_vars,str(xct_rhs))
+        else:
+            self.xct_solver.addRightReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(xct_rhs))
+
+    def _add_xct_reif_left(self,head, xct_coefs,xct_vars,xct_rhs):
+        maximum = max([max([abs(x) for x in xct_coefs]),abs(xct_rhs)])
+        if maximum > 1e18:
+            self.xct_solver.addLeftReification(head,[str(x) for x in xct_coefs],xct_vars,str(xct_rhs))
+        else:
+            self.xct_solver.addLeftReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(xct_rhs))
 
 
     def _post_constraint(self, cpm_expr, reifiable=False):

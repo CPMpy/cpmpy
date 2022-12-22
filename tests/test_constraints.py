@@ -3,19 +3,23 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
-SOLVERNAME = None
+SOLVERNAME = "exact"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"}}
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"},
+                  "exact": {"circuit","max","min"},
+                  }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "exact": {"mod","abs","pow","div","mul"},
+                     }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication

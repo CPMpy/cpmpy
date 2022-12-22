@@ -16,6 +16,7 @@
         gurobi
         pysdd
         z3
+        exact
         utils
 
     ===============
@@ -29,6 +30,7 @@
         CPM_gurobi
         CPM_pysdd
         CPM_z3
+        CPM_exact
 
     =================
     List of functions
