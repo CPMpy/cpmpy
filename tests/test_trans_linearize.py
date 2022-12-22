@@ -80,6 +80,10 @@ class TestTransConstRhs(unittest.TestCase):
         cons = only_const_rhs(cons)[0]
         self.assertEqual("(max(a,b,c)) <= (r)", str(cons))
 
+        cons = cp.AllDifferent([a,b,c])
+        cons = only_const_rhs(cons)[0]
+        self.assertEqual("alldifferent(a,b,c)", str(cons))
+
 
 class TestTransVarsLhs(unittest.TestCase):
 
@@ -119,4 +123,9 @@ class TestTransVarsLhs(unittest.TestCase):
         cons = cp.max([a,b,c,5]) <= rhs
         cons = only_var_lhs(cons)[0]
         self.assertEqual("(max(a,b,c,5)) <= (r)", str(cons))
+
+        cons = cp.AllDifferent([a, b, c])
+        cons = only_var_lhs(cons)[0]
+        self.assertEqual("alldifferent(a,b,c)", str(cons))
+
 
