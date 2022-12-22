@@ -87,6 +87,8 @@ def comp_constraints():
         for comp_name in Comparison.allowed:
             for boolexpr in bool_exprs():
                 for rhs in [NUM_VAR, 1]:
+                    if comp_name == '>' and rhs == 1:
+                        rhs = 0 # >1 is unsat for boolean expressions, so change it to 0
                     yield Comparison(comp_name, boolexpr, rhs)
 
 
