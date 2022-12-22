@@ -290,7 +290,6 @@ class CPM_z3(SolverInterface):
             # 'and'/n, 'or'/n, 'xor'/n, '->'/2
             if cpm_con.name == 'and':
                 z3args = self._z3_expr(cpm_con.args)
-                olhs = None
                 for i in range(len(z3args)):
                     if is_any_list(z3args[i]):
                         z3args[i] = z3.And(z3args[i])
