@@ -183,7 +183,12 @@ def linearize_constraint(cpm_expr):
                 c1 = (~rhs).implies(negated_normal(lhs))
                 c2 = rhs.implies(lhs)
                 return linearize_constraint(flatten_constraint([c1,c2]))
-
+        elif lhs.is_bool() and not isinstance(lhs, _BoolVarImpl) and isinstance(rhs,_NumVarImpl):
+            #boolexpr == intvar, so introduce an intermediate boolvar bv, boolexpr == bv, bv == intvar
+            bv = boolvar()
+            c1 = Comparison('==', lhs, bv)
+            c2 = Comparison('==', bv, rhs)
+            return linearize_constraint(flatten_constraint([c1, c2]))
 
     if cpm_expr.name == "alldifferent":
         """
