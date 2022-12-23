@@ -343,7 +343,76 @@ def only_positive_bv(cpm_expr):
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
+def only_const_rhs(cpm_expr):
+    """
+        Transforms linear expressions so that no constants appear on lhs of comparisons
 
+        Assumes constraint is in linear form (so only apply after `linearize_constraint`
+    """
+
+    if is_any_list(cpm_expr):
+        crhs_cons = [only_const_rhs(expr) for expr in cpm_expr]
+        return [c for l in crhs_cons for c in l]
+
+    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        cond, expr = cpm_expr.args
+        new_expr = only_const_rhs(expr)[0]
+        return [Operator("->", [cond, new_expr])]
+
+    elif isinstance(cpm_expr, Comparison):
+        lhs, rhs = cpm_expr.args
+        if is_num(rhs):
+            return [cpm_expr] # fine
+
+        if isinstance(lhs, Operator) and lhs.name == "sum":
+            lhs = Operator("wsum", [[1]*len(lhs.args)+[-1], lhs.args+[rhs]])
+            rhs = 0
+        elif isinstance(lhs, Operator) and lhs.name == "wsum":
+            lhs = Operator("wsum", [lhs.args[0]+[-1], lhs.args[1]+[rhs]])
+            rhs = 0
+        else:
+            # GenExpr such as min, max
+            pass
+        return [Comparison(cpm_expr.name, lhs, rhs)]
+    else:
+        # global constraints
+        return [cpm_expr]
+
+
+def only_var_lhs(cpm_expr):
+    """
+        Transforms linear expression such that left hand side of comparisons only contains sums/wsums of variables
+
+        Assumes constraint is in linear form (so only apply after `linearize_constraint`
+    """
+    if is_any_list(cpm_expr):
+        vlhs_cons = [only_var_lhs(expr) for expr in cpm_expr]
+        return [c for l in vlhs_cons for c in l]
+
+    if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        cond, expr = cpm_expr.args
+        new_expr = only_var_lhs(expr)[0]
+        return [Operator("->", [cond, new_expr])]
+
+    elif isinstance(cpm_expr, Comparison):
+        lhs, rhs = cpm_expr.args
+
+        if isinstance(lhs, Operator) and lhs.name == "sum":
+            sum_args = lhs.args
+            lhs = Operator("sum", [arg for arg in sum_args if not is_num(arg)]) # filter lhs to only vars
+            rhs -= sum(arg for arg in sum_args if is_num(arg)) # bring consts to rhs
+
+        elif isinstance(lhs, Operator) and lhs.name == "wsum":
+            weights, args = lhs.args
+            lhs = Operator("wsum", list(map(list,zip(*[[w,a] for w,a in zip(weights, args) if not is_num(a)])))) # filter lhs to only vars
+            rhs -= sum(w * a for w,a in zip(weights, args) if is_num(a)) # bring consts with weights to rhs
+        else:
+            # GenExpr such as min, max
+            pass
+        return [Comparison(cpm_expr.name, lhs, rhs)]
+    else:
+        # global constraints
+        return [cpm_expr]
 
 
 
