@@ -73,6 +73,7 @@
         Comparison
         Operator
 """
+import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
@@ -298,10 +299,18 @@ class Expression(object):
 
     # other mathematical ones
     def __truediv__(self, other):
+        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         if is_num(other) and other == 1:
             return self
         return Operator("div", [self, other])
     def __rtruediv__(self, other):
+        warnings.warn("We only support floordivision, use // in stead of /", DeprecationWarning)
+        return Operator("div", [other, self])
+    def __floordiv__(self, other):
+        if is_num(other) and other == 1:
+            return self
+        return Operator("div", [self, other])
+    def __rfloordiv__(self, other):
         return Operator("div", [other, self])
 
     def __mod__(self, other):
@@ -400,7 +409,7 @@ class Operator(Expression):
         '-':   (1, False), # -x
         'abs': (1, False),
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -503,7 +512,7 @@ class Operator(Expression):
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "div": return arg_vals[0] / arg_vals[1]
+        elif self.name == "div": return arg_vals[0] // arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
