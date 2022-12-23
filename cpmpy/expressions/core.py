@@ -304,7 +304,7 @@ class Expression(object):
             return self
         return Operator("div", [self, other])
     def __rtruediv__(self, other):
-        warnings.warn("We only support floordivision, use // in stead of /", DeprecationWarning)
+        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         return Operator("div", [other, self])
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
