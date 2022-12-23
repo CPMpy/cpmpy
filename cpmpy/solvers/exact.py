@@ -27,7 +27,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_const_rhs, only_var_lhs
 from ..transformations.reification import only_bv_implies, reify_rewrite
 import numpy as np
 
@@ -285,8 +285,6 @@ class CPM_exact(SolverInterface):
         """
             Turns a numeric CPMpy 'flat' expression into a solver-specific
             numeric expression
-
-            Used especially to post an expression as objective function
         """
 
         xcoefs = []
@@ -307,20 +305,11 @@ class CPM_exact(SolverInterface):
             xcoefs += [1]
             xvars += [self.solver_var(lhs)]
         elif lhs.name == "sum":
-            for x in lhs.args:
-                if is_num(x):
-                    xrhs -= x
-                else:
-                    xcoefs += [1]
-                    xvars += [self.solver_var(x)]
+            xcoefs = [1]*len(lhs.args)
+            xvars = [self.solver_var(x) for x in lhs.args]
         elif lhs.name == "wsum":
-            for c,x in zip(*lhs.args):
-                assert is_num(c)
-                if is_num(x):
-                    xrhs -= c*x
-                else:
-                    xcoefs += [c]
-                    xvars += [self.solver_var(x)]
+            xcoefs += lhs.args[0]
+            xvars += [self.solver_var(x) for x in lhs.args[1]]
         elif lhs.name == "sub":
             assert len(lhs.args)==2
             xcoefs += [1, -1]
@@ -354,6 +343,8 @@ class CPM_exact(SolverInterface):
         cpm_cons = linearize_constraint(cpm_cons)
         cpm_cons = only_numexpr_equality(cpm_cons)
         cpm_cons = only_positive_bv(cpm_cons)
+        cpm_cons = only_const_rhs(cpm_cons)
+        cpm_cons = only_var_lhs(cpm_cons)
 
         for con in cpm_cons:
             self._post_constraint(con)
