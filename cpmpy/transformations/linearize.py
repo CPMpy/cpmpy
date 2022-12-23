@@ -381,7 +381,7 @@ def only_const_rhs(cpm_expr):
 
 def only_var_lhs(cpm_expr):
     """
-        Transforms linear expression such that left hand size only contains sums/wsums of variables
+        Transforms linear expression such that left hand side of comparisons only contains sums/wsums of variables
 
         Assumes constraint is in linear form (so only apply after `linearize_constraint`
     """
