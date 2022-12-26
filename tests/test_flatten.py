@@ -123,8 +123,8 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var( a+b+c )), "(IV6, [(sum([IV0, IV1, IV2])) == (IV6)])" )
         self.assertEqual( str(get_or_make_var( 2*a )), "(IV7, [(2 * (IV0)) == (IV7)])" )
         self.assertEqual( str(get_or_make_var( a*b )), "(IV8, [((IV0) * (IV1)) == (IV8)])" )
-        self.assertEqual( str(get_or_make_var( a/b )), "(IV9, [((IV0) / (IV1)) == (IV9)])" )
-        self.assertEqual( str(get_or_make_var( 1/b )), "(IV10, [(1 / (IV1)) == (IV10)])" )
+        self.assertEqual( str(get_or_make_var( a/b )), "(IV9, [((IV0) // (IV1)) == (IV9)])" )
+        self.assertEqual( str(get_or_make_var( 1/b )), "(IV10, [(1 // (IV1)) == (IV10)])" )
         self.assertEqual( str(get_or_make_var( a/1 )), "(IV0, [])" )
         self.assertEqual( str(get_or_make_var( abs(cp.intvar(-5,5, name="x")) )), "(IV11, [(abs([x])) == (IV11)])" )
         self.assertEqual( str(get_or_make_var( 1*a + 2*b + 3*c )), "(IV12, [(sum([1, 2, 3] * [IV0, IV1, IV2])) == (IV12)])")
@@ -139,7 +139,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_objective( a+b )), f"(({str(a)}) + ({str(b)}), [])" )
         self.assertEqual( str(flatten_objective( 2*a+3*b )), "(sum([2, 3] * [IV0, IV1]), [])" )
         self.assertEqual( str(flatten_objective( 2*a+3*(b + c) )), "(sum([2, 3] * [IV0, IV5]), [((IV1) + (IV2)) == (IV5)])" )
-        self.assertEqual( str(flatten_objective( a/b+c )), f"((IV6) + ({str(c)}), [(({str(a)}) / ({str(b)})) == (IV6)])" )
+        self.assertEqual( str(flatten_objective( a/b+c )), f"((IV6) + ({str(c)}), [(({str(a)}) // ({str(b)})) == (IV6)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a] )), "(IV7, [([1 2 3][IV0]) == (IV7)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )), "((IV8) + (IV1), [([1 2 3][IV0]) == (IV8)])" )
         self.assertEqual( str(flatten_objective( a+b-c )), "(sum([IV0, IV1, IV9]), [(-1 * (IV2)) == (IV9)])" )
@@ -184,8 +184,8 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( (a == 10).implies(b == c+d) )), "[(IV0 == 10) -> (BV9), (((IV2) + (IV3)) == (IV1)) == (BV9)]" )
         # different order should not create more tempvars
         self.assertEqual( str(flatten_constraint( (a == 10).implies(c+d == b) )), "[(IV0 == 10) -> (BV10), (((IV2) + (IV3)) == (IV1)) == (BV10)]" )
-        self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) / (IV1)) == (IV2)]" )
-        self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) / (IV1)) == (IV2)]" )
+        self.assertEqual( str(flatten_constraint( a / b == c )), "[((IV0) // (IV1)) == (IV2)]" )
+        self.assertEqual( str(flatten_constraint( c == a / b )), "[((IV0) // (IV1)) == (IV2)]" )
 
         # double negation #146
         self.assertEqual( str(flatten_constraint( ~(~(a == 7)) )), "[IV0 == 7]" )
