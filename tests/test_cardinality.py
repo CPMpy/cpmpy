@@ -2,10 +2,7 @@ import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
-from cpmpy.solvers.pysat import CPM_pysat
-
-testif_pysat = pytest.mark.skipif(not CPM_pysat.supported(),
-                                  reason="PySAT not installed")
+from test_solvers import testif_pysat
 
 @testif_pysat
 class TestCardinality(unittest.TestCase):

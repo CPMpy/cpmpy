@@ -2,9 +2,7 @@ import unittest
 import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_pysat
-
-testif_pysat = pytest.mark.skipif(not CPM_pysat.supported(),
-                                  reason="PySAT not installed")
+from test_solvers import testif_pysat
 
 def frietkot():
     # Construct the model.
