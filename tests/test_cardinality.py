@@ -2,9 +2,10 @@ import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
-from test_solvers import testif_pysat
+from cpmpy.solvers.pysat import CPM_pysat
 
-@testif_pysat
+@pytest.mark.skipif(not CPM_pysat.supported(),
+                    reason="PySAT not installed")
 class TestCardinality(unittest.TestCase):
     def setUp(self):
         self.bv_before = boolvar(shape=7)
