@@ -70,7 +70,11 @@ class MusTests(TestCase):
             AllDifferent(x,y) # invalid for musx_assum
         ]
 
-        self.assertEqual(set(mus(cons)), set(cons[1:3]))
+        # non-determinstic
+        #self.assertEqual(set(mus(cons)), set(cons[1:3]))
+        ms = mus(cons)
+        self.assertLess(len(ms), len(cons))
+        self.assertFalse(Model(ms).solve())
         self.assertEqual(set(mus_naive(cons)), set(cons[1:3]))
 
 if __name__ == '__main__':
