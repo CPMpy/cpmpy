@@ -1,6 +1,10 @@
 import unittest
+import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_pysat
+
+testif_pysat = pytest.mark.skipif(not CPM_pysat.supported(),
+                                  reason="PySAT not installed")
 
 def frietkot():
     # Construct the model.
@@ -23,7 +27,7 @@ def frietkot():
     model = Model(allwishes)
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
-
+@testif_pysat
 class TestPySATInterrupt(unittest.TestCase):
     def test_small_isntance_no_interrupt(self):
         """Check if the instance still returns the expected results
