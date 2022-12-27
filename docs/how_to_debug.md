@@ -42,9 +42,19 @@ If you don't find it, report it on the CPMpy github Issues page and we'll help y
 
 You get an error either from CPMpy (e.g. the flattening, or the solver interface) or the solver itself is saying the model is invalid. This may be because you have modelled something impossible, or because you have a corner case that CPMpy does not yet capture.
 
-The two are hard to tell apart. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+If you have a model that fails in this way, try the following code snippet to see what constraint is causing the error:
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+```python
+model = ... # your code, a `Model()`
+`
+for c in model.constraints:
+    print("Trying",c)
+    Model(c).solve()
+```
+
+The last constraint printed before the exception is the curlpit... Please report on Github. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+
+Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on Github and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 
@@ -72,27 +82,27 @@ print(mf)`
 ```
 
 ### Automatically minimising the UNSAT program
-If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to its 'UNSAT core'.
+If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to a 'Minimal Unsatisfiable Subset' (MUS).
 
-You can download our '[musx.py](https://raw.githubusercontent.com/CPMpy/cpmpy/master/examples/advanced/musx.py)' advanced example. If you put it in the same folder as your code, then you can use it as follows:
+This is now part of our standard tools, that you can use as follows:
 
 ```python
-from musx import musx
+from cpmpy.tools import mus
 
-x,y,z = boolvar(3)
+x = boolvar(shape=3, name="x")
 model = Model(
-    x,
-    ~x,
-    x|y,
-    z.implies(x)
+    x[0],
+    x[0] | x[1],
+    x[2].implies(x[1]),
+    ~x[0],
     )
 
-unsat_cons = musx(model.constraints)
-model2 = Model(unsat_cons)
+unsat_cons = mus(model.constraints)
 ```
 
+With this smaller set of constraints, repeat the visual inspection steps above.
 
-With this smaller program, repeat the visual inspection steps above.
+(Note that for an UNSAT problem there can be many MUSes, the `examples/advanced/` folder has the MARCO algorithm that can enumerate all MSS/MUSes.)
 
 
 ## Debugging a satisfiable model, that does not contain an expected solution
@@ -102,7 +112,7 @@ We will ignore the (possible) objective function here and focus on the feasibili
 Add the solution that you know should be a feasible solution as a constraint:
 `model.add( (x == 1) & (y == 2) & (z == 3) ) # yes, brackets around each!`
 
-You now have an UNSAT program! That means you can follow the steps in 'Automatically minimising the UNSAT program' above to better understand it.
+You now have an UNSAT program! That means you can follow the steps above on 'Automatically minimising the UNSAT program' to better understand it.
 
 ## Debugging a satisfiable model, which returns an impossible solution
 
@@ -110,6 +120,5 @@ This one is most annoying... Double check the printing of the model for oddities
 
 Try generating an explanation sequence for the solution... this requires a satisfaction problem, so remove the objective function or add a constraint that constraints the objective function to the value attained by the impossible solution.
 
-As to generating the explanation sequence, we will add this as a demo soon...
-
+As to generating the explanation sequence, check out our advanced example on [stepwise OCUS explanations](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py)
 

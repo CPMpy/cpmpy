@@ -102,9 +102,9 @@
 
 """
 import warnings # for deprecation warning
-from .core import Expression, Operator
+from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -135,7 +135,7 @@ class GlobalConstraint(Expression):
             and use other other global constraints as long as
             it does not create a circular dependency.
         """
-        return None
+        raise NotImplementedError("Decomposition for",self,"not available")
 
     def deepcopy(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)
@@ -168,7 +168,7 @@ class AllDifferent(GlobalConstraint):
         return AllDifferent(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -193,7 +193,7 @@ class AllEqual(GlobalConstraint):
         return AllEqual(*copied_args)
 
     def value(self):
-        return all(c.value() for c in self.decompose())
+        return len(set(a.value() for a in self.args)) == 1
 
 
 def circuit(args):
@@ -274,7 +274,11 @@ class Minimum(GlobalConstraint):
         super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return min([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return min(argvals)
 
     def deepcopy(self, memodict={}):
         """
@@ -294,7 +298,11 @@ class Maximum(GlobalConstraint):
         super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
-        return max([argval(a) for a in self.args])
+        argvals = [argval(a) for a in self.args]
+        if any(val is None for val in argvals):
+            return None
+        else:
+            return max(argvals)
 
     def deepcopy(self, memodict={}):
         """
@@ -326,10 +334,25 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
-        idxval = argval(self.args[1])
-        if not idxval is None:
-            return argval(self.args[0][idxval])
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            return argval(arr[idxval])
         return None # default
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            It is not a constraint itself, so it can not have a decompose().
+            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+            That is what this function does
+            (for now only used in transformations/reification.py)
+        """
+        from .python_builtins import any
+
+        arr,idx = self.args
+        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -365,7 +388,7 @@ class Xor(GlobalConstraint):
 
     def decompose(self):
         if len(self.args) == 2:
-            return (self.args[0] + self.args[1]) == 1
+            return [(self.args[0] + self.args[1]) == 1]
         prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
         for arg in self.args[2:]:
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)
@@ -387,3 +410,70 @@ class Xor(GlobalConstraint):
        """
         copied_args = self._deepcopy_args(memodict)
         return Xor(copied_args)
+
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Supports both varying demand across tasks or equal demand for all jobs
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        super(Cumulative, self).__init__("cumulative",[flatlist(start),
+                                                       flatlist(duration),
+                                                       flatlist(end),
+                                                       demand if is_num(demand) else flatlist(demand),
+                                                       capacity])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+        from ..expressions.python_builtins import sum
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [start[t] + duration[t] == end[t]]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        for t in range(lb,ub+1):
+            demand_at_t = 0
+            for job in range(len(start)):
+                if is_num(demand):
+                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                else:
+                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+            cons += [capacity >= demand_at_t]
+
+        return cons
+
+    def value(self):
+        start, dur, end, demand, cap = [argval(a) for a in self.args]
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if cap < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the cumulative global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Cumulative(*copied_args)
+
+
