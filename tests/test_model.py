@@ -44,6 +44,8 @@ class TestModel(unittest.TestCase):
         os.remove(fname)
 
     def test_io_counters(self):
+        _BoolVarImpl.counter = 0  # don't try this at home
+        _IntVarImpl.counter = 0  # don't try this at home
         fname = join(self.tempdir, "model")
         iv = cp.intvar(1,9, shape=3)
         bv = cp.boolvar()
