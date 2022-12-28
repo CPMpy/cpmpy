@@ -301,6 +301,10 @@ def get_or_make_var(expr):
                     lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
                 ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
                 ivar = _IntVarImpl(lb, ub)
+            elif flatexpr.name == "sub": # binary
+                lb = lbs[0] - ubs[1]
+                ub = ubs[0] - lbs[1]
+                ivar = _IntVarImpl(lb,ub)
             elif flatexpr.name == 'mul': # binary
                 v0 = [lbs[0], ubs[0]]
                 v1 = [lbs[1], ubs[1]]
@@ -313,12 +317,18 @@ def get_or_make_var(expr):
                 # the above can give fractional values, tighten bounds to integer
                 ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds)))
             elif flatexpr.name == 'mod': # binary
-                l = np.arange(lbs[0], ubs[0]+1)
-                r = np.arange(lbs[1], ubs[1]+1)
-                # check all possibilities
-                remainders = np.mod(l[:,None],r)
-                lb, ub = np.min(remainders), np.max(remainders)
-                ivar = _IntVarImpl(lb,ub)
+
+                if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
+                    # special check: if the bounds are too loose we can not check all possibilities below
+                    ivar = _IntVarImpl(-2147483648, 2147483647)
+                else:
+                    l = np.arange(lbs[0], ubs[0]+1)
+                    r = np.arange(lbs[1], ubs[1]+1)
+                    # check all possibilities
+                    remainders = np.mod(l[:,None],r)
+                    lb, ub = np.min(remainders), np.max(remainders)
+                    ivar = _IntVarImpl(lb,ub)
+
             elif flatexpr.name == 'pow': # binary
                 base = [lbs[0], ubs[0]]
                 exp = [lbs[1], ubs[1]]
@@ -342,7 +352,7 @@ def get_or_make_var(expr):
             - Global constraint (non-Boolean) (examples: Max,Min,Element)
             """
             # we don't currently have a generic way to get bounds from non-Boolean globals...
-            # XXX Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
+            # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
             ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
             return (ivar, [flatexpr == ivar]+flatcons)
@@ -462,15 +472,17 @@ def normalized_boolexpr(expr):
                 if is_num(rexpr):
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
-
-                    nnexpr = negated_normal(lexpr)
-                    return normalized_boolexpr(nnexpr)
+                    if exprname == '==':
+                        nnexpr = negated_normal(lexpr)
+                        return normalized_boolexpr(nnexpr)
+                    else: # !=, should only be possible in dubble negation
+                        return normalized_boolexpr(lexpr)
 
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=':
                     # != not needed, negate RHS variable
-                    rhs = ~rvar
+                    rvar = ~rvar
                     exprname = '=='
             else:
                 # other cases: LHS is numexpr
@@ -563,7 +575,7 @@ def negated_normal(expr):
 
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
-        Global: should call decompose and negate that?
+        Global: decompose and negate that
 
         This function only ensures 'negated normal' for the top-level
         constraint (negating arguments recursively as needed),
@@ -603,7 +615,9 @@ def negated_normal(expr):
         # only negated last element
         return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
 
-    else:
-        # global...
-        #raise NotImplementedError("negate_normal {}".format(expr))
-        return expr == 0 # can't do better than this...
+    else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose"):
+            # global... decompose and negate that
+            return negated_normal(Operator('and', expr.decompose()))
+        else:
+            raise NotImplementedError("negate_normal {}".format(expr))

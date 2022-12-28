@@ -102,9 +102,11 @@
 
 """
 import warnings # for deprecation warning
+import numpy as np
+
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -411,6 +413,87 @@ class Xor(GlobalConstraint):
         copied_args = self._deepcopy_args(memodict)
         return Xor(copied_args)
 
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Supports both varying demand across tasks or equal demand for all jobs
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        assert is_any_list(start), "start should be a list"
+        start = flatlist(start)
+        assert is_any_list(duration), "duration should be a list"
+        duration = flatlist(duration)
+        assert is_any_list(end), "end should be a list"
+        end = flatlist(end)
+        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
+
+
+        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+        from ..expressions.python_builtins import sum
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [start[t] + duration[t] == end[t]]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        for t in range(lb,ub+1):
+            demand_at_t = 0
+            for job in range(len(start)):
+                if is_num(demand):
+                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                else:
+                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+            cons += [capacity >= demand_at_t]
+
+        return cons
+
+    def value(self):
+        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
+
+        if any(a is None for a in argvals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, cap = argvals
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if cap < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+    def deepcopy(self, memodict={}):
+        """
+           Return a deep copy of the cumulative global constraint
+           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+       """
+        copied_args = self._deepcopy_args(memodict)
+        return Cumulative(*copied_args)
+
 class NativeConstraint(Expression):
     """
         A constraint whose name corresponds to a native solver API function,
@@ -437,4 +520,3 @@ class NativeConstraint(Expression):
     def deepcopy(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args)
-

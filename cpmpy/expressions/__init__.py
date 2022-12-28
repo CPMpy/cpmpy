@@ -1,5 +1,5 @@
 """
-    All forms of expression objects that allow you to specify constraints and objectives over variables
+    Classes and functions that represent and create expressions (constraints and objectives)
 
     ==================
     List of submodules
@@ -20,6 +20,6 @@
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array, DirectVar
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
-from .globalconstraints import AllDifferent, AllEqual, Circuit, Table, Minimum, Maximum, Element, Xor, NativeConstraint
+from .globalconstraints import AllDifferent, AllEqual, Circuit, Table, Minimum, Maximum, Element, Xor, Cumulative, NativeConstraint
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
 from .python_builtins import all, any, max, min, sum

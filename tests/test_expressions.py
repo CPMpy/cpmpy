@@ -103,11 +103,31 @@ class TestWeightedSum(unittest.TestCase):
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'sum')
 
+    def test_weightedadd_sub(self):
+        expr = self.ivs[0] * 4 - 5 * self.ivs[1]
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+
+    def test_negated_weightedadd(self):
+        expr = self.ivs[0] * 4 - 5 *  self.ivs[1]
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+        expr = -expr # negate, every arg should be negated
+        self.assertEqual(expr.name, 'wsum')
+        self.assertListEqual([-4, 5], expr.args[0])
+
     def test_weighted_nested_epxressions(self):
         expr = self.ivs[0] * 4 + 5 * (self.ivs[1] + 6 * self.ivs[2])
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'wsum')
-        print(expr)
+
+    def test_weighted_nested_mul(self):
+        # issue #137
+        x = boolvar()
+        expr = 100 * (x < 5) * (5 - x) + 10 * (x - 5)
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'wsum')
+        # (if this surprises you, note that the first one is (100*(x<5))*(5-x) in Python
 
     def test_sum_generator(self):
         expr1 = sum(self.ivs)
