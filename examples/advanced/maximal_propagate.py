@@ -5,29 +5,10 @@ Iteratively finds a new solutions by forcing at least one variable to have a val
 """
 
 from cpmpy import *
-from cpmpy.transformations.get_variables import get_variables
-
-
-def maximal_propagate(constraints, solvername="ortools"):
-    # For faster propagation, use incremental solver such as pysat, z3 or gurobi.
-    vars = get_variables(constraints)
-    visisted_domain = {var: set() for var in vars}
-
-    solver = SolverLookup.get(solvername)
-    solver += constraints
-
-    while solver.solve():
-        cons = False
-        for var, values in visisted_domain.items():
-            values.add(var.value())
-            cons |= all(var != val for val in values)
-        solver += cons
-    # exhausted all possible domain values
-    return visisted_domain
+from cpmpy.tools.maximal_propagate import maximal_propagate
 
 
 if __name__ == "__main__":
-
     x,y,z = [intvar(lb=0,ub=5, name=n) for n in "xyz"]
 
     model = Model([x < y, y != 3])
