@@ -32,7 +32,6 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..exceptions import MinizincPathException
-import minizinc.error
 import os
 
 class CPM_minizinc(SolverInterface):
@@ -163,6 +162,7 @@ class CPM_minizinc(SolverInterface):
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         
         # call the solver, with parameters
+        import minizinc.error
         try:
             mzn_result = mzn_inst.solve(**mzn_kwargs)
         except minizinc.error.MiniZincError as e:
