@@ -278,7 +278,7 @@ class CPM_template(SolverInterface):
         if self.TEMPLATE_solver.HasObjective():
             raise Exception("TEMPLATE does not support finding all optimal solutions")
 
-        # if solver supports callbacks
+        # A. Example code if solver supports callbacks
         if is_any_list(display):
             callback = lambda : print([var.value() for var in display])
         else:
@@ -287,7 +287,7 @@ class CPM_template(SolverInterface):
         self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
         return self.TEMPLATE_solver.SolutionCount()
 
-        # else
+        # B. Example code if solver does not support callbacks
         self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
         solution_count = 0
         for solution in self.TEMPLATE_solver.GetSolutions():
