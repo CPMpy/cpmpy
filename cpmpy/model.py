@@ -27,6 +27,8 @@
 
         Model
 """
+import warnings
+
 import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
@@ -237,6 +239,9 @@ class Model(object):
                     except:
                         pass
             from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl  # avoid circular import
+            if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
+                    (_IntVarImpl.counter > 0 and iv_counter > 0):
+                warnings.warn(f"from_file '{fname}': contains auxiliary IV*/BV* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
             _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
             _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
             return m

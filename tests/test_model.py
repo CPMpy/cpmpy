@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import tempfile
 import os
 from os.path import join
@@ -37,8 +38,9 @@ class TestModel(unittest.TestCase):
         m += (iv[0] == 5)
         m.to_file(fname)
 
-        loaded = cp.Model.from_file(fname)
-        self.assertTrue(loaded.solve())
+        with pytest.warns(UserWarning):
+            loaded = cp.Model.from_file(fname)
+            self.assertTrue(loaded.solve())
         os.remove(fname)
 
     def test_io_counters(self):
