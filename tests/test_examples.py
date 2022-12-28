@@ -1,5 +1,11 @@
-"""Tests all examples in the ../examples folder
-with all the solvers available"""
+"""
+Tests all examples in the `examples` folder
+
+Run from the CPMpy root directory with `python3 -m pytest tests/` to make
+sure that you are testing your local version.
+
+Will only run solver tests on solvers that are installed
+"""
 from glob import glob
 from os.path import join
 import types
@@ -7,10 +13,9 @@ import importlib.machinery
 import pytest
 from cpmpy import *
 
-EXAMPLES = glob(join("..", "examples", "*.py")) + \
-           glob(join(".", "examples", "*.py")) + \
-           glob(join("..", "examples/advanced", "*.py")) + \
-           glob(join("..", "examples/csplib", "*.py"))
+EXAMPLES = glob(join(".", "examples", "*.py")) + \
+           glob(join(".", "examples", "advanced", "*.py")) + \
+           glob(join(".", "examples", "csplib", "*.py"))
 
 
 @pytest.mark.parametrize("example", EXAMPLES)

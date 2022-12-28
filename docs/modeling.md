@@ -38,7 +38,7 @@ CPMpy supports discrete decision variables. All variables are numpy arrays, so c
   * Boolean variables: `boolvar(shape=1, name=None)`
   * Integer variables: `intvar(lb, ub, shape=1, name=None)`
 
-See [the API documentation on variables](api/expressions/variables.rst) for more information.
+See [the API documentation on variables](api/expressions/variables.html) for more information.
 
 
 ## Constraints
@@ -50,7 +50,7 @@ You can also use the built-in arithmetic operators `+,-,*,//,%` and we overwrite
 
 CP languages like CPMpy also offer what is called **global constraints**. Convenient expressions that capture part of the problem structure and that the solvers can typically use efficiently too. A non-exhaustive list of global constraints is: `AllDifferent(), AllEqual(), Circuit(), Table(), Element()`.
 
-See [the API documentation on expressions](api/expressions.rst) for more information.
+See [the API documentation on expressions](api/expressions.html) for more information.
 
 
 ## Objective function
@@ -64,4 +64,4 @@ Any CPMpy expression can be added as objective function. Solvers are especially 
 
 The `Model()` object has a number of other helpful functions, such as `status()` to print the status of the last `solve()` call, `solveAll()` to find all solutions, `to_file()` to store the model (you can print a model too, for debugging) and `copy` for creating a copy.
 
-See [the API documentation on Model](api/model.rst) for more information.
+See [the API documentation on Model](api/model.html) for more information.

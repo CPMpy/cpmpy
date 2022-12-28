@@ -1,5 +1,23 @@
 # Change log
 
+## 0.9.10
+New:
+* tools: added MUS computation to tools
+* tools: added hypaerparameter tuning (with Decaprio, CPAIOR22) to tools
+* cumulative global constraint, with native ortools and decomposition 
+* solvers: Z3 interface. Implemented both SAT and OPT subsolvers
+* examples: CSPlib problems, with data, all runnable
+* examples: IJCAI22 tutorial on 'CP as oracle' slides and notebooks
+* variables: add v.clear() to easily clear variables their value
+
+Changed:
+* critical bugfix in double negation normalization
+* bugfixes in solver translations
+* bugfix in negation of globals normalization
+* docs: improved docs on hyperparameter search and adding and testing solvers
+* gurobi: fix timeout status
+* bugfix in element decomposition
+
 ## 0.9.9
 Stabilizing the core implementations and a knowledge compiler as solver
 

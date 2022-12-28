@@ -1,5 +1,5 @@
 """
-    Methods to transform CPMpy expressions in simpler CPMpy expressions
+    Methods to transform CPMpy expressions in other CPMpy expressions
 
     Input and output are always CPMpy expressions, so transformations can
     be chained and called multiple times, as needed.

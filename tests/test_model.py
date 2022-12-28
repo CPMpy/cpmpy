@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import tempfile
 import os
 from os.path import join
@@ -37,8 +38,26 @@ class TestModel(unittest.TestCase):
         m += (iv[0] == 5)
         m.to_file(fname)
 
+        with pytest.warns(UserWarning):
+            loaded = cp.Model.from_file(fname)
+            self.assertTrue(loaded.solve())
+        os.remove(fname)
+
+    def test_io_counters(self):
+        fname = join(self.tempdir, "model")
+        iv = cp.intvar(1,9, shape=3)
+        bv = cp.boolvar()
+        m = cp.Model( iv > 3, ~bv )
+        m += (iv[0] == 5)
+        m.to_file(fname)
+
+        self.assertEqual(_BoolVarImpl.counter, 1)
+        self.assertEqual(_IntVarImpl.counter, 3)
+        _BoolVarImpl.counter = 0  # don't try this at home
+        _IntVarImpl.counter = 0  # don't try this at home
         loaded = cp.Model.from_file(fname)
-        self.assertTrue(loaded.solve())
+        self.assertEqual(_BoolVarImpl.counter, 1)
+        self.assertEqual(_IntVarImpl.counter, 3)
         os.remove(fname)
 
     def test_copy(self):

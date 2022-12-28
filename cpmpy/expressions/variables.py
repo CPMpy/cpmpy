@@ -233,7 +233,15 @@ class _NumVarImpl(Expression):
         return False
 
     def value(self):
+        """ the value obtained in the last solve call
+            (or 'None')
+        """
         return self._value
+
+    def clear(self):
+        """ clear the value obtained from the last solve call
+        """
+        self._value = None
     
     def __repr__(self):
         return self.name
@@ -349,6 +357,9 @@ class NegBoolView(_BoolVarImpl):
             return None
         return (not v)
 
+    def clear(self):
+        self._bv.clear()
+
     def __repr__(self):
         return "~{}".format(self._bv.name)
 
@@ -379,6 +390,11 @@ class NDVarArray(Expression, np.ndarray):
 
     def value(self):
         return np.reshape([x.value() for x in self], self.shape)
+
+    # clear the currently stored values
+    def clear(self):
+        for e in self.flat:
+            e.clear()
 
     def deepcopy(self, memodict={}):
         copied = [arg.deepcopy(memodict) if isinstance(arg, Expression) else arg for arg in self]
@@ -481,9 +497,13 @@ class NDVarArray(Expression, np.ndarray):
     def __rmul__(self, other):
         return self._vectorized(other, '__rmul__') 
     def __truediv__(self, other):
-        return self._vectorized(other, '__truediv__') 
+        return self._vectorized(other, '__truediv__')
     def __rtruediv__(self, other):
-        return self._vectorized(other, '__rtruediv__') 
+        return self._vectorized(other, '__rtruediv__')
+    def __floordiv__(self, other):
+        return self._vectorized(other, '__floordiv__')
+    def __rfloordiv__(self, other):
+        return self._vectorized(other, '__rfloordiv__')
     def __mod__(self, other):
         return self._vectorized(other, '__mod__') 
     def __rmod__(self, other):
