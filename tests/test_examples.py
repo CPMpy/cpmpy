@@ -4,8 +4,7 @@ Tests all examples in the `examples` folder
 Run from the CPMpy root directory with `python3 -m pytest tests/` to make
 sure that you are testing your local version.
 
-?with all the solvers available
-
+Will only run solver tests on solvers that are installed
 """
 from glob import glob
 from os.path import join
