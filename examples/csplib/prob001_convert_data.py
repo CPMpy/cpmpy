@@ -1,10 +1,11 @@
+"""
+This file just reads a csp001 instance textfile and converts it into JSON format
+See `prob001_car_sequence.py` for the actual model that uses the JSON data file
+"""
 import json
-
 import numpy as np
 import re
 import sys
-from pprint import pprint
-import pprint
 
 
 class CompactJSONEncoder(json.JSONEncoder):
