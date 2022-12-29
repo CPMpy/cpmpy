@@ -7,23 +7,31 @@ import pytest
 #   make sure that `SolverLookup.get(SOLVERNAME)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAME = "ortools"
+# CHANGE THIS BACK BEFORE MERGE!
+SOLVERNAME = "glasgowconstraintsolver"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"}}
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"},
+                  "glasgowconstraintsolver": {"circuit"},
+                  }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "glasgowconstraintsolver": {},
+                     }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {"xor", "element"},
-                "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
+                "z3": {"min", "max", "abs"},
+                "glasgowconstraintsolver": {},
+                } # TODO this will become emtpy after resolving issue #105
 
 
 
