@@ -233,7 +233,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         """
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
-            self.gcs.post_or([self.solver_var(cpm_expr)])
+            return self.gcs.post_or([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, 'xor'/n, '->'/2
             if cpm_expr.name == 'and':
