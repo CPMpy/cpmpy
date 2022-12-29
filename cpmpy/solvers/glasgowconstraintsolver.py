@@ -309,15 +309,15 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 if cpm_expr.name == '==':
                     return self.gcs.post_equals(*self.solver_vars([lhs, rhs]))
                 elif cpm_expr.name == '!=':
-                    return self.gcs.post_not_equals(*self.solver_vars([lhs + rhs]))
+                    return self.gcs.post_not_equals(*self.solver_vars([lhs, rhs]))
                 elif cpm_expr.name == '<=':
-                    return self.gcs.post_compare_less(*self.solver_vars([lhs + rhs]), True)
+                    return self.gcs.post_compare_less(*self.solver_vars([lhs, rhs]), True)
                 elif cpm_expr.name == '<':
-                    return self.gcs.post_compare_less(*self.solver_vars([lhs + rhs]), False)
+                    return self.gcs.post_compare_less(*self.solver_vars([lhs, rhs]), False)
                 elif cpm_expr.name == '>=':
-                    return self.gcs.post_compare_less(*self.solver_vars([rhs + lhs]), True)
+                    return self.gcs.post_compare_less(*self.solver_vars([rhs, lhs]), True)
                 elif cpm_expr.name == '>':
-                    return self.gcs.post_compare_less(*self.solver_vars([rhs + lhs]), False)
+                    return self.gcs.post_compare_less(*self.solver_vars([rhs, lhs]), False)
                 else:
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
             
