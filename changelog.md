@@ -1,5 +1,52 @@
 # Change log
 
+## 0.9.11
+FuzzTest bugfix release
+
+* core: importing a file and adding constrains can turn problems wrongly unsatisfiable (#174)
+* core: Added floordivision '//' on integer variables (#201)
+* core: Wsum care (#182)
+* core: cumulative can not assume args are numpy array (#178)
+* core: add custom cpmpy exceptions
+* core: #172 fix - memory crash on mod
+* core: double negation bug #170
+* globals: Enable deep copy of Cumulative global constraint (#169)
+
+* examples: csplib prob001 car sequencepy sliding window view only numpy 1200+ (#186)
+* tests: (re)active constraint tests on ortools as default solver (#180)
+* tests: fix deprecation warnings
+* tests: skipif when solvers not available
+* tests: enable automatic tests on github
+* docs: multiple fixes
+* docs: add developer guidelines
+
+* transf: Make line-expr more linear (#200)
+* solvers: minizinc stopped with a non zero exit code but did not output an error message (#192)
+* solvers: gurobi: timeout status fix
+
+* tools: Example for maximal propagate set of constraints (#147)
+* tools: prevent incrementality of solvers during tuning
+* tools: mus tool crashes with only 1 soft constraint (#196)
+
+
+## 0.9.10
+New:
+* tools: added MUS computation to tools
+* tools: added hypaerparameter tuning (with Decaprio, CPAIOR22) to tools
+* cumulative global constraint, with native ortools and decomposition 
+* solvers: Z3 interface. Implemented both SAT and OPT subsolvers
+* examples: CSPlib problems, with data, all runnable
+* examples: IJCAI22 tutorial on 'CP as oracle' slides and notebooks
+* variables: add v.clear() to easily clear variables their value
+
+Changed:
+* critical bugfix in double negation normalization
+* bugfixes in solver translations
+* bugfix in negation of globals normalization
+* docs: improved docs on hyperparameter search and adding and testing solvers
+* gurobi: fix timeout status
+* bugfix in element decomposition
+
 ## 0.9.9
 Stabilizing the core implementations and a knowledge compiler as solver
 

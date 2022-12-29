@@ -1,7 +1,10 @@
-import numpy as np
 import unittest
+import pytest
+import numpy as np
 import cpmpy as cp
-from cpmpy.solvers.utils import get_supported_solvers
+from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.z3 import CPM_z3
+from cpmpy.solvers.minizinc import CPM_minizinc
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -235,11 +238,9 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(len(s.get_core()) > 0)
 
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
     def test_pysat(self):
-        from cpmpy.solvers.pysat import CPM_pysat
-        if not CPM_pysat.supported():
-            print("Skipping PySAT tests, not installed")
-            return
 
         # Construct the model.
         (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
@@ -282,13 +283,9 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
 
-
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
     def test_minizinc(self):
-        from cpmpy.solvers.minizinc import CPM_minizinc
-        if not CPM_minizinc.supported():
-            print("Skipping minizinc tests, not installed")
-            return
-
         # (from or-tools)
         b = cp.boolvar()
         x = cp.intvar(1,13, shape=3)
@@ -314,6 +311,23 @@ class TestSolvers(unittest.TestCase):
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
+
+
+    @pytest.mark.skipif(not CPM_z3.supported(),
+                        reason="Z3 not installed")
+    def test_z3(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("z3", m)
+        self.assertFalse(s.solve(assumptions=bv))
+        self.assertTrue(len(s.get_core()) > 0)
+
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)

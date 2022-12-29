@@ -141,7 +141,8 @@ class CPM_gurobi(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:
             if self.grb_model.SolCount == 0:
-                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                # can be sat or unsat
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:  # another?
@@ -236,6 +237,9 @@ class CPM_gurobi(SolverInterface):
         # sum
         if cpm_expr.name == "sum":
             return gp.quicksum(self.solver_vars(cpm_expr.args))
+        if cpm_expr.name == "sub":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a - b
         # wsum
         if cpm_expr.name == "wsum":
             return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
@@ -263,7 +267,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = reify_rewrite(cpm_cons)
         cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum", "sub"})
         cpm_cons = only_positive_bv(cpm_cons)
 
         for con in cpm_cons:
@@ -297,7 +301,7 @@ class CPM_gurobi(SolverInterface):
                 return self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum')):
+                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     grblhs = self._make_numexpr(lhs)
                     return self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
