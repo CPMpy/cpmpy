@@ -241,6 +241,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.gcs.post_or(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'xor' and len(cpm_expr.args) == 2:
+                # TODO: also supports >2 args?
                 return self.gcs.post_xor(self.solver_vars(cpm_expr.args))
 
             # Part-Reified constraint: Var -> Boolexpr
@@ -271,6 +272,10 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 elif isinstance(bool_expr, Comparison):
                     lhs = bool_expr.args[0]
                     rhs = bool_expr.args[1]
+                    # TODO: wrongly assumes lhs/rhs are variables
+                    # can be arithmetic too
+                    assert(isinstance(lhs, _NumVarImpl))  
+                    assert(isinstance(rhs, _NumVarImpl))  
                     if bool_expr.name == '==':
                         return self.gcs.post_equals_if(*self.solver_vars([lhs, rhs]), reif_var)
                     elif bool_expr.name == '<=':
@@ -324,9 +329,9 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             # If the comparison is '==' we can have a NumExpr on the lhs
             elif cpm_expr.name == '==':
                 if lhs.name == 'abs':
-                    return self.gcs.post_abs(*self.solver_vars(lhs.args + [rhs]))
+                    return self.gcs.post_abs(*self.solver_vars(list(lhs.args) + [rhs]))
                 elif lhs.name in ['mul', 'div', 'pow', 'mod', 'abs']:
-                    return self.gcs.post_arithmetic(*self.solver_vars(lhs.args + [rhs]), lhs.name)
+                    return self.gcs.post_arithmetic(*self.solver_vars(list(lhs.args) + [rhs]), lhs.name)
                 elif lhs.name == 'sub':
                     var1 = self.solver_var(lhs.args[0])
                     nVar2 = self.gcs.negate(self.solver_var(lhs.args[1]))
@@ -342,7 +347,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 elif lhs.name == 'wsum':
                     summands = self.solver_vars(lhs.args[1])
                     summands.append(self.gcs.negate(self.solver_var(rhs)))
-                    return self.gcs.post_linear_equality(summands, lhs.args[0] + [1], 0)
+                    return self.gcs.post_linear_equality(summands, list(lhs.args[0]) + [1], 0)
                 elif lhs.name == 'max':
                     return self.gcs.post_max(self.solver_vars(lhs.args), self.solver_var(rhs))
                 elif lhs.name == 'min':
