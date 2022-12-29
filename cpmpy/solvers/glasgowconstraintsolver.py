@@ -253,7 +253,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
 
                 # Reified boolean operator:
                 if isinstance(bool_expr, _BoolVarImpl): # bv1 -> bv2
-                    return self.gcs.post_implies(self.solver_vars([bool_lhs, bool_expr]))
+                    return self.gcs.post_implies(*self.solver_vars([bool_lhs, bool_expr]))
                 if isinstance(bool_expr, Operator): # bv -> and(...), bv -> or(...)  # not sure about ('xor' and '->' ???)
                     if bool_expr.name == 'and':
                         return self.gcs.post_and_if(self.solver_vars(bool_expr.args), reif_var)
