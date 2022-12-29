@@ -14,6 +14,7 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -25,7 +26,14 @@ class CPM_glasgowconstraintsolver(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API
     Requires that the 'gcspy' python package is installed:
-    <no pip package or installation instructions as yet>
+    $ pip install gcspy
+
+    See detailed installation instructions at: TODO
+
+    Creates the following attributes (see parent constructor for more):
+    gcs: the gcspy solver object
+    has_objective: whether it has an objective variable
+    objective_var: optional: the variable used as objective
     """
 
     @staticmethod
@@ -42,7 +50,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         Constructor of the native solver object
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (not currently supported)
+        - subsolver: None
         """
         if not self.supported():
             raise Exception("Glasgow Constraint Solver: Install the python package 'gcspy'")
@@ -352,7 +360,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             return self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
             return self.gcs.post_table(*self.solver_vars(cpm_expr.args))
-        else:
+        elif isinstance(cpm_expr, GlobalConstraint):
             # GCS also supports 'count', 'in', and 'NValue' but can't see options for them here at pressent.
 
             self += cpm_expr.decompose()  # assumes a decomposition exists...
