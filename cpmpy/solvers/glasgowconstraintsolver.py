@@ -235,14 +235,11 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             # base case, just var or ~var
             return self.gcs.post_or([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
-            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
                 return self.gcs.post_and(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
                 return self.gcs.post_or(self.solver_vars(cpm_expr.args))
-            elif cpm_expr.name == 'xor' and len(cpm_expr.args) == 2:
-                # TODO: also supports >2 args?
-                return self.gcs.post_xor(self.solver_vars(cpm_expr.args))
 
             # Part-Reified constraint: Var -> Boolexpr
             # LHS must be boolvar due to only_bv_implies
@@ -361,6 +358,8 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
         
         # rest: base (Boolean) global constraints
+        elif cpm_expr.name == 'xor':  # and len(cpm_expr.args) == 2:
+            return self.gcs.post_xor(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'alldifferent':
             return self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
