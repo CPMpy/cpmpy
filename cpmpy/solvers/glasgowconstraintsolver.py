@@ -218,8 +218,8 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         cpm_cons = flatten_constraint(cpm_con)
 
         # Only less than and equals are fully reifiable.
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))
-        cpm_cons = only_numexpr_equality(cpm_cons)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['xor']))
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset())
         cpm_cons = only_bv_implies(cpm_cons)
 
         for con in cpm_cons:
@@ -270,10 +270,6 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 elif isinstance(bool_expr, Comparison):
                     lhs = bool_expr.args[0]
                     rhs = bool_expr.args[1]
-                    # TODO: wrongly assumes lhs/rhs are variables
-                    # can be arithmetic too
-                    assert(isinstance(lhs, _NumVarImpl))  
-                    assert(isinstance(rhs, _NumVarImpl))  
                     if bool_expr.name == '==':
                         return self.gcs.post_equals_if(*self.solver_vars([lhs, rhs]), reif_var)
                     elif bool_expr.name == '<=':
