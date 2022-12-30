@@ -259,8 +259,9 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                         return self.gcs.post_or_if(self.solver_vars(bool_expr.args), reif_var)
                     elif bool_expr.name == '->':
                         return self.gcs.post_implies_if(self.solver_vars(bool_expr.args), reif_var)
-                    elif bool_expr.name == 'xor': # OR-tools implementation doesn't seem to deal with this case?
-                        return self.gcs.post_xor_if(self.solver_vars(bool_expr.args), reif_var)
+                    elif bool_expr.name == 'xor' and len(bool_expr.args) == 2: # OR-tools implementation doesn't seem to deal with this case?
+                        # only binary, non-binary will be decomposed lower
+                        return self.gcs.post_binary_xor_if(self.solver_vars(bool_expr.args), reif_var)
                     else:
                         # Shouldn't happen if reify_rewrite worked?
                         raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -358,8 +359,9 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
         
         # rest: base (Boolean) global constraints
-        elif cpm_expr.name == 'xor':  # and len(cpm_expr.args) == 2:
-            return self.gcs.post_xor(self.solver_vars(cpm_expr.args))
+        elif cpm_expr.name == 'xor' and len(cpm_expr.args) == 2:
+            # only binary, non-binary will be decomposed lower
+            return self.gcs.post_binary_xor(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'alldifferent':
             return self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
