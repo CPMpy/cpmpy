@@ -285,7 +285,7 @@ class CPM_z3(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_con, Operator):
-            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
                 return z3.And(self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'or':
