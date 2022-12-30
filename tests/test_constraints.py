@@ -93,7 +93,7 @@ def comp_constraints():
 def bool_exprs():
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
     """
     if SOLVERNAME is None:
@@ -123,29 +123,26 @@ def bool_exprs():
 def global_constraints():
     """
         Generate all global constraints
-        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element
+        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
+           Xor, Cumulative
     """
-    if SOLVERNAME is None:
+    if SOLVERNAME is None or SOLVERNAME in EXCLUDE_GLOBAL:
         return
 
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
     # TODO: add Circuit
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
-        if SOLVERNAME not in EXCLUDE_GLOBAL or \
-                cons.name not in EXCLUDE_GLOBAL[SOLVERNAME]:
+        if cons.name not in EXCLUDE_GLOBAL[SOLVERNAME]:
             yield cons
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "element" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "element" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         yield cpm_array(NUM_ARGS)[NUM_VAR]
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "xor" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "xor" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         yield Xor(BOOL_ARGS)
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "cumulative" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "cumulative" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         s = intvar(0,10,shape=3,name="start")
         e = intvar(0,10,shape=3,name="end")
         dur = [1,4,3]
