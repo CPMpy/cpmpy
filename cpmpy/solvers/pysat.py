@@ -206,30 +206,31 @@ class CPM_pysat(SolverInterface):
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
 
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
-        # apply transformations, then post internally
-        cpm_cons = to_cnf(cpm_con)
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the native solver API
+
+            What 'primitive' means depends on the solver capabilities,
+            more specifically on the transformations applied in `__add__()`
+
+            Solvers do not need to support all constraints.
         """
         from pysat.card import CardEnc
 
@@ -288,8 +289,9 @@ class CPM_pysat(SolverInterface):
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-        elif cpm_expr.name == 'xor':
-            for con in to_cnf(cpm_expr.decompose()):
+        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
+            # for all global constraints:
+            for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")

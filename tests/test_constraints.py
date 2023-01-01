@@ -13,12 +13,16 @@ SOLVERNAME = "ortools"
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"}}
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent"},
+                  }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
