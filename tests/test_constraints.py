@@ -13,17 +13,21 @@ SOLVERNAME = "ortools"
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"}}
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {"xor", "element"},
-                "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
+                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
+                }
 
 
 
@@ -126,8 +130,12 @@ def global_constraints():
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
            Xor, Cumulative
     """
-    if SOLVERNAME is None or SOLVERNAME in EXCLUDE_GLOBAL:
+    if SOLVERNAME is None:
         return
+
+    if SOLVERNAME not in EXCLUDE_GLOBAL:
+        # add with no exclusions
+        EXCLUDE_GLOBAL[SOLVERNAME] = {}
 
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
     # TODO: add Circuit
