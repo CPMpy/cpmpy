@@ -297,6 +297,7 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
 
 
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
