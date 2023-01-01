@@ -13,8 +13,8 @@ SOLVERNAME = "ortools"
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent"},
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   }
 
 # Exclude certain operators for solvers.
@@ -27,7 +27,8 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {"xor", "element"},
-                "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
+                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
+                }
 
 
 
