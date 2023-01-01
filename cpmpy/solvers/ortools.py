@@ -29,8 +29,8 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, eval_comparison
-from ..transformations.get_variables import get_variables_model, get_variables
-from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
+from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 
@@ -297,40 +297,19 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
 
 
-    def __add__(self, cpm_expr):
-        """
-        Eagerly add a constraint to the underlying solver.
-        
-        Any CPMpy expression given is immediately transformed (throught `transform()`)
-        and then posted to the solver (through `_post_constraint()`).
-        
-        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-        the user knows and cares about. All other variables are auxiliary variables created by transformations.
-
-        :param cpm_expr CPMpy expression, or list thereof
-        :type cpm_expr (list of) Expression(s)
-        """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_expr))
-
-        # transform and post the constraints
-        for con in self.transform(cpm_expr):
-            self._post_constraint(con)
-
-        return self
-
     def transform(self, cpm_expr):
         """
-        Transform arbitrary CPMpy expressions to constraints the solver supports
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Implemented through chaining multiple solver-independent **transformation functions** from
-        the `cpmpy/transformations/` directory.
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        See the 'Adding a new solver' docs on readthedocs for more information.
+            See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr CPMpy expression, or list thereof
-        :type cpm_expr (list of) Expression(s)
-        :returns list of CPMpy expressions
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -348,8 +327,11 @@ class CPM_ortools(SolverInterface):
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
-            
-            - reifiable: if True, will throw an error if cpm_expr can not be reified
+
+        :param cpm_expr: list of CPMpy expressions
+        :type cpm_expr: list of Expression
+
+        :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -440,16 +422,19 @@ class CPM_ortools(SolverInterface):
                 demand = [demand] * len(start)
             intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
             return self.ort_model.AddCumulative(intervals, demand, cap)
-        else:
+        elif hasattr(cpm_expr, 'decompose'):
             # NOT (YET?) MAPPED: Automaton, Circuit,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            self += cpm_expr.decompose()  # assumes a decomposition exists...
-            # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
+            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+            for con in self.transform(cpm_expr.decompose()):
+                self._post_constraint(con)
+
             return None # will throw error if used in reification
-        
+
+        # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
