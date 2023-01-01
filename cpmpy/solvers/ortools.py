@@ -56,7 +56,7 @@ class CPM_ortools(SolverInterface):
         try:
             import ortools
             return True
-        except ImportError as e:
+        except ImportError:
             return False
 
 
@@ -297,41 +297,54 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
 
 
-    def __add__(self, cpm_con):
+    def __add__(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+        Eagerly add a constraint to the underlying solver.
+        
+        Any CPMpy expression given is immediately transformed (throught `transform()`)
+        and then posted to the solver (through `_post_constraint()`).
+        
+        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+        the user knows and cares about. All other variables are auxiliary variables created by transformations.
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
-
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+        :param cpm_expr CPMpy expression, or list thereof
+        :type cpm_expr (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
+        self.user_vars.update(get_variables(cpm_expr))
 
-        # apply transformations, then post internally
-        cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum","sub"})
-        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
-                                             # reified expr must go before this
-        for con in cpm_cons:
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
             self._post_constraint(con)
 
         return self
 
+    def transform(self, cpm_expr):
+        """
+        Transform arbitrary CPMpy expressions to constraints the solver supports
+
+        Implemented through chaining multiple solver-independent **transformation functions** from
+        the `cpmpy/transformations/` directory.
+
+        See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr CPMpy expression, or list thereof
+        :type cpm_expr (list of) Expression(s)
+        :returns list of CPMpy expressions
+        """
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
+                                             # reified expr must go before this
+        return cpm_cons
 
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
-
-            While the normal form is divided in 'base', 'comparison' and 'reified', we
-            here regroup the implementation per CPMpy class
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `__transform()__`.
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))

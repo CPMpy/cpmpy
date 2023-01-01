@@ -264,10 +264,10 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
 
         cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = reify_rewrite(cpm_cons)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))
         cpm_cons = only_bv_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum", "sub"})
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))
         cpm_cons = only_positive_bv(cpm_cons)
 
         for con in cpm_cons:

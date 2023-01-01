@@ -17,15 +17,19 @@ Implementing the template consists of the following parts:
 
 ## Transformations and posting constraints
 
-CPMpy is designed to separate 'transforming' constraints as much as possible from 'posting' constraints.
+CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and posted to the solver (through `_post_constraint()`).
+
+CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from *posting* the supported constraints directly to the solver.
 
 For example, a SAT solver only accepts clauses (disjunctions) over Boolean variables as constraints. So, its `_post_constraint()` method should just consists of reading in a CPMpy 'or' expression over decision variables, for which it then calls the solver to create such a clause. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
-What remains is the difficult part of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple independent **transformation functions** in the `cpmpy/transformations/` directory. For any solver you wish to add, chances are that most of the transformations you need are already implemented. If not, read on.
+What remains is the difficult part of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory.
+
+So for any solver you wish to add, chances are that most of the transformations you need are already implemented. You hence only need to chain the right transformations in the solver's `transform()` method. If you need additional transformations, or want to know how they work, read on.
 
 ## Stateless transformation functions
 
-CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed and posted to the solver. That also allows it to be *incremental*, meaning that you can post some constraints, call `solve()` post some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
+Because CPMpy solver interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()` add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
 The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs too. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
 
