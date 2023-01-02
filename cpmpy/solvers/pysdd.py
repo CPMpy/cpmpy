@@ -215,7 +215,12 @@ class CPM_pysdd(SolverInterface):
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
+
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
+
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var

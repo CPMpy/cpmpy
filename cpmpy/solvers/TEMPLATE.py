@@ -242,12 +242,12 @@ class CPM_template(SolverInterface):
 
     def _post_constraint(self, cpm_con):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
-            Solvers do not need to support all constraints.
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_con, _BoolVarImpl):
             # base case, just var or ~var

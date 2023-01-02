@@ -324,7 +324,7 @@ class CPM_ortools(SolverInterface):
             Post a supported CPMpy constraint directly to the underlying solver's API
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `__transform()__`.
+            are applied in `transform()`.
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))

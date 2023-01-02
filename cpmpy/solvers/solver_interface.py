@@ -204,22 +204,21 @@ class SolverInterface(object):
 
         :return: list of Expression
         """
-        return cpm_expr  # overwrite this function and call the transformations you need
+        return list(cpm_expr)  # overwrite this function and call the transformations you need
 
     def _post_constraint(self, cpm_expr):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `__transform()__`.
+            are applied in `transform()`.
 
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
 
         :param cpm_expr: list of CPMpy expressions
         :type cpm_expr: list of Expression
         """
-        raise NotImplementedError()  # abstract function, overwrite
-        return
+        raise NotImplementedError("solver _post_constraint(): abstract function, overwrite")
 
 
     # OPTIONAL functions

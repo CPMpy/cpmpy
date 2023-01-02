@@ -250,7 +250,7 @@ class CPM_z3(SolverInterface):
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
             Z3 supports nested expressions so translate expression tree and post to solver API directly
         """

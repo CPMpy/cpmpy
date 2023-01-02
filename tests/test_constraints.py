@@ -131,8 +131,12 @@ def global_constraints():
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
            Xor, Cumulative
     """
-    if SOLVERNAME is None or SOLVERNAME in EXCLUDE_GLOBAL:
+    if SOLVERNAME is None:
         return
+
+    if SOLVERNAME not in EXCLUDE_GLOBAL:
+        # add with no exclusions
+        EXCLUDE_GLOBAL[SOLVERNAME] = {}
 
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
     # TODO: add Circuit

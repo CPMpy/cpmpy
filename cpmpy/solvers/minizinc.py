@@ -342,8 +342,8 @@ class CPM_minizinc(SolverInterface):
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
         """
         # Get text expression, add to the solver
-        txt_cons = f"constraint {self._convert_expression(cpm_con)};\n"
-        self.mzn_model.add_string(txt_cons)
+        mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
+        self.mzn_model.add_string(mzn_str)
 
     def _convert_expression(self, expr) -> str:
         """
