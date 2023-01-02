@@ -243,7 +243,10 @@ class CPM_z3(SolverInterface):
         # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        return cpm_expr
+        if is_any_list(cpm_expr):
+            return cpm_expr
+        else:
+            return [cpm_expr]
 
     def _post_constraint(self, cpm_expr):
         """
