@@ -23,11 +23,12 @@
 
         CPM_ortools
 """
+import copy
 import sys  # for stdout checking
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.globalconstraints import NativeConstraint
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, DirectVar, NegBoolView
 from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables_model, get_variables
@@ -418,15 +419,6 @@ class CPM_ortools(SolverInterface):
             raise NotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
-        # Proposal: dynamic mapping of cpm_expr.name to API call? see #74
-        elif isinstance(cpm_expr, NativeConstraint):
-            # get the native function, will raise an AttributeError if it does not exist
-            native_function = getattr(self.ort_model, cpm_expr.name)
-            native_args = [a if cpm_expr.arg_novar is not None and i in cpm_expr.arg_novar
-                             else self.solver_vars(a) for i,a in enumerate(cpm_expr.args)]
-            # len(native_args) should match nr of arguments of `native_function`
-            return native_function(*native_args)
-
         # rest: base (Boolean) global constraints
         elif cpm_expr.name == 'xor':
             return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
@@ -442,15 +434,28 @@ class CPM_ortools(SolverInterface):
                 demand = [demand] * len(start)
             intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
             return self.ort_model.AddCumulative(intervals, demand, cap)
-        else:
+
+        elif hasattr(cpm_expr, 'decompose'):
             # NOT (YET?) MAPPED: Automaton, Circuit,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            self += cpm_expr.decompose() # assumes a decomposition exists...
+            self += cpm_expr.decompose()
             return None # will throw error if used in reification
-        
+
+        elif isinstance(cpm_expr, DirectConstraint):
+            # dynamic mapping of cpm_expr.name to API call, see #74
+            # get the solver function, will raise an AttributeError if it does not exist
+            solver_function = getattr(self.ort_model, cpm_expr.name)
+            solver_args = copy.copy(cpm_expr.args)
+            for i in range(len(solver_args)):
+                if cpm_expr.novar is None or i not in cpm_expr.novar:
+                    # it may contain variables, replace
+                    solver_args[i] = self.solver_vars(solver_args[i])
+            # len(native_args) should match nr of arguments of `native_function`
+            return solver_function(*solver_args)
+
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 

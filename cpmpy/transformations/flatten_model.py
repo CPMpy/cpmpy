@@ -79,7 +79,6 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 """
 import copy
 import math
-import numpy as np
 from ..expressions.core import *
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
@@ -143,6 +142,7 @@ def flatten_constraint(expr):
 
     assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
 
+    from cpmpy.expressions.globalconstraints import GlobalConstraint  # avoid circular import
     if isinstance(expr, Operator):
         """
             - Base Boolean operators: and([Var]), or([Var])        (CPMpy class 'Operator', is_bool())
@@ -218,13 +218,16 @@ def flatten_constraint(expr):
 
         return [Comparison(exprname, lhs, rvar)]+lcons+rcons
 
-    else:
+    elif isinstance(expr, GlobalConstraint):
         """
     - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         """
         (con, flatcons) = normalized_boolexpr(expr)
         return [con] + flatcons
 
+    else:
+        # any other case (e.g. DirectConstraint), pass as is
+        return [expr]
 
 def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
     """

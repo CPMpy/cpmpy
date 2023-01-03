@@ -494,7 +494,7 @@ class Cumulative(GlobalConstraint):
         copied_args = self._deepcopy_args(memodict)
         return Cumulative(*copied_args)
 
-class NativeConstraint(Expression):
+class DirectConstraint(Expression):
     """
         A constraint whose name corresponds to a native solver API function,
         and whose arguments match those of the solver function.
@@ -503,14 +503,25 @@ class NativeConstraint(Expression):
         where possible, and will call the native API function.
     """
     # is_bool: whether this is normal constraint (True or False)
-    def __init__(self, name, arg_list, arg_novar=None):
+    def __init__(self, name, argtuple, novar=None):
         """
-            arg_list: list of arguments to give to the function with name 'name'
-            arg_novar: list of arguments that contain no variables,
-                       that can be passed 'as is' without scanning for variables
+            A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
+
+            It can not be reified, it is not flattened. When added to a CPMpy solver, it will literally just call
+            a function of the underlying solver, replacing CPMpy variables by solver variables along the way.
+
+            If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
+            then use `directvar()` instead, or access the solver object from the solver interface directly.
+
+            name: name of the solver function that you wish to call
+            argtuple: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `argtuple` that contain no variables,
+                   that can be passed 'as is' without scanning for variables
         """
-        super().__init__(name, arg_list)
-        self.arg_novar = arg_novar
+        if not isinstance(argtuple, tuple):
+            argtuple = (argtuple,)  # force tuple
+        super().__init__(name, argtuple)
+        self.novar = novar
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?

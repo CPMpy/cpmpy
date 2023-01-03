@@ -52,8 +52,7 @@ for m in all_machines:
 
 # No overlap constraint: one starts before other one ends
 for j in all_jobs:
-    model.ort_model.AddNoOverlap(intervals[:,j])
-    #? model += DirectConstraint("AddNoOverlap", intervals[:,j])
+    model += DirectConstraint("AddNoOverlap", (intervals[:,j]), novar=[0])
 
 # Precedence constraint per job
 for m1,m2 in combinations(all_machines,2): # [(0,1), (0,2), (1,2)]
