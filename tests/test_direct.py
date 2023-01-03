@@ -31,13 +31,14 @@ class TestDirectORTools(unittest.TestCase):
         interval1_args = intvar(3,10, shape=3)
         interval2_args = intvar(2,10, shape=3)
 
-        interval1 = DirectVar("NewIntervalVar", interval1_args)
-        interval2 = DirectVar("NewIntervalVar", interval2_args)
+        from cpmpy.expressions.variables import _DirectVarImpl
+        interval1 = _DirectVarImpl("NewIntervalVar", tuple(list(interval1_args)+["itv1"]), name="itv1", novar=[3])
+        interval2 = _DirectVarImpl("NewIntervalVar", tuple(list(interval2_args)+["itv1"]), name="itv2", novar=[3])
 
         solver = SolverLookup.get("ortools")
 
         solver += DirectConstraint(name="AddNoOverlap",
-                                   argtuple=([interval1, interval2]), novar=[1])
+                                   argtuple=([interval1, interval2]))
 
         assert solver.solve()
 

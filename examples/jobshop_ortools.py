@@ -39,12 +39,16 @@ all_machines = range(machines_count)
 
 model = SolverLookup.get("ortools")
 
+from cpmpy.expressions.variables import _DirectVarImpl
+
 # make intervalvars... ensures start + dur = end
 intervals = np.zeros(shape=(machines_count,jobs_count), dtype=object)
 for m in all_machines:
     for j in all_jobs:
-        intervals[m,j] = model.ort_model.NewIntervalVar(
-            model.solver_var(start_time[m,j]), jobs_data[j,m], model.solver_var(end_time[m,j]), f"interval[{m},{j}]")
+        #intervals[m,j] = model.ort_model.NewIntervalVar(
+        #    model.solver_var(start_time[m,j]), jobs_data[j,m], model.solver_var(end_time[m,j]), f"interval[{m},{j}]")
+        intervals[m, j] = _DirectVarImpl("NewIntervalVar",
+            (start_time[m,j], jobs_data[j,m], end_time[m,j], f"interval[{m},{j}]"), name=f"interval[{m},{j}]", novar=[1,3])
 #? intervals = directvar("NewIntervalVar", [start_time, jobs_data.T, end_time], shape=start_time.shape, name="interval")
 # this is not yet part of the model, can be surprising to user if they dont have nooverlap/cumul but still want s+d=e?
 # if allow adding to model:
@@ -52,7 +56,7 @@ for m in all_machines:
 
 # No overlap constraint: one starts before other one ends
 for j in all_jobs:
-    model += DirectConstraint("AddNoOverlap", (intervals[:,j]), novar=[0])
+    model += DirectConstraint("AddNoOverlap", (intervals[:,j]))
 
 # Precedence constraint per job
 for m1,m2 in combinations(all_machines,2): # [(0,1), (0,2), (1,2)]

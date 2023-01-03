@@ -370,17 +370,41 @@ class NegBoolView(_BoolVarImpl):
         return NegBoolView(self._bv.deepcopy(memodict))
 
 
-class DirectVar(_NumVarImpl):
+class _DirectVarImpl(Expression):
     """
-        Custom solver variable not supported by CPMpy
+        A DirectVar will directly call a function of the underlying solver when added to a CPMpy solver,
+        and store the solver's response as identifier like it does for other variables.
+
+        It can be used in DirectConstraints just like you use other CPMpy variables.
+
+        Do not create this object directly, use `directvar()` instead
+
+        See `examples/jobshop_ortools.py` for an example.
     """
-    def __init__(self, name, args, arg_novar=[]):
-        self.name = name
-        self.args = args
-        self.arg_novar = arg_novar
+    counter = 0
+
+    def __init__(self, directname, argtuple, novar=None, name=None):
+        """
+            directname: name of the solver function that you wish to call
+            argtuple: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `argtuple` that contain no variables,
+                   that can be passed 'as is' without scanning for variables
+            name: name of the variable
+        """
+        if name is None:
+            name = "DV{}".format(_DirectVarImpl.counter)
+            _DirectVarImpl.counter = _DirectVarImpl.counter + 1 # static counter
+
+        if not isinstance(argtuple, tuple):
+            argtuple = (argtuple,)  # force tuple
+        super().__init__(name, argtuple)
+
+        self.directname = directname
+        self.novar = novar
 
     def __str__(self):
-        return f"{self.name}({str(self.args)})"
+        return f"{self.name}:{self.directname}({str(self.args)})"
+
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):

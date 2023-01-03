@@ -5,7 +5,7 @@ Variables are ordered by appearance, e.g. first encountered first
 """
 import warnings # for deprecation warning
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl,NegBoolView,DirectVar
+from ..expressions.variables import _NumVarImpl,NegBoolView,_DirectVarImpl
 from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
@@ -31,10 +31,6 @@ def get_variables(expr):
     """
         Get variables of an expression
     """
-    if isinstance(expr, DirectVar):
-        # custom variables, extract internal CPMpy variables
-        return get_variables([a for i,a in enumerate(expr.args) if i not in expr.arg_novar])
-
     if isinstance(expr, NegBoolView):
         # this is just a view, return the actual variable
         return [expr._bv]
@@ -42,6 +38,10 @@ def get_variables(expr):
     if isinstance(expr, _NumVarImpl):
         # a real var, do our thing
         return [expr]
+
+    if isinstance(expr, _DirectVarImpl):
+        # custom variables, extract internal CPMpy variables
+        return get_variables([a for i,a in enumerate(expr.args) if expr.novar is not None and i not in expr.novar])
 
     vars_ = []
     # if list or Expr: recurse

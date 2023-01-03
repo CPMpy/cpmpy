@@ -496,23 +496,17 @@ class Cumulative(GlobalConstraint):
 
 class DirectConstraint(Expression):
     """
-        A constraint whose name corresponds to a native solver API function,
-        and whose arguments match those of the solver function.
+        A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
 
-        A solver interface will map the arguments to native solver variables
-        where possible, and will call the native API function.
+        It can not be reified, it is not flattened. When added to a CPMpy solver, it will literally just call
+        a function of the underlying solver, replacing CPMpy variables by solver variables along the way.
+
+        If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
+        then use `directvar()` instead, or access the solver object from the solver interface directly.
     """
     # is_bool: whether this is normal constraint (True or False)
     def __init__(self, name, argtuple, novar=None):
         """
-            A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
-
-            It can not be reified, it is not flattened. When added to a CPMpy solver, it will literally just call
-            a function of the underlying solver, replacing CPMpy variables by solver variables along the way.
-
-            If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
-            then use `directvar()` instead, or access the solver object from the solver interface directly.
-
             name: name of the solver function that you wish to call
             argtuple: tuple of arguments to pass to the solver function with name 'name'
             novar: list of indices (offset 0) of arguments in `argtuple` that contain no variables,
