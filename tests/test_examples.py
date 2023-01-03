@@ -34,16 +34,16 @@ class TestExamples(unittest.TestCase):
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)
 
-    # run again with gurobi
-    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
-        return
-
+    # run again with gurobi, if installed on system
     gbi_slv = SolverLookup.lookup("gurobi")
+    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
+        # exclude those, too slow or solver specific
+        return
     if gbi_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers
+        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
         f = SolverLookup.base_solvers
         try:
-            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]
+            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]+f()
             loader.exec_module(mod)
         finally:
             SolverLookup.base_solvers = f
@@ -54,10 +54,10 @@ class TestExamples(unittest.TestCase):
         return
     mzn_slv = SolverLookup.lookup('minizinc')
     if mzn_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers
+        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
         f = SolverLookup.base_solvers
         try:
-            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]
+            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]+f()
             loader.exec_module(mod)
         finally:
             SolverLookup.base_solvers = f
