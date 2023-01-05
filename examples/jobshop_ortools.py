@@ -42,14 +42,17 @@ model = SolverLookup.get("ortools")
 from cpmpy.expressions.variables import _DirectVarImpl
 
 # make intervalvars... ensures start + dur = end
-intervals = np.zeros(shape=(machines_count,jobs_count), dtype=object)
-for m in all_machines:
-    for j in all_jobs:
-        #intervals[m,j] = model.ort_model.NewIntervalVar(
-        #    model.solver_var(start_time[m,j]), jobs_data[j,m], model.solver_var(end_time[m,j]), f"interval[{m},{j}]")
-        intervals[m, j] = _DirectVarImpl("NewIntervalVar",
-            (start_time[m,j], jobs_data[j,m], end_time[m,j], f"interval[{m},{j}]"), name=f"interval[{m},{j}]", novar=[1,3])
-#? intervals = directvar("NewIntervalVar", [start_time, jobs_data.T, end_time], shape=start_time.shape, name="interval")
+factory = True
+if factory:
+    intervals = directvar("NewIntervalVar", (start_time, jobs_data.T, end_time), novar=[1], shape=start_time.shape, name="interval", insert_name_at_index=3)
+else:
+    intervals = np.zeros(shape=(machines_count,jobs_count), dtype=object)
+    for m in all_machines:
+        for j in all_jobs:
+            #intervals[m,j] = model.ort_model.NewIntervalVar(
+            #    model.solver_var(start_time[m,j]), jobs_data[j,m], model.solver_var(end_time[m,j]), f"interval[{m},{j}]")
+            intervals[m, j] = _DirectVarImpl("NewIntervalVar",
+                (start_time[m,j], jobs_data[j,m], end_time[m,j], f"interval[{m},{j}]"), name=f"interval[{m},{j}]", novar=[1,3])
 # this is not yet part of the model, can be surprising to user if they dont have nooverlap/cumul but still want s+d=e?
 # if allow adding to model:
 #? model += intervals

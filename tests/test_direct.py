@@ -22,7 +22,7 @@ class TestDirectORTools(unittest.TestCase):
         model = SolverLookup.get("ortools")
 
         model += DirectConstraint(name="AddAutomaton",
-                                  argtuple=(trans_vars,0,[2],trans_tabl), novar=[1,2,3])
+                                  arguments=(trans_vars, 0, [2], trans_tabl), novar=[1, 2, 3])
 
         self.assertEqual(model.solveAll(), 6)
 
@@ -31,14 +31,13 @@ class TestDirectORTools(unittest.TestCase):
         interval1_args = intvar(3,10, shape=3)
         interval2_args = intvar(2,10, shape=3)
 
-        from cpmpy.expressions.variables import _DirectVarImpl
-        interval1 = _DirectVarImpl("NewIntervalVar", tuple(list(interval1_args)+["itv1"]), name="itv1", novar=[3])
-        interval2 = _DirectVarImpl("NewIntervalVar", tuple(list(interval2_args)+["itv1"]), name="itv2", novar=[3])
+        interval1 = directvar("NewIntervalVar", interval1_args, name="ITV1", insert_name_at_index=3)
+        interval2 = directvar("NewIntervalVar", interval2_args, name="ITV2", insert_name_at_index=3)
 
         solver = SolverLookup.get("ortools")
 
         solver += DirectConstraint(name="AddNoOverlap",
-                                   argtuple=([interval1, interval2]))
+                                   arguments=([interval1, interval2]))
 
         assert solver.solve()
 
@@ -58,7 +57,7 @@ class TestDirectGurobi(unittest.TestCase):
         model = SolverLookup.get("gurobi")
 
         model += DirectConstraint(name="addGenConstraintPoly",
-                                  argtuple=(x,y,p), novar=[2])
+                                  arguments=(x, y, p), novar=[2])
 
         self.assertTrue(model.solve())
 

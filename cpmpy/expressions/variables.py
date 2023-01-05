@@ -51,7 +51,7 @@ from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist
+from .utils import is_num, is_int, flatlist, is_any_list
 
 
 def BoolVar(shape=1, name=None):
@@ -172,6 +172,84 @@ def intvar(lb, ub, shape=1, name=None):
     data = np.array([_IntVarImpl(lb,ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
+
+
+def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name_at_index=None):
+    """
+        Direct decision variables call a function of the underlying solver when added to a CPMpy solver,
+        and store the solver's response as identifier like it does for other CPMpy variables.
+
+        You can create them at any shape and give them names like other CPMpy variables. They can be used
+        in DirectConstraints just like you use other CPMpy variables.
+
+        Parameters:
+            directname: name of the solver function that you wish to call
+            arguments: tuple of arguments to pass to the solver function with name 'name', see vectorized arguments below
+            novar: list of indices (offset 0, of supplied `arguments`) of arguments that contain no variables,
+                   that can be passed 'as is' without scanning for variables
+            shape: the shape of the n-dimensional array of variables (int, default: 1)
+            name: name of the CPMpy variable, in case of n-dimensional array will automatically have index appended
+            insert_name_at_index: if not None then the name of the variable will be inserted at this position
+                                  of the argument list (and `novar` will be updated accordingly)
+
+        Vectorized arguments: any argument that is a numpy ndarray and that has the same shape as the 'shape' parameter.
+        will be assumed to be a vectorized parameter meaning that every variable will only get the parameter at the
+        corresponding index. If you don't want this, use a plain Python array as argument.
+        
+        Example of vectorized effect:
+        ```
+        begin = intvar(1,9, shape=(2,2), name="begin")
+        end = intvar(1,9, shape=(2,2), name="end")
+        size = 3*np.ones(shape=(2,2))
+        directvar("IntervalVar", (begin, size, end), shape=(2,2), name="ITV")
+        ```
+        
+        will create 4 direct variables:
+            ITV[0,0]:"IntervalVar"(begin[0,0], 3, end[0,0])
+            ITV[0,1]:"IntervalVar"(begin[0,1], 3, end[0,1])
+            ITV[1,0]:"IntervalVar"(begin[1,0], 3, end[1,0])
+            ITV[1,1]:"IntervalVar"(begin[1,1], 3, end[1,1])
+
+        If name is None then a name 'DV<unique number>' will be assigned to it.
+
+        If shape is different from 1, then each element of the array will have the location
+        of this specific variable in the array append to its name.
+    """
+    if shape == 0 or shape is None:
+        raise NullShapeError(shape)
+
+    # update the novar list if a name will be inserted later
+    if insert_name_at_index is not None:
+        if novar is None:
+            novar = [insert_name_at_index]
+        else:
+            assert(isinstance(novar, (list, tuple)))
+            # increase indices at and above insert by 1
+            novar = [insert_name_at_index] + [i if i < insert_name_at_index else i+1 for i in novar]
+
+    if shape == 1:
+        if insert_name_at_index is not None:
+            arguments = list(arguments)  # makes copy, ensures list
+            arguments.insert(insert_name_at_index, name)
+        return _DirectVarImpl(directname, arguments, novar=novar, name=name)
+    else:
+        data = []
+        for idxs in np.ndindex(shape):
+            subname = _genname(name, idxs)
+            subargs = []
+            for arg in arguments:
+                if isinstance(arg, np.ndarray) and arg.shape == shape:
+                    # same shape, assume vectorized argument and take only single element
+                    subargs.append(arg[idxs])
+                else:
+                    subargs.append(arg)
+            if insert_name_at_index is not None:
+                subargs.insert(insert_name_at_index, subname)
+            data.append(_DirectVarImpl(directname, subargs, novar=novar, name=subname))
+
+        # insert into custom ndarray
+        return NDVarArray(shape, dtype=object, buffer=np.array(data))
+
 
 def cparray(arr):
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
@@ -372,32 +450,30 @@ class NegBoolView(_BoolVarImpl):
 
 class _DirectVarImpl(Expression):
     """
-        A DirectVar will directly call a function of the underlying solver when added to a CPMpy solver,
+        A `_DirectVarImpl` will directly call a function of the underlying solver when added to a CPMpy solver,
         and store the solver's response as identifier like it does for other variables.
 
         It can be used in DirectConstraints just like you use other CPMpy variables.
 
-        Do not create this object directly, use `directvar()` instead
-
-        See `examples/jobshop_ortools.py` for an example.
+        Do not create this object manually, use `directvar()` instead.
     """
     counter = 0
 
-    def __init__(self, directname, argtuple, novar=None, name=None):
+    def __init__(self, directname, arguments, novar=None, name=None):
         """
             directname: name of the solver function that you wish to call
-            argtuple: tuple of arguments to pass to the solver function with name 'name'
-            novar: list of indices (offset 0) of arguments in `argtuple` that contain no variables,
+            arguments: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `arguments` that contain no variables,
                    that can be passed 'as is' without scanning for variables
-            name: name of the variable
+            name: name of the CPMpy variable
         """
         if name is None:
             name = "DV{}".format(_DirectVarImpl.counter)
             _DirectVarImpl.counter = _DirectVarImpl.counter + 1 # static counter
 
-        if not isinstance(argtuple, tuple):
-            argtuple = (argtuple,)  # force tuple
-        super().__init__(name, argtuple)
+        if not is_any_list(arguments):
+            arguments = (arguments,)  # force tuple
+        super().__init__(name, arguments)
 
         self.directname = directname
         self.novar = novar

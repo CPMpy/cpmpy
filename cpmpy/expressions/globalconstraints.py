@@ -505,16 +505,16 @@ class DirectConstraint(Expression):
         then use `directvar()` instead, or access the solver object from the solver interface directly.
     """
     # is_bool: whether this is normal constraint (True or False)
-    def __init__(self, name, argtuple, novar=None):
+    def __init__(self, name, arguments, novar=None):
         """
             name: name of the solver function that you wish to call
-            argtuple: tuple of arguments to pass to the solver function with name 'name'
-            novar: list of indices (offset 0) of arguments in `argtuple` that contain no variables,
+            arguments: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `arguments` that contain no variables,
                    that can be passed 'as is' without scanning for variables
         """
-        if not isinstance(argtuple, tuple):
-            argtuple = (argtuple,)  # force tuple
-        super().__init__(name, argtuple)
+        if not isinstance(arguments, tuple):
+            arguments = (arguments,)  # force tuple
+        super().__init__(name, arguments)
         self.novar = novar
 
     def is_bool(self):
