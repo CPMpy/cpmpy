@@ -101,6 +101,7 @@
         Element
 
 """
+import copy
 import warnings # for deprecation warning
 import numpy as np
 
@@ -521,6 +522,27 @@ class DirectConstraint(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return True
+
+    def callSolver(self, CPMpy_solver, Native_solver):
+        """
+            Call the `directname`() function of the native solver,
+            with stored arguments replacing CPMpy variables with solver variables as needed.
+
+            SolverInterfaces will call this function when this constraint is added.
+
+        :param CPMpy_solver: a CPM_solver object, that has a `solver_vars()` function
+        :param Native_solver: the python interface to some specific solver
+        :return: the response of the solver when calling the function
+        """
+        # get the solver function, will raise an AttributeError if it does not exist
+        solver_function = getattr(Native_solver, self.name)
+        solver_args = copy.copy(self.args)
+        for i in range(len(solver_args)):
+            if self.novar is None or i not in self.novar:
+                # it may contain variables, replace
+                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+        # len(native_args) should match nr of arguments of `native_function`
+        return solver_function(*solver_args)
 
     def deepcopy(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)

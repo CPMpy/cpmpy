@@ -46,7 +46,7 @@
     Module details
     ==============
 """
-
+import copy
 from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
@@ -481,6 +481,26 @@ class _DirectVarImpl(Expression):
     def __str__(self):
         return f"{self.name}:{self.directname}({str(self.args)})"
 
+    def callSolver(self, CPMpy_solver, Native_solver):
+        """
+            Call the `directname`() function of the native solver,
+            with stored arguments replacing CPMpy variables with solver variables as needed.
+            
+            SolverInterfaces will call this function when this variable is added.
+
+        :param CPMpy_solver: a CPM_solver object, that has a `solver_vars()` function
+        :param Native_solver: the python interface to some specific solver
+        :return: the response of the solver when calling the function
+        """
+        # get the solver function, will raise an AttributeError if it does not exist
+        solver_function = getattr(Native_solver, self.directname)
+        solver_args = copy.copy(self.args)
+        for i in range(len(solver_args)):
+            if self.novar is None or i not in self.novar:
+                # it may contain variables, replace
+                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+        # len(native_args) should match nr of arguments of `native_function`
+        return solver_function(*solver_args)
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):

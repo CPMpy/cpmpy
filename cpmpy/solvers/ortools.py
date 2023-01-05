@@ -231,15 +231,7 @@ class CPM_ortools(SolverInterface):
         # create if it does not exit
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _DirectVarImpl):
-                # get the solver function, will raise an AttributeError if it does not exist
-                solver_function = getattr(self.ort_model, cpm_var.directname)
-                solver_args = copy.copy(cpm_var.args)
-                for i in range(len(solver_args)):
-                    if cpm_var.novar is None or i not in cpm_var.novar:
-                        # it may contain variables, replace
-                        solver_args[i] = self.solver_vars(solver_args[i])
-                # len(native_args) should match nr of arguments of `native_function`
-                revar = solver_function(*solver_args)
+                revar = cpm_var.callSolver(self, self.ort_model)
             elif isinstance(cpm_var, _BoolVarImpl):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
@@ -450,16 +442,7 @@ class CPM_ortools(SolverInterface):
             return None # will throw error if used in reification
 
         elif isinstance(cpm_expr, DirectConstraint):
-            # dynamic mapping of cpm_expr.name to API call, see #74
-            # get the solver function, will raise an AttributeError if it does not exist
-            solver_function = getattr(self.ort_model, cpm_expr.name)
-            solver_args = copy.copy(cpm_expr.args)
-            for i in range(len(solver_args)):
-                if cpm_expr.novar is None or i not in cpm_expr.novar:
-                    # it may contain variables, replace
-                    solver_args[i] = self.solver_vars(solver_args[i])
-            # len(native_args) should match nr of arguments of `native_function`
-            return solver_function(*solver_args)
+            return cpm_expr.callSolver(self, self.ort_model)
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
