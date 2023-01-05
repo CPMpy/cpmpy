@@ -53,9 +53,9 @@ else:
             #    model.solver_var(start_time[m,j]), jobs_data[j,m], model.solver_var(end_time[m,j]), f"interval[{m},{j}]")
             intervals[m, j] = _DirectVarImpl("NewIntervalVar",
                 (start_time[m,j], jobs_data[j,m], end_time[m,j], f"interval[{m},{j}]"), name=f"interval[{m},{j}]", novar=[1,3])
-# this is not yet part of the model, can be surprising to user if they dont have nooverlap/cumul but still want s+d=e?
-# if allow adding to model:
-#? model += intervals
+# this is not yet part of the model, can be surprising to user if they dont have nooverlap/cumul but still want s+d=e
+# so if you don't use them later in constraints, you can also post them directly:
+#model += intervals
 
 # No overlap constraint: one starts before other one ends
 for j in all_jobs:

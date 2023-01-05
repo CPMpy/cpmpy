@@ -347,6 +347,11 @@ class CPM_ortools(SolverInterface):
         if isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
 
+        elif isinstance(cpm_expr, _DirectVarImpl):
+            # another base case; some variables are also constraints so it should be possible to add them,
+            # even if not used in a traditional constraint
+            return self.solver_var(cpm_expr)
+
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, 'xor'/n, '->'/2
