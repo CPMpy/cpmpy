@@ -46,18 +46,6 @@ def only_numexpr_equality(constraints, supported=frozenset(["sum","wsum"])):
     return newcons
 
 
-def is_not_boolexpr(expr):
-    '''
-    Needed because calling is_bool on an integer is undefined
-    '''
-    if is_bool(expr):
-        return False
-    elif is_num(expr):
-        return True
-    else:
-        return not expr.is_bool()
-
-
 def nbc_main(constraints):
     '''
     Input must be a list of 2 elements, where the first one keeps track of assignment of helper IV's that should not be
@@ -69,7 +57,7 @@ def nbc_main(constraints):
     if isinstance(con, Comparison):
         lhs, rhs = con.args
         if con.name == '==' or con.name == '!=':
-            if is_not_boolexpr(rhs) and lhs.is_bool():
+            if not is_boolexpr(rhs) and lhs.is_bool():
                 #introduce aux var
                 iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
                 #deal with nested constraints

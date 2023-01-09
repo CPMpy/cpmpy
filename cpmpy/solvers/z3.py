@@ -25,22 +25,9 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
-from ..expressions.utils import is_num, is_any_list, is_bool
+from ..expressions.utils import is_num, is_any_list, is_bool, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
-
-
-def is_boolexpr(expr):
-    #boolexpr
-    if hasattr(expr, 'is_bool'):
-        if expr.is_bool():
-            return True
-    #boolean constant
-    else:
-        if is_bool(expr):
-            return True
-    #everything else
-    return False
 
 
 class CPM_z3(SolverInterface):
