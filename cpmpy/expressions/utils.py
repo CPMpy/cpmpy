@@ -41,14 +41,9 @@ def is_bool(arg):
 def is_boolexpr(expr):
     #boolexpr
     if hasattr(expr, 'is_bool'):
-        if expr.is_bool():
-            return True
+        return expr.is_bool()
     #boolean constant
-    else:
-        if is_bool(expr):
-            return True
-    #everything else
-    return False
+    return is_bool(expr)
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
