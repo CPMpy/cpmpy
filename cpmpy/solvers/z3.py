@@ -28,7 +28,20 @@ from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
-from z3 import BoolRef
+
+
+def is_boolexpr(expr):
+    #boolexpr
+    if hasattr(expr, 'is_bool'):
+        if expr.is_bool():
+            return True
+    #boolean constant
+    else:
+        if is_bool(expr):
+            return True
+    #everything else
+    return False
+
 
 class CPM_z3(SolverInterface):
     """
@@ -286,36 +299,13 @@ class CPM_z3(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_con, Operator):
-            #arguments kan be lists because of auxiliary intvars. first element is assignments, just add those with and
-            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
-                z3args = self._z3_expr(cpm_con.args)
-                for i in range(len(z3args)):
-                    if is_any_list(z3args[i]):
-                        z3args[i] = z3.And(z3args[i])
-                return z3.And(z3args)
+                return z3.And(self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'or':
-                z3args = self._z3_expr(cpm_con.args)
-                olhs = None
-                for i in range(len(z3args)):
-                    if is_any_list(z3args[i]):
-                        olhs = z3args[i][0]
-                        z3args[i] = z3args[i][1]
-                if olhs is None:
-                    return z3.Or(z3args)
-                else:
-                    return z3.And(z3.Or(z3args), olhs)
+                return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                z3args = self._z3_expr(cpm_con.args, reify=True)
-                olhs = None
-                for i in range(len(z3args)):
-                    if is_any_list(z3args[i]):
-                        olhs = z3args[i][0]
-                        z3args[i] = z3args[i][1]
-                if olhs is None:
-                    return z3.Implies(*z3args)
-                else:
-                    return z3.And(z3.Implies(*z3args), olhs)
+                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -392,23 +382,12 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-
-                #comparing a boolexpr with an integer or float:
-                if is_num(rhs) and not is_bool(rhs) and lhs.is_bool():
-                    iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
-                    mhs = self._z3_expr(iv)  # turn into z3 expression
-                    lhs, rhs = self._z3_expr(cpm_con.args)
-                    if is_any_list(lhs):
-                        olhs = lhs[0]
-                        orhs = lhs[1]
-                        #keep auxiliary assignments in the first element of the list
-                        return [z3.And(olhs, orhs == mhs), mhs == rhs]
-                    else:
-                        return [lhs == mhs, mhs == rhs]
+                # '==' is not supported between a boolean expression and an arithmetic expression
+                if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
                 else:
-                    lhs, rhs = self._z3_expr(cpm_con.args)
-                if is_any_list(lhs):
-                    return z3.And(lhs[1] == rhs, lhs[0])
+                    lhs = self._z3_expr(lhs)
+                rhs = self._z3_expr(rhs)
                 return (lhs == rhs)
 
 
@@ -419,60 +398,35 @@ class CPM_z3(SolverInterface):
                 new_var, cons = get_or_make_var(rhs)
                 return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, lhs, new_var)))
 
-            # other comparisons
-            lhs, rhs = self._z3_expr(cpm_con.args)
-
-            # Z3 does not support some comparisons on boolrefs. Introduce an intvar to solve this problem
-            if isinstance(lhs, BoolRef):
-                iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
-                mhs = self._z3_expr(iv)  # turn into z3 expression
-                if cpm_con.name == '!=':  #this is supported between boolrefs, not between boolref and int
-                    if isinstance(rhs, BoolRef):
-                        return (lhs != rhs)
-                    else:
-                        return [lhs == mhs, mhs != rhs]
-                if cpm_con.name == '<=':
-                    return [(lhs == mhs), (mhs <= rhs)]
-                elif cpm_con.name == '<':
-                    return [(lhs == mhs), (mhs < rhs)]
-                elif cpm_con.name == '>=':
-                    return [(lhs == mhs), (mhs >= rhs)]
-                elif cpm_con.name == '>':
-                    return [(lhs == mhs), (mhs > rhs)]
-
-            #if nested comparisons
-            elif is_any_list(lhs):
-                olhs = lhs[0]
-                orhs = lhs[1]
-                iv = _IntVarImpl(0, 1)  # 0,1 is the valid domain, as this represents true or false
-                mhs = self._z3_expr(iv)  # turn into z3 expression
-                if cpm_con.name == '!=':  #this is supported between boolrefs, not between boolref and int
-                    if isinstance(rhs, BoolRef):
-                        return [olhs, (orhs != rhs)]
-                    else:
-                        return [z3.And(olhs, orhs == mhs), mhs != rhs]
-                if cpm_con.name == '<=':
-                    return [z3.And(olhs, orhs == mhs), mhs <= rhs]
-                elif cpm_con.name == '<':
-                    return [z3.And(olhs, orhs == mhs), mhs < rhs]
-                elif cpm_con.name == '>=':
-                    return [z3.And(olhs, orhs == mhs), mhs >= rhs]
-                elif cpm_con.name == '>':
-                    return [z3.And(olhs, orhs == mhs), mhs > rhs]
-
+            # other comparisons are not supported on boolrefs, so convert with if then else
+            # only '!=' is supported between 2 boolrefs
+            if cpm_con.name == '!=':
+                if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
+                else:
+                    lhs = self._z3_expr(lhs)
+                rhs = self._z3_expr(rhs)
+                return (lhs != rhs)
             else:
-                # post the comparison
-                if cpm_con.name == '<=':
-                    return (lhs <= rhs)
-                elif cpm_con.name == '<':
-                    return (lhs < rhs)
-                elif cpm_con.name == '>=':
-                    return (lhs >= rhs)
-                elif cpm_con.name == '>':
-                    return (lhs > rhs)
-                elif cpm_con.name == '!=':
-                    return (lhs != rhs)
+                if is_boolexpr(lhs):
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
+                else:
+                    lhs = self._z3_expr(lhs)
 
+                if is_boolexpr(rhs):
+                    rhs = z3.If(self._z3_expr(rhs), 1, 0)
+                else:
+                    rhs = self._z3_expr(rhs)
+
+            # post the comparison
+            if cpm_con.name == '<=':
+                return (lhs <= rhs)
+            elif cpm_con.name == '<':
+                return (lhs < rhs)
+            elif cpm_con.name == '>=':
+                return (lhs >= rhs)
+            elif cpm_con.name == '>':
+                return (lhs > rhs)
 
         # TODO:
         # table
