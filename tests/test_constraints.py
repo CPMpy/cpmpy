@@ -3,24 +3,33 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
-SOLVERNAME = None
+# CHANGE THIS if you want test a different solver
+#   make sure that `SolverLookup.get(SOLVERNAME)` works
+# also add exclusions to the 3 EXCLUDE_* below as needed
+SOLVERNAME = "ortools"
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent"}}
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"}}
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {"xor", "element"},
-                "z3": {"min", "max", "abs"}} # TODO this will become emtpy after resolving issue #105
+                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
+                }
+
+
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
@@ -88,7 +97,7 @@ def comp_constraints():
 def bool_exprs():
     """
         Generate all boolean expressions:
-        - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
     """
     if SOLVERNAME is None:
@@ -118,29 +127,30 @@ def bool_exprs():
 def global_constraints():
     """
         Generate all global constraints
-        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element
+        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
+           Xor, Cumulative
     """
     if SOLVERNAME is None:
         return
+
+    if SOLVERNAME not in EXCLUDE_GLOBAL:
+        # add with no exclusions
+        EXCLUDE_GLOBAL[SOLVERNAME] = {}
 
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
     # TODO: add Circuit
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
-        if SOLVERNAME not in EXCLUDE_GLOBAL or \
-                cons.name not in EXCLUDE_GLOBAL[SOLVERNAME]:
+        if cons.name not in EXCLUDE_GLOBAL[SOLVERNAME]:
             yield cons
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "element" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "element" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         yield cpm_array(NUM_ARGS)[NUM_VAR]
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "xor" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "xor" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         yield Xor(BOOL_ARGS)
 
-    if SOLVERNAME not in EXCLUDE_GLOBAL or \
-            "cumulative" not in EXCLUDE_GLOBAL[SOLVERNAME]:
+    if "cumulative" not in EXCLUDE_GLOBAL[SOLVERNAME]:
         s = intvar(0,10,shape=3,name="start")
         e = intvar(0,10,shape=3,name="end")
         dur = [1,4,3]

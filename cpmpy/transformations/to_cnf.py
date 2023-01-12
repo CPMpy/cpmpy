@@ -16,8 +16,7 @@ from .flatten_model import flatten_constraint, negated_normal
   - BV with BV a BoolVar (or NegBoolView)
   - or([BV]) constraint
   - and([BV]) constraint
-  - xor(BV,BV) constraint (length-2 only for now)
-  - BE != BV  with BE :: BV|or()|and()|xor()|BV!=BV|BV==BV|BV->BV
+  - BE != BV  with BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV
   - BE == BV
   - BE -> BV
   - BV -> BE
@@ -55,8 +54,7 @@ def flat2cnf(constraints):
   - BV with BV a BoolVar (or NegBoolView)
   - or([BV]) constraint
   - and([BV]) constraint
-  - xor(BV,BV) constraint (length-2 only for now)
-  - BE != BV  with BE :: BV|or()|and()|xor()|BV!=BV|BV==BV|BV->BV
+  - BE != BV  with BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV
   - BE == BV
   - BE -> BV
   - BV -> BE
@@ -93,17 +91,7 @@ def flat2cnf(constraints):
             cnf += expr.args
             continue
 
-        # xor() constraints
-        elif isinstance(expr, GlobalConstraint) and expr.name == "xor":
-            if len(expr.args) == 2:
-                a0,a1 = expr.args
-                cnf += flat2cnf([(a0|a1), (~a0|~a1)]) # one true and one false
-                continue
-            else:
-                cnf += to_cnf(expr.decompose())
-                continue
-
-        # BE != BE (same as xor)
+        # BE != BE
         elif isinstance(expr, Comparison) and expr.name == "!=" and expr.args[0].is_bool():
             a0,a1 = expr.args
             # using 'implies' means it will recursively work for BE's too
