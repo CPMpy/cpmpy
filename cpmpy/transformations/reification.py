@@ -56,14 +56,30 @@ def only_bv_implies(constraints):
                 isinstance(cpm_expr.args[1], _BoolVarImpl):
             # BV == BV special case
             if isinstance(cpm_expr.args[0], _BoolVarImpl):
-                l,r = cpm_expr.args
+                l, r = cpm_expr.args
                 newcons.append(l.implies(r))
                 newcons.append(r.implies(l))
             else:
                 # BE == BV :: ~BV -> ~BE, BV -> BE
-                expr,bvar = cpm_expr.args
+                expr, bvar = cpm_expr.args
                 newcons.append((~bvar).implies(negated_normal(expr)))
                 newcons.append(bvar.implies(expr))
+
+        elif isinstance(cpm_expr, Comparison) and \
+                cpm_expr.name == '==' and \
+                cpm_expr.args[0].is_bool() and \
+                isinstance(cpm_expr.args[1], _NumVarImpl):
+            #BV = IV
+            if isinstance(cpm_expr.args[0], _BoolVarImpl):
+                newcons.append(cpm_expr)
+
+            #BE == IV :: IV = BV, ~BV -> ~BE, BV -> BE
+            else:
+                expr, ivar = cpm_expr.args
+                bv = _BoolVarImpl()
+                newcons.append(Comparison('==',bv,ivar))
+                newcons.append((~bv).implies(negated_normal(expr)))
+                newcons.append(bv.implies(expr))
 
         else:
             # all other flat normal form expressions are fine
