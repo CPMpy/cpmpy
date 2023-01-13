@@ -1,8 +1,8 @@
 import copy
 
 from .flatten_model import get_or_make_var
-from ..expressions.core import Comparison, Operator
-from ..expressions.variables import _NumVarImpl, _IntVarImpl
+from ..expressions.core import Comparison
+from ..expressions.variables import _NumVarImpl
 
 """
   Transformations regarding Comparison constraints.
