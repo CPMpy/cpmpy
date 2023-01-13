@@ -367,6 +367,7 @@ class CPM_z3(SolverInterface):
 
                 # '==' is not supported between a boolean expression and an arithmetic expression
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    # lhs is bool and rhs is arith, make lhs also arith
                     lhs = z3.If(self._z3_expr(lhs), 1, 0)
                 else:
                     lhs = self._z3_expr(lhs)
@@ -385,6 +386,7 @@ class CPM_z3(SolverInterface):
             # only '!=' is supported between 2 boolrefs
             if cpm_con.name == '!=':
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    # lhs is bool and rhs is arith, make lhs also arith
                     lhs = z3.If(self._z3_expr(lhs), 1, 0)
                 else:
                     lhs = self._z3_expr(lhs)
