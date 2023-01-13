@@ -253,13 +253,9 @@ class CPM_z3(SolverInterface):
         if is_any_list(cpm_expr):
             for con in cpm_expr:
                 self._post_constraint(con)
-
         # translate each expression tree, then post straight away
-        z3_cons = self._z3_expr(cpm_expr)
-        if is_any_list(z3_cons):
-            for z3_con in z3_cons:
-                self.z3_solver.add(z3_con)
         else:
+            z3_cons = self._z3_expr(cpm_expr)
             return self.z3_solver.add(z3_cons)
 
     def _z3_expr(self, cpm_con, reify=False):
