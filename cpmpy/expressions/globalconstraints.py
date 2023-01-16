@@ -317,7 +317,7 @@ class Maximum(GlobalConstraint):
         return Maximum(copied_args)
 
 def element(arg_list):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 class Element(GlobalConstraint):
@@ -522,3 +522,23 @@ def global_cardinality_count(a,gcc):
     return [count(a,i,v) for i, v in enumerate(gcc)]
     #return [Count(a,i) == v for i, v in enumerate(gcc)]
 
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except_0", flatlist(args))
+
+    def decompose(self):
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        return len(set(a.value() for a in self.args if a.value() != 0)) == len([a.value for a in self.args if a.value() != 0])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferentExcept0(*copied_args)
