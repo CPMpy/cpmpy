@@ -23,6 +23,7 @@
 
         CPM_minizinc
 """
+import warnings
 import numpy as np
 import sys
 from datetime import timedelta # for mzn's timeout
@@ -169,7 +170,8 @@ class CPM_minizinc(SolverInterface):
             if sys.platform == "win32" or sys.platform == "cygwin": #path error can occur in windows
                 path = os.environ.get("path")
                 if "MiniZinc" in str(path):
-                    raise MinizincPathException('You might have the wrong minizinc PATH set (windows user Environment Variables')
+                    warnings.warn('You might have the wrong minizinc PATH set (windows user Environment Variables')
+                    raise e
                 else:
                     raise MinizincPathException("Please add your minizinc installation folder to the user Environment PATH variable")
             else:
