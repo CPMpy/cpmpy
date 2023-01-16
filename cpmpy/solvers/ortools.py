@@ -408,6 +408,10 @@ class CPM_ortools(SolverInterface):
                     assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
                     b = self.solver_var(lhs.args[0])
                     return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                else:
+                    #decompose a numerical global constraint that is not natively supported (ie count)
+                    self += lhs.decompose_comparison(cpm_expr.name, ortrhs)
+                    return None
             raise NotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 

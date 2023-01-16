@@ -503,6 +503,7 @@ class Cumulative(GlobalConstraint):
 # see commented use in gcc
 # for the decomposition to work, see `decompose_comparison()` of element.
 # then we would have `def atleast(n, vars, val): return Count(vars, val) >= n`
+#is in?
 def alldifferent_except_0(args):
     return [ ((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(args)]
 
@@ -521,6 +522,37 @@ def global_cardinality_count(a,gcc):
     assert (len(gcc) == ub+1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub+1}"
     return [count(a,i,v) for i, v in enumerate(gcc)]
     #return [Count(a,i) == v for i, v in enumerate(gcc)]
+
+class Count(GlobalConstraint):
+    """
+    The Count (numerical) global constraint represents the number of occurrences of val in arr
+    """
+
+    def __init__(self,arr,val):
+        super().__init__("count", [arr,val], is_bool=False)
+
+    def value(self):
+        arr, val = self.args
+        val = argval(val)
+        argvals = [argval(a) for a in arr]
+        return sum([argv == val for argv in argvals])
+
+    def deepcopy(self, memodict={}):
+        arr, val = self._deepcopy_args(memodict)
+        return Count(arr, val)
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Count(arr,val) can only be decomposed if it's part of a comparison
+        """
+        from .python_builtins import any
+
+        arr, val = self.args
+        return [any((eval_comparison(cmp_op, j, cmp_rhs) & (Operator('sum',arr == val) == j) for j in range(len(arr) + 1)))]
+
+    def __repr__(self):
+        return "Count({})".format(self.args)
+
 
 class AllDifferentExcept0(GlobalConstraint):
     """
