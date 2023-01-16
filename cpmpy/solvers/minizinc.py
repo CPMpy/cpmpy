@@ -90,7 +90,12 @@ class CPM_minizinc(SolverInterface):
                 solver_names.add(name)
         return solver_names
 
-
+    # variable name can not be any of these keywords
+    keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
+                          'elseif', 'endif', 'enum', 'false', 'float', 'function', 'if', 'in', 'include', 'int',
+                          'intersect', 'let', 'list', 'maximize', 'minimize', 'mod', 'not', 'of', 'op', 'opt', 'output',
+                          'par', 'predicate', 'record', 'satisfy', 'set', 'solve', 'string', 'subset', 'superset',
+                          'symdiff', 'test', 'then', 'true', 'tuple', 'type', 'union', 'var', 'where', 'xor'])
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -299,17 +304,12 @@ class CPM_minizinc(SolverInterface):
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
 
             #test if the name is a valid minizinc identifier
-            #name can not be any of these keywords
-            keywords = ['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
-                        'elseif', 'endif', 'enum', 'false', 'float', 'function', 'if', 'in', 'include', 'int',
-                        'intersect', 'let', 'list', 'maximize', 'minimize', 'mod', 'not', 'of', 'op', 'opt', 'output',
-                        'par', 'predicate', 'record', 'satisfy', 'set', 'solve', 'string', 'subset', 'superset',
-                        'symdiff', 'test', 'then', 'true', 'tuple', 'type', 'union', 'var', 'where', 'xor']
+
 
             if not self.mzn_name_pattern.search(mzn_var):
                 raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores. "
                                 "First character must be an alphabetic character")
-            if mzn_var in keywords:
+            if mzn_var in self.keywords:
                 raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
 
             if isinstance(cpm_var, _BoolVarImpl):
