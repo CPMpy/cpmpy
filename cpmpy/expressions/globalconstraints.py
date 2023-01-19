@@ -99,6 +99,8 @@
         Minimum
         Maximum
         Element
+        Xor
+        Cumulative
 
 """
 import copy
@@ -371,8 +373,7 @@ class Element(GlobalConstraint):
 
 class Xor(GlobalConstraint):
     """
-        The 'xor' constraint for more then 2 arguments.
-        Acts like cascaded xor operators with two inputs
+        The 'xor' exclusive-or constraint
     """
 
     def __init__(self, arg_list):
@@ -380,18 +381,18 @@ class Xor(GlobalConstraint):
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        i = 0  # length can change
-        while i < len(arg_list):
-            if isinstance(arg_list[i], Xor):
-                # merge args in at this position
-                arg_list[i:i + 1] = arg_list[i].args
-            else:
-                i += 1
         super().__init__("xor", arg_list)
 
     def decompose(self):
+        # there are multiple decompositions possible
+        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
+        # since Xor is logical constraint, the default is a logic decomposition
         if len(self.args) == 2:
-            return [(self.args[0] + self.args[1]) == 1]
+            a0, a1 = self.args
+            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+
+        # for more than 2 variables, we chain reified xors
+        # XXX this will involve many calls to the above decomp, shortcut?
         prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
         for arg in self.args[2:]:
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)

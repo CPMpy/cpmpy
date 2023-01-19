@@ -70,9 +70,6 @@ def linearize_constraint(cpm_expr):
             return [sum(cpm_expr.args) >= 1]
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
 
-    if cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
-        return [sum(cpm_expr.args) == 1]
-
     if cpm_expr.name == "->":
         cond, sub_expr = cpm_expr.args
         if not cond.is_bool() or not sub_expr.is_bool():
@@ -183,9 +180,17 @@ def linearize_constraint(cpm_expr):
                 c1 = (~rhs).implies(negated_normal(lhs))
                 c2 = rhs.implies(lhs)
                 return linearize_constraint(flatten_constraint([c1,c2]))
+        elif lhs.is_bool() and not isinstance(lhs, _BoolVarImpl) and isinstance(rhs,_NumVarImpl):
+            #boolexpr == intvar, so introduce an intermediate boolvar bv, boolexpr == bv, bv == intvar
+            bv = boolvar()
+            c1 = Comparison('==', lhs, bv)
+            c2 = Comparison('==', bv, rhs)
+            return linearize_constraint(flatten_constraint([c1, c2]))
 
+    if cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
+        return [sum(cpm_expr.args) == 1]
 
-    if cpm_expr.name == "alldifferent":
+    elif cpm_expr.name == "alldifferent":
         """
             More efficient implementations possible
             http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
