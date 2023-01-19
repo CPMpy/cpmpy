@@ -523,6 +523,36 @@ def global_cardinality_count(a,gcc):
     return [count(a,i,v) for i, v in enumerate(gcc)]
     #return [Count(a,i) == v for i, v in enumerate(gcc)]
 
+
+class GlobalCardinalityCount(GlobalConstraint):
+    """
+        GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
+    The array gcc must have elements 0..ub (so of size ub+1).
+        """
+
+    def __init__(self, a, gcc):
+        super().__init__("gcc", [a,gcc])
+
+    def decompose(self):
+        a, gcc = self.args
+        ub = max([v.ub for v in a])
+        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
+        return [Count(a, i) == v for i, v in enumerate(gcc)]
+
+
+    def value(self):
+        a, gcc = self.args
+        gval = [argval(y) for y in gcc]
+        return all([gval[i] == Count(a,i).value() for i in range(len(gcc))])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return GlobalCardinalityCount(*copied_args)
+
 class Count(GlobalConstraint):
     """
     The Count (numerical) global constraint represents the number of occurrences of val in arr
