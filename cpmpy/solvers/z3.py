@@ -345,6 +345,8 @@ class CPM_z3(SolverInterface):
             if isinstance(rhs, GlobalConstraint) and rhs.name == "element":
                 arr, idx = rhs.args
                 return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
+            if isinstance(lhs,GlobalConstraint) and lhs.name == "count":
+                return self._z3_expr(all(lhs.decompose_comparison(cpm_con.name, rhs)))
 
             if cpm_con.name == "==":
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
