@@ -242,8 +242,20 @@ class Circuit(GlobalConstraint):
         return Circuit(*copied_args)
 
 
-    # TODO: value()
+    def value(self):
+        from .python_builtins import all
+        pathlen = 0
+        idx = 0
+        visited = []
+        arr = [argval(a) for a in self.args]
+        while(idx not in visited):
+            if idx not in range(len(arr)):
+                break
+            visited.append(idx)
+            pathlen += 1
+            idx = arr[idx]
 
+        return all([(pathlen == len(self.args)), (AllDifferent(self.args).value()), (arr[-1] == 0)])
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
