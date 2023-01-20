@@ -227,6 +227,12 @@ def linearize_constraint(cpm_expr):
 
         return linearize_constraint(flatten_constraint(constraints))
 
+    if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "count":
+        '''
+        decomposition of count numerical constraint
+        '''
+        return linearize_constraint(flatten_constraint(cpm_expr.args[0].decompose_comparison(cpm_expr.name, cpm_expr.args[1])))
+
     return [cpm_expr]
 
 
