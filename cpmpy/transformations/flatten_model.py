@@ -353,6 +353,7 @@ def get_or_make_var(expr):
             """
             # we don't currently have a generic way to get bounds from non-Boolean globals...
             # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
+            bounds = flatexpr.get_bounds
             ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
 
             return (ivar, [flatexpr == ivar]+flatcons)

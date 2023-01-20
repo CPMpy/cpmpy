@@ -292,6 +292,18 @@ class Minimum(GlobalConstraint):
         copied_args = self._deepcopy_args(self.args)
         return Minimum(copied_args)
 
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        return [any(eval_comparison(cpm_op, j, cpm_rhs) & (all([j <= a for a in arr])) for j in arr)]
+
+    def get_bounds(self):
+        pass
+
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -315,6 +327,18 @@ class Maximum(GlobalConstraint):
         """
         copied_args = self._deepcopy_args(memodict)
         return Maximum(copied_args)
+
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        return [any(eval_comparison(cpm_op, j, cpm_rhs) & (all([j >= a for a in arr])) for j in arr)]
+
+    def get_bounds(self):
+        pass
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
@@ -579,6 +603,9 @@ class Count(GlobalConstraint):
 
         arr, val = self.args
         return [any((eval_comparison(cmp_op, j, cmp_rhs) & (Operator('sum',arr == val) == j) for j in range(len(arr) + 1)))]
+
+    def get_bounds(self):
+        return [0, len(self.args[0])]
 
     def __repr__(self):
         return "Count({})".format(self.args)
