@@ -485,6 +485,14 @@ class CPM_minizinc(SolverInterface):
             self += (start + dur == end)
             return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
 
+        elif expr.name == "gcc":
+            a, gcc = expr.args
+            cover = [x for x in range(len(gcc))]
+            a = self._convert_expression(a)
+            gcc = self._convert_expression(gcc)
+            cover = self._convert_expression(cover)
+            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
