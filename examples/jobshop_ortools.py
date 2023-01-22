@@ -44,8 +44,10 @@ from cpmpy.expressions.variables import _DirectVarImpl
 # make intervalvars... ensures start + dur = end
 factory = True
 if factory:
+    # use this
     intervals = directvar("NewIntervalVar", (start_time, jobs_data.T, end_time), novar=[1], shape=start_time.shape, name="interval", insert_name_at_index=3)
 else:
+    # or this if you want to hand-code the above
     intervals = np.zeros(shape=(machines_count,jobs_count), dtype=object)
     for m in all_machines:
         for j in all_jobs:
