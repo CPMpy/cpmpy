@@ -14,7 +14,7 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
-                  "minizinc": {"circuit", "cumulative"},  # TODO: cumulative should work...
+                  "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   }
