@@ -118,7 +118,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -128,6 +128,7 @@ class CPM_pysdd(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit, solution_limit, kwargs: not used
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """

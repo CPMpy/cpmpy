@@ -195,7 +195,7 @@ class CPM_ortools(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -205,6 +205,7 @@ class CPM_ortools(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """

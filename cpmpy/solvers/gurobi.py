@@ -366,7 +366,7 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -378,6 +378,7 @@ class CPM_gurobi(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
