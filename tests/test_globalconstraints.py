@@ -100,3 +100,17 @@ class TestGlobal(unittest.TestCase):
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         self.assertTrue(m.solve())
+
+    def test_cumulative_no_np(self):
+        start = cp.intvar(0, 10, 4, "start")
+        duration = (1, 2, 2, 1) # smt weird such as a tuple
+        end = [cp.intvar(0,20, name=f"end[{i}]") for i in range(4)] # force smt weird
+        demand = 1
+        capacity = 1
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        # also test decomposition
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+

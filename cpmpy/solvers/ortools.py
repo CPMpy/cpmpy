@@ -346,7 +346,7 @@ class CPM_ortools(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_expr, Operator):
-            # 'and'/n, 'or'/n, 'xor'/n, '->'/2
+            # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
                 return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
