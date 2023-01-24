@@ -1,6 +1,8 @@
 import unittest
 
 import cpmpy as cp
+from cpmpy.exceptions import NotSupportedError
+
 
 class TestSolveAll(unittest.TestCase):
 
@@ -14,18 +16,37 @@ class TestSolveAll(unittest.TestCase):
             if not solver.supported():
                 continue
 
+
+            sols = set()
+            add_sol = lambda: sols.add(str([a.value(), b.value()]))
+
             solver = cp.SolverLookup.get(name,model=m)
-            self.assertEqual(3, solver.solveAll(solution_limit=1000))
+
+            # pysdd not supporting solution limit
+            if name == "pysdd":
+                count = solver.solveAll(display=add_sol)
+            else:
+                count = solver.solveAll(solution_limit=1000, display=add_sol)
+            self.assertEqual(3, count)
+            self.assertSetEqual(sols,
+                                {"[True, True]","[True, False]","[False, True]"})
 
 
     def test_solveall_with_obj(self):
 
         x = cp.intvar(0, 3, shape=3)
-        m = cp.Model(minimize=cp.sum(x))
+        m = cp.Model(cp.sum(x) >= 1, minimize=cp.sum(x))
 
         for name in cp.SolverLookup.solvernames():
             try:
-                count = m.solveAll(solver=name, solution_limit=1000)
-                self.assertEqual(1, count)
-            except Exception as e:
+                sols = set()
+                add_sol = lambda: sols.add(str(x.value().tolist()))
+
+                count = m.solveAll(solver=name, solution_limit=1000, display=add_sol)
+                self.assertEqual(3, count)
+                self.assertSetEqual(sols,
+                                    {"[1, 0, 0]","[0, 1, 0]","[0, 0, 1]"})
+
+
+            except NotSupportedError as e:
                 pass # solver does not support finding all optimal solutions
