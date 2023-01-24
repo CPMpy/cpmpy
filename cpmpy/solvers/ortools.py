@@ -329,8 +329,8 @@ class CPM_ortools(SolverInterface):
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
 
-        :param cpm_expr: list of CPMpy expressions
-        :type cpm_expr: list of Expression
+        :param cpm_expr: CPMpy expression
+        :type cpm_expr: Expression
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
