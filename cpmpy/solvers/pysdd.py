@@ -23,6 +23,7 @@
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
@@ -71,7 +72,7 @@ class CPM_pysdd(SolverInterface):
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
-            raise Exception("CPM_pysdd: only satisfaction, does not support an objective function")
+            raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
         # initialise the native solver object, or at least their existence
         self.pysdd_vtree = None
