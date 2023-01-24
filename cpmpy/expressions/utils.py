@@ -38,6 +38,12 @@ def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_))
+def is_boolexpr(expr):
+    #boolexpr
+    if hasattr(expr, 'is_bool'):
+        return expr.is_bool()
+    #boolean constant
+    return is_bool(expr)
 def is_pure_list(arg):
     """ is it a list or tuple?
     """

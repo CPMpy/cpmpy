@@ -99,6 +99,8 @@
         Minimum
         Maximum
         Element
+        Xor
+        Cumulative
 
 """
 import warnings # for deprecation warning

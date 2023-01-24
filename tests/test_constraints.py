@@ -3,10 +3,12 @@ from cpmpy.expressions.globalconstraints import *
 
 import pytest
 
+
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(SOLVERNAME)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAME = "ortools"
+
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -92,6 +94,14 @@ def comp_constraints():
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, 1]:
                     yield Comparison(comp_name, glob_expr, rhs)
+
+    if SOLVERNAME == "z3":
+        for comp_name in Comparison.allowed:
+            for boolexpr in bool_exprs():
+                for rhs in [NUM_VAR, 1]:
+                    if comp_name == '>' and rhs == 1:
+                        rhs = 0 # >1 is unsat for boolean expressions, so change it to 0
+                    yield Comparison(comp_name, boolexpr, rhs)
 
 
 # Generate all possible boolean expressions

@@ -25,9 +25,10 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
-from ..expressions.utils import is_num, is_any_list, is_bool
+from ..expressions.utils import is_num, is_any_list, is_bool, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+
 
 class CPM_z3(SolverInterface):
     """
@@ -250,20 +251,16 @@ class CPM_z3(SolverInterface):
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+            Post a primitive CPMpy constraint to the native solver API
 
             Z3 supports nested expressions so translate expression tree and post to solver API directly
         """
         if is_any_list(cpm_expr):
             for con in cpm_expr:
                 self._post_constraint(con)
-
         # translate each expression tree, then post straight away
-        z3_cons = self._z3_expr(cpm_expr)
-        if is_any_list(z3_cons):
-            for z3_con in z3_cons:
-                self.z3_solver.add(z3_con)
         else:
+            z3_cons = self._z3_expr(cpm_expr)
             return self.z3_solver.add(z3_cons)
 
     def _z3_expr(self, cpm_con, reify=False):
@@ -373,7 +370,13 @@ class CPM_z3(SolverInterface):
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
-                lhs, rhs = self._z3_expr(cpm_con.args)
+                # '==' is not supported between a boolean expression and an arithmetic expression
+                if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    # lhs is bool and rhs is arith, make lhs also arith
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
+                else:
+                    lhs = self._z3_expr(lhs)
+                rhs = self._z3_expr(rhs)
                 return (lhs == rhs)
 
 
@@ -384,8 +387,27 @@ class CPM_z3(SolverInterface):
                 new_var, cons = get_or_make_var(rhs)
                 return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, lhs, new_var)))
 
-            # other comparisons
-            lhs, rhs = self._z3_expr(cpm_con.args)
+            # other comparisons are not supported on boolrefs, so convert with if then else
+            # only '!=' is supported between 2 boolrefs
+            if cpm_con.name == '!=':
+                if is_boolexpr(lhs) and not is_boolexpr(rhs):
+                    # lhs is bool and rhs is arith, make lhs also arith
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
+                else:
+                    lhs = self._z3_expr(lhs)
+                rhs = self._z3_expr(rhs)
+                return (lhs != rhs)
+            else:
+                if is_boolexpr(lhs):
+                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
+                else:
+                    lhs = self._z3_expr(lhs)
+
+                if is_boolexpr(rhs):
+                    rhs = z3.If(self._z3_expr(rhs), 1, 0)
+                else:
+                    rhs = self._z3_expr(rhs)
+
             # post the comparison
             if cpm_con.name == '<=':
                 return (lhs <= rhs)
@@ -395,9 +417,6 @@ class CPM_z3(SolverInterface):
                 return (lhs >= rhs)
             elif cpm_con.name == '>':
                 return (lhs > rhs)
-            elif cpm_con.name == '!=':
-                return (lhs != rhs)
-
 
         # TODO:
         # table
@@ -432,3 +451,6 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
+
+
+
