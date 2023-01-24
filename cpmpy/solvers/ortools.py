@@ -190,7 +190,7 @@ class CPM_ortools(SolverInterface):
                     cpm_var._value = bool(cpm_var._value) # ort value is always an int
 
             # translate objective
-            if self.ort_model.HasObjective():
+            if self.has_objective():
                 self.objective_value_ = self.ort_solver.ObjectiveValue()
 
         return has_sol
@@ -209,7 +209,7 @@ class CPM_ortools(SolverInterface):
 
             Returns: number of solutions found
         """
-        if self.ort_model.HasObjective():
+        if self.has_objective():
             raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
 
         cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
@@ -266,6 +266,9 @@ class CPM_ortools(SolverInterface):
             self.ort_model.Minimize(obj)
         else:
             self.ort_model.Maximize(obj)
+
+    def has_objective(self):
+        return self.ort_model.HasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """

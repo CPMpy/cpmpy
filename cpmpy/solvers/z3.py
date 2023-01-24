@@ -163,8 +163,7 @@ class CPM_z3(SolverInterface):
                     cpm_var._value = sol[sol_var].as_long()
 
             # translate objective, for optimisation problems only
-            if isinstance(self.z3_solver, z3.Optimize) and \
-                    len(self.z3_solver.objectives()) != 0:
+            if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
 
@@ -227,6 +226,10 @@ class CPM_z3(SolverInterface):
             self.z3_solver.minimize(obj)
         else:
             self.z3_solver.maximize(obj)
+
+    def has_objective(self):
+        import z3
+        return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
 
     def __add__(self, cpm_con):
         """

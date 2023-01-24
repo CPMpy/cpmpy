@@ -111,7 +111,6 @@ class CPM_gurobi(SolverInterface):
 
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
-        import gurobipy as gp
         from gurobipy import GRB
 
         if time_limit is not None:
@@ -124,8 +123,6 @@ class CPM_gurobi(SolverInterface):
         _ = self.grb_model.optimize(callback=solution_callback)
         grb_objective = self.grb_model.getObjective()
 
-        is_optimization_problem = grb_objective.size() != 0 # TODO: check if better way to do this...
-
         grb_status = self.grb_model.Status
 
         # new status, translate runtime
@@ -133,9 +130,9 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not is_optimization_problem:
+        if grb_status == GRB.OPTIMAL and not self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and is_optimization_problem:
+        elif grb_status == GRB.OPTIMAL and self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -162,7 +159,7 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = int(solver_val)
             # set _objective_value
-            if is_optimization_problem:
+            if self.has_objective():
                 self.objective_value_ = grb_objective.getValue()
 
         return has_sol
@@ -217,6 +214,9 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
         else:
             self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+
+    def has_objective(self):
+        return self.grb_model.getObjective().size() != 0  # TODO: check if better way to do this...
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -422,7 +422,7 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
 
             # Translate objective
-            if self.grb_model.getObjective().size() != 0:                # TODO: check if better way to do this...
+            if self.has_objective():
                 self.objective_value_ = self.grb_model.PoolObjVal
 
             if display is not None:

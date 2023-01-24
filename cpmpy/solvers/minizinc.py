@@ -321,6 +321,8 @@ class CPM_minizinc(SolverInterface):
         else:
             self.mzn_txt_solve = "solve maximize {};\n".format(obj)
 
+    def has_objective(self):
+        return self.mzn_txt_solve != "solve satisfy;"
 
     def __add__(self, cpm_con):
         """
@@ -495,7 +497,7 @@ class CPM_minizinc(SolverInterface):
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
-        if self.mzn_txt_solve != "solve satisfy;":
+        if self.has_objective():
             raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio

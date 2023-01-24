@@ -129,7 +129,7 @@ class CPM_template(SolverInterface):
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
             # translate objective, for optimisation problems only
-            if self.TEMPLATE_solver.HasObjective():
+            if self.has_objective():
                 self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
 
         return has_sol
@@ -182,6 +182,9 @@ class CPM_template(SolverInterface):
             TEMPLATEpy.Minimize(obj)
         else:
             TEMPLATEpy.Maximize(obj)
+
+    def has_objective(self):
+        return TEMPLATEpy.hasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -258,7 +261,7 @@ class CPM_template(SolverInterface):
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -275,8 +278,8 @@ class CPM_template(SolverInterface):
             Returns: number of solutions found
         """
 
-        # check if objective function?
-        if self.TEMPLATE_solver.HasObjective():
+        # check if objective function
+        if self.has_objective():
             raise Exception("TEMPLATE does not support finding all optimal solutions")
 
         # A. Example code if solver supports callbacks

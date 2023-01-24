@@ -22,6 +22,7 @@
 """
 import warnings
 
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
 from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
@@ -120,6 +121,13 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Solver does not support objective functions")
 
+    def has_objective(self):
+        """
+            Returns whether the solver has an objective function or not.
+        """
+        return False
+
+
     def __add__(self, cpm_cons):
         """
             Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
@@ -202,18 +210,14 @@ class SolverInterface(object):
 
             Returns: number of solutions found
         """
+        if self.has_objective():
+            raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
 
         if not call_from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
 
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
-            # check obj value
-            if optimal_val is None:
-                optimal_val = self.objective_value_
-            if optimal_val != self.objective_value_:
-                break # sub-optimal value
-
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
