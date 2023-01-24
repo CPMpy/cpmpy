@@ -21,6 +21,7 @@
         CPM_z3
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
@@ -219,7 +220,8 @@ class CPM_z3(SolverInterface):
         """
         import z3
         # objective can be a nested expression for z3
-        assert isinstance(self.z3_solver, z3.Optimize), "Use the z3 optimizer for optimization problems"
+        if not isinstance(self.z3_solver, z3.Optimize):
+            raise NotSupportedError("Use the z3 optimizer for optimization problems")
         obj = self._z3_expr(expr)
         if minimize:
             self.z3_solver.minimize(obj)
