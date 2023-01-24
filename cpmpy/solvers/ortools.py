@@ -26,6 +26,7 @@
 import sys  # for stdout checking
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, eval_comparison
@@ -208,7 +209,7 @@ class CPM_ortools(SolverInterface):
             Returns: number of solutions found
         """
         if self.ort_model.HasObjective():
-            raise Exception("OR-tools does not support finding all optimal solutions.")
+            raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
 
         cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
         self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
