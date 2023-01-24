@@ -139,10 +139,7 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
-        if display is None:
-            # the desired, fast computation
-            return self.pysdd_root.model_count()
-        else:
+        if display is not None:
             # manually walking over the tree, much slower...
             solution_count = 0
             for sol in self.pysdd_root.models():
@@ -161,6 +158,9 @@ class CPM_pysdd(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # the desired, fast computation
+        return self.pysdd_root.model_count()
 
     def solver_var(self, cpm_var):
         """
