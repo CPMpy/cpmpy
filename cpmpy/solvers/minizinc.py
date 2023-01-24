@@ -31,7 +31,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
-from ..exceptions import MinizincPathException
+from ..exceptions import MinizincPathException, NotSupportedError
 import os
 
 class CPM_minizinc(SolverInterface):
@@ -494,8 +494,8 @@ class CPM_minizinc(SolverInterface):
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
-        if self.mzn_txt_solve != "solve satisfy":
-            raise Exception("Minizinc Python does not support finding all optimal solutions (yet)")
+        if self.mzn_txt_solve != "solve satisfy;":
+            raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio
 
