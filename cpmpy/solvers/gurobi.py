@@ -391,17 +391,15 @@ class CPM_gurobi(SolverInterface):
                 "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
-        self.grb_model.setParam("PoolSearchMode", 2)
-        self.grb_model.setParam("PoolSolutions", solution_limit)
+        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
 
-        for param, val in kwargs.items():
-            self.grb_model.setParam(param, val)
-        # Solve the model
-        self.grb_model.optimize()
+        # solve the model
+        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
 
         optimal_val = None
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
+
         for i in range(solution_count):
             # Specify which solution to query
             self.grb_model.setParam("SolutionNumber", i)
