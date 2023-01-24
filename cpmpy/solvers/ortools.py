@@ -602,6 +602,8 @@ try:
                     if hasattr(cpm_var, "flat"):
                         for cpm_subvar in cpm_var.flat:
                             cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
                     else:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 
