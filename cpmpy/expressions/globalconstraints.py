@@ -390,13 +390,11 @@ class Xor(GlobalConstraint):
             a0, a1 = self.args
             return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
 
-        # for more than 2 variables, we chain reified xors
-        # XXX this will involve many calls to the above decomp, shortcut?
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        # for more than 2 variables, we cascade xors
+        cons = self.args[0] ^ self.args[1]
         for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            cons += new_cons
-        return cons + [prev_var]
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons]
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
