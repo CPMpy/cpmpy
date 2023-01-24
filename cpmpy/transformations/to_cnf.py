@@ -126,6 +126,9 @@ def flat2cnf(constraints):
                 cnf += [a0sub | a1 for a0sub in subcnf]
                 continue
 
+        elif expr.name == "xor":
+            cnf += to_cnf(expr.decompose())
+            continue
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim
         cnf.append(expr)
