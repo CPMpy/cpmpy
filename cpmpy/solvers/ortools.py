@@ -433,9 +433,7 @@ class CPM_ortools(SolverInterface):
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            c = cpm_expr.decompose()
-            if c is not None:
-                self += c  # if a decomposition exists...
+            self += cpm_expr.decompose()
             # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
             return None # will throw error if used in reification
         
