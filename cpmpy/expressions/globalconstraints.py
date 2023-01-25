@@ -220,8 +220,10 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
 
-        if n <= 1:
-            return None
+        if n == 1:
+            return succ[0].lb <= succ[0]
+        elif n == 0:
+            raise Exception("The list of variables given to Circuit constraint is empty")
 
         order = intvar(0,n-1, shape=n)
         return [
