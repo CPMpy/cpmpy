@@ -11,3 +11,8 @@ class CPMpyException(Exception):
 class MinizincPathException(CPMpyException):
     pass
 
+class ConstraintNotImplementedError(CPMpyException):
+    """
+        Indicates a constraint is not implemented for a specific solver.
+        Should ONLY be thrown from a solvers _post_constraint method.
+    """

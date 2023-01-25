@@ -26,6 +26,7 @@
 import sys  # for stdout checking
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import ConstraintNotImplementedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, eval_comparison
@@ -357,8 +358,7 @@ class CPM_ortools(SolverInterface):
                     # the natively reifiable 'and', 'or' and 'sum' remain here
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
-                raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
-                        cpm_expr.name, cpm_expr))
+                raise ConstraintNotImplementedError(f"Not a know supported ORTools Operator '{cpm_expr.name}' {cpm_expr}")
 
         # Comparisons: only numeric ones as the `only_bv_implies()` transformation
         # has removed the '==' reification for Boolean expressions
@@ -404,7 +404,7 @@ class CPM_ortools(SolverInterface):
                     assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
                     b = self.solver_var(lhs.args[0])
                     return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
-            raise NotImplementedError(
+            raise ConstraintNotImplementedError(
                         "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
 
@@ -436,7 +436,7 @@ class CPM_ortools(SolverInterface):
             return None # will throw error if used in reification
 
         # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
-        raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+        raise ConstraintNotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
     def solution_hint(self, cpm_vars, vals):

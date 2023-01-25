@@ -30,6 +30,7 @@
         CPM_pysat
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import ConstraintNotImplementedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
@@ -230,7 +231,7 @@ class CPM_pysat(SolverInterface):
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
+            Solvers can raise 'ConstraintNotImplementedError' for any constraint not supported after transformation
         """
         from pysat.card import CardEnc
 
@@ -241,7 +242,7 @@ class CPM_pysat(SolverInterface):
             if cpm_expr.name == 'or':
                 self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
             else:
-                raise NotImplementedError(
+                raise ConstraintNotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         elif isinstance(cpm_expr, Comparison):
             # only handle cardinality encodings (for now)
@@ -250,7 +251,7 @@ class CPM_pysat(SolverInterface):
                 lits = self.solver_vars(cpm_expr.args[0].args)
                 bound = cpm_expr.args[1]
                 if not is_int(bound):
-                    raise NotImplementedError(f"PySAT sum: rhs `{bound}` type {type(bound)} not supported")
+                    raise ConstraintNotImplementedError(f"PySAT sum: rhs `{bound}` type {type(bound)} not supported")
 
                 clauses = []
                 if cpm_expr.name == "<":
@@ -282,19 +283,19 @@ class CPM_pysat(SolverInterface):
                         ## add is_atleast or is_atmost
                         clauses.append([is_atleast, is_atmost])
                 else:
-                    raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+                    raise ConstraintNotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
                 # post the clauses
                 self.pysat_solver.append_formula(clauses)
             else:
-                raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+                raise ConstraintNotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
         elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
         else:
-            raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+            raise ConstraintNotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
 
     def solution_hint(self, cpm_vars, vals):

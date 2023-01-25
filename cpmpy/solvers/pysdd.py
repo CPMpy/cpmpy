@@ -23,6 +23,7 @@
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import ConstraintNotImplementedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
@@ -231,16 +232,15 @@ class CPM_pysdd(SolverInterface):
                 clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
                 self.pysdd_root &= clause
             else:
-                raise NotImplementedError(
+                raise ConstraintNotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
-        #elif isinstance(cpm_expr, Comparison):
 
         elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
         else:
-            raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
+            raise ConstraintNotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
 
 
     def dot(self):
