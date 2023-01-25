@@ -5,7 +5,9 @@ Loosely based on PySat's MUSX:
 https://github.com/pysathq/pysat/blob/master/examples/musx.py
 
 """
+import numpy as np
 from cpmpy import *
+from cpmpy.expressions.variables import NDVarArray
 from cpmpy.transformations.get_variables import get_variables
 
 def mus(soft, hard=[], solver="ortools"):
@@ -29,8 +31,11 @@ def mus(soft, hard=[], solver="ortools"):
     """
     # order so that constraints with many variables are tried and removed first
     candidates = sorted(soft, key=lambda c: -len(get_variables(c)))
-    
+
     assump = boolvar(shape=len(soft), name="assump")
+    if len(soft) == 1:
+        assump = NDVarArray(shape=1, dtype=object, buffer=np.array([assump]))
+
     m = Model(hard+[assump.implies(candidates)]) # each assumption variable implies a candidate
     s = SolverLookup.get(solver, m)
     assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"

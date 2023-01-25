@@ -12,7 +12,7 @@
     https://pysathq.github.io/
 
     This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,xor,implies,==,!=) or cardinality constraints.
+    and only logical constraints (and,or,implies,==,!=) or cardinality constraints.
 
     Documentation of the solver's own Python API:
     https://pysathq.github.io/docs/html/api/solvers.html
@@ -288,6 +288,9 @@ class CPM_pysat(SolverInterface):
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
+        elif cpm_expr.name == 'xor':
+            for con in to_cnf(cpm_expr.decompose()):
+                self._post_constraint(con)
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
