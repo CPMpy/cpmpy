@@ -25,7 +25,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
-from ..expressions.utils import is_num, is_any_list, is_bool, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 
@@ -272,7 +272,9 @@ class CPM_z3(SolverInterface):
             # translate numpy to python native
             if is_bool(cpm_con):
                 return bool(cpm_con)
-            return int(cpm_con)
+            elif is_int(cpm_con):
+                return int(cpm_con)
+            return float(cpm_con)
 
         elif is_any_list(cpm_con):
             return [self._z3_expr(con) for con in cpm_con]
