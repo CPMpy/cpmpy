@@ -99,9 +99,13 @@
         Minimum
         Maximum
         Element
+        Xor
+        Cumulative
 
 """
 import warnings # for deprecation warning
+import numpy as np
+
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -368,8 +372,7 @@ class Element(GlobalConstraint):
 
 class Xor(GlobalConstraint):
     """
-        The 'xor' constraint for more then 2 arguments.
-        Acts like cascaded xor operators with two inputs
+        The 'xor' exclusive-or constraint
     """
 
     def __init__(self, arg_list):
@@ -377,18 +380,18 @@ class Xor(GlobalConstraint):
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        i = 0  # length can change
-        while i < len(arg_list):
-            if isinstance(arg_list[i], Xor):
-                # merge args in at this position
-                arg_list[i:i + 1] = arg_list[i].args
-            else:
-                i += 1
         super().__init__("xor", arg_list)
 
     def decompose(self):
+        # there are multiple decompositions possible
+        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
+        # since Xor is logical constraint, the default is a logic decomposition
         if len(self.args) == 2:
-            return [(self.args[0] + self.args[1]) == 1]
+            a0, a1 = self.args
+            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+
+        # for more than 2 variables, we chain reified xors
+        # XXX this will involve many calls to the above decomp, shortcut?
         prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
         for arg in self.args[2:]:
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)
@@ -418,11 +421,20 @@ class Cumulative(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
-        super(Cumulative, self).__init__("cumulative",[flatlist(start),
-                                                       flatlist(duration),
-                                                       flatlist(end),
-                                                       demand if is_num(demand) else flatlist(demand),
-                                                       capacity])
+        assert is_any_list(start), "start should be a list"
+        start = flatlist(start)
+        assert is_any_list(duration), "duration should be a list"
+        duration = flatlist(duration)
+        assert is_any_list(end), "end should be a list"
+        end = flatlist(end)
+        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
+
+
+        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -455,7 +467,14 @@ class Cumulative(GlobalConstraint):
         return cons
 
     def value(self):
-        start, dur, end, demand, cap = [argval(a) for a in self.args]
+        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
+
+        if any(a is None for a in argvals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, cap = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
