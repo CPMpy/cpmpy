@@ -21,7 +21,6 @@
         CPM_z3
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import ConstraintNotImplementedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
@@ -327,7 +326,7 @@ class CPM_z3(SolverInterface):
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
-                raise ConstraintNotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
@@ -352,22 +351,22 @@ class CPM_z3(SolverInterface):
             if cpm_con.name == "==":
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
                     if reify:
-                        raise ConstraintNotImplementedError(f"Reification of {cpm_con} not supported yet")
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
                                   self._z3_expr(all([a <= rhs for a in lhs.args])))
                 if isinstance(rhs, GlobalConstraint) and rhs.name == "max":
                     if reify:
-                        raise ConstraintNotImplementedError(f"Reification of {cpm_con} not supported yet")
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs >= a for a in rhs.args])))
                 if isinstance(lhs, GlobalConstraint) and lhs.name == "min":
                     if reify:
-                        raise ConstraintNotImplementedError(f"Reification of {cpm_con} not supported yet")
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
                                   self._z3_expr(all([a >= rhs for a in lhs.args])))
                 if isinstance(rhs, GlobalConstraint) and rhs.name == "min":
                     if reify:
-                        raise ConstraintNotImplementedError(f"Reification of {cpm_con} not supported yet")
+                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
                     return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
                                   self._z3_expr(all([lhs <= a for a in rhs.args])))
 
@@ -435,7 +434,7 @@ class CPM_z3(SolverInterface):
         # global constraints
         return self._z3_expr(all(cpm_con.decompose()))
 
-        raise ConstraintNotImplementedError("Z3: constraint not (yet) supported", cpm_con)
+        raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core

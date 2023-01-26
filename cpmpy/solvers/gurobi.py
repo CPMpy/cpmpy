@@ -27,7 +27,6 @@
 """
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import ConstraintNotImplementedError
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.comparison import only_numexpr_equality
@@ -279,7 +278,7 @@ class CPM_gurobi(SolverInterface):
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            Solvers can raise 'ConstraintNotImplementedError' for any constraint not supported after transformation
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
 
@@ -330,7 +329,7 @@ class CPM_gurobi(SolverInterface):
                     assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                     return self.grb_model.addGenConstrPow(x, grbrhs, a)
 
-            raise ConstraintNotImplementedError(
+            raise NotImplementedError(
                 "Not a know supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -364,7 +363,7 @@ class CPM_gurobi(SolverInterface):
                 self._post_constraint(con)
             return
 
-        raise ConstraintNotImplementedError(cpm_expr)  # if you reach this... please report on github
+        raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):

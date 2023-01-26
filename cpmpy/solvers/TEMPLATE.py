@@ -247,7 +247,7 @@ class CPM_template(SolverInterface):
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            Solvers can raise 'ConstraintNotImplementedError' for any constraint not supported after transformation
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_con, _BoolVarImpl):
             # base case, just var or ~var
