@@ -22,7 +22,7 @@ from .flatten_model import flatten_constraint, negated_normal
   - BV -> BE
 """
 
-def to_cnf(constraints):
+def to_cnf(constraints, supported=frozenset()):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
@@ -43,9 +43,9 @@ def to_cnf(constraints):
         constraints = [constraints]
 
     fnf = flatten_constraint(constraints)
-    return flat2cnf(fnf)
+    return flat2cnf(fnf, supported=supported)
 
-def flat2cnf(constraints):
+def flat2cnf(constraints, supported=frozenset()):
     """
         Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form
 
@@ -126,9 +126,12 @@ def flat2cnf(constraints):
                 cnf += [a0sub | a1 for a0sub in subcnf]
                 continue
 
-        elif expr.name == "xor":
+        # decompose global constraints not supported by solver such as XOR with arity > 2
+        elif expr.is_bool() and isinstance(expr, GlobalConstraint) and \
+                expr.name not in supported:
             cnf += to_cnf(expr.decompose())
             continue
+
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim
         cnf.append(expr)
