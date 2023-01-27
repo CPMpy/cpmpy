@@ -56,14 +56,30 @@ def only_bv_implies(constraints):
                 isinstance(cpm_expr.args[1], _BoolVarImpl):
             # BV == BV special case
             if isinstance(cpm_expr.args[0], _BoolVarImpl):
-                l,r = cpm_expr.args
+                l, r = cpm_expr.args
                 newcons.append(l.implies(r))
                 newcons.append(r.implies(l))
             else:
                 # BE == BV :: ~BV -> ~BE, BV -> BE
-                expr,bvar = cpm_expr.args
+                expr, bvar = cpm_expr.args
                 newcons.append((~bvar).implies(negated_normal(expr)))
                 newcons.append(bvar.implies(expr))
+
+        elif isinstance(cpm_expr, Comparison) and \
+                cpm_expr.name == '==' and \
+                cpm_expr.args[0].is_bool() and \
+                isinstance(cpm_expr.args[1], _NumVarImpl):
+            #BV = IV
+            if isinstance(cpm_expr.args[0], _BoolVarImpl):
+                newcons.append(cpm_expr)
+
+            #BE == IV :: IV = BV, ~BV -> ~BE, BV -> BE
+            else:
+                expr, ivar = cpm_expr.args
+                bv = _BoolVarImpl()
+                newcons.append(Comparison('==',bv,ivar))
+                newcons.append((~bv).implies(negated_normal(expr)))
+                newcons.append(bv.implies(expr))
 
         else:
             # all other flat normal form expressions are fine
@@ -81,6 +97,9 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
         Output will also be in Flat Normal Form
 
         argument 'supported' is a list (or set) of expression names that support reification in the solver
+        including supported 'Left Hand Side' expressions in reified comparisons, e.g. BV -> (LHS == V)
+        Boolean expressions 'and', 'or', and '->' are assumed to support reification
+        (you MUST give an empty supported set if no others are supported...)
     """
     if not is_any_list(constraints):
         # assume list, so make list
@@ -117,9 +136,12 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
             elif isinstance(boolexpr, GlobalConstraint):
                 # Case 2, BE is a GlobalConstraint
                 # replace BE by its decomposition, then flatten
-                reifexpr = copy.copy(cpm_expr)
-                reifexpr.args[boolexpr_index] = all(boolexpr.decompose())  # decomp() returns list
-                newcons += flatten_constraint(reifexpr)
+                if boolexpr.name in supported:
+                    newcons.append(cpm_expr)
+                else:
+                    reifexpr = copy.copy(cpm_expr)
+                    reifexpr.args[boolexpr_index] = all(boolexpr.decompose())  # decomp() returns list
+                    newcons += flatten_constraint(reifexpr)
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op,(lhs,rhs) = boolexpr.name, boolexpr.args

@@ -5,7 +5,8 @@
     https://TODO
 
     This solver can ONLY be used for solution enumeration over Boolean variables!
-    That is, only logical constraints (and,or,xor,implies,==,!=) (and cardinality constraints later).
+    That is, only logical constraints (and,or,implies,==,!=) and Xor global constraint
+    (and cardinality constraints later).
 
     Documentation of the solver's own Python API:
     https://TODO
@@ -233,6 +234,9 @@ class CPM_pysdd(SolverInterface):
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         #elif isinstance(cpm_expr, Comparison):
+        elif cpm_expr.name == 'xor':
+            for con in to_cnf(cpm_expr.decompose()):
+                self._post_constraint(con)
         else:
             raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
 

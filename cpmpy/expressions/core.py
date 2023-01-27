@@ -22,7 +22,7 @@
 
     Mathematical operators:
 
-    - \-x            Operator("-", [x])
+    - -x            Operator("-", [x])
     - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
@@ -73,6 +73,7 @@
         Comparison
         Operator
 """
+import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
@@ -283,14 +284,16 @@ class Expression(object):
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
-        if is_num(other) and other == 0:
-            return 0
+        # this unnecessarily complicates wsum creation
+        #if is_num(other) and other == 0:
+        #    return other
         return Operator("mul", [self, other])
     def __rmul__(self, other):
         if is_num(other) and other == 1:
             return self
-        if is_num(other) and other == 0:
-            return 0
+        # this unnecessarily complicates wsum creation
+        #if is_num(other) and other == 0:
+        #    return other
         return Operator("mul", [other, self])
 
     # matrix multipliciation TODO?
@@ -298,10 +301,18 @@ class Expression(object):
 
     # other mathematical ones
     def __truediv__(self, other):
+        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         if is_num(other) and other == 1:
             return self
         return Operator("div", [self, other])
     def __rtruediv__(self, other):
+        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
+        return Operator("div", [other, self])
+    def __floordiv__(self, other):
+        if is_num(other) and other == 1:
+            return self
+        return Operator("div", [self, other])
+    def __rfloordiv__(self, other):
         return Operator("div", [other, self])
 
     def __mod__(self, other):
@@ -326,6 +337,12 @@ class Expression(object):
 
     # unary mathematical operators
     def __neg__(self):
+        # special case, -(w*x) -> -w*x
+        if self.name == 'mul' and is_num(self.args[0]):
+            return Operator(self.name, [-self.args[0], self.args[1]])
+        elif self.name == 'wsum':
+            # negate the constant weights
+            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
         return Operator("-", [self])
     def __pos__(self):
         return self
@@ -400,7 +417,7 @@ class Operator(Expression):
         '-':   (1, False), # -x
         'abs': (1, False),
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '/'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -412,27 +429,29 @@ class Operator(Expression):
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
 
-        # should we convert the sum into a wsum?
-        if name == 'sum' and any(_wsum_should(a) for a in arg_list) and \
-                not any(is_num(a) for a in arg_list):
-            w,x = [], []
+        # automatic weighted sum (wsum) creation:
+        # if all args are an expression (not a constant)
+        #    and one of the args is a wsum,
+        #                    or a product of a constant and an expression,
+        # then create a wsum of weights,expressions over all
+        if name == 'sum' and \
+                all(not is_num(a) for a in arg_list) and \
+                any(_wsum_should(a) for a in arg_list):
+            w,e = [], []
             for a in arg_list:
-                w1,x1 = _wsum_make(a)
+                w1,e1 = _wsum_make(a)
                 w += w1
-                x += x1
+                e += e1
             name = 'wsum'
-            arg_list = [w,x]
+            arg_list = [w,e]
 
-        # convention for commutative binary operators:
-        # swap if right is constant and left is not
-        if len(arg_list) == 2 and is_num(arg_list[1]) and \
-           name in {'sum', 'mul', 'and', 'or', 'xor'}:
-            arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+        # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
-            # we also have the convention that weighted sums are [weights, vars]
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
 
-        # args of same operator are merged in for n-ary ones
+        # small cleanup: nested n-ary operators are merged into the toplevel
+        # (this is actually against our design principle of creating
+        #  expressions the way the user wrote them)
         if arity == 0:
             i = 0 # length can change
             while i < len(arg_list):
@@ -490,8 +509,8 @@ class Operator(Expression):
         return super().__eq__(other)
 
     def value(self):
-        # if self.name ==
         if self.name == "wsum":
+            # wsum: arg0 is list of constants, no .value() use as is
             arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
         else:
             arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
@@ -503,7 +522,7 @@ class Operator(Expression):
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "div": return arg_vals[0] / arg_vals[1]
+        elif self.name == "div": return arg_vals[0] // arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
@@ -516,20 +535,34 @@ class Operator(Expression):
         return None # default
 
 def _wsum_should(arg):
-    """ Internal helper: should the arg be in a wsum instead of sum """
-    # Undecided: -x + y, -x + -y?
+    """ Internal helper: should the arg be in a wsum instead of sum
+
+    True if the arg is already a wsum,
+    or if it is a product of a constant and an expression 
+    (negation '-' does not mean it SHOULD be a wsum, because then
+     all substractions are transformed into less readable wsums)
+    """
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
-            (arg.name == 'mul' and is_num(arg.args[0])) and len(arg.args) == 2)
+            (arg.name == 'mul' and len(arg.args) == 2 and \
+             any(is_num(a) for a in arg.args)
+            ) )
+
 def _wsum_make(arg):
-    """ Internal helper: prep the arg for wsum """
-    # returns ([weights], [vars])
-    # call only if arg is Operator
+    """ Internal helper: prep the arg for wsum
+
+    returns ([weights], [expressions]) where 'weights' are constants
+    call only if arg is Operator
+    """
     if arg.name == 'wsum':
         return arg.args
     elif arg.name == 'mul':
-        return [arg.args[0]], [arg.args[1]]
+        if is_num(arg.args[0]):
+            return [arg.args[0]], [arg.args[1]]
+        elif is_num(arg.args[1]):
+            return [arg.args[1]], [arg.args[0]]
+        # else falls through to default below
     elif arg.name == '-':
         return [-1], [arg.args[0]]
-    else:
-        return [1], [arg]
+    # default
+    return [1], [arg]
