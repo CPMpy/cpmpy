@@ -386,12 +386,10 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
-        if len(self.args) == 2:
-            a0, a1 = self.args
-            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-        # for more than 2 variables, we cascade xors
-        cons = self.args[0] ^ self.args[1]
+        # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
             cons = (cons | arg) & (~cons | ~arg)
         return [cons]

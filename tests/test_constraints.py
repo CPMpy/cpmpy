@@ -15,9 +15,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative", "xor"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative", "xor"},
-                  # xors: temporarily avoid till #209 is fixed
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   }
 
 # Exclude certain operators for solvers.
@@ -29,9 +28,11 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {"xor", "element"},
+EXCLUDE_IMPL = {"ortools": {"element"},
                 "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
                 "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
+                "pysat": {"xor"}, # xors: temporarily avoid till #209 is fixed
+                "pysdd": {"xor"},
                 }
 
 
