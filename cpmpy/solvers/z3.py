@@ -25,7 +25,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
-from ..expressions.utils import is_num, is_any_list, is_bool, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 
@@ -226,23 +226,28 @@ class CPM_z3(SolverInterface):
         else:
             self.z3_solver.maximize(obj)
 
-    def __add__(self, cpm_con):
+    # most solvers can inherit this function as is, just implement `transform()` and `__post_constraint()` below
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
         # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        self._post_constraint(cpm_con)
-
-        return self
+        if is_any_list(cpm_expr):
+            return cpm_expr
+        else:
+            return [cpm_expr]
 
     def _post_constraint(self, cpm_expr):
         """
@@ -272,7 +277,9 @@ class CPM_z3(SolverInterface):
             # translate numpy to python native
             if is_bool(cpm_con):
                 return bool(cpm_con)
-            return int(cpm_con)
+            elif is_int(cpm_con):
+                return int(cpm_con)
+            return float(cpm_con)
 
         elif is_any_list(cpm_con):
             return [self._z3_expr(con) for con in cpm_con]

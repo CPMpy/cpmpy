@@ -186,41 +186,41 @@ class CPM_pysdd(SolverInterface):
 
         return self._varmap[cpm_var]
 
-
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        For PySDD, it can be beneficial to post a big model (collection of constraints) at once...
+            See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
+        # initialize (arbitrary) vtree from all user-specified vars
         if self.pysdd_root is None:
-            # initialize (arbitrary) vtree from vars
             from pysdd.sdd import SddManager, Vtree
 
             self.pysdd_vtree = Vtree(var_count=len(self.user_vars), vtree_type="balanced")
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
-        # apply transformations, then post internally
-        cpm_cons = to_cnf(cpm_con)
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
+
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
+
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -234,8 +234,10 @@ class CPM_pysdd(SolverInterface):
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         #elif isinstance(cpm_expr, Comparison):
-        elif cpm_expr.name == 'xor':
-            for con in to_cnf(cpm_expr.decompose()):
+
+        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
+            # for all global constraints:
+            for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
         else:
             raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
