@@ -38,7 +38,7 @@ from ..transformations.reification import only_bv_implies, reify_rewrite
 try:
     import gurobipy as gp
     GRB_ENV = None
-except ImportError as e:
+except ImportError:
     pass
 
 
@@ -52,12 +52,8 @@ class CPM_gurobi(SolverInterface):
     See detailed installation instructions at:
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
-    Creates the following attributes:
-    user_vars: set(), variables in the original (non-transformed) model,
-                    for reverse mapping the values after `solve()`
-    cpm_status: SolverStatus(), the CPMpy status after a `solve()`
-    tpl_model: object, TEMPLATE's model object
-    _varmap: dict(), maps cpmpy variables to native solver variables
+    Creates the following attributes (see parent constructor for more):
+    - grb_model: object, TEMPLATE's model object
     """
 
     @staticmethod
@@ -93,6 +89,7 @@ class CPM_gurobi(SolverInterface):
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
+
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
@@ -149,7 +146,8 @@ class CPM_gurobi(SolverInterface):
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
-        # translate solution values (of user vars only)
+        # translate solution values (of user specified variables only)
+        self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -164,14 +162,13 @@ class CPM_gurobi(SolverInterface):
 
         return has_sol
 
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        from gurobipy import GRB
-
-        if is_num(cpm_var):
+        if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
         # special case, negative-bool-view
@@ -180,7 +177,8 @@ class CPM_gurobi(SolverInterface):
             raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
 
         # create if it does not exit
-        if not cpm_var in self._varmap:
+        if cpm_var not in self._varmap:
+            from gurobipy import GRB
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
@@ -192,16 +190,16 @@ class CPM_gurobi(SolverInterface):
         # return from cache
         return self._varmap[cpm_var]
 
+
     def objective(self, expr, minimize=True):
         """
-            Post the expression to optimize to the solver.
+            Post the given expression to the solver as objective to minimize/maximize
 
-            'objective()' can be called multiple times, onlu the last one is used.
+            'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver)
         """
-
         from gurobipy import GRB
 
         # make objective function non-nested
@@ -209,6 +207,7 @@ class CPM_gurobi(SolverInterface):
         self += flat_cons  # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj))
 
+        # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
         if minimize:
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
@@ -246,43 +245,40 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
 
-    def __add__(self, cpm_con):
+
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-
-        cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
-        cpm_cons = linearize_constraint(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum", "sub"})
-        cpm_cons = only_positive_bv(cpm_cons)
-
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        return cpm_cons
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
-            Solvers do not need to support all constraints.
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
 
@@ -360,8 +356,11 @@ class CPM_gurobi(SolverInterface):
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
         # Global constraints
-        else:
-            self += cpm_expr.decompose()
+        elif hasattr(cpm_expr, 'decompose'):
+            # global constraint not known, try posting generic decomposition
+            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+            for con in self.transform(cpm_expr.decompose()):
+                self._post_constraint(con)
             return
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
