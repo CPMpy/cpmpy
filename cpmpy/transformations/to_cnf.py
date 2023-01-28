@@ -1,5 +1,4 @@
 from ..expressions.core import Operator, Comparison
-from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .flatten_model import flatten_constraint, negated_normal
 """
@@ -23,7 +22,7 @@ from .flatten_model import flatten_constraint, negated_normal
   - BV -> BE
 """
 
-def to_cnf(constraints, supported=frozenset()):
+def to_cnf(constraints):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
@@ -44,9 +43,9 @@ def to_cnf(constraints, supported=frozenset()):
         constraints = [constraints]
 
     fnf = flatten_constraint(constraints)
-    return flat2cnf(fnf, supported=supported)
+    return flat2cnf(fnf)
 
-def flat2cnf(constraints, supported=frozenset()):
+def flat2cnf(constraints):
     """
         Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form,
         including flattening global constraints that are is_bool() and not in `supported`.
@@ -66,7 +65,6 @@ def flat2cnf(constraints, supported=frozenset()):
 
         Arguments:
         - constraints: list[Expression] or Operator
-        - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
     cnf = []
     for expr in constraints:
@@ -131,12 +129,6 @@ def flat2cnf(constraints, supported=frozenset()):
                 subcnf = flat2cnf([negated_normal(a0)])
                 cnf += [a0sub | a1 for a0sub in subcnf]
                 continue
-
-        # decompose global constraints not supported by solver such as XOR with arity > 2
-        elif expr.is_bool() and isinstance(expr, GlobalConstraint) and \
-                expr.name not in supported:
-            cnf += to_cnf(expr.decompose())
-            continue
 
         # all other cases not covered (e.g. not continue'd)
         # pass verbatim

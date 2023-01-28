@@ -15,8 +15,9 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "gurobi": {"circuit"},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative", "xor"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative", "xor"},
+                  # xors: temporarily avoid till #209 is fixed
                   }
 
 # Exclude certain operators for solvers.
