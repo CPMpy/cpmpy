@@ -24,10 +24,11 @@
         CPM_ortools
 """
 import sys  # for stdout checking
+import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -423,8 +424,22 @@ class CPM_ortools(SolverInterface):
                 demand = [demand] * len(start)
             intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
             return self.ort_model.AddCumulative(intervals, demand, cap)
-        elif hasattr(cpm_expr, 'decompose'):
-            # NOT (YET?) MAPPED: Automaton, Circuit,
+        elif cpm_expr.name == "circuit":
+            # ortools has a constraint over the arcs, so we need to create these
+            # when using an objective over arcs, using these vars direclty is recommended
+            # (see PCTSP-path model in the future)
+            x = cpm_expr.args
+            N = len(x)
+            arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+            # post channeling constraints from int to bool
+            self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+            # post the global constraint
+            # when posting arcs on diagonal (i==j), it would do subcircuit
+            ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+            return self.ort_model.AddCircuit(ort_arcs)
+            
+        else:
+            # NOT (YET?) MAPPED: Automaton,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
