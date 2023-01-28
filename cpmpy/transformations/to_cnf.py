@@ -3,7 +3,8 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .flatten_model import flatten_constraint, negated_normal
 """
-  Converts the logical constraints into disjuctions using the tseitin transform.
+  Converts the logical constraints into disjuctions using the tseitin transform,
+        including flattening global constraints that are is_bool() and not in `supported`.
   
   Other constraints are copied verbatim so this transformation
   can also be used in non-pure CNF settings
@@ -27,8 +28,8 @@ def to_cnf(constraints, supported=frozenset()):
         Converts all logical constraints into Conjunctive Normal Form
 
         Arguments:
-
         - constraints: list[Expression] or Operator
+        - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
     if isinstance(constraints, Operator): 
         if constraints.name == "and":
@@ -47,7 +48,8 @@ def to_cnf(constraints, supported=frozenset()):
 
 def flat2cnf(constraints, supported=frozenset()):
     """
-        Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form
+        Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form,
+        including flattening global constraints that are is_bool() and not in `supported`.
 
         What is now left to do is to tseitin encode:
 
@@ -61,6 +63,10 @@ def flat2cnf(constraints, supported=frozenset()):
 
         We do it in a principled way for each of the cases. (in)equalities
         get transformed into implications, everything is modular.
+
+        Arguments:
+        - constraints: list[Expression] or Operator
+        - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
     cnf = []
     for expr in constraints:
