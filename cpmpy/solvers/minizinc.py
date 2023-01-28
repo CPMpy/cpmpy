@@ -322,36 +322,28 @@ class CPM_minizinc(SolverInterface):
             self.mzn_txt_solve = "solve maximize {};\n".format(obj)
 
 
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            No transformations, just ensure it is a list of constraints
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
-        # we can't unpack lists in _post_constraint, so must do it upfront
-        # and can't make assumptions on '.flat' existing either
-        if is_any_list(cpm_con):
-            cpm_con = flatlist(cpm_con)
+        if is_any_list(cpm_expr):
+            return flatlist(cpm_expr)
         else:
-            cpm_con = [cpm_con]
+            return [cpm_expr]
 
-        # no transformations
-        for con in cpm_con:
-            self._post_constraint(con)
-
-        return self
-
-    def _post_constraint(self, cpm_expr):
+    def _post_constraint(self, cpm_con):
         """
-            Post a CPMpy constraint to the native solver API
+            Translate a CPMpy constraint to MiniZinc string and add it to the solver
         """
         # Get text expression, add to the solver
-        txt_cons = f"constraint {self._convert_expression(cpm_expr)};\n"
-        self.mzn_model.add_string(txt_cons)
+        mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
+        self.mzn_model.add_string(mzn_str)
 
     def _convert_expression(self, expr) -> str:
         """
