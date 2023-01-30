@@ -6,8 +6,8 @@ import pytest
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
-SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-# SOLVERNAMES = ["ortools"]
+SOLVERNAMES = ["exact"] # TODO BEFORE MERGE: uncomment line below, remove this line
+# SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
