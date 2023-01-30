@@ -320,36 +320,31 @@ class CPM_exact(SolverInterface):
         return xcoefs,xvars,xrhs
 
 
-    def __add__(self, cpm_con):
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+        Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+        Implemented through chaining multiple solver-independent **transformation functions** from
+        the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+        See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-
-        cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
-        cpm_cons = linearize_constraint(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons)
-        cpm_cons = only_positive_bv(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
         cpm_cons = only_const_rhs(cpm_cons)
         cpm_cons = only_var_lhs(cpm_cons)
-
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        return cpm_cons
 
     @staticmethod
     def fix(o):
@@ -386,12 +381,12 @@ class CPM_exact(SolverInterface):
 
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
-            Solvers do not need to support all constraints.
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from exact import Exact as xct
 
