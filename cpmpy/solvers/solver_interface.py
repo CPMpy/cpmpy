@@ -21,6 +21,7 @@
 
 """
 from ..expressions.core import Expression
+from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
 #
@@ -118,12 +119,6 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Solver does not support objective functions")
 
-    def __add__(self, cpm_cons):
-        """
-            Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
-        """
-        raise NotImplementedError("Solver does not support eagerly adding constraints")
-
 
     def status(self):
         return self.cpm_status
@@ -170,16 +165,61 @@ class SolverInterface(object):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
 
+    # most solvers can inherit this function as is, just implement `transform()` and `__post_constraint()` below
+    def __add__(self, cpm_expr):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (throught `transform()`)
+            and then posted to the solver (through `_post_constraint()`).
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about. All other variables are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        self.user_vars.update(get_variables(cpm_expr))
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
+
+        return self
+
+    def transform(self, cpm_expr):
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
+        """
+        return list(cpm_expr)  # overwrite this function and call the transformations you need
+
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
-            Solvers do not need to support all constraints.
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
+
+        :param cpm_expr: list of CPMpy expressions
+        :type cpm_expr: list of Expression
         """
-        return None
+        raise NotImplementedError("solver _post_constraint(): abstract function, overwrite")
+
 
     # OPTIONAL functions
 
