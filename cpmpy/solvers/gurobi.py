@@ -243,7 +243,7 @@ class CPM_gurobi(SolverInterface):
         if cpm_expr.name == "wsum":
             return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
-        raise NotImplementedError("gurobi: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
@@ -330,7 +330,7 @@ class CPM_gurobi(SolverInterface):
                     return self.grb_model.addGenConstrPow(x, grbrhs, a)
 
             raise NotImplementedError(
-                "Not a know supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+                "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints

@@ -103,7 +103,7 @@ class CPM_ortools(SolverInterface):
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+                           Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
             Additional keyword arguments:
@@ -227,14 +227,14 @@ class CPM_ortools(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             return self.solver_var(cpm_var._bv).Not()
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
 
         return self._varmap[cpm_var]
@@ -295,7 +295,7 @@ class CPM_ortools(SolverInterface):
                 x = self.solver_vars(cpm_expr.args[1])
                 return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
 
-        raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
@@ -358,7 +358,7 @@ class CPM_ortools(SolverInterface):
                     # the natively reifiable 'and', 'or' and 'sum' remain here
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
-                raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
+                raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
         # Comparisons: only numeric ones as the `only_bv_implies()` transformation
@@ -406,7 +406,7 @@ class CPM_ortools(SolverInterface):
                     b = self.solver_var(lhs.args[0])
                     return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
             raise NotImplementedError(
-                        "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                        "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
 
         # rest: base (Boolean) global constraints

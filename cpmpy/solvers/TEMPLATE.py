@@ -148,14 +148,14 @@ class CPM_template(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
 
         # return from cache
@@ -170,7 +170,8 @@ class CPM_template(SolverInterface):
             'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
-             are premanently posted to the solver)
+
+            are permanently posted to the solver)
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
@@ -214,7 +215,7 @@ class CPM_template(SolverInterface):
         #        x = self.solver_vars(cpm_expr.args[1])
         #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
 
-        raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter

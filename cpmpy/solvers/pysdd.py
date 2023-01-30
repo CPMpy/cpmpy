@@ -173,7 +173,7 @@ class CPM_pysdd(SolverInterface):
             # just a view, get actual var identifier, return -id
             return -self.solver_var(cpm_var._bv)
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # make new var, add at end (what is best here??)
