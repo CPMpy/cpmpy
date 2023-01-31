@@ -81,7 +81,7 @@ class CPM_exact(SolverInterface):
         self.assumption_dict = None
 
         # objective can only be set once, so keep track of this
-        self.has_objective = False
+        self.objective_is_set = False
         self.objective_minimize = True
 
         # initialise everything else and post the constraints/objective
@@ -93,13 +93,10 @@ class CPM_exact(SolverInterface):
             return False
 
         # fill in variable values
-        exact_vals = self.xct_solver.getLastSolutionFor([self.solver_var(cpm_var) for cpm_var in self.user_vars])
-        i = 0
-        for cpm_var in self.user_vars:
-            cpm_var._value = exact_vals[i]
-            if isinstance(cpm_var, _BoolVarImpl):
-                cpm_var._value = bool(cpm_var._value) # xct value is always an int
-            i+=1
+        lst_vars = list(self.user_vars)
+        exact_vals = self.xct_solver.getLastSolutionFor([self.solver_var(cpm_var) for cpm_var in lst_vars])
+        for cpm_var, val in zip(lst_vars,exact_vals):
+            cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
         # translate objective
         self.objective_value_ = self.xct_solver.getObjectiveBounds()[1] # last upper bound to the objective
@@ -123,8 +120,8 @@ class CPM_exact(SolverInterface):
         """
         from exact import Exact as xct
 
-        if not self.has_objective:
-            self.has_objective=True
+        if not self.objective_is_set:
+            self.objective_is_set=True
             self.xct_solver.init([],[])
 
         # set time limit?
@@ -132,22 +129,11 @@ class CPM_exact(SolverInterface):
             self.xct_solver.setOption("timeout",str(time_limit))
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
-            print(kw,val)
-            print(type(self.xct_solver))
             self.xct_solver.setOption(kw,str(val))
 
         if assumptions is not None:
             print("TODO: implement assumptions")
             assert(False)
-            #ort_assum_vars = self.solver_vars(assumptions)
-            ## dict mapping ortools vars to CPMpy vars
-            #self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
-            #self.ort_model.ClearAssumptions()  # because add just appends
-            #self.ort_model.AddAssumptions(ort_assum_vars)
-            ## workaround for a presolve with assumptions bug in ortools
-            ## https://github.com/google/or-tools/issues/2649
-            ## still present in v9.0
-            #self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
         # call the solver, with parameters
         my_status = self.xct_solver.runFull()
@@ -186,8 +172,8 @@ class CPM_exact(SolverInterface):
             Returns: number of solutions found
         """
 
-        if not self.has_objective:
-            self.has_objective=True
+        if not self.objective_is_set:
+            self.objective_is_set=True
             self.xct_solver.init([],[])
 
         # avoid adding upper bounds when enumerating solutions
@@ -265,8 +251,8 @@ class CPM_exact(SolverInterface):
 
             'objective()' can only be called once
         """
-        assert not self.has_objective, "Exact accepts an objective function only once."
-        self.has_objective = True
+        assert not self.objective_is_set, "Exact accepts an objective function only once."
+        self.objective_is_set = True
         self.objective_minimize = minimize
 
         # make objective function non-nested
