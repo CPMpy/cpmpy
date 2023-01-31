@@ -16,7 +16,7 @@ Base constraints: (no nesting)
 ------------------------------
 
     - Boolean variable
-    - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+    - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
     - Boolean impliciation: Var -> Var                     (CPMpy class 'Operator', is_bool())
     - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
                         Var == Constant                    (CPMpy class 'Comparison')
@@ -49,7 +49,7 @@ Reify/imply constraint: (up to two nestings on one side)
 
     Boolexpr:
 
-        - Boolean operators: and([Var]), or([Var]), xor([Var]) (CPMpy class 'Operator', is_bool())
+        - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         - Comparison constraint (see above)                    (CPMpy class 'Comparison')
@@ -621,11 +621,10 @@ def negated_normal(expr):
             return expr == 0 # can't do better than this...
 
     elif expr.name == 'xor':
-        # avoid circular import
-        from ..expressions.globalconstraints import Xor
         # stay in xor space
-        # only negated last element
-        return Xor(expr.args[:-1]) ^ negated_normal(expr.args[-1])
+        # only negate last element
+        from ..expressions.globalconstraints import Xor  # avoid circular import
+        return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
 
     else: # circular if I import GlobalConstraint here...
         if hasattr(expr, "decompose"):

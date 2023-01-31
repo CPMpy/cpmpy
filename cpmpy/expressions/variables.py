@@ -497,9 +497,13 @@ class NDVarArray(Expression, np.ndarray):
     def __rmul__(self, other):
         return self._vectorized(other, '__rmul__') 
     def __truediv__(self, other):
-        return self._vectorized(other, '__truediv__') 
+        return self._vectorized(other, '__truediv__')
     def __rtruediv__(self, other):
-        return self._vectorized(other, '__rtruediv__') 
+        return self._vectorized(other, '__rtruediv__')
+    def __floordiv__(self, other):
+        return self._vectorized(other, '__floordiv__')
+    def __rfloordiv__(self, other):
+        return self._vectorized(other, '__rfloordiv__')
     def __mod__(self, other):
         return self._vectorized(other, '__mod__') 
     def __rmod__(self, other):

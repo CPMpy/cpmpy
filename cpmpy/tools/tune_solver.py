@@ -68,6 +68,8 @@ class ParameterTuner:
         if max_tries is None:
             max_tries = len(combos_np)
         while len(combos_np) and i < max_tries:
+            # Make new solver
+            solver = SolverLookup.get(self.solvername, self.model)
             # Apply scoring to all combos
             scores = self._get_score(combos_np)
             max_idx = np.where(scores == scores.min())[0][0]
