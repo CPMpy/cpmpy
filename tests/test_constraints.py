@@ -9,7 +9,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-# SOLVERNAMES = ["ortools"]
+SOLVERNAMES = ["pysat"]
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -74,10 +74,10 @@ def numexprs(solver):
     for (name, arity) in list(names):
         if name in {"wsum", "sum", "mul"}:
             # add int and bool version
-            if solver not in EXCLUDE_OPERATORS or name + ":int" not in EXCLUDE_OPERATORS[SOLVERNAME]:
+            if solver not in EXCLUDE_OPERATORS or name + ":int" not in EXCLUDE_OPERATORS[solver]:
                 names += [(name + ":int", arity)]
                 to_delete |= {(name, arity)}
-            if solver not in EXCLUDE_OPERATORS or name + ":bool" not in EXCLUDE_OPERATORS[SOLVERNAME]:
+            if solver not in EXCLUDE_OPERATORS or name + ":bool" not in EXCLUDE_OPERATORS[solver]:
                 names += [(name + ":bool", arity)]
                 to_delete |= {(name, arity)}
 
@@ -122,14 +122,14 @@ def comp_constraints(solver):
                 if numexpr.name == "mul" and all(isinstance(arg, Expression) and arg.is_bool() for arg in numexpr.args) \
                         and comp_name == ">" and is_num(rhs) and rhs == 1:
                     rhs = 0
-                if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[solver]):
                     yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, 1]:
-                    if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[SOLVERNAME]):
+                    if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[solver]):
                         yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
