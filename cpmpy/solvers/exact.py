@@ -301,7 +301,7 @@ class CPM_exact(SolverInterface):
             xcoefs += [1, -1]
             xvars += [self.solver_var(lhs.args[0]), self.solver_var(lhs.args[1])]
         else:
-            raise NotImplementedError("Exact: Unexpected lhs {} expr {}".format(lhs.name,lhs))
+            raise NotImplementedError("Exact: Unexpected lhs {} for expression {}".format(lhs.name,lhs))
 
         return xcoefs,xvars,xrhs
 
