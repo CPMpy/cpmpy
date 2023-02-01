@@ -228,7 +228,10 @@ def linearize_constraint(cpm_expr):
 
         constraints = [sum(sigma) == 1]
         constraints += [sum(np.arange(n) * sigma) == idx]
-        constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
+        # translation with implication:
+        constraints += [s.implies(Comparison(cpm_expr.name,a,cpm_expr.args[1])) for s,a in zip(sigma,arr)]
+        # translation with multiplication:
+        # constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
 
         return linearize_constraint(flatten_constraint(constraints))
 
