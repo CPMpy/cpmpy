@@ -30,6 +30,7 @@
         CPM_pysat
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
@@ -97,7 +98,7 @@ class CPM_pysat(SolverInterface):
         if not self.supported():
             raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface (NOT the 'pysat' package!)")
         if cpm_model and cpm_model.objective_ is not None:
-            raise Exception("CPM_pysat: only satisfaction, does not support an objective function")
+            raise NotSupportedError("CPM_pysat: only satisfaction, does not support an objective function")
 
         from pysat.formula import IDPool
         from pysat.solvers import Solver

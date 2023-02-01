@@ -23,6 +23,7 @@
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
@@ -71,7 +72,7 @@ class CPM_pysdd(SolverInterface):
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
-            raise Exception("CPM_pysdd: only satisfaction, does not support an objective function")
+            raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
         # initialise the native solver object, or at least their existence
         self.pysdd_vtree = None
@@ -117,7 +118,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -127,6 +128,7 @@ class CPM_pysdd(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit, solution_limit, kwargs: not used
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """
@@ -138,10 +140,7 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
-        if display is None:
-            # the desired, fast computation
-            return self.pysdd_root.model_count()
-        else:
+        if display is not None:
             # manually walking over the tree, much slower...
             solution_count = 0
             for sol in self.pysdd_root.models():
@@ -160,6 +159,9 @@ class CPM_pysdd(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # the desired, fast computation
+        return self.pysdd_root.model_count()
 
     def solver_var(self, cpm_var):
         """

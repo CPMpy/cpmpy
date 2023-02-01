@@ -27,6 +27,7 @@ import sys  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison
@@ -190,12 +191,12 @@ class CPM_ortools(SolverInterface):
                     cpm_var._value = bool(cpm_var._value) # ort value is always an int
 
             # translate objective
-            if self.ort_model.HasObjective():
+            if self.has_objective():
                 self.objective_value_ = self.ort_solver.ObjectiveValue()
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -205,10 +206,13 @@ class CPM_ortools(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """
-        # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
+
         cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
         self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
         return cb.solution_count()
@@ -263,6 +267,9 @@ class CPM_ortools(SolverInterface):
             self.ort_model.Minimize(obj)
         else:
             self.ort_model.Maximize(obj)
+
+    def has_objective(self):
+        return self.ort_model.HasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -613,6 +620,8 @@ try:
                     if hasattr(cpm_var, "flat"):
                         for cpm_subvar in cpm_var.flat:
                             cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
                     else:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 

@@ -37,7 +37,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
-from ..exceptions import MinizincPathException
+from ..exceptions import MinizincPathException, NotSupportedError
 
 
 class CPM_minizinc(SolverInterface):
@@ -346,6 +346,8 @@ class CPM_minizinc(SolverInterface):
         else:
             self.mzn_txt_solve = "solve maximize {};\n".format(obj)
 
+    def has_objective(self):
+        return self.mzn_txt_solve != "solve satisfy;"
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
@@ -495,7 +497,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -506,11 +508,15 @@ class CPM_minizinc(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
+
         import asyncio
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
