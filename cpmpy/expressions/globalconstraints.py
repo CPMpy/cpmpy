@@ -266,6 +266,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
+        #make it a list because other code assumes decompositions return a list of constraints
         return [any(all(arr == row) for row in tab)]
 
 
