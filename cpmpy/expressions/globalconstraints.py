@@ -266,7 +266,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        return any(all(arr == row) for row in tab)
+        return [any(all(arr == row) for row in tab)]
 
 
     def deepcopy(self, memodict={}):
@@ -277,7 +277,11 @@ class Table(GlobalConstraint):
         array, table = self._deepcopy_args(memodict)
         return Table(array, table)
 
-    # TODO: value()
+    def value(self):
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        return arrval in tab
+
 
 # Numeric Global Constraints (with integer-valued return type)
 
