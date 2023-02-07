@@ -264,7 +264,9 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
-        raise NotImplementedError("TODO: table decomposition")
+        from .python_builtins import any, all
+        arr, tab = self.args
+        return any(all(arr == row) for row in tab)
 
 
     def deepcopy(self, memodict={}):
