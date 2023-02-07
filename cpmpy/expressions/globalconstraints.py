@@ -246,16 +246,16 @@ class Circuit(GlobalConstraint):
         from .python_builtins import all
         pathlen = 0
         idx = 0
-        visited = []
+        visited = set()
         arr = [argval(a) for a in self.args]
         while(idx not in visited):
-            if idx not in range(len(arr)):
+            if not (0 <= idx < len(arr)):
                 break
-            visited.append(idx)
+            visited.add(idx)
             pathlen += 1
             idx = arr[idx]
 
-        return all([(pathlen == len(self.args)), (AllDifferent(self.args).value()), (arr[-1] == 0)])
+        return (pathlen == len(self.args)) and (arr[-1] == 0)
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
@@ -311,7 +311,10 @@ class Minimum(GlobalConstraint):
         from .python_builtins import any, all
 
         arr = argval(self.args)
-        return [any(eval_comparison(cpm_op, j, cpm_rhs) & (all([j <= a for a in arr])) for j in arr)]
+        ub = max(a.ub for a in arr)
+        lb = min(a.lb for a in arr)
+        _min = intvar(lb, ub)
+        return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
 
     def get_bounds(self):
         pass
@@ -347,7 +350,10 @@ class Maximum(GlobalConstraint):
         from .python_builtins import any, all
 
         arr = argval(self.args)
-        return [any(eval_comparison(cpm_op, j, cpm_rhs) & (all([j >= a for a in arr])) for j in arr)]
+        ub = max(a.ub for a in arr)
+        lb = min(a.lb for a in arr)
+        _max = intvar(lb, ub)
+        return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
 
     def get_bounds(self):
         pass
@@ -532,34 +538,6 @@ class Cumulative(GlobalConstraint):
         return Cumulative(*copied_args)
 
 
-
-# from Hakan's global decompositions.
-# We should make these GlobalConstraint with the corresponding decomposition.
-# Note that count is a numeric global constraint like min/max/element.
-# see commented use in gcc
-# for the decomposition to work, see `decompose_comparison()` of element.
-# then we would have `def atleast(n, vars, val): return Count(vars, val) >= n`
-#is in?
-def alldifferent_except_0(args):
-    return [ ((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(args)]
-
-def count(a,val,c):
-    """
-    Ensure that the number of occurrences of val in a is exactly c.
-    """
-    return [sum(a == val) == c]
-
-def global_cardinality_count(a,gcc):
-    """
-    Global cardinality count: Collect the number of occurrences of each value 0..a.ub in gcc.
-    The array gcc must have elements 0..ub (so of size ub+1).
-    """
-    ub = max([v.ub for v in a])
-    assert (len(gcc) == ub+1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub+1}"
-    return [count(a,i,v) for i, v in enumerate(gcc)]
-    #return [Count(a,i) == v for i, v in enumerate(gcc)]
-
-
 class GlobalCardinalityCount(GlobalConstraint):
     """
         GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
@@ -600,8 +578,7 @@ class Count(GlobalConstraint):
     def value(self):
         arr, val = self.args
         val = argval(val)
-        argvals = [argval(a) for a in arr]
-        return sum([argv == val for argv in argvals])
+        return sum([argval(a) == val for a in arr])
 
     def deepcopy(self, memodict={}):
         arr, val = self._deepcopy_args(memodict)
@@ -614,7 +591,7 @@ class Count(GlobalConstraint):
         from .python_builtins import any
 
         arr, val = self.args
-        return [any((eval_comparison(cmp_op, j, cmp_rhs) & (Operator('sum',arr == val) == j) for j in range(len(arr) + 1)))]
+        return eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)
 
     def get_bounds(self):
         return [0, len(self.args[0])]
