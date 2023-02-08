@@ -5,7 +5,8 @@
     https://TODO
 
     This solver can ONLY be used for solution enumeration over Boolean variables!
-    That is, only logical constraints (and,or,xor,implies,==,!=) (and cardinality constraints later).
+    That is, only logical constraints (and,or,implies,==,!=) and Xor global constraint
+    (and cardinality constraints later).
 
     Documentation of the solver's own Python API:
     https://TODO
@@ -22,6 +23,7 @@
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
@@ -70,7 +72,7 @@ class CPM_pysdd(SolverInterface):
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
-            raise Exception("CPM_pysdd: only satisfaction, does not support an objective function")
+            raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
         # initialise the native solver object, or at least their existence
         self.pysdd_vtree = None
@@ -116,7 +118,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -126,6 +128,7 @@ class CPM_pysdd(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit, solution_limit, kwargs: not used
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """
@@ -137,10 +140,7 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
-        if display is None:
-            # the desired, fast computation
-            return self.pysdd_root.model_count()
-        else:
+        if display is not None:
             # manually walking over the tree, much slower...
             solution_count = 0
             for sol in self.pysdd_root.models():
@@ -160,6 +160,9 @@ class CPM_pysdd(SolverInterface):
                 else:
                     display()  # callback
 
+        # the desired, fast computation
+        return self.pysdd_root.model_count()
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
@@ -172,7 +175,7 @@ class CPM_pysdd(SolverInterface):
             # just a view, get actual var identifier, return -id
             return -self.solver_var(cpm_var._bv)
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # make new var, add at end (what is best here??)
@@ -185,41 +188,41 @@ class CPM_pysdd(SolverInterface):
 
         return self._varmap[cpm_var]
 
-
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        For PySDD, it can be beneficial to post a big model (collection of constraints) at once...
+            See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
+        # initialize (arbitrary) vtree from all user-specified vars
         if self.pysdd_root is None:
-            # initialize (arbitrary) vtree from vars
             from pysdd.sdd import SddManager, Vtree
 
             self.pysdd_vtree = Vtree(var_count=len(self.user_vars), vtree_type="balanced")
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
-        # apply transformations, then post internally
-        cpm_cons = to_cnf(cpm_con)
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
+
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
+
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -233,6 +236,11 @@ class CPM_pysdd(SolverInterface):
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         #elif isinstance(cpm_expr, Comparison):
+
+        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
+            # for all global constraints:
+            for con in self.transform(cpm_expr.decompose()):
+                self._post_constraint(con)
         else:
             raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
 

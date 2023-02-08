@@ -27,6 +27,8 @@
 
         Model
 """
+import warnings
+
 import numpy as np
 from .expressions.core import Operator
 from .expressions.utils import is_any_list
@@ -162,7 +164,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
@@ -219,7 +221,30 @@ class Model(object):
             :return: an object of :class: `Model`
         """
         with open(fname, "rb") as f:
-            return pickle.load(f)
+            m = pickle.load(f)
+            # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
+            from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+            vs = get_variables_model(m)
+            bv_counter = 0
+            iv_counter = 0
+            for v in vs:
+                if v.name.startswith("BV"):
+                    try:
+                        bv_counter = max(bv_counter, int(v.name[2:])+1)
+                    except:
+                        pass
+                elif v.name.startswith("IV"):
+                    try:
+                        iv_counter = max(iv_counter, int(v.name[2:])+1)
+                    except:
+                        pass
+            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl  # avoid circular import
+            if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
+                    (_IntVarImpl.counter > 0 and iv_counter > 0):
+                warnings.warn(f"from_file '{fname}': contains auxiliary IV*/BV* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+            _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
+            _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
+            return m
 
     def copy(self):
         """
