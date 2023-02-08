@@ -239,7 +239,7 @@ class CPM_pysat(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # flatten constraints and to cnf
-        cpm_cons = to_cnf(cpm_con)
+        cpm_cons = sorted(to_cnf(cpm_con), key=lambda x: str(x))
 
         for con in cpm_cons:
             if not is_boolvar_constraint(con):
@@ -284,8 +284,16 @@ class CPM_pysat(SolverInterface):
             # base case, just var or ~var
             clauses.append([self.solver_var(cpm_expr)])
         elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'or':
+            if cpm_expr.name == 'or' and all(isinstance(v, _BoolVarImpl) for v in cpm_expr.args):
                 clauses.append(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'or' and len(cpm_expr.args) == 2:
+                bv, subexpr = cpm_expr.args
+                solver_var = self.solver_vars(bv)
+                sub_clauses = self._enocde_constraints(subexpr)
+
+                for subcl in sub_clauses:
+                    subcl.append(solver_var)
+                return sub_clauses
             else:
                 raise NotImplementedError(
                     f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
