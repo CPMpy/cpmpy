@@ -613,6 +613,11 @@ def negated_normal(expr):
         return ~expr
 
     elif isinstance(expr, Comparison):
+        if expr.name == '==' and expr.args[0].is_bool() \
+           and not is_num(expr.args[1]):  # XXX and is ==0 hack..., fix with ~
+            # Boolean case, double reification, keep == and negate arg1
+            return Comparison('==', expr.args[0], negated_normal(expr.args[1]))
+
         newexpr = copy.copy(expr)
         if   expr.name == '==': newexpr.name = '!='
         elif expr.name == '!=': newexpr.name = '=='
