@@ -152,7 +152,11 @@ def flatten_constraint(expr):
         """
         # does not type-check that arguments are bool... Could do now with expr.is_bool()!
         if all(__is_flat_var(arg) for arg in expr.args):
-            return [expr]
+            if expr.name == 'not':
+                #convert to negboolview
+                return [NegBoolView(expr.args[0])]
+            else:
+                return [expr]
 
         if expr.name == '->':
             # ->, allows a boolexpr on one side
@@ -168,6 +172,10 @@ def flatten_constraint(expr):
 
             newexpr = Operator(expr.name, (lhs,rhs))
             return [newexpr]+flatcons
+        elif expr.name == 'not':
+            nnexpr = negated_normal(expr.args[0])
+            (con, flatcons) = normalized_boolexpr(nnexpr)
+            return [con]+flatcons
         else:
             # a normalizable boolexpr
             (con, flatcons) = normalized_boolexpr(expr)
@@ -405,6 +413,15 @@ def normalized_boolexpr(expr):
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
 
+        #push down the negation
+        if expr.name == 'not':
+            nnexpr = negated_normal(expr.args[0])
+            if __is_flat_var(nnexpr):
+                #can be a flat var in this case because Not(bv) get converted to NegBoolView
+                return (nnexpr, [])
+            else:
+                return normalized_boolexpr(nnexpr)
+
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -470,6 +487,7 @@ def normalized_boolexpr(expr):
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 if is_num(rexpr):
+                    #TODO this code should be unreachable after making not an expression
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
                     if exprname == '==':
@@ -604,6 +622,8 @@ def negated_normal(expr):
             return Operator('and', [negated_normal(arg) for arg in expr.args])
         elif expr.name == '->':
             return expr.args[0] & negated_normal(expr.args[1])
+        elif expr.name == 'not':
+            return expr.args[0]
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
             return expr == 0 # can't do better than this...
@@ -615,6 +635,10 @@ def negated_normal(expr):
         return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
 
     else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose_negation"):
+            # for global constraints where the negation of the decomposition is not equivalent
+            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
+            return Operator('and', expr.decompose_negation())
         if hasattr(expr, "decompose"):
             # global... decompose and negate that
             return negated_normal(Operator('and', expr.decompose()))

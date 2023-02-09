@@ -260,6 +260,41 @@ class Circuit(GlobalConstraint):
 
         return (pathlen == len(self.args)) and (arr[-1] == 0)
 
+    def decompose_negation(self):
+        '''
+        returns the decomposition of the negation. We can not simply negate the decomposition
+        because of the use of auxiliary variables in the decomposition
+
+        should return something in negated normal form, since flatten_model.negated_normal() returns this
+        '''
+
+        succ = cpm_array(self.args)
+        n = len(succ)
+        order = intvar(0, n - 1, shape=n)
+        return [Operator('not', [Operator('and',[~AllDifferent(succ),
+                   # others: ith one is successor of i-1
+                    ] + [order[i] != succ[order[i - 1]] for i in range(1, n)] )]),
+                # not negating following constraints since they involve only the auxiliary variables
+                # loop: first one is successor of '0'
+                order[0] == succ[0],
+                # last one is '0'
+                order[n - 1] == 0,
+                # different orders
+                AllDifferent(order)]
+        return [Operator('or', ([~AllDifferent(succ),
+                   # others: ith one is successor of i-1
+                    ] + [order[i] != succ[order[i - 1]] for i in range(1, n)])),
+                #not negating following constraints since they involve only the auxiliary variables
+                # loop: first one is successor of '0'
+                order[0] == succ[0],
+                # last one is '0'
+                order[n - 1] == 0,
+                # different orders
+                AllDifferent(order)]
+
+
+
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
