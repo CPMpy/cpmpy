@@ -81,6 +81,7 @@ import copy
 import math
 import numpy as np
 from ..expressions.core import *
+from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 
@@ -237,11 +238,13 @@ def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
 
-    if isinstance(expr, Expression) and expr.name in supported:
-        return normalized_numexpr(expr)
+    (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
+    if isinstance(flatexpr, Expression) and flatexpr.name in supported:
+        return (flatexpr, flatcons)
     else:
-        # any other numeric expression
-        return get_or_make_var(expr)
+        # any other numeric expression,
+        var, cons = get_or_make_var(flatexpr)
+        return (var, cons+flatcons)
 
 
 def __is_flat_var(arg):
@@ -281,7 +284,7 @@ def get_or_make_var(expr):
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
-        if isinstance(flatexpr, Operator) and expr.name == "wsum":
+        if isinstance(flatexpr, Operator) and flatexpr.name == "wsum":
             # more complex args, and weights can be negative, so more complex lbs/ubs
             weights, flatvars  = flatexpr.args
             bounds = np.array([[w * fvar.lb for w, fvar in zip(weights, flatvars)],
@@ -419,43 +422,6 @@ def normalized_boolexpr(expr):
         else:
             # LHS can be numexpr, RHS has to be variable
 
-            # TODO: optimisations that swap directions instead when it can avoid to create vars
-            """
-            if expr.name == '==' or expr.name == '!=':
-                # RHS has to be variable, LHS can be more
-                if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
-                    # LHS is var and RHS not, swap for new expression
-                    lexpr, rexpr = rexpr, lexpr
-
-                if __is_numexpr(lexpr) and __is_numexpr(rexpr):
-                    # numeric case
-                    (lrich, lcons) = flatten_objective(lexpr)
-                    (rvar, rcons) = flatten_numexpr(rexpr)
-                else:
-                    # Boolean case
-                    # make LHS reify_ready, RHS var
-                    (lrich, lcons) = reify_ready_boolexpr(lexpr)
-                    (rvar, rcons) = flatten_boolexpr(rexpr)
-                flatcons += [Comparison(expr.name, lrich, rvar)]+lcons+rcons
-
-            else: # inequalities '<=', '<', '>=', '>'
-                newname = expr.name
-                # LHS can be linexpr, RHS a var
-                if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
-                    # LHS is var and RHS not, swap for new expression (incl. operator name)
-                    lexpr, rexpr = rexpr, lexpr
-                    if   expr.name == "<=": newname = ">="
-                    elif expr.name == "<":  newname = ">"
-                    elif expr.name == ">=": newname = "<="
-                    elif expr.name == ">":  newname = "<"
-
-                # make LHS like objective, RHS var
-                (lrich, lcons) = flatten_objective(lexpr)
-                (rvar, rcons) = flatten_numexpr(rexpr)
-                flatcons += [Comparison(newname, lrich, rvar)]+lcons+rcons
-            """
-
-            # RHS must be var (or const)
             lexpr, rexpr = expr.args
             exprname = expr.name
 
@@ -532,15 +498,36 @@ def normalized_numexpr(expr):
         return get_or_make_var(expr)
 
     elif isinstance(expr, Operator):
-        # special case, -var, turn into -1*args[0]
-        if expr.name == '-': # unary
-            return normalized_numexpr(-1*expr.args[0])
+        # rewrite -a, const*a and a*const into a weighted sum, so it can be used as objective
+        if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
+            return normalized_numexpr(Operator("wsum", _wsum_make(expr)))
 
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
 
-        elif expr.name == 'wsum': # unary
+        # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
+        if expr.name == "sum" and \
+           any(a.name == "-" or _wsum_should(expr) for a in expr.args):
+            we = [_wsum_make(a) for a in expr.args]
+            w = [wi for w,_ in we for wi in w]
+            e = [ei for _,e in we for ei in e]
+            return normalized_numexpr(Operator("wsum", (w,e)))
+
+        # wsum needs special handling because expr.args is a tuple of which only 2nd one has exprs
+        if expr.name == 'wsum':
             weights, sub_exprs  = expr.args
+            # while here, avoid creation of auxiliary variables for compatible operators -/sum/wsum
+            i = 0
+            while(i < len(sub_exprs)): # can dynamically change
+                if sub_exprs[i].name in ['-', 'sum', 'wsum']:
+                    w,e = _wsum_make(sub_exprs[i])
+                    # insert in place, and next iteration over same 'i' again
+                    weights[i:i+1] = [weights[i]*wj for wj in w]
+                    sub_exprs[i:i+1] = e
+                else:
+                    i = i+1
+
+            # now flatten the resulting subexprs
             flatvars, flatcons = map(list, zip(*[get_or_make_var(arg) for arg in sub_exprs])) # also bool, reified...
             newexpr = Operator(expr.name, (weights, flatvars))
             return (newexpr, [c for con in flatcons for c in con])
