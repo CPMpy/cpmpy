@@ -186,23 +186,31 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return [expr]
-
-        # swap 'Var == Expr' to normal 'Expr == Var'
+        exprname = expr.name  # so it can be modified
         lexpr, rexpr = expr.args
+        rewritten = False
+
+        # rewrite 'Var == Expr' to normalzed 'Expr == Var'
         if (expr.name == '==' or expr.name == '!=') \
                 and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
             lexpr, rexpr = rexpr, lexpr
+            rewritten = True
+
+        # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+        if exprname == '!=' and lexpr.is_bool():
+            exprname = '=='
+            rexpr = ~rexpr
+            rewritten = True
+
+        # already flat?
+        if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
+            if not rewritten:
+                return [expr]  # original
+            else:
+                return [Comparison(exprname, lexpr, rexpr)]
 
         # ensure rhs is var
         (rvar, rcons) = get_or_make_var(rexpr)
-
-        exprname = expr.name  # so it can be modified
-        # 'BoolExpr != Rvar' to normal 'BoolExpr == ~Rvar'
-        if exprname == '!=' and lexpr.is_bool():  # negate rvar
-            exprname = '=='
-            rvar = ~rvar
 
         # Reification (double implication): Boolexpr == Var
         if exprname == '==' and lexpr.is_bool():
@@ -376,15 +384,14 @@ def get_or_make_var_or_list(expr):
 
 def normalized_boolexpr(expr):
     """
-        all 'flat normal form' Boolean expressions that can be 'reified', meaning that
+        input is any Boolean (is_bool()) expression,
+        output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
+            - subexpr == BoolVar
+            - subexpr -> BoolVar
 
-            - expr == BoolVar
-            - expr != BoolVar
-            - expr -> BoolVar
+        are valid output expressions.
 
-        are valid expressions.
-
-        Currently, this is the case for:
+        Currently, this is the case for subexpr:
         - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
@@ -417,10 +424,10 @@ def normalized_boolexpr(expr):
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return (expr, [])
+        if expr.name != '!=' and all(__is_flat_var(arg) for arg in expr.args):
+            return (expr, [])  # shortcut
         else:
-            # LHS can be numexpr, RHS has to be variable
+            # LHS can be boolexpr, RHS has to be variable
 
             lexpr, rexpr = expr.args
             exprname = expr.name

@@ -94,7 +94,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var(~x)), "(~BV0, [])" )
 
         self.assertEqual( str(get_or_make_var(x == y)), "(BV3, [((BV0) == (BV1)) == (BV3)])" )
-        self.assertEqual( str(get_or_make_var(x != y)), "(BV4, [((BV0) != (BV1)) == (BV4)])" )
+        self.assertEqual( str(get_or_make_var(x != y)), "(BV4, [((BV0) == (~BV1)) == (BV4)])" )
         self.assertEqual( str(get_or_make_var(x > y)), "(BV5, [((BV0) > (BV1)) == (BV5)])" )
         self.assertEqual( str(get_or_make_var(x <= y)), "(BV6, [((BV0) <= (BV1)) == (BV6)])" )
 
