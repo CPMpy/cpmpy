@@ -135,14 +135,29 @@ def flatten_constraint(expr):
         for e in expr:
             flatcons += flatten_constraint(e)  # add all at end
         return flatcons
+
+    assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
+
     # recursively flatten top-level 'and'
-    if isinstance(expr, Operator) and expr.name == 'and':
+    if expr.name == 'and':
         flatcons = []
         for e in expr.args:
             flatcons += flatten_constraint(e)  # add all at end
         return flatcons
 
-    assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
+    # check of it contains conjunctions, and if so split out
+    # also in case of a nested implication, merge in
+    elif expr.name == 'or':
+        for i,a in enumerate(expr.args):
+            if isinstance(expr, Operator):
+                if a.name == 'and':
+                    # OK, can avoid aux var creation by splitting over the and
+                    return flatten_constraint([Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args])
+                if a.name == '->':
+                    # not allowed to rewrite in place, so create new one
+                    a0,a1 = a.args
+                    return flatten_constraint(Operator("or", expr.args[:i]+[~a0,a1]+expr.args[i+1:]))
+
 
     if isinstance(expr, Operator):
         """
