@@ -80,7 +80,7 @@ class TestTransfReif(unittest.TestCase):
         cases = [(rv == bvs[0], "[(rv) == (bvs[0])]"),
                  (rv == all(bvs), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]"),
                  (rv.implies(any(bvs)), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]"),
-                 ((bvs[0].implies(bvs[1])).implies(rv), "[((~bvs[0]) or (bvs[1])) -> (rv)]"),
+                 ((bvs[0].implies(bvs[1])).implies(rv), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]"),
                  (rv == AllDifferent(ivs), "[(and([BV0, BV1, BV2])) == (rv), ((ivs[0]) != (ivs[1])) == (BV0), ((ivs[0]) != (ivs[2])) == (BV1), ((ivs[1]) != (ivs[2])) == (BV2)]"),
                  (rv.implies(AllDifferent(ivs)), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]"),
                  (rv == (arr[intvar(-1,3)] != 1), "[((BV6) or (BV7)) == (rv), (IV0 == 0) == (BV6), (IV0 == 2) == (BV7)]"),

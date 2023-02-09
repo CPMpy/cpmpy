@@ -156,6 +156,24 @@ def flatten_constraint(expr):
             return [expr]
 
         if expr.name == '->':
+            # some rewrite rules that avoid creating auxiliary variables
+            # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
+            # XXX ideally negations are already pushed down, so a0->~(or(...)) is also covered
+            if expr.args[1].name == 'and':
+                a1s = expr.args[1].args
+                a0 = expr.args[0]
+                return flatten_constraint([a0.implies(a1) for a1 in a1s])
+            # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
+            if expr.args[0].name == 'or':
+                a0s = expr.args[0].args
+                a1 = expr.args[1]
+                return flatten_constraint([(~a1).implies(~a0) for a0 in a0s])
+            # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
+            if expr.args[0].name == '->':
+                a01,a02 = expr.args[0].args
+                a1 = expr.args[1]
+                return flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)])
+
             # ->, allows a boolexpr on one side
             if isinstance(expr.args[0], _BoolVarImpl):
                 # LHS is var, ensure RHS is normalized 'Boolexpr'
