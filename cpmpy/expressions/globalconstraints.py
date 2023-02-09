@@ -101,6 +101,9 @@
         Element
         Xor
         Cumulative
+        Count
+        AlldifferenExcept0
+        GlobalCardinalityCount
 
 """
 import warnings # for deprecation warning
