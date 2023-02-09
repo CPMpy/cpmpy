@@ -410,7 +410,7 @@ class CPM_z3(SolverInterface):
             return z3.Distinct(self._z3_expr(cpm_con.args))
 
         # global constraints
-        return self._z3_expr(cpm_con.decompose())
+        return self._z3_expr(all(cpm_con.decompose()))
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 

@@ -598,7 +598,8 @@ class Count(GlobalConstraint):
         from .python_builtins import any
 
         arr, val = self.args
-        return eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)
+        #we assume decompositions return lists of constraints
+        return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
 
     def get_bounds(self):
         return [0, len(self.args[0])]
