@@ -38,16 +38,28 @@ def only_bv_implies(constraints):
 
     newcons = []
     for cpm_expr in constraints:
-        # Operators: check BE -> BV
+        # Operators: check BE -> BE
         if isinstance(cpm_expr, Operator) and \
                 cpm_expr.name == '->' and \
-                cpm_expr.args[0].is_bool() and \
-                not isinstance(cpm_expr.args[0], _BoolVarImpl) and \
-                isinstance(cpm_expr.args[1], _BoolVarImpl):
-            # BE -> BV :: ~BV -> ~BE
-            negbvar = ~(cpm_expr.args[1])
-            negexpr = negated_normal(cpm_expr.args[0])
-            newcons.append(negbvar.implies(negexpr))
+                cpm_expr.args[0].is_bool():
+            if not isinstance(cpm_expr.args[0], _BoolVarImpl) and \
+                    isinstance(cpm_expr.args[1], _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                negbvar = ~(cpm_expr.args[1])
+                negexpr = negated_normal(cpm_expr.args[0])
+                newcons += only_bv_implies([ negbvar.implies(negexpr) ])
+            elif isinstance(cpm_expr.args[1], Comparison) and \
+                    cpm_expr.args[1].name == '==' and \
+                    cpm_expr.args[1].args[0].is_bool():
+                # BV1 -> BV2 == BV3 :: BV1 -> (BV2->BV3 & BV3->BV2)
+                #                   :: BV1 -> (BV2->BV3) & BV1 -> (BV3->BV2)
+                #                   :: BV1 -> (~BV2|BV3) & BV1 -> (~BV3|BV2)
+                bv1 = cpm_expr.args[0]
+                bv2,bv3 = cpm_expr.args[1].args
+                newcons += only_bv_implies([ bv1.implies(~bv2|bv3),
+                                             bv1.implies(~bv3|bv2) ])
+            else:  # OK
+                newcons.append(cpm_expr)
 
         # Comparisons: check BE == BV
         elif isinstance(cpm_expr, Comparison) and \
@@ -57,13 +69,13 @@ def only_bv_implies(constraints):
             # BV == BV special case
             if isinstance(cpm_expr.args[0], _BoolVarImpl):
                 l, r = cpm_expr.args
-                newcons.append(l.implies(r))
-                newcons.append(r.implies(l))
+                newcons += only_bv_implies([ l.implies(r),
+                                             r.implies(l) ])
             else:
                 # BE == BV :: ~BV -> ~BE, BV -> BE
                 expr, bvar = cpm_expr.args
-                newcons.append((~bvar).implies(negated_normal(expr)))
-                newcons.append(bvar.implies(expr))
+                newcons += only_bv_implies([ (~bvar).implies(negated_normal(expr)),
+                                             bvar.implies(expr) ])
 
         elif isinstance(cpm_expr, Comparison) and \
                 cpm_expr.name == '==' and \
@@ -77,9 +89,9 @@ def only_bv_implies(constraints):
             else:
                 expr, ivar = cpm_expr.args
                 bv = _BoolVarImpl()
-                newcons.append(Comparison('==',bv,ivar))
-                newcons.append((~bv).implies(negated_normal(expr)))
-                newcons.append(bv.implies(expr))
+                newcons += only_bv_implies([ Comparison('==',bv,ivar),
+                                             (~bv).implies(negated_normal(expr)),
+                                             bv.implies(expr) ])
 
         else:
             # all other flat normal form expressions are fine
