@@ -487,7 +487,7 @@ def normalized_boolexpr(expr):
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 if is_num(rexpr):
-                    #TODO this code should be unreachable after making not an expression
+                    #This case still exists, as the users can write boolexpr == 0
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
                     if exprname == '==':
