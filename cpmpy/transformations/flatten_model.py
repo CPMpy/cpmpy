@@ -633,11 +633,14 @@ def negated_normal(expr):
         if expr.name == 'and':
             return Operator('or', [negated_normal(arg) for arg in expr.args])
         elif expr.name == 'or':
+            # XXX this might create a top-level and
             return Operator('and', [negated_normal(arg) for arg in expr.args])
         elif expr.name == '->':
+            # XXX this might create a top-level and
             return expr.args[0] & negated_normal(expr.args[1])
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
+            # XXX do raise, better safe then sorry
             return expr == 0 # can't do better than this...
 
     elif expr.name == 'xor':
