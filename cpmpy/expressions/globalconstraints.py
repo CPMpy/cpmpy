@@ -111,7 +111,7 @@ import numpy as np
 
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -345,14 +345,15 @@ class Minimum(GlobalConstraint):
         """
         from .python_builtins import any, all
 
-        arr = argval(self.args)
-        ub = max(a.ub for a in arr)
-        lb = min(a.lb for a in arr)
+        lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
-        return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
+        return all([any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)])
 
     def get_bounds(self):
-        pass
+        ub = min([get_bounds(a)[1] for a in self.args]) #lowest upperbound
+        lb = min([get_bounds(a)[0] for a in self.args]) #lowest lowerbound
+        return lb, ub
+
 
 class Maximum(GlobalConstraint):
     """
@@ -383,15 +384,14 @@ class Maximum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
-
-        arr = argval(self.args)
-        ub = max(a.ub for a in arr)
-        lb = min(a.lb for a in arr)
+        lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
-        return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
+        return all([any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)])
 
     def get_bounds(self):
-        pass
+        ub = max([get_bounds(a)[1] for a in self.args])  # highest upperbound
+        lb = max([get_bounds(a)[0] for a in self.args])  # highest lowerbound
+        return lb, ub
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
@@ -630,7 +630,7 @@ class Count(GlobalConstraint):
         return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
 
     def get_bounds(self):
-        return [0, len(self.args[0])]
+        return (0, len(self.args[0]))
 
     def __repr__(self):
         return "Count({})".format(self.args)

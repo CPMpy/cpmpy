@@ -21,6 +21,7 @@ Internal utilities for expression handling.
         argval
         eval_comparison
 """
+from math import floor, ceil
 
 import numpy as np
 from collections.abc import Iterable # for _flatten
@@ -109,3 +110,9 @@ def ite(condition, if_true, if_false):
             (~condition).implies(if_false)
            )
 
+def get_bounds(expr):
+    if hasattr(expr,'get_bounds'):
+        return expr.get_bounds()
+    else:
+        assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
+        return floor(expr), ceil(expr)

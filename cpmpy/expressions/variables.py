@@ -238,6 +238,9 @@ class _NumVarImpl(Expression):
         """
         return self._value
 
+    def get_bounds(self):
+        """ the lower and upper bounds"""
+        return self.lb, self.ub
     def clear(self):
         """ clear the value obtained from the last solve call
         """
