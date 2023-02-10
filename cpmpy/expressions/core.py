@@ -352,7 +352,6 @@ class Expression(object):
     # 'not' for now, no unary constraint for it
     def __invert__(self):
         return Operator("not", [self])
-        return (self == 0)
 
 
 class Comparison(Expression):

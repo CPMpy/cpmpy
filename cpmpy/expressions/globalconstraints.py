@@ -281,16 +281,6 @@ class Circuit(GlobalConstraint):
                 order[n - 1] == 0,
                 # different orders
                 AllDifferent(order)]
-        return [Operator('or', ([~AllDifferent(succ),
-                   # others: ith one is successor of i-1
-                    ] + [order[i] != succ[order[i - 1]] for i in range(1, n)])),
-                #not negating following constraints since they involve only the auxiliary variables
-                # loop: first one is successor of '0'
-                order[0] == succ[0],
-                # last one is '0'
-                order[n - 1] == 0,
-                # different orders
-                AllDifferent(order)]
 
 
 
