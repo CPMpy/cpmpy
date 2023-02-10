@@ -547,7 +547,7 @@ def normalized_numexpr(expr):
 
         # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
         if expr.name == "sum" and \
-           any(a.name == "-" or _wsum_should(expr) for a in expr.args):
+           any(isinstance(a, Operator) and (a.name == "-" or _wsum_should(a)) for a in expr.args):
             we = [_wsum_make(a) for a in expr.args]
             w = [wi for w,_ in we for wi in w]
             e = [ei for _,e in we for ei in e]
