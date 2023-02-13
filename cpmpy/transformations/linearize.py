@@ -48,7 +48,7 @@ from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
-def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
+def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form', and implications only contain boolean variables on the lhs.
@@ -56,7 +56,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
     """
 
     if is_any_list(cpm_expr):
-        lin_cons = [linearize_constraint(expr, supported=supported) for expr in cpm_expr]
+        lin_cons = [linearize_constraint(expr, supported=supported, reified=reified) for expr in cpm_expr]
         return [c for l in lin_cons for c in l]
 
     # boolvar
@@ -81,11 +81,11 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
 
         if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
             # shortcut for BV -> BV, convert to disjunction and apply linearize on it
-            return linearize_constraint(~cond | sub_expr)
+            return linearize_constraint(~cond | sub_expr, reified=reified)
 
         # BV -> LinExpr
         if isinstance(cond, _BoolVarImpl):
-            lin_sub = linearize_constraint(sub_expr, supported=supported)
+            lin_sub = linearize_constraint(sub_expr, supported=supported, reified=True)
             return [cond.implies(lin) for lin in lin_sub]
 
     # comparisons
@@ -117,18 +117,15 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
                 constraints += [sum(np.arange(n) * sigma) == idx]
                 # translation with implication:
                 constraints += [s.implies(Comparison(cpm_expr.name, a, cpm_expr.args[1])) for s, a in zip(sigma, arr)]
-                return linearize_constraint(constraints, supported=supported)
+                return linearize_constraint(constraints, supported=supported, reified=reified)
 
             # other global constraints
             elif isinstance(lhs, GlobalConstraint) and hasattr(lhs, "decompose_comparison"):
                 decomp = lhs.decompose_comparison(cpm_expr.name, rhs)
-                return linearize_constraint(flatten_constraint(decomp),supported=supported)
+                return linearize_constraint(flatten_constraint(decomp), supported=supported, reified=reified)
 
             else:
                 raise NotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported} or 'sub', 'mul','element' but is {lhs}. Please report on github")
-
-
-
 
         if isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}:
             # bring all vars to lhs
@@ -153,21 +150,27 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
             new_rhs, cons = get_or_make_var(rhs + 1)
             return [lhs >= new_rhs] + cons
         if cpm_expr.name == "!=":
-            # Big-M implementation, ensure no new reifications are added
-            # TODO: add extra argument to linearize to indiciate we are in an reification? Then switch between big-M or inidcator constraints.
             # Special case: BV != BV
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                 return [lhs + rhs == 1]
 
-            # Normal case: big M implementation
-            z = boolvar()
-            # Calculate bounds of M = |lhs - rhs| + 1,  TODO: should be easier after fixing issue #96
-            bound1, _ = get_or_make_var(1 + lhs - rhs)
-            bound2, _ = get_or_make_var(1 + rhs - lhs)
-            M = max(bound1.ub, bound2.ub)
+            if reified or (lhs.name not in {"sum","wsum"} and not isinstance(lhs, _NumVarImpl)):
+                # Big M implementation
+                z = boolvar()
+                # Calculate bounds of M = |lhs - rhs| + 1,  TODO: should be easier after fixing issue #96
+                bound1, _ = get_or_make_var(1 + lhs - rhs)
+                bound2, _ = get_or_make_var(1 + rhs - lhs)
+                M = max(bound1.ub, bound2.ub)
 
-            cons = [lhs - M * z <= rhs-1, lhs + M*z >= rhs + M + 1]
-            return linearize_constraint(flatten_constraint(cons), supported=supported)
+                cons = [lhs - M * z <= rhs - 1, lhs + M * z >= rhs + M + 1]
+                return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
+
+            else:
+                # introduce new indicator constraints
+                z = boolvar()
+                constraints = [z.implies(lhs < rhs), (~z).implies(lhs > rhs)]
+                return linearize_constraint(constraints, supported=supported, reified=reified)
+
 
         return [Comparison(cpm_expr.name, lhs, rhs)]
 
