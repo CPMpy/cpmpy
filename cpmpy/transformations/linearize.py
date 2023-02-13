@@ -51,8 +51,8 @@ from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarI
 def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
     """
     Transforms all constraints to a linear form.
-    This function assumes all constraints are in 'flat normal form'.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()'.
+    This function assumes all constraints are in 'flat normal form', and implications only contain boolean variables on the lhs.
+    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint() and cpmpy.transformations.reification.only_bv_implies()'.
     """
 
     if is_any_list(cpm_expr):
@@ -77,6 +77,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
     if cpm_expr.name == "->":
         # determine direction of implication
         cond, sub_expr = cpm_expr.args
+        assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of implication must be boolvar. Apply `only_bv_implies` before calling `linearize_constraint`"
 
         if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
             # shortcut for BV -> BV, convert to disjunction and apply linearize on it
@@ -86,11 +87,6 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
         if isinstance(cond, _BoolVarImpl):
             lin_sub = linearize_constraint(sub_expr, supported=supported)
             return [cond.implies(lin) for lin in lin_sub]
-        # # LinExpr -> BV Updated: unsupported by new grammar
-        # lin_cond = linearize_constraint(cond, supported=supported)
-        # if len(lin_cond) > 1:
-        #     new_vars, cons = zip(*[get_or_make_var(l_expr) for l_expr in lin_cond])
-        #     return [sum(new_vars) == len(new_vars)] + [cond.implies(sub_expr) for cond in lin_cond]
 
     # comparisons
     if isinstance(cpm_expr, Comparison):
@@ -101,7 +97,9 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
             if isinstance(lhs, _NumVarImpl) and is_num(rhs):
                 pass
             elif isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
-                lhs, rhs = lhs + -1 * rhs, 0  # bring numvar to lhs
+                # bring numvar to lhs
+                lhs = lhs + -1 * rhs
+                rhs = 0
 
             elif lhs.name == "sub":
                 # convert to wsum
@@ -241,14 +239,10 @@ def only_positive_bv(cpm_expr):
     if cpm_expr.name == "->":
 
         cond, subexpr = cpm_expr.args
+        assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply `linearize_constraint` before calling `only_positive_bv`"
         if isinstance(cond, _BoolVarImpl): # BV -> Expr
             subexpr = only_positive_bv(subexpr)
             return[cond.implies(expr) for expr in subexpr]
-        # else: # Expr -> BV Update: Unsupported by new grammar
-        #     cond, new_cons = only_positive_bv(cond), []
-        #     if len(cond) > 1:
-        #         cond, new_cons = cond # new variables introduced
-        #     return [cond.implies(subexpr)] + new_cons
 
     if isinstance(cpm_expr, GlobalConstraint):
         return [cpm_expr]
