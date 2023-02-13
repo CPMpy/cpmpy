@@ -164,7 +164,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret

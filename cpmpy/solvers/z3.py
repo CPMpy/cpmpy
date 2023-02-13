@@ -21,6 +21,7 @@
         CPM_z3
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
@@ -162,10 +163,9 @@ class CPM_z3(SolverInterface):
                     cpm_var._value = sol[sol_var].as_long()
 
             # translate objective, for optimisation problems only
-            if isinstance(self.z3_solver, z3.Optimize) and \
-                    len(self.z3_solver.objectives()) != 0:
+            if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj)
+                self.objective_value_ = sol.evaluate(obj).as_long()
 
         else:
             for cpm_var in self.user_vars:
@@ -207,7 +207,10 @@ class CPM_z3(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    # if TEMPLATE does not support objective functions, you can delete objective()/_make_numexpr()
+    def has_objective(self):
+        import z3
+        return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
+
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -219,14 +222,16 @@ class CPM_z3(SolverInterface):
         """
         import z3
         # objective can be a nested expression for z3
-        assert isinstance(self.z3_solver, z3.Optimize), "Use the z3 optimizer for optimization problems"
+        if not isinstance(self.z3_solver, z3.Optimize):
+            raise NotSupportedError("Use the z3 optimizer for optimization problems")
         obj = self._z3_expr(expr)
         if minimize:
             self.z3_solver.minimize(obj)
         else:
             self.z3_solver.maximize(obj)
 
-    # most solvers can inherit this function as is, just implement `transform()` and `__post_constraint()` below
+
+    # most solvers can inherit `__add__()` as is, just implement `transform()` and `__post_constraint()` below
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports

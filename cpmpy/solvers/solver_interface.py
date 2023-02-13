@@ -20,17 +20,15 @@
     Each solver has its own class that inherits from `SolverInterface`.
 
 """
+import warnings
+import time
+from enum import Enum
+
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
-from ..transformations.get_variables import get_variables
+from ..transformations.get_variables import get_variables, get_variables_model
 from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
-#
-#==============================================================================
-from enum import Enum
-import time
-
-#==============================================================================
-from cpmpy.transformations.get_variables import get_variables_model
 
 
 class SolverInterface(object):
@@ -119,7 +117,6 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Solver does not support objective functions")
 
-
     def status(self):
         return self.cpm_status
 
@@ -139,6 +136,12 @@ class SolverInterface(object):
         :return: Bool:
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
+        """
+        return False
+
+    def has_objective(self):
+        """
+            Returns whether the solver has an objective function or not.
         """
         return False
 
@@ -223,7 +226,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -235,11 +238,17 @@ class SolverInterface(object):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
-        # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
+
+        if not call_from_model:
+            warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
+
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
             # display if needed
