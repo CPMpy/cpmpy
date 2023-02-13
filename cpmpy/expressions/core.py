@@ -550,7 +550,7 @@ class Operator(Expression):
             return sum([get_bounds(x)[0] for x in self.args]), sum([get_bounds(x)[1] for x in self.args])
         elif self.name == 'wsum':
             return sum(self.args[0] * np.array([get_bounds(x)[0] for x in self.args[1]])), \
-                   sum(self.args[0] * np.array([get_bounds(x) for x in self.args[1]]))
+                   sum(self.args[0] * np.array([get_bounds(x)[1] for x in self.args[1]]))
         elif self.name == 'sub':
             return tuple(np.subtract(get_bounds(self.args[0]),get_bounds(self.args[1])))
         elif self.name == 'div':
@@ -571,8 +571,11 @@ class Operator(Expression):
                 return 0, ub2
             elif lb1 >=0 and lb2 > 0:
                 return 0, ub1
-            elif lb1 >= 0 and ub2 < 0:
+            elif ub2 < 0:
+                #lb1 < 0 and ub1 > 0
                 return lb2, 0
+            elif lb2 > 0:
+                return 0, ub2
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])

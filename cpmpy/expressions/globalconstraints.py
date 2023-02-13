@@ -350,6 +350,9 @@ class Minimum(GlobalConstraint):
         return all([any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)])
 
     def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
         ub = min([get_bounds(a)[1] for a in self.args]) #lowest upperbound
         lb = min([get_bounds(a)[0] for a in self.args]) #lowest lowerbound
         return lb, ub
@@ -389,6 +392,9 @@ class Maximum(GlobalConstraint):
         return all([any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)])
 
     def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
         ub = max([get_bounds(a)[1] for a in self.args])  # highest upperbound
         lb = max([get_bounds(a)[0] for a in self.args])  # highest lowerbound
         return lb, ub
@@ -446,6 +452,12 @@ class Element(GlobalConstraint):
         arr, idx = self._deepcopy_args(memodict)
         return Element(arr, idx)
 
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        arr, idx = self.args
+        return min([get_bounds(x)[0] for x in arr]), max([get_bounds(x)[1] for x in arr])
 
 class Xor(GlobalConstraint):
     """
@@ -630,6 +642,9 @@ class Count(GlobalConstraint):
         return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
 
     def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
         return (0, len(self.args[0]))
 
     def __repr__(self):
