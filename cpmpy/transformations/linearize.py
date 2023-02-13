@@ -202,7 +202,6 @@ def only_positive_bv(cpm_expr):
 
         Resulting expression is linear.
     """
-
     if is_any_list(cpm_expr):
         nn_cons = [only_positive_bv(expr) for expr in cpm_expr]
         return [c for l in nn_cons for c in l]
@@ -215,17 +214,17 @@ def only_positive_bv(cpm_expr):
             if isinstance(lhs,NegBoolView):
                 lhs, rhs = -lhs._bv, rhs - 1
 
-        elif lhs.name == "sum":
-            weights = [-1 if isinstance(a, NegBoolView) else 1 for a in lhs.args]
-            lhs = sum(w * a._bv if isinstance(a, NegBoolView) else w * a for w,a in zip(weights,lhs.args))
-            rhs -= sum(w < 0 for w in weights)
+        if lhs.name == "sum" and any(isinstance(a, NegBoolView) for a in lhs.args):
+            lhs = Operator("wsum",[[1]*len(lhs.args), lhs.args])
 
-        elif lhs.name == "wsum":
-            weights = [-w if isinstance(a, NegBoolView) else w for w,a in zip(*lhs.args)]
-            rhs -= sum((w < 0) * w for w in weights)
-            lhs = sum(w * a._bv if isinstance(a, NegBoolView) else w * a for w,a in zip(weights,lhs.args[1]))
+        if lhs.name == "wsum":
+            weights, args = lhs.args
+            idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
+            lhs = sum(w * a if i not in idxes else -w * a._bv for i,(w,a) in enumerate(zip(weights, args)))
+            rhs -= sum(weights[i] for i in idxes)
 
-        else: # other operators in comparison such as "min", "max"
+        if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
+        # other operators in comparison such as "min", "max"
             lhs = copy.copy(lhs)
             for i,arg in enumerate(list(lhs.args)):
                 if isinstance(arg, NegBoolView):
@@ -237,7 +236,6 @@ def only_positive_bv(cpm_expr):
 
     # reification
     if cpm_expr.name == "->":
-
         cond, subexpr = cpm_expr.args
         assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply `linearize_constraint` before calling `only_positive_bv`"
         if isinstance(cond, _BoolVarImpl): # BV -> Expr
