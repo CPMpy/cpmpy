@@ -79,18 +79,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}):
         cond, sub_expr = cpm_expr.args
 
         if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
-            # shortcut for BV -> BV exprs
-            if isinstance(cond, NegBoolView):
-                if isinstance(sub_expr, NegBoolView):
-                    return [cond + -1 *sub_expr >= 0] # ~BV -> ~BV
-                else:
-                    return [cond + sub_expr >= 1] # ~BV -> BV
-            else:
-                if isinstance(sub_expr, NegBoolView):
-                    return [cond + sub_expr <= 1] # BV -> ~BV
-                else:
-                    return [cond + -1 *sub_expr <= 0] # BV -> BV
-
+            # shortcut for BV -> BV, convert to disjunction and apply linearize on it
+            return linearize_constraint(~cond | sub_expr)
 
         # BV -> LinExpr
         if isinstance(cond, _BoolVarImpl):
