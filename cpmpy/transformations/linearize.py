@@ -142,6 +142,10 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 rhs += -sum(w * arg for w,arg in zip(*lhs.args) if is_num(arg))
                 lhs = sum(w * arg for w, arg in zip(*lhs.args) if not is_num(arg))
 
+        if isinstance(lhs, Operator) and lhs.name == "mul" and is_num(lhs.args[0]):
+            # convert to wsum
+            lhs = Operator("wsum",[[lhs.args[0]],[lhs.args[1]]])
+
         # now fix the comparisons themselves
         if cpm_expr.name == "<":
             new_rhs, cons = get_or_make_var(rhs - 1)
@@ -223,7 +227,8 @@ def only_positive_bv(cpm_expr):
         if lhs.name == "wsum":
             weights, args = lhs.args
             idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
-            lhs = sum(w * a if i not in idxes else -w * a._bv for i,(w,a) in enumerate(zip(weights, args)))
+            nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
+            lhs = Operator("wsum", [nw, na]) # force making wsum, even for arity = 1
             rhs -= sum(weights[i] for i in idxes)
 
         if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
