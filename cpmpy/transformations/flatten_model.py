@@ -127,7 +127,7 @@ def flatten_constraint(expr):
     elif isinstance(expr, _BoolVarImpl):
         return [expr]
     elif is_num(expr) or isinstance(expr, _NumVarImpl):
-        raise Exception("Numeric constants or numeric variables not allowed as base constraint")
+        raise Exception(f"Numeric constants or numeric variables not allowed as base constraint: {expr}")
 
     # recursively flatten list of constraints
     if is_any_list(expr):
@@ -151,6 +151,7 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
         """
+
         # does not type-check that arguments are bool... Could do now with expr.is_bool()!
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
@@ -266,6 +267,7 @@ def get_or_make_var(expr):
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
+
     if __is_flat_var(expr):
         return (expr, [])
 

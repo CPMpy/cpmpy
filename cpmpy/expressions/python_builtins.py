@@ -19,9 +19,11 @@
         sum
 """
 import numpy as np
-from .variables import NDVarArray
+from fishhook import *
+from .variables import NDVarArray, _IntVarImpl, _BoolVarImpl
 from .core import Expression, Operator
 from .globalconstraints import Minimum, Maximum
+from ..exceptions import CPMpyException
 
 # Overwriting all/any python built-ins
 # all: listwise 'and'
@@ -100,3 +102,52 @@ def sum(iterable):
     if not any(isinstance(elem, Expression) for elem in iterable):
         return np.sum(iterable)
     return Operator("sum", iterable)
+
+@hook(int)
+def implies(self, other):
+    print("am i here?")
+    if self is True:
+        return other
+    if self is False:
+        return True
+    # or alternatively
+    return Operator("->", [self, other])
+
+@hook(bool, int)
+def __or__(self, other):
+    # or alternatively
+    if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
+        return orig(self, other)
+    else:
+        if not isinstance(other,_BoolVarImpl):
+            raise CPMpyException(f" logical conjunction involving an IntVar ({other}) is not allowed")
+        return Operator("or", [self, other])
+
+@hook(_IntVarImpl)
+def __or__(self, other):
+    if not isinstance(self, _BoolVarImpl):
+        raise CPMpyException(f" logical conjunction involving an IntVar ({other}) is not allowed")
+    else:
+        return Operator("or", [self, other])
+
+@hook(_IntVarImpl)
+def __and__(self, other):
+    if not isinstance(self, _BoolVarImpl):
+        raise CPMpyException(f" logical conjunction involving an IntVar ({other}) is not allowed")
+    else:
+        return Operator("and", [self, other])
+
+@hook(_IntVarImpl)
+def implies(self, other):
+    if not isinstance(self, _BoolVarImpl):
+        raise CPMpyException(f" logical conjunction involving an IntVar ({other}) is not allowed")
+    else:
+        return Operator("->", [self, other])
+
+
+@hook(int)
+def is_bool(self):
+    if self > 1 or self < 0:
+        return False
+    else:
+        return True
