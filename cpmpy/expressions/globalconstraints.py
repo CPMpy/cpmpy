@@ -103,7 +103,6 @@
         Xor
         Cumulative
         Count
-        AlldifferenExcept0
         GlobalCardinalityCount
 
 """
