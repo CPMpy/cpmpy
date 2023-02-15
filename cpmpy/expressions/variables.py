@@ -50,6 +50,7 @@
 from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
+from ..exceptions import CPMpyException
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist
 
@@ -280,6 +281,16 @@ class _IntVarImpl(_NumVarImpl):
             return self
         return super().__abs__()
 
+    def __and__(self, other):
+        raise CPMpyException(f"Logical conjunction involving an IntVar ({other}) is not allowed")
+
+    def __or__(self, other):
+        raise CPMpyException(f"Logical disjunction involving an IntVar ({other}) is not allowed")
+
+    def implies(self, other):
+        raise CPMpyException(f"Logical implication involving an IntVar ({other}) is not allowed")
+
+
 class _BoolVarImpl(_IntVarImpl):
     """
     **Boolean** constraint variable with given lowerbound and upperbound.
@@ -333,6 +344,15 @@ class _BoolVarImpl(_IntVarImpl):
 
     def __abs__(self):
         return self
+
+    def __and__(self, other):
+        return Operator("and", [self, other])
+
+    def __or__(self, other):
+        return Operator("or", [self, other])
+
+    def implies(self, other):
+        return Operator("->", [self, other])
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
