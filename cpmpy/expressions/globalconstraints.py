@@ -628,24 +628,3 @@ class Count(GlobalConstraint):
     def __repr__(self):
         return "Count({})".format(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
-    """
-    All nonzero arguments have a distinct value
-    """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except_0", flatlist(args))
-
-    def decompose(self):
-        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
-
-    def value(self):
-        return len(set(a.value() for a in self.args if a.value() != 0)) == len([a.value for a in self.args if a.value() != 0])
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the AllDifferentExceptO global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return AllDifferentExcept0(*copied_args)
