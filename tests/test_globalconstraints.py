@@ -49,12 +49,12 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
-        # TODO implement circuit unit test
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
-        _ = model.solve()
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
 
     def test_not_circuit(self):
         x = cp.intvar(0, 5, 6)
@@ -66,6 +66,12 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
         self.assertFalse(cp.Circuit(x).value())
+
+        nbNotModels = model.solveAll()
+        nbModels = cp.Model(cp.Circuit(x)).solveAll()
+        total = cp.Model(x == x).solveAll()
+
+        self.assertEqual(str(total), str(nbModels + nbNotModels))
 
     def test_not_xor(self):
         bv = cp.boolvar(5)

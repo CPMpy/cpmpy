@@ -150,7 +150,7 @@ class GlobalConstraint(Expression):
 
     def decompose_negation(self):
         from .python_builtins import all
-        return ~all(self.decompose())
+        return [~all(self.decompose())]
 
 
 # Global Constraints (with Boolean return type)
@@ -275,16 +275,14 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0, n - 1, shape=n)
-        return [~all([AllDifferent(succ)
-                   # others: ith one is successor of i-1
-                    ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]),
-                # not negating following constraints since they involve only the auxiliary variables
-                # loop: first one is successor of '0'
-                order[0] == succ[0],
-                # last one is '0'
-                order[n - 1] == 0,
+        return [~all([AllDifferent(succ),
                 # different orders
-                AllDifferent(order)]
+                AllDifferent(order)
+                    ]),
+                # not negating following constraints since they involve the auxiliary variables
+                # loop: first one is successor of '0'
+                order[0] == succ[0]
+                ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]
 
 
 
