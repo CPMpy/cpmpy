@@ -67,6 +67,11 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertFalse(cp.Circuit(x).value())
 
+    def test_not_xor(self):
+        bv = cp.boolvar(5)
+        self.assertTrue(cp.Model(~cp.Xor(bv)).solve())
+        self.assertFalse(cp.Xor(bv).value())
+
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
