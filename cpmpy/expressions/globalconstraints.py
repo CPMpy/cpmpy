@@ -148,6 +148,9 @@ class GlobalConstraint(Expression):
         copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args, self._is_bool)
 
+    def decompose_negation(self):
+        return [Operator('not', [Operator('and',self.decompose())])]
+
 
 # Global Constraints (with Boolean return type)
 

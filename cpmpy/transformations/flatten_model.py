@@ -628,12 +628,6 @@ def negated_normal(expr):
             #raise NotImplementedError("negate_normal {}".format(expr))
             return expr == 0 # can't do better than this...
 
-    elif expr.name == 'xor':
-        # stay in xor space
-        # only negate last element
-        from ..expressions.globalconstraints import Xor  # avoid circular import
-        return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
-
     else: # circular if I import GlobalConstraint here...
         if hasattr(expr, "decompose_negation"):
             # for global constraints where the negation of the decomposition is not equivalent
