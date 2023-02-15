@@ -1,6 +1,9 @@
 import unittest
+
+from numpy import ndarray
+
 import cpmpy as cp
-from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalCardinalityCount, Count, AllDifferentExcept0
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
@@ -87,11 +90,11 @@ class TestGlobal(unittest.TestCase):
         constraints = [cp.Minimum(iv) + 9 == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
-        self.assertEqual(min(iv.value()), -1)
+        self.assertEqual(str(min(iv.value())), '-1')
 
         model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
         self.assertTrue(model.solve())
-        self.assertEqual(min(iv.value()), 4)
+        self.assertEqual(str(min(iv.value())), '4')
 
 
     def test_maximum(self):
@@ -103,7 +106,7 @@ class TestGlobal(unittest.TestCase):
 
         model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
-        self.assertNotEqual(max(iv.value()), 4)
+        self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_element(self):
         iv = cp.intvar(-8, 8, 3)
@@ -178,3 +181,49 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_global_cardinality_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
+        self.assertTrue(cp.Model([GlobalCardinalityCount(iv, gcc), iv == [5,5,4]]).solve())
+        self.assertEqual( str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertTrue(GlobalCardinalityCount(iv, gcc).value())
+
+        self.assertTrue(cp.Model([GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
+        self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertTrue(GlobalCardinalityCount(iv, gcc).value())
+    def test_not_global_cardinality_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
+        self.assertTrue(cp.Model([~GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
+        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertFalse(GlobalCardinalityCount(iv, gcc).value())
+
+        self.assertFalse(cp.Model([~GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
+                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+
+    def test_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([iv[0] == 0, iv[1] != 1, iv[2] != 2, Count(iv, 0) == 3]).solve())
+        self.assertEqual(str(iv.value()),'[0 0 0]')
+        x = cp.intvar(-8,8)
+        y = cp.intvar(0,5)
+        self.assertTrue(cp.Model(Count(iv, x) == y).solve())
+        self.assertEqual(str(Count(iv, x).value()), str(y.value()))
+
+        self.assertTrue(cp.Model(Count(iv, x) != y).solve())
+        self.assertTrue(cp.Model(Count(iv, x) >= y).solve())
+        self.assertTrue(cp.Model(Count(iv, x) <= y).solve())
+        self.assertTrue(cp.Model(Count(iv, x) < y).solve())
+        self.assertTrue(cp.Model(Count(iv, x) > y).solve())
+    def test_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([AllDifferentExcept0(iv)]).solve())
+        self.assertTrue(AllDifferentExcept0(iv).value())
+        self.assertTrue(cp.Model([AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
+        self.assertTrue(AllDifferentExcept0(iv).value())
+
+    def test_not_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([~AllDifferentExcept0(iv)]).solve())
+        self.assertFalse(AllDifferentExcept0(iv).value())
+        self.assertFalse(cp.Model([~AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
