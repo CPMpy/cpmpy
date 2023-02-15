@@ -187,7 +187,6 @@ class AllDifferentExcept0(GlobalConstraint):
 
     def value(self):
         vals = [a.value() for a in self.args if a.value() != 0]
-        print(vals)
         return len(set(vals)) == len(vals)
 
     def deepcopy(self, memodict={}):
