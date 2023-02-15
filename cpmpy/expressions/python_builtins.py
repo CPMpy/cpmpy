@@ -103,19 +103,17 @@ def sum(iterable):
         return np.sum(iterable)
     return Operator("sum", iterable)
 
-@hook(int)
+@hook(bool, int)
 def implies(self, other):
-    print("am i here?")
-    if self is True:
-        return other
-    if self is False:
-        return True
-    # or alternatively
+    if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
+        return orig(self, other)
+    else:
+        if not isinstance(other,_BoolVarImpl):
+            raise CPMpyException(f" logical conjunction involving an IntVar ({other}) is not allowed")
     return Operator("->", [self, other])
 
 @hook(bool, int)
 def __or__(self, other):
-    # or alternatively
     if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
         return orig(self, other)
     else:
