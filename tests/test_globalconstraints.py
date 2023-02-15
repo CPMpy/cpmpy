@@ -30,6 +30,47 @@ class TestGlobal(unittest.TestCase):
 
                 # ensure all different values
                 self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
+    
+    def test_alldifferent2(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), False),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferent(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+    
+    def test_alldifferent_except0(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), True),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferentExcept0(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
 
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143

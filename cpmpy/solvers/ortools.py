@@ -24,13 +24,15 @@
         CPM_ortools
 """
 import sys  # for stdout checking
+import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison
-from ..transformations.get_variables import get_variables_model, get_variables
-from ..transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, negated_normal
+from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 
@@ -56,7 +58,7 @@ class CPM_ortools(SolverInterface):
         try:
             import ortools
             return True
-        except ImportError as e:
+        except ImportError:
             return False
 
 
@@ -102,7 +104,7 @@ class CPM_ortools(SolverInterface):
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the or-tools interace is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+                           Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
             Additional keyword arguments:
@@ -189,12 +191,12 @@ class CPM_ortools(SolverInterface):
                     cpm_var._value = bool(cpm_var._value) # ort value is always an int
 
             # translate objective
-            if self.ort_model.HasObjective():
+            if self.has_objective():
                 self.objective_value_ = self.ort_solver.ObjectiveValue()
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -204,10 +206,13 @@ class CPM_ortools(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """
-        # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
+
         cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
         self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
         return cb.solution_count()
@@ -226,14 +231,14 @@ class CPM_ortools(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             return self.solver_var(cpm_var._bv).Not()
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
 
         return self._varmap[cpm_var]
@@ -262,6 +267,9 @@ class CPM_ortools(SolverInterface):
             self.ort_model.Minimize(obj)
         else:
             self.ort_model.Maximize(obj)
+
+    def has_objective(self):
+        return self.ort_model.HasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -294,49 +302,45 @@ class CPM_ortools(SolverInterface):
                 x = self.solver_vars(cpm_expr.args[1])
                 return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
 
-        raise NotImplementedError("ORTools: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
-        # apply transformations, then post internally
-        cpm_cons = flatten_constraint(cpm_con)
-        cpm_cons = reify_rewrite(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported={"sum", "wsum","sub"})
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
-
+        return cpm_cons
 
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
-
-            While the normal form is divided in 'base', 'comparison' and 'reified', we
-            here regroup the implementation per CPMpy class
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
             Returns the posted ortools 'Constraint', so that it can be used in reification
             e.g. self._post_constraint(smth, reifiable=True).onlyEnforceIf(self.solver_var(bvar))
-            
-            - reifiable: if True, will throw an error if cpm_expr can not be reified
+
+        :param cpm_expr: CPMpy expression
+        :type cpm_expr: Expression
+
+        :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
@@ -361,7 +365,7 @@ class CPM_ortools(SolverInterface):
                     # the natively reifiable 'and', 'or' and 'sum' remain here
                     return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
-                raise NotImplementedError("Not a know supported ORTools Operator '{}' {}".format(
+                raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
         # Comparisons: only numeric ones as the `only_bv_implies()` transformation
@@ -413,7 +417,7 @@ class CPM_ortools(SolverInterface):
                     self += lhs.decompose_comparison(cpm_expr.name, cpm_expr.args[1])
                     return None
             raise NotImplementedError(
-                        "Not a know supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                        "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
 
         # rest: base (Boolean) global constraints
@@ -431,16 +435,33 @@ class CPM_ortools(SolverInterface):
                 demand = [demand] * len(start)
             intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
             return self.ort_model.AddCumulative(intervals, demand, cap)
+        elif cpm_expr.name == "circuit":
+            # ortools has a constraint over the arcs, so we need to create these
+            # when using an objective over arcs, using these vars direclty is recommended
+            # (see PCTSP-path model in the future)
+            x = cpm_expr.args
+            N = len(x)
+            arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+            # post channeling constraints from int to bool
+            self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+            # post the global constraint
+            # when posting arcs on diagonal (i==j), it would do subcircuit
+            ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+            return self.ort_model.AddCircuit(ort_arcs)
+            
         else:
-            # NOT (YET?) MAPPED: Automaton, Circuit,
+            # NOT (YET?) MAPPED: Automaton,
             #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
             #    ReservoirConstraint, ReservoirConstraintWithActive
             
             # global constraint not known, try posting generic decomposition
-            self += cpm_expr.decompose()  # assumes a decomposition exists...
-            # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
+            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+            for con in self.transform(cpm_expr.decompose()):
+                self._post_constraint(con)
+
             return None # will throw error if used in reification
-        
+
+        # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
@@ -603,6 +624,8 @@ try:
                     if hasattr(cpm_var, "flat"):
                         for cpm_subvar in cpm_var.flat:
                             cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
                     else:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 

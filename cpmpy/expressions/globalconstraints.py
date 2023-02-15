@@ -93,6 +93,7 @@
         :nosignatures:
 
         AllDifferent
+        AllDifferentExcept0
         AllEqual
         Circuit
         Table
@@ -176,6 +177,29 @@ class AllDifferent(GlobalConstraint):
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
+
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except0", flatlist(args))
+
+    def decompose(self):
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        vals = [a.value() for a in self.args if a.value() != 0]
+        return len(set(vals)) == len(vals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferentExcept0(*copied_args)
+
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -436,17 +460,13 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
-        if len(self.args) == 2:
-            a0, a1 = self.args
-            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-        # for more than 2 variables, we chain reified xors
-        # XXX this will involve many calls to the above decomp, shortcut?
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            cons += new_cons
-        return cons + [prev_var]
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons]
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1

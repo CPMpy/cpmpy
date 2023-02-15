@@ -16,8 +16,6 @@ Data format compatible with both variations of model (with and without block con
 Model was created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 
-from numpy.lib.stride_tricks import sliding_window_view
-
 import cpmpy
 from cpmpy import *
 

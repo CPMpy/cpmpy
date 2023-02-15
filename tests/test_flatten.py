@@ -117,11 +117,10 @@ class TestFlattenExpr(unittest.TestCase):
 
     def test_get_or_make_var__num(self):
         (a,b,c,d,e) = self.ivars[:5]
-        (x,y,z) = self.bvars[:3]
 
         self.assertEqual( str(get_or_make_var( a+b )), "(IV5, [((IV0) + (IV1)) == (IV5)])" )
         self.assertEqual( str(get_or_make_var( a+b+c )), "(IV6, [(sum([IV0, IV1, IV2])) == (IV6)])" )
-        self.assertEqual( str(get_or_make_var( 2*a )), "(IV7, [(2 * (IV0)) == (IV7)])" )
+        self.assertEqual( str(get_or_make_var( 2*a )), "(IV7, [(sum([2] * [IV0])) == (IV7)])" )
         self.assertEqual( str(get_or_make_var( a*b )), "(IV8, [((IV0) * (IV1)) == (IV8)])" )
         self.assertEqual( str(get_or_make_var( a//b )), "(IV9, [((IV0) // (IV1)) == (IV9)])" )
         self.assertEqual( str(get_or_make_var( 1//b )), "(IV10, [(1 // (IV1)) == (IV10)])" )
@@ -130,19 +129,30 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var( 1*a + 2*b + 3*c )), "(IV12, [(sum([1, 2, 3] * [IV0, IV1, IV2])) == (IV12)])")
         self.assertEqual( str(get_or_make_var( cp.cpm_array([1,2,3])[a] )), "(IV13, [([1 2 3][IV0]) == (IV13)])" )
         self.assertEqual( str(get_or_make_var( cp.cpm_array([b+c,2,3])[a] )), "(IV15, [((IV14, 2, 3)[IV0]) == (IV15), ((IV1) + (IV2)) == (IV14)])" )
+        self.assertEqual( str(get_or_make_var( a*2 )), "(IV16, [(sum([2] * [IV0])) == (IV16)])" )
 
     def test_objective(self):
         (a,b,c,d,e) = self.ivars[:5]
-        (x,y,z) = self.bvars[:3]
 
         self.assertEqual( str(flatten_objective( a )), f"({str(a)}, [])" )
+        self.assertEqual( str(flatten_objective( -a )), '(sum([-1] * [IV0]), [])' )
+        self.assertEqual( str(flatten_objective( -2*a )), '(sum([-2] * [IV0]), [])' )
         self.assertEqual( str(flatten_objective( a+b )), f"(({str(a)}) + ({str(b)}), [])" )
+        self.assertEqual( str(flatten_objective( a-b )), '(sum([1, -1] * [IV0, IV1]), [])' )
+        self.assertEqual( str(flatten_objective( -a+b )), '(sum([-1, 1] * [IV0, IV1]), [])' )
+        self.assertEqual( str(flatten_objective( a+b-c )), "(sum([1, 1, -1] * [IV0, IV1, IV2]), [])" )
         self.assertEqual( str(flatten_objective( 2*a+3*b )), "(sum([2, 3] * [IV0, IV1]), [])" )
-        self.assertEqual( str(flatten_objective( 2*a+3*(b + c) )), "(sum([2, 3] * [IV0, IV5]), [((IV1) + (IV2)) == (IV5)])" )
+        self.assertEqual( str(flatten_objective( 2*a+b*3 )), "(sum([2, 3] * [IV0, IV1]), [])" )
+        self.assertEqual( str(flatten_objective( 2*a-b*3 )), "(sum([2, -3] * [IV0, IV1]), [])" )
+        self.assertEqual( str(flatten_objective( 2*a-3*b+4*c )), "(sum([2, -3, 4] * [IV0, IV1, IV2]), [])" )
+        self.assertEqual( str(flatten_objective( 2*a+3*(b + c) )), "(sum([2, 3, 3] * [IV0, IV1, IV2]), [])" )
+        self.assertEqual( str(flatten_objective( 2*a-3*(b + 2*c) )), "(sum([2, -3, -6] * [IV0, IV1, IV2]), [])" )
+        self.assertEqual( str(flatten_objective( 2*a-3*(b - c*2) )), '(sum([2, -3, 6] * [IV0, IV1, IV2]), [])' )
+        cp.intvar(0,2) # increase counter
         self.assertEqual( str(flatten_objective( a//b+c )), f"((IV6) + ({str(c)}), [(({str(a)}) // ({str(b)})) == (IV6)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a] )), "(IV7, [([1 2 3][IV0]) == (IV7)])" )
         self.assertEqual( str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )), "((IV8) + (IV1), [([1 2 3][IV0]) == (IV8)])" )
-        self.assertEqual( str(flatten_objective( a+b-c )), "(sum([IV0, IV1, IV9]), [(-1 * (IV2)) == (IV9)])" )
+
 
     def test_constraint(self):
         (a,b,c,d,e) = self.ivars[:5]
