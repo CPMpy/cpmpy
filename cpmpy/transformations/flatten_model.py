@@ -80,6 +80,7 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 import copy
 import math
 import numpy as np
+from ..exceptions import CPMpyException
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -127,7 +128,7 @@ def flatten_constraint(expr):
     elif isinstance(expr, _BoolVarImpl):
         return [expr]
     elif is_num(expr) or isinstance(expr, _NumVarImpl):
-        raise Exception(f"Numeric constants or numeric variables not allowed as base constraint: {expr}")
+        raise CPMpyException(f"Numeric constants or numeric variables not allowed as base constraint: {expr}")
 
     # recursively flatten list of constraints
     if is_any_list(expr):
@@ -151,6 +152,9 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
         """
+
+        if not all(arg.is_bool() for arg in expr.args):
+            raise CPMpyException(f"Logical operations involving integers are not allowed")
 
         # does not type-check that arguments are bool... Could do now with expr.is_bool()!
         if all(__is_flat_var(arg) for arg in expr.args):
