@@ -149,7 +149,8 @@ class GlobalConstraint(Expression):
         return type(self)(self.name, copied_args, self._is_bool)
 
     def decompose_negation(self):
-        return [Operator('not', [Operator('and',self.decompose())])]
+        from .python_builtins import all
+        return ~all(self.decompose())
 
 
 # Global Constraints (with Boolean return type)
@@ -270,13 +271,13 @@ class Circuit(GlobalConstraint):
 
         should return something in negated normal form, since flatten_model.negated_normal() returns this
         '''
-
+        from .python_builtins import all
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0, n - 1, shape=n)
-        return [Operator('not', [Operator('and',[~AllDifferent(succ),
+        return [~all([AllDifferent(succ)
                    # others: ith one is successor of i-1
-                    ] + [order[i] != succ[order[i - 1]] for i in range(1, n)] )]),
+                    ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]),
                 # not negating following constraints since they involve only the auxiliary variables
                 # loop: first one is successor of '0'
                 order[0] == succ[0],
@@ -477,6 +478,19 @@ class Xor(GlobalConstraint):
             prev_var, new_cons = get_or_make_var(prev_var ^ arg)
             cons += new_cons
         return cons + [prev_var]
+
+    def decompose_negation(self):
+        from .python_builtins import all
+        if len(self.args) == 2:
+            return ~all(self.decompose())
+        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        var_list = [prev_var]
+        for arg in self.args[2:]:
+            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
+            var_list += [prev_var]
+            cons += new_cons
+        return cons + [~all(var_list)]
+
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
