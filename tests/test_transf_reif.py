@@ -69,6 +69,10 @@ class TestTransfReif(unittest.TestCase):
             e = (rv == (arr[idx] != 1))
             self.assertEqual(Model(e).solveAll(), cnt)
 
+        # Another case, with a more specific check... if the element-wise decomp is empty
+        e = bvs[0].implies(Element([1,2,3], iv) < 1)
+        self.assertFalse(Model(e, bvs[0]==True).solve())
+
 
     def test_reif_rewrite(self):
         bvs = boolvar(shape=4, name="bvs")

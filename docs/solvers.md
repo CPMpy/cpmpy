@@ -43,7 +43,12 @@ s += sum(x) <= 5
 s.solve()
 ```
 
+Creating a solver object using an initialized `Model` instance will not alter the `Model` in any way during or after solving. This is especially important when querying the _status_ to get the result of a solve call. For example, in the following, `m.status()` and `s.status()` will not yield the same result!
 
+```python
+s = SolverLookup.get("ortools",m)
+s.solve()
+```
 ## Setting solver parameters
 
 Now lets use our solver-specific powers: ortools has a parameter _log_search_progress_ that make it show information during solving for example:

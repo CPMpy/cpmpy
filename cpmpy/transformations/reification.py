@@ -56,14 +56,30 @@ def only_bv_implies(constraints):
                 isinstance(cpm_expr.args[1], _BoolVarImpl):
             # BV == BV special case
             if isinstance(cpm_expr.args[0], _BoolVarImpl):
-                l,r = cpm_expr.args
+                l, r = cpm_expr.args
                 newcons.append(l.implies(r))
                 newcons.append(r.implies(l))
             else:
                 # BE == BV :: ~BV -> ~BE, BV -> BE
-                expr,bvar = cpm_expr.args
+                expr, bvar = cpm_expr.args
                 newcons.append((~bvar).implies(negated_normal(expr)))
                 newcons.append(bvar.implies(expr))
+
+        elif isinstance(cpm_expr, Comparison) and \
+                cpm_expr.name == '==' and \
+                cpm_expr.args[0].is_bool() and \
+                isinstance(cpm_expr.args[1], _NumVarImpl):
+            #BV = IV
+            if isinstance(cpm_expr.args[0], _BoolVarImpl):
+                newcons.append(cpm_expr)
+
+            #BE == IV :: IV = BV, ~BV -> ~BE, BV -> BE
+            else:
+                expr, ivar = cpm_expr.args
+                bv = _BoolVarImpl()
+                newcons.append(Comparison('==',bv,ivar))
+                newcons.append((~bv).implies(negated_normal(expr)))
+                newcons.append(bv.implies(expr))
 
         else:
             # all other flat normal form expressions are fine
@@ -72,7 +88,7 @@ def only_bv_implies(constraints):
     return newcons
 
 
-def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
+def reify_rewrite(constraints, supported=frozenset()):
     """
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
@@ -80,10 +96,12 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
         Input is expected to be in Flat Normal Form (so after `flatten_constraint()`)
         Output will also be in Flat Normal Form
 
-        argument 'supported' is a list (or set) of expression names that support reification in the solver
-        including supported 'Left Hand Side' expressions in reified comparisons, e.g. BV -> (LHS == V)
-        Boolean expressions 'and', 'or', and '->' are assumed to support reification
-        (you MUST give an empty supported set if no others are supported...)
+        Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
+        (actually currently all comparisons <op> in {'==', '!=', '<=', '<', '>=', '>'},
+         IV1 <op> IV2 are assumed to support reification BV -> (IV1 <op> IV2))
+
+        :param supported  a (frozen)set of expression names that support reification in the solver, including
+                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. BV -> (LHS == V)
     """
     if not is_any_list(constraints):
         # assume list, so make list
@@ -130,7 +148,7 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op,(lhs,rhs) = boolexpr.name, boolexpr.args
                 #   have list of supported lhs's such as sum and wsum...
-                #   at the very least, (iv1 == iv2) == bv has to be supported (or equivalently, sum: (iv1 - iv2 == 0) == bv)
+                #   at the very least, (iv1 == iv2) == bv has to be supported
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
                 elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= len(lhs.args[0])):
@@ -140,7 +158,12 @@ def reify_rewrite(constraints, supported=frozenset(['sum', 'wsum'])):
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    if decomp is False:
+                        # TODO uh... special case, can't insert a constant here with the current transformations...
+                        # use IV < IV.lb which will be false...
+                        decomp = (lhs.args[1] < lhs.args[1].lb)
+                    reifexpr.args[boolexpr_index] = decomp
                     newcons += flatten_constraint(reifexpr)
                 else:  #   other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)

@@ -439,11 +439,9 @@ class Operator(Expression):
         if name == 'sum' and \
                 all(not is_num(a) for a in arg_list) and \
                 any(_wsum_should(a) for a in arg_list):
-            w,e = [], []
-            for a in arg_list:
-                w1,e1 = _wsum_make(a)
-                w += w1
-                e += e1
+            we = [_wsum_make(a) for a in arg_list]
+            w = [wi for w,_ in we for wi in w]
+            e = [ei for _,e in we for ei in e]
             name = 'wsum'
             arg_list = [w,e]
 
@@ -463,6 +461,16 @@ class Operator(Expression):
                     arg_list[i:i+1] = arg_list[i].args
                     i += l
                 i += 1
+
+        # another cleanup, translate -(v*c) to v*-c
+        if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
+            mul_args = arg_list[0].args
+            if is_num(mul_args[0]):
+                name = 'mul'
+                arg_list = (-mul_args[0], mul_args[1])
+            elif is_num(mul_args[1]):
+                name = 'mul'
+                arg_list = (mul_args[0], -mul_args[1])
 
         super().__init__(name, arg_list)
 
@@ -559,6 +567,8 @@ def _wsum_make(arg):
     """
     if arg.name == 'wsum':
         return arg.args
+    elif arg.name == 'sum':
+        return [1]*len(arg.args), arg.args
     elif arg.name == 'mul':
         if is_num(arg.args[0]):
             return [arg.args[0]], [arg.args[1]]

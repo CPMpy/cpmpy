@@ -1,7 +1,6 @@
 import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
-
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -27,6 +26,47 @@ class TestGlobal(unittest.TestCase):
 
                 # ensure all different values
                 self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
+
+    def test_alldifferent2(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), False),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferent(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
+    def test_alldifferent_except0(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), True),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferentExcept0(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
 
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
@@ -55,6 +95,70 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
+
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertFalse(cp.Table(iv, [[10, 8, 2], [5, 3, 2]]).value())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
+    def test_minimum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Minimum(iv) + 9 == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '-1')
+
+        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '4')
+
+
+    def test_maximum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Maximum(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(max(iv.value()) <= -1)
+
+        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(max(iv.value())), '4')
+
+    def test_element(self):
+        iv = cp.intvar(-8, 8, 3)
+        idx = cp.intvar(-8, 8)
+        constraints = [cp.Element(iv,idx) == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv,idx).value() == 8)
+
+
+    def test_Xor(self):
+        bv = cp.boolvar(5)
+        self.assertTrue(cp.Model(cp.Xor(bv)).solve())
+        self.assertTrue(cp.Xor(bv).value())
 
     def test_not_circuit(self):
         x = cp.intvar(0, 5, 6)
@@ -136,3 +240,49 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_global_cardinality_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc), iv == [5,5,4]]).solve())
+        self.assertEqual( str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
+
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
+        self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
+    def test_not_global_cardinality_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
+        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
+        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
+
+        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
+                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+
+    def test_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([iv[0] == 0, iv[1] != 1, iv[2] != 2, cp.Count(iv, 0) == 3]).solve())
+        self.assertEqual(str(iv.value()),'[0 0 0]')
+        x = cp.intvar(-8,8)
+        y = cp.intvar(0,5)
+        self.assertTrue(cp.Model(cp.Count(iv, x) == y).solve())
+        self.assertEqual(str(cp.Count(iv, x).value()), str(y.value()))
+
+        self.assertTrue(cp.Model(cp.Count(iv, x) != y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) >= y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) <= y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) < y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) > y).solve())
+    def test_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
+
+    def test_not_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
+        self.assertFalse(cp.AllDifferentExcept0(iv).value())
+        self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
