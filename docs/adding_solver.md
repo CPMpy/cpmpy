@@ -8,7 +8,7 @@ Implementing the template consists of the following parts:
 
   * `supported()` where you check if the solver package is installed. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package.
   * `__init__()` where you initialize the underlying solver object
-  * `solver_var()` where you create new solver variables and map them CPMpy decision variables
+  * `solver_var()` where you create new solver variables and map them to CPMpy decision variables
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
   * `objective()` if your solver supports optimisation
   * `__add__()` where you call the necessary transformations to transform CPMpy expressions to those that the solver supports
@@ -17,17 +17,21 @@ Implementing the template consists of the following parts:
 
 ## Transformations and posting constraints
 
-CPMpy is designed to separate 'transforming' constraints as much as possible from 'posting' constraints.
+CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and posted to the solver (through `_post_constraint()`).
+
+CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from *posting* the supported constraints directly to the solver.
 
 For example, a SAT solver only accepts clauses (disjunctions) over Boolean variables as constraints. So, its `_post_constraint()` method should just consists of reading in a CPMpy 'or' expression over decision variables, for which it then calls the solver to create such a clause. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
-What remains is the difficult part of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple independent **transformation functions** in the `cpmpy/transformations/` directory. For any solver you wish to add, chances are that most of the transformations you need are already implemented. If not, read on.
+What remains is the difficult part of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory.
+
+So for any solver you wish to add, chances are that most of the transformations you need are already implemented. You hence only need to chain the right transformations in the solver's `transform()` method. If you need additional transformations, or want to know how they work, read on.
 
 ## Stateless transformation functions
 
-CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed and posted to the solver. That also allows it to be *incremental*, meaning that you can post some constraints, call `solve()` post some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
+Because CPMpy solver interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()` add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
-The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs too. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
+The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
 
 That also makes them modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
 
@@ -42,7 +46,7 @@ With **functional** we mean that the API interface is for example a single class
 
 What we mean with **light-weight** is that it has none or few custom data-structures exposed at the Python level. That means that the arguments and return types of the API consist mostly of standard integers/strings/lists.
 
-Here is a fictive pseudo-code of such an API, which is heavily inspired on the Ortools CP-SAT interface:
+Here is fictional pseudo-code of such an API, which is heavily inspired on the OR-Tools CP-SAT interface:
 
 ```cpp
 class SolverX {
@@ -67,7 +71,7 @@ class SolverX {
     void postAllDifferent(vector<str> varIDs);
     void postSum(vector<str> varIds, str Operator, str varID);
     void postSum(vector<str> varIds, str Operator, int const);
-    // I think or-tools actually creates a map (unique ID) for both variables and constants, so they can be used in the same expression
+    // I think OR-Tools actually creates a map (unique ID) for both variables and constants, so they can be used in the same expression
     void postWeightedSum(vector<str> varIds, vector<int> weights, str Operator, str varID);
     ...
 
@@ -92,9 +96,9 @@ The CPMpy package provides a large testsuite on which newly added solvers can be
 Note that for this testsuite to work, you need to add your solver to the `SolverLookup` utility.
 This is done by adding an import statement in `/solvers/__init__.py` and adding an entry in the list of solvers in  `/solvers/utils.py`.
 
-To run the testsuite on your solver, go to `/tests/constraints.py` and set `SOLVERNAME` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
+To run the testsuite on your solver, go to `/tests/test_constraints.py` and set `SOLVERNAME` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
 As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
-The result your solver answers after posting the constraint is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
+After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
 ## Tunable hyperparameters
 CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](solver_parameters.md)).

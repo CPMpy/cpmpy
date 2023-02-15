@@ -392,17 +392,13 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
-        if len(self.args) == 2:
-            a0, a1 = self.args
-            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-        # for more than 2 variables, we chain reified xors
-        # XXX this will involve many calls to the above decomp, shortcut?
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            cons += new_cons
-        return cons + [prev_var]
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons]
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
