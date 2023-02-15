@@ -56,6 +56,17 @@ class TestGlobal(unittest.TestCase):
 
         _ = model.solve()
 
+    def test_not_circuit(self):
+        x = cp.intvar(0, 5, 6)
+        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [~cp.Circuit(x)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertFalse(cp.Circuit(x).value())
+
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
