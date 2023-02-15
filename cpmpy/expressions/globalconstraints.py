@@ -252,13 +252,15 @@ class Circuit(GlobalConstraint):
         visited = set()
         arr = [argval(a) for a in self.args]
         while(idx not in visited):
+            if idx == None:
+                return False
             if not (0 <= idx < len(arr)):
                 break
             visited.add(idx)
             pathlen += 1
             idx = arr[idx]
 
-        return (pathlen == len(self.args)) and (arr[-1] == 0)
+        return pathlen == len(self.args)
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
