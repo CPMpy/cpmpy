@@ -346,7 +346,7 @@ def only_positive_bv(cpm_expr):
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
 
-    if isinstance(cpm_expr, GlobalConstraint):
+    if is_bool(cpm_expr) or isinstance(cpm_expr, GlobalConstraint):
         return [cpm_expr]
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
