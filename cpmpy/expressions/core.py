@@ -77,6 +77,7 @@ import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
+from ..exceptions import CPMpyException
 
 from .utils import is_num, is_any_list, flatlist
 
@@ -177,11 +178,24 @@ class Expression(object):
     # Python does not offer relevant syntax...
     # for double implication, use equivalence self == other
     def implies(self, other):
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical implication involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical implication involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
+
         # other constant
         if other is True:
             return True
         if other is False:
             return ~self
+
         return Operator('->', [self, other])
 
     # Comparisons
@@ -204,6 +218,18 @@ class Expression(object):
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
+
         # some simple constant removal
         if other is True:
             return self
@@ -211,7 +237,20 @@ class Expression(object):
             return False
 
         return Operator("and", [self, other])
+
+
     def __rand__(self, other):
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
         # some simple constant removal
         if other is True:
             return self
@@ -221,6 +260,18 @@ class Expression(object):
         return Operator("and", [other, self])
 
     def __or__(self, other):
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
+
         # some simple constant removal
         if other is True:
             return True
@@ -229,6 +280,18 @@ class Expression(object):
 
         return Operator("or", [self, other])
     def __ror__(self, other):
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
+
         # some simple constant removal
         if other is True:
             return True
@@ -241,6 +304,17 @@ class Expression(object):
         # avoid cyclic import
         from .globalconstraints import Xor
         # some simple constant removal
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
         if other is True:
             return ~self
         if other is False:
@@ -248,8 +322,20 @@ class Expression(object):
         return Xor([self, other])
 
     def __rxor__(self, other):
+
         # avoid cyclic import
         from .globalconstraints import Xor
+
+        # checking if both are bool
+        # checking them separately, to give a more clear exception message to the user
+        if not self.is_bool():
+            raise CPMpyException(
+                f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
+
+        if not other.is_bool():
+            raise CPMpyException(
+                f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+
         # some simple constant removal
         if other is True:
             return ~self
