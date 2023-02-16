@@ -41,7 +41,7 @@ from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
 from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_any_list, is_num
+from ..expressions.utils import is_any_list, is_num, is_bool
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
 def linearize_constraint(cpm_expr):
@@ -54,6 +54,9 @@ def linearize_constraint(cpm_expr):
     if is_any_list(cpm_expr):
         lin_cons = [linearize_constraint(expr) for expr in cpm_expr]
         return [c for l in lin_cons for c in l]
+
+    if is_bool(cpm_expr):
+        return [cpm_expr]
 
     if isinstance(cpm_expr, _BoolVarImpl):
         if isinstance(cpm_expr, NegBoolView):
