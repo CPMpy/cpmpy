@@ -108,8 +108,16 @@ def __and__(self, other):
     if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
         return orig(self, other)
     else:
+
+        if not self.is_bool():
+            raise CPMpyException(f"Logical conjunction involving an integer ({self}) is not allowed")
+
+        if isinstance(self,int):
+            self = (self == 1)  # convert to True or False
+
         if not isinstance(other,_BoolVarImpl):
             raise CPMpyException(f"Logical conjunction involving an IntVar ({other}) is not allowed")
+
         return Operator("and", [self, other])
 
 @hook(bool, int)
@@ -117,8 +125,16 @@ def __or__(self, other):
     if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
         return orig(self, other)
     else:
+
+        if not self.is_bool():
+            raise CPMpyException(f"Logical disjunction involving an integer ({self}) is not allowed")
+
+        if isinstance(self,int):
+            self = (self == 1)  # convert to True or False
+
         if not isinstance(other,_BoolVarImpl):
             raise CPMpyException(f"Logical disjunction involving an IntVar ({other}) is not allowed")
+
         return Operator("or", [self, other])
 
 @hook(bool, int)
@@ -126,9 +142,17 @@ def implies(self, other):
     if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
         return orig(self, other)
     else:
+
+        if not self.is_bool():
+            raise CPMpyException(f"Logical implication involving an integer ({self}) is not allowed")
+
+        if isinstance(self,int):
+            self = (self == 1)  # convert to True or False
+
         if not isinstance(other,_BoolVarImpl):
             raise CPMpyException(f"Logical implication involving an IntVar ({other}) is not allowed")
-    return Operator("->", [self, other])
+
+        return Operator("->", [self, other])
 
 @hook(int)
 def is_bool(self):

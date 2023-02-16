@@ -346,13 +346,22 @@ class _BoolVarImpl(_IntVarImpl):
         return self
 
     def __and__(self, other):
-        return Operator("and", [self, other])
+        if other.is_bool():
+            return Operator("and", [self, other])
+        else:
+            raise CPMpyException(f"Logical conjunction involving a non boolean argument ({other}) is not allowed")
 
     def __or__(self, other):
-        return Operator("or", [self, other])
+        if other.is_bool():
+            return Operator("or", [self, other])
+        else:
+            raise CPMpyException(f"Logical disjunction involving a non boolean argument ({other}) is not allowed")
 
     def implies(self, other):
-        return Operator("->", [self, other])
+        if other.is_bool():
+            return Operator("->", [self, other])
+        else:
+            raise CPMpyException(f"Logical implication involving a non boolean argument ({other}) is not allowed")
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass

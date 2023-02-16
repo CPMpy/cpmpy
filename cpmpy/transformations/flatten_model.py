@@ -153,10 +153,6 @@ def flatten_constraint(expr):
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
         """
 
-        if not all(arg.is_bool() for arg in expr.args):
-            raise CPMpyException(f"Logical operations involving integers are not allowed")
-
-        # does not type-check that arguments are bool... Could do now with expr.is_bool()!
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
 
