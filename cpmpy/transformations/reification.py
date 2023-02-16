@@ -110,6 +110,7 @@ def reify_rewrite(constraints, supported=frozenset()):
     newcons = []
     for cpm_expr in constraints:
         if not isinstance(cpm_expr, Expression):
+            newcons.append(cpm_expr)# keep expression
             continue
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
