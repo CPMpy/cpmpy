@@ -30,7 +30,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison
+from ..expressions.utils import is_num, is_any_list, eval_comparison, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -342,6 +342,9 @@ class CPM_ortools(SolverInterface):
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
+        # True or False
+        if is_bool(cpm_expr):
+            return self.ort_model.Add(cpm_expr)
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
