@@ -105,7 +105,7 @@ def sum(iterable):
 
 @hook(bool, int)
 def __and__(self, other):
-    if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
+    if not (isinstance(other,Expression)):
         return orig(self, other)
     else:
 
@@ -122,7 +122,7 @@ def __and__(self, other):
 
 @hook(bool, int)
 def __or__(self, other):
-    if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
+    if not (isinstance(other,Expression)):
         return orig(self, other)
     else:
 
@@ -139,7 +139,7 @@ def __or__(self, other):
 
 @hook(bool, int)
 def implies(self, other):
-    if not (isinstance(other,_IntVarImpl) or isinstance(other, _BoolVarImpl) ):
+    if not (isinstance(other,Expression)):
         return orig(self, other)
     else:
 
