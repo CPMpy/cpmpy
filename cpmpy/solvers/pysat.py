@@ -294,6 +294,8 @@ class CPM_pysat(SolverInterface):
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
+        if cpm_expr is False:
+            self.pysat_solver.add_clause([])
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
