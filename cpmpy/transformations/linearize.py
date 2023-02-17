@@ -61,8 +61,6 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
     # boolvar
     if isinstance(cpm_expr, _BoolVarImpl):
-        if isinstance(cpm_expr, NegBoolView):
-            return [sum([cpm_expr._bv]) <= 0]
         return [sum([cpm_expr]) >= 1]
 
     # conjunction
