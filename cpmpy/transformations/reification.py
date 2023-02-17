@@ -170,7 +170,12 @@ def reify_rewrite(constraints, supported=frozenset()):
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    if decomp is False:
+                        # TODO uh... special case, can't insert a constant here with the current transformations...
+                        # use IV < IV.lb which will be false...
+                        decomp = (lhs.args[1] < lhs.args[1].lb)
+                    reifexpr.args[boolexpr_index] = decomp
                     newcons += flatten_constraint(reifexpr)
                 else:  #   other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)

@@ -328,8 +328,8 @@ def get_or_make_var(expr):
         if isinstance(flatexpr, Operator) and flatexpr.name == "wsum":
             # more complex args, and weights can be negative, so more complex lbs/ubs
             weights, flatvars  = flatexpr.args
-            bounds = np.array([[w * fvar.lb for w, fvar in zip(weights, flatvars)],
-                               [w * fvar.ub for w, fvar in zip(weights, flatvars)]])
+            bounds = np.array([[w * fvar if is_num(fvar) else w * fvar.lb for w, fvar in zip(weights, flatvars)],
+                               [w * fvar if is_num(fvar) else w * fvar.ub for w, fvar in zip(weights, flatvars)]])
             lb, ub = bounds.min(axis=0).sum(), bounds.max(axis=0).sum() # for every column is axis=0...
             ivar = _IntVarImpl(lb, ub)
             return (ivar, [flatexpr == ivar]+flatcons)
@@ -547,7 +547,8 @@ def normalized_numexpr(expr):
 
         # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
         if expr.name == "sum" and \
-           any(isinstance(a, Operator) and (a.name == "-" or _wsum_should(a)) for a in expr.args):
+           all(isinstance(a, Expression) for a in expr.args) and \
+           any((a.name == "-" or _wsum_should(a)) for a in expr.args):
             we = [_wsum_make(a) for a in expr.args]
             w = [wi for w,_ in we for wi in w]
             e = [ei for _,e in we for ei in e]
@@ -559,7 +560,11 @@ def normalized_numexpr(expr):
             # while here, avoid creation of auxiliary variables for compatible operators -/sum/wsum
             i = 0
             while(i < len(sub_exprs)): # can dynamically change
-                if sub_exprs[i].name in ['-', 'sum', 'wsum']:
+                if isinstance(sub_exprs[i], Operator) and \
+                    ((sub_exprs[i].name in ['-', 'sum'] and \
+                        all(isinstance(a, Expression) for a in sub_exprs[i].args)) or \
+                     (sub_exprs[i].name == 'wsum' and \
+                        all(isinstance(a, Expression) for a in sub_exprs[i].args[1]))):  # TODO: avoid constants for now...
                     w,e = _wsum_make(sub_exprs[i])
                     # insert in place, and next iteration over same 'i' again
                     weights[i:i+1] = [weights[i]*wj for wj in w]
