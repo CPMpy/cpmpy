@@ -132,7 +132,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             # bring all vars to lhs
             if isinstance(rhs, _NumVarImpl):
                 if lhs.name == "sum":
-                    lhs, rhs = sum([-1 * rhs]+[1 * a for a in lhs.args]), 0
+                    lhs, rhs = sum([1 * a for a in lhs.args]+[-1 * rhs]), 0
                 else:
                     lhs, rhs = lhs + -1*rhs, 0
             # bring all const to rhs
