@@ -2,6 +2,7 @@ import unittest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions import *
+from cpmpy.expressions.utils import ite
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
 
@@ -192,9 +193,23 @@ class TestMul(unittest.TestCase):
         for expr in prod.args:
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
+    def test_ite(self):
+        x = intvar(0, 5, shape=3, name="x")
+        iter = ite(x[0] > 2, x[1] > x[2], x[1] == x[2])
+        constraints = [iter]
+        self.assertTrue(cp.Model(constraints).solve())
 
+        constraints = [iter, x == [0, 4, 4]]
+        self.assertTrue(cp.Model(constraints).solve())
 
+        constraints = [iter, x == [4, 4, 3]]
+        self.assertTrue(cp.Model(constraints).solve())
 
+        constraints = [iter, x == [4, 4, 4]]
+        self.assertFalse(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [1, 3, 2]]
+        self.assertFalse(cp.Model(constraints).solve())
 
 
 if __name__ == '__main__':
