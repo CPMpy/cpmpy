@@ -101,6 +101,22 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
+    def test_not_circuit(self):
+        x = cp.intvar(0, 5, 6)
+        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [~cp.Circuit(x)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertFalse(cp.Circuit(x).value())
+
+        nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
+        nbModels = cp.Model(cp.Circuit(x)).solveAll(solver="minizinc",display=lambda: self.assertTrue(cp.Circuit(x).value()))
+        total = cp.Model(x == x).solveAll()
+
+        self.assertEqual(str(total), str(nbModels + nbNotModels))
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
@@ -154,33 +170,19 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value()] == 8)
         self.assertTrue(cp.Element(iv,idx).value() == 8)
 
-
     def test_Xor(self):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(cp.Xor(bv)).solve())
         self.assertTrue(cp.Xor(bv).value())
 
-    def test_not_circuit(self):
-        x = cp.intvar(0, 5, 6)
-        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
-        model = cp.Model(constraints)
-        self.assertFalse(model.solve())
-
-        constraints = [~cp.Circuit(x)]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-        self.assertFalse(cp.Circuit(x).value())
-
-        nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
-        nbModels = cp.Model(cp.Circuit(x)).solveAll(display=lambda: self.assertTrue(cp.Circuit(x).value()))
-        total = cp.Model(x == x).solveAll()
-
-        self.assertEqual(str(total), str(nbModels + nbNotModels))
-
     def test_not_xor(self):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(~cp.Xor(bv)).solve())
         self.assertFalse(cp.Xor(bv).value())
+        nbNotModels = cp.Model(~cp.Xor(bv)).solveAll(display=lambda: self.assertFalse(cp.Xor(bv).value()))
+        nbModels = cp.Model(cp.Xor(bv)).solveAll(display=lambda: self.assertTrue(cp.Xor(bv).value()))
+        total = cp.Model(bv == bv).solveAll()
+        self.assertEqual(str(total), str(nbModels + nbNotModels))
 
     def test_minimax_python(self):
         from cpmpy import min,max

@@ -494,18 +494,6 @@ class Xor(GlobalConstraint):
             cons = (cons | arg) & (~cons | ~arg)
         return [cons]
 
-    def decompose_negation(self):
-        from .python_builtins import all
-        if len(self.args) == 2:
-            return ~all(self.decompose())
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
-        var_list = [prev_var]
-        for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            var_list += [prev_var]
-            cons += new_cons
-        return cons + [~all(var_list)]
-
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
