@@ -103,6 +103,9 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 # convert to wsum
                 lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
 
+            elif lhs.name == "mul" and is_num(lhs.args[0]):
+                lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
+
             elif lhs.name == "element":
                 arr, idx = cpm_expr.args[0].args
                 # Assuming 1-d array
@@ -123,7 +126,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 return linearize_constraint(flatten_constraint(decomp), supported=supported, reified=reified)
 
             else:
-                raise NotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported} or 'sub', 'mul','element' but is {lhs}. Please report on github")
+                raise NotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported} or 'sub','element' but is {lhs}. Please report on github")
 
         if isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}:
             # bring all vars to lhs
