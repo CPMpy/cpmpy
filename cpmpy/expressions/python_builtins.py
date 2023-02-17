@@ -105,37 +105,15 @@ def sum(iterable):
 
 @hook(bool, int)
 def __and__(self, other):
-    if not (isinstance(other,Expression)):
-        return orig(self, other)
-    else:
-
-        if not self.is_bool():
-            raise CPMpyException(f"Logical conjunction involving an integer ({self}) is not allowed")
-
-        if isinstance(self,int):
-            self = (self == 1)  # convert to True or False
-
-        if not isinstance(other,_BoolVarImpl):
-            raise CPMpyException(f"Logical conjunction involving an IntVar ({other}) is not allowed")
-
-        return Operator("and", [self, other])
+    if isinstance(other, Expression):
+        return other.__rand__(self)
+    return orig(self, other)
 
 @hook(bool, int)
 def __or__(self, other):
-    if not (isinstance(other,Expression)):
-        return orig(self, other)
-    else:
-
-        if not self.is_bool():
-            raise CPMpyException(f"Logical disjunction involving an integer ({self}) is not allowed")
-
-        if isinstance(self,int):
-            self = (self == 1)  # convert to True or False
-
-        if not isinstance(other,_BoolVarImpl):
-            raise CPMpyException(f"Logical disjunction involving an IntVar ({other}) is not allowed")
-
-        return Operator("or", [self, other])
+    if isinstance(other, Expression):
+        return other.__ror__(self)
+    return orig(self, other)
 
 @hook(bool, int)
 def implies(self, other):
