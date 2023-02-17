@@ -287,7 +287,7 @@ class Circuit(GlobalConstraint):
             pathlen += 1
             idx = arr[idx]
 
-        return pathlen == len(self.args)
+        return pathlen == len(self.args) and idx == 0
 
     def decompose_negation(self):
         '''
