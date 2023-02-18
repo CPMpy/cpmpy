@@ -410,7 +410,7 @@ class CPM_z3(SolverInterface):
                 else:
                     lhs = self._z3_expr(lhs)
 
-                if is_boolexpr(rhs):
+                if is_boolexpr(rhs) and not isinstance(rhs,int):
                     rhs = z3.If(self._z3_expr(rhs), 1, 0)
                 else:
                     rhs = self._z3_expr(rhs)
