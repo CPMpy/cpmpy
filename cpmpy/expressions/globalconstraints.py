@@ -106,7 +106,7 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -232,6 +232,8 @@ class Circuit(GlobalConstraint):
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
+        if len(flatlist(args)) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
