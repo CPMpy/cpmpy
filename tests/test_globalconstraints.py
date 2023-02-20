@@ -95,6 +95,8 @@ class TestGlobal(unittest.TestCase):
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
+        _ = model.solve()
+
     def test_table(self):
         iv = cp.intvar(-8,8,3)
         constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
