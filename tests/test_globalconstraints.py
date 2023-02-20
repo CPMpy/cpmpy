@@ -155,3 +155,20 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_ite(self):
+        x = cp.intvar(0, 5, shape=3, name="x")
+        iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
+        constraints = [iter]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [0, 4, 4]]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [4, 4, 3]]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [4, 4, 4]]
+        self.assertFalse(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [1, 3, 2]]
+        self.assertFalse(cp.Model(constraints).solve())

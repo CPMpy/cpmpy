@@ -289,7 +289,32 @@ class Table(GlobalConstraint):
 
     # TODO: value()
 
-# Numeric Global Constraints (with integer-valued return type)
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported
+# a little helper:
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        super().__init__("ite", [condition, if_true, if_false], is_bool=True)
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        condition_val = argval(condition)
+        true_val = argval(if_true)
+        false_val = argval(if_false)
+        if condition_val:
+            return true_val
+        else:
+            return false_val
+
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return (condition.implies(if_true) & \
+                (~condition).implies(if_false)
+                )
+
+    def __repr__(self):
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
 class Minimum(GlobalConstraint):
