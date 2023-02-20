@@ -90,11 +90,12 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     if isinstance(cpm_expr, Comparison):
         lhs, rhs = cpm_expr.args
 
+        # Var <op> Const is fine
+        if isinstance(lhs, _NumVarImpl) and is_num(rhs):
+            pass
         # linearize unsupported operators
-        if lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
-            if isinstance(lhs, _NumVarImpl) and is_num(rhs):
-                pass
-            elif isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
+        elif lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
+            if isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
                 # bring numvar to lhs
                 lhs = lhs + -1 * rhs
                 rhs = 0
@@ -109,7 +110,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             elif lhs.name == "element":
                 arr, idx = cpm_expr.args[0].args
                 # Assuming 1-d array
-                assert len(arr.shape) == 1, f"Only support 1-d element constraints, not {cpm_expr} which has shape {cpm_expr.shape}"
+                assert len(np.array(arr).shape) == 1, f"Only support 1-d element constraints, not {cpm_expr} which has shape {cpm_expr.shape}"
 
                 n = len(arr)
                 sigma = boolvar(shape=n)
