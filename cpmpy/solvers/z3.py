@@ -437,6 +437,8 @@ class CPM_z3(SolverInterface):
             return z3_cons
         elif cpm_con.name == 'alldifferent':
             return z3.Distinct(self._z3_expr(cpm_con.args))
+        elif cpm_con.name == 'ite':
+            return z3.If(self._z3_expr(cpm_con.args[0]),self._z3_expr(cpm_con.args[1]),self._z3_expr(cpm_con.args[2]))
 
         # global constraints
         return self._z3_expr(all(cpm_con.decompose()))
