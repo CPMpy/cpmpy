@@ -97,6 +97,26 @@ class TestGlobal(unittest.TestCase):
 
         _ = model.solve()
 
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertFalse(cp.Table(iv, [[10, 8, 2], [5, 3, 2]]).value())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
