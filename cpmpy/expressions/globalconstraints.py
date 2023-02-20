@@ -308,9 +308,7 @@ class IfThenElse(GlobalConstraint):
 
     def decompose(self):
         condition, if_true, if_false = self.args
-        return (condition.implies(if_true) & \
-                (~condition).implies(if_false)
-                )
+        return [condition.implies(if_true), (~condition).implies(if_false)]
 
     def __repr__(self):
         condition, if_true, if_false = self.args
