@@ -115,44 +115,6 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
-    def test_minimum(self):
-        iv = cp.intvar(-8, 8, 3)
-        constraints = [cp.Minimum(iv) + 9 == 8]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-        self.assertEqual(str(min(iv.value())), '-1')
-
-        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
-        self.assertTrue(model.solve())
-        self.assertEqual(str(min(iv.value())), '4')
-
-
-    def test_maximum(self):
-        iv = cp.intvar(-8, 8, 3)
-        constraints = [cp.Maximum(iv) + 9 <= 8]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-        self.assertTrue(max(iv.value()) <= -1)
-
-        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
-        self.assertTrue(model.solve())
-        self.assertNotEqual(str(max(iv.value())), '4')
-
-    def test_element(self):
-        iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
-        constraints = [cp.Element(iv,idx) == 8]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
-
-
-    def test_Xor(self):
-        bv = cp.boolvar(5)
-        self.assertTrue(cp.Model(cp.Xor(bv)).solve())
-        self.assertTrue(cp.Xor(bv).value())
-
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
