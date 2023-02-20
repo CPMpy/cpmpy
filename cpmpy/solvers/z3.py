@@ -355,28 +355,15 @@ class CPM_z3(SolverInterface):
                 arr, idx = rhs.args
                 return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
 
+            if isinstance(lhs, GlobalConstraint) and hasattr(lhs, 'decompose_comparison'):
+                return z3.And(self._z3_expr(lhs.decompose_comparison(cpm_con.name, rhs)))
+            if isinstance(rhs, GlobalConstraint)  and hasattr(rhs, 'decompose_comparison'):
+                invertmap = {'>': '<', '<': '>', '<=': '>=', '>=': '<='}
+                #swap lhs and rhs for decomposition
+                if cpm_con.name in invertmap:
+                    cpm_con.name = invertmap[cpm_con.name]
+                return z3.And(self._z3_expr(rhs.decompose_comparison(cpm_con.name, lhs)))
             if cpm_con.name == "==":
-                if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
-                                  self._z3_expr(all([a <= rhs for a in lhs.args])))
-                if isinstance(rhs, GlobalConstraint) and rhs.name == "max":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
-                                  self._z3_expr(all([lhs >= a for a in rhs.args])))
-                if isinstance(lhs, GlobalConstraint) and lhs.name == "min":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
-                                  self._z3_expr(all([a >= rhs for a in lhs.args])))
-                if isinstance(rhs, GlobalConstraint) and rhs.name == "min":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
-                                  self._z3_expr(all([lhs <= a for a in rhs.args])))
-
                 # '==' is not supported between a boolean expression and an arithmetic expression
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
                     # lhs is bool and rhs is arith, make lhs also arith
@@ -385,14 +372,6 @@ class CPM_z3(SolverInterface):
                     lhs = self._z3_expr(lhs)
                 rhs = self._z3_expr(rhs)
                 return (lhs == rhs)
-
-
-            if isinstance(lhs, GlobalConstraint) and lhs.name in ("min", "max"):
-                new_var, cons = get_or_make_var(lhs)
-                return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, new_var, rhs)))
-            if isinstance(rhs, GlobalConstraint) and rhs.name in ("min", "max"):
-                new_var, cons = get_or_make_var(rhs)
-                return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, lhs, new_var)))
 
             # other comparisons are not supported on boolrefs, so convert with if then else
             # only '!=' is supported between 2 boolrefs
