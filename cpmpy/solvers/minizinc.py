@@ -223,7 +223,12 @@ class CPM_minizinc(SolverInterface):
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = mzn_result.statistics['time']  # --output-time
+            time = mzn_result.statistics['time']
+            if isinstance(time, int):
+                self.cpm_status.runtime = time / 1000
+            elif isinstance(time, timedelta):
+                self.cpm_status.runtime = time.total_seconds()  # --output-time
+
 
         # translate exit status
         mzn_status = mzn_result.status

@@ -93,6 +93,7 @@
         :nosignatures:
 
         AllDifferent
+        AllDifferentExcept0
         AllEqual
         Circuit
         Table
@@ -105,7 +106,7 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -174,6 +175,29 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except0", flatlist(args))
+
+    def decompose(self):
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        vals = [a.value() for a in self.args if a.value() != 0]
+        return len(set(vals)) == len(vals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferentExcept0(*copied_args)
+
+
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -208,6 +232,8 @@ class Circuit(GlobalConstraint):
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
+        if len(flatlist(args)) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
@@ -317,7 +343,7 @@ class Maximum(GlobalConstraint):
         return Maximum(copied_args)
 
 def element(arg_list):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 class Element(GlobalConstraint):

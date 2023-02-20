@@ -287,8 +287,8 @@ def get_or_make_var(expr):
         if isinstance(flatexpr, Operator) and flatexpr.name == "wsum":
             # more complex args, and weights can be negative, so more complex lbs/ubs
             weights, flatvars  = flatexpr.args
-            bounds = np.array([[w * fvar.lb for w, fvar in zip(weights, flatvars)],
-                               [w * fvar.ub for w, fvar in zip(weights, flatvars)]])
+            bounds = np.array([[w * fvar if is_num(fvar) else w * fvar.lb for w, fvar in zip(weights, flatvars)],
+                               [w * fvar if is_num(fvar) else w * fvar.ub for w, fvar in zip(weights, flatvars)]])
             lb, ub = bounds.min(axis=0).sum(), bounds.max(axis=0).sum() # for every column is axis=0...
             ivar = _IntVarImpl(lb, ub)
             return (ivar, [flatexpr == ivar]+flatcons)
