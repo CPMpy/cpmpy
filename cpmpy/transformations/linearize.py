@@ -150,17 +150,20 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         # now fix the comparisons themselves
         if cpm_expr.name == "<":
-            new_rhs, cons = get_or_make_var(rhs - 1)
+            new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
             return [lhs <= new_rhs] + cons
         if cpm_expr.name == ">":
-            new_rhs, cons = get_or_make_var(rhs + 1)
+            new_rhs, cons = get_or_make_var(rhs + 1) # if rhs is constant, will return new constant
             return [lhs >= new_rhs] + cons
         if cpm_expr.name == "!=":
             # Special case: BV != BV
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                 return [lhs + rhs == 1]
 
-            if reified or (lhs.name not in {"sum","wsum"} and not isinstance(lhs, _NumVarImpl)):
+            if reified or (isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}):
+                # lhs is sum/wsum and rhs is contant OR
+                # lhs is GenExpr and rhs is constant or var
+                #  ... what requires less new variables?
                 # Big M implementation
                 z = boolvar()
                 # Calculate bounds of M = |lhs - rhs| + 1,  TODO: should be easier after fixing issue #96
