@@ -90,12 +90,17 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
-        # TODO implement circuit unit test
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
-        _ = model.solve()
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
