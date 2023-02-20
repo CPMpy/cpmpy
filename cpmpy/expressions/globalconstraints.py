@@ -102,6 +102,8 @@
         Element
         Xor
         Cumulative
+        Count
+        AlldifferenExcept0
 
 """
 import warnings # for deprecation warning
@@ -539,3 +541,35 @@ class Cumulative(GlobalConstraint):
         return Cumulative(*copied_args)
 
 
+class Count(GlobalConstraint):
+    """
+    The Count (numerical) global constraint represents the number of occurrences of val in arr
+    """
+
+    def __init__(self,arr,val):
+        super().__init__("count", [arr,val], is_bool=False)
+
+    def value(self):
+        arr, val = self.args
+        val = argval(val)
+        return sum([argval(a) == val for a in arr])
+
+    def deepcopy(self, memodict={}):
+        arr, val = self._deepcopy_args(memodict)
+        return Count(arr, val)
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Count(arr,val) can only be decomposed if it's part of a comparison
+        """
+        from .python_builtins import any
+
+        arr, val = self.args
+        #we assume decompositions return lists of constraints
+        return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
+
+    def get_bounds(self):
+        return [0, len(self.args[0])]
+
+    def __repr__(self):
+        return "Count({})".format(self.args)

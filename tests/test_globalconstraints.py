@@ -177,3 +177,17 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_count(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([iv[0] == 0, iv[1] != 1, iv[2] != 2, cp.Count(iv, 0) == 3]).solve())
+        self.assertEqual(str(iv.value()),'[0 0 0]')
+        x = cp.intvar(-8,8)
+        y = cp.intvar(0,5)
+        self.assertTrue(cp.Model(cp.Count(iv, x) == y).solve())
+        self.assertEqual(str(cp.Count(iv, x).value()), str(y.value()))
+
+        self.assertTrue(cp.Model(cp.Count(iv, x) != y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) >= y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) <= y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) < y).solve())
+        self.assertTrue(cp.Model(cp.Count(iv, x) > y).solve())
