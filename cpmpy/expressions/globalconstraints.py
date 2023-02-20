@@ -318,6 +318,16 @@ class Minimum(GlobalConstraint):
         copied_args = self._deepcopy_args(self.args)
         return Minimum(copied_args)
 
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        _min = intvar(-2147483648, 2147483647)
+        return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
+
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -341,6 +351,17 @@ class Maximum(GlobalConstraint):
         """
         copied_args = self._deepcopy_args(memodict)
         return Maximum(copied_args)
+
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        _max = intvar(-2147483648, 2147483647)
+        return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
