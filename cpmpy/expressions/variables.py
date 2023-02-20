@@ -539,6 +539,12 @@ class NDVarArray(Expression, np.ndarray):
     # TODO?
     #object.__matmul__(self, other)
 
+class bool_val(Expression):
+    '''internal representation of boolean value'''
+    def __init__(self, val):
+        assert (val is True) or (val is False)
+        self.val = val
+
 
 def _genname(basename, idxs):
     """
