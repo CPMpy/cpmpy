@@ -171,7 +171,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 bound2, _ = get_or_make_var(1 + rhs - lhs)
                 M = max(bound1.ub, bound2.ub)
 
-                cons = [lhs - M * z <= rhs - 1, lhs + M * z >= rhs + M + 1]
+                cons = [lhs - M*z <= rhs-1, lhs - M*z >= rhs-M+1]
                 return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
 
             else:
