@@ -76,12 +76,17 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c2), "(~BV3) -> (sum([1, 1, -1] * [x, y, z]) >= 1)")
         c1, c2 = linearize_constraint(a.implies(x != y))
         self.assertEqual(str(c1), "(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1)")
-        self.assertEqual(str(c2), "(a) -> (sum([1, -1, 6] * [x, y, BV4]) >= 7)")
-
+        self.assertEqual(str(c2), "(a) -> (sum([1, -1, 6] * [x, y, BV4]) >= -5)")
 
 
 
 class TestConstRhs(unittest.TestCase):
+
+    def  test_numvar(self):
+        a, b = [cp.intvar(0, 10, name=n) for n in "ab"]
+
+        cons = linearize_constraint(a <= b)[0]
+        self.assertEqual("sum([1, -1] * [a, b]) <= 0", str(cons))
 
     def test_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
