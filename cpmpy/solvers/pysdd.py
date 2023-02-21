@@ -28,6 +28,7 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
 from ..transformations.get_variables import get_variables
+from ..transformations.normalize import make_cpm_expr
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysdd(SolverInterface):
@@ -213,7 +214,7 @@ class CPM_pysdd(SolverInterface):
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
-        return to_cnf(cpm_expr)
+        return to_cnf(make_cpm_expr(cpm_expr))
 
     def _post_constraint(self, cpm_expr):
         """

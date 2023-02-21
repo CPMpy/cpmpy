@@ -34,6 +34,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.normalize import make_cpm_expr
 from ..transformations.reification import only_bv_implies, reify_rewrite
 
 try:
@@ -264,7 +265,8 @@ class CPM_gurobi(SolverInterface):
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = make_cpm_expr(cpm_expr)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
@@ -283,8 +285,8 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
         # True or False
-        if is_bool(cpm_expr):
-            return self.grb_model.addConstr(cpm_expr)
+        if isinstance(cpm_expr, BoolVal):
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const

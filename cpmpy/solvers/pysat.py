@@ -31,10 +31,11 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.get_variables import get_variables
+from ..transformations.normalize import make_cpm_expr
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -222,7 +223,7 @@ class CPM_pysat(SolverInterface):
 
         :return: list of Expression
         """
-        return to_cnf(cpm_expr)
+        return to_cnf(make_cpm_expr(cpm_expr))
 
     def _post_constraint(self, cpm_expr):
         """
@@ -234,6 +235,10 @@ class CPM_pysat(SolverInterface):
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from pysat.card import CardEnc
+        # True or False
+        if isinstance(cpm_expr, BoolVal):
+            if cpm_expr.args[0] is False:
+                return self.pysat_solver.add_clause([])
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -294,8 +299,6 @@ class CPM_pysat(SolverInterface):
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
-        if cpm_expr is False:
-            self.pysat_solver.add_clause([])
         else:
             raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 

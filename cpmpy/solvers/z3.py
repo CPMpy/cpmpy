@@ -22,13 +22,14 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.normalize import make_cpm_expr
 
 
 class CPM_z3(SolverInterface):
@@ -249,10 +250,7 @@ class CPM_z3(SolverInterface):
         # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        if is_any_list(cpm_expr):
-            return cpm_expr
-        else:
-            return [cpm_expr]
+        return make_cpm_expr(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
@@ -288,7 +286,10 @@ class CPM_z3(SolverInterface):
 
         elif is_any_list(cpm_con):
             return [self._z3_expr(con) for con in cpm_con]
-            
+
+        elif isinstance(cpm_con, BoolVal):
+            return cpm_con.args
+
         elif isinstance(cpm_con, _NumVarImpl):
             return self.solver_var(cpm_con)
 

@@ -28,11 +28,12 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.normalize import make_cpm_expr
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 
@@ -320,7 +321,8 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
-        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = make_cpm_expr(cpm_expr)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
@@ -342,9 +344,11 @@ class CPM_ortools(SolverInterface):
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
+
         # True or False
-        if is_bool(cpm_expr):
-            return self.ort_model.Add(cpm_expr)
+        if isinstance(cpm_expr, BoolVal):
+            return self.ort_model.Add(cpm_expr.args[0])
+
         # Base case: Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
