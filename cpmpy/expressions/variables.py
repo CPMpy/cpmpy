@@ -50,7 +50,6 @@
 from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
-from ..exceptions import CPMpyException
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist
 
@@ -280,7 +279,6 @@ class _IntVarImpl(_NumVarImpl):
             # no-op
             return self
         return super().__abs__()
-
 
 class _BoolVarImpl(_IntVarImpl):
     """
