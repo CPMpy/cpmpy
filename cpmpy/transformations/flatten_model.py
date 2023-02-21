@@ -80,7 +80,6 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 import copy
 import math
 import numpy as np
-from ..exceptions import CPMpyException
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -127,8 +126,9 @@ def flatten_constraint(expr):
             return [expr]  # not sure about this one... means False is a valid FNF expression
     elif isinstance(expr, _BoolVarImpl):
         return [expr]
-    elif is_num(expr) or isinstance(expr, _NumVarImpl):
-        raise CPMpyException(f"Numeric constants or numeric variables not allowed as base constraint: {expr}")
+
+    assert not (is_num(expr) or isinstance(expr, _NumVarImpl)), \
+        f"Numeric constants or numeric variables not allowed as base constraint: {expr}"
 
     # recursively flatten list of constraints
     if is_any_list(expr):
