@@ -39,7 +39,7 @@ import numpy as np
 from .reification import only_bv_implies
 from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
-from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make
+from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_any_list, is_num, is_bool
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
@@ -54,9 +54,6 @@ def linearize_constraint(cpm_expr):
     if is_any_list(cpm_expr):
         lin_cons = [linearize_constraint(expr) for expr in cpm_expr]
         return [c for l in lin_cons for c in l]
-
-    if is_bool(cpm_expr):
-        return [cpm_expr]
 
     if isinstance(cpm_expr, _BoolVarImpl):
         if isinstance(cpm_expr, NegBoolView):
@@ -346,7 +343,7 @@ def only_positive_bv(cpm_expr):
         else:
             raise NotImplementedError(f"Operator {lhs} is not supported on left right hand side of implication in {cpm_expr}")
 
-    if is_bool(cpm_expr) or isinstance(cpm_expr, GlobalConstraint):
+    if isinstance(cpm_expr, (BoolVal, GlobalConstraint)):
         return [cpm_expr]
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")

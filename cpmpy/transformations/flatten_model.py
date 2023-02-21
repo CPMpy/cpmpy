@@ -118,13 +118,7 @@ def flatten_constraint(expr):
         it will return 'Exception' if something is not supported
         TODO, what built-in python error is best?
     """
-    # base cases
-    if isinstance(expr, bool):
-        if expr:
-            return []
-        else:
-            return [expr]  # not sure about this one... means False is a valid FNF expression
-    elif isinstance(expr, _BoolVarImpl):
+    if isinstance(expr, _BoolVarImpl):
         return [expr]
     elif is_num(expr) or isinstance(expr, _NumVarImpl):
         raise Exception("Numeric constants or numeric variables not allowed as base constraint")
