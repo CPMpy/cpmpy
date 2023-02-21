@@ -63,44 +63,48 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     if isinstance(cpm_expr, _BoolVarImpl):
         return [sum([cpm_expr]) >= 1]
 
-    # conjunction
-    if cpm_expr.name == "and":
-        return [sum(cpm_expr.args) >= len(cpm_expr.args)]
+    # Boolean operators
+    if isinstance(cpm_expr, (Operator, GlobalConstraint)) and cpm_expr.is_bool():
+        # conjunction
+        if cpm_expr.name == "and":
+            return [sum(cpm_expr.args) >= len(cpm_expr.args)]
 
-    # disjunction
-    if cpm_expr.name == "or":
-        return [sum(cpm_expr.args) >= 1]
+        # disjunction
+        elif cpm_expr.name == "or":
+            return [sum(cpm_expr.args) >= 1]
 
-    # reification
-    if cpm_expr.name == "->":
-        # determine direction of implication
-        cond, sub_expr = cpm_expr.args
-        assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of implication must be boolvar. Apply `only_bv_implies` before calling `linearize_constraint`"
+        # xor
+        elif cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
+            return [sum(cpm_expr.args) >= 1]
 
-        if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
-            # shortcut for BV -> BV, convert to disjunction and apply linearize on it
-            return linearize_constraint(~cond | sub_expr, reified=reified)
+        # reification
+        elif cpm_expr.name == "->":
+            # determine direction of implication
+            cond, sub_expr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of implication must be boolvar. Apply `only_bv_implies` before calling `linearize_constraint`"
 
-        # BV -> LinExpr
-        if isinstance(cond, _BoolVarImpl):
-            lin_sub = linearize_constraint(sub_expr, supported=supported, reified=True)
-            return [cond.implies(lin) for lin in lin_sub]
+            if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
+                # shortcut for BV -> BV, convert to disjunction and apply linearize on it
+                return linearize_constraint(~cond | sub_expr, reified=reified)
+
+            # BV -> LinExpr
+            if isinstance(cond, _BoolVarImpl):
+                lin_sub = linearize_constraint(sub_expr, supported=supported, reified=True)
+                return [cond.implies(lin) for lin in lin_sub]
 
     # comparisons
     if isinstance(cpm_expr, Comparison):
         lhs, rhs = cpm_expr.args
 
-        # Var <op> Const is fine
-        if isinstance(lhs, _NumVarImpl) and is_num(rhs):
-            pass
-        # linearize unsupported operators
-        elif lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
-            if isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
-                # bring numvar to lhs
-                lhs = lhs + -1 * rhs
-                rhs = 0
+        if isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
+            # bring numvar to lhs
+            lhs = 1 * lhs + -1 * rhs
+            rhs = 0
 
-            elif lhs.name == "sub":
+        # linearize unsupported operators
+        elif isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
+
+            if lhs.name == "sub":
                 # convert to wsum
                 lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
 
