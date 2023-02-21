@@ -133,13 +133,14 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             else:
                 raise NotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported} or 'sub','element' but is {lhs}. Please report on github")
 
-        if isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}:
+        if is_num(lhs) or (isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}):
             # bring all vars to lhs
             if isinstance(rhs, _NumVarImpl):
-                if lhs.name == "sum":
+                if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args]+[-1 * rhs]), 0
                 else:
                     lhs, rhs = lhs + -1*rhs, 0
+
             # bring all const to rhs
             if lhs.name == "sum":
                 rhs += -sum(arg for arg in lhs.args if is_num(arg))
@@ -164,7 +165,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                 return [lhs + rhs == 1]
 
-            if reified or (isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}):
+            if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
                 # lhs is sum/wsum and rhs is contant OR
                 # lhs is GenExpr and rhs is constant or var
                 #  ... what requires less new variables?
@@ -228,7 +229,7 @@ def only_positive_bv(cpm_expr):
 
         if isinstance(lhs, _NumVarImpl):
             if isinstance(lhs,NegBoolView):
-                lhs, rhs = -lhs._bv, rhs - 1
+                lhs, rhs = Operator("wsum",[[-1], [lhs._bv]]), 1 - rhs
 
         if lhs.name == "sum" and any(isinstance(a, NegBoolView) for a in lhs.args):
             lhs = Operator("wsum",[[1]*len(lhs.args), lhs.args])
