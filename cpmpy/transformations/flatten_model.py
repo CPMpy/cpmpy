@@ -110,7 +110,7 @@ def flatten_model(orig_model):
 
 def flatten_constraint(expr):
     """
-        input is any expression; except bool, is_num(), pure _NumVarImpl,
+        input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
         
         output: see definition of 'flat normal form' above.
