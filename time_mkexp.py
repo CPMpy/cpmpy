@@ -42,7 +42,7 @@ def run(dirname, funcs):
     print(df.max().round(3))
     print()
     print("Times of second run:")
-    df = pd.DataFrame.from_records(times, index=fnames)
+    df = pd.DataFrame.from_records(times2, index=fnames)
     print("Total")
     print(df.sum().round(3))
     print("Max")
