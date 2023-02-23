@@ -7,43 +7,46 @@ import os
 import pickle
 import time
 from os.path import join
+import pandas as pd
 
 from cpmpy import *
 
 
-def run(dirname):
-    times = [0]
-    times2 = [0]
-    max_name = ""
-    for f in sorted(glob.glob(join(dirname, "*.bt"))):
+def run(dirname, funcs):
+    times = []
+    times2 = []
+    fnames = sorted(glob.glob(join(dirname, "*.bt")))
+    for f in fnames:
+        times.append(dict())
+        times2.append(dict())
         with open(f, 'rb') as fpcl:
-                print('.', end='', flush=True)
-                model = pickle.loads(brotli.decompress(fpcl.read()))
-                cpm_cons = model.constraints
+            model = pickle.loads(brotli.decompress(fpcl.read()))
+            cpm_cons = model.constraints
 
+            for func in funcs:
                 t0 = time.time()
-                newexp = make_cpm_expr2bf(cpm_cons)
+                newexp = func(cpm_cons)
                 t1 = time.time() - t0
-                v = len(newexp)
-                print(v, end='', flush=True)
-                if t1 > max(times):
-                    max_name = f
-                times.append( t1 )
+                times[-1][str(func.__name__)] = t1
 
                 t2 = time.time()
                 newexp2 = make_cpm_expr2bf(newexp)
                 t3 = time.time() - t2
-                times2.append( t3 )
+                times2[-1][str(func.__name__)] = t3
 
-                # well, don't do nothing with it...
-                newexp3 = make_cpm_expr2bf(newexp2)
-
-    print("")  # after all the .'s
-    print("Total", sum(times))
-    print("Max  ", max(times), max_name)
-    print("2, no-op list")
-    print("Total2", sum(times2))
-    print("Max2  ", max(times2))
+    print("Times of first run:")
+    df = pd.DataFrame.from_records(times, index=fnames)
+    print("Total")
+    print(df.sum().round(3))
+    print("Max")
+    print(df.max().round(3))
+    print()
+    print("Times of second run:")
+    df = pd.DataFrame.from_records(times, index=fnames)
+    print("Total")
+    print(df.sum().round(3))
+    print("Max")
+    print(df.max().round(3))
 
 import numpy as np
 from cpmpy.expressions.utils import is_any_list
@@ -450,4 +453,23 @@ def make_cpm_expr4(cpm_expr):
 if __name__ == '__main__':
     dirname = os.path.join("cpmpy-bigtest","models")
     assert os.path.exists("cpmpy-bigtest"), "Make sure you cloned bigtest in `cpmpy-bigtest/`"
-    run(dirname)
+
+    funcs = [
+        make_cpm_expr1,
+        make_cpm_expr1b,
+        make_cpm_expr2,
+        make_cpm_expr2b,
+        make_cpm_expr2bb,
+        make_cpm_expr2bc,
+        make_cpm_expr2bd,
+        make_cpm_expr2be,
+        make_cpm_expr2bf,
+        make_cpm_expr2c,
+        make_cpm_expr3,
+        make_cpm_expr3b,
+        make_cpm_expr4,
+        make_cpm_expr5,
+        make_cpm_expr5b
+    ]
+
+    run(dirname, funcs)
