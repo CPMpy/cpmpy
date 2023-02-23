@@ -15,7 +15,8 @@ from cpmpy import *
 def run(dirname, funcs):
     times = []
     times2 = []
-    fnames = sorted(glob.glob(join(dirname, "*.bt")))
+    fnames = sorted(glob.glob(join(dirname, "*.bt"))+glob.glob(join(dirname, "*/*.bt")))
+    print(f"{len(fnames)} models")
     for f in fnames:
         times.append(dict())
         times2.append(dict())
@@ -23,34 +24,38 @@ def run(dirname, funcs):
             model = pickle.loads(brotli.decompress(fpcl.read()))
             cpm_cons = model.constraints
 
+            l = len(make_cpm_expr1b(cpm_cons))
             for func in funcs:
                 t0 = time.time()
                 newexp = func(cpm_cons)
                 t1 = time.time() - t0
+                assert (len(newexp) == l), f"Bug {func}: {len(newexp)} instead of {l}"
                 times[-1][str(func.__name__)] = t1
 
                 t2 = time.time()
                 newexp2 = func(newexp)
                 t3 = time.time() - t2
+                assert (len(newexp2) == l), f"Bug {func}: {len(newexp)} instead of {l}"
                 times2[-1][str(func.__name__)] = t3
 
     print("Times of first run:")
     df = pd.DataFrame.from_records(times, index=fnames)
     print("Total")
-    print(df.sum().round(3))
+    print(df.sum().round(3).sort_values().head(8))
     print("Max")
-    print(df.max().round(3))
+    print(df.max().round(3).sort_values().head(4))
     print()
     print("Times of second run:")
     df = pd.DataFrame.from_records(times2, index=fnames)
     print("Total")
-    print(df.sum().round(3))
+    print(df.sum().round(3).sort_values().head(8))
     print("Max")
-    print(df.max().round(3))
+    print(df.max().round(3).sort_values().head(4))
 
 import numpy as np
 from cpmpy.expressions.utils import is_any_list
 from cpmpy.expressions.core import Expression, Operator, BoolVal
+from cpmpy.expressions.variables import NDVarArray
 from collections.abc import Iterable
 
 # original
@@ -173,14 +178,14 @@ def make_cpm_expr2bc(cpm_expr):
     newlist = []
     for e in cpm_expr:
         if isinstance(e, Expression):
-            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
                 newlist.extend(make_cpm_expr2bc(e.flat))
             elif e.name == "and":
                 newlist.extend(make_cpm_expr2bc(e.args))
             else:
                 # presumably the most frequent case
                 newlist.append(e)
-        elif isinstance(e, (list, tuple)):
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
             newlist.extend(make_cpm_expr2bc(e))
         elif e is False:
             newlist.append(BoolVal(e))
@@ -201,7 +206,7 @@ def make_cpm_expr2bd(cpm_expr):
     newlist = []
     for e in cpm_expr:
         if isinstance(e, Expression):
-            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
                 newlist.extend(make_cpm_expr2bd(e.flat))
             elif e.name == "and":
                 newlist.extend(make_cpm_expr2bd(e.args))
@@ -227,7 +232,7 @@ def make_cpm_expr2be(cpm_expr):
 
     def unravel(e):
         if isinstance(e, Expression):
-            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
                 for ee in e.flat:
                     unravel(ee)
             elif e.name == "and":
@@ -236,7 +241,7 @@ def make_cpm_expr2be(cpm_expr):
             else:
                 # presumably the most frequent case
                 newlist.append(e)
-        elif isinstance(e, (list, tuple)):
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
             for ee in e:
                 unravel(ee)
         elif e is False:
@@ -257,14 +262,14 @@ def make_cpm_expr2bf(cpm_expr):
     def unravel(lst):
       for e in lst:
         if isinstance(e, Expression):
-            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
                 unravel(e.flat)
             elif e.name == "and":
                 unravel(e.args)
             else:
                 # presumably the most frequent case
                 newlist.append(e)
-        elif isinstance(e, (list, tuple, np.flatiter)):
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
             unravel(e)
         elif e is False:
             newlist.append(BoolVal(e))
@@ -549,14 +554,14 @@ def make_cpm_expr_generator(cpm_expr):
 
         for e in cpm_expr:
             if isinstance(e, Expression):
-                if isinstance(e, np.ndarray):  # sometimes does not have a .name
+                if isinstance(e, NDVarArray):  # sometimes does not have a .name
                     yield from do_recurse(e.flat)
                 elif e.name == "and":
                     yield from do_recurse(e.args)
                 else:
                     # presumably the most frequent case
                     yield e
-            elif isinstance(e, (list, tuple)):
+            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 yield from do_recurse(e)
             elif e is False:
                 yield BoolVal(e)
@@ -577,14 +582,14 @@ def make_cpm_expr2bf_ignace(cpm_expr):
     def unravel(lst):
       for e in lst:
         if isinstance(e, Expression):
-            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
                 unravel(e.flat)
             elif e.name == "and":
                 unravel(e.args)
             else:
                 # presumably the most frequent case
                 append(e)
-        elif isinstance(e, (list, tuple, np.flatiter)):
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
             unravel(e)
         elif e is False:
             append(BoolVal(e))
@@ -603,22 +608,22 @@ if __name__ == '__main__':
         make_cpm_expr1,
         # make_cpm_expr1b,
         # make_cpm_expr2,
-        # make_cpm_expr2b,
-        # make_cpm_expr2bb,
+        make_cpm_expr2b,
+        make_cpm_expr2bb,
         make_cpm_expr2bc,
-        # make_cpm_expr2bd,
-        # make_cpm_expr2be,
+        make_cpm_expr2bd,
+        make_cpm_expr2be,
         make_cpm_expr2bf,
-        # make_cpm_expr2c,
+        make_cpm_expr2c,
         # make_cpm_expr3,
         # make_cpm_expr3b,
         # make_cpm_expr4,
         # make_cpm_expr5,
         # make_cpm_expr5b,
-        # make_cpm_expr_6,
-        # make_cpm_expr_7,
-        # make_cpm_expr_7b,
-        # make_cpm_expr_generator,
+        make_cpm_expr_6,
+        # make_cpm_expr_7,  # buggy
+        make_cpm_expr_7b,
+        make_cpm_expr_generator,
         make_cpm_expr2bf_ignace
 
     ]
