@@ -1,6 +1,6 @@
 # MAKE SURE THIS FILE IS -NOT- IN THE SQUASH COMMIT
 # install brotli
-# clone cpmpy-bigtest in this directory
+# clone cpmpy-bigtest in this directory: https://github.com/CPMpy/cpmpy-bigtest 
 import brotli
 import glob
 import os
