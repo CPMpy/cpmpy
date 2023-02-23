@@ -30,7 +30,7 @@ def run(dirname, funcs):
                 times[-1][str(func.__name__)] = t1
 
                 t2 = time.time()
-                newexp2 = make_cpm_expr2bf(newexp)
+                newexp2 = func(newexp)
                 t3 = time.time() - t2
                 times2[-1][str(func.__name__)] = t3
 
