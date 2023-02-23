@@ -109,7 +109,7 @@ import numpy as np
 from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -296,17 +296,17 @@ class Table(GlobalConstraint):
 # a little helper:
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
+        assert all([is_boolexpr(condition), is_boolexpr(if_true), is_boolexpr(if_false)]), \
+            "only boolean expression allowed in IfThenElse"
         super().__init__("ite", [condition, if_true, if_false], is_bool=True)
 
     def value(self):
         condition, if_true, if_false = self.args
         condition_val = argval(condition)
-        true_val = argval(if_true)
-        false_val = argval(if_false)
-        if condition_val:
-            return true_val
+        if argval(condition):
+            return argval(if_true)
         else:
-            return false_val
+            return argval(if_false)
 
     def decompose(self):
         condition, if_true, if_false = self.args

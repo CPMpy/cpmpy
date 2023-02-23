@@ -159,6 +159,7 @@ class TestGlobal(unittest.TestCase):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
         constraints = [iter]
+        print(constraints)
         self.assertTrue(cp.Model(constraints).solve())
 
         constraints = [iter, x == [0, 4, 4]]
