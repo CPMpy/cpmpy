@@ -43,14 +43,14 @@ def run(dirname, funcs):
     print("Total")
     print(df.sum().round(3).sort_values().head(8))
     print("Max")
-    print(df.max().round(3).sort_values().head(4))
+    print(df.max().round(4).sort_values().head(4))
     print()
     print("Times of second run:")
     df = pd.DataFrame.from_records(times2, index=fnames)
     print("Total")
     print(df.sum().round(3).sort_values().head(8))
     print("Max")
-    print(df.max().round(3).sort_values().head(4))
+    print(df.max().round(4).sort_values().head(4))
 
 import numpy as np
 from cpmpy.expressions.utils import is_any_list
@@ -278,6 +278,212 @@ def make_cpm_expr2bf(cpm_expr):
     unravel((cpm_expr,))
 
     return newlist
+
+
+def make_cpm_expr2bg(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    # check and shortcut if it will not rewrite anything, worth checking
+    if isinstance(cpm_expr, (list, tuple)):
+        rewrite = False
+        for e in cpm_expr:
+            if not isinstance(e, Expression) or \
+                    isinstance(e, NDVarArray) or \
+                    e.name == "and":
+                rewrite = True
+                break
+        if not rewrite:
+            return list(cpm_expr)
+
+    # @profile
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+
+    newlist = []
+    append = newlist.append
+    unravel((cpm_expr,), append)
+
+    return newlist
+
+
+def make_cpm_expr2bg2(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    # check and shortcut if it will not rewrite anything, worth checking
+    is_enum = isinstance(cpm_expr, (list, tuple))
+    if is_enum:
+        rewrite = False
+        for e in cpm_expr:
+            if not isinstance(e, Expression) or \
+                    isinstance(e, NDVarArray) or \
+                    e.name == "and":
+                rewrite = True
+                break
+        if not rewrite:
+            return list(cpm_expr)
+
+    # @profile
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+
+    newlist = []
+    append = newlist.append  # reuse function pointer directly
+    if is_enum:
+        unravel(cpm_expr, append)  # first art already enumerable
+    else:
+        unravel((cpm_expr,), append)  # first arg must be enumerable
+    return newlist
+
+def make_cpm_expr2bg3(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+
+    newlist = []
+    append = newlist.append  # reuse function pointer directly
+
+    # check and shortcut if it will not rewrite anything, worth checking
+    if isinstance(cpm_expr, (list, tuple)):
+        for e in cpm_expr:
+            if not isinstance(e, Expression) or \
+                    isinstance(e, NDVarArray) or \
+                    e.name == "and":
+                # needs rewrite, we know it is an enum
+                unravel(cpm_expr, append)
+                return newlist
+        # no rewrite needed (but could be tuple)
+        return list(cpm_expr)
+
+    unravel((cpm_expr,), append)  # first arg must be enumerable
+    return newlist
+
+def make_cpm_expr2bg4(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+
+    newlist = []
+    append = newlist.append  # reuse function pointer directly
+
+    # check and shortcut if it will not rewrite anything, worth checking
+    if isinstance(cpm_expr, (list, tuple)):
+        for i,e in enumerate(cpm_expr):
+            if not isinstance(e, Expression) or \
+                    isinstance(e, NDVarArray) or \
+                    e.name == "and":
+                # keep part before as is
+                unravel(cpm_expr[i:], append)
+                return cpm_expr[:i]+newlist
+        return list(cpm_expr)
+
+    unravel((cpm_expr,), append)  # first arg must be enumerable
+    return newlist
+
+def make_cpm_expr6(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    def unravel(lst, append):
+      first = None
+      for i,e in enumerate(lst):
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                first = i
+                unravel(e.flat, append)
+            elif e.name == "and":
+                first = i
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                if i is not None:
+                    append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            first = i
+            unravel(e, append)
+        elif e is False:
+            if i is not None:
+                append(BoolVal(e))
+        elif e is True:
+            first = i
+        elif e is not True:  # if True: pass
+            if i is not None:
+                append(e)
+      return first
+
+    newlist = []
+    append = newlist.append  # reuse function pointer directly
+    if isinstance(cpm_expr, list):
+        i = unravel(cpm_expr, append)
+        if i is None:
+            return newlist
+        elif i == len(cpm_expr):
+            return cpm_expr
+        return cpm_expr[:i] + newlist
+    else:
+        unravel((cpm_expr,), append)  # first arg must be enumerable
+        return newlist
 
 # non-recursive
 def make_cpm_expr5(cpm_expr):
@@ -599,6 +805,35 @@ def make_cpm_expr2bf_ignace(cpm_expr):
 
     return newlist
 
+# add func as arg? (local lookup)
+def make_cpm_expr2bf_ignace2(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    # @profile
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+
+    newlist = []
+    append = newlist.append
+    unravel((cpm_expr,), append)
+
+    return newlist
+
 
 if __name__ == '__main__':
     dirname = os.path.join("cpmpy-bigtest","models")
@@ -614,6 +849,10 @@ if __name__ == '__main__':
         make_cpm_expr2bd,
         make_cpm_expr2be,
         make_cpm_expr2bf,
+        make_cpm_expr2bg,
+        make_cpm_expr2bg2,
+        make_cpm_expr2bg3,
+        make_cpm_expr2bg4,
         make_cpm_expr2c,
         # make_cpm_expr3,
         # make_cpm_expr3b,
@@ -624,7 +863,8 @@ if __name__ == '__main__':
         # make_cpm_expr_7,  # buggy
         make_cpm_expr_7b,
         make_cpm_expr_generator,
-        make_cpm_expr2bf_ignace
+        make_cpm_expr2bf_ignace,
+        make_cpm_expr2bf_ignace2,
 
     ]
 
