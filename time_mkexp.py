@@ -450,26 +450,177 @@ def make_cpm_expr4(cpm_expr):
 
     return newlist
 
+####### Ignace's attempts ########
+def make_cpm_expr_6(lst):
+    # clean non-iterative version,
+    # slower because of inline modification of lists
+    if not is_any_list(lst):
+        lst = [lst]
+    i = 0
+    lst = list(lst)
+    while i < len(lst):
+        expr = lst[i]
+        if is_any_list(expr):
+            lst.extend(lst.pop(i))
+        elif isinstance(expr, Operator) and lst[i].name == "and":
+            lst.extend(lst.pop(i).args)
+        elif lst is False:
+            lst.append(BoolVal(lst.pop(i)))
+        else:
+            # fine, skip
+            i += 1
+
+    return lst
+
+def make_cpm_expr_7(lst):
+    # non-recursive version without inline changing size of list
+    # faster than previous but does not beat 'make_cpm_expr_2bf'
+    # main time lost in if-checks (and a little bit in the "out.append" where it would be better to use out.extend with a bunch of elements in 1 go)
+
+    if not is_any_list(lst):
+        lst = [lst]
+    out, stack = [], [lst]
+    while len(stack):
+        expr = stack.pop()
+        if isinstance(expr, Expression):
+            if isinstance(expr, np.ndarray):  # sometimes does not have a .name
+                stack.extend(expr.flat)
+            elif expr.name == "and":
+                stack.extend(expr.args)
+            else:
+                out.append(expr)
+        if is_any_list(expr):
+            stack.extend(expr)
+        elif isinstance(expr, Operator) and expr.name == "and":
+            stack.extend(expr.args)
+        elif expr is False:
+            out.append(BoolVal(expr))
+        elif expr is not True:  # if True: pass
+            out.append(expr)
+
+    out.extend(stack)
+    return out
+
+def make_cpm_expr_7b(lst):
+    if not is_any_list(lst):
+        lst = [lst]
+    out, stack = [], [lst]
+    i = 1
+    while i <= len(stack):
+        if is_any_list(stack[len(stack)-i]):
+            # last to len(stack)-i+1 are normal exprs
+            out.extend(stack[len(stack)-i+1:])
+            stack[len(stack)-i+1:] = []
+            i = 1
+
+            stack.extend(stack.pop())
+        elif isinstance(stack[len(stack)-i], Operator) and stack[len(stack)-i].name == "and":
+            # last to len(stack)-i+1 are normal exprs
+            out.extend(stack[len(stack) - i + 1:])
+            stack[len(stack) - i + 1:] = []
+            i = 1
+
+            stack.extend(stack.pop().args)
+
+        elif stack[len(stack)-i] is False:
+            # last to len(stack)-i+1 are normal exprs
+            out.extend(stack[len(stack) - i + 1:])
+            stack[len(stack) - i + 1:] = []
+            i = 1
+
+            out.append(BoolVal(stack.pop()))
+        else:
+            i += 1
+    out.extend(stack)
+    return out
+
+
+
+# @profile
+def make_cpm_expr_generator(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    if not isinstance(cpm_expr, (list, tuple, np.ndarray, np.flatiter)):
+        cpm_expr = (cpm_expr,)
+
+    # @profile
+    def do_recurse(cpm_expr):
+
+        for e in cpm_expr:
+            if isinstance(e, Expression):
+                if isinstance(e, np.ndarray):  # sometimes does not have a .name
+                    yield from do_recurse(e.flat)
+                elif e.name == "and":
+                    yield from do_recurse(e.args)
+                else:
+                    # presumably the most frequent case
+                    yield e
+            elif isinstance(e, (list, tuple)):
+                yield from do_recurse(e)
+            elif e is False:
+                yield BoolVal(e)
+            elif e is not True:  # if True: pass
+                yield e
+
+    return list(do_recurse(cpm_expr))
+
+
+# @profile
+def make_cpm_expr2bf_ignace(cpm_expr):
+    """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    newlist = []
+    append = newlist.append
+    # @profile
+    def unravel(lst):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, np.ndarray):  # sometimes does not have a .name
+                unravel(e.flat)
+            elif e.name == "and":
+                unravel(e.args)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter)):
+            unravel(e)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
+    unravel((cpm_expr,))
+
+    return newlist
+
+
 if __name__ == '__main__':
     dirname = os.path.join("cpmpy-bigtest","models")
     assert os.path.exists("cpmpy-bigtest"), "Make sure you cloned bigtest in `cpmpy-bigtest/`"
 
     funcs = [
         make_cpm_expr1,
-        make_cpm_expr1b,
-        make_cpm_expr2,
-        make_cpm_expr2b,
-        make_cpm_expr2bb,
+        # make_cpm_expr1b,
+        # make_cpm_expr2,
+        # make_cpm_expr2b,
+        # make_cpm_expr2bb,
         make_cpm_expr2bc,
-        make_cpm_expr2bd,
-        make_cpm_expr2be,
+        # make_cpm_expr2bd,
+        # make_cpm_expr2be,
         make_cpm_expr2bf,
-        make_cpm_expr2c,
-        make_cpm_expr3,
-        make_cpm_expr3b,
-        make_cpm_expr4,
-        make_cpm_expr5,
-        make_cpm_expr5b
+        # make_cpm_expr2c,
+        # make_cpm_expr3,
+        # make_cpm_expr3b,
+        # make_cpm_expr4,
+        # make_cpm_expr5,
+        # make_cpm_expr5b,
+        # make_cpm_expr_6,
+        # make_cpm_expr_7,
+        # make_cpm_expr_7b,
+        # make_cpm_expr_generator,
+        make_cpm_expr2bf_ignace
+
     ]
 
     run(dirname, funcs)
