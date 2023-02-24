@@ -108,7 +108,7 @@ import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, NDVarArray
+from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
