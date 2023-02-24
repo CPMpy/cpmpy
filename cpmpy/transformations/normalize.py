@@ -16,8 +16,7 @@ def make_cpm_expr(cpm_expr):
             elif e.name == "and":
                 unravel(e.args, append)
             else:
-                # presumably the most frequent case
-                append(e)
+                append(e) # presumably the most frequent case
         elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
             unravel(e, append)
         elif e is False:
