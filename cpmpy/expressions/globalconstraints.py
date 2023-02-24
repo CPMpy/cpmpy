@@ -108,7 +108,7 @@ import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array
+from .variables import boolvar, intvar, cpm_array, NDVarArray
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
 from ..transformations.flatten_model import get_or_make_var
 
@@ -294,8 +294,14 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        #make it a list because other code assumes decompositions return a list of constraints
-        return [any(all(arr == row) for row in tab)]
+        #Comparing multiple values at once only works with an NDVarArray. We cannot assume that arr has that type here
+        options = []
+        for row in tab:
+            assignment = []
+            for i in range(len(row)):
+                assignment += [arr[i] == row[i]]
+            options += [all(assignment)]
+        return [any(options)]
 
 
     def deepcopy(self, memodict={}):
