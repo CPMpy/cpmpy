@@ -395,6 +395,9 @@ class CPM_minizinc(SolverInterface):
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
+        if not isinstance(expr, Expression):
+            return self.solver_var(expr) # constants
+
         if isinstance(expr, BoolVal):
             return str(expr.args is True).lower()
 
