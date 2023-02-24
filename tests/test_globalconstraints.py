@@ -104,6 +104,14 @@ class TestGlobal(unittest.TestCase):
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
         constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
