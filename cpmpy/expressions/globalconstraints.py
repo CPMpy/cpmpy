@@ -294,14 +294,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        #Comparing multiple values at once only works with an NDVarArray. We cannot assume that arr has that type here
-        options = []
-        for row in tab:
-            assignment = []
-            for i in range(len(row)):
-                assignment += [arr[i] == row[i]]
-            options += [all(assignment)]
-        return [any(options)]
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
 
 
     def deepcopy(self, memodict={}):
