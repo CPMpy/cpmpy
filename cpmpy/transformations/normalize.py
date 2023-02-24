@@ -1,20 +1,32 @@
+import numpy as np
 
-from cpmpy.expressions.utils import is_any_list
-from cpmpy.expressions.core import Operator, BoolVal
+from ..expressions.core import BoolVal, Expression
+from ..expressions.variables import NDVarArray
 
 def make_cpm_expr(cpm_expr):
     """
-        unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
-        """
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression
+    """
+    # very efficient version with limited function lookups and list operations
+    def unravel(lst, append):
+      for e in lst:
+        if isinstance(e, Expression):
+            if isinstance(e, NDVarArray):  # sometimes does not have a .name
+                unravel(e.flat, append)
+            elif e.name == "and":
+                unravel(e.args, append)
+            else:
+                # presumably the most frequent case
+                append(e)
+        elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            unravel(e, append)
+        elif e is False:
+            append(BoolVal(e))
+        elif e is not True:  # if True: pass
+            append(e)
 
-    if is_any_list(cpm_expr):
-        expr = [make_cpm_expr(e) for e in cpm_expr]
-        return [e for lst in expr for e in lst]
-    if cpm_expr is True:
-        return []
-    if cpm_expr is False:
-        return [BoolVal(cpm_expr)]
-    if isinstance(cpm_expr, Operator) and cpm_expr.name == "and":
-        return make_cpm_expr(cpm_expr.args)
-    return [cpm_expr]
+    newlist = []
+    append = newlist.append
+    unravel((cpm_expr,), append)
 
+    return newlist
