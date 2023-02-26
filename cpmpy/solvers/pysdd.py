@@ -27,7 +27,6 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables
 from ..transformations.normalize import make_cpm_expr
 from ..transformations.to_cnf import to_cnf
 
