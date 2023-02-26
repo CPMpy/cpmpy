@@ -185,7 +185,7 @@ class SolverInterface(object):
         :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr, seen=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):

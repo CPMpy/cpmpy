@@ -28,12 +28,12 @@ def get_variables_model(model):
 def vars_expr(expr):
     warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
     return get_variables(expr)
-def get_variables(expr, seen=None):
+def get_variables(expr, collect=None):
     """
         Get variables of an expression
 
         - expr: Expression or list of expressions
-        - seen: optional set, variables will be added to this set of given
+        - collect: optional set, variables will be added to this set of given
    """
     def extract(lst, append):
         for e in lst:
@@ -56,13 +56,13 @@ def get_variables(expr, seen=None):
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 extract(e, append)
 
-    if seen is not None:
+    if collect is not None:
         # add to given set
-        append = seen.add
+        append = collect.add
         extract((expr,), append)
         return seen
 
-    # no 'seen' given, return ordered list
+    # no 'collect' given, return ordered list
     vars_ = []
     append = vars_.append
     extract((expr,), append)
