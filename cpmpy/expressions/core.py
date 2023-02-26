@@ -5,7 +5,7 @@
 ##
 """
     The `Expression` superclass and common subclasses `Expression` and `Operator`.
-    
+
     None of these objects should be directly created, they are automatically created through operator
     overloading on variables and expressions.
 
@@ -40,7 +40,7 @@
     - x ^ y         Xor([x,y])  # a global constraint
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
-    
+
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
 
@@ -62,7 +62,7 @@
                     subexpressions and doing the appropriate computation
                     this is used to conveniently print variable values, objective values
                     and any other expression value (e.g. during debugging).
-    
+
     ===============
     List of classes
     ===============
@@ -181,14 +181,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical implication involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical implication involving a non boolean argument ({type(other)}: {other}) is not allowed")
-
+        assert self.is_bool(), f"Logical implication involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical implication involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         # other constant
         if other is True:
@@ -221,13 +215,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+        assert self.is_bool(), f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
 
         # some simple constant removal
@@ -237,19 +226,12 @@ class Expression(object):
             return False
 
         return Operator("and", [self, other])
-
-
     def __rand__(self, other):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+        assert self.is_bool(), f"Logical conjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical conjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         # some simple constant removal
         if other is True:
@@ -263,14 +245,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
-
+        assert self.is_bool(), f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         # some simple constant removal
         if other is True:
@@ -283,14 +259,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
-
+        assert self.is_bool(), f"Logical disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         # some simple constant removal
         if other is True:
@@ -307,13 +277,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+        assert self.is_bool(), f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         if other is True:
             return ~self
@@ -328,13 +293,8 @@ class Expression(object):
 
         # checking if both are bool
         # checking them separately, to give a more clear exception message to the user
-        if not self.is_bool():
-            raise CPMpyException(
-                f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed")
-
-        if not other.is_bool():
-            raise CPMpyException(
-                f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed")
+        assert self.is_bool(), f"Logical exclusive disjunction involving a non boolean argument ({type(self)}: {self}) is not allowed"
+        assert other.is_bool(), f"Logical exclusive disjunction involving a non boolean argument ({type(other)}: {other}) is not allowed"
 
         # some simple constant removal
         if other is True:
@@ -365,7 +325,7 @@ class Expression(object):
         #     return -self
         # return Operator("sub", [other, self])
         return (-self).__radd__(other)
-    
+
     # multiplication, puts the 'constant' (other) first
     def __mul__(self, other):
         if is_num(other) and other == 1:
@@ -450,9 +410,9 @@ class Comparison(Expression):
 
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
+            return "({}) {} ({})".format(self.args[0], self.name, self.args[1])
         # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+        return "{} {} {}".format(self.args[0], self.name, self.args[1])
 
     def __hash__(self):
         # __hash__ is None be default as __eq__ is overwritten
@@ -562,7 +522,7 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
-    
+
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:
@@ -632,7 +592,7 @@ def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
     True if the arg is already a wsum,
-    or if it is a product of a constant and an expression 
+    or if it is a product of a constant and an expression
     (negation '-' does not mean it SHOULD be a wsum, because then
      all substractions are transformed into less readable wsums)
     """
