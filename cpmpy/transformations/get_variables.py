@@ -60,7 +60,7 @@ def get_variables(expr, collect=None):
         # add to given set
         append = collect.add
         extract((expr,), append)
-        return seen
+        return collect
 
     # no 'collect' given, return ordered list
     vars_ = []
