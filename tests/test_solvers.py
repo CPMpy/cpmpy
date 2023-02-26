@@ -2,9 +2,12 @@ import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
+
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
+
+from cpmpy.exceptions import MinizincNameException
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -313,6 +316,19 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
 
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_names(self):
+        a = cp.boolvar(name='5var')#has to start with alphabetic character
+        b = cp.boolvar(name='va+r')#no special characters
+        c = cp.boolvar(name='solve')#no keywords
+        with self.assertRaises(MinizincNameException):
+            cp.Model(a == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(b == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(c == 0).solve(solver="minizinc")
+
     @pytest.mark.skipif(not CPM_z3.supported(),
                         reason="Z3 not installed")
     def test_z3(self):
@@ -339,6 +355,11 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
         s = cp.SolverLookup.get("z3", m)
         self.assertTrue(s.solve())
+
+        x = cp.intvar(0, 1)
+        m = cp.Model((x >= 0.1) & (x != 1))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertFalse(s.solve()) # upgrade z3 with pip install --upgrade z3-solver
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)

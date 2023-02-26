@@ -45,7 +45,7 @@ class CPM_template(SolverInterface):
     <URL to detailed solver installation instructions, if any>
 
     Creates the following attributes (see parent constructor for more):
-    tpl_model: object, TEMPLATE's model object
+    - tpl_model: object, TEMPLATE's model object
     """
 
     @staticmethod
@@ -54,7 +54,7 @@ class CPM_template(SolverInterface):
         try:
             import TEMPLATEpy as gp
             return True
-        except ImportError as e:
+        except ImportError:
             return False
 
 
@@ -129,7 +129,7 @@ class CPM_template(SolverInterface):
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
             # translate objective, for optimisation problems only
-            if self.TEMPLATE_solver.HasObjective():
+            if self.has_objective():
                 self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
 
         return has_sol
@@ -148,16 +148,17 @@ class CPM_template(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
 
+        # return from cache
         return self._varmap[cpm_var]
 
 
@@ -169,7 +170,8 @@ class CPM_template(SolverInterface):
             'objective()' can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
+
+            are permanently posted to the solver)
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
@@ -182,6 +184,9 @@ class CPM_template(SolverInterface):
             TEMPLATEpy.Minimize(obj)
         else:
             TEMPLATEpy.Maximize(obj)
+
+    def has_objective(self):
+        return TEMPLATEpy.hasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -213,47 +218,102 @@ class CPM_template(SolverInterface):
         #        x = self.solver_vars(cpm_expr.args[1])
         #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
 
-        raise NotImplementedError("TEMPLATE: Not a know supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def __add__(self, cpm_con):
+    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    def transform(self, cpm_expr):
         """
-        Post a (list of) CPMpy constraints(=expressions) to the solver
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-        Note that we don't store the constraints in a cpm_model,
-        we first transform the constraints into primitive constraints,
-        then post those primitive constraints directly to the native solver
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
-
         # apply transformations, then post internally
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
-        cpm_cons = flatten_constraint(cpm_con)
-        for con in cpm_cons:
-            self._post_constraint(con)
-
-        return self
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        #cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        #cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        # ...
+        return cpm_cons
 
     def _post_constraint(self, cpm_con):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Post a supported CPMpy constraint directly to the underlying solver's API
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            What 'supported' means depends on the solver capabilities, and in effect on what transformations
+            are applied in `transform()`.
 
-            Solvers do not need to support all constraints.
+            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         if isinstance(cpm_con, _BoolVarImpl):
             # base case, just var or ~var
             self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
         elif isinstance(cpm_con, Operator) and cpm_con.name == 'or':
             self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
-        else:
-            raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+        elif hasattr(cpm_expr, 'decompose'):
+            # global constraint not known, try posting generic decomposition
+            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+            for con in self.transform(cpm_expr.decompose()):
+                self._post_constraint(con)
+        
+        raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
+
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+        """
+            A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
+
+            If the problem is an optimization problem, returns only optimal solutions.
+
+           Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+
+        # check if objective function
+        if self.has_objective():
+            raise Exception("TEMPLATE does not support finding all optimal solutions")
+
+        # A. Example code if solver supports callbacks
+        if is_any_list(display):
+            callback = lambda : print([var.value() for var in display])
+        else:
+            callback = display
+
+        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        return self.TEMPLATE_solver.SolutionCount()
+
+        # B. Example code if solver does not support callbacks
+        self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
+        solution_count = 0
+        for solution in self.TEMPLATE_solver.GetSolutions():
+            solution_count += 1
+            # Translate solution to variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = solution.value(solver_var)
+
+            if display is not None:
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print([v.value() for v in display])
+                else:
+                    display()  # callback
+
+        return solution_count

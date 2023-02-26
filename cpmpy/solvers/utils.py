@@ -121,14 +121,13 @@ class SolverLookup():
         if ':' in solvername:
             solvername,_ = solvername.split(':',maxsplit=1)
 
-        # find CPM_slv
-        CPM_slv = None
+
         for (basename, CPM_slv) in SolverLookup.base_solvers():
             if basename == solvername:
-                # CPM_slv is assigned the right one
-                break
+                # found the right solver
+                return CPM_slv
 
-        return CPM_slv
+        return None
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead

@@ -18,11 +18,11 @@ from ..expressions.variables import _NumVarImpl
     - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
-def only_numexpr_equality(constraints, supported=frozenset(["sum","wsum"])):
+def only_numexpr_equality(constraints, supported=frozenset()):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 
-        argument 'supported' is a list (or set) of expression names that supports all comparisons in the solver
+        :param supported  a (frozen)set of expression names that supports all comparisons in the solver
     """
 
     # shallow copy (could support inplace too this way...)
