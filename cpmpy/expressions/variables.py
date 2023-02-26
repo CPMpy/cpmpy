@@ -195,25 +195,36 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
         Vectorized arguments: any argument that is a numpy ndarray and that has the same shape as the 'shape' parameter.
         will be assumed to be a vectorized parameter meaning that every variable will only get the parameter at the
         corresponding index. If you don't want this, use a plain Python array as argument.
+
+        Normal usage:
+        ```
+        begin = intvar(1,9, name="begin")
+        end = intvar(1,9, name="end")
+        size = 3
+        directvar("IntervalVar", (begin, size, end, "ITV0"), name="ITV0")
+        ```
+
+        The last one is equivalent to:
+        ```
+        directvar("IntervalVar", (begin, size, end), name="ITV0", insert_name_at_index=3)
+        ```
         
-        Example of vectorized effect:
+        Advanced usage, with automatic vectorization:
         ```
         begin = intvar(1,9, shape=(2,2), name="begin")
         end = intvar(1,9, shape=(2,2), name="end")
         size = 3*np.ones(shape=(2,2))
-        directvar("IntervalVar", (begin, size, end), shape=(2,2), name="ITV")
+        directvar("IntervalVar", (begin, size, end), shape=(2,2), name="ITV", insert_name_at_index=3)
         ```
         
         will create 4 direct variables:
-            ITV[0,0]:"IntervalVar"(begin[0,0], 3, end[0,0])
-            ITV[0,1]:"IntervalVar"(begin[0,1], 3, end[0,1])
-            ITV[1,0]:"IntervalVar"(begin[1,0], 3, end[1,0])
-            ITV[1,1]:"IntervalVar"(begin[1,1], 3, end[1,1])
+            ITV[0,0]:"IntervalVar"(begin[0,0], 3, end[0,0], "ITV[0,0]")
+            ITV[0,1]:"IntervalVar"(begin[0,1], 3, end[0,1], "ITV[0,1]")
+            ITV[1,0]:"IntervalVar"(begin[1,0], 3, end[1,0], "ITV[1,0]")
+            ITV[1,1]:"IntervalVar"(begin[1,1], 3, end[1,1], "ITV[1,1]")
 
         If name is None then a name 'DV<unique number>' will be assigned to it.
-
-        If shape is different from 1, then each element of the array will have the location
-        of this specific variable in the array append to its name.
+        If shape is different from 1, indices are automatically added to the name.
     """
     if shape == 0 or shape is None:
         raise NullShapeError(shape)

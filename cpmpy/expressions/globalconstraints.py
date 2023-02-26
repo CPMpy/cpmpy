@@ -569,7 +569,6 @@ class DirectConstraint(Expression):
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
         then use `directvar()` instead, or access the solver object from the solver interface directly.
     """
-    # is_bool: whether this is normal constraint (True or False)
     def __init__(self, name, arguments, novar=None):
         """
             name: name of the solver function that you wish to call
