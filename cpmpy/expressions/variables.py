@@ -206,7 +206,7 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
 
         The last one is equivalent to:
         ```
-        directvar("IntervalVar", (begin, size, end), name="ITV0", insert_name_at_index=3)
+        directvar("IntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV0")
         ```
         
         Advanced usage, with automatic vectorization:
@@ -214,7 +214,7 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
         begin = intvar(1,9, shape=(2,2), name="begin")
         end = intvar(1,9, shape=(2,2), name="end")
         size = 3*np.ones(shape=(2,2))
-        directvar("IntervalVar", (begin, size, end), shape=(2,2), name="ITV", insert_name_at_index=3)
+        directvar("IntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV", shape=(2,2))
         ```
         
         will create 4 direct variables:
