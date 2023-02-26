@@ -121,8 +121,7 @@ def reify_rewrite(constraints, supported=frozenset()):
 
     newcons = []
     for cpm_expr in constraints:
-        if not isinstance(cpm_expr, Expression):
-            continue
+        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, run transformations.normalize.make_cpm_expr first!"
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
         if cpm_expr.name == '->':

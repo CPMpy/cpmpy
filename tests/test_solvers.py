@@ -382,5 +382,9 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(minimize=sum([v]))
         self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
-        
+
+    def test_false(self):
+        m = cp.Model([cp.boolvar(), False])
+        for name, _ in cp.SolverLookup.base_solvers():
+            self.assertFalse(m.solve(solver=name))
 

@@ -352,6 +352,17 @@ class Expression(object):
     def __invert__(self):
         return (self == 0)
 
+class BoolVal(Expression):
+    """
+        Wrapper for python or numpy BoolVals
+    """
+
+    def __init__(self, arg):
+        assert arg is False or arg is True
+        super(BoolVal, self).__init__("BoolVal", [bool(arg)])
+
+    def value(self):
+        return self.args[0]
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions

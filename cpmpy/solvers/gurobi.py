@@ -28,6 +28,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -204,8 +205,8 @@ class CPM_gurobi(SolverInterface):
 
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons  # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj))
+        self += flat_cons
+        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -281,6 +282,9 @@ class CPM_gurobi(SolverInterface):
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
+        # True or False
+        if isinstance(cpm_expr, BoolVal):
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
