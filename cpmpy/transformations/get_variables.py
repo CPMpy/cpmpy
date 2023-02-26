@@ -7,7 +7,7 @@ import warnings # for deprecation warning
 import numpy as np
 
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray, DirectVarImpl
+from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray, _DirectVarImpl
 from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
