@@ -58,26 +58,18 @@ def flat2cnf(constraints):
     """
     cnf = []
     for expr in constraints:
-        is_operator = isinstance(expr, Operator)
-
-        # top-level and() constraint, split up
-        # XXX ideally flatten/only_bv_implies do not create these, check/fix (in negation)
-        if is_operator and expr.name == "and":
-            cnf += expr.args
-            continue
-
         # BE -> BE
-        elif is_operator and expr.name == '->':
+        if expr.name == '->':
             a0,a1 = expr.args
 
             # BoolVar() -> BoolVar()
             if isinstance(a1, _BoolVarImpl) or \
-                    isinstance(a1, Operator) and a1.name == 'or':
+                    (isinstance(a1, Operator) and a1.name == 'or'):
                 cnf.append(~a0 | a1)
                 continue
 
-        # all other cases not covered (e.g. not continue'd)
-        # pass verbatim
+        # all other cases added as is...
+        # TODO: we should raise here? is not really CNF...
         cnf.append(expr)
 
     return cnf
