@@ -204,8 +204,8 @@ class CPM_gurobi(SolverInterface):
 
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons  # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj))
+        self += flat_cons
+        get_variables(flat_obj, seen=self.user_vars)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)

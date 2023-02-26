@@ -4,8 +4,10 @@ Returns an list of all variables in the model or expressions
 Variables are ordered by appearance, e.g. first encountered first
 """
 import warnings # for deprecation warning
+import numpy as np
+
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl,NegBoolView
+from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
 from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
@@ -20,37 +22,58 @@ def get_variables_model(model):
 
     # then append to it from objective
     seen = frozenset(vars_)
-    vars_ += [x for x in get_variables(model.objective_) if not x in seen]
+    return vars_ + [x for x in get_variables(model.objective_) if not x in seen]
 
-    return vars_
 
 def vars_expr(expr):
     warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
     return get_variables(expr)
-def get_variables(expr):
+def get_variables(expr, seen=None):
     """
         Get variables of an expression
-    """
-    if isinstance(expr, NegBoolView):
-        # this is just a view, return the actual variable
-        return [expr._bv]
-        
-    if isinstance(expr, _NumVarImpl):
-        # a real var, do our thing
-        return [expr]
 
+        - expr: Expression or list of expressions
+        - seen: optional set, variables will be added to this set of given
+   """
+    def extract(lst, append):
+        for e in lst:
+            if isinstance(e, Expression):
+                if isinstance(e, _NumVarImpl):
+                    if isinstance(e, NegBoolView):
+                        # this is just a view, return the actual variable
+                        e = e._bv
+                    append(e)
+                elif isinstance(e, NDVarArray):  # sometimes does not have a .name
+                    if e.dtype == object:
+                        extract(e.flat, append)
+                    # else: all const, skip
+                elif e.name == "wsum":
+                    extract(e.args[1], append)  # skip data in arg0
+                elif e.name == "table":
+                    extract(e.args[0], append)  # skip data in arg1
+                else:
+                    extract(e.args, append)
+            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+                extract(e, append)
+
+    if seen is not None:
+        # add to given set
+        append = seen.add
+        extract((expr,), append)
+        return seen
+
+    # no 'seen' given, return ordered list
     vars_ = []
-    # if list or Expr: recurse
-    if is_any_list(expr):
-        for subexpr in expr:
-            vars_ += get_variables(subexpr)
-    elif isinstance(expr, Expression):
-        for subexpr in expr.args:
-            vars_ += get_variables(subexpr)
-    # else: every non-list, non-expression
+    append = vars_.append
+    extract((expr,), append)
 
     # mimics an ordered set, manually...
-    return _uniquify(vars_)
+    # (looks expensive but surprisingly little overhead)
+    # https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
+    seen = set()
+    seen_add = seen.add
+    return [x for x in vars_ if not (x in seen or seen_add(x))]
+
 
 def print_variables(expr_or_model):
     """
@@ -58,11 +81,11 @@ def print_variables(expr_or_model):
 
         argument 'expr_or_model' can be an expression or a model
     """
-    vars_ = None
-    if isinstance(expr_or_model, Expression) or is_any_list(expr_or_model):
-        vars_ = get_variables(expr_or_model)
-    else:
+    from ..model import Model
+    if isinstance(expr_or_model, Model):
         vars_ = get_variables_model(expr_or_model)
+    else:
+        vars_ = get_variables(expr_or_model)
 
     # TODO: variables with the same prefix name will have the same domain
     # group them for clarity?
@@ -71,8 +94,10 @@ def print_variables(expr_or_model):
     for var in vars_:
         print(f"    {var}: {var.lb}..{var.ub}")
 
+
 # https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
 def _uniquify(seq):
+    warnings.warn("Deprecated, copy inline if used, will be removed in stable version", DeprecationWarning)
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
