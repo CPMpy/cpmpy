@@ -9,6 +9,7 @@ import numpy as np
 from cpmpy import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.transformations.get_variables import get_variables
+from cpmpy.transformations.normalize import toplevel_list
 
 def mus(soft, hard=[], solver="ortools"):
     """
@@ -29,6 +30,9 @@ def mus(soft, hard=[], solver="ortools"):
         :param: solver: name of a solver, see SolverLookup.solvernames()
             "z3" and "gurobi" are incremental, "ortools" restarts the solver
     """
+    # ensure toplevel list
+    soft = toplevel_list(soft, merge_and=False)
+
     # order so that constraints with many variables are tried and removed first
     candidates = sorted(soft, key=lambda c: -len(get_variables(c)))
 
