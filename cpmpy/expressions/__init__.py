@@ -12,6 +12,7 @@
         globalconstraints
         python_builtins
         utils
+        fishhooks
 
 
 """
@@ -23,3 +24,5 @@ from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import AllDifferent, AllEqual, Circuit, Table, Minimum, Maximum, Element, Xor, Cumulative
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
 from .python_builtins import all, any, max, min, sum
+from .fishhooks import *
+

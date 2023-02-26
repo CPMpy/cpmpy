@@ -77,7 +77,6 @@ import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
-from ..exceptions import CPMpyException
 
 from .utils import is_num, is_any_list, flatlist
 
