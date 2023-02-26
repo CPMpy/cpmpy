@@ -34,7 +34,6 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
-from ..transformations.normalize import make_cpm_expr
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -222,7 +221,9 @@ class CPM_pysat(SolverInterface):
 
         :return: list of Expression
         """
-        return to_cnf(make_cpm_expr(cpm_expr))
+        # we accept more than clauses,
+        # would be better to call the transfs that to_cnf calls instead (see other pull request)
+        return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
@@ -233,25 +234,15 @@ class CPM_pysat(SolverInterface):
 
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
-        from pysat.card import CardEnc
-        # True or False
-        if isinstance(cpm_expr, BoolVal):
-            if cpm_expr.args[0] is False:
-                return self.pysat_solver.add_clause([])
+        if cpm_expr.name == 'or':
+            self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
-        if isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
-        elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'or':
-                self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
-            else:
-                raise NotImplementedError(
-                    f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
         elif isinstance(cpm_expr, Comparison):
             # only handle cardinality encodings (for now)
             if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum" and all(
                     isinstance(v, _BoolVarImpl) for v in cpm_expr.args[0].args):
+                from pysat.card import CardEnc
+
                 lits = self.solver_vars(cpm_expr.args[0].args)
                 bound = cpm_expr.args[1]
                 if not is_int(bound):
@@ -298,8 +289,18 @@ class CPM_pysat(SolverInterface):
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
+
+        elif isinstance(cpm_expr, BoolVal):
+            # base case: Boolean value
+            if cpm_expr.args[0] is False:
+                return self.pysat_solver.add_clause([])
+
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            # base case, just var or ~var
+            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
+
         else:
-            raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+            raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
 
 
     def solution_hint(self, cpm_vars, vals):

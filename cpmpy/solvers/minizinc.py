@@ -38,7 +38,7 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
-from ..transformations.normalize import make_cpm_expr
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_minizinc(SolverInterface):
@@ -365,7 +365,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        return make_cpm_expr(cpm_expr)
+        return toplevel_list(cpm_expr)
 
     def _post_constraint(self, cpm_con):
         """

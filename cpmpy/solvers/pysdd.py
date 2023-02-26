@@ -24,10 +24,9 @@
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list
-from ..transformations.normalize import make_cpm_expr
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysdd(SolverInterface):
@@ -213,7 +212,8 @@ class CPM_pysdd(SolverInterface):
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
-        return to_cnf(make_cpm_expr(cpm_expr))
+        # acctually supports nested Boolean operators natively...
+        return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
@@ -224,25 +224,28 @@ class CPM_pysdd(SolverInterface):
 
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
-        if isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            self.pysdd_root &= self.solver_var(cpm_expr)
-        elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'or':
-                # not sure about this way of making a clause...
-                clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
-                self.pysdd_root &= clause
-            else:
-                raise NotImplementedError(
-                    f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
+        if cpm_expr.name == 'or':
+            # not sure about this way of making a clause...
+            clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
+            self.pysdd_root &= clause
+            
         #elif isinstance(cpm_expr, Comparison):
 
         elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
+
+        elif isinstance(cpm_expr, BoolVal):
+            # base case: Boolean value
+            self.pysdd_root &= cpm_expr.args[0]  # not tested...
+
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            # base case, just var or ~var
+            self.pysdd_root &= self.solver_var(cpm_expr)
+
         else:
-            raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
+            raise NotImplementedError(f"CPM_pysdd: Non supported constraint {cpm_expr}")
 
 
     def dot(self):

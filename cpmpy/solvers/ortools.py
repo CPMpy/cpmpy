@@ -30,10 +30,10 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison, is_bool
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
-from ..transformations.normalize import make_cpm_expr
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 
@@ -321,8 +321,7 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
-        cpm_cons = make_cpm_expr(cpm_expr)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
@@ -345,16 +344,8 @@ class CPM_ortools(SolverInterface):
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
 
-        # True or False
-        if isinstance(cpm_expr, BoolVal):
-            return self.ort_model.Add(cpm_expr.args[0])
-
-        # Base case: Boolean variable
-        if isinstance(cpm_expr, _BoolVarImpl):
-            return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
-
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
-        elif isinstance(cpm_expr, Operator):
+        if isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
                 return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
@@ -422,49 +413,54 @@ class CPM_ortools(SolverInterface):
             raise NotImplementedError(
                         "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
+        # base (Boolean) global constraints
+        elif isinstance(cpm_expr, GlobalConstraint):
 
-        # rest: base (Boolean) global constraints
-        elif cpm_expr.name == 'xor':
-            return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
-        elif cpm_expr.name == 'alldifferent':
-            return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
-        elif cpm_expr.name == 'table':
-            assert (len(cpm_expr.args) == 2)  # args = [array, table]
-            array, table = self.solver_vars(cpm_expr.args)
-            return self.ort_model.AddAllowedAssignments(array, table)
-        elif cpm_expr.name == "cumulative":
-            start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
-            if is_num(demand):
-                demand = [demand] * len(start)
-            intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-            return self.ort_model.AddCumulative(intervals, demand, cap)
-        elif cpm_expr.name == "circuit":
-            # ortools has a constraint over the arcs, so we need to create these
-            # when using an objective over arcs, using these vars direclty is recommended
-            # (see PCTSP-path model in the future)
-            x = cpm_expr.args
-            N = len(x)
-            arcvars = boolvar(shape=(N,N), name="circuit_arcs")
-            # post channeling constraints from int to bool
-            self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
-            # post the global constraint
-            # when posting arcs on diagonal (i==j), it would do subcircuit
-            ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
-            return self.ort_model.AddCircuit(ort_arcs)
+            if cpm_expr.name == 'alldifferent':
+                return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr.args)
+                return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == "cumulative":
+                start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
+                if is_num(demand):
+                    demand = [demand] * len(start)
+                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
+                return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "circuit":
+                # ortools has a constraint over the arcs, so we need to create these
+                # when using an objective over arcs, using these vars direclty is recommended
+                # (see PCTSP-path model in the future)
+                x = cpm_expr.args
+                N = len(x)
+                arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+                # post channeling constraints from int to bool
+                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                # post the global constraint
+                # when posting arcs on diagonal (i==j), it would do subcircuit
+                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+                return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == 'xor':
+                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+            else:
+                # NOT (YET?) MAPPED: Automaton, ForbiddenAssignments, Inverse?,
+                #    ReservoirConstraint, ReservoirConstraintWithActive
             
-        else:
-            # NOT (YET?) MAPPED: Automaton,
-            #    ForbiddenAssignments, Inverse?, NoOverlap, NoOverlap2D,
-            #    ReservoirConstraint, ReservoirConstraintWithActive
-            
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
+                # global constraint not known, try posting generic decomposition
+                # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+                for con in self.transform(cpm_expr.decompose()):
+                    self._post_constraint(con)
+                return None  # will throw error if used in reification
 
-            return None # will throw error if used in reification
-
-        # TODO: DirectConstraint/NativeConstraint from cpm_expr.name to API call? see #74
+        # unlikely base case: Boolean variable
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
+        # unlikely base case: True or False
+        elif isinstance(cpm_expr, BoolVal):
+            return self.ort_model.Add(cpm_expr.args[0])
+        
+        # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
