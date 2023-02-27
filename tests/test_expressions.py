@@ -2,7 +2,6 @@ import unittest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions import *
-from cpmpy.expressions.utils import ite
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
 
