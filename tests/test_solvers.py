@@ -385,6 +385,7 @@ class TestSolvers(unittest.TestCase):
 
     def test_false(self):
         m = cp.Model([cp.boolvar(), False])
-        for name, _ in cp.SolverLookup.base_solvers():
-            self.assertFalse(m.solve(solver=name))
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                self.assertFalse(m.solve(solver=name))
 
