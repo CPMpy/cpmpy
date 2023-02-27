@@ -10,6 +10,7 @@ from os.path import join
 import pandas as pd
 
 from cpmpy import *
+from cpmpy.transformations.normalize import toplevel_list
 
 
 def run(dirname, funcs):
@@ -844,27 +845,28 @@ if __name__ == '__main__':
         # make_cpm_expr1b,
         # make_cpm_expr2,
         make_cpm_expr2b,
-        make_cpm_expr2bb,
+        #make_cpm_expr2bb,
         make_cpm_expr2bc,
-        make_cpm_expr2bd,
-        make_cpm_expr2be,
-        make_cpm_expr2bf,
-        make_cpm_expr2bg,
-        make_cpm_expr2bg2,
-        make_cpm_expr2bg3,
-        make_cpm_expr2bg4,
+        #make_cpm_expr2bd,
+        #make_cpm_expr2be,
+        #make_cpm_expr2bf,
+        #make_cpm_expr2bg,
+        #make_cpm_expr2bg2,
+        #make_cpm_expr2bg3,
+        #make_cpm_expr2bg4,
         make_cpm_expr2c,
         # make_cpm_expr3,
         # make_cpm_expr3b,
         # make_cpm_expr4,
         # make_cpm_expr5,
         # make_cpm_expr5b,
-        make_cpm_expr_6,
+        #make_cpm_expr_6,
         # make_cpm_expr_7,  # buggy
         make_cpm_expr_7b,
         make_cpm_expr_generator,
-        make_cpm_expr2bf_ignace,
+        #make_cpm_expr2bf_ignace,
         make_cpm_expr2bf_ignace2,
+        toplevel_list,
 
     ]
 

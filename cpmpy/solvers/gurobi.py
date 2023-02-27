@@ -28,7 +28,6 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.utils import is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var

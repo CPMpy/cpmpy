@@ -399,7 +399,7 @@ class CPM_minizinc(SolverInterface):
             return self.solver_var(expr) # constants
 
         if isinstance(expr, BoolVal):
-            return str(expr.args is True).lower()
+            return str(expr.args[0]).lower()
 
         # default
         if isinstance(expr, _NumVarImpl):
