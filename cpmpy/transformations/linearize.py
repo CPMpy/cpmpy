@@ -143,11 +143,24 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
             # bring all const to rhs
             if lhs.name == "sum":
-                rhs += -sum(arg for arg in lhs.args if is_num(arg))
-                lhs = sum(arg for arg in lhs.args if not is_num(arg)) # TODO: avoid looping again and keep idxes?
+                new_args = []
+                for i, arg in enumerate(lhs.args):
+                    if is_num(arg):
+                        rhs -= arg
+                    else:
+                        new_args.append(arg)
+                lhs = Operator("sum", new_args)
+
             elif lhs.name == "wsum":
-                rhs += -sum(w * arg for w,arg in zip(*lhs.args) if is_num(arg))
-                lhs = sum(w * arg for w, arg in zip(*lhs.args) if not is_num(arg))
+                new_weights, new_args = [],[]
+                for i, (w, arg) in enumerate(zip(*lhs.args)):
+                    if is_num(arg):
+                        rhs -= w * arg
+                    else:
+                        new_weights.append(w)
+                        new_args.append(arg)
+                lhs = Operator("wsum",[new_weights, new_args])
+
 
         if isinstance(lhs, Operator) and lhs.name == "mul" and is_num(lhs.args[0]):
             # convert to wsum
