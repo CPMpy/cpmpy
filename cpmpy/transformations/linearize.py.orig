@@ -44,8 +44,12 @@ from .flatten_model import flatten_constraint, get_or_make_var
 
 from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
+<<<<<<< HEAD
+from ..expressions.utils import is_any_list, is_num, is_bool
+=======
 from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
+>>>>>>> 183-revisit-linearize-transformation
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
 def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
@@ -209,6 +213,33 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         return constraints
 
+<<<<<<< HEAD
+    if cpm_expr.name in [">=", "<=", "=="] and cpm_expr.args[0].name == "element":
+        """
+            Decomposition of element constraint according to:
+            ```
+            Refalo, P. (2000, September). Linear formulation of constraint programming models and hybrid solvers. 
+            In International Conference on Principles and Practice of Constraint Programming (pp. 369-383). Springer, Berlin, Heidelberg.
+            ```            
+        """
+        arr, idx = cpm_expr.args[0].args
+        # Assuming 1-d array
+        assert len(arr.shape) == 1, f"Only support 1-d element constraints, not {cpm_expr} which has shape {cpm_expr.shape}"
+
+        n = len(arr)
+        sigma = boolvar(shape=n)
+
+        constraints = [sum(sigma) == 1]
+        constraints += [sum(np.arange(n) * sigma) == idx]
+        # translation with implication:
+        constraints += [s.implies(Comparison(cpm_expr.name,a,cpm_expr.args[1])) for s,a in zip(sigma,arr)]
+        # translation with multiplication:
+        # constraints += [Comparison(cpm_expr.name, np.dot(arr,sigma), cpm_expr.args[1])]
+
+        return linearize_constraint(flatten_constraint(constraints))
+
+=======
+>>>>>>> 183-revisit-linearize-transformation
     return [cpm_expr]
 
 

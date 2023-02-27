@@ -266,9 +266,9 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max","mul", "abs","pow","div"}))  # the core of the MIP-linearization
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
     def _post_constraint(self, cpm_expr):

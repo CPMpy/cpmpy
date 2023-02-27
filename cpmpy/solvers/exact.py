@@ -27,7 +27,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_const_rhs, only_var_lhs
+from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
 import numpy as np
 
@@ -328,8 +328,6 @@ class CPM_exact(SolverInterface):
         cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
-        cpm_cons = only_const_rhs(cpm_cons)
-        cpm_cons = only_var_lhs(cpm_cons)
         return cpm_cons
 
     @staticmethod
