@@ -32,30 +32,26 @@ def only_bv_implies(constraints):
         Assumes all constraints are in 'flat normal form'. Hence only apply
         AFTER `flatten()`
     """
-    if not is_any_list(constraints):
-        # assume list, so make list
-        constraints = [constraints]
-
     newcons = []
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if cpm_expr.name == '->' and \
-                not isinstance(cpm_expr.args[0], _BoolVarImpl) and \
-                isinstance(cpm_expr.args[1], _BoolVarImpl):
-            # BE -> BV :: ~BV -> ~BE
+        if cpm_expr.name == '->':
             a0,a1 = cpm_exr.args
-            newexpr = (~a1).implies(~a0)
-            newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
-elif isinstance(cpm_expr.args[1], Comparison) and \
-                    cpm_expr.args[1].name == '==' and \
-                    cpm_expr.args[1].args[0].is_bool():
-                # BV1 -> BV2 == BV3 :: BV1 -> (BV2->BV3 & BV3->BV2)
-                #                   :: BV1 -> (BV2->BV3) & BV1 -> (BV3->BV2)
-                #                   :: BV1 -> (~BV2|BV3) & BV1 -> (~BV3|BV2)
-                bv1 = cpm_expr.args[0]
-                bv2,bv3 = cpm_expr.args[1].args
-                newcons += only_bv_implies([ bv1.implies(~bv2|bv3),
-
+            if not isinstance(a0, _BoolVarImpl) and \
+                    isinstance(a1, _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                newexpr = (~a1).implies(~a0)
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            elif isinstance(a1, Comparison) and \
+                    a1.name == '==' and a1.args[0].is_bool():
+                # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
+                #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
+                #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
+                bv2,bv3 = a1.args
+                newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            else:
+                newcons.append(cpm_expr)
 
         # Comparisons: check BE == BV
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
