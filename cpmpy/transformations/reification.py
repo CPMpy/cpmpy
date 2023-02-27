@@ -52,7 +52,7 @@ def only_bv_implies(constraints):
                 newcons.append(a1.implies(a0))
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a1).implies(a0), a1.implies(a0))
+                newexprs = ((~a1).implies(~a0), a1.implies(a0))
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
             # XXX there used to be a weird
             # BE0 == IVar1 :: IVar1 = BVarX, ~BVarX -> ~BE, BVarX -> BE

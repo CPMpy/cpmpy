@@ -359,7 +359,7 @@ class BoolVal(Expression):
 
     def __init__(self, arg):
         assert arg is False or arg is True
-        super(BoolVal, self).__init__("BoolVal", [bool(arg)])
+        super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
         return self.args[0]
