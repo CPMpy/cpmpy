@@ -201,8 +201,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
         # Linear decomposition of alldifferent using bipartite matching
         sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
 
-        constraints = [sum(row) == 1 for row in sigma]  # Exactly one value
-        constraints += [sum(col) <= 1 for col in sigma.T]  # All diff values
+        constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
+        constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
 
         for arg, row in zip(cpm_expr.args, sigma):
             constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
