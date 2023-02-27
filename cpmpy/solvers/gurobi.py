@@ -281,6 +281,9 @@ class CPM_gurobi(SolverInterface):
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
+        # True or False
+        if isinstance(cpm_expr, BoolVal):
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const

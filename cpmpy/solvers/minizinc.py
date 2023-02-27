@@ -33,11 +33,12 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_minizinc(SolverInterface):
@@ -364,10 +365,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        if is_any_list(cpm_expr):
-            return flatlist(cpm_expr)
-        else:
-            return [cpm_expr]
+        return toplevel_list(cpm_expr)
 
     def _post_constraint(self, cpm_con):
         """
@@ -397,13 +395,14 @@ class CPM_minizinc(SolverInterface):
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
-        if not isinstance(expr, Expression) or \
-                isinstance(expr, _NumVarImpl):
-            if expr is True:
-                return "true"
-            if expr is False:
-                return "false"
-            # default
+        if not isinstance(expr, Expression):
+            return self.solver_var(expr) # constants
+
+        if isinstance(expr, BoolVal):
+            return str(expr.args[0]).lower()
+
+        # default
+        if isinstance(expr, _NumVarImpl):
             if isinstance(expr, NegBoolView):
                 return "not " + self.solver_var(expr._bv)
             return self.solver_var(expr)
