@@ -90,12 +90,67 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
-        # TODO implement circuit unit test
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
-        _ = model.solve()
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertFalse(cp.Table(iv, [[10, 8, 2], [5, 3, 2]]).value())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
+    def test_minimum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Minimum(iv) + 9 == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '-1')
+
+        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '4')
+
+    def test_maximum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Maximum(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(max(iv.value()) <= -1)
+
+        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_minimax_python(self):
         from cpmpy import min,max
@@ -108,7 +163,7 @@ class TestGlobal(unittest.TestCase):
         mi = cp.min(iv)
         ma = cp.max(iv)
         self.assertIsInstance(mi, GlobalConstraint) 
-        self.assertIsInstance(ma, GlobalConstraint) 
+        self.assertIsInstance(ma, GlobalConstraint)
         
         def solve_return(model):
             model.solve()
