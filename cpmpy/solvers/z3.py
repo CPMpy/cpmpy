@@ -21,13 +21,14 @@
         CPM_z3
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..exceptions import NotSupportedError
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
-from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_z3(SolverInterface):
@@ -162,10 +163,9 @@ class CPM_z3(SolverInterface):
                     cpm_var._value = sol[sol_var].as_long()
 
             # translate objective, for optimisation problems only
-            if isinstance(self.z3_solver, z3.Optimize) and \
-                    len(self.z3_solver.objectives()) != 0:
+            if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj)
+                self.objective_value_ = sol.evaluate(obj).as_long()
 
         else:
             for cpm_var in self.user_vars:
@@ -207,7 +207,10 @@ class CPM_z3(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    # if TEMPLATE does not support objective functions, you can delete objective()/_make_numexpr()
+    def has_objective(self):
+        import z3
+        return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
+
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -219,14 +222,16 @@ class CPM_z3(SolverInterface):
         """
         import z3
         # objective can be a nested expression for z3
-        assert isinstance(self.z3_solver, z3.Optimize), "Use the z3 optimizer for optimization problems"
+        if not isinstance(self.z3_solver, z3.Optimize):
+            raise NotSupportedError("Use the z3 optimizer for optimization problems")
         obj = self._z3_expr(expr)
         if minimize:
             self.z3_solver.minimize(obj)
         else:
             self.z3_solver.maximize(obj)
 
-    # most solvers can inherit this function as is, just implement `transform()` and `__post_constraint()` below
+
+    # most solvers can inherit `__add__()` as is, just implement `transform()` and `__post_constraint()` below
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -244,10 +249,7 @@ class CPM_z3(SolverInterface):
         # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        if is_any_list(cpm_expr):
-            return cpm_expr
-        else:
-            return [cpm_expr]
+        return toplevel_list(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
         """
@@ -255,13 +257,9 @@ class CPM_z3(SolverInterface):
 
             Z3 supports nested expressions so translate expression tree and post to solver API directly
         """
-        if is_any_list(cpm_expr):
-            for con in cpm_expr:
-                self._post_constraint(con)
         # translate each expression tree, then post straight away
-        else:
-            z3_cons = self._z3_expr(cpm_expr)
-            return self.z3_solver.add(z3_cons)
+        z3_cons = self._z3_expr(cpm_expr)
+        return self.z3_solver.add(z3_cons)
 
     def _z3_expr(self, cpm_con, reify=False):
         """
@@ -275,6 +273,7 @@ class CPM_z3(SolverInterface):
 
         if is_num(cpm_con):
             # translate numpy to python native
+            # TODO: z3 BoolVal/IntVal?
             if is_bool(cpm_con):
                 return bool(cpm_con)
             elif is_int(cpm_con):
@@ -282,8 +281,12 @@ class CPM_z3(SolverInterface):
             return float(cpm_con)
 
         elif is_any_list(cpm_con):
+            # arguments can be lists
             return [self._z3_expr(con) for con in cpm_con]
-            
+
+        elif isinstance(cpm_con, BoolVal):
+            return cpm_con.args
+
         elif isinstance(cpm_con, _NumVarImpl):
             return self.solver_var(cpm_con)
 
@@ -332,46 +335,34 @@ class CPM_z3(SolverInterface):
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
-
             lhs, rhs = cpm_con.args
+            lhs_is_expr = isinstance(lhs, Expression)
+            rhs_is_expr = isinstance(rhs, Expression)
 
             # 'abs'/1
-            if isinstance(rhs, Operator) and rhs.name == "abs":
-                arg = rhs.args[0]
-                return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
-            if isinstance(lhs, Operator) and lhs.name == "abs":
+            if lhs_is_expr and lhs.name == "abs":
                 arg = lhs.args[0]
                 return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
+            elif rhs_is_expr and rhs.name == "abs":
+                arg = rhs.args[0]
+                return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
 
-            if isinstance(lhs, GlobalConstraint) and lhs.name == "element":
+            elif lhs_is_expr and lhs.name == "element":
                 arr, idx = lhs.args
                 return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, arr[i], rhs)) for i in range(len(arr))]))
-            if isinstance(rhs, GlobalConstraint) and rhs.name == "element":
+            elif rhs_is_expr and rhs.name == "element":
                 arr, idx = rhs.args
                 return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
 
-            if cpm_con.name == "==":
-                if isinstance(lhs, GlobalConstraint) and lhs.name == "max":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
-                                  self._z3_expr(all([a <= rhs for a in lhs.args])))
-                if isinstance(rhs, GlobalConstraint) and rhs.name == "max":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
-                                  self._z3_expr(all([lhs >= a for a in rhs.args])))
-                if isinstance(lhs, GlobalConstraint) and lhs.name == "min":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(a == rhs for a in lhs.args)),
-                                  self._z3_expr(all([a >= rhs for a in lhs.args])))
-                if isinstance(rhs, GlobalConstraint) and rhs.name == "min":
-                    if reify:
-                        raise NotImplementedError(f"Reification of {cpm_con} not supported yet")
-                    return z3.And(self._z3_expr(any(lhs == a for a in rhs.args)),
-                                  self._z3_expr(all([lhs <= a for a in rhs.args])))
-
+            elif hasattr(lhs, 'decompose_comparison'):
+                return z3.And(self._z3_expr(lhs.decompose_comparison(cpm_con.name, rhs)))
+            elif hasattr(rhs, 'decompose_comparison'):
+                invertmap = {'>': '<', '<': '>', '<=': '>=', '>=': '<='}
+                #swap lhs and rhs for decomposition
+                if cpm_con.name in invertmap:
+                    cpm_con.name = invertmap[cpm_con.name]
+                return z3.And(self._z3_expr(rhs.decompose_comparison(cpm_con.name, lhs)))
+            elif cpm_con.name == "==":
                 # '==' is not supported between a boolean expression and an arithmetic expression
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
                     # lhs is bool and rhs is arith, make lhs also arith
@@ -381,17 +372,8 @@ class CPM_z3(SolverInterface):
                 rhs = self._z3_expr(rhs)
                 return (lhs == rhs)
 
-
-            if isinstance(lhs, GlobalConstraint) and lhs.name in ("min", "max"):
-                new_var, cons = get_or_make_var(lhs)
-                return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, new_var, rhs)))
-            if isinstance(rhs, GlobalConstraint) and rhs.name in ("min", "max"):
-                new_var, cons = get_or_make_var(rhs)
-                return z3.And(self._z3_expr(all(cons)), self._z3_expr(Comparison(cpm_con.name, lhs, new_var)))
-
-            # other comparisons are not supported on boolrefs, so convert with if then else
-            # only '!=' is supported between 2 boolrefs
-            if cpm_con.name == '!=':
+            elif cpm_con.name == '!=':
+                # '!=' is supported between 2 boolrefs
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
                     # lhs is bool and rhs is arith, make lhs also arith
                     lhs = z3.If(self._z3_expr(lhs), 1, 0)
@@ -400,6 +382,7 @@ class CPM_z3(SolverInterface):
                 rhs = self._z3_expr(rhs)
                 return (lhs != rhs)
             else:
+                # other comparisons are not supported on boolrefs, so convert with if then else
                 if is_boolexpr(lhs):
                     lhs = z3.If(self._z3_expr(lhs), 1, 0)
                 else:
@@ -410,31 +393,32 @@ class CPM_z3(SolverInterface):
                 else:
                     rhs = self._z3_expr(rhs)
 
-            # post the comparison
-            if cpm_con.name == '<=':
-                return (lhs <= rhs)
-            elif cpm_con.name == '<':
-                return (lhs < rhs)
-            elif cpm_con.name == '>=':
-                return (lhs >= rhs)
-            elif cpm_con.name == '>':
-                return (lhs > rhs)
-
-        # TODO:
-        # table
+                # post the comparison
+                if cpm_con.name == '<=':
+                    return (lhs <= rhs)
+                elif cpm_con.name == '<':
+                    return (lhs < rhs)
+                elif cpm_con.name == '>=':
+                    return (lhs >= rhs)
+                elif cpm_con.name == '>':
+                    return (lhs > rhs)
 
         # rest: base (Boolean) global constraints
-        elif cpm_con.name == 'xor':
-            z3_args = self._z3_expr(cpm_con.args)
-            z3_cons = z3.Xor(z3_args[0], z3_args[1])
-            for a in z3_args[2:]:
-                z3_cons = z3.Xor(z3_cons, a)
-            return z3_cons
-        elif cpm_con.name == 'alldifferent':
-            return z3.Distinct(self._z3_expr(cpm_con.args))
+        elif isinstance(cpm_con, GlobalConstraint):
+            # TODO:
+            # table
 
-        # global constraints
-        return self._z3_expr(all(cpm_con.decompose()))
+            if cpm_con.name == 'alldifferent':
+                return z3.Distinct(self._z3_expr(cpm_con.args))
+            elif cpm_con.name == 'xor':
+                z3_args = self._z3_expr(cpm_con.args)
+                z3_cons = z3.Xor(z3_args[0], z3_args[1])
+                for a in z3_args[2:]:
+                    z3_cons = z3.Xor(z3_cons, a)
+                return z3_cons
+            else:
+                # global constraints
+                return self._z3_expr(all(cpm_con.decompose()))
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 

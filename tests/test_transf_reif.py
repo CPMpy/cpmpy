@@ -28,7 +28,7 @@ class TestTransfReif(unittest.TestCase):
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies(expr)), strexpr )
+            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
             self.assertTrue(Model(expr).solve())
 
     def test_reif_element(self):
@@ -68,6 +68,10 @@ class TestTransfReif(unittest.TestCase):
             idx = intvar(lb,ub, name="idx")
             e = (rv == (arr[idx] != 1))
             self.assertEqual(Model(e).solveAll(), cnt)
+
+        # Another case, with a more specific check... if the element-wise decomp is empty
+        e = bvs[0].implies(Element([1,2,3], iv) < 1)
+        self.assertFalse(Model(e, bvs[0]==True).solve())
 
 
     def test_reif_rewrite(self):

@@ -93,6 +93,7 @@
         :nosignatures:
 
         AllDifferent
+        AllDifferentExcept0
         AllEqual
         Circuit
         Table
@@ -105,7 +106,7 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -174,6 +175,29 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except0", flatlist(args))
+
+    def decompose(self):
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        vals = [a.value() for a in self.args if a.value() != 0]
+        return len(set(vals)) == len(vals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferentExcept0(*copied_args)
+
+
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -208,6 +232,8 @@ class Circuit(GlobalConstraint):
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
+        if len(flatlist(args)) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
@@ -242,8 +268,22 @@ class Circuit(GlobalConstraint):
         return Circuit(*copied_args)
 
 
-    # TODO: value()
+    def value(self):
+        from .python_builtins import all
+        pathlen = 0
+        idx = 0
+        visited = set()
+        arr = [argval(a) for a in self.args]
+        while(idx not in visited):
+            if idx == None:
+                return False
+            if not (0 <= idx < len(arr)):
+                break
+            visited.add(idx)
+            pathlen += 1
+            idx = arr[idx]
 
+        return pathlen == len(self.args) and idx == 0
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
@@ -252,7 +292,9 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
-        raise NotImplementedError("TODO: table decomposition")
+        from .python_builtins import any, all
+        arr, tab = self.args
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
 
 
     def deepcopy(self, memodict={}):
@@ -263,7 +305,11 @@ class Table(GlobalConstraint):
         array, table = self._deepcopy_args(memodict)
         return Table(array, table)
 
-    # TODO: value()
+    def value(self):
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        return arrval in tab
+
 
 # Numeric Global Constraints (with integer-valued return type)
 
@@ -292,6 +338,16 @@ class Minimum(GlobalConstraint):
         copied_args = self._deepcopy_args(self.args)
         return Minimum(copied_args)
 
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        _min = intvar(-2147483648, 2147483647)
+        return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
+
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -316,8 +372,19 @@ class Maximum(GlobalConstraint):
         copied_args = self._deepcopy_args(memodict)
         return Maximum(copied_args)
 
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        """
+        from .python_builtins import any, all
+
+        arr = argval(self.args)
+        _max = intvar(-2147483648, 2147483647)
+        return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
+
+
 def element(arg_list):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 class Element(GlobalConstraint):

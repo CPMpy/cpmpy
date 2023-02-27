@@ -359,7 +359,7 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0, 1)
         m = cp.Model((x >= 0.1) & (x != 1))
         s = cp.SolverLookup.get("z3", m)
-        self.assertFalse(s.solve())
+        self.assertFalse(s.solve()) # upgrade z3 with pip install --upgrade z3-solver
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -382,5 +382,10 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(minimize=sum([v]))
         self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
-        
+
+    def test_false(self):
+        m = cp.Model([cp.boolvar(), False])
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                self.assertFalse(m.solve(solver=name))
 

@@ -33,11 +33,12 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
 from ..transformations.get_variables import get_variables_model, get_variables
-from ..exceptions import MinizincPathException
+from ..exceptions import MinizincPathException, NotSupportedError
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_minizinc(SolverInterface):
@@ -223,7 +224,12 @@ class CPM_minizinc(SolverInterface):
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = mzn_result.statistics['time']  # --output-time
+            time = mzn_result.statistics['time']
+            if isinstance(time, int):
+                self.cpm_status.runtime = time / 1000
+            elif isinstance(time, timedelta):
+                self.cpm_status.runtime = time.total_seconds()  # --output-time
+
 
         # translate exit status
         mzn_status = mzn_result.status
@@ -336,7 +342,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        self.user_vars.update(get_variables(expr)) # add objvars to vars
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -346,6 +352,8 @@ class CPM_minizinc(SolverInterface):
         else:
             self.mzn_txt_solve = "solve maximize {};\n".format(obj)
 
+    def has_objective(self):
+        return self.mzn_txt_solve != "solve satisfy;"
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
@@ -357,10 +365,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        if is_any_list(cpm_expr):
-            return flatlist(cpm_expr)
-        else:
-            return [cpm_expr]
+        return toplevel_list(cpm_expr)
 
     def _post_constraint(self, cpm_con):
         """
@@ -390,13 +395,14 @@ class CPM_minizinc(SolverInterface):
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
-        if not isinstance(expr, Expression) or \
-                isinstance(expr, _NumVarImpl):
-            if expr is True:
-                return "true"
-            if expr is False:
-                return "false"
-            # default
+        if not isinstance(expr, Expression):
+            return self.solver_var(expr) # constants
+
+        if isinstance(expr, BoolVal):
+            return str(expr.args[0]).lower()
+
+        # default
+        if isinstance(expr, _NumVarImpl):
             if isinstance(expr, NegBoolView):
                 return "not " + self.solver_var(expr._bv)
             return self.solver_var(expr)
@@ -495,7 +501,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -506,11 +512,15 @@ class CPM_minizinc(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
+
         import asyncio
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
