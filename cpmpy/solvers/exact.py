@@ -65,10 +65,9 @@ class CPM_exact(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'exact' package to use this solver interface")
+            raise Exception("Install 'exact' as a python package to use this solver interface")
 
         from exact import Exact as xct
 
@@ -76,12 +75,15 @@ class CPM_exact(SolverInterface):
 
         # initialise the native solver object
         self.xct_solver = xct()
+        self.xct_solver.setOption("inp-purelits", "0")    # no dominance breaking to preserve solutions
+        self.xct_solver.setOption("inp-dombreaklim", "0") # no dominance breaking to preserve solutions
 
         # for solving with assumption variables,
         self.assumption_dict = None
 
         # objective can only be set once, so keep track of this
-        self.objective_is_set = False
+        self.solver_is_initialized = False
+        self.has_objective = False
         self.objective_minimize = True
 
         # initialise everything else and post the constraints/objective
@@ -94,7 +96,7 @@ class CPM_exact(SolverInterface):
 
         # fill in variable values
         lst_vars = list(self.user_vars)
-        exact_vals = self.xct_solver.getLastSolutionFor([self.solver_var(cpm_var) for cpm_var in lst_vars])
+        exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
@@ -106,6 +108,7 @@ class CPM_exact(SolverInterface):
         return True
 
     def solve(self, time_limit=None, assumptions=None, **kwargs):
+        # TODO: test this function
         """
             Call Exact
 
@@ -120,23 +123,31 @@ class CPM_exact(SolverInterface):
         """
         from exact import Exact as xct
 
-        if not self.objective_is_set:
-            self.objective_is_set=True
+        if not self.solver_is_initialized:
+            assert not self.has_objective
+            self.xct_solver.setOption("opt-boundupper", "0")
             self.xct_solver.init([],[])
+            self.solver_is_initialized=True
 
-        # set time limit?
+        # TODO: set time limit?
         if time_limit is not None:
             self.xct_solver.setOption("timeout",str(time_limit))
+
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
             self.xct_solver.setOption(kw,str(val))
 
+        # set assumptions
         if assumptions is not None:
-            print("TODO: implement assumptions")
-            assert(False)
+            assert(all(is_bool(v) for v in assumptions))
+            assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
+            assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
+            self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
+            self.xct_solver.setAssumptions(assump_vars, assump_vals);
+            # NOTE: setAssumptions clears previous assumptions
 
         # call the solver, with parameters
-        my_status = self.xct_solver.runFull()
+        my_status = self.xct_solver.runFull(not self.has_objective)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -148,6 +159,9 @@ class CPM_exact(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif my_status == 1:
+            assert self.xct_solver.hasSolution()
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status == 2:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
@@ -156,6 +170,7 @@ class CPM_exact(SolverInterface):
         return self.getSolAndObj()
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+        # TODO: test this function
         """
             Compute all solutions and optionally display the solutions.
 
@@ -172,12 +187,13 @@ class CPM_exact(SolverInterface):
             Returns: number of solutions found
         """
 
-        if not self.objective_is_set:
-            self.objective_is_set=True
-            self.xct_solver.init([],[])
+        assert not self.has_objective
+        self.xct_solver.setOption("opt-boundupper", "0")
 
-        # avoid adding upper bounds when enumerating solutions
-        self.xct_solver.setOption("opt-boundupper",str(0))
+        if not self.solver_is_initialized:
+            self.xct_solver.init([],[])
+            self.solver_is_initialized=True
+
         # set time limit?
         if time_limit is not None:
             self.xct_solver.setOption("timeout",str(time_limit))
@@ -193,7 +209,7 @@ class CPM_exact(SolverInterface):
             status = 3
             while status == 3: # SolveState::INPROCESSED
                 # call the solver, with parameters
-                status = self.xct_solver.runOnce()
+                status = self.xct_solver.runOnce(not self.has_objective)
             assert status == 0 or status == 1, "Unexpected status code for Exact."
             if status == 0: # SolveState::UNSAT
                 break
@@ -206,7 +222,7 @@ class CPM_exact(SolverInterface):
         return solsfound
 
 
-    def solver_var(self, cpm_var):
+    def solver_var(self, cpm_var, encoding="onehot"):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
@@ -215,10 +231,8 @@ class CPM_exact(SolverInterface):
         #if is_num(cpm_var):  # shortcut, eases posting constraints
             #return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).Not()
+        # variables to be translated should be positive
+        assert(not isinstance(cpm_var, NegBoolView))
 
         # return it if it already exists
         if cpm_var in self._varmap:
@@ -233,14 +247,13 @@ class CPM_exact(SolverInterface):
             ub = cpm_var.ub
             if max(abs(lb),abs(ub)) > 1e18:
                 # larger than 64 bit should be passed by string
-                self.xct_solver.addVariable(revar,str(lb), str(ub))
+                self.xct_solver.addVariable(revar,str(lb), str(ub), encoding)
             else:
-                self.xct_solver.addVariable(revar,lb,ub)
+                self.xct_solver.addVariable(revar,lb,ub, encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
         return revar
-
 
     def objective(self, expr, minimize):
         """
@@ -251,8 +264,8 @@ class CPM_exact(SolverInterface):
 
             'objective()' can only be called once
         """
-        assert not self.objective_is_set, "Exact accepts an objective function only once."
-        self.objective_is_set = True
+        assert not self.has_objective, "Exact accepts an objective function only once."
+        self.has_objective = True
         self.objective_minimize = minimize
 
         # make objective function non-nested
@@ -266,6 +279,7 @@ class CPM_exact(SolverInterface):
             xct_coefs = [-x for x in xct_coefs]
 
         self.xct_solver.init(xct_coefs,xct_vars)
+        self.solver_is_initialized = True
 
     def _make_numexpr(self, lhs, rhs):
         """
@@ -283,7 +297,7 @@ class CPM_exact(SolverInterface):
             xcoefs += [-1]
             xvars += [self.solver_var(rhs)]
         else:
-            raise NotImplementedError("Exact: Unexpected rhs {} expr {}".format(rhs.name,rhs))
+            raise NotImplementedError("Exact: Unexpected rhs {} for expression {}".format(rhs.name,rhs))
 
         if is_num(lhs):
             xrhs -= lhs
@@ -292,10 +306,10 @@ class CPM_exact(SolverInterface):
             xvars += [self.solver_var(lhs)]
         elif lhs.name == "sum":
             xcoefs = [1]*len(lhs.args)
-            xvars = [self.solver_var(x) for x in lhs.args]
+            xvars = self.solver_vars(lhs.args)
         elif lhs.name == "wsum":
             xcoefs += lhs.args[0]
-            xvars += [self.solver_var(x) for x in lhs.args[1]]
+            xvars += self.solver_vars(lhs.args[1])
         elif lhs.name == "sub":
             assert len(lhs.args)==2
             xcoefs += [1, -1]
