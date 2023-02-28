@@ -238,7 +238,10 @@ class CPM_pysdd(SolverInterface):
 
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
-            self.pysdd_root &= cpm_expr.args[0]  # not tested...
+            if cpm_expr.args[0]:
+                self.pysdd_root &= self.pysdd_manager.true()
+            else:
+                self.pysdd_root &= self.pysdd_manager.false()
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var

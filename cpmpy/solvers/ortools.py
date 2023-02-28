@@ -31,7 +31,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, is_bool
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -456,6 +456,7 @@ class CPM_ortools(SolverInterface):
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
             return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
+
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             return self.ort_model.Add(cpm_expr.args[0])

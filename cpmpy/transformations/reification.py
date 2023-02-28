@@ -4,7 +4,7 @@ from ..expressions.globalconstraints import GlobalConstraint, Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, negated_normal, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var
 
 """
   Transformations regarding reification constraints.
@@ -55,14 +55,14 @@ def only_bv_implies(constraints):
 
         # Comparisons: check BE == BV
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
-            a0,a1 = cpm_exr.args
+            a0,a1 = cpm_expr.args
             if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
                 # BVar0 == BVar1 special case, no need to re-transform
                 newcons.append(a0.implies(a1))
                 newcons.append(a1.implies(a0))
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a1).implies(a0), a1.implies(a0))
+                newexprs = ((~a1).implies(~a0), a1.implies(a0))
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
             # XXX there used to be a weird
             # BE0 == IVar1 :: IVar1 = BVarX, ~BVarX -> ~BE, BVarX -> BE

@@ -28,7 +28,7 @@ class TestTransfReif(unittest.TestCase):
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies(expr)), strexpr )
+            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
             self.assertTrue(Model(expr).solve())
 
     def test_reif_element(self):

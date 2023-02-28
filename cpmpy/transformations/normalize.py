@@ -17,7 +17,7 @@ def toplevel_list(cpm_expr, merge_and=True):
             if isinstance(e, Expression):
                 if isinstance(e, NDVarArray):  # sometimes does not have .name
                     unravel(e.flat, append)
-                elif e.name == "and":
+                elif merge_and and e.name == "and":
                     unravel(e.args, append)
                 else:
                     assert (e.is_bool()), f"Only boolean expressions allowed at toplevel, got {e}"
