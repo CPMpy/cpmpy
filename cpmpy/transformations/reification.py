@@ -36,7 +36,7 @@ def only_bv_implies(constraints):
     for cpm_expr in constraints:
         # Operators: check BE -> BV
         if cpm_expr.name == '->':
-            a0,a1 = cpm_exr.args
+            a0,a1 = cpm_expr.args
             if not isinstance(a0, _BoolVarImpl) and \
                     isinstance(a1, _BoolVarImpl):
                 # BE -> BV :: ~BV -> ~BE

@@ -141,16 +141,16 @@ def flatten_constraint(expr):
                 newlist.append(expr)
                 continue
 
-            if expr.name == 'or':
+            elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
-                if builtins.any(isinstance(a, Operator) and a.name == '->'):
+                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
                     newargs = list(expr.args)  # take copy
                     for i,a in enumerate(newargs):
                         if isinstance(a, Operator) and a.name == '->':
                             newargs[i:i+1] = [~a0,a1]
                     # there could be nested implications
-                    newlist.extend(flatten_constraint(Operator('or', newargs))
+                    newlist.extend(flatten_constraint(Operator('or', newargs)))
                     continue
                 else:
                     # check if disjunction contains conjunctions, and if so split out
@@ -161,7 +161,7 @@ def flatten_constraint(expr):
                             newexprs = [Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args]
                             break
                     if newexprs is not None:
-                        newlist.extend(flatten_constraint(newexpr))
+                        newlist.extend(flatten_constraint(newexprs))
                         continue
 
             elif expr.name == '->':
@@ -199,11 +199,13 @@ def flatten_constraint(expr):
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
                 newlist.extend(rcons)
-            else:
-                # a normalizable boolexpr
-                (con, flatcons) = normalized_boolexpr(expr)
-                newlist.append(con)
-                newlist.extend(flatcons)
+                continue
+
+            # if none of the above cases + continue matched:
+            # a normalizable boolexpr
+            (con, flatcons) = normalized_boolexpr(expr)
+            newlist.append(con)
+            newlist.extend(flatcons)
 
         elif isinstance(expr, Comparison):
             """
@@ -236,7 +238,7 @@ def flatten_constraint(expr):
             if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
                 if not rewritten:
                     newlist.append(expr)  # original
-                else
+                else:
                     newlist.append(Comparison(exprname, lexpr, rexpr))
                 continue
 
