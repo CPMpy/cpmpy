@@ -18,12 +18,12 @@ class TestTransfReif(unittest.TestCase):
                  ((~a).implies(b), "[(~a) -> (b)]"),
                  ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
                  ((a).implies(b&c), "[(a) -> ((b) and (c))]"),
-                 ((b|c).implies(a), "[(~a) -> ((~b) and (~c))]"),
+                 ((b|c).implies(a), "[(~a) -> (~b), (~a) -> (~c)]"),
                  ((b&c).implies(a), "[(~a) -> ((~b) or (~c))]"),
                  ((a)==(b), "[(a) -> (b), (b) -> (a)]"),
                  ((~a)==(b), "[(~a) -> (b), (b) -> (~a)]"),
-                 ((b|c)==(a), "[(~a) -> ((~b) and (~c)), (a) -> ((b) or (c))]"),
-                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> ((b) and (c))]"),
+                 ((b|c)==(a), "[(~a) -> (~b), (~a) -> (~c), (a) -> ((b) or (c))]"),
+                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> (b), (a) -> (c)]"),
                 ]
 
         # test transformation
