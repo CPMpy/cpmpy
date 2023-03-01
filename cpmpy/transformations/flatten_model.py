@@ -148,7 +148,7 @@ def flatten_constraint(expr):
                     newargs = list(expr.args)  # take copy
                     for i,a in enumerate(newargs):
                         if isinstance(a, Operator) and a.name == '->':
-                            newargs[i:i+1] = [~a0,a1]
+                            newargs[i:i+1] = [~a.args[0],a.args[1]]
                     # there could be nested implications
                     newlist.extend(flatten_constraint(Operator('or', newargs)))
                     continue
