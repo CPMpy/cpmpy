@@ -106,7 +106,7 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-from ..exceptions import CPMpyException
+from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -408,7 +408,9 @@ class Element(GlobalConstraint):
         arr, idx = self.args
         idxval = argval(idx)
         if idxval is not None:
-            return argval(arr[idxval])
+            if idxval >= 0 and idxval < len(arr):
+                return argval(arr[idxval])
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
         return None # default
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
