@@ -78,7 +78,9 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist
+from .utils import is_num, is_any_list, flatlist, argval
+from ..exceptions import IncompleteFunctionError
+
 
 class Expression(object):
     """
@@ -530,9 +532,9 @@ class Operator(Expression):
     def value(self):
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
         else:
-            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+            arg_vals = [argval(arg) for arg in self.args]
 
 
         if any(a is None for a in arg_vals): return None

@@ -26,6 +26,9 @@ import numpy as np
 from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
 
+from cpmpy.exceptions import IncompleteFunctionError
+
+
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
@@ -76,7 +79,11 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    return a.value() if hasattr(a, "value") else a
+    try:
+        return a.value() if hasattr(a, "value") else a
+    except IncompleteFunctionError as e:
+        if a.is_bool(): return False
+        raise e
 
 def eval_comparison(str_op, lhs, rhs):
     """
