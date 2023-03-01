@@ -208,7 +208,10 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             from pysdd.sdd import SddManager, Vtree
 
-            self.pysdd_vtree = Vtree(var_count=len(self.user_vars), vtree_type="balanced")
+            cnt = len(self.user_vars)
+            if cnt == 0:
+                cnt = 1  # otherwise segfault
+            self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
