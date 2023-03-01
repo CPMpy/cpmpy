@@ -34,7 +34,6 @@ def all(iterable):
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
-        print(elem, type(elem))
         if elem is False or elem is np.False_:
             return False  # no need to create constraint
         elif elem is True or elem is np.True_:
