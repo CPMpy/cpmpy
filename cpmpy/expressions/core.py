@@ -352,7 +352,7 @@ class Expression(object):
         return Operator("abs", [self])
     # 'not' for now, no unary constraint for it
     def __invert__(self):
-        return Operator("not", [self])
+        return (self == 0)
 
 class BoolVal(Expression):
     """
@@ -420,7 +420,6 @@ class Operator(Expression):
         'and': (0, True),
         'or':  (0, True),
         '->':  (2, True),
-        'not': (1, True),
         'sum': (0, False),
         'wsum': (2, False),
         'sub': (2, False), # x - y
@@ -553,7 +552,6 @@ class Operator(Expression):
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
         elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
-        elif self.name == "not": return not arg_vals[0]
 
         return None # default
 

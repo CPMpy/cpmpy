@@ -382,15 +382,6 @@ def normalized_boolexpr(expr):
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
 
-        #push down the negation
-        if expr.name == 'not':
-            nnexpr = negated_normal(expr.args[0])
-            if __is_flat_var(nnexpr):
-                #can be a flat var in this case because Not(bv) get converted to NegBoolView
-                return (nnexpr, [])
-            else:
-                return normalized_boolexpr(nnexpr)
-
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -586,8 +577,6 @@ def negated_normal(expr):
         elif expr.name == '->':
             # XXX this might create a top-level and
             return expr.args[0] & negated_normal(expr.args[1])
-        elif expr.name == 'not':
-            return expr.args[0]
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
             # XXX do raise, better safe then sorry
@@ -600,10 +589,6 @@ def negated_normal(expr):
         return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
 
     else: # circular if I import GlobalConstraint here...
-        if hasattr(expr, "decompose_negation"):
-            # for global constraints where the negation of the decomposition is not equivalent
-            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
-            return Operator('and', expr.decompose_negation())
         if hasattr(expr, "decompose"):
             # global... decompose and negate that
             return negated_normal(Operator('and', expr.decompose()))

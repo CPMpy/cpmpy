@@ -205,7 +205,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(~BV0) and (~BV1)]" )
         self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((~BV0) and (~BV1))]" )
         self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[(BV2) and (BV11), ((BV0) or (BV1)) == (BV11)]" )
-        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[and([BV2, BV0, BV1])]" )
+        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((BV0) and (BV1)) == (BV12)]" )
         self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
         self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((BV0) or (BV1)) -> (BV2), ((BV0) or (BV1)) -> (~BV1)]" )
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
