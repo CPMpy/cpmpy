@@ -18,17 +18,17 @@ class TestTransfReif(unittest.TestCase):
                  ((~a).implies(b), "[(~a) -> (b)]"),
                  ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
                  ((a).implies(b&c), "[(a) -> ((b) and (c))]"),
-                 ((b|c).implies(a), "[(~a) -> ((~b) and (~c))]"),
+                 ((b|c).implies(a), "[(~a) -> (~b), (~a) -> (~c)]"),
                  ((b&c).implies(a), "[(~a) -> ((~b) or (~c))]"),
                  ((a)==(b), "[(a) -> (b), (b) -> (a)]"),
                  ((~a)==(b), "[(~a) -> (b), (b) -> (~a)]"),
-                 ((b|c)==(a), "[(~a) -> ((~b) and (~c)), (a) -> ((b) or (c))]"),
-                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> ((b) and (c))]"),
+                 ((b|c)==(a), "[(~a) -> (~b), (~a) -> (~c), (a) -> ((b) or (c))]"),
+                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> (b), (a) -> (c)]"),
                 ]
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies(expr)), strexpr )
+            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
             self.assertTrue(Model(expr).solve())
 
     def test_reif_element(self):
@@ -69,6 +69,10 @@ class TestTransfReif(unittest.TestCase):
             e = (rv == (arr[idx] != 1))
             self.assertEqual(Model(e).solveAll(), cnt)
 
+        # Another case, with a more specific check... if the element-wise decomp is empty
+        e = bvs[0].implies(Element([1,2,3], iv) < 1)
+        self.assertFalse(Model(e, bvs[0]==True).solve())
+
 
     def test_reif_rewrite(self):
         bvs = boolvar(shape=4, name="bvs")
@@ -80,10 +84,10 @@ class TestTransfReif(unittest.TestCase):
         cases = [(rv == bvs[0], "[(rv) == (bvs[0])]"),
                  (rv == all(bvs), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]"),
                  (rv.implies(any(bvs)), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]"),
-                 ((bvs[0].implies(bvs[1])).implies(rv), "[((~bvs[0]) or (bvs[1])) -> (rv)]"),
+                 ((bvs[0].implies(bvs[1])).implies(rv), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]"),
                  (rv == AllDifferent(ivs), "[(and([BV0, BV1, BV2])) == (rv), ((ivs[0]) != (ivs[1])) == (BV0), ((ivs[0]) != (ivs[2])) == (BV1), ((ivs[1]) != (ivs[2])) == (BV2)]"),
-                 (rv.implies(AllDifferent(ivs)), "[(rv) -> (and([BV6, BV7, BV8])), ((ivs[0]) != (ivs[1])) == (BV6), ((ivs[0]) != (ivs[2])) == (BV7), ((ivs[1]) != (ivs[2])) == (BV8)]"),
-                 (rv == (arr[intvar(-1,3)] != 1), "[((BV12) or (BV13)) == (rv), (IV0 == 0) == (BV12), (IV0 == 2) == (BV13)]"),
+                 (rv.implies(AllDifferent(ivs)), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]"),
+                 (rv == (arr[intvar(-1,3)] != 1), "[((BV6) or (BV7)) == (rv), (IV0 == 0) == (BV6), (IV0 == 2) == (BV7)]"),
                  (rv == (arr[intvar(0,2)] != 1), "[([0 1 2][IV1]) == (IV2), (IV2 != 1) == (rv)]"),
                  (rv == (max(ivs) > 5), "[(max(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 > 5) == (rv)]"),
                  (rv.implies(min(ivs) != 0), "[(min(ivs[0],ivs[1],ivs[2])) == (IV6), (rv) -> (IV6 != 0)]"),

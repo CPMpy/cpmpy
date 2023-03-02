@@ -1,5 +1,23 @@
 # Change log
 
+## 0.9.12
+New:
+* examples/ use notebooks with graphic visualisation whenever possible
+* examples/ add pareto optimal enumeration
+* new global: AllDifferentExcept0, with tests
+
+Changed:
+* minizinc: status time in seconds
+* reify_rewrite: very special case, if (non-total) element elemnt-wise decomp returns false,
+* flatten: avoid unnecessary sum decompositions
+* SolverLookup: would select the last one if an invalid was given
+* solveAll() return warning if an objective function is present
+* comparing a boolean expression with an intvar crashed most solvers (#208)
+* z3: bugfixes in translation
+* globals: give xor a logic-based decomposition
+* tests: multiple improvements, run with all solvers
+
+
 ## 0.9.11
 FuzzTest bugfix release
 

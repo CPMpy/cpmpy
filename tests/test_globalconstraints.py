@@ -27,6 +27,47 @@ class TestGlobal(unittest.TestCase):
 
                 # ensure all different values
                 self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
+    
+    def test_alldifferent2(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), False),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferent(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+    
+    def test_alldifferent_except0(self):
+        # test known input/outputs
+        tuples = [
+                  ((1,2,3), True),
+                  ((1,2,1), False),
+                  ((0,1,2), True),
+                  ((2,0,3), True),
+                  ((2,0,2), False),
+                  ((0,0,2), True),
+                 ]
+        iv = cp.intvar(0,4, shape=3)
+        c = cp.AllDifferentExcept0(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
 
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
@@ -49,12 +90,67 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
-        # TODO implement circuit unit test
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
 
-        _ = model.solve()
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertFalse(cp.Table(iv, [[10, 8, 2], [5, 3, 2]]).value())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
+    def test_minimum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Minimum(iv) + 9 == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '-1')
+
+        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
+        self.assertTrue(model.solve())
+        self.assertEqual(str(min(iv.value())), '4')
+
+    def test_maximum(self):
+        iv = cp.intvar(-8, 8, 3)
+        constraints = [cp.Maximum(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(max(iv.value()) <= -1)
+
+        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_minimax_python(self):
         from cpmpy import min,max
@@ -67,7 +163,7 @@ class TestGlobal(unittest.TestCase):
         mi = cp.min(iv)
         ma = cp.max(iv)
         self.assertIsInstance(mi, GlobalConstraint) 
-        self.assertIsInstance(ma, GlobalConstraint) 
+        self.assertIsInstance(ma, GlobalConstraint)
         
         def solve_return(model):
             model.solve()
@@ -114,3 +210,20 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_ite(self):
+        x = cp.intvar(0, 5, shape=3, name="x")
+        iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
+        constraints = [iter]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [0, 4, 4]]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [4, 4, 3]]
+        self.assertTrue(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [4, 4, 4]]
+        self.assertFalse(cp.Model(constraints).solve())
+
+        constraints = [iter, x == [1, 3, 2]]
+        self.assertFalse(cp.Model(constraints).solve())

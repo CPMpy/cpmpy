@@ -4,7 +4,6 @@ import numpy as np
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
-from cpmpy.expressions.utils import get_bounds
 
 
 class TestSum(unittest.TestCase):

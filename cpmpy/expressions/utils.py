@@ -39,6 +39,12 @@ def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_))
+def is_boolexpr(expr):
+    #boolexpr
+    if hasattr(expr, 'is_bool'):
+        return expr.is_bool()
+    #boolean constant
+    return is_bool(expr)
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
@@ -103,12 +109,6 @@ def eval_comparison(str_op, lhs, rhs):
     else:
         raise Exception("Not a known comparison:", str_op)
 
-# syntax of the form 'if b then x == 9 else x == 0' is not supported
-# a little helper:
-def ite(condition, if_true, if_false):
-    return (condition.implies(if_true) & \
-            (~condition).implies(if_false)
-           )
 
 def get_bounds(expr):
     if hasattr(expr,'get_bounds'):

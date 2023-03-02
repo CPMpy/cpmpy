@@ -251,7 +251,7 @@ class _NumVarImpl(Expression):
 
     # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
-        return hash(str(self))
+        return hash(self.name)
 
     def deepcopy(self, memodict={}):
         copied = type(self)(self.lb, self.ub, self.name)
@@ -339,7 +339,8 @@ class _BoolVarImpl(_IntVarImpl):
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
-    def __hash__(self): return super().__hash__()
+    def __hash__(self):
+        return hash(self.name)
 
 class NegBoolView(_BoolVarImpl):
     """

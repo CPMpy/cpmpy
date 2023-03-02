@@ -1,5 +1,5 @@
-CPMpy pysat interace (:mod:`cpmpy.solvers.pysat`)
-=================================================
+CPMpy pysat interface (:mod:`cpmpy.solvers.pysat`)
+==================================================
 
 .. automodule:: cpmpy.solvers.pysat
     :members:

@@ -108,10 +108,10 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -177,6 +177,29 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except0", flatlist(args))
+
+    def decompose(self):
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+
+    def value(self):
+        vals = [a.value() for a in self.args if a.value() != 0]
+        return len(set(vals)) == len(vals)
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the AllDifferentExceptO global constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return AllDifferentExcept0(*copied_args)
+
+
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -211,6 +234,8 @@ class Circuit(GlobalConstraint):
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
+        if len(flatlist(args)) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
@@ -252,38 +277,15 @@ class Circuit(GlobalConstraint):
         visited = set()
         arr = [argval(a) for a in self.args]
         while(idx not in visited):
+            if idx == None:
+                return False
             if not (0 <= idx < len(arr)):
                 break
             visited.add(idx)
             pathlen += 1
             idx = arr[idx]
 
-        return (pathlen == len(self.args)) and (arr[-1] == 0)
-
-    def decompose_negation(self):
-        '''
-        returns the decomposition of the negation. We can not simply negate the decomposition
-        because of the use of auxiliary variables in the decomposition
-
-        should return something in negated normal form, since flatten_model.negated_normal() returns this
-        '''
-
-        succ = cpm_array(self.args)
-        n = len(succ)
-        order = intvar(0, n - 1, shape=n)
-        return [Operator('not', [Operator('and',[~AllDifferent(succ),
-                   # others: ith one is successor of i-1
-                    ] + [order[i] != succ[order[i - 1]] for i in range(1, n)] )]),
-                # not negating following constraints since they involve only the auxiliary variables
-                # loop: first one is successor of '0'
-                order[0] == succ[0],
-                # last one is '0'
-                order[n - 1] == 0,
-                # different orders
-                AllDifferent(order)]
-
-
-
+        return pathlen == len(self.args) and idx == 0
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
@@ -294,8 +296,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        #make it a list because other code assumes decompositions return a list of constraints
-        return [any(all(arr == row) for row in tab)]
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
 
 
     def deepcopy(self, memodict={}):
@@ -312,7 +313,30 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-# Numeric Global Constraints (with integer-valued return type)
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported
+# a little helper:
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        assert all([is_boolexpr(condition), is_boolexpr(if_true), is_boolexpr(if_false)]), \
+            "only boolean expression allowed in IfThenElse"
+        super().__init__("ite", [condition, if_true, if_false], is_bool=True)
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        condition_val = argval(condition)
+        if argval(condition):
+            return argval(if_true)
+        else:
+            return argval(if_false)
+
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return [condition.implies(if_true), (~condition).implies(if_false)]
+
+    def __repr__(self):
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
 class Minimum(GlobalConstraint):
@@ -475,17 +499,13 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
-        if len(self.args) == 2:
-            a0, a1 = self.args
-            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-        # for more than 2 variables, we chain reified xors
-        # XXX this will involve many calls to the above decomp, shortcut?
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            cons += new_cons
-        return cons + [prev_var]
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons]
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
