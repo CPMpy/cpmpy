@@ -1,9 +1,7 @@
 import unittest
-
-from numpy import ndarray
-
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
+
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -104,9 +102,16 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
-
     def test_table(self):
         iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
         constraints = [cp.Table(iv, [[10, 8, 2], [5, 2, 2]])]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
@@ -136,7 +141,6 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '4')
 
-
     def test_maximum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Maximum(iv) + 9 <= 8]
@@ -151,12 +155,11 @@ class TestGlobal(unittest.TestCase):
     def test_element(self):
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
-        constraints = [cp.Element(iv,idx) == 8]
+        constraints = [cp.Element(iv, idx) == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
         self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
-
+        self.assertTrue(cp.Element(iv, idx).value() == 8)
 
     def test_Xor(self):
         bv = cp.boolvar(5)
@@ -174,7 +177,7 @@ class TestGlobal(unittest.TestCase):
         mi = cp.min(iv)
         ma = cp.max(iv)
         self.assertIsInstance(mi, GlobalConstraint) 
-        self.assertIsInstance(ma, GlobalConstraint) 
+        self.assertIsInstance(ma, GlobalConstraint)
         
         def solve_return(model):
             model.solve()

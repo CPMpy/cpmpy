@@ -109,7 +109,7 @@
 """
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
@@ -235,6 +235,8 @@ class Circuit(GlobalConstraint):
     """
     def __init__(self, *args):
         super().__init__("circuit", flatlist(args))
+        if len(flatlist(args)) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
@@ -295,8 +297,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        #make it a list because other code assumes decompositions return a list of constraints
-        return [any(all(arr == row) for row in tab)]
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
 
 
     def deepcopy(self, memodict={}):
@@ -350,9 +351,6 @@ class Minimum(GlobalConstraint):
         _min = intvar(-2147483648, 2147483647)
         return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
 
-    def get_bounds(self):
-        pass
-
 class Maximum(GlobalConstraint):
     """
         Computes the maximum value of the arguments
@@ -387,8 +385,6 @@ class Maximum(GlobalConstraint):
         _max = intvar(-2147483648, 2147483647)
         return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
 
-    def get_bounds(self):
-        pass
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)

@@ -34,9 +34,9 @@ def all(iterable):
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
-        if elem is False:
-            return False # no need to create constraint
-        elif elem is True:
+        if elem is False or elem is np.False_:
+            return False  # no need to create constraint
+        elif elem is True or elem is np.True_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append( elem )
@@ -58,9 +58,9 @@ def any(iterable):
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
-        if elem is True:
+        if elem is True or elem is np.True_:
             return True # no need to create constraint
-        elif elem is False:
+        elif elem is False or elem is np.False_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append( elem )
