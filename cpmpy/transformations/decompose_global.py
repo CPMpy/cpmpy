@@ -23,27 +23,40 @@ def decompose_global(lst_of_expr, supported={}):
         # 1: Base case boolean global constraint
         if hasattr(cpm_expr, "decompose") and cpm_expr.name not in supported:
             cpm_expr = cpm_expr.decompose()
-        # 2: global constraint on lhs of a comparison
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
+            if cpm_expr.name == "==":
+                if hasattr(rhs, "decompose") and rhs.name not in supported: # probably most frequent case
+                    cpm_expr = [lhs == (all(rhs.decompose()))]
+                elif hasattr(lhs, "decompose") and lhs.name not in supported:
+                    cpm_expr = [all(lhs.decompose()) == rhs]
+                elif isinstance(lhs, Comparison) and \
+                        isinstance(lhs.args[0], GlobalConstraint) and lhs.args[0].name not in supported:
+                    cpm_expr = [all(_decompose_global_comp(lhs)) == rhs]
+                elif isinstance(rhs, Comparison) and \
+                        isinstance(rhs.args[0], GlobalConstraint) and rhs.args[0].name not in supported:
+                    cpm_expr = [lhs == all(_decompose_global_comp(rhs))]
+
             if isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
                 cpm_expr = _decompose_global_comp(cpm_expr)
+
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            cond, subexpr = cpm_expr.args
-            if hasattr(subexpr, "decompose") and subexpr.name not in supported: # probably most frequent case
-                # 3: Boolean global constraint on rhs of implies
-                cpm_expr = [cond.implies(all(subexpr.decompose()))]
-            elif hasattr(cond, "decompose") and cond.name not in supported:
-                # 4: Boolean global constraint on lhs of implies
-                cpm_expr = [all(cond.decompose()).implies(subexpr)]
-            elif isinstance(cond, Comparison) and \
-                    isinstance(cond.args[0], GlobalConstraint) and cond.args[0].name not in supported:
-                # 5: global constraint on lhs of comparison on lhs of implies
-                cpm_expr = [all(_decompose_global_comp(cond)).implies(subexpr)]
-            elif isinstance(subexpr, Comparison) and \
-                    isinstance(subexpr.args[0], GlobalConstraint) and subexpr.args[0].name not in supported:
-                # 6: Numerical global constraint on lhs of comparison on rhs of implies
-                cpm_expr = [cond.implies(all(_decompose_global_comp(subexpr)))]
+            lhs, rhs = cpm_expr.args
+            if hasattr(rhs, "decompose") and rhs.name not in supported: # probably most frequent case
+                # 3: Boolean global constraint on rhs of reification
+                cpm_expr = [rhs.implies(all(rhs.decompose()))]
+            elif hasattr(lhs, "decompose") and lhs.name not in supported:
+                # 4: Boolean global constraint on lhs of reification
+                cpm_expr = [all(lhs.decompose()).implies(rhs)]
+            elif isinstance(lhs, Comparison) and \
+                    isinstance(lhs.args[0], GlobalConstraint) and lhs.args[0].name not in supported:
+                # 5: global constraint on lhs of comparison on lhs of reification
+                cpm_expr = [all(_decompose_global_comp(lhs)).implies(rhs)]
+            elif isinstance(rhs, Comparison) and \
+                    isinstance(rhs.args[0], GlobalConstraint) and rhs.args[0].name not in supported:
+                # 6: Numerical global constraint on lhs of comparison on rhs of reification
+                cpm_expr = [lhs.implies(all(_decompose_global_comp(rhs)))]
+
 
         if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
             newlist.extend(decompose_global(flatten_constraint(cpm_expr), supported=supported))
