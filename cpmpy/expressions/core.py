@@ -550,13 +550,22 @@ class Operator(Expression):
             lbs, ubs = zip(*[get_bounds(x) for x in self.args])
             return sum(lbs), sum(ubs)
         elif self.name == 'wsum':
-            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
-            return sum(self.args[0] * np.array(lbs)), \
-                   sum(self.args[0] * np.array(ubs))
+
+            weights = self.args[0]
+            vars = self.args[1]
+            bounds = [0]*len(weights) #initialise list of same length
+            for i in range(len(self.args[0])):
+                #calculate bounds for each term in the wsum
+                bounds[i] = np.multiply(weights[i],get_bounds(vars[i]))
+                if bounds[i][0] > bounds[i][1]:
+                    bounds[i][0], bounds[i][1] = bounds[i][1], bounds[i][0]
+            lbs, ubs = zip(*bounds)
+            return sum(lbs), sum(ubs)
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
-            return lb1 - lb2, ub1 - ub2
+            bounds = [lb1 - lb2, lb1 - ub2, ub1 - lb2, ub1 - ub2]
+            return min(bounds), max(bounds)
         elif self.name == 'div':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])

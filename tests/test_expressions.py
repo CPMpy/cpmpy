@@ -4,6 +4,7 @@ import numpy as np
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
+from cpmpy.expressions.utils import get_bounds
 
 
 class TestSum(unittest.TestCase):
@@ -193,9 +194,92 @@ class TestMul(unittest.TestCase):
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
 
+    def test_bounds_mul_sub_sum(self):
+        x = intvar(-8,8)
+        y = intvar(-4,6)
+        for name in ['mul','sub','sum']:
+            op = Operator(name,[x,y])
+            for lhs in range(*x.get_bounds()):
+                for rhs in range(*y.get_bounds()):
+                    val = Operator(name,[lhs,rhs]).value()
+                    self.assertTrue(val >= op.get_bounds()[0])
+                    self.assertTrue(val <= op.get_bounds()[1])
+
+    def test_bounds_wsum(self):
+        x = intvar(-8, 8,3)
+        weights = [2,4,-3]
+        op = Operator('wsum',[weights,x])
+        for x1 in range(*x[0].get_bounds()):
+            for x2 in range(*x[1].get_bounds()):
+                for x3 in range(*x[2].get_bounds()):
+                    val = Operator('wsum',[weights,[x1,x2,x3]]).value()
+                    self.assertTrue(val >= op.get_bounds()[0])
+                    self.assertTrue(val <= op.get_bounds()[1])
 
 
+    def test_bounds_div(self):
+        x = intvar(-8, 8)
+        y = intvar(-7,-1)
+        z = intvar(1,9)
+        op1 = Operator('div',[x,y])
+        op2 = Operator('div',[x,z])
+        for lhs in range(*x.get_bounds()):
+            for rhs in range(*y.get_bounds()):
+                val = Operator('div',[lhs,rhs]).value()
+                self.assertTrue(val >= op1.get_bounds()[0])
+                self.assertTrue(val <= op1.get_bounds()[1])
+            for rhs in range(*z.get_bounds()):
+                val = Operator('div', [lhs, rhs]).value()
+                self.assertTrue(val >= op2.get_bounds()[0])
+                self.assertTrue(val <= op2.get_bounds()[1])
 
+    def test_bounds_mod(self):
+        x = intvar(-8, 8)
+        y = intvar(-7, -1)
+        z = intvar(1, 9)
+        op1 = Operator('mod',[x,y])
+        op2 = Operator('mod',[x,z])
+        for lhs in range(*x.get_bounds()):
+            for rhs in range(*y.get_bounds()):
+                val = Operator('mod',[lhs,rhs]).value()
+                self.assertTrue(val >= op1.get_bounds()[0])
+                self.assertTrue(val <= op1.get_bounds()[1])
+            for rhs in range(*z.get_bounds()):
+                val = Operator('mod', [lhs, rhs]).value()
+                self.assertTrue(val >= op2.get_bounds()[0])
+                self.assertTrue(val <= op2.get_bounds()[1])
+
+    def test_bounds_pow(self):
+        x = intvar(-8, 8)
+        z = intvar(1, 9)
+        # only nonnegative exponents allowed
+        op = Operator('pow',[x,z])
+        for lhs in range(*x.get_bounds()):
+            for rhs in range(*z.get_bounds()):
+                val = Operator('pow',[lhs,rhs]).value()
+                self.assertTrue(val >= op.get_bounds()[0])
+                self.assertTrue(val <= op.get_bounds()[1])
+
+    def test_bounds_unary(self):
+        x = intvar(-8, 8)
+        y = intvar(-7, -1)
+        z = intvar(1, 9)
+        for name in ['-', 'abs']:
+            op = Operator(name,[x])
+            op1 = Operator(name,[z])
+            op2 = Operator(name,[y])
+            for lhs in range(*x.get_bounds()):
+                val = Operator(name, [lhs]).value()
+                self.assertTrue(val >= op.get_bounds()[0])
+                self.assertTrue(val <= op.get_bounds()[1])
+            for lhs in range(*z.get_bounds()):
+                val = Operator(name, [lhs]).value()
+                self.assertTrue(val >= op1.get_bounds()[0])
+                self.assertTrue(val <= op1.get_bounds()[1])
+            for lhs in range(*y.get_bounds()):
+                val = Operator(name, [lhs]).value()
+                self.assertTrue(val >= op2.get_bounds()[0])
+                self.assertTrue(val <= op2.get_bounds()[1])
 
 if __name__ == '__main__':
     unittest.main()
