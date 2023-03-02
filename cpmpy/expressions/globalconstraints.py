@@ -109,7 +109,7 @@ import numpy as np
 from ..exceptions import CPMpyException
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -311,7 +311,30 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-# Numeric Global Constraints (with integer-valued return type)
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported
+# a little helper:
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        assert all([is_boolexpr(condition), is_boolexpr(if_true), is_boolexpr(if_false)]), \
+            "only boolean expression allowed in IfThenElse"
+        super().__init__("ite", [condition, if_true, if_false], is_bool=True)
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        condition_val = argval(condition)
+        if argval(condition):
+            return argval(if_true)
+        else:
+            return argval(if_false)
+
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return [condition.implies(if_true), (~condition).implies(if_false)]
+
+    def __repr__(self):
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
 class Minimum(GlobalConstraint):

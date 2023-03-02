@@ -494,6 +494,12 @@ class CPM_minizinc(SolverInterface):
             self += [s + d == e for s,d,e in zip(start,dur,end)]
             return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
 
+        elif expr.name == 'ite':
+            cond, tr, fal = expr.args
+            return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
+                                                        self._convert_expression(fal))
+
+
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
