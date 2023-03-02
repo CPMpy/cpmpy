@@ -655,11 +655,10 @@ class Count(GlobalConstraint):
         """
         Count(arr,val) can only be decomposed if it's part of a comparison
         """
-        from .python_builtins import any
+        from .python_builtins import all
 
         arr, val = self.args
-        #we assume decompositions return lists of constraints
-        return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
 
     def get_bounds(self):
         """
