@@ -193,6 +193,7 @@ class TestMul(unittest.TestCase):
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
 
+class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
         x = intvar(-8,8)
         y = intvar(-4,6)
