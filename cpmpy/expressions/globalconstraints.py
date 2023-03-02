@@ -369,7 +369,7 @@ class Minimum(GlobalConstraint):
 
         arr = argval(self.args)
         _min = intvar(-2147483648, 2147483647)
-        return all([any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)])
+        return [any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)]
 
 class Maximum(GlobalConstraint):
     """
@@ -403,7 +403,7 @@ class Maximum(GlobalConstraint):
 
         arr = argval(self.args)
         _max = intvar(-2147483648, 2147483647)
-        return all([any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)])
+        return [any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)]
 
 
 def element(arg_list):
