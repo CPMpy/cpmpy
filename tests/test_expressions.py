@@ -199,22 +199,24 @@ class TestMul(unittest.TestCase):
         y = intvar(-4,6)
         for name in ['mul','sub','sum']:
             op = Operator(name,[x,y])
+            lb, ub = op.get_bounds()
             for lhs in range(*x.get_bounds()):
                 for rhs in range(*y.get_bounds()):
                     val = Operator(name,[lhs,rhs]).value()
-                    self.assertTrue(val >= op.get_bounds()[0])
-                    self.assertTrue(val <= op.get_bounds()[1])
+                    self.assertTrue(val >= lb)
+                    self.assertTrue(val <= ub)
 
     def test_bounds_wsum(self):
         x = intvar(-8, 8,3)
         weights = [2,4,-3]
         op = Operator('wsum',[weights,x])
+        lb, ub = op.get_bounds()
         for x1 in range(*x[0].get_bounds()):
             for x2 in range(*x[1].get_bounds()):
                 for x3 in range(*x[2].get_bounds()):
                     val = Operator('wsum',[weights,[x1,x2,x3]]).value()
-                    self.assertTrue(val >= op.get_bounds()[0])
-                    self.assertTrue(val <= op.get_bounds()[1])
+                    self.assertTrue(val >= lb)
+                    self.assertTrue(val <= ub)
 
 
     def test_bounds_div(self):
@@ -222,43 +224,48 @@ class TestMul(unittest.TestCase):
         y = intvar(-7,-1)
         z = intvar(1,9)
         op1 = Operator('div',[x,y])
+        lb1,ub1 = op1.get_bounds()
         op2 = Operator('div',[x,z])
+        lb2,ub2 = op2.get_bounds()
         for lhs in range(*x.get_bounds()):
             for rhs in range(*y.get_bounds()):
                 val = Operator('div',[lhs,rhs]).value()
-                self.assertTrue(val >= op1.get_bounds()[0])
-                self.assertTrue(val <= op1.get_bounds()[1])
+                self.assertTrue(val >= lb1)
+                self.assertTrue(val <= ub1)
             for rhs in range(*z.get_bounds()):
                 val = Operator('div', [lhs, rhs]).value()
-                self.assertTrue(val >= op2.get_bounds()[0])
-                self.assertTrue(val <= op2.get_bounds()[1])
+                self.assertTrue(val >= lb2)
+                self.assertTrue(val <= ub2)
 
     def test_bounds_mod(self):
         x = intvar(-8, 8)
         y = intvar(-7, -1)
         z = intvar(1, 9)
         op1 = Operator('mod',[x,y])
+        lb1, ub1 = op1.get_bounds()
         op2 = Operator('mod',[x,z])
+        lb2, ub2 = op2.get_bounds()
         for lhs in range(*x.get_bounds()):
             for rhs in range(*y.get_bounds()):
                 val = Operator('mod',[lhs,rhs]).value()
-                self.assertTrue(val >= op1.get_bounds()[0])
-                self.assertTrue(val <= op1.get_bounds()[1])
+                self.assertTrue(val >= lb1)
+                self.assertTrue(val <= ub1)
             for rhs in range(*z.get_bounds()):
                 val = Operator('mod', [lhs, rhs]).value()
-                self.assertTrue(val >= op2.get_bounds()[0])
-                self.assertTrue(val <= op2.get_bounds()[1])
+                self.assertTrue(val >= lb2)
+                self.assertTrue(val <= ub2)
 
     def test_bounds_pow(self):
         x = intvar(-8, 8)
         z = intvar(1, 9)
         # only nonnegative exponents allowed
         op = Operator('pow',[x,z])
+        lb, ub = op.get_bounds()
         for lhs in range(*x.get_bounds()):
             for rhs in range(*z.get_bounds()):
                 val = Operator('pow',[lhs,rhs]).value()
-                self.assertTrue(val >= op.get_bounds()[0])
-                self.assertTrue(val <= op.get_bounds()[1])
+                self.assertTrue(val >= lb)
+                self.assertTrue(val <= ub)
 
     def test_bounds_unary(self):
         x = intvar(-8, 8)
@@ -266,20 +273,23 @@ class TestMul(unittest.TestCase):
         z = intvar(1, 9)
         for name in ['-', 'abs']:
             op = Operator(name,[x])
+            lb, ub = op.get_bounds()
             op1 = Operator(name,[z])
+            lb1, ub1 = op.get_bounds()
             op2 = Operator(name,[y])
+            lb2, ub2 = op.get_bounds()
             for lhs in range(*x.get_bounds()):
                 val = Operator(name, [lhs]).value()
-                self.assertTrue(val >= op.get_bounds()[0])
-                self.assertTrue(val <= op.get_bounds()[1])
+                self.assertTrue(val >= lb)
+                self.assertTrue(val <= ub)
             for lhs in range(*z.get_bounds()):
                 val = Operator(name, [lhs]).value()
-                self.assertTrue(val >= op1.get_bounds()[0])
-                self.assertTrue(val <= op1.get_bounds()[1])
+                self.assertTrue(val >= lb1)
+                self.assertTrue(val <= ub1)
             for lhs in range(*y.get_bounds()):
                 val = Operator(name, [lhs]).value()
-                self.assertTrue(val >= op2.get_bounds()[0])
-                self.assertTrue(val <= op2.get_bounds()[1])
+                self.assertTrue(val >= lb2)
+                self.assertTrue(val <= ub2)
 
 if __name__ == '__main__':
     unittest.main()
