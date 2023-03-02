@@ -596,7 +596,7 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def decompose(self):
         a, gcc = self.args
-        ub = max([v.ub for v in a])
+        ub = max([get_bounds(v)[1] for v in a])
         assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         return [Count(a, i) == v for i, v in enumerate(gcc)]
 
