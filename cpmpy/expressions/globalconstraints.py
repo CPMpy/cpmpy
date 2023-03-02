@@ -102,9 +102,6 @@
         Element
         Xor
         Cumulative
-        Count
-        GlobalCardinalityCount
-        AlldifferenExcept0
 
 """
 import warnings # for deprecation warning
@@ -561,66 +558,4 @@ class Cumulative(GlobalConstraint):
         copied_args = self._deepcopy_args(memodict)
         return Cumulative(*copied_args)
 
-
-class GlobalCardinalityCount(GlobalConstraint):
-    """
-        GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
-    The array gcc must have elements 0..ub (so of size ub+1).
-        """
-
-    def __init__(self, a, gcc):
-        super().__init__("gcc", [a,gcc])
-
-    def decompose(self):
-        a, gcc = self.args
-        ub = max([v.ub for v in a])
-        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
-        return [Count(a, i) == v for i, v in enumerate(gcc)]
-
-    def value(self):
-        a, gcc = self.args
-        gval = [argval(y) for y in gcc]
-        return all([gval[i] == Count(a,i).value() for i in range(len(gcc))])
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the AllDifferentExceptO global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return GlobalCardinalityCount(*copied_args)
-
-
-class Count(GlobalConstraint):
-    """
-    The Count (numerical) global constraint represents the number of occurrences of val in arr
-    """
-
-    def __init__(self,arr,val):
-        super().__init__("count", [arr,val], is_bool=False)
-
-    def value(self):
-        arr, val = self.args
-        val = argval(val)
-        return sum([argval(a) == val for a in arr])
-
-    def deepcopy(self, memodict={}):
-        arr, val = self._deepcopy_args(memodict)
-        return Count(arr, val)
-
-    def decompose_comparison(self, cmp_op, cmp_rhs):
-        """
-        Count(arr,val) can only be decomposed if it's part of a comparison
-        """
-        from .python_builtins import any
-
-        arr, val = self.args
-        #we assume decompositions return lists of constraints
-        return [eval_comparison(cmp_op, Operator('sum',arr==val), cmp_rhs)]
-
-    def get_bounds(self):
-        return [0, len(self.args[0])]
-
-    def __repr__(self):
-        return "Count({})".format(self.args)
 
