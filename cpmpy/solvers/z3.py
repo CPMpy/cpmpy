@@ -423,10 +423,6 @@ class CPM_z3(SolverInterface):
                 # global constraints
                 return self._z3_expr(all(cpm_con.decompose()))
 
-
-        # global constraints
-        return self._z3_expr(all(cpm_con.decompose()))
-
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 
     # Other functions from SolverInterface that you can overwrite:
