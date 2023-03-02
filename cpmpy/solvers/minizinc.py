@@ -516,6 +516,12 @@ class CPM_minizinc(SolverInterface):
             cover = self._convert_expression(cover)
             return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
 
+        elif expr.name == 'ite':
+            cond, tr, fal = expr.args
+            return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
+                                                        self._convert_expression(fal))
+
+
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))

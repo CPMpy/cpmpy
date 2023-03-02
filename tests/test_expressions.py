@@ -193,9 +193,5 @@ class TestMul(unittest.TestCase):
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
 
-
-
-
-
 if __name__ == '__main__':
     unittest.main()

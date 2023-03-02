@@ -418,6 +418,9 @@ class CPM_z3(SolverInterface):
                 for a in z3_args[2:]:
                     z3_cons = z3.Xor(z3_cons, a)
                 return z3_cons
+            elif cpm_con.name == 'ite':
+                return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
+                             self._z3_expr(cpm_con.args[2]))
             else:
                 # global constraints
                 return self._z3_expr(all(cpm_con.decompose()))
