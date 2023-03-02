@@ -542,23 +542,27 @@ class Operator(Expression):
         if self.is_bool():
             return 0, 1 #boolean
         elif self.name == 'mul':
-            b1,b2 = get_bounds(self.args[0])
-            b3,b4 = get_bounds(self.args[1])
-            bounds = [b1 * b3, b1 * b4, b2 * b3, b2 * b4]
+            lb1,ub1 = get_bounds(self.args[0])
+            lb2,ub2 = get_bounds(self.args[1])
+            bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             return min(bounds), max(bounds)
         elif self.name == 'sum':
-            return sum([get_bounds(x)[0] for x in self.args]), sum([get_bounds(x)[1] for x in self.args])
+            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            return sum(lbs), sum(ubs)
         elif self.name == 'wsum':
-            return sum(self.args[0] * np.array([get_bounds(x)[0] for x in self.args[1]])), \
-                   sum(self.args[0] * np.array([get_bounds(x)[1] for x in self.args[1]]))
+            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            return sum(self.args[0] * np.array(lbs)), \
+                   sum(self.args[0] * np.array(ubs))
         elif self.name == 'sub':
-            return tuple(np.subtract(get_bounds(self.args[0]),get_bounds(self.args[1])))
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            return lb1 - lb2, ub1 - ub2
         elif self.name == 'div':
-            b1, b2 = get_bounds(self.args[0])
-            b3, b4 = get_bounds(self.args[1])
-            if b3 <= 0 <= b4:
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [b1 // b3, b1 // b4, b2 // b3, b2 // b4]
+            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
             return min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
