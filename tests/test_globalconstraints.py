@@ -253,6 +253,8 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
         self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
         self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
+
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1]], gcc).value())
     def test_not_global_cardinality_count(self):
         iv = cp.intvar(-8, 8, shape=3)
         gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
@@ -277,6 +279,8 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cp.Count(iv, x) <= y).solve())
         self.assertTrue(cp.Model(cp.Count(iv, x) < y).solve())
         self.assertTrue(cp.Model(cp.Count(iv, x) > y).solve())
+
+        self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
     def test_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())
