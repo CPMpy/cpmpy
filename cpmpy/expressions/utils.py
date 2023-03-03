@@ -111,8 +111,11 @@ def eval_comparison(str_op, lhs, rhs):
 
 
 def get_bounds(expr):
+    #can return floats, use floor and ceil when creating an intvar
     if hasattr(expr,'get_bounds'):
         return expr.get_bounds()
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
-        return floor(expr), ceil(expr)
+        if is_bool(expr):
+            return 0, 1
+        return expr, expr
