@@ -1,3 +1,4 @@
+import copy
 
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.core import Expression, Comparison, Operator
@@ -12,6 +13,12 @@ def decompose_global(lst_of_expr, supported={}):
         Accepts a list of flat constraints as input
         Returns a list of flat constraints
     """
+    def _is_supported(cpm_expr):
+        if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
+            return False
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint) and cpm_expr.name not in supported:
+            return False
+        return True
 
     if not is_any_list(lst_of_expr):
         lst_of_expr= [lst_of_expr]
@@ -19,47 +26,34 @@ def decompose_global(lst_of_expr, supported={}):
     newlist = []
     for cpm_expr in lst_of_expr:
         assert isinstance(cpm_expr, Expression), f"Expected CPMpy expression but got {cpm_expr}, run 'cpmpy.transformations.normalize.toplevel_list' first"
+        decomp_idx = None
 
-        # 1: Base case boolean global constraint
-        if hasattr(cpm_expr, "decompose") and cpm_expr.name not in supported:
-            cpm_expr = cpm_expr.decompose()
+        if hasattr(cpm_expr, "decompose") and cpm_expr.is_bool() and cpm_expr.name not in supported:
+            cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if cpm_expr.name == "==":
-                if hasattr(rhs, "decompose") and rhs.name not in supported: # probably most frequent case
-                    cpm_expr = [lhs == (all(rhs.decompose()))]
-                elif hasattr(lhs, "decompose") and lhs.name not in supported:
-                    cpm_expr = [all(lhs.decompose()) == rhs]
-                elif isinstance(lhs, Comparison) and \
-                        isinstance(lhs.args[0], GlobalConstraint) and lhs.args[0].name not in supported:
-                    cpm_expr = [all(_decompose_global_comp(lhs)) == rhs]
-                elif isinstance(rhs, Comparison) and \
-                        isinstance(rhs.args[0], GlobalConstraint) and rhs.args[0].name not in supported:
-                    cpm_expr = [lhs == all(_decompose_global_comp(rhs))]
+            if cpm_expr.name == "==" and not _is_supported(lhs): # can be both boolean or numerical globals
+                decomp_idx = 0
 
             if isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
-                cpm_expr = _decompose_global_comp(cpm_expr)
+                cpm_expr = do_decompose(cpm_expr) # base global constraint in comparison
+                decomp_idx = None
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             lhs, rhs = cpm_expr.args
-            if hasattr(rhs, "decompose") and rhs.name not in supported: # probably most frequent case
-                # 3: Boolean global constraint on rhs of reification
-                cpm_expr = [rhs.implies(all(rhs.decompose()))]
-            elif hasattr(lhs, "decompose") and lhs.name not in supported:
-                # 4: Boolean global constraint on lhs of reification
-                cpm_expr = [all(lhs.decompose()).implies(rhs)]
-            elif isinstance(lhs, Comparison) and \
-                    isinstance(lhs.args[0], GlobalConstraint) and lhs.args[0].name not in supported:
-                # 5: global constraint on lhs of comparison on lhs of reification
-                cpm_expr = [all(_decompose_global_comp(lhs)).implies(rhs)]
-            elif isinstance(rhs, Comparison) and \
-                    isinstance(rhs.args[0], GlobalConstraint) and rhs.args[0].name not in supported:
-                # 6: Numerical global constraint on lhs of comparison on rhs of reification
-                cpm_expr = [lhs.implies(all(_decompose_global_comp(rhs)))]
+            if not _is_supported(rhs):
+                decomp_idx = 1 # reified (numerical) global constraint, probably most frequent case
+            elif not _is_supported(lhs):
+                decomp_idx = 0
 
+        if decomp_idx is not None:
+            cpm_expr = copy.copy(cpm_expr)
+            cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
+            cpm_expr = [cpm_expr]
 
         if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
-            newlist.extend(decompose_global(flatten_constraint(cpm_expr), supported=supported))
+            flat = flatten_constraint(cpm_expr)
+            newlist.extend(decompose_global(flat, supported=supported))
         else:
             # default
             newlist.append(cpm_expr)
@@ -67,18 +61,18 @@ def decompose_global(lst_of_expr, supported={}):
     return newlist
 
 
-def _decompose_global_comp(cpm_expr):
-    """
-        Helper function for decomposing global constraints in comparisons
-    """
-    assert isinstance(cpm_expr, Comparison), f"expected CPMpy Comparison, got {cpm_expr}"
 
-    lhs, rhs = cpm_expr.args
-    if hasattr(lhs, "decompose_comparison"):
-        # numerical global
-        return lhs.decompose_comparison(cpm_expr.name, rhs)
-    if hasattr(lhs, "decompose"):
-        # boolean global
-        return [Comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
 
-    raise ValueError(f"Expected global constraint on lhs of comparison {cpm_expr}, got {lhs}")
+def do_decompose(cpm_expr):
+    """
+        Helper function for decomposing global constraints
+        - cpm_expr: Global constraint or comparison containing a global constraint on lhs
+    """
+    if isinstance(cpm_expr, Comparison):
+        lhs, rhs = cpm_expr.args
+        if lhs.is_bool():
+            return [Comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
+        else:
+            return lhs.decompose_comparison(cpm_expr.name, rhs)
+
+    return cpm_expr.decompose()
