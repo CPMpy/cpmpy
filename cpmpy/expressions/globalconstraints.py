@@ -434,7 +434,7 @@ class Element(GlobalConstraint):
             return argval(arr[idxval])
         return None # default
 
-    def decompose_comparison(self, cmp_op, cmp_rhs):
+    def decompose_comparison(self, cpm_op, cpm_rhs):
         """
             `Element(arr,ix)` represents the array lookup itself (a numeric variable)
             It is not a constraint itself, so it can not have a decompose().
@@ -445,8 +445,9 @@ class Element(GlobalConstraint):
         """
         from .python_builtins import any
 
-        arr,idx = self.args
-        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
+        arr, idx = self.args
+        return [(idx == i).implies(Comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
+               [idx >= 0, idx < len(arr)]
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
