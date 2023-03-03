@@ -16,7 +16,7 @@ def decompose_global(lst_of_expr, supported={}):
     def _is_supported(cpm_expr):
         if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
             return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint) and cpm_expr.name not in supported:
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint) and cpm_expr.args[0].name not in supported:
             return False
         return True
 
@@ -35,7 +35,7 @@ def decompose_global(lst_of_expr, supported={}):
             if cpm_expr.name == "==" and not _is_supported(lhs): # can be both boolean or numerical globals
                 decomp_idx = 0
 
-            if isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
+            if not _is_supported(cpm_expr):
                 cpm_expr = do_decompose(cpm_expr) # base global constraint in comparison
                 decomp_idx = None
 
