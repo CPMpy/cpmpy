@@ -38,7 +38,6 @@
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
     - x ^ y         Xor([x,y])  # a global constraint
-    - ~x         Operator("not", [x])
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -78,7 +77,6 @@ import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
-from math import floor, ceil
 from .utils import is_num, is_any_list, flatlist, get_bounds
 
 

@@ -377,9 +377,8 @@ class Minimum(GlobalConstraint):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        ub = min([get_bounds(a)[1] for a in self.args]) #lowest upperbound
-        lb = min([get_bounds(a)[0] for a in self.args]) #lowest lowerbound
-        return lb, ub
+        lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+        return min(lbs), min(ubs)
 
 
 class Maximum(GlobalConstraint):
@@ -419,9 +418,9 @@ class Maximum(GlobalConstraint):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        ub = max([get_bounds(a)[1] for a in self.args])  # highest upperbound
-        lb = max([get_bounds(a)[0] for a in self.args])  # highest lowerbound
-        return lb, ub
+        lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+        return max(lbs), max(lbs)  # highest upperbound
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
@@ -481,7 +480,8 @@ class Element(GlobalConstraint):
         Returns the bounds of the (numerical) global constraint
         """
         arr, idx = self.args
-        return min([get_bounds(x)[0] for x in arr]), max([get_bounds(x)[1] for x in arr])
+        lbs, ubs = zip(*[get_bounds(x) for x in arr])
+        return min(lbs), max(ubs)
 
 class Xor(GlobalConstraint):
     """
