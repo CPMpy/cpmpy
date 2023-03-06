@@ -110,7 +110,7 @@ def eval_comparison(str_op, lhs, rhs):
 
 
 def get_bounds(expr):
-    # can return floats, use floor and ceil when creating an intvar?
+    # can return floats, use floor and ceil when creating an intvar!
     if hasattr(expr,'get_bounds'):
         return expr.get_bounds()
     else:
