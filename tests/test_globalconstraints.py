@@ -152,6 +152,20 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertNotEqual(str(max(iv.value())), '4')
 
+    def test_element(self):
+        iv = cp.intvar(-8, 8, 3)
+        idx = cp.intvar(-8, 8)
+        constraints = [cp.Element(iv,idx) == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv,idx).value() == 8)
+
+    def test_xor(self):
+        bv = cp.boolvar(5)
+        self.assertTrue(cp.Model(cp.Xor(bv)).solve())
+        self.assertTrue(cp.Xor(bv).value())
+
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
@@ -227,3 +241,16 @@ class TestGlobal(unittest.TestCase):
 
         constraints = [iter, x == [1, 3, 2]]
         self.assertFalse(cp.Model(constraints).solve())
+
+    def test_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
+
+    def test_not_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
+        self.assertFalse(cp.AllDifferentExcept0(iv).value())
+        self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
