@@ -52,7 +52,7 @@
     - ~x            x == 0
 
 
-    Apart from operator overleading, expressions implement two important functions:
+    Apart from operator overloading, expressions implement two important functions:
 
     - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
                     If it does, the expression can be used as top-level constraint
