@@ -367,7 +367,6 @@ class Minimum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
-        #TODO arr = argval(self.args) ??
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
         return all([any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)])
@@ -409,7 +408,6 @@ class Maximum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
-        arr = argval(self.args)
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
         return all([any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)])
