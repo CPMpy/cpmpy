@@ -93,6 +93,7 @@
         :nosignatures:
 
         AllDifferent
+        AllDifferentExcept0
         AllEqual
         Circuit
         Table
@@ -102,7 +103,6 @@
         Xor
         Cumulative
         Count
-        AlldifferenExcept0
         GlobalCardinalityCount
 
 """
@@ -620,7 +620,6 @@ class GlobalCardinalityCount(GlobalConstraint):
         assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         return [Count(a, i) == v for i, v in enumerate(gcc)]
 
-
     def value(self):
         a, gcc = self.args
         gval = [argval(y) for y in gcc]
@@ -628,11 +627,39 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def deepcopy(self, memodict={}):
         """
-            Return a deep copy of the AllDifferentExceptO global constraint
+            Return a deep copy of the constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
         copied_args = self._deepcopy_args(memodict)
         return GlobalCardinalityCount(*copied_args)
+
+class Count(GlobalConstraint):
+    """
+    The Count (numerical) global constraint represents the number of occurrences of val in arr
+    """
+
+    def __init__(self,arr,val):
+        super().__init__("count", [arr,val], is_bool=False)
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Count(arr,val) can only be decomposed if it's part of a comparison
+        """
+        arr, val = self.args
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+
+    def value(self):
+        arr, val = self.args
+        val = argval(val)
+        return sum([argval(a) == val for a in arr])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Count(*copied_args)
 
 class Count(GlobalConstraint):
     """
@@ -669,24 +696,3 @@ class Count(GlobalConstraint):
     def __repr__(self):
         return "Count({})".format(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
-    """
-    All nonzero arguments have a distinct value
-    """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except_0", flatlist(args))
-
-    def decompose(self):
-        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
-
-    def value(self):
-        return len(set(a.value() for a in self.args if a.value() != 0)) == len([a.value for a in self.args if a.value() != 0])
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the AllDifferentExceptO global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return AllDifferentExcept0(*copied_args)
