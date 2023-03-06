@@ -77,8 +77,8 @@ import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
-from .utils import is_num, is_any_list, flatlist, get_bounds
 
+from .utils import is_num, is_any_list, flatlist, get_bounds
 
 class Expression(object):
     """

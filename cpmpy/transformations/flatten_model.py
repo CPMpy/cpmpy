@@ -138,8 +138,8 @@ def flatten_constraint(expr):
             """
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
-                    newlist.append(expr)
-                    continue
+                newlist.append(expr)
+                continue
 
             elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
