@@ -47,7 +47,15 @@ class TestGlobal(unittest.TestCase):
             for (var,val) in zip(iv,vals):
                 var._value = val
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
-    
+
+    def test_not_alldifferent(self):
+        # from fuzztester of Ruben Kindt, #143
+        pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
+        m = cp.Model()
+        m += ~cp.AllDifferent(pos)
+        self.assertTrue(m.solve("ortools"))
+        self.assertFalse(cp.AllDifferent(pos).value())
+
     def test_alldifferent_except0(self):
         # test known input/outputs
         tuples = [
@@ -68,14 +76,19 @@ class TestGlobal(unittest.TestCase):
                 var._value = val
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
+        # and some more
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
+        self.assertTrue(cp.AllDifferentExcept0(iv).value())
 
-    def test_not_alldifferent(self):
-        # from fuzztester of Ruben Kindt, #143
-        pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
-        m = cp.Model()
-        m += ~cp.AllDifferent(pos)
-        self.assertTrue(m.solve("ortools"))
-        self.assertFalse(cp.AllDifferent(pos).value())
+    def test_not_alldifferentexcept0(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
+        self.assertFalse(cp.AllDifferentExcept0(iv).value())
+        self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
+
 
     def test_circuit(self):
         """
@@ -282,15 +295,3 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
 
-    def test_alldifferentexcept0(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())
-        self.assertTrue(cp.AllDifferentExcept0(iv).value())
-        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
-        self.assertTrue(cp.AllDifferentExcept0(iv).value())
-
-    def test_not_alldifferentexcept0(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
-        self.assertFalse(cp.AllDifferentExcept0(iv).value())
-        self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
