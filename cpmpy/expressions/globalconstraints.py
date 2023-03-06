@@ -419,7 +419,7 @@ class Maximum(GlobalConstraint):
         Returns the bounds of the (numerical) global constraint
         """
         lbs, ubs = zip(*[get_bounds(x) for x in self.args])
-        return max(lbs), max(lbs)  # highest upperbound
+        return max(lbs), max(ubs)
 
 
 def element(arg_list):
@@ -652,6 +652,10 @@ class Count(GlobalConstraint):
         arr, val = self.args
         val = argval(val)
         return sum([argval(a) == val for a in arr])
+
+    def get_bounds(self):
+        arr, val = self.args
+        return 0, len(arr)
 
     def deepcopy(self, memodict={}):
         """
