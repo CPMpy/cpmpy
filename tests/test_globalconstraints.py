@@ -161,8 +161,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value()] == 8)
         self.assertTrue(cp.Element(iv,idx).value() == 8)
 
-
-    def test_Xor(self):
+    def test_xor(self):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(cp.Xor(bv)).solve())
         self.assertTrue(cp.Xor(bv).value())
@@ -255,6 +254,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
 
         self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1]], gcc).value())
+
     def test_not_global_cardinality_count(self):
         iv = cp.intvar(-8, 8, shape=3)
         gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
@@ -281,6 +281,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cp.Count(iv, x) > y).solve())
 
         self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
+
     def test_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv)]).solve())

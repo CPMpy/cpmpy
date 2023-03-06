@@ -104,7 +104,6 @@
         Cumulative
         Count
         GlobalCardinalityCount
-        AlldifferenExcept0
 
 """
 import warnings # for deprecation warning
@@ -607,7 +606,7 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def deepcopy(self, memodict={}):
         """
-            Return a deep copy of the AllDifferentExceptO global constraint
+            Return a deep copy of the constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
         copied_args = self._deepcopy_args(memodict)
@@ -622,27 +621,24 @@ class Count(GlobalConstraint):
     def __init__(self,arr,val):
         super().__init__("count", [arr,val], is_bool=False)
 
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Count(arr,val) can only be decomposed if it's part of a comparison
+        """
+        arr, val = self.args
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+
     def value(self):
         arr, val = self.args
         val = argval(val)
         return sum([argval(a) == val for a in arr])
 
     def deepcopy(self, memodict={}):
-        arr, val = self._deepcopy_args(memodict)
-        return Count(arr, val)
-
-    def decompose_comparison(self, cmp_op, cmp_rhs):
         """
-        Count(arr,val) can only be decomposed if it's part of a comparison
+            Return a deep copy of the constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
         """
-        from .python_builtins import any
+        copied_args = self._deepcopy_args(memodict)
+        return Count(*copied_args)
 
-        arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
-
-    def get_bounds(self):
-        return [0, len(self.args[0])]
-
-    def __repr__(self):
-        return "Count({})".format(self.args)
 

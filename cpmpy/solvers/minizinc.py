@@ -416,13 +416,13 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
-        #count: we need the lhs and rhs together
+        # count: we need the lhs and rhs together
         if isinstance(expr, Comparison) and expr.args[0].name == 'count':
             name = expr.name
             lhs, rhs = expr.args
-            c = self._convert_expression(rhs) #count
-            x = [self._convert_expression(countable) for countable in lhs.args[0]] #array
-            y = self._convert_expression(lhs.args[1]) #value to count in array
+            c = self._convert_expression(rhs)  # count
+            x = [self._convert_expression(countable) for countable in lhs.args[0]]  # array
+            y = self._convert_expression(lhs.args[1])  # value to count in array
             functionmap = {'==': 'count_eq', '!=': 'count_neq',
                         '<=': 'count_geq', '>=': 'count_leq',
                         '>': 'count_lt', '<': 'count_gt'}
