@@ -271,7 +271,6 @@ class Circuit(GlobalConstraint):
 
 
     def value(self):
-        from .python_builtins import all
         pathlen = 0
         idx = 0
         visited = set()
@@ -600,9 +599,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         return [Count(a, i) == v for i, v in enumerate(gcc)]
 
     def value(self):
-        a, gcc = self.args
-        gval = [argval(y) for y in gcc]
-        return all([gval[i] == Count(a,i).value() for i in range(len(gcc))])
+        from .python_builtins import all
+        return all(self.decompose()).value()
 
     def deepcopy(self, memodict={}):
         """
