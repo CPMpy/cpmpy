@@ -271,7 +271,6 @@ class Circuit(GlobalConstraint):
 
 
     def value(self):
-        from .python_builtins import all
         pathlen = 0
         idx = 0
         visited = set()
@@ -368,7 +367,7 @@ class Minimum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
-
+        #TODO arr = argval(self.args) ??
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
         return all([any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)])
@@ -410,6 +409,7 @@ class Maximum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
+        arr = argval(self.args)
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
         return all([any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)])
@@ -612,18 +612,17 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
 
     def __init__(self, a, gcc):
+        ub = max([get_bounds(v)[1] for v in a])
+        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         super().__init__("gcc", [a,gcc])
 
     def decompose(self):
         a, gcc = self.args
-        ub = max([get_bounds(v)[1] for v in a])
-        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         return [Count(a, i) == v for i, v in enumerate(gcc)]
 
     def value(self):
-        a, gcc = self.args
-        gval = [argval(y) for y in gcc]
-        return all([gval[i] == Count(a,i).value() for i in range(len(gcc))])
+        from .python_builtins import all
+        return all(self.decompose()).value()
 
     def deepcopy(self, memodict={}):
         """
@@ -661,4 +660,5 @@ class Count(GlobalConstraint):
         """
         copied_args = self._deepcopy_args(memodict)
         return Count(*copied_args)
+
 
