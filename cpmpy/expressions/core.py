@@ -567,7 +567,7 @@ class Operator(Expression):
             return sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
-            var_bounds2 = np.array([get_bounds(arg) for arg in vars]).T
+            var_bounds = np.array([get_bounds(arg) for arg in vars]).T
             bounds = var_bounds * weights
             return bounds.min(axis=0).sum(), bounds.max(axis=0).sum()  # for every column is axis=0...
 
