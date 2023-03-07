@@ -354,6 +354,7 @@ class CPM_z3(SolverInterface):
                 arr, idx = rhs.args
                 return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
             if isinstance(lhs,GlobalConstraint) and lhs.name == "count":
+                # I think this case is covered in the next line
                 return self._z3_expr(all(lhs.decompose_comparison(cpm_con.name, rhs)))
 
             elif hasattr(lhs, 'decompose_comparison'):

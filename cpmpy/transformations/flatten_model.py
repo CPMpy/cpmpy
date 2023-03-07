@@ -332,6 +332,7 @@ def get_or_make_var(expr):
         # normalize expr into a numexpr LHS,
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
+
         lb, ub = flatexpr.get_bounds()
         ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
         return (ivar, [flatexpr == ivar]+flatcons)
