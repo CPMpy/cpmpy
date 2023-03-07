@@ -102,6 +102,8 @@
         Element
         Xor
         Cumulative
+        Count
+        GlobalCardinalityCount
 
 """
 import warnings # for deprecation warning
@@ -109,7 +111,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -269,7 +271,6 @@ class Circuit(GlobalConstraint):
 
 
     def value(self):
-        from .python_builtins import all
         pathlen = 0
         idx = 0
         visited = set()
@@ -311,7 +312,30 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-# Numeric Global Constraints (with integer-valued return type)
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported
+# a little helper:
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        assert all([is_boolexpr(condition), is_boolexpr(if_true), is_boolexpr(if_false)]), \
+            "only boolean expression allowed in IfThenElse"
+        super().__init__("ite", [condition, if_true, if_false], is_bool=True)
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        condition_val = argval(condition)
+        if argval(condition):
+            return argval(if_true)
+        else:
+            return argval(if_false)
+
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return [condition.implies(if_true), (~condition).implies(if_false)]
+
+    def __repr__(self):
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
 class Minimum(GlobalConstraint):
@@ -559,5 +583,62 @@ class Cumulative(GlobalConstraint):
        """
         copied_args = self._deepcopy_args(memodict)
         return Cumulative(*copied_args)
+
+
+class GlobalCardinalityCount(GlobalConstraint):
+    """
+        GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
+    The array gcc must have elements 0..ub (so of size ub+1).
+        """
+
+    def __init__(self, a, gcc):
+        super().__init__("gcc", [a,gcc])
+
+    def decompose(self):
+        a, gcc = self.args
+        ub = max([v.ub for v in a])
+        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
+        return [Count(a, i) == v for i, v in enumerate(gcc)]
+
+    def value(self):
+        from .python_builtins import all
+        return all(self.decompose()).value()
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return GlobalCardinalityCount(*copied_args)
+
+
+class Count(GlobalConstraint):
+    """
+    The Count (numerical) global constraint represents the number of occurrences of val in arr
+    """
+
+    def __init__(self,arr,val):
+        super().__init__("count", [arr,val], is_bool=False)
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Count(arr,val) can only be decomposed if it's part of a comparison
+        """
+        arr, val = self.args
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+
+    def value(self):
+        arr, val = self.args
+        val = argval(val)
+        return sum([argval(a) == val for a in arr])
+
+    def deepcopy(self, memodict={}):
+        """
+            Return a deep copy of the constraint
+            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        """
+        copied_args = self._deepcopy_args(memodict)
+        return Count(*copied_args)
 
 

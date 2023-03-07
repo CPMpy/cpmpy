@@ -52,7 +52,7 @@
     - ~x            x == 0
 
 
-    Apart from operator overleading, expressions implement two important functions:
+    Apart from operator overloading, expressions implement two important functions:
 
     - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
                     If it does, the expression can be used as top-level constraint
@@ -474,14 +474,15 @@ class Operator(Expression):
                 i += 1
 
         # another cleanup, translate -(v*c) to v*-c
-        if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
-            mul_args = arg_list[0].args
-            if is_num(mul_args[0]):
-                name = 'mul'
-                arg_list = (-mul_args[0], mul_args[1])
-            elif is_num(mul_args[1]):
-                name = 'mul'
-                arg_list = (mul_args[0], -mul_args[1])
+        if hasattr(arg_list[0],'name'):
+            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
+                mul_args = arg_list[0].args
+                if is_num(mul_args[0]):
+                    name = 'mul'
+                    arg_list = (-mul_args[0], mul_args[1])
+                elif is_num(mul_args[1]):
+                    name = 'mul'
+                    arg_list = (mul_args[0], -mul_args[1])
 
         super().__init__(name, arg_list)
 

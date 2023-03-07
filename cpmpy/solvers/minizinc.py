@@ -416,6 +416,20 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
+        # count: we need the lhs and rhs together
+        if isinstance(expr, Comparison) and expr.args[0].name == 'count':
+            name = expr.name
+            lhs, rhs = expr.args
+            c = self._convert_expression(rhs)  # count
+            x = [self._convert_expression(countable) for countable in lhs.args[0]]  # array
+            y = self._convert_expression(lhs.args[1])  # value to count in array
+            functionmap = {'==': 'count_eq', '!=': 'count_neq',
+                        '<=': 'count_geq', '>=': 'count_leq',
+                        '>': 'count_lt', '<': 'count_gt'}
+            if name in functionmap:
+                name = functionmap[name]
+            return "{}({},{},{})".format(name, x, y, c)
+
         args_str = [self._convert_expression(e) for e in expr.args]
 
         # standard expressions: comparison, operator, element
@@ -493,6 +507,19 @@ class CPM_minizinc(SolverInterface):
             start, dur, end, _, _ = expr.args
             self += [s + d == e for s,d,e in zip(start,dur,end)]
             return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
+
+        elif expr.name == 'ite':
+            cond, tr, fal = expr.args
+            return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
+                                                        self._convert_expression(fal))
+
+        elif expr.name == "gcc":
+            a, gcc = expr.args
+            cover = [x for x in range(len(gcc))]
+            a = self._convert_expression(a)
+            gcc = self._convert_expression(gcc)
+            cover = self._convert_expression(cover)
+            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
