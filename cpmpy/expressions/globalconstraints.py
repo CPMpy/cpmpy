@@ -375,8 +375,8 @@ class Minimum(GlobalConstraint):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        lbs, ubs = zip(*[get_bounds(x) for x in self.args])
-        return min(lbs), min(ubs)
+        bnds = [get_bounds(x) for x in self.args]
+        return min(lb for lb,ub in bnds), min(ub for lb,ub in bnds)
 
 
 class Maximum(GlobalConstraint):
@@ -416,8 +416,8 @@ class Maximum(GlobalConstraint):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        lbs, ubs = zip(*[get_bounds(x) for x in self.args])
-        return max(lbs), max(ubs)
+        bnds = [get_bounds(x) for x in self.args]
+        return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 
 def element(arg_list):
@@ -478,8 +478,8 @@ class Element(GlobalConstraint):
         Returns the bounds of the (numerical) global constraint
         """
         arr, idx = self.args
-        lbs, ubs = zip(*[get_bounds(x) for x in arr])
-        return min(lbs), max(ubs)
+        bnds = [get_bounds(x) for x in arr]
+        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 class Xor(GlobalConstraint):
     """
