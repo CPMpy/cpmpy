@@ -174,6 +174,12 @@ class Expression(object):
         copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args)
 
+    # keep for backwards compatibility
+
+    def deepcopy(self, memodict={}):
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
+
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
     # for double implication, use equivalence self == other
@@ -397,10 +403,10 @@ class Comparison(Expression):
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Comparison
-            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
+            :param: memodict: dictionary containing already copied objects
         """
         copied_args = self._deepcopy_args(memodict)
         return Comparison(self.name, *copied_args)

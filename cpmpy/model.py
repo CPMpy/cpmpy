@@ -27,6 +27,7 @@
 
         Model
 """
+import copy
 import warnings
 
 import numpy as np
@@ -271,3 +272,7 @@ class Model(object):
             copied_model.objective(copied_obj, self.objective_is_min)
 
         return copied_model
+
+    def deepcopy(self, memodict={}):
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
