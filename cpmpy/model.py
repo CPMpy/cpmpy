@@ -257,12 +257,12 @@ class Model(object):
             return Model(self.constraints, maximize=self.objective_)
 
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Deep copies a the model to a new instance.
             :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
         """
-        copied_cons = [cpm_cons.deepcopy(memodict) for cpm_cons in self.constraints]
+        copied_cons = copy.deepcopy(self.constraints, memodict)
         if self.objective_ is not None:
             copied_obj = self.objective_.deepcopy(memodict)
 

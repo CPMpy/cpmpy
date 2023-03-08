@@ -250,7 +250,7 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         return hash(self.name)
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         copied = type(self)(self.lb, self.ub, self.name)
         copied._value = self.value()
         return copied
@@ -367,7 +367,7 @@ class NegBoolView(_BoolVarImpl):
     def __invert__(self):
         return self._bv
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         return NegBoolView(self._bv.deepcopy(memodict))
 
 
@@ -397,7 +397,7 @@ class NDVarArray(Expression, np.ndarray):
         for e in self.flat:
             e.clear()
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         copied = [arg.deepcopy(memodict) if isinstance(arg, Expression) else arg for arg in self]
         return cpm_array(copied)
     

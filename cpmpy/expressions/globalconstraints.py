@@ -144,7 +144,7 @@ class GlobalConstraint(Expression):
         """
         raise NotImplementedError("Decomposition for",self,"not available")
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args, self._is_bool)
 
@@ -166,7 +166,7 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)]
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Alldifferent global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -191,7 +191,7 @@ class AllDifferentExcept0(GlobalConstraint):
         vals = [a.value() for a in self.args if a.value() != 0]
         return len(set(vals)) == len(vals)
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the AllDifferentExceptO global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -214,7 +214,7 @@ class AllEqual(GlobalConstraint):
         """
         return [var1 == var2 for var1, var2 in all_pairs(self.args)]
 
-    def deepcopy(self, memdict={}):
+    def __deepcopy__(self, memdict={}):
         """
             Return a deep copy of the AllEqual global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -261,7 +261,7 @@ class Circuit(GlobalConstraint):
         ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 
-    def deepcopy(self, memdict={}):
+    def __deepcopy__(self, memdict={}):
         """
             Return a deep copy of the Circuit global constraint
            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -298,7 +298,7 @@ class Table(GlobalConstraint):
         return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
 
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Table global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -354,7 +354,7 @@ class Minimum(GlobalConstraint):
         else:
             return min(argvals)
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Minimum global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -388,7 +388,7 @@ class Maximum(GlobalConstraint):
         else:
             return max(argvals)
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Maximum global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -452,7 +452,7 @@ class Element(GlobalConstraint):
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the Element global constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -493,7 +493,7 @@ class Xor(GlobalConstraint):
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
            Return a deep copy of the xor global constraint
            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -574,7 +574,7 @@ class Cumulative(GlobalConstraint):
 
         return True
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
            Return a deep copy of the cumulative global constraint
            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -602,7 +602,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         from .python_builtins import all
         return all(self.decompose()).value()
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
@@ -631,7 +631,7 @@ class Count(GlobalConstraint):
         val = argval(val)
         return sum([argval(a) == val for a in arr])
 
-    def deepcopy(self, memodict={}):
+    def __deepcopy__(self, memodict={}):
         """
             Return a deep copy of the constraint
             :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()

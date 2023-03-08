@@ -73,6 +73,7 @@
         Comparison
         Operator
 """
+import copy
 import warnings
 from types import GeneratorType
 from collections.abc import Iterable
@@ -139,7 +140,7 @@ class Expression(object):
         """
             Create and return a deep copy of the arguments of the expression
             Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+            :param: memodict: dictionary with already copied objects
         """
         return self._deepcopy_arg_list(self.args)
 
@@ -147,7 +148,7 @@ class Expression(object):
         """
             Create and return a deep copy of the arguments in `arglist`.
             Recursively deep copy nested lists.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+            :param: memodict: dictionary with already copied objects, 
         """
         copied = []
         for arg in arglist:
@@ -157,7 +158,7 @@ class Expression(object):
 
             if arg not in memodict:
                 if isinstance(arg, Expression):
-                    memodict[arg] = arg.deepcopy(memodict)
+                    memodict[arg] = copy.deepcopy(arg, memodict)
                 elif is_num(arg) or isinstance(arg, bool):
                     memodict[arg] = arg
                 else:
@@ -165,10 +166,10 @@ class Expression(object):
             copied += [memodict[arg]]
         return copied
 
-    def deepcopy(self, memodict = {}):
+    def __deepcopy__(self, memodict = {}):
         """
             Return a deep copy of the Expression
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+            :param: memodict: dictionary with already copied objects, 
         """
         copied_args = self._deepcopy_args(memodict)
         return type(self)(self.name, copied_args)
