@@ -258,21 +258,8 @@ class Model(object):
             return Model(self.constraints, maximize=self.objective_)
 
 
-    def __deepcopy__(self, memodict={}):
-        """
-            Deep copies a the model to a new instance.
-            :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
-        """
-        copied_cons = copy.deepcopy(self.constraints, memodict)
-        if self.objective_ is not None:
-            copied_obj = self.objective_.deepcopy(memodict)
 
-        copied_model = Model(copied_cons)
-        if self.objective_ is not None:
-            copied_model.objective(copied_obj, self.objective_is_min)
-
-        return copied_model
-
+    # keep for backwards compatibility
     def deepcopy(self, memodict={}):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
         return copy.deepcopy(self, memodict)
