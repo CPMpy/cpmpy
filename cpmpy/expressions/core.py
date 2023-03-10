@@ -73,6 +73,7 @@
         Comparison
         Operator
 """
+import copy
 import warnings
 from types import GeneratorType
 from collections.abc import Iterable
@@ -135,43 +136,11 @@ class Expression(object):
     def value(self):
         return None # default
 
-    def _deepcopy_args(self, memodict={}):
-        """
-            Create and return a deep copy of the arguments of the expression
-            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        return self._deepcopy_arg_list(self.args)
 
-    def _deepcopy_arg_list(self, arglist, memodict={}):
-        """
-            Create and return a deep copy of the arguments in `arglist`.
-            Recursively deep copy nested lists.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied = []
-        for arg in arglist:
-            if is_any_list(arg):
-                copied += [self._deepcopy_arg_list(arg, memodict)]
-                continue
-
-            if arg not in memodict:
-                if isinstance(arg, Expression):
-                    memodict[arg] = arg.deepcopy(memodict)
-                elif is_num(arg) or isinstance(arg, bool):
-                    memodict[arg] = arg
-                else:
-                    raise ValueError(f"Not a supported argument to copy: {arg}")
-            copied += [memodict[arg]]
-        return copied
-
-    def deepcopy(self, memodict = {}):
-        """
-            Return a deep copy of the Expression
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return type(self)(self.name, copied_args)
+    # keep for backwards compatibility
+    def deepcopy(self, memodict={}):
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -395,15 +364,6 @@ class Comparison(Expression):
         elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Comparison
-            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return Comparison(self.name, *copied_args)
-
 
 
 class Operator(Expression):
