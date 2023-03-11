@@ -446,6 +446,10 @@ class CPM_ortools(SolverInterface):
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
                 return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == 'inverse':
+                assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
+                fwd, rev = self.solver_vars(cpm_expr.args)
+                return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             else:

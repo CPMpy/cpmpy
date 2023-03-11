@@ -416,6 +416,15 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
+        # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
+        if expr.name == "inverse":
+            def zero_based(array):
+                return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
+
+            str_fwd = zero_based(expr.args[0])
+            str_rev = zero_based(expr.args[1])
+            return "inverse({}, {})".format(str_fwd, str_rev)
+
         # count: we need the lhs and rhs together
         if isinstance(expr, Comparison) and expr.args[0].name == 'count':
             name = expr.name

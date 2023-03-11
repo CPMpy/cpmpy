@@ -96,6 +96,7 @@
         AllDifferentExcept0
         AllEqual
         Circuit
+        Inverse
         Table
         Minimum
         Maximum
@@ -245,6 +246,23 @@ class Circuit(GlobalConstraint):
             idx = arr[idx]
 
         return pathlen == len(self.args) and idx == 0
+
+class Inverse(GlobalConstraint):
+    """
+       Inverse (aka channeling / assignment) constraint. 'fwd' and
+       'rev' represent inverse functions; that is,
+
+           fwd[i] == x  <==>  rev[x] == i
+
+    """
+    def __init__(self, fwd, rev):
+        assert len(fwd) == len(rev)
+        super().__init__("inverse", [fwd, rev])
+
+    def decompose(self):
+        from .python_builtins import all
+        fwd, rev = self.args
+        return [all(rev[x] == i for i, x in enumerate(fwd))]
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
