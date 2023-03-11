@@ -453,7 +453,7 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             else:
-                # NOT (YET?) MAPPED: Automaton, ForbiddenAssignments, Inverse?,
+                # NOT (YET?) MAPPED: Automaton, ForbiddenAssignments,
                 #    ReservoirConstraint, ReservoirConstraintWithActive
             
                 # global constraint not known, try posting generic decomposition
