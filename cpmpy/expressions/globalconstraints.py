@@ -267,7 +267,7 @@ class Inverse(GlobalConstraint):
     def value(self):
         fwd = argval(self.args[0])
         rev = argval(self.args[1])
-        return len(fwd) == len(rev) and all(rev[x] == i for i, x in enumerate(fwd))
+        return all(rev[x] == i for i, x in enumerate(fwd))
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
