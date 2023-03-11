@@ -137,6 +137,9 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
+        # constraint can be used as value
+        self.assertTrue(inv.value())
+
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
