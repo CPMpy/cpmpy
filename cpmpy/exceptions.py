@@ -17,3 +17,6 @@ class MinizincNameException(CPMpyException):
 
 class NotSupportedError(CPMpyException):
     pass
+
+class IncompleteFunctionError(CPMpyException):
+    pass

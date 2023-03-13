@@ -79,7 +79,9 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist
+from .utils import is_num, is_any_list, flatlist, argval
+from ..exceptions import IncompleteFunctionError
+
 
 class Expression(object):
     """
@@ -491,9 +493,9 @@ class Operator(Expression):
     def value(self):
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
         else:
-            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+            arg_vals = [argval(arg) for arg in self.args]
 
 
         if any(a is None for a in arg_vals): return None
@@ -502,11 +504,16 @@ class Operator(Expression):
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "div": return arg_vals[0] // arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        elif self.name == "div":
+            try:
+                return arg_vals[0] // arg_vals[1]
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
