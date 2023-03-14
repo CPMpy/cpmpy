@@ -45,9 +45,39 @@ class TestTransfDecomp(unittest.TestCase):
         cons = bv.implies(min(ivs) <= 1)
         self.assertEqual(str(decompose_global(cons)),
                          "[(bv) -> ((BV2) or (BV3)), ((x) <= (IV1)) == (BV2), ((y) <= (IV1)) == (BV3), (bv) -> ((x) >= (IV1)), (bv) -> ((y) >= (IV1)), (bv) -> (IV1 <= 1)]")
+        self.assertEqual(str(decompose_global(cons, supported={"min"})),str([cons]))
+
         cons = (min(ivs) <= 1).implies(bv)
         self.assertEqual(str(decompose_global(cons)),
                          "[(and([BV6, BV7, BV8, BV9])) -> (bv), ((BV4) or (BV5)) == (BV6), ((x) <= (IV2)) == (BV4), ((y) <= (IV2)) == (BV5), ((x) >= (IV2)) == (BV7), ((y) >= (IV2)) == (BV8), (IV2 <= 1) == (BV9)]")
+        self.assertEqual(str(decompose_global(cons, supported={"min"})), str([cons]))
+
         cons = (min(ivs) <= 1) == (bv)
         self.assertEqual(str(decompose_global(cons)),
                          "[(and([BV12, BV13, BV14, BV15])) == (bv), ((BV10) or (BV11)) == (BV12), ((x) <= (IV3)) == (BV10), ((y) <= (IV3)) == (BV11), ((x) >= (IV3)) == (BV13), ((y) >= (IV3)) == (BV14), (IV3 <= 1) == (BV15)]")
+        self.assertEqual(str(decompose_global(cons, supported={"min"})), str([cons]))
+
+    def test_decompose_partial_func(self):
+
+        arr = intvar(1, 9, shape=2)
+        idx = intvar(-1,5,name="idx")
+        bv = boolvar(name ="bv")
+
+        cons = arr[idx] <= 10
+        self.assertEqual(str(decompose_global(cons)), "[(idx == 0) -> (BV0), (IV0 <= 10) == (BV0), (idx == 1) -> (BV1), (IV1 <= 10) == (BV1), idx >= 0, idx < 2]")
+        self.assertEqual(str(decompose_global(cons, supported={"element"})), str([cons]))
+
+        ivc, bvc = _IntVarImpl.counter, _BoolVarImpl.counter
+        cons =(arr[idx] <= 10) == bv
+        decomp = cons.args[0].args[0].decompose_comparison("<=",10)
+        reified_decomp = flatten_constraint(all(decomp) == bv)
+
+        _IntVarImpl.counter, _BoolVarImpl.counter = ivc, bvc
+        self.assertEqual(str(decompose_global(cons)),str(reified_decomp))
+        _IntVarImpl.counter, _BoolVarImpl.counter = ivc, bvc
+        self.assertEqual(str(decompose_global(cons, supported={"element"})), str(reified_decomp))
+        self.assertEqual(str(decompose_global(cons, supported={"element"}, supported_reif={"element"})), str([cons]))
+
+
+
+
