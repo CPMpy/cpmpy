@@ -73,12 +73,14 @@
         Comparison
         Operator
 """
+import copy
 import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, get_bounds
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds
+from ..exceptions import IncompleteFunctionError
 
 class Expression(object):
     """
@@ -135,43 +137,11 @@ class Expression(object):
     def value(self):
         return None # default
 
-    def _deepcopy_args(self, memodict={}):
-        """
-            Create and return a deep copy of the arguments of the expression
-            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        return self._deepcopy_arg_list(self.args)
 
-    def _deepcopy_arg_list(self, arglist, memodict={}):
-        """
-            Create and return a deep copy of the arguments in `arglist`.
-            Recursively deep copy nested lists.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied = []
-        for arg in arglist:
-            if is_any_list(arg):
-                copied += [self._deepcopy_arg_list(arg, memodict)]
-                continue
-
-            if arg not in memodict:
-                if isinstance(arg, Expression):
-                    memodict[arg] = arg.deepcopy(memodict)
-                elif is_num(arg) or isinstance(arg, bool):
-                    memodict[arg] = arg
-                else:
-                    raise ValueError(f"Not a supported argument to copy: {arg}")
-            copied += [memodict[arg]]
-        return copied
-
-    def deepcopy(self, memodict = {}):
-        """
-            Return a deep copy of the Expression
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return type(self)(self.name, copied_args)
+    # keep for backwards compatibility
+    def deepcopy(self, memodict={}):
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -396,15 +366,6 @@ class Comparison(Expression):
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
 
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Comparison
-            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return Comparison(self.name, *copied_args)
-
-
 
 class Operator(Expression):
     """
@@ -531,9 +492,9 @@ class Operator(Expression):
     def value(self):
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
         else:
-            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+            arg_vals = [argval(arg) for arg in self.args]
 
 
         if any(a is None for a in arg_vals): return None
@@ -542,11 +503,16 @@ class Operator(Expression):
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "div": return arg_vals[0] // arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        elif self.name == "div":
+            try:
+                return arg_vals[0] // arg_vals[1]
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
