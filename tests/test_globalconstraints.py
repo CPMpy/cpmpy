@@ -329,6 +329,8 @@ class TestBounds(unittest.TestCase):
         z = cp.intvar(1, 9)
         expr = cp.Minimum([x,y,z])
         lb,ub = expr.get_bounds()
+        self.assertEqual(lb,-8)
+        self.assertEqual(ub,-1)
         self.assertFalse(cp.Model(expr<lb).solve())
         self.assertFalse(cp.Model(expr>ub).solve())
 
@@ -339,6 +341,8 @@ class TestBounds(unittest.TestCase):
         z = cp.intvar(1, 9)
         expr = cp.Maximum([x,y,z])
         lb,ub = expr.get_bounds()
+        self.assertEqual(lb,1)
+        self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr<lb).solve())
         self.assertFalse(cp.Model(expr>ub).solve())
 
@@ -348,6 +352,8 @@ class TestBounds(unittest.TestCase):
         z = cp.intvar(1, 9)
         expr = cp.Element([x, y, z],z)
         lb, ub = expr.get_bounds()
+        self.assertEqual(lb,-8)
+        self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
 
@@ -358,5 +364,7 @@ class TestBounds(unittest.TestCase):
         a = cp.intvar(1, 9)
         expr = cp.Count([x, y, z], a)
         lb, ub = expr.get_bounds()
+        self.assertEqual(lb,0)
+        self.assertEqual(ub,3)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
