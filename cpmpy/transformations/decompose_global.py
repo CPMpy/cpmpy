@@ -6,18 +6,33 @@ from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint
 
-def decompose_global(lst_of_expr, supported={}):
+def decompose_global(lst_of_expr, supported={}, supported_reif={}):
 
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of flat constraints as input
         Returns a list of flat constraints
+
+        - supported: a set of supported global constraints or global functions
+        - supported_reified: a set of supported global constraints within a reification
     """
-    def _is_supported(cpm_expr):
-        if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint) and cpm_expr.args[0].name not in supported:
-            return False
+    def _is_supported(cpm_expr, reified):
+        if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
+            if reified and cpm_expr.name not in supported_reif:
+                return False
+            if reified and cpm_expr.name not in supported:
+                return False
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint):
+            if not cpm_expr.args[0].name in supported:
+                # reified numerical global constraints can be rewritten to non-reified versions
+                #  so only have to check for 'supported' set
+                return False
+            if reified and not cpm_expr.args[0].is_total() and cpm_expr.name not in supported_reif:
+                # edge case for partial functions as they cannot be rewritten to non-reified versions
+                #  have to decompose to total functions
+                #  ASSUMPTION: the decomposition for partial global functions is total! (for now only Element)
+                return False
+
         return True
 
     if not is_any_list(lst_of_expr):
@@ -32,18 +47,18 @@ def decompose_global(lst_of_expr, supported={}):
             cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if cpm_expr.name == "==" and not _is_supported(lhs): # can be both boolean or numerical globals
-                decomp_idx = 0
+            if cpm_expr.name == "==" and not _is_supported(lhs, reified=True):
+                decomp_idx = 0 # this means it is an unsupported reified boolean global
 
-            if not _is_supported(cpm_expr):
-                cpm_expr = do_decompose(cpm_expr) # base global constraint in comparison
+            if not _is_supported(cpm_expr, reified=False):
+                cpm_expr = do_decompose(cpm_expr) # unsupported numerical constraint in comparison
                 decomp_idx = None
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            lhs, rhs = cpm_expr.args
-            if not _is_supported(rhs):
+            lhs, rhs = cpm_expr.args # BV -> Expr or Expr -> BV
+            if not _is_supported(rhs, reified=True):
                 decomp_idx = 1 # reified (numerical) global constraint, probably most frequent case
-            elif not _is_supported(lhs):
+            elif not _is_supported(lhs, reified=True):
                 decomp_idx = 0
 
         if decomp_idx is not None:
