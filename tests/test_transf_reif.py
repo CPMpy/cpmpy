@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from cpmpy import *
+from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_bv_implies, reify_rewrite

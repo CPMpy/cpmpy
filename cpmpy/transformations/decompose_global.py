@@ -6,7 +6,7 @@ from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint
 
-def decompose_global(lst_of_expr, supported={}, supported_reif={}):
+def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
     """
         Decomposes any global constraint not supported by the solver
@@ -15,6 +15,12 @@ def decompose_global(lst_of_expr, supported={}, supported_reif={}):
 
         - supported: a set of supported global constraints or global functions
         - supported_reified: a set of supported global constraints within a reification
+
+        Unsupported global constraints are decomposed into equivalent simpler constraints.
+        Numerical global constraints are left reified even if not part of the `supported_reified` set
+            as they can be rewritten using `cpmpy.transformations.reification.reify_rewrite`...
+                ... reified partial functions are decomposed when unsupported by `supported_reified`
+
     """
     def _is_supported(cpm_expr, reified):
         if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
@@ -27,7 +33,7 @@ def decompose_global(lst_of_expr, supported={}, supported_reif={}):
                 # reified numerical global constraints can be rewritten to non-reified versions
                 #  so only have to check for 'supported' set
                 return False
-            if reified and not cpm_expr.args[0].is_total() and cpm_expr.name not in supported_reif:
+            if reified and not cpm_expr.args[0].is_total() and cpm_expr.args[0].name not in supported_reif:
                 # edge case for partial functions as they cannot be rewritten to non-reified versions
                 #  have to decompose to total functions
                 #  ASSUMPTION: the decomposition for partial global functions is total! (for now only Element)
@@ -35,6 +41,7 @@ def decompose_global(lst_of_expr, supported={}, supported_reif={}):
 
         return True
 
+    assert supported_reif <= supported, "`supported` set is assumed to be a subset of the `supported_reified` set"
     if not is_any_list(lst_of_expr):
         lst_of_expr= [lst_of_expr]
 
@@ -47,7 +54,7 @@ def decompose_global(lst_of_expr, supported={}, supported_reif={}):
             cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if cpm_expr.name == "==" and not _is_supported(lhs, reified=True):
+            if cpm_expr.name == "==" and not _is_supported(lhs, reified=True): # rhs will always be const/var
                 decomp_idx = 0 # this means it is an unsupported reified boolean global
 
             if not _is_supported(cpm_expr, reified=False):
@@ -55,19 +62,19 @@ def decompose_global(lst_of_expr, supported={}, supported_reif={}):
                 decomp_idx = None
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            lhs, rhs = cpm_expr.args # BV -> Expr or Expr -> BV
+            lhs, rhs = cpm_expr.args # BV -> Expr or Expr -> BV as flat normal form is required
             if not _is_supported(rhs, reified=True):
                 decomp_idx = 1 # reified (numerical) global constraint, probably most frequent case
             elif not _is_supported(lhs, reified=True):
                 decomp_idx = 0
 
         if decomp_idx is not None:
-            cpm_expr = copy.copy(cpm_expr)
+            cpm_expr = copy.deepcopy(cpm_expr) # need deepcopy as we are changing args of list inplace
             cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
             cpm_expr = [cpm_expr]
 
         if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
-            flat = flatten_constraint(cpm_expr)
+            flat = flatten_constraint(cpm_expr) # most of the time will already be flat... do check here?
             newlist.extend(decompose_global(flat, supported=supported))
         else:
             # default
@@ -86,7 +93,7 @@ def do_decompose(cpm_expr):
     if isinstance(cpm_expr, Comparison):
         lhs, rhs = cpm_expr.args
         if lhs.is_bool():
-            return [Comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
+            return [eval_comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
         else:
             return lhs.decompose_comparison(cpm_expr.name, rhs)
 
