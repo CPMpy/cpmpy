@@ -111,7 +111,7 @@ import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array
+from .variables import boolvar, intvar, cpm_array, _NumVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr
 from ..transformations.flatten_model import get_or_make_var
 
@@ -144,6 +144,13 @@ class GlobalConstraint(Expression):
             it does not create a circular dependency.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
+
+    def is_total(self):
+        """
+            Returns whether the global constraint is a total function.
+            If true, its value is defined for all arguments
+        """
+        return True
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
@@ -409,6 +416,14 @@ class Element(GlobalConstraint):
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)]
+
+    def is_total(self):
+        arr, idx = self.args
+        if isinstance(idx, _NumVarImpl):
+            return idx.lb >= 0 & idx.ub < len(arr)
+        else:
+            raise NotImplementedError("Bound calculation for {idx} not supported yet, fix in pull request #224")
+
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
