@@ -540,8 +540,7 @@ class Operator(Expression):
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
-            bounds = [lb1 - lb2, lb1 - ub2, ub1 - lb2, ub1 - ub2]
-            return min(bounds), max(bounds)
+            return lb1-ub2, ub1-lb2
         elif self.name == 'div':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
@@ -554,38 +553,31 @@ class Operator(Expression):
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("% by domain containing 0 is not supported")
-            if ub1 <= 0 and ub2 < 0:
-                return lb1, 0
-            elif ub1 <= 0 and lb2 > 0:
-                return 0, ub2
-            elif lb1 >=0 and lb2 > 0:
-                return 0, ub1
             elif ub2 < 0:
-                #lb1 < 0 and ub1 > 0
-                return lb2, 0
+                return lb2 + 1, 0
             elif lb2 > 0:
-                return 0, ub2
+                return 0, ub2 - 1
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 < 0:
                 raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
             bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
-            if ub2 > 0:  # even/uneven behave differently when base is negative
-                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)]
+            if lb1 < 0 and 0 < ub2:  # even/uneven behave differently when base is negative
+                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
+                # this is safe but not tight (e.g., [-2,-1]^2 will get [-2,4] as range instead of [1,4])
             return min(bounds), max(bounds)
 
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
             return -ub1, -lb1
         elif self.name == 'abs':
-            lb1, ub1 = get_bounds(self.args[0])
-            if lb1 < 0 and ub1 > 0:
-                lb = 0  # from neg to pos, so includes 0
-            else:
-                lb = min(abs(lb1), abs(ub1))  # same sign, take smallest
-            ub = max(abs(lb1), abs(ub1))  # largest abs value
-            return lb, ub
+            lb, ub = get_bounds(self.args[0])
+            if lb >= 0: 
+                return lb,ub
+            if ub <= 0: 
+                return -ub,-lb
+            return 0, max(-lb,ub)
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
