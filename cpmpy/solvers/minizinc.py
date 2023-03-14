@@ -416,6 +416,29 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
+        # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
+        if expr.name == "inverse":
+            def zero_based(array):
+                return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
+
+            str_fwd = zero_based(expr.args[0])
+            str_rev = zero_based(expr.args[1])
+            return "inverse({}, {})".format(str_fwd, str_rev)
+
+        # count: we need the lhs and rhs together
+        if isinstance(expr, Comparison) and expr.args[0].name == 'count':
+            name = expr.name
+            lhs, rhs = expr.args
+            c = self._convert_expression(rhs)  # count
+            x = [self._convert_expression(countable) for countable in lhs.args[0]]  # array
+            y = self._convert_expression(lhs.args[1])  # value to count in array
+            functionmap = {'==': 'count_eq', '!=': 'count_neq',
+                        '<=': 'count_geq', '>=': 'count_leq',
+                        '>': 'count_lt', '<': 'count_gt'}
+            if name in functionmap:
+                name = functionmap[name]
+            return "{}({},{},{})".format(name, x, y, c)
+
         args_str = [self._convert_expression(e) for e in expr.args]
 
         # standard expressions: comparison, operator, element
@@ -499,6 +522,13 @@ class CPM_minizinc(SolverInterface):
             return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
                                                         self._convert_expression(fal))
 
+        elif expr.name == "gcc":
+            a, gcc = expr.args
+            cover = [x for x in range(len(gcc))]
+            a = self._convert_expression(a)
+            gcc = self._convert_expression(gcc)
+            cover = self._convert_expression(cover)
+            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
