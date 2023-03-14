@@ -360,14 +360,6 @@ class CPM_gurobi(SolverInterface):
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
-        # Global constraints
-        elif hasattr(cpm_expr, 'decompose'):
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-            return
-
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
