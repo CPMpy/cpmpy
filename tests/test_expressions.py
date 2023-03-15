@@ -195,6 +195,121 @@ class TestMul(unittest.TestCase):
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
 
+def inclusive_range(lb,ub):
+        return range(lb,ub+1)
+
+class TestBounds(unittest.TestCase):
+    def test_bounds_mul_sub_sum(self):
+        x = intvar(-8,8)
+        y = intvar(-4,6)
+        for name, test_lb, test_ub in [('mul',-48,48),('sub',-14,12),('sum',-12,14)]:
+            op = Operator(name,[x,y])
+            lb, ub = op.get_bounds()
+            self.assertEqual(test_lb,lb)
+            self.assertEqual(test_ub,ub)
+            for lhs in inclusive_range(*x.get_bounds()):
+                for rhs in inclusive_range(*y.get_bounds()):
+                    val = Operator(name,[lhs,rhs]).value()
+                    self.assertGreaterEqual(val,lb)
+                    self.assertLessEqual(val,ub)
+
+    def test_bounds_wsum(self):
+        x = intvar(-8, 8,3)
+        weights = [2,4,-3]
+        op = Operator('wsum',[weights,x])
+        lb, ub = op.get_bounds()
+        self.assertEqual(lb,-72)
+        self.assertEqual(ub,72)
+        for x1 in inclusive_range(*x[0].get_bounds()):
+            for x2 in inclusive_range(*x[1].get_bounds()):
+                for x3 in inclusive_range(*x[2].get_bounds()):
+                    val = Operator('wsum',[weights,[x1,x2,x3]]).value()
+                    self.assertGreaterEqual(val,lb)
+                    self.assertLessEqual(val,ub)
+
+    def test_bounds_div(self):
+        x = intvar(-8, 8)
+        y = intvar(-7,-1)
+        z = intvar(3,9)
+        op1 = Operator('div',[x,y])
+        lb1,ub1 = op1.get_bounds()
+        self.assertEqual(lb1,-8)
+        self.assertEqual(ub1,8)
+        op2 = Operator('div',[x,z])
+        lb2,ub2 = op2.get_bounds()
+        self.assertEqual(lb2,-3)
+        self.assertEqual(ub2,2)
+        for lhs in inclusive_range(*x.get_bounds()):
+            for rhs in inclusive_range(*y.get_bounds()):
+                val = Operator('div',[lhs,rhs]).value()
+                self.assertGreaterEqual(val,lb1)
+                self.assertLessEqual(val,ub1)
+            for rhs in inclusive_range(*z.get_bounds()):
+                val = Operator('div', [lhs, rhs]).value()
+                self.assertGreaterEqual(val,lb2)
+                self.assertLessEqual(val,ub2)
+
+    def test_bounds_mod(self):
+        x = intvar(-8, 8)
+        y = intvar(-5, -1)
+        z = intvar(1, 4)
+        op1 = Operator('mod',[x,y])
+        lb1, ub1 = op1.get_bounds()
+        self.assertEqual(lb1,-4)
+        self.assertEqual(ub1,0)
+        op2 = Operator('mod',[x,z])
+        lb2, ub2 = op2.get_bounds()
+        self.assertEqual(lb2,0)
+        self.assertEqual(ub2,3)
+        for lhs in inclusive_range(*x.get_bounds()):
+            for rhs in inclusive_range(*y.get_bounds()):
+                val = Operator('mod',[lhs,rhs]).value()
+                self.assertGreaterEqual(val,lb1)
+                self.assertLessEqual(val,ub1)
+            for rhs in inclusive_range(*z.get_bounds()):
+                val = Operator('mod', [lhs, rhs]).value()
+                self.assertGreaterEqual(val,lb2)
+                self.assertLessEqual(val,ub2)
+
+    def test_bounds_pow(self):
+        x = intvar(-8, 5)
+        z = intvar(1, 9)
+        # only nonnegative exponents allowed
+        op = Operator('pow',[x,z])
+        lb, ub = op.get_bounds()
+        self.assertEqual(lb,-134217728)
+        self.assertEqual(ub,16777216)
+        for lhs in inclusive_range(*x.get_bounds()):
+            for rhs in inclusive_range(*z.get_bounds()):
+                val = Operator('pow',[lhs,rhs]).value()
+                self.assertGreaterEqual(val,lb)
+                self.assertLessEqual(val,ub)
+
+    def test_bounds_unary(self):
+        x = intvar(-8, 5)
+        y = intvar(-7, -2)
+        z = intvar(1, 9)
+        for var,test_lb,test_ub in [(x,-5,8),(y,2,7),(z,-9,-1)]:
+            name = '-'
+            op = Operator(name,[var])
+            lb, ub = op.get_bounds()
+            self.assertEqual(test_lb,lb)
+            self.assertEqual(test_ub,ub)
+            for lhs in inclusive_range(*var.get_bounds()):
+                val = Operator(name, [lhs]).value()
+                self.assertGreaterEqual(val,lb)
+                self.assertLessEqual(val,ub)
+        for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
+            name = 'abs'
+            op = Operator(name,[var])
+            lb, ub = op.get_bounds()
+            self.assertEqual(test_lb,lb)
+            self.assertEqual(test_ub,ub)
+            for lhs in inclusive_range(*var.get_bounds()):
+                val = Operator(name, [lhs]).value()
+                self.assertGreaterEqual(val,lb)
+                self.assertLessEqual(val,ub)
+
     def test_incomplete_func(self):
         # element constraint
         arr = cpm_array([1,2,3])
@@ -220,7 +335,6 @@ class TestMul(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3"))
             self.assertTrue(cons.value())
-
 
 
 

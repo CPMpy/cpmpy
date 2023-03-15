@@ -112,7 +112,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -144,6 +144,13 @@ class GlobalConstraint(Expression):
             it does not create a circular dependency.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
+
+    def get_bounds(self):
+        """
+        Returns the bounds of a Boolean global constraint.
+        Numerical global constraints should reimplement this.
+        """
+        return (0,1)
 
     def is_total(self):
         """
@@ -340,10 +347,17 @@ class Minimum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
+        lb, ub = self.get_bounds()
+        _min = intvar(lb, ub)
+        return [any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)]
 
-        arr = argval(self.args)
-        _min = intvar(-2147483648, 2147483647)
-        return [any(x <= _min for x in arr), all(x >= _min for x in arr), eval_comparison(cpm_op, _min, cpm_rhs)]
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        bnds = [get_bounds(x) for x in self.args]
+        return min(lb for lb,ub in bnds), min(ub for lb,ub in bnds)
+
 
 class Maximum(GlobalConstraint):
     """
@@ -366,10 +380,16 @@ class Maximum(GlobalConstraint):
         Decomposition if it's part of a comparison
         """
         from .python_builtins import any, all
+        lb, ub = self.get_bounds()
+        _max = intvar(lb, ub)
+        return [any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)]
 
-        arr = argval(self.args)
-        _max = intvar(-2147483648, 2147483647)
-        return [any(x >= _max for x in arr), all(x <= _max for x in arr), eval_comparison(cpm_op, _max, cpm_rhs)]
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        bnds = [get_bounds(x) for x in self.args]
+        return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 
 def element(arg_list):
@@ -419,14 +439,20 @@ class Element(GlobalConstraint):
 
     def is_total(self):
         arr, idx = self.args
-        if isinstance(idx, _NumVarImpl):
-            return idx.lb >= 0 & idx.ub < len(arr)
-        else:
-            raise NotImplementedError("Bound calculation for {idx} not supported yet, fix in pull request #224")
-
+        lb, ub = get_bounds(idx)
+        return lb >= 0 & idx.ub < len(arr)
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        arr, idx = self.args
+        bnds = [get_bounds(x) for x in arr]
+        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+
 
 class Xor(GlobalConstraint):
     """
@@ -542,12 +568,12 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
 
     def __init__(self, a, gcc):
+        ub = max([get_bounds(v)[1] for v in a])
+        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         super().__init__("gcc", [a,gcc])
 
     def decompose(self):
         a, gcc = self.args
-        ub = max([v.ub for v in a])
-        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         return [Count(a, i) == v for i, v in enumerate(gcc)]
 
     def value(self):
@@ -574,3 +600,10 @@ class Count(GlobalConstraint):
         arr, val = self.args
         val = argval(val)
         return sum([argval(a) == val for a in arr])
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        arr, val = self.args
+        return 0, len(arr)

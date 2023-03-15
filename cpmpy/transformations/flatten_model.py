@@ -333,82 +333,9 @@ def get_or_make_var(expr):
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
-        if isinstance(flatexpr, Operator) and flatexpr.name == "wsum":
-            # more complex args, and weights can be negative, so more complex lbs/ubs
-            weights, flatvars  = flatexpr.args
-            bounds = np.array([[w * fvar if is_num(fvar) else w * fvar.lb for w, fvar in zip(weights, flatvars)],
-                               [w * fvar if is_num(fvar) else w * fvar.ub for w, fvar in zip(weights, flatvars)]])
-            lb, ub = bounds.min(axis=0).sum(), bounds.max(axis=0).sum() # for every column is axis=0...
-            ivar = _IntVarImpl(lb, ub)
-            return (ivar, [flatexpr == ivar]+flatcons)
-
-        elif isinstance(flatexpr, Operator):
-            lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatexpr.args]
-            ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatexpr.args]
-
-            if flatexpr.name == 'abs': # unary
-                if lbs[0] < 0 and ubs[0] > 0:
-                    lb = 0 # from neg to pos, so includes 0
-                else:
-                    lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
-                ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
-                ivar = _IntVarImpl(lb, ub)
-            elif flatexpr.name == "sub": # binary
-                lb = lbs[0] - ubs[1]
-                ub = ubs[0] - lbs[1]
-                ivar = _IntVarImpl(lb,ub)
-            elif flatexpr.name == 'mul': # binary
-                v0 = [lbs[0], ubs[0]]
-                v1 = [lbs[1], ubs[1]]
-                bnds = [v0[i]*v1[j] for i in [0,1] for j in [0,1]]
-                ivar = _IntVarImpl(min(bnds),max(bnds))
-            elif flatexpr.name == 'div': # binary
-                num = [lbs[0], ubs[0]]
-                denom = [lbs[1], ubs[1]]
-                bnds = [num[i]/denom[j] for i in [0,1] for j in [0,1]]
-                # the above can give fractional values, tighten bounds to integer
-                ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds)))
-            elif flatexpr.name == 'mod': # binary
-
-                if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
-                    # special check: if the bounds are too loose we can not check all possibilities below
-                    ivar = _IntVarImpl(-2147483648, 2147483647)
-                else:
-                    l = np.arange(lbs[0], ubs[0]+1)
-                    r = np.arange(lbs[1], ubs[1]+1)
-                    # check all possibilities
-                    remainders = np.mod(l[:,None],r)
-                    lb, ub = np.min(remainders), np.max(remainders)
-                    ivar = _IntVarImpl(lb,ub)
-
-            elif flatexpr.name == 'pow': # binary
-                base = [lbs[0], ubs[0]]
-                exp = [lbs[1], ubs[1]]
-                if exp[0] < 0:
-                    raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
-                bnds = [base[i]**exp[j] for i in [0,1] for j in [0,1]]
-                if exp[1] > 0: # even/uneven behave differently when base is negative
-                    bnds += [base[0]**(exp[1]-1), base[1]**(exp[1]-1)]
-                ivar = _IntVarImpl(min(bnds), max(bnds))
-            elif flatexpr.name == 'sum': # n-ary
-                ivar = _IntVarImpl(sum(lbs), sum(ubs))
-            elif flatexpr.is_bool(): # Boolean
-                ivar = _BoolVarImpl() # TODO: we can support Bool? check, update docs
-            else:
-                raise Exception("Operator '{}' not known in get_or_make_var".format(expr.name)) # or bug
-
-            return (ivar, [flatexpr == ivar]+flatcons)
-
-        else:
-            """
-            - Global constraint (non-Boolean) (examples: Max,Min,Element)
-            """
-            # we don't currently have a generic way to get bounds from non-Boolean globals...
-            # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
-            ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
-
-            return (ivar, [flatexpr == ivar]+flatcons)
-
+        lb, ub = flatexpr.get_bounds()
+        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
+        return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
     """ Like get_or_make_var() but also accepts and recursively transforms lists

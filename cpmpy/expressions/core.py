@@ -79,9 +79,8 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, argval
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds
 from ..exceptions import IncompleteFunctionError
-
 
 class Expression(object):
     """
@@ -521,6 +520,75 @@ class Operator(Expression):
 
         return None # default
 
+    def get_bounds(self):
+        """
+        Returns an estimate of lower and upper bound of the expression.
+        These bounds are safe: all possible values for the expression agree with the bounds.
+        These bounds are not tight: it may be possible that the bound itself is not a possible value for the expression.
+        """
+        if self.is_bool():
+            return 0, 1 #boolean
+        elif self.name == 'mul':
+            lb1,ub1 = get_bounds(self.args[0])
+            lb2,ub2 = get_bounds(self.args[1])
+            bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+            return min(bounds), max(bounds)
+        elif self.name == 'sum':
+            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            return sum(lbs), sum(ubs)
+        elif self.name == 'wsum':
+            weights, vars = self.args
+            var_bounds = np.array([get_bounds(arg) for arg in vars]).T
+            bounds = var_bounds * weights
+            return bounds.min(axis=0).sum(), bounds.max(axis=0).sum()  # for every column is axis=0...
+
+        elif self.name == 'sub':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            return lb1-ub2, ub1-lb2
+        elif self.name == 'div':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("division by domain containing 0 is not supported")
+            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+            return min(bounds), max(bounds)
+        elif self.name == 'mod':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("% by domain containing 0 is not supported")
+            elif ub2 < 0:
+                return lb2 + 1, 0
+            elif lb2 > 0:
+                return 0, ub2 - 1
+        elif self.name == 'pow':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 < 0:
+                raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
+            bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
+            if lb1 < 0 and 0 < ub2:  
+                # The lower and upper bounds depend on either the largest or the second largest exponent 
+                # value when the base term can be negative. 
+                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
+                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
+                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
+            return min(bounds), max(bounds)
+
+        elif self.name == '-':
+            lb1, ub1 = get_bounds(self.args[0])
+            return -ub1, -lb1
+        elif self.name == 'abs':
+            lb, ub = get_bounds(self.args[0])
+            if lb >= 0: 
+                return lb,ub
+            if ub <= 0: 
+                return -ub,-lb
+            return 0, max(-lb,ub)
+        
+        assert (False, "Invalid code path: bound requested for unknown expression. Please report this bug.")
+        
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 

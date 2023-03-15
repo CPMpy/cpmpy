@@ -347,13 +347,6 @@ class CPM_z3(SolverInterface):
                 arg = rhs.args[0]
                 return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
 
-            elif lhs_is_expr and lhs.name == "element":
-                arr, idx = lhs.args
-                return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, arr[i], rhs)) for i in range(len(arr))]))
-            elif rhs_is_expr and rhs.name == "element":
-                arr, idx = rhs.args
-                return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
-
             elif hasattr(lhs, 'decompose_comparison'):
                 return z3.And(self._z3_expr(lhs.decompose_comparison(cpm_con.name, rhs)))
             elif hasattr(rhs, 'decompose_comparison'):
