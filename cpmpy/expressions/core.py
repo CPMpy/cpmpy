@@ -521,6 +521,11 @@ class Operator(Expression):
         return None # default
 
     def get_bounds(self):
+        """
+        Returns an estimate of lower and upper bound of the expression.
+        These bounds are safe: all possible values for the expression agree with the bounds.
+        These bounds are not tight: it may be possible that the bound itself is not a possible value for the expression.
+        """
         if self.is_bool():
             return 0, 1 #boolean
         elif self.name == 'mul':
@@ -563,9 +568,12 @@ class Operator(Expression):
             if lb2 < 0:
                 raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
             bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
-            if lb1 < 0 and 0 < ub2:  # even/uneven behave differently when base is negative
+            if lb1 < 0 and 0 < ub2:  
+                # The lower and upper bounds depend on either the largest or the second largest exponent 
+                # value when the base term can be negative. 
+                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
                 bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
-                # this is safe but not tight (e.g., [-2,-1]^2 will get [-2,4] as range instead of [1,4])
+                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
             return min(bounds), max(bounds)
 
         elif self.name == '-':
@@ -578,6 +586,9 @@ class Operator(Expression):
             if ub <= 0: 
                 return -ub,-lb
             return 0, max(-lb,ub)
+        
+        assert (False, "Invalid code path: bound requested for unknown expression. Please report this bug.")
+        
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 

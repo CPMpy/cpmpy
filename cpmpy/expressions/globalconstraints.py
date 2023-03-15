@@ -144,6 +144,13 @@ class GlobalConstraint(Expression):
             it does not create a circular dependency.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
+    
+    def get_bounds(self):
+        """
+        Returns the bounds of a Boolean global constraint.
+        Numerical global constraints should reimplement this.
+        """
+        return (0,1)
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
@@ -582,5 +589,8 @@ class Count(GlobalConstraint):
         return sum([argval(a) == val for a in arr])
 
     def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
         arr, val = self.args
         return 0, len(arr)

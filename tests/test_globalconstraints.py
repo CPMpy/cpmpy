@@ -368,3 +368,8 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub,3)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
+
+    def test_bounds_xor(self):
+        # just one case of a Boolean global constraint
+        expr = cp.Xor(cp.boolvar(3))
+        self.assertEquals(expr.get_bounds(),(0,1))
