@@ -116,3 +116,13 @@ def eval_comparison(str_op, lhs, rhs):
         raise Exception("Not a known comparison:", str_op)
 
 
+def get_bounds(expr):
+    # can return floats, use floor and ceil when creating an intvar!
+    from cpmpy.expressions.core import Expression
+    if isinstance(expr,Expression):
+        return expr.get_bounds()
+    else:
+        assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
+        if is_bool(expr):
+            return 0, 1
+        return expr, expr
