@@ -42,7 +42,7 @@ import numpy as np
 
 from .flatten_model import flatten_constraint, get_or_make_var
 
-from ..expressions.core import Comparison, Operator, _wsum_should, _wsum_make
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
@@ -273,7 +273,7 @@ def only_positive_bv(cpm_expr):
             subexpr = only_positive_bv(subexpr)
             return[cond.implies(expr) for expr in subexpr]
 
-    if isinstance(cpm_expr, GlobalConstraint):
+    if isinstance(cpm_expr, (GlobalConstraint, BoolVal)):
         return [cpm_expr]
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
