@@ -18,20 +18,36 @@ class TestTransfDecomp(unittest.TestCase):
 
         cons = AllDifferent(ivs)
         self.assertEqual(str(decompose_global(cons)), "[(x) != (y), (x) != (z), (y) != (z)]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"})), str([cons]))
+
         # reified
         cons = bv.implies(AllDifferent(ivs))
         self.assertEqual(str(decompose_global(cons)),
                          "[(bv) -> ((x) != (y)), (bv) -> ((x) != (z)), (bv) -> ((y) != (z))]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"})),
+                         "[(bv) -> ((x) != (y)), (bv) -> ((x) != (z)), (bv) -> ((y) != (z))]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"}, supported_reif={"alldifferent"})),str([cons]))
+
         cons = AllDifferent(ivs).implies(bv)
         self.assertEqual(str(decompose_global(cons)),
                          "[(and([BV0, BV1, BV2])) -> (bv), ((x) != (y)) == (BV0), ((x) != (z)) == (BV1), ((y) != (z)) == (BV2)]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"})),
+                         "[(and([BV3, BV4, BV5])) -> (bv), ((x) != (y)) == (BV3), ((x) != (z)) == (BV4), ((y) != (z)) == (BV5)]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"}, supported_reif={"alldifferent"})),
+                         str([cons]))
+
         cons = AllDifferent(ivs) == (bv)
         self.assertEqual(str(decompose_global(cons)),
-                         "[(and([BV3, BV4, BV5])) == (bv), ((x) != (y)) == (BV3), ((x) != (z)) == (BV4), ((y) != (z)) == (BV5)]")
+                         "[(and([BV6, BV7, BV8])) == (bv), ((x) != (y)) == (BV6), ((x) != (z)) == (BV7), ((y) != (z)) == (BV8)]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"})),
+                         "[(and([BV9, BV10, BV11])) == (bv), ((x) != (y)) == (BV9), ((x) != (z)) == (BV10), ((y) != (z)) == (BV11)]")
+        self.assertEqual(str(decompose_global(cons, supported={"alldifferent"}, supported_reif={"alldifferent"})),
+                         str([cons]))
+
         # tricky one
         cons = AllDifferent(ivs) < (bv)
         self.assertEqual(str(decompose_global(cons)),
-                         "[(BV9) < (bv), (and([BV6, BV7, BV8])) == (BV9), ((x) != (y)) == (BV6), ((x) != (z)) == (BV7), ((y) != (z)) == (BV8)]")
+                         "[(BV15) < (bv), (and([BV12, BV13, BV14])) == (BV15), ((x) != (y)) == (BV12), ((x) != (z)) == (BV13), ((y) != (z)) == (BV14)]")
 
     def test_decompose_num(self):
 

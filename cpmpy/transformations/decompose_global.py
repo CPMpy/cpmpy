@@ -26,7 +26,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
         if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
             if reified and cpm_expr.name not in supported_reif:
                 return False
-            if reified and cpm_expr.name not in supported:
+            if not reified and cpm_expr.name not in supported:
                 return False
         if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint):
             if not cpm_expr.args[0].name in supported:
@@ -50,7 +50,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
         assert isinstance(cpm_expr, Expression), f"Expected CPMpy expression but got {cpm_expr}, run 'cpmpy.transformations.normalize.toplevel_list' first"
         decomp_idx = None
 
-        if hasattr(cpm_expr, "decompose") and cpm_expr.is_bool() and cpm_expr.name not in supported:
+        if hasattr(cpm_expr, "decompose") and not _is_supported(cpm_expr, reified=False):
             cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
