@@ -137,6 +137,9 @@ class Expression(object):
     def value(self):
         return None # default
 
+    def get_bounds(self):
+        return 0,1 #default for boolean expressions
+
 
     # keep for backwards compatibility
     def deepcopy(self, memodict={}):
