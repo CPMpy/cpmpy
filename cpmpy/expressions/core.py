@@ -140,7 +140,6 @@ class Expression(object):
     def get_bounds(self):
         return 0,1 #default for boolean expressions
 
-
     # keep for backwards compatibility
     def deepcopy(self, memodict={}):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
