@@ -41,7 +41,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
         return True
 
-    assert supported_reif <= supported, "`supported` set is assumed to be a subset of the `supported_reified` set"
+    assert supported_reif <= supported, "`supported_reif` set is assumed to be a subset of the `supported` set"
     if not is_any_list(lst_of_expr):
         lst_of_expr= [lst_of_expr]
 
