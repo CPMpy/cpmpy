@@ -20,6 +20,13 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
         Numerical global constraints are left reified even if not part of the `supported_reified` set
             as they can be rewritten using `cpmpy.transformations.reification.reify_rewrite`...
                 ... reified partial functions are decomposed when unsupported by `supported_reified`
+                The following `bv -> NumExpr <comp> Var/Const` can always be rewritten as ...
+                                [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
+                So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
+                TODO: decide if we want to do the rewrite of unsupported globals here or leave it to `reify_rewrite`.
+                    Currently, we left it for `reify_rewrite`
+
+
 
     """
     def _is_supported(cpm_expr, reified):
