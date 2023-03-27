@@ -127,31 +127,30 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = all(boolexpr.decompose())  # decomp() returns list
-                    newcons += flatten_constraint(reifexpr)
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run `cpmpy.transformations.decompose_global.decompose_global` to decompose unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
-                op,(lhs,rhs) = boolexpr.name, boolexpr.args
+                op, (lhs, rhs) = boolexpr.name, boolexpr.args
                 #   have list of supported lhs's such as sum and wsum...
                 #   at the very least, (iv1 == iv2) == bv has to be supported
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
                 elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= len(lhs.args[0])):
                     # special case: (Element(arr,idx) <OP> RHS) == BV (or -> in some way)
-                    # if the domain of 'idx' is larger than the range of 'arr', then 
+                    # if the domain of 'idx' is larger than the range of 'arr', then
                     # this is allowed and BV should be false if it takes a value there
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    decomp = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op, rhs))  # decomp() returns list
+                    print(decomp)
                     if decomp is False:
                         # TODO uh... special case, can't insert a constant here with the current transformations...
                         # use IV < IV.lb which will be false...
                         decomp = (lhs.args[1] < lhs.args[1].lb)
                     reifexpr.args[boolexpr_index] = decomp
                     newcons += flatten_constraint(reifexpr)
-                else:  #   other cases (assuming LHS is a total function):
+                else:  # other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
                     (auxvar, cons) = get_or_make_var(lhs)

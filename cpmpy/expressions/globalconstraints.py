@@ -111,7 +111,7 @@ import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array
+from .variables import boolvar, intvar, cpm_array, _NumVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
@@ -144,13 +144,20 @@ class GlobalConstraint(Expression):
             it does not create a circular dependency.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
-    
+
     def get_bounds(self):
         """
         Returns the bounds of a Boolean global constraint.
         Numerical global constraints should reimplement this.
         """
         return (0,1)
+
+    def is_total(self):
+        """
+            Returns whether the global constraint is a total function.
+            If true, its value is defined for all arguments
+        """
+        return True
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
@@ -342,7 +349,7 @@ class Minimum(GlobalConstraint):
         from .python_builtins import any, all
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
-        return all([any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)])
+        return [any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)]
 
     def get_bounds(self):
         """
@@ -375,7 +382,7 @@ class Maximum(GlobalConstraint):
         from .python_builtins import any, all
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
-        return all([any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)])
+        return [any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)]
 
     def get_bounds(self):
         """
@@ -415,7 +422,7 @@ class Element(GlobalConstraint):
             raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
         return None # default
 
-    def decompose_comparison(self, cmp_op, cmp_rhs):
+    def decompose_comparison(self, cpm_op, cpm_rhs):
         """
             `Element(arr,ix)` represents the array lookup itself (a numeric variable)
             It is not a constraint itself, so it can not have a decompose().
@@ -426,8 +433,14 @@ class Element(GlobalConstraint):
         """
         from .python_builtins import any
 
-        arr,idx = self.args
-        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
+        arr, idx = self.args
+        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
+               [idx >= 0, idx < len(arr)]
+
+    def is_total(self):
+        arr, idx = self.args
+        lb, ub = get_bounds(idx)
+        return lb >= 0 & idx.ub < len(arr)
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
