@@ -30,6 +30,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.comparison import only_numexpr_equality
+from ..transformations.decompose_global import decompose_global
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
@@ -264,6 +265,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = decompose_global(cpm_cons, supported={"min","max", "element", "alldifferent"}) #element and alldiff have specialized MIP decomp in linearize
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
@@ -281,6 +283,9 @@ class CPM_gurobi(SolverInterface):
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
+        # True or False
+        if isinstance(cpm_expr, BoolVal):
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -354,14 +359,6 @@ class CPM_gurobi(SolverInterface):
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
-
-        # Global constraints
-        elif hasattr(cpm_expr, 'decompose'):
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-            return
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 

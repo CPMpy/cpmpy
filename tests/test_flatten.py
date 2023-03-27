@@ -94,7 +94,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var(~x)), "(~BV0, [])" )
 
         self.assertEqual( str(get_or_make_var(x == y)), "(BV3, [((BV0) == (BV1)) == (BV3)])" )
-        self.assertEqual( str(get_or_make_var(x != y)), "(BV4, [((BV0) != (BV1)) == (BV4)])" )
+        self.assertEqual( str(get_or_make_var(x != y)), "(BV4, [((BV0) == (~BV1)) == (BV4)])" )
         self.assertEqual( str(get_or_make_var(x > y)), "(BV5, [((BV0) > (BV1)) == (BV5)])" )
         self.assertEqual( str(get_or_make_var(x <= y)), "(BV6, [((BV0) <= (BV1)) == (BV6)])" )
 
@@ -164,6 +164,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( x&y )), "[BV0, BV1]" )
         self.assertEqual( str(flatten_constraint( x&y&~z )), "[BV0, BV1, ~BV2]" )
         self.assertEqual( str(flatten_constraint( x.implies(y) )), "[(BV0) -> (BV1)]" )
+        self.assertEqual( str(flatten_constraint( x|(y.implies(z)) )), "[or([BV0, ~BV1, BV2])]" )
         self.assertEqual( str(flatten_constraint( (a > 10)&x )), "[IV0 > 10, BV0]" )
         cp.boolvar() # increase counter
         self.assertEqual( str(flatten_constraint( (a > 10).implies(x) )), "[(IV0 > 10) -> (BV0)]" )
@@ -206,11 +207,11 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[(BV2) and (BV11), ((BV0) or (BV1)) == (BV11)]" )
         self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((BV0) and (BV1)) == (BV12)]" )
         self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
-        self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((~BV2) or (BV1)) -> (BV13), ((~BV0) and (~BV1)) == (BV13)]" )
+        self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((BV0) or (BV1)) -> (BV2), ((BV0) or (BV1)) -> (~BV1)]" )
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
 
         # boolexpr as numexpr
-        self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV14 <= 0, ((IV0) + (IV1) == 2) == (BV14)]" )
+        self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV13 <= 0, ((IV0) + (IV1) == 2) == (BV13)]" )
 
         # != in boolexpr, bug #170
-        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV15) == (~BV0), [(IV0 == 1) == (BV15)])" )
+        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV14) == (~BV0), [(IV0 == 1) == (BV14)])" )
