@@ -138,7 +138,9 @@ class Expression(object):
         return None # default
 
     def get_bounds(self):
-        return 0,1 #default for boolean expressions
+        if self.is_bool():
+            return 0,1 #default for boolean expressions
+        raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
     # keep for backwards compatibility
     def deepcopy(self, memodict={}):
