@@ -238,6 +238,9 @@ class _NumVarImpl(Expression):
         """
         return self._value
 
+    def get_bounds(self):
+        """ the lower and upper bounds"""
+        return self.lb, self.ub
     def clear(self):
         """ clear the value obtained from the last solve call
         """
@@ -250,10 +253,6 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         return hash(self.name)
 
-    def deepcopy(self, memodict={}):
-        copied = type(self)(self.lb, self.ub, self.name)
-        copied._value = self.value()
-        return copied
 
 class _IntVarImpl(_NumVarImpl):
     """
@@ -367,9 +366,6 @@ class NegBoolView(_BoolVarImpl):
     def __invert__(self):
         return self._bv
 
-    def deepcopy(self, memodict={}):
-        return NegBoolView(self._bv.deepcopy(memodict))
-
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(Expression, np.ndarray):
@@ -397,9 +393,6 @@ class NDVarArray(Expression, np.ndarray):
         for e in self.flat:
             e.clear()
 
-    def deepcopy(self, memodict={}):
-        copied = [arg.deepcopy(memodict) if isinstance(arg, Expression) else arg for arg in self]
-        return cpm_array(copied)
     
     def __repr__(self):
         """

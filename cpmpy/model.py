@@ -27,6 +27,7 @@
 
         Model
 """
+import copy
 import warnings
 
 import numpy as np
@@ -257,17 +258,8 @@ class Model(object):
             return Model(self.constraints, maximize=self.objective_)
 
 
+
+    # keep for backwards compatibility
     def deepcopy(self, memodict={}):
-        """
-            Deep copies a the model to a new instance.
-            :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
-        """
-        copied_cons = [cpm_cons.deepcopy(memodict) for cpm_cons in self.constraints]
-        if self.objective_ is not None:
-            copied_obj = self.objective_.deepcopy(memodict)
-
-        copied_model = Model(copied_cons)
-        if self.objective_ is not None:
-            copied_model.objective(copied_obj, self.objective_is_min)
-
-        return copied_model
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
