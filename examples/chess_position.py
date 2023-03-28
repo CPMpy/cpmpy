@@ -50,7 +50,7 @@ occupancy_in_board = np.array([False, False, False, False, False, False,  True, 
                                 True, False, False, False,  True, False, False, False])
 
 # Variable to represent the whole board
-board = intvar(0, 12, (8, 8), "board")
+board = intvar(0, 12, (8,8), "board")
 
 # Variable to represent the pieces, with first row the probabilies and second row the indexes
 pieces = intvar(0, 10000000, (2, len(piece_probabilities)), name="pieces")
@@ -82,21 +82,21 @@ pieces_values = pieces_values.astype(int)
 
 # All the constraints that a chess board has to follow
 model = Model(
-    # both colors have only one king
+    # Both colors have only one king
     (sum(board[l,c] == k for l in range(0,8) for c in range(0,8)) == 1),
     (sum(board[l,c] == K for l in range(0,8) for c in range(0,8)) == 1),
-    # both colors have maximum 16 pieces
+    # Both colors have maximum 16 pieces
     (sum(board[l,c] < 6 for l in range(0,8) for c in range(0,8)) <= 16),
     (sum(((board[l,c] >= 6) & (board[l,c] < 12)) for l in range(0,8) for c in range(0,8)) <= 16),
-    # both colors have maximum 8 pawns
+    # Both colors have maximum 8 pawns
     (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) <= 8),
     (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) <= 8),
-    # pawns can't be on the edge of the board
-    (sum(board[0, c] == p for c in range(0,8)) == 0),
-    (sum(board[0, c] == P for c in range(0,8)) == 0),
-    (sum(board[7, c] == p for c in range(0,8)) == 0),
-    (sum(board[7, c] == P for c in range(0,8)) == 0),
-    # the number of pieces of each piece without promotion
+    # Pawns can't be on the edge of the board
+    (sum(board[0,c] == p for c in range(0,8)) == 0),
+    (sum(board[0,c] == P for c in range(0,8)) == 0),
+    (sum(board[7,c] == p for c in range(0,8)) == 0),
+    (sum(board[7,c] == P for c in range(0,8)) == 0),
+    # The number of pieces of each piece without promotion
     (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == b for l in range(0,8) for c in range(0,8)) <= 2),
     (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == B for l in range(0,8) for c in range(0,8)) <= 2),
     (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == r for l in range(0,8) for c in range(0,8)) <= 2),
@@ -105,25 +105,25 @@ model = Model(
     (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == N for l in range(0,8) for c in range(0,8)) <= 2),
     (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == q for l in range(0,8) for c in range(0,8)) <= 1),
     (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8).implies(sum(board[l,c] == Q for l in range(0,8) for c in range(0,8)) <= 1),
-    # bishops can't have moved if the pawns are still in starting position
+    # Bishops can't have moved if the pawns are still in starting position
     ((board[1,1] == p) & (board[1,3] == p) & (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8) & (sum(board[l,c] == b for l in range(0,8) for c in range(0,8)) == 2)).implies(board[0,2]==b),
     ((board[6,1] == P) & (board[6,3] == P) & (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8) & (sum(board[l,c] == B for l in range(0,8) for c in range(0,8)) == 2)).implies(board[7,2]==B),
     ((board[1,4] == p) & (board[1,6] == p) & (sum(board[l,c] == b for l in range(0,8) for c in range(0,8)) == 2) & (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8)).implies(board[0,5]==b),
     ((board[6,4] == P) & (board[6,6] == P) & (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8) & (sum(board[l,c] == B for l in range(0,8) for c in range(0,8)) == 2)).implies(board[7,5]==B),
-    # if bishop isn't able to get out and pawns are still in starting position, rook is stuck
+    # If bishop isn't able to get out and pawns are still in starting position, rook is stuck
     (((board[6,4] == P) & (board[6,6] == P) & (board[6,7] == P) & (board[7,5]==B)).implies(Xor([board[7,6]==R,board[7,7] == R]))),
     (((board[6,1] == P) & (board[6,3] == P) & (board[6,0] == P) & (board[7,2]==B)).implies(Xor([board[7,1]==R,board[7,0] == R]))),
     (((board[1,1] == p) & (board[1,3] == p) & (board[1,0] == p) & (board[0,2]==b)).implies(Xor([board[0,1]==r,board[0,0] == r]))),
     (((board[1,4] == p) & (board[1,6] == p) & (board[1,7] == p) & (board[0,5]==b)).implies(Xor([board[0,6]==r,board[0,7] == r]))),
-    # if both bishops are stuck and pawns are in starting position, king and queen are also in starting position
+    # If both bishops are stuck and pawns are in starting position, king and queen are also in starting position
     (((board[1,1] == p) & (board[1,2] == p) & (board[1,3] == p) & (board[1,4] == p) & (board[1,5] == p) & (board[1,6] == p)).implies((board[0,3]==q) | (board[0,4]==k))),
     (((board[6,1] == P) & (board[6,2] == P) & (board[6,3] == P) & (board[6,4] == P) & (board[6,5] == P) & (board[6,6] == P)).implies((board[7,3]==Q) | (board[7,4]==K))),
-    # if the pawns in column 2 or 7 didn't move, bishop of own color can't be in the corners of the board
+    # If the pawns in column 2 or 7 didn't move, bishop of own color can't be in the corners of the board
     (board[6,1] == P).implies(~((board[7,0] == B))),
     (board[6,6] == P).implies(~((board[7,7] == B))),
     (board[1,6] == p).implies(~((board[0,7] == b))),
     (board[1,1] == p).implies(~((board[0,0] == b))),
-    # if the pawns in column 2 or 7 didn't move, bishop of other color can't be in the corners of the board excpet when promoted
+    # If the pawns in column 2 or 7 didn't move, bishop of other color can't be in the corners of the board excpet when promoted
     ((board[6,1] == P) & (board[7,0] == B)).implies(sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) <= 7),
     ((board[6,6] == P) & (board[7,7] == B)).implies(sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) <= 7),
     ((board[1,6] == p) & (board[0,7] == b)).implies(sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) <= 7),
@@ -132,8 +132,8 @@ model = Model(
 
 # Put the index of the maximum value into the second row of the pieces variable
 for i in range(len(pieces_values)):
-    model += (((pieces[0,i] == pieces_values.item((i, 0))) & (pieces[1,i] == 0)) | ((pieces[0,i] == pieces_values.item((i, 1))) & (pieces[1,i] == 1)) | ((pieces[0,i] == pieces_values.item((i, 2))) & (pieces[1,i] == 2)) | ((pieces[0,i] == pieces_values.item((i, 3))) & (pieces[1,i] == 3)) | ((pieces[0,i] == pieces_values.item((i, 4))) & (pieces[1,i] == 4)) | ((pieces[0,i] == pieces_values.item((i, 5))) & (pieces[1,i] == 5)) \
-        | ((pieces[0,i] == pieces_values.item((i, 6))) & (pieces[1,i] == 6)) | ((pieces[0,i] == pieces_values.item((i, 7))) & (pieces[1,i] == 7)) | ((pieces[0,i] == pieces_values.item((i, 8))) & (pieces[1,i] == 8)) | ((pieces[0,i] == pieces_values.item((i, 9))) & (pieces[1,i] == 9)) | ((pieces[0,i] == pieces_values.item((i, 10))) & (pieces[1,i] == 10)) | ((pieces[0,i] == pieces_values.item((i, 11))) & (pieces[1,i] == 11)))
+    model += (((pieces[0,i] == pieces_values.item((i,0))) & (pieces[1,i] == 0)) | ((pieces[0,i] == pieces_values.item((i,1))) & (pieces[1,i] == 1)) | ((pieces[0,i] == pieces_values.item((i,2))) & (pieces[1,i] == 2)) | ((pieces[0,i] == pieces_values.item((i,3))) & (pieces[1,i] == 3)) | ((pieces[0,i] == pieces_values.item((i,4))) & (pieces[1,i] == 4)) | ((pieces[0,i] == pieces_values.item((i,5))) & (pieces[1,i] == 5)) \
+        | ((pieces[0,i] == pieces_values.item((i,6))) & (pieces[1,i] == 6)) | ((pieces[0,i] == pieces_values.item((i,7))) & (pieces[1,i] == 7)) | ((pieces[0,i] == pieces_values.item((i,8))) & (pieces[1,i] == 8)) | ((pieces[0,i] == pieces_values.item((i,9))) & (pieces[1,i] == 9)) | ((pieces[0,i] == pieces_values.item((i,10))) & (pieces[1,i] == 10)) | ((pieces[0,i] == pieces_values.item((i,11))) & (pieces[1,i] == 11)))
 
 # Put the pieces into the right place of the board
 index = 0
