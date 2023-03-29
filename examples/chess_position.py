@@ -12,7 +12,7 @@ from enum import Enum
 from functools import total_ordering
 
 
-# Replace numerals by letters for easier interepretation
+# Replace numerals by letters for easier interpretation
 def replace_value(x):
     return dict.get(x, x)
 
@@ -62,9 +62,9 @@ for i in range(len(piece_probabilities)):
         pieces_values[i,j] = int((piece_probabilities[i,j]*10000).item())
 
 # Assign values to pieces
-b, k, n, p, q, r = 0, 1, 2, 3, 4, 5 # black pieces
-B, K, N, P, Q, R = 6, 7, 8, 9, 10, 11 # white pieces
-E = 12 # empty square
+b, k, n, p, q, r = 0, 1, 2, 3, 4, 5 # Black pieces
+B, K, N, P, Q, R = 6, 7, 8, 9, 10, 11 # White pieces
+E = 12 # Empty square
 
 # Lowercases are black pieces, uppercases white pieces, and E is empty square
 dict = {0: 'b', 1: 'k', 2: 'n', 3: 'p', 4: 'q', 5: 'r', 6: 'B', 7: 'K', 8: 'N', 9: 'P', 10: 'Q', 11: 'R', 12: 'E'}
@@ -111,13 +111,13 @@ model = Model(
     ((board[1,4] == p) & (board[1,6] == p) & (sum(board[l,c] == b for l in range(0,8) for c in range(0,8)) == 2) & (sum(board[l,c] == p for l in range(0,8) for c in range(0,8)) == 8)).implies(board[0,5]==b),
     ((board[6,4] == P) & (board[6,6] == P) & (sum(board[l,c] == P for l in range(0,8) for c in range(0,8)) == 8) & (sum(board[l,c] == B for l in range(0,8) for c in range(0,8)) == 2)).implies(board[7,5]==B),
     # If bishop isn't able to get out and pawns are still in starting position, rook is stuck
-    (((board[6,4] == P) & (board[6,6] == P) & (board[6,7] == P) & (board[7,5]==B)).implies(Xor([board[7,6]==R,board[7,7] == R]))),
-    (((board[6,1] == P) & (board[6,3] == P) & (board[6,0] == P) & (board[7,2]==B)).implies(Xor([board[7,1]==R,board[7,0] == R]))),
-    (((board[1,1] == p) & (board[1,3] == p) & (board[1,0] == p) & (board[0,2]==b)).implies(Xor([board[0,1]==r,board[0,0] == r]))),
-    (((board[1,4] == p) & (board[1,6] == p) & (board[1,7] == p) & (board[0,5]==b)).implies(Xor([board[0,6]==r,board[0,7] == r]))),
+    (((board[6,4] == P) & (board[6,6] == P) & (board[6,7] == P) & (board[7,5] == B)).implies(Xor([board[7,6] == R,board[7,7] == R]))),
+    (((board[6,1] == P) & (board[6,3] == P) & (board[6,0] == P) & (board[7,2] == B)).implies(Xor([board[7,1] == R,board[7,0] == R]))),
+    (((board[1,1] == p) & (board[1,3] == p) & (board[1,0] == p) & (board[0,2] == b)).implies(Xor([board[0,1] == r,board[0,0] == r]))),
+    (((board[1,4] == p) & (board[1,6] == p) & (board[1,7] == p) & (board[0,5] == b)).implies(Xor([board[0,6] == r,board[0,7] == r]))),
     # If both bishops are stuck and pawns are in starting position, king and queen are also in starting position
-    (((board[1,1] == p) & (board[1,2] == p) & (board[1,3] == p) & (board[1,4] == p) & (board[1,5] == p) & (board[1,6] == p)).implies((board[0,3]==q) | (board[0,4]==k))),
-    (((board[6,1] == P) & (board[6,2] == P) & (board[6,3] == P) & (board[6,4] == P) & (board[6,5] == P) & (board[6,6] == P)).implies((board[7,3]==Q) | (board[7,4]==K))),
+    (((board[1,1] == p) & (board[1,2] == p) & (board[1,3] == p) & (board[1,4] == p) & (board[1,5] == p) & (board[1,6] == p)).implies((board[0,3] == q) | (board[0,4] == k))),
+    (((board[6,1] == P) & (board[6,2] == P) & (board[6,3] == P) & (board[6,4] == P) & (board[6,5] == P) & (board[6,6] == P)).implies((board[7,3] == Q) | (board[7,4] == K))),
     # If the pawns in column 2 or 7 didn't move, bishop of own color can't be in the corners of the board
     (board[6,1] == P).implies(~((board[7,0] == B))),
     (board[6,6] == P).implies(~((board[7,7] == B))),
@@ -155,6 +155,5 @@ if model.solve():
     board_string = v_replace_value(board.value())
 
     print(board_string)
-
 else:
     print("no model found")
