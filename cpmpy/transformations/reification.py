@@ -143,7 +143,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
                     decomp = all(lhs.decompose_comparison(op, rhs))  # decomp() returns list
-                    print(decomp)
+                    #print(decomp)
                     if decomp is False:
                         # TODO uh... special case, can't insert a constant here with the current transformations...
                         # use IV < IV.lb which will be false...
