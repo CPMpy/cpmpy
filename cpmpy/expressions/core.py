@@ -360,7 +360,7 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        arg_vals = [argval(a) for a in self.args]
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return (arg_vals[0] == arg_vals[1])
         elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
