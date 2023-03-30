@@ -54,6 +54,10 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form', and implications only contain boolean variables on the lhs.
     Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint() and cpmpy.transformations.reification.only_bv_implies()'.
+
+    `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+    Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
+
     """
 
     if is_any_list(cpm_expr):
@@ -103,7 +107,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             rhs = 0
 
         # linearize unsupported operators
-        elif isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
+        elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
 
             if lhs.name == "sub":
                 # convert to wsum
@@ -113,6 +117,9 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
             else:
                 raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
+
+        elif isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
+            raise ValueError("Linearization of `lhs` not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
 
         if is_num(lhs) or (isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}):
             # bring all vars to lhs
@@ -200,6 +207,9 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
 
         return constraints
+
+    elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
+        raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
 
     return [cpm_expr]
 
