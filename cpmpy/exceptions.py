@@ -20,3 +20,6 @@ class NotSupportedError(CPMpyException):
 
 class IncompleteFunctionError(CPMpyException):
     pass
+
+class TransformationNotImplementedError(CPMpyException):
+    pass

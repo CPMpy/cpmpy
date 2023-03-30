@@ -41,6 +41,7 @@ import copy
 import numpy as np
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
@@ -64,7 +65,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
         return [sum([cpm_expr]) >= 1]
 
     # Boolean operators
-    if isinstance(cpm_expr, (Operator, GlobalConstraint)) and cpm_expr.is_bool():
+    if isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
         # conjunction
         if cpm_expr.name == "and":
             return [sum(cpm_expr.args) >= len(cpm_expr.args)]
@@ -110,28 +111,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
             elif lhs.name == "mul" and is_num(lhs.args[0]):
                 lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-
-            elif lhs.name == "element":
-                arr, idx = cpm_expr.args[0].args
-                # Assuming 1-d array
-                assert len(np.array(arr).shape) == 1, f"Only support 1-d element constraints, not {cpm_expr} which has shape {cpm_expr.shape}"
-
-                n = len(arr)
-                sigma = boolvar(shape=n)
-
-                constraints = [sum(sigma) == 1]
-                constraints += [sum(np.arange(n) * sigma) == idx]
-                # translation with implication:
-                constraints += [s.implies(Comparison(cpm_expr.name, a, cpm_expr.args[1])) for s, a in zip(sigma, arr)]
-                return linearize_constraint(constraints, supported=supported, reified=reified)
-
-            # other global constraints
-            elif isinstance(lhs, GlobalConstraint) and hasattr(lhs, "decompose_comparison"):
-                decomp = lhs.decompose_comparison(cpm_expr.name, rhs)
-                return linearize_constraint(flatten_constraint(decomp), supported=supported, reified=reified)
-
             else:
-                raise NotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported} or 'sub','element' but is {lhs}. Please report on github")
+                raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
 
         if is_num(lhs) or (isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}):
             # bring all vars to lhs
@@ -184,10 +165,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 #  ... what requires less new variables?
                 # Big M implementation
                 z = boolvar()
-                # Calculate bounds of M = |lhs - rhs| + 1,  TODO: should be easier after fixing issue #96
-                bound1, _ = get_or_make_var(1 + lhs - rhs)
-                bound2, _ = get_or_make_var(1 + rhs - lhs)
-                M = max(bound1.ub, bound2.ub)
+                # Calculate bounds of M = |lhs - rhs| + 1
+                _, M = (abs(lhs - rhs) + 1).get_bounds()
 
                 cons = [lhs - M*z <= rhs-1, lhs - M*z >= rhs-M+1]
                 return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
