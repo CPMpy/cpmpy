@@ -86,7 +86,7 @@ from .normalize import toplevel_list
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_boolexpr
 
 def flatten_model(orig_model):
     """
@@ -553,8 +553,8 @@ def negated_normal(expr):
         return ~expr
 
     elif isinstance(expr, Comparison):
-        if expr.name == '==' and expr.args[0].is_bool() \
-           and expr.args[1].is_bool():
+        if expr.name == '==' and is_boolexpr(expr.args[0]) \
+           and is_boolexpr(expr.args[1]):
             # Boolean case, double reification, keep == and negate arg1
             return Comparison('==', expr.args[0], negated_normal(expr.args[1]))
 
