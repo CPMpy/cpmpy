@@ -470,7 +470,7 @@ class CPM_minizinc(SolverInterface):
                 # I don't think there is a more direct way unfortunately
                 w = [self._convert_expression(wi) for wi in expr.args[0]]
                 x = [self._convert_expression(xi) for xi in expr.args[1]]
-                args_str = [f"{wi}*{xi}" for wi,xi in zip(w,x)]
+                args_str = [f"{wi}*({xi})" for wi,xi in zip(w,x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
             # special case, infix: two args
