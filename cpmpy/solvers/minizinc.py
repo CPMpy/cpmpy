@@ -223,13 +223,34 @@ class CPM_minizinc(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
+        runtime = 0
         if 'time' in mzn_result.statistics:
             time = mzn_result.statistics['time']
             if isinstance(time, int):
                 self.cpm_status.runtime = time / 1000
             elif isinstance(time, timedelta):
                 self.cpm_status.runtime = time.total_seconds()  # --output-time
-
+        else:
+            if 'flatTime' in mzn_result.statistics:
+                time = mzn_result.statistics['flatTime']
+                if isinstance(time, int):
+                    runtime += time / 1000
+                elif isinstance(time, timedelta):
+                    runtime += time.total_seconds()  # --output-time
+            if 'initTime' in mzn_result.statistics:
+                time = mzn_result.statistics['initTime']
+                if isinstance(time, int):
+                    runtime += time / 1000
+                elif isinstance(time, timedelta):
+                    runtime += time.total_seconds()  # --output-time
+            if 'solveTime' in mzn_result.statistics:
+                time = mzn_result.statistics['solveTime']
+                if isinstance(time, int):
+                    runtime += time / 1000
+                elif isinstance(time, timedelta):
+                    runtime += time.total_seconds()  # --output-time
+            if runtime != 0:
+                self.cpm_status.runtime = runtime
 
         # translate exit status
         mzn_status = mzn_result.status
@@ -246,7 +267,7 @@ class CPM_minizinc(SolverInterface):
             raise Exception("MiniZinc solver returned with status 'Error'")
         elif mzn_status == minizinc.result.Status.UNKNOWN:
             # means, no solution was found (e.g. within timeout?)...
-            self.cpm_status.exitstatus = ExitStatus.ERROR
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError  # a new status type was introduced, please report on github
 
