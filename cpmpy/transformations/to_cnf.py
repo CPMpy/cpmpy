@@ -1,5 +1,6 @@
 from ..expressions.core import Operator, Comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView
+from .reification import only_bv_implies
 from .flatten_model import flatten_constraint, negated_normal
 """
   Converts the logical constraints into disjuctions using the tseitin transform,
@@ -30,19 +31,8 @@ def to_cnf(constraints):
         - constraints: list[Expression] or Operator
         - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
-    if isinstance(constraints, Operator): 
-        if constraints.name == "and":
-            # and() is same as a list of its elements
-            constraints = constraints.args
-        elif constraints.name in ['or', '->']:
-            # make or() into [or()] as result will be cnf anyway
-            constraints = [constraints]
-
-    if not isinstance(constraints, (list,tuple)):
-        # catch rest, single object to singleton object
-        constraints = [constraints]
-
     fnf = flatten_constraint(constraints)
+    fnf = only_bv_implies(fnf)
     return flat2cnf(fnf)
 
 def flat2cnf(constraints):
@@ -68,70 +58,18 @@ def flat2cnf(constraints):
     """
     cnf = []
     for expr in constraints:
-        is_operator = isinstance(expr, Operator)
-        # base cases
-        if isinstance(expr, (bool,int)):
-            # python convention: 1 is true, rest is false
-            if expr:
-                continue # skip this trivially true expr
-            else:
-                return [False]
-
-        # BoolVar()
-        elif isinstance(expr, _BoolVarImpl): # includes NegBoolView
-            cnf.append(expr)
-            continue
-
-        # or() constraint
-        elif is_operator and expr.name == "or":
-            # top-level OR constraint, easy
-            cnf.append(expr)
-            continue
-
-        # and() constraints
-        elif is_operator and expr.name == "and":
-            # special case: top-level AND constraint,
-            # flatten into toplevel conjunction
-            cnf += expr.args
-            continue
-
-        # BE != BE
-        elif isinstance(expr, Comparison) and expr.name == "!=" and expr.args[0].is_bool():
-            a0,a1 = expr.args
-            # using 'implies' means it will recursively work for BE's too
-            cnf += flat2cnf([a0.implies(~a1), (~a0).implies(a1)]) # one true and one false
-            continue
-
-        # BE == BE
-        elif isinstance(expr, Comparison) and expr.name == "==" and expr.args[0].is_bool():
-            a0,a1 = expr.args
-            # using 'implies' means it will recursively work for BE's too
-            cnf += flat2cnf([a0.implies(a1), a1.implies(a0)]) # a0->a1 and a1->a0
-            continue
-
         # BE -> BE
-        elif is_operator and expr.name == '->':
+        if expr.name == '->':
             a0,a1 = expr.args
 
             # BoolVar() -> BoolVar()
-            if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
+            if isinstance(a1, _BoolVarImpl) or \
+                    (isinstance(a1, Operator) and a1.name == 'or'):
                 cnf.append(~a0 | a1)
                 continue
-            # BoolVar() -> BE
-            elif isinstance(a0, _BoolVarImpl):
-                # flat, so a1 must itself be a base constraint
-                subcnf = flat2cnf([a1]) # will return a list that is flat
-                cnf += [~a0 | a1sub for a1sub in subcnf]
-                continue
-            # BE -> BoolVar()
-            elif isinstance(a1, _BoolVarImpl):
-                # a0 is the base constraint, negate to ~a1 -> ~a0
-                subcnf = flat2cnf([negated_normal(a0)])
-                cnf += [a0sub | a1 for a0sub in subcnf]
-                continue
 
-        # all other cases not covered (e.g. not continue'd)
-        # pass verbatim
+        # all other cases added as is...
+        # TODO: we should raise here? is not really CNF...
         cnf.append(expr)
 
     return cnf
