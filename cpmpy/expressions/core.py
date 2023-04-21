@@ -38,7 +38,8 @@
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
     - x ^ y         Xor([x,y])  # a global constraint
-    - ~x         Operator("not", [x])
+    - ~x            Operator("not", [x])
+                    which in turn creates a NegBoolView()` in case x is a Boolean variable
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -46,12 +47,6 @@
     CPMpy hence has a function 'implies()' that can be called:
 
     - x.implies(y)  Operator("->", [x,y])
-
-    For negation, we rewrite this to the more generic expression `x == 0`.
-    (which in turn creates a `NegBoolView()` in case x is a Boolean variable)
-
-    - ~x            x == 0
-
 
     Apart from operator overloading, expressions implement two important functions:
 
