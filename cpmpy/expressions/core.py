@@ -38,6 +38,7 @@
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
     - x ^ y         Xor([x,y])  # a global constraint
+    - ~x         Operator("not", [x])
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -79,8 +80,8 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds
-from ..exceptions import IncompleteFunctionError
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr
+from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
     """
@@ -322,9 +323,10 @@ class Expression(object):
         return self
     def __abs__(self):
         return Operator("abs", [self])
-    # 'not' for now, no unary constraint for it
     def __invert__(self):
-        return (self == 0)
+        if not (is_boolexpr(self)):
+            raise TypeError("Not operator is only allowed on boolean expressions")
+        return Operator("not", [self])
 
 class BoolVal(Expression):
     """
@@ -383,6 +385,7 @@ class Operator(Expression):
         'and': (0, True),
         'or':  (0, True),
         '->':  (2, True),
+        'not': (1, True),
         'sum': (0, False),
         'wsum': (2, False),
         'sub': (2, False), # x - y
@@ -521,6 +524,7 @@ class Operator(Expression):
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
         elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
+        elif self.name == "not": return not arg_vals[0]
 
         return None # default
 

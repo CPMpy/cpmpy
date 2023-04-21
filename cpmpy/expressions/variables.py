@@ -511,6 +511,8 @@ class NDVarArray(Expression, np.ndarray):
     
     # VECTORIZED Bool operators
     # __invert__ not needed because translated to == 0 and that is handled properly
+    def __invert__(self):
+        return cpm_array([~s for s in self])
     def __and__(self, other):
         return self._vectorized(other, '__and__') 
     def __rand__(self, other):

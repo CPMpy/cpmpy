@@ -136,6 +136,9 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
+            if expr.name == 'not':
+                newlist.extend(flatten_constraint(negated_normal(expr.args[0])))
+                continue
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
@@ -200,6 +203,8 @@ def flatten_constraint(expr):
                 newlist.extend(lcons)
                 newlist.extend(rcons)
                 continue
+
+
 
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
@@ -382,7 +387,11 @@ def normalized_boolexpr(expr):
             # TODO, optimisation if args1 is an 'or'?
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
-
+        if expr.name == 'not':
+            nnexpr = negated_normal(expr.args[0])
+            if __is_flat_var(nnexpr):
+                return nnexpr, []
+            return normalized_boolexpr(nnexpr)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -578,6 +587,8 @@ def negated_normal(expr):
         elif expr.name == '->':
             # XXX this might create a top-level and
             return expr.args[0] & negated_normal(expr.args[1])
+        elif expr.name == 'not':
+            return expr.args[0]
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
             # XXX do raise, better safe then sorry
