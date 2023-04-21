@@ -300,10 +300,7 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == '->':
                 return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
             elif cpm_con.name == 'not':
-                if is_boolexpr(cpm_con.args[0]):
-                    return z3.Not(self._z3_expr(cpm_con.args[0]))
-                else:
-                    return self._z3_expr(cpm_con.args[0] == 0)
+                return z3.Not(self._z3_expr(cpm_con.args[0]))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
