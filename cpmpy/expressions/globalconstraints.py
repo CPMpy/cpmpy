@@ -630,7 +630,5 @@ class Count(GlobalConstraint):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        return [0, len(self.args[0])]
-
-    def __repr__(self):
-        return "Count({})".format(self.args)
+        arr, val = self.args
+        return 0, len(arr)
