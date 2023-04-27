@@ -321,6 +321,8 @@ class Expression(object):
     def __invert__(self):
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
+        if isinstance(self,BoolVal):
+            return BoolVal(not self.args[0])
         return Operator("not", [self])
 
 class BoolVal(Expression):
