@@ -127,7 +127,7 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Circuit(x).value())
 
         nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
-        nbModels = cp.Model(cp.Circuit(x)).solveAll(solver="minizinc",display=lambda: self.assertTrue(cp.Circuit(x).value()))
+        nbModels = cp.Model(cp.Circuit(x)).solveAll(display=lambda: self.assertTrue(cp.Circuit(x).value()))
         total = cp.Model(x == x).solveAll()
 
         self.assertEqual(str(total), str(nbModels + nbNotModels))
