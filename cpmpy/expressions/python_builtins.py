@@ -20,7 +20,7 @@
 """
 import numpy as np
 from .variables import NDVarArray
-from .core import Expression, Operator
+from .core import Expression, Operator, BoolVal
 from .globalconstraints import Minimum, Maximum
 
 # Overwriting all/any python built-ins
@@ -35,7 +35,7 @@ def all(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if elem is False or elem is np.False_:
-            return False  # no need to create constraint
+            return BoolVal(False)  # no need to create constraint
         elif elem is True or elem is np.True_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
@@ -46,8 +46,7 @@ def all(iterable):
         return collect[0]
     if len(collect) >= 2:
         return Operator("and", collect)
-    return True
-
+    return BoolVal(True)
 # any: listwise 'or'
 def any(iterable):
     """
@@ -59,7 +58,7 @@ def any(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if elem is True or elem is np.True_:
-            return True # no need to create constraint
+            return BoolVal(True) # no need to create constraint
         elif elem is False or elem is np.False_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
@@ -70,7 +69,7 @@ def any(iterable):
         return collect[0]
     if len(collect) >= 2:
         return Operator("or", collect)
-    return False
+    return BoolVal(False)
 
 def max(iterable):
     """

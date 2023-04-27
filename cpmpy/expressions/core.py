@@ -149,7 +149,7 @@ class Expression(object):
     def implies(self, other):
         # other constant
         if other is True:
-            return True
+            return BoolVal(True)
         if other is False:
             return ~self
         return Operator('->', [self, other])
@@ -178,7 +178,7 @@ class Expression(object):
         if other is True:
             return self
         if other is False:
-            return False
+            return BoolVal(False)
 
         return Operator("and", [self, other])
     def __rand__(self, other):
@@ -186,14 +186,14 @@ class Expression(object):
         if other is True:
             return self
         if other is False:
-            return False
+            return BoolVal(False)
 
         return Operator("and", [other, self])
 
     def __or__(self, other):
         # some simple constant removal
         if other is True:
-            return True
+            return BoolVal(True)
         if other is False:
             return self
 
@@ -201,7 +201,7 @@ class Expression(object):
     def __ror__(self, other):
         # some simple constant removal
         if other is True:
-            return True
+            return BoolVal(True)
         if other is False:
             return self
 
