@@ -152,6 +152,10 @@ class GlobalConstraint(Expression):
         """
         return (0,1)
 
+    def decompose_negation(self):
+        from .python_builtins import all
+        return [~all(self.decompose())]
+
     def is_total(self):
         """
             Returns whether the global constraint is a total function.
@@ -260,6 +264,27 @@ class Circuit(GlobalConstraint):
             idx = arr[idx]
 
         return pathlen == len(self.args) and idx == 0
+
+    def decompose_negation(self):
+        '''
+        returns the decomposition of the negation. We can not simply negate the decomposition
+        because of the use of auxiliary variables in the decomposition
+
+        should return something in negated normal form, since flatten_model.negated_normal() returns this
+        '''
+        from .python_builtins import all
+        succ = cpm_array(self.args)
+        n = len(succ)
+        order = intvar(0, n - 1, shape=n)
+        return [~all([AllDifferent(succ),
+                # different orders
+                AllDifferent(order)
+                    ]),
+                # not negating following constraints since they involve the auxiliary variables
+                # loop: first one is successor of '0'
+                order[0] == succ[0]
+                ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]
+
 
 class Inverse(GlobalConstraint):
     """

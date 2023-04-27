@@ -202,16 +202,16 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( ~(~(a == 7)) )), "[IV0 == 7]" )
 
         # negated normal form tests
-        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[(~BV0) and (~BV1)]" )
+        self.assertEqual( str(flatten_constraint( ~(x|y) )), "[~BV0, ~BV1]" )
         self.assertEqual( str(flatten_constraint( z.implies(~(x|y)) )), "[(BV2) -> ((~BV0) and (~BV1))]" )
-        self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[(BV2) and (BV11), ((BV0) or (BV1)) == (BV11)]" )
-        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[(BV2) and (BV12), ((BV0) and (BV1)) == (BV12)]" )
+        self.assertEqual( str(flatten_constraint( ~(z.implies(~(x|y))) )), "[BV2, (BV0) or (BV1)]" )
+        self.assertEqual( str(flatten_constraint(~(z.implies(~(x&y))))), "[BV2, BV0, BV1]" )
         self.assertEqual( str(flatten_constraint((~z).implies(~(x|y)))), "[(~BV2) -> ((~BV0) and (~BV1))]" )
         self.assertEqual( str(flatten_constraint((~z|y).implies(~(x|y)))), "[((BV0) or (BV1)) -> (BV2), ((BV0) or (BV1)) -> (~BV1)]" )
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
 
         # boolexpr as numexpr
-        self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV13 <= 0, ((IV0) + (IV1) == 2) == (BV13)]" )
+        self.assertEqual( str(flatten_constraint((a + b == 2) <= 0)), "[BV11 <= 0, ((IV0) + (IV1) == 2) == (BV11)]" )
 
         # != in boolexpr, bug #170
-        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV14) == (~BV0), [(IV0 == 1) == (BV14)])" )
+        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])" )
