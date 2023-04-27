@@ -163,6 +163,16 @@ class GlobalConstraint(Expression):
         """
         return True
 
+    def allow_reify_decompose(self):
+        """
+
+        Returns wheter the global constraint can be decomposed in a reified context.
+        This is not the case when the decomposition involves constraints that only affect auxiliary variables.
+        In that case you should also override decompose_negation
+
+        """
+        return True
+
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -285,6 +295,8 @@ class Circuit(GlobalConstraint):
                 order[0] == succ[0]
                 ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]
 
+    def allow_reify_decompose(self):
+        return False
 
 class Inverse(GlobalConstraint):
     """
