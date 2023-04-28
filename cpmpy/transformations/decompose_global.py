@@ -81,10 +81,10 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
                 if cpm_expr.name == '==':
                     #can't just decompose in reified context. Make use of decompose_negation here.
                     li = cpm_expr.args[decomp_idx - 1].implies(all(do_decompose(cpm_expr.args[decomp_idx])))
-                    ri = ~cpm_expr.args[decomp_idx - 1].implies(all(cpm_expr.args[decomp_idx].decompose_negation()))
+                    ri = (~cpm_expr.args[decomp_idx - 1]).implies(all(cpm_expr.args[decomp_idx].decompose_negation()))
                     cpm_expr = [li, ri]
                 elif cpm_expr.name == '->':
-                    cpm_expr = [~cpm_expr.args[decomp_idx - 1].implies(all(cpm_expr.args[decomp_idx].decompose_negation()))]
+                    cpm_expr = [(~cpm_expr.args[decomp_idx - 1]).implies(all(cpm_expr.args[decomp_idx].decompose_negation()))]
             else:
                 cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
                 cpm_expr = [cpm_expr]
