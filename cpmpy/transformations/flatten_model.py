@@ -136,9 +136,6 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
-            if expr.name == 'not':
-                newlist.extend(flatten_constraint(negated_normal(expr.args[0])))
-                continue
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
@@ -314,7 +311,7 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr):
+def get_or_make_var(expr,neg=False):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
@@ -331,6 +328,8 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
         bvar = _BoolVarImpl()
+        if neg:
+            return (bvar, [flatexpr == ~bvar]+flatcons)
         return (bvar, [flatexpr == bvar]+flatcons)
 
     else:
@@ -387,21 +386,20 @@ def normalized_boolexpr(expr):
             # TODO, optimisation if args1 is an 'or'?
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
-        if expr.name == 'not':
-            nnexpr = negated_normal(expr.args[0])
-            if __is_flat_var(nnexpr):
-                return nnexpr, []
-            #return normalized_boolexpr(nnexpr)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
+        if expr.name == 'not':
+            if all(__is_flat_var(arg) for arg in expr.args[0].args):
+                # flatcon in the not, so make negboolview that equals it
+                flatvar,flatcons = get_or_make_var(expr.args[0])
+                return ~flatvar, [c for c in flatcons]
+            # This also circumvents the Operator constructor, so that we create negboolviews instead of not(bv)
+            flatvar,flatcons = get_or_make_var(expr.args[0],neg=True)
+            return (flatvar,flatcons)
         else:
             # one of the arguments is not flat, flatten all
             flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
-            if expr.name == 'not':
-                assert len(flatvars) == 1, "not operator only takes one argument"
-                newexpr = ~flatvars[0] #to make use of the negboolview
-            else:
-                newexpr = Operator(expr.name, flatvars)
+            newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
