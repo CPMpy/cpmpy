@@ -391,13 +391,17 @@ def normalized_boolexpr(expr):
             nnexpr = negated_normal(expr.args[0])
             if __is_flat_var(nnexpr):
                 return nnexpr, []
-            return normalized_boolexpr(nnexpr)
+            #return normalized_boolexpr(nnexpr)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
             # one of the arguments is not flat, flatten all
             flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
-            newexpr = Operator(expr.name, flatvars)
+            if expr.name == 'not':
+                assert len(flatvars) == 1, "not operator only takes one argument"
+                newexpr = ~flatvars[0] #to make use of the negboolview
+            else:
+                newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
@@ -558,7 +562,7 @@ def negated_normal(expr):
         it does not ensure flatness (except if the input is flat)
     """
 
-    if __is_flat_var(expr):
+    if __is_flat_var(expr) or hasattr(expr, "decompose"):
         return ~expr
 
     elif isinstance(expr, Comparison):
