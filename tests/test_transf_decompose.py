@@ -14,6 +14,7 @@ class TestTransfDecomp(unittest.TestCase):
 
     def test_decompose_bool(self):
         ivs = [intvar(1, 9, name=n) for n in "xyz"]
+        ivo = [intvar(0, 9, name=n) for n in "ert"]
         bv = boolvar(name="bv")
 
         cons = AllDifferent(ivs)
@@ -48,6 +49,12 @@ class TestTransfDecomp(unittest.TestCase):
         cons = AllDifferent(ivs) < (bv)
         self.assertEqual(str(decompose_global(cons)),
                          "[(BV15) < (bv), (and([BV12, BV13, BV14])) == (BV15), ((x) != (y)) == (BV12), ((x) != (z)) == (BV13), ((y) != (z)) == (BV14)]")
+
+
+        self.assertTrue(Model([decompose_global(flatten_constraint(bv == Circuit(ivo)),supported={"alldifferent","element","circuit"},supported_reif={"alldifferent","element"})]).solve())
+        self.assertFalse(Model([Xor([Circuit(ivs),Circuit(ivs)])]).solve())
+        self.assertTrue(Model([Circuit(ivs).implies(Xor([Circuit(ivs),Circuit(ivs)]))]).solve())
+
 
     def test_decompose_num(self):
 

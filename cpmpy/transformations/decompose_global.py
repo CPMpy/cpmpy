@@ -77,8 +77,17 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
         if decomp_idx is not None:
             cpm_expr = copy.deepcopy(cpm_expr) # need deepcopy as we are changing args of list inplace
-            cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
-            cpm_expr = [cpm_expr]
+            if hasattr(cpm_expr.args[decomp_idx],"allow_reify_decompose") and not cpm_expr.args[decomp_idx].allow_reify_decompose():
+                if cpm_expr.name == '==':
+                    #can't just decompose in reified context. Make use of decompose_negation here.
+                    li = cpm_expr.args[decomp_idx - 1].implies(all(do_decompose(cpm_expr.args[decomp_idx])))
+                    ri = ~cpm_expr.args[decomp_idx - 1].implies(all(cpm_expr.args[decomp_idx].decompose_negation()))
+                    cpm_expr = [li, ri]
+                elif cpm_expr.name == '->':
+                    cpm_expr = [~cpm_expr.args[decomp_idx - 1].implies(all(cpm_expr.args[decomp_idx].decompose_negation()))]
+            else:
+                cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
+                cpm_expr = [cpm_expr]
 
         if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
             flat = flatten_constraint(cpm_expr) # most of the time will already be flat... do check here?
