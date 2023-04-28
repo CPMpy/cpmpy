@@ -47,8 +47,8 @@ from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarI
 def linearize_constraint(cpm_expr):
     """
     Transforms all constraints to a linear form.
-    This function assumes all constraints are in 'flat normal form'.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()'.
+    This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
+    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_bv_implies()'.
     """
 
     if is_any_list(cpm_expr):

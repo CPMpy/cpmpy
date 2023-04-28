@@ -80,7 +80,8 @@ def reify_rewrite(constraints, supported=frozenset()):
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
 
-        Input is expected to be in Flat Normal Form (so after `flatten_constraint()`)
+        Input is expected to be in Flat Normal Form without unsupported globals present.
+        (so after `flatten_constraint()` and 'decompose_global()')
         Output will also be in Flat Normal Form
 
         Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
