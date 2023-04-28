@@ -22,3 +22,6 @@ class NotSupportedError(CPMpyException):
 
 class IncompleteFunctionError(CPMpyException):
     pass
+
+class TypeError(CPMpyException):
+    pass

@@ -336,7 +336,23 @@ class TestBounds(unittest.TestCase):
             self.assertTrue(m.solve(solver="z3"))
             self.assertTrue(cons.value())
 
-
-
+    def test_not_operator(self):
+        p = boolvar()
+        q = boolvar()
+        x = intvar(0,9)
+        self.assertTrue(cp.Model([~p]).solve())
+        #self.assertRaises(cp.exceptions.TypeError, cp.Model([~x]).solve())
+        self.assertTrue(cp.Model([~(x == 0)]).solve())
+        self.assertTrue(cp.Model([~~p]).solve())
+        self.assertTrue(cp.Model([~(p & p)]).solve())
+        self.assertTrue(cp.Model([~~~~~(p & p)]).solve())
+        self.assertTrue(cp.Model([~cpm_array([p,q,p])]).solve())
+        self.assertTrue(cp.Model([~p.implies(q)]).solve())
+        self.assertTrue(cp.Model([~p.implies(~q)]).solve())
+        self.assertTrue(cp.Model([p.implies(~q)]).solve())
+        self.assertTrue(cp.Model([p == ~q]).solve())
+        self.assertTrue(cp.Model([~~p == ~q]).solve())
+        self.assertTrue(cp.Model([Operator('not',[p]) == q]).solve())
+        self.assertTrue(cp.Model([Operator('not',[p])]).solve())
 if __name__ == '__main__':
     unittest.main()
