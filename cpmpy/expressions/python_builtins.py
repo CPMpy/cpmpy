@@ -78,7 +78,7 @@ def max(iterable):
         max() overwrites python built-in,
         checks if all constants and computes np.max() in that case
     """
-    if not any(isinstance(elem, Expression) for elem in iterable):
+    if is_false_cst(any(isinstance(elem, Expression) for elem in iterable)):
         return np.max(iterable)
     return Maximum(iterable)
 
@@ -87,7 +87,7 @@ def min(iterable):
         min() overwrites python built-in,
         checks if all constants and computes np.min() in that case
     """
-    if not any(isinstance(elem, Expression) for elem in iterable):
+    if is_false_cst(any(isinstance(elem, Expression) for elem in iterable)):
         return np.min(iterable)
     return Minimum(iterable)
 
@@ -98,6 +98,6 @@ def sum(iterable):
         otherwise, makes a sum Operator directly on `iterable`
     """
     iterable = list(iterable) # Fix generator polling
-    if not any(isinstance(elem, Expression) for elem in iterable):
+    if is_false_cst(any(isinstance(elem, Expression) for elem in iterable)):
         return np.sum(iterable)
     return Operator("sum", iterable)
