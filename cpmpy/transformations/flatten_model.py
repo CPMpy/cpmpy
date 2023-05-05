@@ -311,7 +311,7 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr,neg=False):
+def get_or_make_var(expr):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
@@ -328,8 +328,6 @@ def get_or_make_var(expr,neg=False):
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
         bvar = _BoolVarImpl()
-        if neg:
-            return (bvar, [flatexpr == ~bvar]+flatcons)
         return (bvar, [flatexpr == bvar]+flatcons)
 
     else:
@@ -394,8 +392,8 @@ def normalized_boolexpr(expr):
                 flatvar,flatcons = get_or_make_var(expr.args[0])
                 return ~flatvar, [c for c in flatcons]
             # This also circumvents the Operator constructor, so that we create negboolviews instead of not(bv)
-            flatvar,flatcons = get_or_make_var(expr.args[0],neg=True)
-            return (flatvar,flatcons)
+            flatvar,flatcons = get_or_make_var(expr.args[0])
+            return (~flatvar,flatcons)
         else:
             # one of the arguments is not flat, flatten all
             flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
