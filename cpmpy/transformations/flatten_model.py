@@ -597,13 +597,5 @@ def negated_normal(expr):
             # XXX do raise, better safe then sorry
             return expr == 0 # can't do better than this...
 
-    else: # circular if I import GlobalConstraint here...
-        if hasattr(expr, "decompose_negation"):
-            # for global constraints where the negation of the decomposition is not equivalent
-            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
-            return Operator('and', expr.decompose_negation())
-        if hasattr(expr, "decompose"):
-            # global... decompose and negate that
-            return negated_normal(Operator('and', expr.decompose()))
-        else:
-            raise NotImplementedError("negate_normal {}".format(expr))
+    else:
+        raise NotImplementedError("negate_normal {}".format(expr))
