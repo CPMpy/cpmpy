@@ -52,8 +52,8 @@ from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarI
 def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
-    This function assumes all constraints are in 'flat normal form', and implications only contain boolean variables on the lhs.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint() and cpmpy.transformations.reification.only_bv_implies()'.
+    This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
+    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_bv_implies()'.
 
     `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`

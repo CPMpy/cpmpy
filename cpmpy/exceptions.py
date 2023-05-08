@@ -14,12 +14,18 @@ class MinizincPathException(CPMpyException):
 class MinizincNameException(CPMpyException):
     pass
 
+class MinizincBoundsException(CPMpyException):
+    pass
 
 class NotSupportedError(CPMpyException):
     pass
 
 class IncompleteFunctionError(CPMpyException):
     pass
+
+class TypeError(CPMpyException):
+    pass
+
 
 class TransformationNotImplementedError(CPMpyException):
     pass

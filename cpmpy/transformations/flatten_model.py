@@ -86,7 +86,7 @@ from .normalize import toplevel_list
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_boolexpr
 
 def flatten_model(orig_model):
     """
@@ -136,6 +136,9 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
+            if expr.name == 'not':
+                newlist.extend(flatten_constraint(negated_normal(expr.args[0])))
+                continue
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
@@ -200,6 +203,8 @@ def flatten_constraint(expr):
                 newlist.extend(lcons)
                 newlist.extend(rcons)
                 continue
+
+
 
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
@@ -382,7 +387,11 @@ def normalized_boolexpr(expr):
             # TODO, optimisation if args1 is an 'or'?
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
-
+        if expr.name == 'not':
+            nnexpr = negated_normal(expr.args[0])
+            if __is_flat_var(nnexpr):
+                return nnexpr, []
+            return normalized_boolexpr(nnexpr)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -553,8 +562,8 @@ def negated_normal(expr):
         return ~expr
 
     elif isinstance(expr, Comparison):
-        if expr.name == '==' and expr.args[0].is_bool() \
-           and not is_num(expr.args[1]):  # XXX and is ==0 hack..., fix with ~
+        if expr.name == '==' and is_boolexpr(expr.args[0]) \
+           and is_boolexpr(expr.args[1]):
             # Boolean case, double reification, keep == and negate arg1
             return Comparison('==', expr.args[0], negated_normal(expr.args[1]))
 
@@ -578,18 +587,18 @@ def negated_normal(expr):
         elif expr.name == '->':
             # XXX this might create a top-level and
             return expr.args[0] & negated_normal(expr.args[1])
+        elif expr.name == 'not':
+            return expr.args[0]
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
             # XXX do raise, better safe then sorry
             return expr == 0 # can't do better than this...
 
-    elif expr.name == 'xor':
-        # stay in xor space
-        # only negate last element
-        from ..expressions.globalconstraints import Xor  # avoid circular import
-        return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
-
     else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose_negation"):
+            # for global constraints where the negation of the decomposition is not equivalent
+            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
+            return Operator('and', expr.decompose_negation())
         if hasattr(expr, "decompose"):
             # global... decompose and negate that
             return negated_normal(Operator('and', expr.decompose()))

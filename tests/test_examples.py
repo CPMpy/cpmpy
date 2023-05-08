@@ -8,15 +8,21 @@ Will only run solver tests on solvers that are installed
 """
 from glob import glob
 from os.path import join
+from os import getcwd
 import types
 import importlib.machinery
 import pytest
 from cpmpy import *
 
-EXAMPLES = glob(join(".", "examples", "*.py")) + \
-           glob(join(".", "examples", "advanced", "*.py")) + \
-           glob(join(".", "examples", "csplib", "*.py"))
-
+cwd = getcwd()
+if 'y' in cwd[-2:]:
+    EXAMPLES =  glob(join(".", "examples", "*.py")) + \
+                glob(join(".", "examples", "advanced", "*.py")) + \
+                glob(join(".", "examples", "csplib", "*.py"))
+else:
+    EXAMPLES = glob(join("..", "examples", "*.py")) + \
+               glob(join("..", "examples", "advanced", "*.py")) + \
+               glob(join("..", "examples", "csplib", "*.py"))
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples(example):

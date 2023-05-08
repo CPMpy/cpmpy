@@ -32,7 +32,7 @@ from datetime import timedelta # for mzn's timeout
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import MinizincNameException
+from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
@@ -223,13 +223,17 @@ class CPM_minizinc(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
+        runtime = 0
         if 'time' in mzn_result.statistics:
-            time = mzn_result.statistics['time']
-            if isinstance(time, int):
-                self.cpm_status.runtime = time / 1000
-            elif isinstance(time, timedelta):
-                self.cpm_status.runtime = time.total_seconds()  # --output-time
-
+            self.cpm_status.runtime = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
+        else:
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("flatTime", 0))
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("initTime", 0))
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("solveTime", 0))
+            if runtime != 0:
+                self.cpm_status.runtime = runtime
+            else:
+                raise NotImplementedError #Please report on github, minizinc probably changed their time names/types
 
         # translate exit status
         mzn_status = mzn_result.status
@@ -246,11 +250,19 @@ class CPM_minizinc(SolverInterface):
             raise Exception("MiniZinc solver returned with status 'Error'")
         elif mzn_status == minizinc.result.Status.UNKNOWN:
             # means, no solution was found (e.g. within timeout?)...
-            self.cpm_status.exitstatus = ExitStatus.ERROR
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError  # a new status type was introduced, please report on github
 
         return self.cpm_status
+
+    def mzn_time_to_seconds(self, time):
+        if isinstance(time, int):
+            return time / 1000
+        elif isinstance(time, timedelta):
+            return time.total_seconds()  # --output-time
+        else:
+            raise NotImplementedError #unexpected type for time
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
@@ -327,6 +339,8 @@ class CPM_minizinc(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
             elif isinstance(cpm_var, _IntVarImpl):
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
             self._varmap[cpm_var] = mzn_var
 
@@ -470,7 +484,7 @@ class CPM_minizinc(SolverInterface):
                 # I don't think there is a more direct way unfortunately
                 w = [self._convert_expression(wi) for wi in expr.args[0]]
                 x = [self._convert_expression(xi) for xi in expr.args[1]]
-                args_str = [f"{wi}*{xi}" for wi,xi in zip(w,x)]
+                args_str = [f"{wi}*({xi})" for wi,xi in zip(w,x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
             # special case, infix: two args

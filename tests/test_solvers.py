@@ -258,6 +258,44 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
+    # this test fails on OR-tools version <9.6
+    def test_ortools_version(self):
+
+        a,b,c,d = [cp.intvar(0,3, name=n) for n in "abcd"]
+        p,q,r,s = [cp.intvar(0,3, name=n) for n in "pqrs"]
+
+        bv1, bv2, bv3 = [cp.boolvar(name=f"bv{i}") for i in range(1,4)]
+
+        model = cp.Model()
+
+        model += b != 1
+        model += b != 2
+
+        model += c != 0
+        model += c != 3
+
+        model += d != 0
+
+        model += p != 2
+        model += p != 3
+
+        model += q != 1
+
+        model += r != 1
+
+        model += s != 2
+
+        model += cp.AllDifferent([a,b,c,d])
+        model += cp.AllDifferent([p,q,r,s])
+
+        model += bv1.implies(a == 0)
+        model += bv2.implies(r == 0)
+        model += bv3.implies(a == 2)
+        model += (~bv1).implies(p == 0)
+
+        model += bv2 | bv3
+
+        self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
