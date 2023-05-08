@@ -590,7 +590,7 @@ class Operator(Expression):
                 return -ub,-lb
             return 0, max(-lb,ub)
         
-        assert (False, "Invalid code path: bound requested for unknown expression. Please report this bug.")
+        raise ValueError("Bound requested for unknown expression {self}, please report bug on github")
         
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
