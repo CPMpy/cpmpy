@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 
@@ -44,12 +44,6 @@ def simplify_bool_const(lst_of_expr, num_context=False):
     - list_of_expr: list of CPMpy expressions
     """
 
-    def _is_false(expr):
-        return isinstance(expr, BoolVal) and expr.args[0] is False
-
-    def _is_true(expr):
-        return isinstance(expr, BoolVal) and expr.args[0] is True
-
     newlist = []
     for expr in lst_of_expr:
 
@@ -64,24 +58,24 @@ def simplify_bool_const(lst_of_expr, num_context=False):
             args = simplify_bool_const(expr.args, num_context=not expr.is_bool())
 
             if expr.name == "or":
-                if any(_is_true(arg) for arg in args):
+                if any(is_false_cst(arg) for arg in args):
                     newlist.append(1 if num_context else BoolVal(True))
                 else:
                     newlist.append(Operator("or", [arg for arg in args if not isinstance(arg, BoolVal)]))
 
             elif expr.name == "and":
-                if any(_is_false(arg) for arg in args):
+                if any(is_false_cst(arg) for arg in args):
                     newlist.append(0 if num_context else BoolVal(False))
                 else:
                     newlist.append(Operator("and", [arg for arg in args if not isinstance(arg, BoolVal)]))
 
             elif expr.name == "->":
                 cond, bool_expr = args
-                if _is_false(cond) or _is_true(bool_expr):
+                if is_false_cst(cond) or is_true_cst(bool_expr):
                     newlist.append(BoolVal(True))
-                elif _is_true(cond):
+                elif is_true_cst(cond):
                     newlist.append(bool_expr)
-                elif _is_false(bool_expr):
+                elif is_false_cst(bool_expr):
                     newlist += simplify_bool_const([~cond])
                 else:
                     newlist.append(cond.implies(bool_expr))
