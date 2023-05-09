@@ -1,3 +1,4 @@
+import copy
 import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -262,7 +263,7 @@ class TestGlobal(unittest.TestCase):
         capacity = 2
         m += cp.AllDifferent(start)
         m += cp.Cumulative(start, duration, end, demand, capacity)
-        m2 = m.deepcopy()  # should not throw an exception
+        m2 = copy.deepcopy(m)  # should not throw an exception
         self.assertEqual(repr(m), repr(m2))  # should be True
 
     def test_cumulative_single_demand(self):
@@ -408,4 +409,4 @@ class TestBounds(unittest.TestCase):
     def test_bounds_xor(self):
         # just one case of a Boolean global constraint
         expr = cp.Xor(cp.boolvar(3))
-        self.assertEquals(expr.get_bounds(),(0,1))
+        self.assertEqual(expr.get_bounds(),(0,1))

@@ -32,7 +32,7 @@ from datetime import timedelta # for mzn's timeout
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import MinizincNameException
+from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, flatlist
@@ -339,6 +339,8 @@ class CPM_minizinc(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
             elif isinstance(cpm_var, _IntVarImpl):
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
             self._varmap[cpm_var] = mzn_var
 

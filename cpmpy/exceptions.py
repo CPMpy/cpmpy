@@ -14,6 +14,8 @@ class MinizincPathException(CPMpyException):
 class MinizincNameException(CPMpyException):
     pass
 
+class MinizincBoundsException(CPMpyException):
+    pass
 
 class NotSupportedError(CPMpyException):
     pass
