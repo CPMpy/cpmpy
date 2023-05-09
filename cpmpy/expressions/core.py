@@ -75,7 +75,7 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
@@ -148,9 +148,9 @@ class Expression(object):
     # for double implication, use equivalence self == other
     def implies(self, other):
         # other constant
-        if other is True:
-            return True
-        if other is False:
+        if is_true_cst(other):
+            return BoolVal(True)
+        if is_false_cst(other):
             return ~self
         return Operator('->', [self, other])
 
@@ -175,34 +175,34 @@ class Expression(object):
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
         # some simple constant removal
-        if other is True:
+        if is_true_cst(other):
             return self
-        if other is False:
-            return False
+        if is_false_cst(other):
+            return BoolVal(False)
 
         return Operator("and", [self, other])
     def __rand__(self, other):
         # some simple constant removal
-        if other is True:
+        if is_true_cst(other):
             return self
-        if other is False:
-            return False
+        if is_false_cst(other):
+            return BoolVal(False)
 
         return Operator("and", [other, self])
 
     def __or__(self, other):
         # some simple constant removal
-        if other is True:
-            return True
-        if other is False:
+        if is_true_cst(other):
+            return BoolVal(True)
+        if is_false_cst(other):
             return self
 
         return Operator("or", [self, other])
     def __ror__(self, other):
         # some simple constant removal
-        if other is True:
-            return True
-        if other is False:
+        if is_true_cst(other):
+            return BoolVal(True)
+        if is_false_cst(other):
             return self
 
         return Operator("or", [other, self])
@@ -211,9 +211,9 @@ class Expression(object):
         # avoid cyclic import
         from .globalconstraints import Xor
         # some simple constant removal
-        if other is True:
+        if is_true_cst(other):
             return ~self
-        if other is False:
+        if is_false_cst(other):
             return self
         return Xor([self, other])
 
@@ -221,9 +221,9 @@ class Expression(object):
         # avoid cyclic import
         from .globalconstraints import Xor
         # some simple constant removal
-        if other is True:
+        if is_true_cst(other):
             return ~self
-        if other is False:
+        if is_false_cst(other):
             return self
         return Xor([other, self])
 
@@ -334,6 +334,10 @@ class BoolVal(Expression):
 
     def value(self):
         return self.args[0]
+
+    def __invert__(self):
+        self.args[0] = not self.args[0]
+        return self
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions

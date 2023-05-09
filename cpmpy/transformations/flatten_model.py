@@ -594,6 +594,9 @@ def negated_normal(expr):
             # XXX do raise, better safe then sorry
             return expr == 0 # can't do better than this...
 
+    elif isinstance(expr,BoolVal):
+        return BoolVal(not expr.args[0])
+
     else: # circular if I import GlobalConstraint here...
         if hasattr(expr, "decompose_negation"):
             # for global constraints where the negation of the decomposition is not equivalent
