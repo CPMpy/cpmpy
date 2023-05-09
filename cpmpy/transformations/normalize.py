@@ -92,7 +92,10 @@ def simplify_bool_const(lst_of_expr, num_context=False):
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_bool_const(expr.args, num_context=True)
             newlist.append(eval_comparison(expr.name, lhs, rhs))
-        else: # global constraints
+        elif isinstance(expr, GlobalConstraint):
+            expr = copy.deepcopy(expr)
+            expr.args = simplify_bool_const(expr.args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
-
+        else: # variables/constants
+            newlist.append(expr)
     return newlist
