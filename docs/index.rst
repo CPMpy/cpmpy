@@ -44,6 +44,29 @@ Getting started:
    api/solvers
    api/transformations
 
+Supported solvers
+-----------------
+
+CPMpy can translate to many different solvers, and even provides direct access to them.
+
+To make clear how well supported and tested these solvers are, we work with a tiered classification:
+
+* Tier 1 solvers: passes all internal tests, passes our bigtest suit, will be fuzztested in the near future
+    - "ortools" the OR-Tools CP-SAT solver
+    - "pysat" the PySAT library and its many SAT solvers ("pysat:glucose4", "pysat:lingeling", etc)
+
+* Tier 2 solvers: passes all internal tests, might fail on edge cases in bigtest
+    - "minizinc" the MiniZinc modeling system and its many solvers ("minizinc:gecode", "minizinc:chuffed", etc)
+    - "z3" the SMT solver and theorem prover
+    - "gurobi" the MIP solver
+    - "PySDD" a Boolean knowledge compiler
+
+* Tier 3 solvers: they are work in progress and live in a pull request
+    - "gcs" the Glasgow Constraint Solver
+    - "exact" the Exact pseudo-boolean solver
+
+We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
+
 
 FAQ
 ---
