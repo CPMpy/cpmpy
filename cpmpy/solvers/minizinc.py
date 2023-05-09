@@ -35,8 +35,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, flatlist
-from ..transformations.get_variables import get_variables_model, get_variables
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.normalize import toplevel_list
 
@@ -543,6 +544,11 @@ class CPM_minizinc(SolverInterface):
             gcc = self._convert_expression(gcc)
             cover = self._convert_expression(cover)
             return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+
+        # a direct constraint, treat differently for MiniZinc, a text-based language
+        # use the name as, unpack the arguments from the argument tuple
+        elif isinstance(expr, DirectConstraint):
+            return "{}({})".format(expr.name, args_str[0])
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:

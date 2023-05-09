@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -39,6 +39,25 @@ class TestDirectPySAT(unittest.TestCase):
 
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
+
+@pytest.mark.skipif(not CPM_minizinc.supported(),
+                    reason="MinZinc not installed")
+class TestDirectMiniZinc(unittest.TestCase):
+
+    def test_direct_clause(self):
+        iv = intvar(1,9, shape=3)
+
+        model = SolverLookup.get("minizinc")
+
+        # MiniZinc is oddly different for DirectConstraint, because it is a text-based language
+        # so, as DirectConstraint name, you need to give the name of a text-based constraint,
+        # NOT a name of a function of the mzn_model class...
+
+        # this just to demonstrate, there are no 0's in the domains...
+        model += DirectConstraint("alldifferent_except_0", iv)
+
+        self.assertTrue(model.solve())
+        self.assertTrue(AllDifferent(iv).value())
 
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
