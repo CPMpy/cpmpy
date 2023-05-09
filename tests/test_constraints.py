@@ -98,7 +98,7 @@ def comp_constraints(solver):
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
-                for rhs in [NUM_VAR, BoolVal(True)]:
+                for rhs in [NUM_VAR,1, BoolVal(True)]:
                     yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
