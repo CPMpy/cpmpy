@@ -53,9 +53,7 @@ def get_variables(expr, collect=None):
                     extract(e.args[0], append)  # skip data in arg1
                 elif isinstance(e, _DirectVarImpl) and e.novar is not None:
                     # custom variables, skip novar arguments
-                    for i,a in enumerate(e.args):
-                        if i not in e.novar:
-                            extract(a, append)
+                    extract([a for i,a in enumerate(e.args) if i not in e.novar], append)
                 else:
                     extract(e.args, append)
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
