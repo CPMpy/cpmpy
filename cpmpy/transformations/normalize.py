@@ -3,7 +3,6 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
@@ -99,7 +98,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, int):
                 # direct simplification of boolean comparisons
                 if rhs < 0:
-                    newlist.append(expr.name in  {"!=", ">", ">="}) # all other operators evaluate to False
+                    newlist.append(BoolVal(expr.name in  {"!=", ">", ">="})) # all other operators evaluate to False
                 if rhs == 0:
                     if expr.name == "!=" or expr.name == ">":
                         newlist.append(lhs)
@@ -107,7 +106,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         newlist.append(~lhs)
                     if expr.name == "<":
                         newlist.append(BoolVal(False))
-                    if expr.name == ">":
+                    if expr.name == ">=":
                         newlist.append(BoolVal(True))
                 if rhs == 1:
                     if expr.name == "==" or expr.name == ">=":
@@ -119,10 +118,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if expr.name == "<=":
                         newlist.append(BoolVal(True))
                 if rhs > 1:
-                    newlist.append(expr.name in  {"!=", "<", "<="}) # all other operators evaluate to False
+                    newlist.append(BoolVal(expr.name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(expr.name, lhs, rhs))
-        elif isinstance(expr, GlobalConstraint):
+        elif hasattr(expr, "decompose"):
             expr = copy.deepcopy(expr)
             expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
