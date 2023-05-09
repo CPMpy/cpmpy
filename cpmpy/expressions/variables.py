@@ -327,6 +327,9 @@ class _NumVarImpl(Expression):
         """
         return self._value
 
+    def get_bounds(self):
+        """ the lower and upper bounds"""
+        return self.lb, self.ub
     def clear(self):
         """ clear the value obtained from the last solve call
         """
@@ -339,10 +342,6 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         return hash(self.name)
 
-    def deepcopy(self, memodict={}):
-        copied = type(self)(self.lb, self.ub, self.name)
-        copied._value = self.value()
-        return copied
 
 class _IntVarImpl(_NumVarImpl):
     """
@@ -456,9 +455,6 @@ class NegBoolView(_BoolVarImpl):
     def __invert__(self):
         return self._bv
 
-    def deepcopy(self, memodict={}):
-        return NegBoolView(self._bv.deepcopy(memodict))
-
 
 class _DirectVarImpl(Expression):
     """
@@ -540,9 +536,6 @@ class NDVarArray(Expression, np.ndarray):
         for e in self.flat:
             e.clear()
 
-    def deepcopy(self, memodict={}):
-        copied = [arg.deepcopy(memodict) if isinstance(arg, Expression) else arg for arg in self]
-        return cpm_array(copied)
     
     def __repr__(self):
         """
@@ -660,7 +653,8 @@ class NDVarArray(Expression, np.ndarray):
         return self._vectorized(other, '__rpow__') 
     
     # VECTORIZED Bool operators
-    # __invert__ not needed because translated to == 0 and that is handled properly
+    def __invert__(self):
+        return cpm_array([~s for s in self])
     def __and__(self, other):
         return self._vectorized(other, '__and__') 
     def __rand__(self, other):

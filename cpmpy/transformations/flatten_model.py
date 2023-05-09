@@ -79,10 +79,14 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 """
 import copy
 import math
+import builtins
+import numpy as np
+
+from .normalize import toplevel_list
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_boolexpr
 
 def flatten_model(orig_model):
     """
@@ -91,9 +95,7 @@ def flatten_model(orig_model):
     from ..model import Model  # otherwise circular dependency...
 
     # the top-level constraints
-    basecons = []
-    for con in orig_model.constraints:
-        basecons += flatten_constraint(con)
+    basecons = flatten_constraint(orig_model.constraints)
 
     # the objective
     if orig_model.objective_ is None:
@@ -109,74 +111,109 @@ def flatten_model(orig_model):
 
 def flatten_constraint(expr):
     """
-        input is any expression; except bool, is_num(), pure _NumVarImpl,
+        input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
         
         output: see definition of 'flat normal form' above.
 
         it will return 'Exception' if something is not supported
         TODO, what built-in python error is best?
+        RE TODO: we now have custom NotImpl/NotSupported
     """
-    # base cases
-    if isinstance(expr, bool):
-        if expr:
-            return []
-        else:
-            return [expr]  # not sure about this one... means False is a valid FNF expression
-    elif isinstance(expr, _BoolVarImpl):
-        return [expr]
-    elif is_num(expr) or isinstance(expr, _NumVarImpl):
-        raise Exception("Numeric constants or numeric variables not allowed as base constraint")
+    newlist = []
+    # for backwards compatibility reasons, we now consider it a meta-
+    # transformation, that calls (preceding) transformations itself
+    # e.g. `toplevel_list()` ensures it is a list
+    for expr in toplevel_list(expr):
 
-    # recursively flatten list of constraints
-    if is_any_list(expr):
-        flatcons = []
-        for e in expr:
-            flatcons += flatten_constraint(e)  # add all at end
-        return flatcons
-    # recursively flatten top-level 'and'
-    if isinstance(expr, Operator) and expr.name == 'and':
-        flatcons = []
-        for e in expr.args:
-            flatcons += flatten_constraint(e)  # add all at end
-        return flatcons
+        if isinstance(expr, _BoolVarImpl):
+            newlist.append(expr)
 
-    assert expr.is_bool(), f"Boolean expressions only in flatten_constraint, `{expr}` not allowed."
-
-    from cpmpy.expressions.globalconstraints import GlobalConstraint  # avoid circular import
-    if isinstance(expr, Operator):
-        """
+        elif isinstance(expr, Operator):
+            """
             - Base Boolean operators: and([Var]), or([Var])        (CPMpy class 'Operator', is_bool())
             - Base Boolean impliciation: Var -> Var                (CPMpy class 'Operator', is_bool())
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
-        """
-        # does not type-check that arguments are bool... Could do now with expr.is_bool()!
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return [expr]
+            """
+            if expr.name == 'not':
+                newlist.extend(flatten_constraint(negated_normal(expr.args[0])))
+                continue
+            # does not type-check that arguments are bool... Could do now with expr.is_bool()!
+            if all(__is_flat_var(arg) for arg in expr.args):
+                newlist.append(expr)
+                continue
 
-        if expr.name == '->':
-            # ->, allows a boolexpr on one side
-            if isinstance(expr.args[0], _BoolVarImpl):
-                # LHS is var, ensure RHS is normalized 'Boolexpr'
-                lhs = expr.args[0]
-                (rhs,flatcons) = normalized_boolexpr(expr.args[1])
-            else:
-                # make LHS normalized 'Boolexpr', RHS must be a var
-                (lhs,lcons) = normalized_boolexpr(expr.args[0])
-                (rhs,rcons) = get_or_make_var(expr.args[1])
-                flatcons = lcons+rcons
+            elif expr.name == 'or':
+                # rewrites that avoid auxiliary var creation, should go to normalize?
+                # in case of an implication in a disjunction, merge in
+                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
+                    newargs = list(expr.args)  # take copy
+                    for i,a in enumerate(newargs):
+                        if isinstance(a, Operator) and a.name == '->':
+                            newargs[i:i+1] = [~a.args[0],a.args[1]]
+                    # there could be nested implications
+                    newlist.extend(flatten_constraint(Operator('or', newargs)))
+                    continue
+                else:
+                    # check if disjunction contains conjunctions, and if so split out
+                    newexprs = None
+                    for i,a in enumerate(expr.args):
+                        if isinstance(a, Operator) and a.name == 'and':
+                            # can avoid aux var creation by splitting over the and
+                            newexprs = [Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args]
+                            break
+                    if newexprs is not None:
+                        newlist.extend(flatten_constraint(newexprs))
+                        continue
 
-            newexpr = Operator(expr.name, (lhs,rhs))
-            return [newexpr]+flatcons
-        else:
+            elif expr.name == '->':
+                # some rewrite rules that avoid creating auxiliary variables
+                # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
+                # XXX ideally negations are already pushed down, so a0->~(or(...)) is also covered
+                if expr.args[1].name == 'and':
+                    a1s = expr.args[1].args
+                    a0 = expr.args[0]
+                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s]))
+                    continue
+                # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
+                elif expr.args[0].name == 'or':
+                    a0s = expr.args[0].args
+                    a1 = expr.args[1]
+                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s]))
+                    continue
+                # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
+                elif expr.args[0].name == '->':
+                    a01,a02 = expr.args[0].args
+                    a1 = expr.args[1]
+                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)]))
+                    continue
+
+                # ->, allows a boolexpr on one side
+                elif isinstance(expr.args[0], _BoolVarImpl):
+                    # LHS is var, ensure RHS is normalized 'Boolexpr'
+                    lhs,lcons = expr.args[0], ()
+                    rhs,rcons = normalized_boolexpr(expr.args[1])
+                else:
+                    # make LHS normalized 'Boolexpr', RHS must be a var
+                    lhs,lcons = normalized_boolexpr(expr.args[0])
+                    rhs,rcons = get_or_make_var(expr.args[1])
+
+                newlist.append(Operator(expr.name, (lhs,rhs)))
+                newlist.extend(lcons)
+                newlist.extend(rcons)
+                continue
+
+
+
+            # if none of the above cases + continue matched:
             # a normalizable boolexpr
             (con, flatcons) = normalized_boolexpr(expr)
-            return [con]+flatcons
+            newlist.append(con)
+            newlist.extend(flatcons)
 
-
-    elif isinstance(expr, Comparison):
-        """
+        elif isinstance(expr, Comparison):
+            """
     - Base Boolean equality: Var == Var                         (CPMpy class 'Comparison')
                              Var == Constant                    (CPMpy class 'Comparison')
     - Numeric equality:  Numexpr == Var                    (CPMpy class 'Comparison')
@@ -185,50 +222,68 @@ def flatten_constraint(expr):
                            Numexpr != Constant             (CPMpy class 'Comparison')
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
-        """
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return [expr]
+            """
+            exprname = expr.name  # so it can be modified
+            lexpr, rexpr = expr.args
+            rewritten = False
 
-        # swap 'Var == Expr' to normal 'Expr == Var'
-        lexpr, rexpr = expr.args
-        if (expr.name == '==' or expr.name == '!=') \
-                and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
-            lexpr, rexpr = rexpr, lexpr
+            # rewrite 'Var == Expr' to normalzed 'Expr == Var'
+            if (expr.name == '==' or expr.name == '!=') \
+                    and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                lexpr, rexpr = rexpr, lexpr
+                rewritten = True
 
-        # ensure rhs is var
-        (rvar, rcons) = get_or_make_var(rexpr)
+            # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+            if exprname == '!=' and lexpr.is_bool():
+                exprname = '=='
+                rexpr = ~rexpr
+                rewritten = True
 
-        exprname = expr.name  # so it can be modified
-        # 'BoolExpr != Rvar' to normal 'BoolExpr == ~Rvar'
-        if exprname == '!=' and lexpr.is_bool():  # negate rvar
-            exprname = '=='
-            rvar = ~rvar
+            # already flat?
+            if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
+                if not rewritten:
+                    newlist.append(expr)  # original
+                else:
+                    newlist.append(Comparison(exprname, lexpr, rexpr))
+                continue
 
-        # Reification (double implication): Boolexpr == Var
-        if exprname == '==' and lexpr.is_bool():
-            if is_num(rexpr):
-                # shortcut, full original one is normalizable BoolExpr
-                # such as And(v1,v2,v3) == 0
-                (con, flatcons) = normalized_boolexpr(expr)
-                return [con]+flatcons
+            # ensure rhs is var
+            (rvar, rcons) = get_or_make_var(rexpr)
+
+            # Reification (double implication): Boolexpr == Var
+            if exprname == '==' and lexpr.is_bool():
+                if is_num(rexpr):
+                    # shortcut, full original one is normalizable BoolExpr
+                    # such as And(v1,v2,v3) == 0
+                    # TODO: should be normalized away in earlier transform
+                    (con, flatcons) = normalized_boolexpr(expr)
+                    newlist.append(con)
+                    newlist.extend(flatcons)
+                    continue
+                else:
+                    (lhs, lcons) = normalized_boolexpr(lexpr)
             else:
-                (lhs, lcons) = normalized_boolexpr(lexpr)
-        else:
-            # other cases: LHS is numexpr
-            (lhs, lcons) = normalized_numexpr(lexpr)
+                # other cases: LHS is numexpr
+                (lhs, lcons) = normalized_numexpr(lexpr)
 
-        return [Comparison(exprname, lhs, rvar)]+lcons+rcons
+            newlist.append(Comparison(exprname, lhs, rvar))
+            newlist.extend(lcons)
+            newlist.extend(rcons)
 
     elif isinstance(expr, GlobalConstraint):
         """
     - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
-        """
-        (con, flatcons) = normalized_boolexpr(expr)
-        return [con] + flatcons
+            """
+            (con, flatcons) = normalized_boolexpr(expr)
+            newlist.append(con)
+            newlist.extend(flatcons)
 
     else:
         # any other case (e.g. DirectConstraint), pass as is
-        return [expr]
+        newlist.append(expr)
+
+    return newlist
+
 
 def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
     """
@@ -287,82 +342,9 @@ def get_or_make_var(expr):
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
-        if isinstance(flatexpr, Operator) and flatexpr.name == "wsum":
-            # more complex args, and weights can be negative, so more complex lbs/ubs
-            weights, flatvars  = flatexpr.args
-            bounds = np.array([[w * fvar if is_num(fvar) else w * fvar.lb for w, fvar in zip(weights, flatvars)],
-                               [w * fvar if is_num(fvar) else w * fvar.ub for w, fvar in zip(weights, flatvars)]])
-            lb, ub = bounds.min(axis=0).sum(), bounds.max(axis=0).sum() # for every column is axis=0...
-            ivar = _IntVarImpl(lb, ub)
-            return (ivar, [flatexpr == ivar]+flatcons)
-
-        elif isinstance(flatexpr, Operator):
-            lbs = [var.lb if isinstance(var, _NumVarImpl) else var for var in flatexpr.args]
-            ubs = [var.ub if isinstance(var, _NumVarImpl) else var for var in flatexpr.args]
-
-            if flatexpr.name == 'abs': # unary
-                if lbs[0] < 0 and ubs[0] > 0:
-                    lb = 0 # from neg to pos, so includes 0
-                else:
-                    lb = min(abs(lbs[0]), abs(ubs[0])) # same sign, take smallest
-                ub = max(abs(lbs[0]), abs(ubs[0])) # largest abs value
-                ivar = _IntVarImpl(lb, ub)
-            elif flatexpr.name == "sub": # binary
-                lb = lbs[0] - ubs[1]
-                ub = ubs[0] - lbs[1]
-                ivar = _IntVarImpl(lb,ub)
-            elif flatexpr.name == 'mul': # binary
-                v0 = [lbs[0], ubs[0]]
-                v1 = [lbs[1], ubs[1]]
-                bnds = [v0[i]*v1[j] for i in [0,1] for j in [0,1]]
-                ivar = _IntVarImpl(min(bnds),max(bnds))
-            elif flatexpr.name == 'div': # binary
-                num = [lbs[0], ubs[0]]
-                denom = [lbs[1], ubs[1]]
-                bnds = [num[i]/denom[j] for i in [0,1] for j in [0,1]]
-                # the above can give fractional values, tighten bounds to integer
-                ivar = _IntVarImpl(math.ceil(min(bnds)), math.floor(max(bnds)))
-            elif flatexpr.name == 'mod': # binary
-
-                if (ubs[0]+1) - lbs[0] > 1000000 or (ubs[1]+1) - lbs[1] > 1000000:
-                    # special check: if the bounds are too loose we can not check all possibilities below
-                    ivar = _IntVarImpl(-2147483648, 2147483647)
-                else:
-                    l = np.arange(lbs[0], ubs[0]+1)
-                    r = np.arange(lbs[1], ubs[1]+1)
-                    # check all possibilities
-                    remainders = np.mod(l[:,None],r)
-                    lb, ub = np.min(remainders), np.max(remainders)
-                    ivar = _IntVarImpl(lb,ub)
-
-            elif flatexpr.name == 'pow': # binary
-                base = [lbs[0], ubs[0]]
-                exp = [lbs[1], ubs[1]]
-                if exp[0] < 0:
-                    raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
-                bnds = [base[i]**exp[j] for i in [0,1] for j in [0,1]]
-                if exp[1] > 0: # even/uneven behave differently when base is negative
-                    bnds += [base[0]**(exp[1]-1), base[1]**(exp[1]-1)]
-                ivar = _IntVarImpl(min(bnds), max(bnds))
-            elif flatexpr.name == 'sum': # n-ary
-                ivar = _IntVarImpl(sum(lbs), sum(ubs))
-            elif flatexpr.is_bool(): # Boolean
-                ivar = _BoolVarImpl() # TODO: we can support Bool? check, update docs
-            else:
-                raise Exception("Operator '{}' not known in get_or_make_var".format(expr.name)) # or bug
-
-            return (ivar, [flatexpr == ivar]+flatcons)
-
-        else:
-            """
-            - Global constraint (non-Boolean) (examples: Max,Min,Element)
-            """
-            # we don't currently have a generic way to get bounds from non-Boolean globals...
-            # TODO issue #96 Add to GlobalCons as function? e.g. (lb,ub) = expr.get_bounds()? would also work for Operator...
-            ivar = _IntVarImpl(-2147483648, 2147483647) # TODO, this can breaks solvers
-
-            return (ivar, [flatexpr == ivar]+flatcons)
-
+        lb, ub = flatexpr.get_bounds()
+        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
+        return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
@@ -379,15 +361,14 @@ def get_or_make_var_or_list(expr):
 
 def normalized_boolexpr(expr):
     """
-        all 'flat normal form' Boolean expressions that can be 'reified', meaning that
+        input is any Boolean (is_bool()) expression,
+        output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
+            - subexpr == BoolVar
+            - subexpr -> BoolVar
 
-            - expr == BoolVar
-            - expr != BoolVar
-            - expr -> BoolVar
+        are valid output expressions.
 
-        are valid expressions.
-
-        Currently, this is the case for:
+        Currently, this is the case for subexpr:
         - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
@@ -410,7 +391,11 @@ def normalized_boolexpr(expr):
             # TODO, optimisation if args1 is an 'or'?
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
-
+        if expr.name == 'not':
+            nnexpr = negated_normal(expr.args[0])
+            if __is_flat_var(nnexpr):
+                return nnexpr, []
+            return normalized_boolexpr(nnexpr)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -420,10 +405,10 @@ def normalized_boolexpr(expr):
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
-        if all(__is_flat_var(arg) for arg in expr.args):
-            return (expr, [])
+        if expr.name != '!=' and all(__is_flat_var(arg) for arg in expr.args):
+            return (expr, [])  # shortcut
         else:
-            # LHS can be numexpr, RHS has to be variable
+            # LHS can be boolexpr, RHS has to be variable
 
             lexpr, rexpr = expr.args
             exprname = expr.name
@@ -581,6 +566,11 @@ def negated_normal(expr):
         return ~expr
 
     elif isinstance(expr, Comparison):
+        if expr.name == '==' and is_boolexpr(expr.args[0]) \
+           and is_boolexpr(expr.args[1]):
+            # Boolean case, double reification, keep == and negate arg1
+            return Comparison('==', expr.args[0], negated_normal(expr.args[1]))
+
         newexpr = copy.copy(expr)
         if   expr.name == '==': newexpr.name = '!='
         elif expr.name == '!=': newexpr.name = '=='
@@ -596,20 +586,23 @@ def negated_normal(expr):
         if expr.name == 'and':
             return Operator('or', [negated_normal(arg) for arg in expr.args])
         elif expr.name == 'or':
+            # XXX this might create a top-level and
             return Operator('and', [negated_normal(arg) for arg in expr.args])
         elif expr.name == '->':
+            # XXX this might create a top-level and
             return expr.args[0] & negated_normal(expr.args[1])
+        elif expr.name == 'not':
+            return expr.args[0]
         else:
             #raise NotImplementedError("negate_normal {}".format(expr))
+            # XXX do raise, better safe then sorry
             return expr == 0 # can't do better than this...
 
-    elif expr.name == 'xor':
-        # stay in xor space
-        # only negate last element
-        from ..expressions.globalconstraints import Xor  # avoid circular import
-        return Xor(expr.args[:-1] + [negated_normal(expr.args[-1])])
-
     else: # circular if I import GlobalConstraint here...
+        if hasattr(expr, "decompose_negation"):
+            # for global constraints where the negation of the decomposition is not equivalent
+            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
+            return Operator('and', expr.decompose_negation())
         if hasattr(expr, "decompose"):
             # global... decompose and negate that
             return negated_normal(Operator('and', expr.decompose()))

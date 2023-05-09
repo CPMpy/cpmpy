@@ -38,6 +38,8 @@
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
     - x ^ y         Xor([x,y])  # a global constraint
+    - ~x            Operator("not", [x])
+                    which in turn creates a NegBoolView()` in case x is a Boolean variable
 
     Finally there are two special cases for logical operators 'implies' and '~/not'.
     
@@ -46,13 +48,7 @@
 
     - x.implies(y)  Operator("->", [x,y])
 
-    For negation, we rewrite this to the more generic expression `x == 0`.
-    (which in turn creates a `NegBoolView()` in case x is a Boolean variable)
-
-    - ~x            x == 0
-
-
-    Apart from operator overleading, expressions implement two important functions:
+    Apart from operator overloading, expressions implement two important functions:
 
     - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
                     If it does, the expression can be used as top-level constraint
@@ -73,12 +69,14 @@
         Comparison
         Operator
 """
+import copy
 import warnings
 from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr
+from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
     """
@@ -135,43 +133,15 @@ class Expression(object):
     def value(self):
         return None # default
 
-    def _deepcopy_args(self, memodict={}):
-        """
-            Create and return a deep copy of the arguments of the expression
-            Used in copy() methods of expressions to ensure there are no shared variables between the original expression and its copy.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        return self._deepcopy_arg_list(self.args)
+    def get_bounds(self):
+        if self.is_bool():
+            return 0,1 #default for boolean expressions
+        raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
-    def _deepcopy_arg_list(self, arglist, memodict={}):
-        """
-            Create and return a deep copy of the arguments in `arglist`.
-            Recursively deep copy nested lists.
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied = []
-        for arg in arglist:
-            if is_any_list(arg):
-                copied += [self._deepcopy_arg_list(arg, memodict)]
-                continue
-
-            if arg not in memodict:
-                if isinstance(arg, Expression):
-                    memodict[arg] = arg.deepcopy(memodict)
-                elif is_num(arg) or isinstance(arg, bool):
-                    memodict[arg] = arg
-                else:
-                    raise ValueError(f"Not a supported argument to copy: {arg}")
-            copied += [memodict[arg]]
-        return copied
-
-    def deepcopy(self, memodict = {}):
-        """
-            Return a deep copy of the Expression
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return type(self)(self.name, copied_args)
+    # keep for backwards compatibility
+    def deepcopy(self, memodict={}):
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
@@ -348,10 +318,22 @@ class Expression(object):
         return self
     def __abs__(self):
         return Operator("abs", [self])
-    # 'not' for now, no unary constraint for it
     def __invert__(self):
-        return (self == 0)
+        if not (is_boolexpr(self)):
+            raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
+        return Operator("not", [self])
 
+class BoolVal(Expression):
+    """
+        Wrapper for python or numpy BoolVals
+    """
+
+    def __init__(self, arg):
+        assert arg is False or arg is True
+        super(BoolVal, self).__init__("boolval", [bool(arg)])
+
+    def value(self):
+        return self.args[0]
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
@@ -375,7 +357,7 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+        arg_vals = [argval(a) for a in self.args]
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return (arg_vals[0] == arg_vals[1])
         elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
@@ -384,15 +366,6 @@ class Comparison(Expression):
         elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
         elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
         return None # default
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Comparison
-            :param: memodict: dictionary containing already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return Comparison(self.name, *copied_args)
-
 
 
 class Operator(Expression):
@@ -407,6 +380,7 @@ class Operator(Expression):
         'and': (0, True),
         'or':  (0, True),
         '->':  (2, True),
+        'not': (1, True),
         'sum': (0, False),
         'wsum': (2, False),
         'sub': (2, False), # x - y
@@ -461,14 +435,15 @@ class Operator(Expression):
                 i += 1
 
         # another cleanup, translate -(v*c) to v*-c
-        if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
-            mul_args = arg_list[0].args
-            if is_num(mul_args[0]):
-                name = 'mul'
-                arg_list = (-mul_args[0], mul_args[1])
-            elif is_num(mul_args[1]):
-                name = 'mul'
-                arg_list = (mul_args[0], -mul_args[1])
+        if hasattr(arg_list[0],'name'):
+            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
+                mul_args = arg_list[0].args
+                if is_num(mul_args[0]):
+                    name = 'mul'
+                    arg_list = (-mul_args[0], mul_args[1])
+                elif is_num(mul_args[1]):
+                    name = 'mul'
+                    arg_list = (mul_args[0], -mul_args[1])
 
         super().__init__(name, arg_list)
 
@@ -519,9 +494,9 @@ class Operator(Expression):
     def value(self):
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [arg.value() if isinstance(arg, Expression) else arg for arg in self.args[1]]]
+            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
         else:
-            arg_vals = [arg.value() if isinstance(arg, Expression) else arg for arg in self.args]
+            arg_vals = [argval(arg) for arg in self.args]
 
 
         if any(a is None for a in arg_vals): return None
@@ -530,18 +505,93 @@ class Operator(Expression):
         elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "div": return arg_vals[0] // arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
+        elif self.name == "div":
+            try:
+                return arg_vals[0] // arg_vals[1]
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
         elif self.name == "->": return (not arg_vals[0]) or arg_vals[1]
+        elif self.name == "not": return not arg_vals[0]
 
         return None # default
 
+    def get_bounds(self):
+        """
+        Returns an estimate of lower and upper bound of the expression.
+        These bounds are safe: all possible values for the expression agree with the bounds.
+        These bounds are not tight: it may be possible that the bound itself is not a possible value for the expression.
+        """
+        if self.is_bool():
+            return 0, 1 #boolean
+        elif self.name == 'mul':
+            lb1,ub1 = get_bounds(self.args[0])
+            lb2,ub2 = get_bounds(self.args[1])
+            bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+            return min(bounds), max(bounds)
+        elif self.name == 'sum':
+            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            return sum(lbs), sum(ubs)
+        elif self.name == 'wsum':
+            weights, vars = self.args
+            var_bounds = np.array([get_bounds(arg) for arg in vars]).T
+            bounds = var_bounds * weights
+            return bounds.min(axis=0).sum(), bounds.max(axis=0).sum()  # for every column is axis=0...
+
+        elif self.name == 'sub':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            return lb1-ub2, ub1-lb2
+        elif self.name == 'div':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("division by domain containing 0 is not supported")
+            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+            return min(bounds), max(bounds)
+        elif self.name == 'mod':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("% by domain containing 0 is not supported")
+            elif ub2 < 0:
+                return lb2 + 1, 0
+            elif lb2 > 0:
+                return 0, ub2 - 1
+        elif self.name == 'pow':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 < 0:
+                raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
+            bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
+            if lb1 < 0 and 0 < ub2:  
+                # The lower and upper bounds depend on either the largest or the second largest exponent 
+                # value when the base term can be negative. 
+                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
+                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
+                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
+            return min(bounds), max(bounds)
+
+        elif self.name == '-':
+            lb1, ub1 = get_bounds(self.args[0])
+            return -ub1, -lb1
+        elif self.name == 'abs':
+            lb, ub = get_bounds(self.args[0])
+            if lb >= 0: 
+                return lb,ub
+            if ub <= 0: 
+                return -ub,-lb
+            return 0, max(-lb,ub)
+        
+        raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
+        
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
