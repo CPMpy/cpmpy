@@ -461,7 +461,7 @@ class CPM_ortools(SolverInterface):
         elif isinstance(cpm_expr, BoolVal):
             return self.ort_model.Add(cpm_expr.args[0])
 
-	# a direct constraint, pass to solver
+        # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
             return cpm_expr.callSolver(self, self.ort_model)
 

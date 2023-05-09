@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi
+from cpmpy.solvers import CPM_gurobi, CPM_pysat
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -21,10 +21,25 @@ class TestDirectORTools(unittest.TestCase):
 
         model = SolverLookup.get("ortools")
 
-        model += DirectConstraint(name="AddAutomaton",
-                                  arguments=(trans_vars, 0, [2], trans_tabl), novar=[1, 2, 3])
+        model += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                                  novar=[1, 2, 3])  # optional, what not to scan for vars
 
         self.assertEqual(model.solveAll(), 6)
+
+@pytest.mark.skipif(not CPM_pysat.supported(),
+                    reason="PySAT not installed")
+class TestDirectPySAT(unittest.TestCase):
+
+    def test_direct_clause(self):
+        x,y = boolvar(2)
+
+        model = SolverLookup.get("pysat")
+
+        model += DirectConstraint("add_clause", [x, y])
+
+        self.assertTrue(model.solve())
+        self.assertTrue(x.value() or y.value())
+
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
                     reason="Gurobi not installed")
@@ -38,8 +53,8 @@ class TestDirectGurobi(unittest.TestCase):
 
         model = SolverLookup.get("gurobi")
 
-        model += DirectConstraint(name="addGenConstraintPoly",
-                                  arguments=(x, y, p), novar=[2])
+        model += DirectConstraint("addGenConstraintPoly", (x, y, p),
+                                  novar=[2])  # optional, what not to scan for vars
 
         self.assertTrue(model.solve())
 
