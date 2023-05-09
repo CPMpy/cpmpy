@@ -82,7 +82,7 @@ import math
 import builtins
 import numpy as np
 
-from .normalize import toplevel_list
+from .normalize import toplevel_list, simplify_bool_const
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -124,7 +124,9 @@ def flatten_constraint(expr):
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
-    for expr in toplevel_list(expr):
+    normalized_list = toplevel_list(expr)
+    normalized_list = simplify_bool_const(normalized_list)
+    for expr in normalized_list:
 
         if isinstance(expr, _BoolVarImpl):
             newlist.append(expr)
