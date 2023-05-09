@@ -1,8 +1,11 @@
+import copy
+
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst
-from ..expressions.variables import NDVarArray
+from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
 
 def toplevel_list(cpm_expr, merge_and=True):
@@ -37,7 +40,7 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
-def simplify_bool_const(lst_of_expr, num_context=False):
+def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
@@ -55,7 +58,7 @@ def simplify_bool_const(lst_of_expr, num_context=False):
             newlist.append(int(expr.value()) if num_context else expr)
 
         elif isinstance(expr, Operator):
-            args = simplify_bool_const(expr.args, num_context=not expr.is_bool())
+            args = simplify_boolean(expr.args, num_context=not expr.is_bool())
 
             if expr.name == "or":
                 if any(is_false_cst(arg) for arg in args):
@@ -76,7 +79,7 @@ def simplify_bool_const(lst_of_expr, num_context=False):
                 elif is_true_cst(cond):
                     newlist.append(bool_expr)
                 elif is_false_cst(bool_expr):
-                    newlist += simplify_bool_const([~cond])
+                    newlist += simplify_boolean([~cond])
                 else:
                     newlist.append(cond.implies(bool_expr))
 
@@ -90,11 +93,38 @@ def simplify_bool_const(lst_of_expr, num_context=False):
                 newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = simplify_bool_const(expr.args, num_context=True)
-            newlist.append(eval_comparison(expr.name, lhs, rhs))
+            lhs, rhs = simplify_boolean(expr.args, num_context=True)
+            if isinstance(lhs, int) and isinstance(rhs, _BoolVarImpl):
+                lhs, rhs = rhs, lhs
+            if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, int):
+                # direct simplification of boolean comparisons
+                if rhs < 0:
+                    newlist.append(expr.name in  {"!=", ">", ">="}) # all other operators evaluate to False
+                if rhs == 0:
+                    if expr.name == "!=" or expr.name == ">":
+                        newlist.append(lhs)
+                    if expr.name == "==" or expr.name == "<=":
+                        newlist.append(~lhs)
+                    if expr.name == "<":
+                        newlist.append(BoolVal(False))
+                    if expr.name == ">":
+                        newlist.append(BoolVal(True))
+                if rhs == 1:
+                    if expr.name == "==" or expr.name == ">=":
+                        newlist.append(lhs)
+                    if expr.name == "!=" or expr.name == "<":
+                        newlist.append(~lhs)
+                    if expr.name == ">":
+                        newlist.append(BoolVal(False))
+                    if expr.name == "<=":
+                        newlist.append(BoolVal(True))
+                if rhs > 1:
+                    newlist.append(expr.name in  {"!=", "<", "<="}) # all other operators evaluate to False
+            else:
+                newlist.append(eval_comparison(expr.name, lhs, rhs))
         elif isinstance(expr, GlobalConstraint):
             expr = copy.deepcopy(expr)
-            expr.args = simplify_bool_const(expr.args) # TODO: how to determine boolean or numerical context?
+            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
         else: # variables/constants
             newlist.append(expr)
