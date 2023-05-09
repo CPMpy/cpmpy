@@ -1,4 +1,4 @@
-from cpmpy import Model, SolverLookup
+from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
 
 import pytest
@@ -92,21 +92,25 @@ def comp_constraints(solver):
     """
     for comp_name in Comparison.allowed:
         for numexpr in numexprs(solver):
-            for rhs in [NUM_VAR, 1]:
+            for rhs in [NUM_VAR, 1, BoolVal(True)]:
                 yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
-                for rhs in [NUM_VAR, 1]:
+                for rhs in [NUM_VAR, BoolVal(True)]:
                     yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
         for comp_name in Comparison.allowed:
             for boolexpr in bool_exprs(solver):
-                for rhs in [NUM_VAR, 1]:
-                    if comp_name == '>' and rhs == 1:
-                        rhs = 0 # >1 is unsat for boolean expressions, so change it to 0
+                for rhs in [NUM_VAR, 1, BoolVal(True)]:
+                    if comp_name == '>':
+                        # >1 is unsat for boolean expressions, so change it to 0
+                        if isinstance(rhs, int) and rhs == 1:
+                            rhs = 0
+                        if isinstance(rhs, BoolVal) and rhs.args[0] == True:
+                            rhs = BoolVal(False)
                     yield Comparison(comp_name, boolexpr, rhs)
 
 
