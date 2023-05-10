@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -36,6 +36,20 @@ class TestDirectPySAT(unittest.TestCase):
         model = SolverLookup.get("pysat")
 
         model += DirectConstraint("add_clause", [x, y])
+
+        self.assertTrue(model.solve())
+        self.assertTrue(x.value() or y.value())
+
+@pytest.mark.skipif(not CPM_pysdd.supported(),
+                    reason="PySDD not installed")
+class TestDirectPySDD(unittest.TestCase):
+
+    def test_direct_clause(self):
+        x,y = boolvar(2)
+
+        model = SolverLookup.get("pysdd")
+
+        model += DirectConstraint("conjoin", (x, y))
 
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
@@ -83,3 +97,5 @@ class TestDirectGurobi(unittest.TestCase):
         poly_val = sum(np.array(p)*x_terms)
 
         self.assertEqual(y.value(), poly_val)
+
+
