@@ -42,6 +42,8 @@ class CPM_z3(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     z3_solver: object, z3's Solver() object
+
+    The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
 
     @staticmethod
@@ -416,6 +418,10 @@ class CPM_z3(SolverInterface):
             else:
                 # global constraints
                 return self._z3_expr(all(cpm_con.decompose()))
+
+        # a direct constraint, make with z3 (will be posted to it by calling function)
+        elif isinstance(cpm_con, DirectConstraint):
+            return cpm_con.callSolver(self, z3)
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 

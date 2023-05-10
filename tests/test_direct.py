@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -53,6 +53,20 @@ class TestDirectPySDD(unittest.TestCase):
 
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
+
+@pytest.mark.skipif(not CPM_z3.supported(),
+                    reason="Z3py not installed")
+class TestDirectZ3(unittest.TestCase):
+
+    def test_direct_clause(self):
+        iv = intvar(1,9, shape=3)
+
+        model = SolverLookup.get("z3")
+
+        model += DirectConstraint("Distinct", iv)
+
+        self.assertTrue(model.solve())
+        self.assertTrue(AllDifferent(iv).value())
 
 @pytest.mark.skipif(not CPM_minizinc.supported(),
                     reason="MinZinc not installed")
