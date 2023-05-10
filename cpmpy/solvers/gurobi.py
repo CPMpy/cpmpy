@@ -56,6 +56,8 @@ class CPM_gurobi(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     - grb_model: object, TEMPLATE's model object
+
+    The `DirectConstraint`, when used, checks for functions in the `grb_model` object.
     """
 
     @staticmethod

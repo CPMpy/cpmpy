@@ -68,16 +68,18 @@ class TestDirectGurobi(unittest.TestCase):
 
         x = intvar(0,10,name="x")
         y = intvar(0,100,name="y")
-        p = np.arange(3)
 
         model = SolverLookup.get("gurobi")
 
-        model += DirectConstraint("addGenConstraintPoly", (x, y, p),
+        # y = 2 x^3 + 1.5 x^2 + 1
+        p = [2, 1.5, 0, 1]
+        model += DirectConstraint("addGenConstrPoly", (x, y, p),
                                   novar=[2])  # optional, what not to scan for vars
 
         self.assertTrue(model.solve())
 
-        x_val, y_val = x.value(), y.value()
-        cons_val = p[0] * x_val ** 3 + p[1] * x_val ** 2 + p[2] * x_val ** 3
+        x_val = x.value()
+        x_terms = [x_val**3, x_val**2, x_val**1, x_val**0]
+        poly_val = sum(np.array(p)*x_terms)
 
-        self.assertEqual(y_val, cons_val)
+        self.assertEqual(y.value(), poly_val)
