@@ -101,19 +101,14 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     if isinstance(cpm_expr, Comparison):
         lhs, rhs = cpm_expr.args
 
-        if isinstance(lhs, _NumVarImpl) and isinstance(rhs, _NumVarImpl):
-            # bring numvar to lhs
-            lhs = 1 * lhs + -1 * rhs
-            rhs = 0
+        if lhs.name == "sub":
+            # convert to wsum
+            lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
 
         # linearize unsupported operators
         elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
 
-            if lhs.name == "sub":
-                # convert to wsum
-                lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
-
-            elif lhs.name == "mul" and is_num(lhs.args[0]):
+            if lhs.name == "mul" and is_num(lhs.args[0]):
                 lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
             else:
                 raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
@@ -121,7 +116,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
         elif isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
             raise ValueError("Linearization of `lhs` not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
 
-        if is_num(lhs) or (isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}):
+        if is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum","wsum"}):
             # bring all vars to lhs
             if isinstance(rhs, _NumVarImpl):
                 if isinstance(lhs, Operator) and lhs.name == "sum":
@@ -129,6 +124,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 else:
                     lhs, rhs = lhs + -1*rhs, 0
 
+            assert not is_num(lhs), "lhs cannot be an integer at this point!"
             # bring all const to rhs
             if lhs.name == "sum":
                 new_args = []
