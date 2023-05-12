@@ -80,7 +80,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         # xor
         elif cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
-            return [sum(cpm_expr.args) >= 1]
+            return [sum(cpm_expr.args) == 1]
 
         # reification
         elif cpm_expr.name == "->":
