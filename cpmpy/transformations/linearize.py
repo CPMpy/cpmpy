@@ -146,17 +146,17 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 lhs = Operator("wsum",[new_weights, new_args])
 
 
-        if isinstance(lhs, Operator) and lhs.name == "mul" and is_num(lhs.args[0]):
+        if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
             # convert to wsum
             lhs = Operator("wsum",[[lhs.args[0]],[lhs.args[1]]])
 
         # now fix the comparisons themselves
         if cpm_expr.name == "<":
             new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
-            return [lhs <= new_rhs] + cons
+            return [lhs <= new_rhs] + linearize_constraint(cons)
         if cpm_expr.name == ">":
             new_rhs, cons = get_or_make_var(rhs + 1) # if rhs is constant, will return new constant
-            return [lhs >= new_rhs] + cons
+            return [lhs >= new_rhs] + linearize_constraint(cons)
         if cpm_expr.name == "!=":
             # Special case: BV != BV
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -175,7 +175,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 # Calculate bounds of M = |lhs - rhs| + 1
                 _, M = (abs(lhs - rhs) + 1).get_bounds()
 
-                cons = [lhs - M*z <= rhs-1, lhs - M*z >= rhs-M+1]
+                cons = [lhs + -M*z <= rhs-1, lhs  + M*z >= rhs-M+1]
                 return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
 
             else:
@@ -252,7 +252,7 @@ def only_positive_bv(cpm_expr):
                     lhs.args[i] = new_arg
                     new_cons += cons
 
-        return [Comparison(cpm_expr.name, lhs, rhs)] + new_cons
+        return [Comparison(cpm_expr.name, lhs, rhs)] + linearize_constraint(new_cons)
 
     # reification
     if cpm_expr.name == "->":
