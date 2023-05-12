@@ -90,7 +90,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
             if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
                 # shortcut for BV -> BV, convert to disjunction and apply linearize on it
-                return linearize_constraint(~cond | sub_expr, reified=reified)
+                return linearize_constraint(sub_expr >= cond)
 
             # BV -> LinExpr
             if isinstance(cond, _BoolVarImpl):
