@@ -22,18 +22,18 @@ Indicator constraints:
 - BoolVar -> LinExpr <= Constant
 
 - BoolVar -> GenExpr                    (GenExpr.name in supported, GenExpr.is_bool())
-- BoolVar -> GenExpr >= Var/Constant    (GenExpr.name in supported)
-- BoolVar -> GenExpr <= Var/Constant    (GenExpr.name in supported)
-- BoolVar -> GenExpr == Var/Constant    (GenExpr.name in supported)
+- BoolVar -> GenExpr >= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
+- BoolVar -> GenExpr <= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
+- BoolVar -> GenExpr == Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
 
 Where BoolVar is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------
 - GenExpr                               (GenExpr.name in supported, GenExpr.is_bool())
-- GenExpr == Var/Constant               (GenExpr.name in supported)
-- GenExpr <= Var/Constant               (GenExpr.name in supported)
-- GenExpr >= Var/Constant               (GenExpr.name in supported)
+- GenExpr == Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
+- GenExpr <= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
+- GenExpr >= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
 
 
 """
@@ -167,10 +167,14 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 return [lhs + rhs == 1]
 
             if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
-                # lhs is sum/wsum and rhs is contant OR
+                # lhs is sum/wsum and rhs is constant OR
                 # lhs is GenExpr and rhs is constant or var
                 #  ... what requires less new variables?
                 # Big M implementation
+                # M is chosen so that
+                # lhs - rhs + 1 =< M*z
+                # rhs - lhs + 1 =< M*~z
+                # holds
                 z = boolvar()
                 # Calculate bounds of M = |lhs - rhs| + 1
                 _, M = (abs(lhs - rhs) + 1).get_bounds()
