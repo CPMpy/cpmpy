@@ -107,6 +107,7 @@
         GlobalCardinalityCount
 
 """
+import copy
 import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
@@ -632,3 +633,56 @@ class Count(GlobalConstraint):
         """
         arr, val = self.args
         return 0, len(arr)
+
+
+class DirectConstraint(Expression):
+    """
+        A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
+
+        It can not be reified, it is not flattened, it can not contain other CPMpy expressions than variables.
+        When added to a CPMpy solver, it will literally just directly call a function on the underlying solver,
+        replacing CPMpy variables by solver variables along the way.
+
+        See the documentation of the solver (constructor) for details on how that solver handles them.
+
+        If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
+        then use `directvar()` instead, or access the solver object from the solver interface directly.
+    """
+    def __init__(self, name, arguments, novar=None):
+        """
+            name: name of the solver function that you wish to call
+            arguments: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `arguments` that contain no variables,
+                   that can be passed 'as is' without scanning for variables
+        """
+        if not isinstance(arguments, tuple):
+            arguments = (arguments,)  # force tuple
+        super().__init__(name, arguments)
+        self.novar = novar
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return True
+
+    def callSolver(self, CPMpy_solver, Native_solver):
+        """
+            Call the `directname`() function of the native solver,
+            with stored arguments replacing CPMpy variables with solver variables as needed.
+
+            SolverInterfaces will call this function when this constraint is added.
+
+        :param CPMpy_solver: a CPM_solver object, that has a `solver_vars()` function
+        :param Native_solver: the python interface to some specific solver
+        :return: the response of the solver when calling the function
+        """
+        # get the solver function, will raise an AttributeError if it does not exist
+        solver_function = getattr(Native_solver, self.name)
+        solver_args = copy.copy(self.args)
+        for i in range(len(solver_args)):
+            if self.novar is None or i not in self.novar:
+                # it may contain variables, replace
+                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+        # len(native_args) should match nr of arguments of `native_function`
+        return solver_function(*solver_args)
+

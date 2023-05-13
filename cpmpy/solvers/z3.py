@@ -23,11 +23,10 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.normalize import toplevel_list
 
 
@@ -43,6 +42,8 @@ class CPM_z3(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     z3_solver: object, z3's Solver() object
+
+    The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
 
     @staticmethod
@@ -417,6 +418,10 @@ class CPM_z3(SolverInterface):
             else:
                 # global constraints
                 return self._z3_expr(all(cpm_con.decompose()))
+
+        # a direct constraint, make with z3 (will be posted to it by calling function)
+        elif isinstance(cpm_con, DirectConstraint):
+            return cpm_con.callSolver(self, z3)
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 

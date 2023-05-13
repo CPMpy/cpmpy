@@ -29,6 +29,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
@@ -52,6 +53,8 @@ class CPM_ortools(SolverInterface):
     Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
     ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+
+    The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
 
     @staticmethod
@@ -459,7 +462,11 @@ class CPM_ortools(SolverInterface):
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             return self.ort_model.Add(cpm_expr.args[0])
-        
+
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.ort_model)
+
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
