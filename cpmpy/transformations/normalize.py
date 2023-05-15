@@ -4,7 +4,7 @@ import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst
-from ..expressions.variables import NDVarArray, _BoolVarImpl
+from ..expressions.variables import NDVarArray, _BoolVarImpl, _IntVarImpl
 from ..exceptions import NotSupportedError
 
 def toplevel_list(cpm_expr, merge_and=True):
