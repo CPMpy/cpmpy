@@ -113,8 +113,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, \
-    is_false_cst, is_true_cst
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -175,7 +174,7 @@ class AllDifferent(GlobalConstraint):
     def __init__(self, *args):
         flatargs = flatlist(args)
         if not (all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs)):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)²)
+            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
         super().__init__("alldifferent", flatargs)
 
     def decompose(self):
@@ -192,7 +191,7 @@ class AllDifferentExcept0(GlobalConstraint):
     """
     def __init__(self, *args):
         flatargs = flatlist(args)
-        if not (all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs))
+        if not (all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs)):
             raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
         super().__init__("alldifferent_except0", flatargs)
 
