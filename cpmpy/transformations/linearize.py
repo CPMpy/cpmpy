@@ -168,14 +168,14 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 #  ... what requires less new variables?
                 # Big M implementation
                 # M is chosen so that
-                # lhs - rhs + 1 =< M*z
-                # rhs - lhs + 1 =< M*~z
+                # lhs - rhs + 1 <= M*z
+                # rhs - lhs + 1 <= M*~z
                 # holds
                 z = boolvar()
                 # Calculate bounds of M = |lhs - rhs| + 1
                 _, M = (abs(lhs - rhs) + 1).get_bounds()
 
-                cons = [lhs + -M*z <= rhs-1, lhs  + M*z >= rhs-M+1]
+                cons = [lhs + -M*z <= rhs-1, lhs  + -M*z >= rhs-M+1]
                 return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
 
             else:
