@@ -439,6 +439,11 @@ class Element(GlobalConstraint):
     def __init__(self, arr, idx):
         super().__init__("element", [arr, idx], is_bool=False)
 
+    def __getitem__(self, index):
+        idx = self.args[1]
+        idx = idx*get_bounds(idx)[1] + index
+        return Element(self.args[0], idx)
+
     def value(self):
         arr, idx = self.args
         idxval = argval(idx)
