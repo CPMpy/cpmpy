@@ -113,7 +113,8 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, \
+    is_false_cst, is_true_cst
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -123,7 +124,7 @@ class GlobalConstraint(Expression):
 
         Like all expressions it has a `.name` and `.args` property.
         Overwrites the `.is_bool()` method. You can indicate
-        in the constructer whether it has Boolean return type or not.
+        in the constructor whether it has Boolean return type or not.
     """
     # is_bool: whether this is normal constraint (True or False)
     #   not is_bool: it computes a numeric value (ex: Minimum, Element)
@@ -172,7 +173,10 @@ class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
     def __init__(self, *args):
-        super().__init__("alldifferent", flatlist(args))
+        flatargs = flatlist(args)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
+        super().__init__("alldifferent", flatargs)
 
     def decompose(self):
         """Returns the decomposition
@@ -187,7 +191,10 @@ class AllDifferentExcept0(GlobalConstraint):
     All nonzero arguments have a distinct value
     """
     def __init__(self, *args):
-        super().__init__("alldifferent_except0", flatlist(args))
+        flatargs = flatlist(args)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
+        super().__init__("alldifferent_except0", flatargs)
 
     def decompose(self):
         return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
@@ -204,7 +211,10 @@ class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
     def __init__(self, *args):
-        super().__init__("allequal", flatlist(args))
+        flatargs = flatlist(args)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
+        super().__init__("allequal", flatargs)
 
     def decompose(self):
         """Returns the decomposition
@@ -222,8 +232,11 @@ class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
     def __init__(self, *args):
-        super().__init__("circuit", flatlist(args))
-        if len(flatlist(args)) < 2:
+        flatargs = flatlist(args)
+        assert not any(is_boolexpr(arg) for arg in flatargs), \
+            "Circuit global constraint only takes arithmetic arguments: {}".format(flatargs)
+        super().__init__("circuit", flatargs)
+        if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
@@ -296,6 +309,9 @@ class Inverse(GlobalConstraint):
 
     """
     def __init__(self, fwd, rev):
+        flatargs = flatlist([fwd,rev])
+        assert not any(is_boolexpr(arg) for arg in flatargs), \
+            "Only integer arguments allowed for global constraint Inverse: {}".format(flatargs)
         assert len(fwd) == len(rev)
         super().__init__("inverse", [fwd, rev])
 
@@ -359,7 +375,10 @@ class Minimum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        super().__init__("min", flatlist(arg_list), is_bool=False)
+        flatargs = flatlist(arg_list)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
+        super().__init__("min", flatargs, is_bool=False)
 
     def value(self):
         argvals = [argval(a) for a in self.args]
@@ -392,7 +411,10 @@ class Maximum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        super().__init__("max", flatlist(arg_list), is_bool=False)
+        flatargs = flatlist(arg_list)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
+        super().__init__("max", flatargs, is_bool=False)
 
     def value(self):
         argvals = [argval(a) for a in self.args]
@@ -437,6 +459,10 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
+        flatargs = flatlist(arr)
+        assert not is_boolexpr(idx), "index cannot be a boolexpression: {}".format(idx)
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
@@ -486,11 +512,14 @@ class Xor(GlobalConstraint):
     """
 
     def __init__(self, arg_list):
+        flatargs = flatlist(arg_list)
+        assert all(is_boolexpr(arg) for arg in flatargs), \
+            "Only Boolean arguments allowed in Xor global constraint: {}".format(flatargs)
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        super().__init__("xor", arg_list)
+        super().__init__("xor", flatargs)
 
     def decompose(self):
         # there are multiple decompositions possible
@@ -532,6 +561,9 @@ class Cumulative(GlobalConstraint):
             demand = flatlist(demand)
             assert len(demand) == len(start), "Shape of demand should match start, duration and end"
 
+        flatargs = flatlist([start, duration, end, demand, capacity])
+        assert not any(is_boolexpr(arg) for arg in flatargs), \
+            "All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs)
 
         super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
 
@@ -594,6 +626,9 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
 
     def __init__(self, a, gcc):
+        flatargs = flatlist([a, gcc])
+        assert not any(is_boolexpr(arg) for arg in flatargs), \
+            "Only numerical arguments allowed for gcc global constraint: {}".format(flatargs)
         ub = max([get_bounds(v)[1] for v in a])
         assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
         super().__init__("gcc", [a,gcc])
@@ -613,6 +648,9 @@ class Count(GlobalConstraint):
     """
 
     def __init__(self,arr,val):
+        flatargs = flatlist([arr,val])
+        assert all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs), \
+            "Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs)
         super().__init__("count", [arr,val], is_bool=False)
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
