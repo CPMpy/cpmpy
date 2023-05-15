@@ -79,6 +79,16 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c2), "(a) -> (sum([1, -1, 6] * [x, y, BV4]) >= -5)")
 
 
+    def test_neq(self):
+        # not equals is a tricky constraint to linearize, do some extra tests on it here
+
+        x, y, z = [cp.intvar(0, 5, name=n) for n in "xyz"]
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+
+        cons = 2*x + 3*y + 4*z != 10
+        self.assertEqual(str(linearize_constraint(cons)),"[(BV3) -> (sum([2, 3, 4] * [x, y, z]) <= 9), (~BV3) -> (sum([2, 3, 4] * [x, y, z]) >= 11)]")
+
+
 
 class TestConstRhs(unittest.TestCase):
 
