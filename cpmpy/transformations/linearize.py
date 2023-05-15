@@ -174,9 +174,9 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                 # holds
                 z = boolvar()
                 # Calculate bounds of M = |lhs - rhs| + 1
-                _, M = (abs(lhs - rhs) + 1).get_bounds()
-
-                cons = [lhs + -M*z <= rhs-1, lhs  + -M*z >= rhs-M+1]
+                _, M1 = (lhs - rhs + 1).get_bounds()
+                _, M2 = (rhs - lhs + 1).get_bounds()
+                cons = [lhs + -M1*z <= rhs-1, lhs  + -M2*z >= rhs-M2+1]
                 return linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
 
             else:
