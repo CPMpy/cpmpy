@@ -121,8 +121,10 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             if isinstance(rhs, _NumVarImpl):
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args]+[-1 * rhs]), 0
-                else:
+                elif isinstance(lhs, Operator) and lhs.name == "wsum":
                     lhs, rhs = lhs + -1*rhs, 0
+                else:
+                    raise ValueError(f"unexpected expression on lhs of expression, should be sum or wsum but got {lhs}")
 
             assert not is_num(lhs), "lhs cannot be an integer at this point!"
             # bring all const to rhs
