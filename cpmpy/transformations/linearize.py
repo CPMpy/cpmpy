@@ -90,7 +90,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
             if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
                 # shortcut for BV -> BV, convert to disjunction and apply linearize on it
-                return linearize_constraint(sub_expr >= cond)
+                return linearize_constraint(cond <= sub_expr)
 
             # BV -> LinExpr
             if isinstance(cond, _BoolVarImpl):
@@ -121,10 +121,10 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
             if isinstance(rhs, _NumVarImpl):
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args]+[-1 * rhs]), 0
-                elif isinstance(lhs, Operator) and lhs.name == "wsum":
+                elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
                     lhs, rhs = lhs + -1*rhs, 0
                 else:
-                    raise ValueError(f"unexpected expression on lhs of expression, should be sum or wsum but got {lhs}")
+                    raise ValueError(f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
 
             assert not is_num(lhs), "lhs cannot be an integer at this point!"
             # bring all const to rhs
@@ -146,8 +146,6 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                         new_weights.append(w)
                         new_args.append(arg)
                 lhs = Operator("wsum",[new_weights, new_args])
-            else:
-                raise ValueError(f"unexpected expression on lhs of expression, should be sum or wsum but got {lhs}")
 
         if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
             # convert to wsum
@@ -190,7 +188,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         return [Comparison(cpm_expr.name, lhs, rhs)]
 
-    elif cpm_expr.name == "alldifferent":
+    elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
         """
             More efficient implementations possible
             http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
