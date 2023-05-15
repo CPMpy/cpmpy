@@ -144,7 +144,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
                         new_weights.append(w)
                         new_args.append(arg)
                 lhs = Operator("wsum",[new_weights, new_args])
-
+            else:
+                raise ValueError(f"unexpected expression on lhs of expression, should be sum or wsum but got {lhs}")
 
         if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
             # convert to wsum
