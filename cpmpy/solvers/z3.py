@@ -285,7 +285,7 @@ class CPM_z3(SolverInterface):
             return [self._z3_expr(con) for con in cpm_con]
 
         elif isinstance(cpm_con, BoolVal):
-            return cpm_con.args
+            return cpm_con.args[0]
 
         elif isinstance(cpm_con, _NumVarImpl):
             return self.solver_var(cpm_con)
