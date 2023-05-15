@@ -26,6 +26,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list
 from ..transformations.to_cnf import to_cnf
 
@@ -43,6 +44,8 @@ class CPM_pysdd(SolverInterface):
     pysdd_vtree: a pysdd.sdd.Vtree
     pysdd_manager: a pysdd.sdd.SddManager
     pysdd_root: a pysdd.sdd.SddNode
+
+    The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and `&=` posts the result to pysdd_root.
     """
 
     @staticmethod
@@ -249,6 +252,10 @@ class CPM_pysdd(SolverInterface):
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
             self.pysdd_root &= self.solver_var(cpm_expr)
+
+        # a direct constraint, pass to manager, post to root
+        elif isinstance(cpm_expr, DirectConstraint):
+            self.pysdd_root &= cpm_expr.callSolver(self, self.pysdd_manager)
 
         else:
             raise NotImplementedError(f"CPM_pysdd: Non supported constraint {cpm_expr}")

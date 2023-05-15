@@ -35,8 +35,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, flatlist
-from ..transformations.get_variables import get_variables_model, get_variables
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.normalize import toplevel_list
 
@@ -64,6 +65,8 @@ class CPM_minizinc(SolverInterface):
     mzn_model: object, the minizinc.Model instance
     mzn_solve: object, the minizinc.Solver instance
     mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
+
+    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
     @staticmethod
@@ -543,6 +546,11 @@ class CPM_minizinc(SolverInterface):
             gcc = self._convert_expression(gcc)
             cover = self._convert_expression(cover)
             return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+
+        # a direct constraint, treat differently for MiniZinc, a text-based language
+        # use the name as, unpack the arguments from the argument tuple
+        elif isinstance(expr, DirectConstraint):
+            return "{}({})".format(expr.name, ",".join(args_str))
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:

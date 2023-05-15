@@ -33,6 +33,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list, is_int
 from ..transformations.to_cnf import to_cnf
 
@@ -49,6 +50,8 @@ class CPM_pysat(SolverInterface):
     Creates the following attributes (see parent constructor for more):
     pysat_vpool: a pysat.formula.IDPool for the variable mapping
     pysat_solver: a pysat.solver.Solver() (default: glucose4)
+
+    The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
 
     @staticmethod
@@ -298,6 +301,10 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
             self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
+
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.pysat_solver)
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
