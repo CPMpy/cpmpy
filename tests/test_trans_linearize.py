@@ -88,6 +88,8 @@ class TestTransLinearize(unittest.TestCase):
         cons = 2*x + 3*y + 4*z != 10
         self.assertEqual(str(linearize_constraint(cons)),"[(BV3) -> (sum([2, 3, 4] * [x, y, z]) <= 9), (~BV3) -> (sum([2, 3, 4] * [x, y, z]) >= 11)]")
 
+        cons = a.implies(x != y)
+        self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
 class TestConstRhs(unittest.TestCase):
