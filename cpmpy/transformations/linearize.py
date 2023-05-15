@@ -44,7 +44,7 @@ from .flatten_model import flatten_constraint, get_or_make_var
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
@@ -263,44 +263,7 @@ def only_positive_bv(cpm_expr):
             subexpr = only_positive_bv(subexpr)
             return[cond.implies(expr) for expr in subexpr]
 
-    if isinstance(cpm_expr, (GlobalConstraint, BoolVal)):
+    if isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
         return [cpm_expr]
 
     raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
