@@ -93,7 +93,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
 
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
-            if isinstance(lhs, int) and isinstance(rhs, _BoolVarImpl):
+            if (isinstance(lhs, int) and isinstance(rhs, _BoolVarImpl)) or isinstance(lhs, BoolVal) and isinstance(rhs, _IntVarImpl):
                 lhs, rhs = rhs, lhs
             if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, int):
                 # direct simplification of boolean comparisons
