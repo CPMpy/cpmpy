@@ -1,5 +1,46 @@
 # Change log
 
+## 0.9.13
+Solid progress release.
+
+To make more clear how well-supported each of the solvers are, we introduced a tiered classification:
+
+* Tier 1 solvers: passes all internal tests, passes our bigtest suit, will be fuzztested in the near future
+    - "ortools" the OR-Tools CP-SAT solver
+    - "pysat" the PySAT library and its many SAT solvers ("pysat:glucose4", "pysat:lingeling", etc)
+
+* Tier 2 solvers: passes all internal tests, might fail on edge cases in bigtest
+    - "minizinc" the MiniZinc modeling system and its many solvers ("minizinc:gecode", "minizinc:chuffed", etc)
+    - "z3" the SMT solver and theorem prover
+    - "gurobi" the MIP solver
+    - "PySDD" a Boolean knowledge compiler
+
+* Tier 3 solvers: they are work in progress and live in a pull request
+    - "gcs" the Glasgow Constraint Solver
+    - "exact" the Exact pseudo-boolean solver
+
+We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
+
+New above the hood:
+* added 'DirectConstraint', a generic way to post solver-specific constraints which CPMpy does not implement, with multiple examples such as ortools' automaton, circuit, multicircuit
+* added 'Count' global constraint with decomposition
+* added 'GlobalCardinalityCount' (GCC) global constraint with decomposition
+* added 'Inverse' global constraint with with decomposition
+* a Boolean 'IfThenElse' global constraint with decomposition c->if_true & (~c)->if_false
+
+New under the hood:
+* a BoolVal() expression object for constants True/False, better handling/cleaning of Bool constants as a result
+* added a highly efficient 'toplevel_list' transformation that all solvers call to get a list of CPMpy expressions, simplifies what to expect as input for transformations
+* 'decompose_globals' is now a transformation that decomposes the unsupported globals, it also does it best to properly handle 'numeric' globals, reified globals and negated globals
+
+Changed:
+* added missing decomposition for 'Table' global constraint
+* highly optimized the 'get_variables' transformation
+* pushed bounds computation into the expressions, more robust and extensible
+* removed custom deepcopy() for Python's better built-in one
+* slightly better handling of incomplete (partial) functions, e.g. in bounds computation (ongoing work)
+* fixed bugs in MiniZinc and Z3's rewriting, related to int vs bool
+
 ## 0.9.12
 New:
 * examples/ use notebooks with graphic visualisation whenever possible

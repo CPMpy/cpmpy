@@ -29,9 +29,10 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_global
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -55,6 +56,8 @@ class CPM_gurobi(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     - grb_model: object, TEMPLATE's model object
+
+    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
 
     @staticmethod
@@ -359,6 +362,10 @@ class CPM_gurobi(SolverInterface):
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
+
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.grb_model)
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
