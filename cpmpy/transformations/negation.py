@@ -27,6 +27,9 @@ def recurse_negation(expr, negative_context=True):
         it does not ensure flatness (except if the input is flat)
     """
 
+    if isinstance(expr, (_BoolVarImpl,BoolVal)):
+        return ~expr if negative_context else expr
+
     if isinstance(expr, Comparison):
 
         newexpr = copy.copy(expr)
@@ -59,5 +62,12 @@ def recurse_negation(expr, negative_context=True):
                 raise ValueError(f"Unknown operator to negate {expr}")
         return newexpr
 
-    # direct constraint, global constraint, variables, constants
-    return ~expr if negative_context else expr
+    # global constraints
+    if hasattr(expr, "decompose"):
+        return ~expr if negative_context else expr #TODO: recurse into arguments? This should be re-called after decompose_globals anyway...
+
+    # numvars or direct constraint
+    if negative_context:
+        raise ValueError(f"Unsupported expression to negate: {expr}")
+
+    return expr
