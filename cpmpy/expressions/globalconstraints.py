@@ -440,9 +440,7 @@ class Element(GlobalConstraint):
         super().__init__("element", [arr, idx], is_bool=False)
 
     def __getitem__(self, index):
-        idx = self.args[1]
-        idx = idx*get_bounds(idx)[1] + index
-        return Element(self.args[0], idx)
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma separated indices")
 
     def value(self):
         arr, idx = self.args
