@@ -606,6 +606,22 @@ class GlobalCardinalityCount(GlobalConstraint):
         from .python_builtins import all
         return all(self.decompose()).value()
 
+class GlobalCardinality(GlobalConstraint):
+    """
+    GlobalCardinality(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables
+    must be equal to occ[i].
+    """
+
+    def __init__(self, vars, vals, occ):
+        super().__init__("gc", [vars,vals,occ])
+
+    def decompose(self):
+        vars, vals, occ = self.args
+        return [Count(vars, i) == v for i, v in zip(vals, occ)]
+
+    def value(self):
+        from .python_builtins import all
+        return all(self.decompose()).value()
 
 class Count(GlobalConstraint):
     """
