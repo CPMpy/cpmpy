@@ -423,30 +423,26 @@ class Isin(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
-        self.expr = expr
-        self.arr = arr
+        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
+            "The expressions in the Isin constraint should not be boolean"
+        assert len(arr) > 1, "The array given must contain more than 1 elements"
         super().__init__("isin", [expr, arr], is_bool=True)
 
     def decompose(self):
-        cons =[]
-        lb, ub = self.expr.get_bounds()
-
-        expressions = all(isinstance(a, Expression) for a in self.arr)
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+        expressions = all(isinstance(a, Expression) for a in arr)
         if expressions:
             from .python_builtins import any
-            cons = [any(self.expr == a for a in self.arr)]
+            return [any(expr == a for a in arr)]
         else:
-            for i in range(lb,ub+1):
-                if i not in self.arr:
-                    cons.append(self.expr != i)
-
-        return cons
+            return [expr != val for val in range(lb, ub + 1) if val not in arr]
 
     def value(self):
-        return argval(self.expr) in argval(self.arr)
+        return argval(self.args[0]) in argval(self.args[1])
 
     def __repr__(self):
-        return "{} in {}".format(self.expr, self.arr)
+        return "{} in {}".format(self.args[0], self.args[1])
 
 
 def element(arg_list):
