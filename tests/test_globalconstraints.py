@@ -158,6 +158,18 @@ class TestGlobal(unittest.TestCase):
         # constraint can be used as value
         self.assertTrue(inv.value())
 
+    def test_isin(self):
+        iv = cp.intvar(-8, 8)
+        iv_arr = cp.intvar(-8, 8, shape=5)
+        constraints = [cp.Isin(iv, iv_arr)]
+        model = cp.Model(constraints)
+        assert model.solve() == True
+        assert iv.value() in iv_arr.value()
+        vals = [1, 5, 8, -4]
+        constraints = [cp.Isin(iv, vals)]
+        model = cp.Model(constraints)
+        assert model.solve() == True
+        assert iv.value() in vals
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
