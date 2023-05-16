@@ -430,14 +430,10 @@ class Isin(GlobalConstraint):
     def decompose(self):
         cons =[]
         lb, ub = self.expr.get_bounds()
-        #alb, aub = [self.arr.min(), self.arr.max()]
-
         for i in range(lb,ub+1):
             if i not in self.arr:
                 cons.append(self.expr != i)
-
         return cons
-
 
     def value(self):
         return argval(self.expr) in self.arr
