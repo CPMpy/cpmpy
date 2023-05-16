@@ -428,7 +428,6 @@ class Isin(GlobalConstraint):
         super().__init__("isin", [expr, arr], is_bool=True)
 
     def decompose(self):
-        from .python_builtins import any
         cons =[]
         lb, ub = self.expr.get_bounds()
         #alb, aub = [self.arr.min(), self.arr.max()]
