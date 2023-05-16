@@ -589,26 +589,7 @@ class Cumulative(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-        GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
-    The array gcc must have elements 0..ub (so of size ub+1).
-        """
-
-    def __init__(self, a, gcc):
-        ub = max([get_bounds(v)[1] for v in a])
-        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
-        super().__init__("gcc", [a,gcc])
-
-    def decompose(self):
-        a, gcc = self.args
-        return [Count(a, i) == v for i, v in enumerate(gcc)]
-
-    def value(self):
-        from .python_builtins import all
-        return all(self.decompose()).value()
-
-class GlobalCardinality(GlobalConstraint):
-    """
-    GlobalCardinality(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables
+    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables
     must be equal to occ[i].
     """
 
@@ -622,6 +603,7 @@ class GlobalCardinality(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         return all(self.decompose()).value()
+
 
 class Count(GlobalConstraint):
     """
