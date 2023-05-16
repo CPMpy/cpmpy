@@ -447,9 +447,7 @@ class Isin(GlobalConstraint):
         return argval(self.expr) in argval(self.arr)
 
     def __repr__(self):
-        if len(self.args) == 2:
-            return "{} xor {}".format(*self.args)
-        return "xor({})".format(self.args)
+        return "{} in {}".format(self.expr, self.arr)
 
 
 def element(arg_list):
