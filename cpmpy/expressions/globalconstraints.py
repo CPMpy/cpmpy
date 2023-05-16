@@ -417,6 +417,37 @@ class Maximum(GlobalConstraint):
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
+class Isin(GlobalConstraint):
+    """
+        The "isin" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        self.expr = expr
+        self.arr = arr
+        super().__init__("isin", [expr, arr], is_bool=True)
+
+    def decompose(self):
+        from .python_builtins import any
+        cons =[]
+        lb, ub = self.expr.get_bounds()
+        #alb, aub = [self.arr.min(), self.arr.max()]
+
+        for i in range(lb,ub+1):
+            if i not in self.arr:
+                cons.append(self.expr != i)
+
+        return cons
+
+
+    def value(self):
+        return argval(self.expr) in self.arr
+
+    def __repr__(self):
+        if len(self.args) == 2:
+            return "{} xor {}".format(*self.args)
+        return "xor({})".format(self.args)
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
