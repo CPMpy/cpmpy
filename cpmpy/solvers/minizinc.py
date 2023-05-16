@@ -540,12 +540,11 @@ class CPM_minizinc(SolverInterface):
                                                         self._convert_expression(fal))
 
         elif expr.name == "gcc":
-            a, gcc = expr.args
-            cover = [x for x in range(len(gcc))]
-            a = self._convert_expression(a)
-            gcc = self._convert_expression(gcc)
-            cover = self._convert_expression(cover)
-            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+            vars, vals, occ = expr.args
+            vars = self._convert_expression(vars)
+            vals = self._convert_expression(vals)
+            occ = self._convert_expression(occ)
+            return "global_cardinality({},{},{})".format(vars,vals,occ)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
