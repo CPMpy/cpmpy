@@ -404,6 +404,27 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_gcc(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+
+        iv = cp.intvar(-8, 8, shape=5)
+        occ = cp.intvar(0, len(iv), shape=3)
+        val = [1, 4, 5]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
+
     @pytest.mark.skipif(not CPM_z3.supported(),
                         reason="Z3 not installed")
     def test_z3(self):
