@@ -46,7 +46,6 @@
     Module details
     ==============
 """
-
 from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
@@ -418,15 +417,17 @@ class NDVarArray(Expression, np.ndarray):
         if isinstance(index, tuple) and \
            any(isinstance(el, Expression) for el in index):
             index_rest = list(index) # mutable view
-            var = [] # collector of variables
+            dim_lengths = list(self.shape)
+            # for calculating the index combining the vars given
+            dim_lengths.append(1)
+            new_index = 0
             for i in range(len(index)):
                 if isinstance(index[i], Expression):
-                    index_rest[i] = Ellipsis # selects all remaining dimensions
-                    var.append(index[i])
-            assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
-            # single var, so flatten rest array
+                    index_rest[i] = slice(0,dim_lengths[i]) # selects all remaining dimensions
+                    new_index += dim_lengths[i+1]*index[i] #  combine the vars given in one index
+            # using index as single var, so flatten rest array
             array_rest = self[tuple(index_rest)] # non-var array selection
-            return Element(array_rest, var[0])
+            return Element(array_rest, new_index)
 
         ret = super().__getitem__(index)
         # this is a bit ugly,
