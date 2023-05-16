@@ -16,6 +16,14 @@ class TransSimplify(unittest.TestCase):
     def test_bool_ops(self):
         expr = Operator("or", self.bvs.tolist() + [False])
         self.assertEqual(str(self.transform(expr)), "[or([bv[0], bv[1], bv[2]])]")
+        expr = Operator("or", self.bvs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), "[boolval(True)]")
+
+        expr = Operator("and", self.bvs.tolist() + [False]) + self.ivs[0] >= 10
+        self.assertEqual(str(self.transform(expr)), "[0 + (iv[0]) >= 10]")
+        expr = Operator("and", self.bvs.tolist() + [True]) + self.ivs[0] >= 10
+        self.assertEqual(str(self.transform(expr)), "[(and([bv[0], bv[1], bv[2]])) + (iv[0]) >= 10]")
+
 
         expr = Operator("->", [self.bvs[0], True])
         self.assertEqual(str(self.transform(expr)), "[boolval(True)]")
