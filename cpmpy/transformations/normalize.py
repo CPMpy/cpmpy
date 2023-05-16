@@ -60,7 +60,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             args = simplify_boolean(expr.args, num_context=not expr.is_bool())
 
             if expr.name == "or":
-                if any(is_false_cst(arg) for arg in args):
+                if any(is_true_cst(arg) for arg in args):
                     newlist.append(1 if num_context else BoolVal(True))
                 else:
                     newlist.append(Operator("or", [arg for arg in args if not isinstance(arg, BoolVal)]))
@@ -83,8 +83,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(cond.implies(bool_expr))
 
             elif expr.name == "not":
-                if isinstance(args[0], BoolVal):
-                    newlist.append(BoolVal(not args[0]))
+                if is_true_cst(args[0]):
+                    newlist.append(BoolVal(False))
+                elif is_false_cst(args[0]):
+                    newlist.append(BoolVal(True))
                 else:
                     newlist.append(~args[0])
 
