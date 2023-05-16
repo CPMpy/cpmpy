@@ -594,7 +594,7 @@ class GlobalCardinalityCount(GlobalConstraint):
     """
 
     def __init__(self, vars, vals, occ):
-        super().__init__("gc", [vars,vals,occ])
+        super().__init__("gcc", [vars,vals,occ])
 
     def decompose(self):
         vars, vals, occ = self.args
