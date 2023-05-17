@@ -209,7 +209,7 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])]
 
     def value(self):
         return len(set(a.value() for a in self.args)) == 1
