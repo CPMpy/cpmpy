@@ -190,7 +190,7 @@ class AllDifferentExcept0(GlobalConstraint):
         super().__init__("alldifferent_except0", flatlist(args))
 
     def decompose(self):
-        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)]
 
     def value(self):
         vals = [a.value() for a in self.args if a.value() != 0]
