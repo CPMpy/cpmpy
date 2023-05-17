@@ -227,8 +227,8 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Element(iv, idx).value() == 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3))
-        idx = cp.intvar(-8, 8)
-        idx2 = cp.intvar(-8, 8)
+        idx = cp.intvar(0, 3)
+        idx2 = cp.intvar(0, 3)
         constraints = [iv[idx,idx2] == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
