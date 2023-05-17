@@ -210,13 +210,29 @@ class TestGlobal(unittest.TestCase):
         self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_element(self):
+        # test 1-D
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
+        # test directly the constraint
         constraints = [cp.Element(iv,idx) == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
         self.assertTrue(iv.value()[idx.value()] == 8)
         self.assertTrue(cp.Element(iv,idx).value() == 8)
+        # test through __get_item__
+        constraints = [iv[idx] == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv, idx).value() == 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        idx = cp.intvar(-8, 8)
+        idx2 = cp.intvar(-8, 8)
+        constraints = [iv[idx,idx2] == 8]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
     def test_xor(self):
         bv = cp.boolvar(5)
