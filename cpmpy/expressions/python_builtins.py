@@ -36,9 +36,9 @@ def all(iterable):
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
-        if is_false_cst(elem):
-            return BoolVal(False)  # no need to create constraint
-        elif is_true_cst(elem):
+        if elem is False or elem is np.False_:
+            return False  # no need to create constraint
+        elif elem is True or elem is np.True_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append( elem )
@@ -48,7 +48,8 @@ def all(iterable):
         return collect[0]
     if len(collect) >= 2:
         return Operator("and", collect)
-    return BoolVal(True)
+    return True
+
 # any: listwise 'or'
 def any(iterable):
     """
@@ -59,9 +60,9 @@ def any(iterable):
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
     for elem in iterable:
-        if is_true_cst(elem):
-            return BoolVal(True) # no need to create constraint
-        elif is_false_cst(elem):
+        if elem is True or elem is np.True_:
+            return True # no need to create constraint
+        elif elem is False or elem is np.False_:
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append( elem )
@@ -71,7 +72,7 @@ def any(iterable):
         return collect[0]
     if len(collect) >= 2:
         return Operator("or", collect)
-    return BoolVal(False)
+    return False
 
 def max(iterable):
     """
