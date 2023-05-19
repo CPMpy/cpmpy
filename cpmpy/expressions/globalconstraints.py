@@ -458,11 +458,11 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
-        flatargs = flatlist(arr)
+        flatarr = flatlist(arr)
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if not (all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs)):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
+        if not (all(is_boolexpr(arg) for arg in flatarr) or not any(is_boolexpr(arg) for arg in flatarr)):
+            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatarr))
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
@@ -519,6 +519,7 @@ class Xor(GlobalConstraint):
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
+            flatargs = arg_list
         super().__init__("xor", flatargs)
 
     def decompose(self):
