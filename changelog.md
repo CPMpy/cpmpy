@@ -1,5 +1,17 @@
 # Change log
 
+## 0.9.14
+Hotfix release
+
+Our builtin-overwrites 'any' and 'all' returned BoolVal's, and they did not yet have a `__bool__()` property so they would be correctly evaluated when used in 'if' functions and other standard python contexts. This can easily break user code that uses `any` or `all` when doing 'from cpmpy import \*'.
+
+Unfortunately we merged the BoolVal branch with the above behaviour, even though we had a version that fixed it, but this was not yet pushed to the branch.
+
+* This hotfix release fixes it so that `any` and `all` return standard Booleans again (and BoolVal has a `__bool__()` also).
+
+* We also include a small fix to make the Inverse global constraint decomposition work for non-variable arrays too.
+
+
 ## 0.9.13
 Solid progress release.
 
