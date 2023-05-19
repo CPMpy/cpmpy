@@ -1,8 +1,5 @@
 import copy
 import unittest
-
-from cpmpy import cpm_array
-
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.exceptions import TypeError
