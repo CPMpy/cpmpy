@@ -312,11 +312,12 @@ class Inverse(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, cpm_array(rev)])
+        super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
         from .python_builtins import all
         fwd, rev = self.args
+        rev = cpm_array(rev)
         return [all(rev[x] == i for i, x in enumerate(fwd))]
 
     def value(self):
