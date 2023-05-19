@@ -313,8 +313,6 @@ class Expression(object):
         elif self.name == 'wsum':
             # negate the constant weights
             return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
-        elif is_boolexpr(self):
-            return ~self
         return Operator("-", [self])
     def __pos__(self):
         return self
