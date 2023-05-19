@@ -339,6 +339,10 @@ class BoolVal(Expression):
         self.args[0] = not self.args[0]
         return self
 
+    def __bool__(self):
+        """Called to implement truth value testing and the built-in operation bool(), return stored value"""
+        return self.args[0]
+
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
     """
