@@ -302,11 +302,12 @@ class Inverse(GlobalConstraint):
     def decompose(self):
         from .python_builtins import all
         fwd, rev = self.args
+        rev = cpm_array(rev)
         return [all(rev[x] == i for i, x in enumerate(fwd))]
 
     def value(self):
-        fwd = argval(self.args[0])
-        rev = argval(self.args[1])
+        fwd = [argval(a) for a in self.args[0]]
+        rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
 class Table(GlobalConstraint):
