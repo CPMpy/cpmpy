@@ -297,7 +297,7 @@ class Inverse(GlobalConstraint):
     """
     def __init__(self, fwd, rev):
         assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, rev])
+        super().__init__("inverse", [fwd, cpm_array(rev)])
 
     def decompose(self):
         from .python_builtins import all
@@ -305,8 +305,8 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))]
 
     def value(self):
-        fwd = argval(self.args[0])
-        rev = argval(self.args[1])
+        fwd = [argval(a) for a in self.args[0]]
+        rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
 class Table(GlobalConstraint):
