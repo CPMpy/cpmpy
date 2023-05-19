@@ -278,7 +278,7 @@ class CPM_z3(SolverInterface):
             if is_bool(cpm_con):
                 return bool(cpm_con)
             elif is_int(cpm_con):
-                return int(cpm_con)
+                return z3.IntVal(int(cpm_con))
             return float(cpm_con)
 
         elif is_any_list(cpm_con):
