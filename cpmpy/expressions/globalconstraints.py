@@ -312,7 +312,7 @@ class Inverse(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, rev])
+        super().__init__("inverse", [fwd, cpm_array(rev)])
 
     def decompose(self):
         from .python_builtins import all
@@ -320,8 +320,8 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))]
 
     def value(self):
-        fwd = argval(self.args[0])
-        rev = argval(self.args[1])
+        fwd = [argval(a) for a in self.args[0]]
+        rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
 class Table(GlobalConstraint):
@@ -553,6 +553,9 @@ class Cumulative(GlobalConstraint):
         start = flatlist(start)
         assert is_any_list(duration), "duration should be a list"
         duration = flatlist(duration)
+        for d in duration:
+            if get_bounds(d)[0]<0:
+                raise TypeError("durations should be non-negative")
         assert is_any_list(end), "end should be a list"
         end = flatlist(end)
         assert len(start) == len(duration) == len(end), "Lists should be equal length"
@@ -560,7 +563,12 @@ class Cumulative(GlobalConstraint):
         if is_any_list(demand):
             demand = flatlist(demand)
             assert len(demand) == len(start), "Shape of demand should match start, duration and end"
-
+            for d in demand:
+                if is_boolexpr(d):
+                    raise TypeError("demands must be non-boolean: {}".format(d))
+        else:
+            if is_boolexpr(demand):
+                raise TypeError("demand must be non-boolean: {}".format(demand))
         flatargs = flatlist([start, duration, end, demand, capacity])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
@@ -630,7 +638,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         ub = max([get_bounds(v)[1] for v in a])
-        assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
+        if not (len(gcc) == ub + 1):
+            raise TypeError(f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}")
         super().__init__("gcc", [a,gcc])
 
     def decompose(self):
