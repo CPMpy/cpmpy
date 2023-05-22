@@ -405,6 +405,11 @@ class Operator(Expression):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool = Operator.allowed[name]
+        if is_bool:
+            #only boolean arguments allowed
+            for arg in flatlist(arg_list):
+                if not is_boolexpr(arg):
+                    raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
             arg_list = flatlist(arg_list)
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
