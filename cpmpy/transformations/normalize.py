@@ -108,7 +108,18 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 flipmap = {"==":"==", "!=":"!=", "<=":">=", "<":">"}
                 name = flipmap[name]
                 lhs, rhs = rhs, lhs
-            if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, int):
+            """
+            Simplify expressions according to this table:
+            x  | <0	 0	 1	>1
+            --------------------
+            == |  F	~x	 x	 F
+            != |  T	 x	~x	 T
+            >  |  T	 x	 F	 F
+            <  |  F	 F	~x	 T
+            >= |  T	 T	 x	 F
+            <= |  F	~x	 T	 T
+            """
+            if is_boolexpr(lhs) and isinstance(rhs, int):
                 # direct simplification of boolean comparisons
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
