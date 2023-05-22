@@ -63,13 +63,21 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 if any(is_true_cst(arg) for arg in args):
                     newlist.append(1 if num_context else BoolVal(True))
                 else:
-                    newlist.append(Operator("or", [arg for arg in args if not isinstance(arg, BoolVal)]))
+                    filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
+                    if len(filtered_args):
+                        newlist.append(Operator("or", filtered_args))
+                    else:
+                        newlist.append(BoolVal(False))
 
             elif expr.name == "and":
                 if any(is_false_cst(arg) for arg in args):
                     newlist.append(0 if num_context else BoolVal(False))
                 else:
-                    newlist.append(Operator("and", [arg for arg in args if not isinstance(arg, BoolVal)]))
+                    filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
+                    if len(filtered_args):
+                        newlist.append(Operator("and", filtered_args))
+                    else:
+                        newlist.append(BoolVal(True))
 
             elif expr.name == "->":
                 cond, bool_expr = args
