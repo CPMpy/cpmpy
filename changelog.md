@@ -1,5 +1,8 @@
 # Change log
 
+## 0.9.15
+Re-release of 0.9.14 due to github action pip-release screw-up
+
 ## 0.9.14
 Hotfix release
 
