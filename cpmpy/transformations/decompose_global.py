@@ -1,93 +1,10 @@
 import copy
 
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint
-
-
-def decompose_tree(lst_of_expr, supported=set(), supported_reif=set(), nested=False):
-    """
-        Decomposes any global constraint not supported by the solver
-        Accepts a list of CPMpy expressions as input
-        Returns a list of CPMpy expressions
-
-        - supported: a set of supported global constraints or global functions
-        - supported_reified: as set of supported global constraints/functions within a reification
-
-        Unsupported constraints are decomposed in equivalent simpler constraints.
-        Special care taken for partial global constraints in reified contexts and constraints in negative contexts
-
-        Supported numerical global functions are left in reified contexts as they can be rewritten using
-            `cpmpy.transformations.reification.reify_rewrite`
-            The following `bv -> NumExpr <comp> Var/Const` can always be rewritten as  [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
-            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
-    """
-
-    newlist = []
-    for expr in lst_of_expr:
-
-        if isinstance(expr, (_BoolVarImpl, BoolVal, DirectConstraint)):
-            newlist.append(expr)
-            continue
-
-        if isinstance(expr, Operator):
-            # tricky here, what if some argument is a numerical global constraint? Need to create a new auxiliary variable
-            # for example: min(x,y,z) + iv <= 10 and min has to be decomposed
-            #   then we should call min(x,y,z).decompose_comparison('==', AUX) and put AUX into the SUM as argument
-            pass #TODO
-
-
-
-        if isinstance(expr, Comparison):
-            lhs, rhs = expr.args
-
-            if hasattr(lhs, "decompose_comparison"):
-                # numerical global constraint
-                should_decompose = lhs.name not in supported_reif if nested else lhs.name not in supported
-                if should_decompose:
-                    expr = lhs.decompose_comparison(expr.name, rhs)
-
-            elif hasattr(rhs, "decompose_comparison"):
-                # numerical global constraint
-                should_decompose = rhs.name not in supported_reif if nested else lhs.name not in supported
-                if should_decompose:
-                    flipmap = {"==":"==", "!=":"!=","<":">", "<=":">="}
-                    expr = rhs.decompose_comparison(flipmap[expr.name], lhs)
-
-            if isinstance(expr, list):# decomposition has triggered above
-                newlist.extend(decompose_tree(expr, supported, supported_reif, nested)) # no new level of nesting
-            else: # recurse into arguments of comparison
-                decomp_lhs = decompose_tree([lhs], supported, supported_reif, nested=True)
-                decomp_rhs = decompose_tree([rhs], supported, supported_reif, nested=True)
-                if len(decomp_lhs) >= 1:
-                    assert hasattr(lhs, "decompose") and lhs.is_bool(), "unexpected argument, lhs should be boolean global constraint if decomposition was triggered"
-                    decomp_lhs = [all(decomp_lhs)]
-                if len(decomp_rhs) >= 1:
-                    assert hasattr(rhs, "decompose") and rhs.is_bool(), "unexpected argument, rhs should be boolean global constraint if decomposition was triggered"
-                    decomp_rhs = [all(decomp_rhs)]
-
-                newlist.append(Comparison(expr.name, decomp_lhs[0], decomp_rhs[0]))
-            continue
-
-
-        if hasattr(expr, "decompose"):
-            # boolean global constraint
-            should_decompose = expr.name not in supported_reif if nested else expr.name not in supported
-            if should_decompose:
-                expr = do_decompose(expr)
-
-            if isinstance(expr, list): #decomposition has triggered above
-                newlist.extend(decompose_tree(expr, supported, supported_reif, nested))
-            else:# recurse into arguments
-                # tricky case, similar to Operator
-                # E.g. AllDifferent(min(x,y,z), a,b) where min should be decomposed!
-                pass # TODO
-
-
-
 
 def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
@@ -108,6 +25,9 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
                 So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
                 TODO: decide if we want to do the rewrite of unsupported globals here or leave it to `reify_rewrite`.
                     Currently, we left it for `reify_rewrite`
+
+
+
     """
     def _is_supported(cpm_expr, reified):
         if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
@@ -172,11 +92,10 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
 
 
-def do_decompose(cpm_expr, negative_context=False):
+def do_decompose(cpm_expr):
     """
         Helper function for decomposing global constraints
         - cpm_expr: Global constraint or comparison containing a global constraint on lhs
-        - negative_context: Boolean indicating if the global constraints should be decomposed using `decompose_negation`
     """
     if isinstance(cpm_expr, Comparison):
         lhs, rhs = cpm_expr.args
@@ -185,6 +104,4 @@ def do_decompose(cpm_expr, negative_context=False):
         else:
             return lhs.decompose_comparison(cpm_expr.name, rhs)
 
-    if negative_context:
-        return cpm_expr.decompose_negation()
     return cpm_expr.decompose()
