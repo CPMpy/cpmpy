@@ -325,6 +325,9 @@ class CPM_minizinc(SolverInterface):
             might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
+            if cpm_var < -2147483646 or cpm_var > 2147483646:
+                raise MinizincBoundsException(
+                    "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
