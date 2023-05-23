@@ -338,8 +338,7 @@ def get_or_make_var(expr):
 
         if isinstance(flatexpr,_BoolVarImpl):
             #avoids unnecessary bv == bv or bv == ~bv assignments
-            #return flatexpr,flatcons
-            pass
+            return flatexpr,flatcons
         bvar = _BoolVarImpl()
         return (bvar, [flatexpr == bvar]+flatcons)
 
