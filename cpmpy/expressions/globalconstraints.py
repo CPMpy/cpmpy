@@ -113,8 +113,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, \
-    is_single_type_list
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
 # Base class GlobalConstraint
@@ -173,10 +172,7 @@ class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
     def __init__(self, *args):
-        flatargs = flatlist(args)
-        if not (all(is_boolexpr(arg) for arg in flatargs) or not any(is_boolexpr(arg) for arg in flatargs)):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
-        super().__init__("alldifferent", flatargs)
+        super().__init__("alldifferent", flatlist(args))
 
     def decompose(self):
         """Returns the decomposition
@@ -191,10 +187,7 @@ class AllDifferentExcept0(GlobalConstraint):
     All nonzero arguments have a distinct value
     """
     def __init__(self, *args):
-        flatargs = flatlist(args)
-        if not is_single_type_list(flatargs):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
-        super().__init__("alldifferent_except0", flatargs)
+        super().__init__("alldifferent_except0", flatlist(args))
 
     def decompose(self):
         return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
@@ -211,10 +204,7 @@ class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
     def __init__(self, *args):
-        flatargs = flatlist(args)
-        if not is_single_type_list(flatargs):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
-        super().__init__("allequal", flatargs)
+        super().__init__("allequal", flatlist(args))
 
     def decompose(self):
         """Returns the decomposition
@@ -376,10 +366,7 @@ class Minimum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        flatargs = flatlist(arg_list)
-        if not is_single_type_list(flatargs):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
-        super().__init__("min", flatargs, is_bool=False)
+        super().__init__("min", flatlist(arg_list), is_bool=False)
 
     def value(self):
         argvals = [argval(a) for a in self.args]
@@ -412,10 +399,7 @@ class Maximum(GlobalConstraint):
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
     def __init__(self, arg_list):
-        flatargs = flatlist(arg_list)
-        if not is_single_type_list(flatargs):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
-        super().__init__("max", flatargs, is_bool=False)
+        super().__init__("max", flatlist(arg_list), is_bool=False)
 
     def value(self):
         argvals = [argval(a) for a in self.args]
@@ -460,11 +444,8 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
-        flatarr = flatlist(arr)
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if not is_single_type_list(flatarr):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatarr))
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
@@ -660,9 +641,8 @@ class Count(GlobalConstraint):
     """
 
     def __init__(self,arr,val):
-        flatargs = flatlist([arr,val])
-        if not is_single_type_list(flatargs):
-            raise TypeError("Mixing of arithmetic and boolean arguments is not allowed for global constraints: {}".format(flatargs))
+        if is_any_list(val) or not is_any_list(arr):
+            raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
         super().__init__("count", [arr,val], is_bool=False)
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
