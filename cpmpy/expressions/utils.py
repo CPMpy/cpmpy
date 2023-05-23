@@ -142,14 +142,3 @@ def get_bounds(expr):
         if is_bool(expr):
             return 0, 1
         return expr, expr
-
-def is_single_type_list(args):
-    '''
-    Checks wether all the elements of a (flat) list are of the same type (boolean or not boolean)
-    '''
-    is_bool = is_boolexpr(args[0])
-    for expr in args[1:]:
-        if is_boolexpr(expr) != is_bool:
-            return False
-    return True
-
