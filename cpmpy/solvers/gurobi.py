@@ -279,7 +279,7 @@ class CPM_gurobi(SolverInterface):
       """
             Eagerly add a constraint to the underlying solver.
 
-            Any CPMpy expression given is immediately transformed (throught `transform()`)
+            Any CPMpy expression given is immediately transformed (through `transform()`)
             and then posted to the solver in this function.
 
             This can raise 'NotImplementedError' for any constraint not supported after transformation

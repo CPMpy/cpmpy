@@ -252,7 +252,7 @@ class CPM_z3(SolverInterface):
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
-            Any CPMpy expression given is immediately transformed (throught `transform()`)
+            Any CPMpy expression given is immediately transformed (through `transform()`)
             and then posted to the solver in this function.
 
             This can raise 'NotImplementedError' for any constraint not supported after transformation
@@ -271,7 +271,6 @@ class CPM_z3(SolverInterface):
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
             # translate each expression tree, then post straight away
-            print(cpm_con)
             z3_con = self._z3_expr(cpm_con)
             self.z3_solver.add(z3_con)
 
