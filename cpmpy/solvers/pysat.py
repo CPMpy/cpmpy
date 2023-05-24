@@ -33,7 +33,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.utils import is_any_list, is_int
-from ..transformations.get_variables import get_variables, get_variables_model
+from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysat(SolverInterface):
@@ -123,7 +123,6 @@ class CPM_pysat(SolverInterface):
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
 
         # initialise everything else and post the constraints/objective
-        assert all(v.is_bool() for v in get_variables_model(cpm_model)), "Only support boolean variables in model"
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
 
@@ -265,30 +264,30 @@ class CPM_pysat(SolverInterface):
 
                 clauses = []
                 if cpm_expr.name == "<":
-                    clauses += CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+                    clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "<=":
                     clauses += CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == ">=":
                     clauses += CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == ">":
-                    clauses += CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+                    clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "==":
                     clauses += CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
                 elif cpm_expr.name == "!=":
                     # special cases with bounding 'hardcoded' for clarity
                     if bound <= 0:
-                        clauses += CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+                        clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
                     elif bound >= len(lits):
-                        clauses += CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+                        clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
                     else:
                         ## add implication literal to atleast/atmost
                         is_atleast = self.solver_var(boolvar())
                         clauses += [atl + [-is_atleast] for atl in
-                                    CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
+                                    CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
 
                         is_atmost = self.solver_var(boolvar())
                         clauses += [atm + [-is_atmost] for atm in
-                                    CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
+                                    CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
 
                         ## add is_atleast or is_atmost
                         clauses.append([is_atleast, is_atmost])

@@ -81,8 +81,6 @@ import copy
 import math
 import numpy as np
 from ..expressions.core import *
-from ..expressions.core import _wsum_should
-from ..expressions.core import _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list
 
@@ -187,17 +185,6 @@ def flatten_constraint(expr):
     - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
         """
-
-        left, right = expr.args[0], expr.args[1]
-
-        # Flatten a complex weighted sum where any of the sub expressions is a sum, mul, neg, ...
-        # e.g. bv0 - 3 * (bv2 + 2 * bv1)
-        if isinstance(left, Operator) and \
-            (left.name == "wsum" or
-            any(_wsum_should_flatten(sub_expr) for sub_expr in left.args) ):
-            w_new, x_new = _wsum_make_flatten(left)
-            return [Comparison(expr.name, Operator("wsum",[w_new, x_new] ),right)]
-
         if all(__is_flat_var(arg) for arg in expr.args):
             return [expr]
 
@@ -406,6 +393,7 @@ def normalized_boolexpr(expr):
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
+
     if isinstance(expr, Operator):
         # and, or, ->
 
@@ -632,46 +620,3 @@ def negated_normal(expr):
             return negated_normal(Operator('and', expr.decompose()))
         else:
             raise NotImplementedError("negate_normal {}".format(expr))
-
-
-def _wsum_should_flatten(arg):
-    # in flatten we also turn negations (in sums) into weighted sums,
-    # for stronger expression simplification
-    if isinstance(arg, Operator) and arg.name == "-":
-        # TODO: HANDLE the ABS operator 
-        if any(isinstance(sub_arg, Operator) and sub_arg.name == "abs" for sub_arg in arg.args):
-            return False
-        return True
-    return _wsum_should(arg)
-
-def _wsum_make_flatten(sub_expr):
-    # Mixed operator weighted sums that can be flattened into one,
-    # where any of the sub expressions is a sum, mul, neg, ...
-    # e.g. bv0 - 3 * (bv2 + 2 * bv1)
-    if sub_expr.name == 'wsum':
-        w_new, x_new = [], []
-        for wi, xi in zip(sub_expr.args[0], sub_expr.args[1]):
-            wni, xni = _wsum_make_flatten(xi)
-            wni = [wnij * wi for wnij in wni]
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == 'mul':
-        w = sub_expr.args[0]
-        wi, x = _wsum_make_flatten(sub_expr.args[1])
-        wi_new = [wij*w for wij in wi]
-        return wi_new, x
-    elif sub_expr.name == "sum":
-        w_new, x_new = [], []
-        for xi in sub_expr.args:
-            wni, xni = _wsum_make_flatten(xi)
-            w_new += wni
-            x_new += xni
-        return w_new, x_new
-    elif sub_expr.name == "-" and isinstance(sub_expr.args[0], Operator):
-        # - (3 * y)
-        w, x = _wsum_make_flatten(sub_expr.args[0])
-        return [-i for i in w], x
-
-    ## base case
-    return _wsum_make(sub_expr)
