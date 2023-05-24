@@ -32,12 +32,14 @@ from datetime import timedelta # for mzn's timeout
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import MinizincNameException
-from ..expressions.core import Expression, Comparison, Operator
+from ..exceptions import MinizincNameException, MinizincBoundsException
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, flatlist
-from ..transformations.get_variables import get_variables_model, get_variables
-from ..exceptions import MinizincPathException
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables
+from ..exceptions import MinizincPathException, NotSupportedError
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_minizinc(SolverInterface):
@@ -63,6 +65,8 @@ class CPM_minizinc(SolverInterface):
     mzn_model: object, the minizinc.Model instance
     mzn_solve: object, the minizinc.Solver instance
     mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
+
+    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
     @staticmethod
@@ -222,8 +226,17 @@ class CPM_minizinc(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
+        runtime = 0
         if 'time' in mzn_result.statistics:
-            self.cpm_status.runtime = mzn_result.statistics['time']  # --output-time
+            self.cpm_status.runtime = self.mzn_time_to_seconds(mzn_result.statistics.get("time"))
+        else:
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("flatTime", 0))
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("initTime", 0))
+            runtime += self.mzn_time_to_seconds(mzn_result.statistics.get("solveTime", 0))
+            if runtime != 0:
+                self.cpm_status.runtime = runtime
+            else:
+                raise NotImplementedError #Please report on github, minizinc probably changed their time names/types
 
         # translate exit status
         mzn_status = mzn_result.status
@@ -240,11 +253,19 @@ class CPM_minizinc(SolverInterface):
             raise Exception("MiniZinc solver returned with status 'Error'")
         elif mzn_status == minizinc.result.Status.UNKNOWN:
             # means, no solution was found (e.g. within timeout?)...
-            self.cpm_status.exitstatus = ExitStatus.ERROR
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError  # a new status type was introduced, please report on github
 
         return self.cpm_status
+
+    def mzn_time_to_seconds(self, time):
+        if isinstance(time, int):
+            return time / 1000
+        elif isinstance(time, timedelta):
+            return time.total_seconds()  # --output-time
+        else:
+            raise NotImplementedError #unexpected type for time
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
@@ -321,6 +342,8 @@ class CPM_minizinc(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
             elif isinstance(cpm_var, _IntVarImpl):
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
             self._varmap[cpm_var] = mzn_var
 
@@ -336,7 +359,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        self.user_vars.update(get_variables(expr)) # add objvars to vars
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -346,6 +369,8 @@ class CPM_minizinc(SolverInterface):
         else:
             self.mzn_txt_solve = "solve maximize {};\n".format(obj)
 
+    def has_objective(self):
+        return self.mzn_txt_solve != "solve satisfy;"
 
     # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
@@ -357,10 +382,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        if is_any_list(cpm_expr):
-            return flatlist(cpm_expr)
-        else:
-            return [cpm_expr]
+        return toplevel_list(cpm_expr)
 
     def _post_constraint(self, cpm_con):
         """
@@ -390,13 +412,14 @@ class CPM_minizinc(SolverInterface):
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
-        if not isinstance(expr, Expression) or \
-                isinstance(expr, _NumVarImpl):
-            if expr is True:
-                return "true"
-            if expr is False:
-                return "false"
-            # default
+        if not isinstance(expr, Expression):
+            return self.solver_var(expr) # constants
+
+        if isinstance(expr, BoolVal):
+            return str(expr.args[0]).lower()
+
+        # default
+        if isinstance(expr, _NumVarImpl):
             if isinstance(expr, NegBoolView):
                 return "not " + self.solver_var(expr._bv)
             return self.solver_var(expr)
@@ -409,6 +432,29 @@ class CPM_minizinc(SolverInterface):
                 str_tbl += ",".join(map(str, row)) + " |"  # rows
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
+
+        # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
+        if expr.name == "inverse":
+            def zero_based(array):
+                return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
+
+            str_fwd = zero_based(expr.args[0])
+            str_rev = zero_based(expr.args[1])
+            return "inverse({}, {})".format(str_fwd, str_rev)
+
+        # count: we need the lhs and rhs together
+        if isinstance(expr, Comparison) and expr.args[0].name == 'count':
+            name = expr.name
+            lhs, rhs = expr.args
+            c = self._convert_expression(rhs)  # count
+            x = [self._convert_expression(countable) for countable in lhs.args[0]]  # array
+            y = self._convert_expression(lhs.args[1])  # value to count in array
+            functionmap = {'==': 'count_eq', '!=': 'count_neq',
+                        '<=': 'count_geq', '>=': 'count_leq',
+                        '>': 'count_lt', '<': 'count_gt'}
+            if name in functionmap:
+                name = functionmap[name]
+            return "{}({},{},{})".format(name, x, y, c)
 
         args_str = [self._convert_expression(e) for e in expr.args]
 
@@ -441,7 +487,7 @@ class CPM_minizinc(SolverInterface):
                 # I don't think there is a more direct way unfortunately
                 w = [self._convert_expression(wi) for wi in expr.args[0]]
                 x = [self._convert_expression(xi) for xi in expr.args[1]]
-                args_str = [f"{wi}*{xi}" for wi,xi in zip(w,x)]
+                args_str = [f"{wi}*({xi})" for wi,xi in zip(w,x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
             # special case, infix: two args
@@ -488,6 +534,24 @@ class CPM_minizinc(SolverInterface):
             self += [s + d == e for s,d,e in zip(start,dur,end)]
             return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
 
+        elif expr.name == 'ite':
+            cond, tr, fal = expr.args
+            return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
+                                                        self._convert_expression(fal))
+
+        elif expr.name == "gcc":
+            a, gcc = expr.args
+            cover = [x for x in range(len(gcc))]
+            a = self._convert_expression(a)
+            gcc = self._convert_expression(gcc)
+            cover = self._convert_expression(cover)
+            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+
+        # a direct constraint, treat differently for MiniZinc, a text-based language
+        # use the name as, unpack the arguments from the argument tuple
+        elif isinstance(expr, DirectConstraint):
+            return "{}({})".format(expr.name, ",".join(args_str))
+
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
@@ -495,7 +559,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -506,11 +570,15 @@ class CPM_minizinc(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
         # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
+
         import asyncio
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER

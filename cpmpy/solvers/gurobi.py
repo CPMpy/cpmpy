@@ -29,8 +29,10 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.decompose_global import decompose_global
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -54,6 +56,8 @@ class CPM_gurobi(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     - grb_model: object, TEMPLATE's model object
+
+    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
 
     @staticmethod
@@ -108,7 +112,6 @@ class CPM_gurobi(SolverInterface):
 
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
-        import gurobipy as gp
         from gurobipy import GRB
 
         if time_limit is not None:
@@ -121,8 +124,6 @@ class CPM_gurobi(SolverInterface):
         _ = self.grb_model.optimize(callback=solution_callback)
         grb_objective = self.grb_model.getObjective()
 
-        is_optimization_problem = grb_objective.size() != 0 # TODO: check if better way to do this...
-
         grb_status = self.grb_model.Status
 
         # new status, translate runtime
@@ -130,9 +131,9 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not is_optimization_problem:
+        if grb_status == GRB.OPTIMAL and not self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and is_optimization_problem:
+        elif grb_status == GRB.OPTIMAL and self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -160,7 +161,7 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = int(solver_val)
             # set _objective_value
-            if is_optimization_problem:
+            if self.has_objective():
                 self.objective_value_ = grb_objective.getValue()
 
         return has_sol
@@ -207,8 +208,8 @@ class CPM_gurobi(SolverInterface):
 
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons  # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj))
+        self += flat_cons
+        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -216,6 +217,9 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
         else:
             self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+
+    def has_objective(self):
+        return self.grb_model.getObjective().size() != 0  # TODO: check if better way to do this...
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -264,11 +268,12 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = decompose_global(cpm_cons, supported={"min","max","alldifferent"}) # alldiff has specialized MIP decomp in linearize
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons)  # the core of the MIP-linearization
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div"}))  # the core of the MIP-linearization
+        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
     def _post_constraint(self, cpm_expr):
@@ -281,6 +286,9 @@ class CPM_gurobi(SolverInterface):
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
         from gurobipy import GRB
+        # True or False
+        if isinstance(cpm_expr, BoolVal):
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -355,18 +363,13 @@ class CPM_gurobi(SolverInterface):
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
-        # Global constraints
-        elif hasattr(cpm_expr, 'decompose'):
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-            return
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.grb_model)
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
-
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -378,6 +381,7 @@ class CPM_gurobi(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
@@ -385,24 +389,33 @@ class CPM_gurobi(SolverInterface):
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
+
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number and set time_limit to be not None.")
+                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
-        self.grb_model.setParam("PoolSearchMode", 2)
-        self.grb_model.setParam("PoolSolutions", solution_limit)
+        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
 
-        for param, val in kwargs.items():
-            self.grb_model.setParam(param, val)
-        # Solve the model
-        self.grb_model.optimize()
+        # solve the model
+        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
 
-
+        optimal_val = None
         solution_count = self.grb_model.SolCount
+        opt_sol_count = 0
+
         for i in range(solution_count):
             # Specify which solution to query
             self.grb_model.setParam("SolutionNumber", i)
+            sol_obj_val = self.grb_model.PoolObjVal
+            if optimal_val is None:
+                optimal_val = sol_obj_val
+            if optimal_val is not None:
+                # sub-optimal solutions
+                if sol_obj_val != optimal_val:
+                    break
+            opt_sol_count += 1
+
             # Translate solution to variables
             for cpm_var in self.user_vars:
                 solver_val = self.solver_var(cpm_var).Xn
@@ -410,9 +423,10 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = int(solver_val)
+
             # Translate objective
-            if self.grb_model.getObjective().size() != 0:                # TODO: check if better way to do this...
-                self.objective_value_ = self.grb_model.getObjective().getValue()
+            if self.has_objective():
+                self.objective_value_ = self.grb_model.PoolObjVal
 
             if display is not None:
                 if isinstance(display, Expression):
@@ -425,4 +439,4 @@ class CPM_gurobi(SolverInterface):
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
 
-        return solution_count
+        return opt_sol_count

@@ -109,6 +109,24 @@ class TestSolvers(unittest.TestCase):
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 
+    def test_ortools_inverse(self):
+        from cpmpy.solvers.ortools import CPM_ortools
+
+        fwd = cp.intvar(0, 9, shape=10)
+        rev = cp.intvar(0, 9, shape=10)
+
+        # Fixed value for `fwd`
+        fixed_fwd = [9, 4, 7, 2, 1, 3, 8, 6, 0, 5]
+        # Inverse of the above
+        expected_inverse = [8, 4, 3, 5, 1, 9, 7, 2, 6, 0]
+
+        model = cp.Model(cp.Inverse(fwd, rev), fwd == fixed_fwd)
+
+        solver = CPM_ortools(model)
+        self.assertTrue(solver.solve())
+        self.assertEqual(list(rev.value()), expected_inverse)
+
+
     def test_ortools_direct_solver(self):
         """
         Test direct solver access.
@@ -240,6 +258,44 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
+    # this test fails on OR-tools version <9.6
+    def test_ortools_version(self):
+
+        a,b,c,d = [cp.intvar(0,3, name=n) for n in "abcd"]
+        p,q,r,s = [cp.intvar(0,3, name=n) for n in "pqrs"]
+
+        bv1, bv2, bv3 = [cp.boolvar(name=f"bv{i}") for i in range(1,4)]
+
+        model = cp.Model()
+
+        model += b != 1
+        model += b != 2
+
+        model += c != 0
+        model += c != 3
+
+        model += d != 0
+
+        model += p != 2
+        model += p != 3
+
+        model += q != 1
+
+        model += r != 1
+
+        model += s != 2
+
+        model += cp.AllDifferent([a,b,c,d])
+        model += cp.AllDifferent([p,q,r,s])
+
+        model += bv1.implies(a == 0)
+        model += bv2.implies(r == 0)
+        model += bv3.implies(a == 2)
+        model += (~bv1).implies(p == 0)
+
+        model += bv2 | bv3
+
+        self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -329,6 +385,25 @@ class TestSolvers(unittest.TestCase):
         with self.assertRaises(MinizincNameException):
             cp.Model(c == 0).solve(solver="minizinc")
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_inverse(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+
+        fwd = cp.intvar(0, 9, shape=10)
+        rev = cp.intvar(0, 9, shape=10)
+
+        # Fixed value for `fwd`
+        fixed_fwd = [9, 4, 7, 2, 1, 3, 8, 6, 0, 5]
+        # Inverse of the above
+        expected_inverse = [8, 4, 3, 5, 1, 9, 7, 2, 6, 0]
+
+        model = cp.Model(cp.Inverse(fwd, rev), fwd == fixed_fwd)
+
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertEqual(list(rev.value()), expected_inverse)
+
     @pytest.mark.skipif(not CPM_z3.supported(),
                         reason="Z3 not installed")
     def test_z3(self):
@@ -359,7 +434,7 @@ class TestSolvers(unittest.TestCase):
         x = cp.intvar(0, 1)
         m = cp.Model((x >= 0.1) & (x != 1))
         s = cp.SolverLookup.get("z3", m)
-        self.assertFalse(s.solve())
+        self.assertFalse(s.solve()) # upgrade z3 with pip install --upgrade z3-solver
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -382,5 +457,12 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(minimize=sum([v]))
         self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
-        
+
+    # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
+    @pytest.mark.filterwarnings("ignore:model inconsistency detected")
+    def test_false(self):
+        m = cp.Model([cp.boolvar(), False])
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                self.assertFalse(m.solve(solver=name))
 

@@ -23,10 +23,11 @@
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..exceptions import NotSupportedError
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list
-from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysdd(SolverInterface):
@@ -43,6 +44,8 @@ class CPM_pysdd(SolverInterface):
     pysdd_vtree: a pysdd.sdd.Vtree
     pysdd_manager: a pysdd.sdd.SddManager
     pysdd_root: a pysdd.sdd.SddNode
+
+    The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and `&=` posts the result to pysdd_root.
     """
 
     @staticmethod
@@ -71,7 +74,7 @@ class CPM_pysdd(SolverInterface):
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
-            raise Exception("CPM_pysdd: only satisfaction, does not support an objective function")
+            raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
         # initialise the native solver object, or at least their existence
         self.pysdd_vtree = None
@@ -117,7 +120,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -127,6 +130,7 @@ class CPM_pysdd(SolverInterface):
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit, solution_limit, kwargs: not used
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
 
             Returns: number of solutions found
         """
@@ -138,10 +142,7 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
-        if display is None:
-            # the desired, fast computation
-            return self.pysdd_root.model_count()
-        else:
+        if display is not None:
             # manually walking over the tree, much slower...
             solution_count = 0
             for sol in self.pysdd_root.models():
@@ -160,6 +161,9 @@ class CPM_pysdd(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # the desired, fast computation
+        return self.pysdd_root.model_count()
 
     def solver_var(self, cpm_var):
         """
@@ -207,10 +211,14 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             from pysdd.sdd import SddManager, Vtree
 
-            self.pysdd_vtree = Vtree(var_count=len(self.user_vars), vtree_type="balanced")
+            cnt = len(self.user_vars)
+            if cnt == 0:
+                cnt = 1  # otherwise segfault
+            self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
+        # acctually supports nested Boolean operators natively...
         return to_cnf(cpm_expr)
 
     def _post_constraint(self, cpm_expr):
@@ -222,25 +230,35 @@ class CPM_pysdd(SolverInterface):
 
             Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
         """
-        if isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            self.pysdd_root &= self.solver_var(cpm_expr)
-        elif isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'or':
-                # not sure about this way of making a clause...
-                clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
-                self.pysdd_root &= clause
-            else:
-                raise NotImplementedError(
-                    f"Automatic conversion of Operator {cpm_expr} to CNF not yet supported, please report on github.")
+        if cpm_expr.name == 'or':
+            # not sure about this way of making a clause...
+            clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
+            self.pysdd_root &= clause
+            
         #elif isinstance(cpm_expr, Comparison):
 
         elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
             # for all global constraints:
             for con in self.transform(cpm_expr.decompose()):
                 self._post_constraint(con)
+
+        elif isinstance(cpm_expr, BoolVal):
+            # base case: Boolean value
+            if cpm_expr.args[0]:
+                self.pysdd_root &= self.pysdd_manager.true()
+            else:
+                self.pysdd_root &= self.pysdd_manager.false()
+
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            # base case, just var or ~var
+            self.pysdd_root &= self.solver_var(cpm_expr)
+
+        # a direct constraint, pass to manager, post to root
+        elif isinstance(cpm_expr, DirectConstraint):
+            self.pysdd_root &= cpm_expr.callSolver(self, self.pysdd_manager)
+
         else:
-            raise NotImplementedError(f"Constraint {cpm_expr} not supported by CPM_pysdd")
+            raise NotImplementedError(f"CPM_pysdd: Non supported constraint {cpm_expr}")
 
 
     def dot(self):
