@@ -105,8 +105,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
             if isinstance(lhs, int) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
-                flipmap = {"==":"==", "!=":"!=", "<=":">=", "<":">"}
-                name = flipmap[name]
+                if name == "<": name = ">"
+                elif name == ">": name=  "<"
+                elif name == "<=" : name = ">="
+                elif name == ">=" : name = "<="
                 lhs, rhs = rhs, lhs
             """
             Simplify expressions according to this table:
@@ -123,7 +125,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 # direct simplification of boolean comparisons
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
-                if rhs == 0:
+                elif rhs == 0:
                     if name == "!=" or name == ">":
                         newlist.append(lhs)
                     if name == "==" or name == "<=":
@@ -132,7 +134,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         newlist.append(BoolVal(False))
                     if name == ">=":
                         newlist.append(BoolVal(True))
-                if rhs == 1:
+                elif rhs == 1:
                     if name == "==" or name == ">=":
                         newlist.append(lhs)
                     if name == "!=" or name == "<":
@@ -141,14 +143,14 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         newlist.append(BoolVal(False))
                     if name == "<=":
                         newlist.append(BoolVal(True))
-                if rhs > 1:
+                elif rhs > 1:
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
         elif hasattr(expr, "decompose"):
-            expr = copy.deepcopy(expr)
+            expr = copy.copy(expr)
             expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
-        else: # variables/constants
+        else: # variables/constants/direct constraints
             newlist.append(expr)
     return newlist
