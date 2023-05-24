@@ -186,6 +186,7 @@ class SolverInterface(object):
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
+        self.solver_vars(list(self.user_vars)) # ensure all variables are known to the solver
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
