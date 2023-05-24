@@ -407,7 +407,7 @@ class Operator(Expression):
         arity, is_bool = Operator.allowed[name]
         if is_bool:
             #only boolean arguments allowed
-            for arg in flatlist(arg_list):
+            for arg in arg_list:
                 if not is_boolexpr(arg):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
