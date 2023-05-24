@@ -39,7 +39,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
 class CPM_minizinc(SolverInterface):
@@ -382,7 +382,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        return toplevel_list(cpm_expr)
+        return simplify_boolean(toplevel_list(cpm_expr))
 
     def _post_constraint(self, cpm_con):
         """
