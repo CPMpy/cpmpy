@@ -232,7 +232,6 @@ class CPM_z3(SolverInterface):
             self.z3_solver.maximize(obj)
 
 
-    # most solvers can inherit `__add__()` as is, just implement `transform()` and `__post_constraint()` below
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -247,20 +246,36 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
-        # Z3 supports nested expressions, so no transformations needed
-        # that also means we don't need to extract user variables here
-        # we store them directly in `solver_var()` itself.
         return toplevel_list(cpm_expr)
 
-    def _post_constraint(self, cpm_expr):
+    def __add__(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
-
             Z3 supports nested expressions so translate expression tree and post to solver API directly
+
+            Any CPMpy expression given is immediately transformed (throught `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        # translate each expression tree, then post straight away
-        z3_cons = self._z3_expr(cpm_expr)
-        return self.z3_solver.add(z3_cons)
+        # all variables are user variables, handled in `solver_var()`
+
+        # transform and post the constraints
+        for cpm_con in self.transform(cpm_expr):
+            # translate each expression tree, then post straight away
+            print(cpm_con)
+            z3_con = self._z3_expr(cpm_con)
+            self.z3_solver.add(z3_con)
+
+        return self
 
     def _z3_expr(self, cpm_con, reify=False):
         """

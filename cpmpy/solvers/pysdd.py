@@ -28,6 +28,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list
+from ..transformations.get_variables import get_variables
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysdd(SolverInterface):
@@ -190,7 +191,6 @@ class CPM_pysdd(SolverInterface):
 
         return self._varmap[cpm_var]
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -218,18 +218,32 @@ class CPM_pysdd(SolverInterface):
             self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
             self.pysdd_root = self.pysdd_manager.true()
 
-        # acctually supports nested Boolean operators natively...
+        # actually supports nested Boolean operators natively...
         return to_cnf(cpm_expr)
 
-    def _post_constraint(self, cpm_expr):
-        """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+    def __add__(self, cpm_expr_orig):
+      """
+            Eagerly add a constraint to the underlying solver.
 
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+            Any CPMpy expression given is immediately transformed (throught `transform()`)
+            and then posted to the solver in this function.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
-        """
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+      """
+      # add new user vars to the set
+      get_variables(cpm_expr_orig, collect=self.user_vars)
+
+      # transform and post the constraints
+      for cpm_expr in self.transform(cpm_expr_orig):
         if cpm_expr.name == 'or':
             # not sure about this way of making a clause...
             clause = reduce(self.pysdd_manager.disjoin, self.solver_vars(cpm_expr.args))
@@ -239,8 +253,7 @@ class CPM_pysdd(SolverInterface):
 
         elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
             # for all global constraints:
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
+            self += cpm_expr.decompose()
 
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
@@ -260,6 +273,7 @@ class CPM_pysdd(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysdd: Non supported constraint {cpm_expr}")
 
+      return self
 
     def dot(self):
         """
