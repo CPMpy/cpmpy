@@ -65,3 +65,22 @@ class TransSimplify(unittest.TestCase):
                 print(expr)
                 expr_should = BoolVal(val_should) if isinstance(val_should, bool) else val_should
                 self.assertEqual(str(self.transform(expr)), str([expr_should]))
+
+
+    def test_simplify_expressions(self):
+
+        expr = cp.AllDifferent(self.ivs) == 0
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
+        expr = 0 == cp.AllDifferent(self.ivs)
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
+
+        expr = (self.ivs[0] <= self.ivs[1]) == 0
+        self.assertEqual(str(self.transform(expr)), '[not([(iv[0]) <= (iv[1])])]')
+
+        expr = (self.ivs[0] == self.ivs[1]) == 1
+        self.assertEqual(str(self.transform(expr)), '[(iv[0]) == (iv[1])]')
+
+        # very nested one
+        expr = Operator("and", self.bvs[:1].tolist() + [BoolVal(False)]) == Operator("or", self.bvs)
+        self.assertEqual(str(self.transform(expr)), '[not([or([bv[0], bv[1], bv[2]])])]')
+
