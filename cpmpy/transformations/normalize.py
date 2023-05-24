@@ -6,6 +6,7 @@ from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr
 from ..expressions.variables import NDVarArray, _BoolVarImpl, _IntVarImpl
 from ..exceptions import NotSupportedError
+from ..expressions.globalconstraints import GlobalConstraint
 
 def toplevel_list(cpm_expr, merge_and=True):
     """
@@ -147,7 +148,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
-        elif hasattr(expr, "decompose"):
+        elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
             expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
