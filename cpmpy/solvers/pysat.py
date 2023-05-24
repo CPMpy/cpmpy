@@ -309,7 +309,7 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                return self.pysat_solver.add_clause([])
+                self.pysat_solver.add_clause([])
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -317,7 +317,7 @@ class CPM_pysat(SolverInterface):
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
-            return cpm_expr.callSolver(self, self.pysat_solver)
+            cpm_expr.callSolver(self, self.pysat_solver)
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
