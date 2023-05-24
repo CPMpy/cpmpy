@@ -23,7 +23,7 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum:int", "wsum:int", "mul:int", "sub", "mod", "div", "pow", "abs","-"},
+                     "pysat": {"sum:int", "wsum:int", "mul", "sub", "mod", "div", "pow", "abs","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      }
 
