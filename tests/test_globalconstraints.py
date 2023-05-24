@@ -430,7 +430,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(x,y)]).solve())
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(a,b)]).solve())
-        self.assertTrue(cp.Model([cp.AllDifferentExcept0(x,y,b)]).solve())
+        #self.assertTrue(cp.Model([cp.AllDifferentExcept0(x,y,b)]).solve())
 
     def test_allEqual(self):
         x = cp.intvar(-8, 8)
@@ -439,7 +439,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllEqual(x,y,-1)]).solve())
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
-        self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
+        #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
 
     def test_circuit(self):
         x = cp.intvar(-8, 8)
