@@ -479,6 +479,9 @@ class CPM_minizinc(SolverInterface):
                         'sum': '+', 'sub': '-',
                         'mul': '*', 'pow': '^'}
             op_str = expr.name
+            expr_bounds = expr.get_bounds()
+            if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
+                raise MinizincBoundsException("minizinc does not accept expressions with bounds outside of range (-2147483646..2147483646)")
             if op_str in printmap:
                 op_str = printmap[op_str]
 
