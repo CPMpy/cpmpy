@@ -272,8 +272,8 @@ class CPM_template(SolverInterface):
             if isinstance(cpm_con, _BoolVarImpl):
                 # base case, just var or ~var
                 self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
-            elif isinstance(cpm_con, Operator) and cpm_con.name == 'or':
-                self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
+            elif cpm_con.name == 'or':
+                self.TEMPLATE_solver.add_clause(self.solver_vars(cpm_con.args))
             elif hasattr(cpm_expr, 'decompose'):
                 # global constraint not known, try posting generic decomposition
                 # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
