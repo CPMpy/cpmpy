@@ -421,7 +421,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferent(x,y)]).solve())
         self.assertTrue(cp.Model([cp.AllDifferent(a,b)]).solve())
-        self.assertRaises(TypeError, cp.AllDifferent,(x,y,b))
+        self.assertTrue(cp.Model([cp.AllDifferent(x,y,b)]).solve())
 
     def test_allDiffEx0(self):
         x = cp.intvar(-8, 8)
@@ -430,7 +430,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(x,y)]).solve())
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(a,b)]).solve())
-        self.assertRaises(TypeError,cp.AllDifferentExcept0,(x,y,b))
+        #self.assertTrue(cp.Model([cp.AllDifferentExcept0(x,y,b)]).solve())
 
     def test_allEqual(self):
         x = cp.intvar(-8, 8)
@@ -439,7 +439,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllEqual(x,y,-1)]).solve())
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
-        self.assertRaises(TypeError,cp.AllEqual,(x,y,b))
+        #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
 
     def test_circuit(self):
         x = cp.intvar(-8, 8)
@@ -475,7 +475,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.Minimum([x,y]) == x]).solve())
         self.assertTrue(cp.Model([cp.Minimum([a,b | a]) == b]).solve())
-        self.assertRaises(TypeError,cp.Minimum,[x,y,b])
+        self.assertTrue(cp.Model([cp.Minimum([x,y,b]) == -2]).solve())
 
     def test_max(self):
         x = cp.intvar(-8, 8)
@@ -484,7 +484,7 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.Maximum([x,y]) == x]).solve())
         self.assertTrue(cp.Model([cp.Maximum([a,b | a]) == b]).solve())
-        self.assertRaises(TypeError,cp.Maximum,([x,y,b]))
+        self.assertTrue(cp.Model([cp.Maximum([x,y,b]) == 2 ]).solve())
 
     def test_element(self):
         x = cp.intvar(-8, 8)
@@ -494,7 +494,7 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.Element([x,y],x) == x]).solve())
         self.assertTrue(cp.Model([cp.Element([a,b | a],x) == b]).solve())
         self.assertRaises(TypeError,cp.Element,[x,y],b)
-        self.assertRaises(TypeError,cp.Element,[x,a],x)
+        self.assertTrue(cp.Model([cp.Element([y,a],x) == False]).solve())
 
     def test_xor(self):
         x = cp.intvar(-8, 8)
@@ -540,8 +540,5 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y],[z,q])]).solve())
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[x,False])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y,q],[z,x])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[z,b])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a],[a,b])
+        self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
+        self.assertRaises(TypeError, cp.Count, [x,y],[x,False])

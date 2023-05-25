@@ -24,9 +24,9 @@ def toplevel_list(cpm_expr, merge_and=True):
                     append(e) # presumably the most frequent case
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 unravel(e, append)
-            elif e is False:
+            elif e is False or e is np.False_:
                 append(BoolVal(e))
-            elif e is not True:  # if True: pass
+            elif e is not True and e is not np.True_:  # if True: pass
                 raise NotSupportedError(f"Expression {e} is not a valid CPMpy constraint")
 
     newlist = []
