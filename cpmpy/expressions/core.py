@@ -329,7 +329,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert arg is False or arg is True
+        assert is_true_cst(arg) or is_false_cst(arg)
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
@@ -407,7 +407,7 @@ class Operator(Expression):
         arity, is_bool = Operator.allowed[name]
         if is_bool:
             #only boolean arguments allowed
-            for arg in flatlist(arg_list):
+            for arg in arg_list:
                 if not is_boolexpr(arg):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
