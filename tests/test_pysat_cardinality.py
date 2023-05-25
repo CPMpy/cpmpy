@@ -9,7 +9,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 class TestCardinality(unittest.TestCase):
     def setUp(self):
         self.bv_before = boolvar(shape=7)
-        self.bvs = boolvar(shape=3)
+        self.bvs = cpm_array(boolvar(shape=2).tolist() + [~boolvar()])
 
     def test_pysat_atmost(self):
 
