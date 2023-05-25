@@ -329,7 +329,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert arg is False or arg is True
+        assert is_true_cst(arg) or is_false_cst(arg)
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
