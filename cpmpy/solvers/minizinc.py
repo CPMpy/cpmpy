@@ -325,6 +325,9 @@ class CPM_minizinc(SolverInterface):
             might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
+            if cpm_var < -2147483646 or cpm_var > 2147483646:
+                raise MinizincBoundsException(
+                    "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
@@ -412,6 +415,9 @@ class CPM_minizinc(SolverInterface):
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
 
+        if isinstance(expr,(bool,np.bool_)):
+            expr = BoolVal(expr)
+
         if not isinstance(expr, Expression):
             return self.solver_var(expr) # constants
 
@@ -473,6 +479,9 @@ class CPM_minizinc(SolverInterface):
                         'sum': '+', 'sub': '-',
                         'mul': '*', 'pow': '^'}
             op_str = expr.name
+            expr_bounds = expr.get_bounds()
+            if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
+                raise MinizincBoundsException("minizinc does not accept expressions with bounds outside of range (-2147483646..2147483646)")
             if op_str in printmap:
                 op_str = printmap[op_str]
 
