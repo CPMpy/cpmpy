@@ -326,7 +326,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table", "cumulative","circuit"})
+        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table","cumulative","circuit","inverse"})
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
