@@ -331,6 +331,8 @@ class CPM_minizinc(SolverInterface):
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
+            # we assume all variables are user variables (because no transforms)
+            self.user_vars.add(cpm_var)
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
@@ -362,7 +364,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        get_variables(expr, collect=self.user_vars)  # add objvars to vars
+        #get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -375,7 +377,6 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             No transformations, just ensure it is a list of constraints
@@ -387,13 +388,33 @@ class CPM_minizinc(SolverInterface):
         """
         return toplevel_list(cpm_expr)
 
-    def _post_constraint(self, cpm_con):
+    def __add__(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        # Get text expression, add to the solver
-        mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
-        self.mzn_model.add_string(mzn_str)
+        # all variables are user variables, handled in `solver_var()`
+
+        # transform and post the constraints
+        for cpm_con in self.transform(cpm_expr):
+            # Get text expression, add to the solver
+            mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
+            self.mzn_model.add_string(mzn_str)
+
+        return self
 
     def _convert_expression(self, expr) -> str:
         """
