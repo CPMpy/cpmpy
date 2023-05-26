@@ -157,6 +157,13 @@ class GlobalConstraint(Expression):
         from .python_builtins import all
         return [~all(self.decompose())]
 
+
+    def equivalent_decomposition(self):
+        """
+            Returns whether self.decompose() == self holds.
+        """
+        return True
+
     def is_total(self):
         """
             Returns whether the global constraint is a total function.
@@ -265,6 +272,10 @@ class Circuit(GlobalConstraint):
             idx = arr[idx]
 
         return pathlen == len(self.args) and idx == 0
+
+
+    def equivalent_decomposition(self):
+        return False
 
     def decompose_negation(self):
         '''
