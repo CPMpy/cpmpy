@@ -579,7 +579,7 @@ class Cumulative(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables
+    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
     must be equal to occ[i].
     """
 
