@@ -17,16 +17,16 @@ def toplevel_list(cpm_expr, merge_and=True):
             if isinstance(e, Expression):
                 if isinstance(e, NDVarArray):  # sometimes does not have .name
                     unravel(e.flat, append)
-                elif e.name == "and" and merge_and:
+                elif merge_and and e.name == "and":
                     unravel(e.args, append)
                 else:
                     assert (e.is_bool()), f"Only boolean expressions allowed at toplevel, got {e}"
                     append(e) # presumably the most frequent case
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 unravel(e, append)
-            elif e is False:
+            elif e is False or e is np.False_:
                 append(BoolVal(e))
-            elif e is not True:  # if True: pass
+            elif e is not True and e is not np.True_:  # if True: pass
                 raise NotSupportedError(f"Expression {e} is not a valid CPMpy constraint")
 
     newlist = []

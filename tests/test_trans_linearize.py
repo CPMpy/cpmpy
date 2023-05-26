@@ -28,13 +28,9 @@ class TestTransLinearize(unittest.TestCase):
         cons = linearize_constraint(a | b)[0]
         self.assertEqual("(a) + (b) >= 1", str(cons))
 
-        # xor
-        cons = linearize_constraint(a ^ b)[0]
-        self.assertEqual("(a) + (b) == 1", str(cons))
-
         # implies
         cons = linearize_constraint(a.implies(b))[0]
-        self.assertEqual("(a) -> (b >= 1)", str(cons))
+        self.assertEqual("sum([1, -1] * [a, b]) <= 0", str(cons))
     
     def test_bug_168(self):
         from cpmpy.solvers import CPM_gurobi
@@ -58,8 +54,8 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(linearize_constraint(a | b | c)), "[sum([a, b, c]) >= 1]")
         self.assertEqual(str(linearize_constraint(a | b | (~c))), "[sum([a, b, ~c]) >= 1]")
         # test implies
-        self.assertEqual(str(linearize_constraint(a.implies(b))), "[(~a) + (b) >= 1]")
-        self.assertEqual(str(linearize_constraint(a.implies(~b))), "[(~a) + (~b) >= 1]")
+        self.assertEqual(str(linearize_constraint(a.implies(b))), "[sum([1, -1] * [a, b]) <= 0]")
+        self.assertEqual(str(linearize_constraint(a.implies(~b))), "[sum([1, -1] * [~b, a]) >= 0]")
         self.assertEqual(str(linearize_constraint(a.implies(x+y+z >= 0))), "[(a) -> (sum([x, y, z]) >= 0)]")
         self.assertEqual(str(linearize_constraint(a.implies(x+y+z > 0))), "[(a) -> (sum([x, y, z]) >= 1)]")
         # test sub
@@ -76,8 +72,25 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c2), "(~BV3) -> (sum([1, 1, -1] * [x, y, z]) >= 1)")
         c1, c2 = linearize_constraint(a.implies(x != y))
         self.assertEqual(str(c1), "(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1)")
-        self.assertEqual(str(c2), "(a) -> (sum([1, -1, 6] * [x, y, BV4]) >= -5)")
+        self.assertEqual(str(c2), "(a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)")
 
+
+    def test_neq(self):
+        # not equals is a tricky constraint to linearize, do some extra tests on it here
+
+        x, y, z = [cp.intvar(0, 5, name=n) for n in "xyz"]
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+
+        cons = 2*x + 3*y + 4*z != 10
+        self.assertEqual(str(linearize_constraint(cons)),"[(BV3) -> (sum([2, 3, 4] * [x, y, z]) <= 9), (~BV3) -> (sum([2, 3, 4] * [x, y, z]) >= 11)]")
+
+        cons = a.implies(x != y)
+        lin_cons = linearize_constraint(cons)
+        cons_vals = []
+        cp.Model(lin_cons).solveAll(solver="ortools", display=lambda : cons_vals.append(cons.value()))
+        print(len(cons_vals))
+        self.assertTrue(all(cons_vals))
+        # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
 class TestConstRhs(unittest.TestCase):
@@ -122,11 +135,11 @@ class TestConstRhs(unittest.TestCase):
         rhs = intvar(0, 10, name="r")
 
         cons = cp.max([a,b,c]) <= rhs
-        cons = linearize_constraint(cons)[0]
+        cons = linearize_constraint(cons, supported={"max"})[0]
         self.assertEqual("(max(a,b,c)) <= (r)", str(cons))
 
         cons = cp.AllDifferent([a,b,c])
-        cons = linearize_constraint(cons)[0]
+        cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
 
@@ -166,11 +179,11 @@ class TestVarsLhs(unittest.TestCase):
         rhs = intvar(0, 10, name="r")
 
         cons = cp.max([a,b,c,5]) <= rhs
-        cons = linearize_constraint(cons)[0]
+        cons = linearize_constraint(cons, supported={"max"})[0]
         self.assertEqual("(max(a,b,c,5)) <= (r)", str(cons))
 
         cons = cp.AllDifferent([a, b, c])
-        cons = linearize_constraint(cons)[0]
+        cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
 

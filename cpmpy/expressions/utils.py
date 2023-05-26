@@ -25,6 +25,8 @@ Internal utilities for expression handling.
 import numpy as np
 from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
+from cpmpy.exceptions import IncompleteFunctionError
+
 
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
@@ -38,6 +40,23 @@ def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_))
+def is_false_cst(arg):
+    """Is the argument the constant False (can be of type bool, np.bool and BoolVal)"""
+    from cpmpy import BoolVal
+    if arg is False or arg is np.False_:
+        return True
+    elif isinstance(arg, BoolVal):
+        return not arg.args[0]
+    return False
+
+def is_true_cst(arg):
+    """Is the argument the constant True (can be of type bool, np.bool and BoolVal)"""
+    from cpmpy import BoolVal
+    if arg is True or arg is np.True_:
+        return True
+    elif isinstance(arg, BoolVal):
+        return arg.args[0]
+    return False
 def is_boolexpr(expr):
     #boolexpr
     if hasattr(expr, 'is_bool'):
@@ -76,7 +95,11 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    return a.value() if hasattr(a, "value") else a
+    try:
+        return a.value() if hasattr(a, "value") else a
+    except IncompleteFunctionError as e:
+        if a.is_bool(): return False
+        raise e
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -108,3 +131,14 @@ def eval_comparison(str_op, lhs, rhs):
     else:
         raise Exception("Not a known comparison:", str_op)
 
+
+def get_bounds(expr):
+    # can return floats, use floor and ceil when creating an intvar!
+    from cpmpy.expressions.core import Expression
+    if isinstance(expr,Expression):
+        return expr.get_bounds()
+    else:
+        assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
+        if is_bool(expr):
+            return 0, 1
+        return expr, expr

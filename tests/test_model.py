@@ -6,6 +6,7 @@ from os.path import join
 
 from numpy import logaddexp
 import cpmpy as cp
+from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
 
 
@@ -86,24 +87,25 @@ class TestModel(unittest.TestCase):
 
 
     def test_deepcopy(self):
+        import copy
         x,y,z = [cp.boolvar(name=n) for n in "xyz"]
 
         cons1 = x > y
         cons2 = x + y == 1
-        m = cp.Model([cons1, cons2])
+        cons3 = z > y
+        m = cp.Model([cons1, cons2], [cons3])
 
         memodict = dict()
-        m_dcopy = m.deepcopy(memodict)
-        print(memodict)
+        m_dcopy = copy.deepcopy(m, memodict)
         m_dcopy.solve()
 
         self.assertIsNone(cons1.value())
         self.assertIsNone(cons2.value())
+        self.assertIsNone(cons3.value())
 
         m.solve()
 
-        m2 = m.deepcopy()
+        m2 = copy.deepcopy(m)
 
-        self.assertTrue(m2.constraints[0].value())
-        self.assertTrue(m2.constraints[1].value())
-
+        for cons in flatlist(m2.constraints):
+            self.assertTrue(cons.value())

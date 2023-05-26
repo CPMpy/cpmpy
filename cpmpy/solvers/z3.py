@@ -20,14 +20,15 @@
 
         CPM_z3
 """
+from z3 import BoolRef
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
-from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.normalize import toplevel_list
 
 
@@ -43,6 +44,8 @@ class CPM_z3(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     z3_solver: object, z3's Solver() object
+
+    The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
 
     @staticmethod
@@ -277,7 +280,7 @@ class CPM_z3(SolverInterface):
             if is_bool(cpm_con):
                 return bool(cpm_con)
             elif is_int(cpm_con):
-                return int(cpm_con)
+                return z3.IntVal(int(cpm_con))
             return float(cpm_con)
 
         elif is_any_list(cpm_con):
@@ -285,7 +288,7 @@ class CPM_z3(SolverInterface):
             return [self._z3_expr(con) for con in cpm_con]
 
         elif isinstance(cpm_con, BoolVal):
-            return cpm_con.args
+            return cpm_con.args[0]
 
         elif isinstance(cpm_con, _NumVarImpl):
             return self.solver_var(cpm_con)
@@ -299,6 +302,8 @@ class CPM_z3(SolverInterface):
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
                 return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
+            elif cpm_con.name == 'not':
+                return z3.Not(self._z3_expr(cpm_con.args[0]))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -311,23 +316,45 @@ class CPM_z3(SolverInterface):
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
             elif cpm_con.name == 'sub':
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, BoolRef):
+                    rhs = z3.If(rhs,1,0)
                 return lhs - rhs
             elif cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs * rhs
             elif cpm_con.name == "div":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs / rhs
             elif cpm_con.name == "pow":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs ** rhs
             elif cpm_con.name == "mod":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, BoolRef):
+                    rhs = z3.If(lhs,1,0)
                 return lhs % rhs
 
             # '-'/1
             elif cpm_con.name == "-":
+                if is_boolexpr(cpm_con.args[0]):
+                    return -z3.If(self._z3_expr(cpm_con.args[0]), 1, 0)
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
@@ -346,13 +373,6 @@ class CPM_z3(SolverInterface):
             elif rhs_is_expr and rhs.name == "abs":
                 arg = rhs.args[0]
                 return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
-
-            elif lhs_is_expr and lhs.name == "element":
-                arr, idx = lhs.args
-                return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, arr[i], rhs)) for i in range(len(arr))]))
-            elif rhs_is_expr and rhs.name == "element":
-                arr, idx = rhs.args
-                return self._z3_expr(all([(idx == i).implies(Comparison(cpm_con.name, lhs, arr[i])) for i in range(len(arr))]))
 
             elif hasattr(lhs, 'decompose_comparison'):
                 return z3.And(self._z3_expr(lhs.decompose_comparison(cpm_con.name, rhs)))
@@ -416,9 +436,16 @@ class CPM_z3(SolverInterface):
                 for a in z3_args[2:]:
                     z3_cons = z3.Xor(z3_cons, a)
                 return z3_cons
+            elif cpm_con.name == 'ite':
+                return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
+                             self._z3_expr(cpm_con.args[2]))
             else:
                 # global constraints
                 return self._z3_expr(all(cpm_con.decompose()))
+
+        # a direct constraint, make with z3 (will be posted to it by calling function)
+        elif isinstance(cpm_con, DirectConstraint):
+            return cpm_con.callSolver(self, z3)
 
         raise NotImplementedError("Z3: constraint not (yet) supported", cpm_con)
 

@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from cpmpy import *
+from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
@@ -18,12 +19,12 @@ class TestTransfReif(unittest.TestCase):
                  ((~a).implies(b), "[(~a) -> (b)]"),
                  ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
                  ((a).implies(b&c), "[(a) -> ((b) and (c))]"),
-                 ((b|c).implies(a), "[(~a) -> ((~b) and (~c))]"),
+                 ((b|c).implies(a), "[(~a) -> (~b), (~a) -> (~c)]"),
                  ((b&c).implies(a), "[(~a) -> ((~b) or (~c))]"),
                  ((a)==(b), "[(a) -> (b), (b) -> (a)]"),
                  ((~a)==(b), "[(~a) -> (b), (b) -> (~a)]"),
-                 ((b|c)==(a), "[(~a) -> ((~b) and (~c)), (a) -> ((b) or (c))]"),
-                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> ((b) and (c))]"),
+                 ((b|c)==(a), "[(~a) -> (~b), (~a) -> (~c), (a) -> ((b) or (c))]"),
+                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> (b), (a) -> (c)]"),
                 ]
 
         # test transformation
@@ -79,22 +80,20 @@ class TestTransfReif(unittest.TestCase):
         ivs = intvar(1,9, shape=3, name="ivs")
         rv = boolvar(name="rv")
         arr = cpm_array([0,1,2])
-        
-        # various reify_rewrite cases:
-        cases = [(rv == bvs[0], "[(rv) == (bvs[0])]"),
-                 (rv == all(bvs), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]"),
-                 (rv.implies(any(bvs)), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]"),
-                 ((bvs[0].implies(bvs[1])).implies(rv), "[((~bvs[0]) or (bvs[1])) -> (rv)]"),
-                 (rv == AllDifferent(ivs), "[(and([BV0, BV1, BV2])) == (rv), ((ivs[0]) != (ivs[1])) == (BV0), ((ivs[0]) != (ivs[2])) == (BV1), ((ivs[1]) != (ivs[2])) == (BV2)]"),
-                 (rv.implies(AllDifferent(ivs)), "[(rv) -> (and([BV6, BV7, BV8])), ((ivs[0]) != (ivs[1])) == (BV6), ((ivs[0]) != (ivs[2])) == (BV7), ((ivs[1]) != (ivs[2])) == (BV8)]"),
-                 (rv == (arr[intvar(-1,3)] != 1), "[((BV12) or (BV13)) == (rv), (IV0 == 0) == (BV12), (IV0 == 2) == (BV13)]"),
-                 (rv == (arr[intvar(0,2)] != 1), "[([0 1 2][IV1]) == (IV2), (IV2 != 1) == (rv)]"),
-                 (rv == (max(ivs) > 5), "[(max(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 > 5) == (rv)]"),
-                 (rv.implies(min(ivs) != 0), "[(min(ivs[0],ivs[1],ivs[2])) == (IV6), (rv) -> (IV6 != 0)]"),
-                 ((min(ivs) != 0).implies(rv), "[(min(ivs[0],ivs[1],ivs[2])) == (IV8), (IV8 != 0) -> (rv)]"),
-                ]
 
-        # test transformation
-        for (expr, strexpr) in cases:
-            self.assertEqual( str(reify_rewrite(flatten_constraint(expr))), strexpr )
-            self.assertTrue(Model(expr).solve())
+        f = lambda expr : str(reify_rewrite(flatten_constraint(expr)))
+        fd = lambda expr : str(reify_rewrite(decompose_global(flatten_constraint(expr))))
+
+
+        # various reify_rewrite cases:
+        self.assertEqual(f(rv == bvs[0]), "[(rv) == (bvs[0])]")
+        self.assertEqual(f(rv == all(bvs)), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]")
+        self.assertEqual(f(rv.implies(any(bvs))), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]")
+        self.assertEqual(f((bvs[0].implies(bvs[1])).implies(rv)), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]")
+        self.assertRaises(ValueError, lambda : f(rv == AllDifferent(ivs)))
+        self.assertEqual(fd(rv.implies(AllDifferent(ivs))), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]")
+        self.assertEqual(f(rv == (arr[intvar(-1, 3)] != 1)), "[(and([BV0, BV1, BV2])) == (rv), (IV0 != 1) == (BV0), (IV0 >= 0) == (BV1), (IV0 < 3) == (BV2)]")
+        self.assertEqual(f(rv == (arr[intvar(0, 2)] != 1)), "[([0 1 2][IV1]) == (IV2), (IV2 != 1) == (rv)]")
+        self.assertEqual(f(rv == (max(ivs) > 5)), "[(max(ivs[0],ivs[1],ivs[2])) == (IV3), (IV3 > 5) == (rv)]")
+        self.assertEqual(f(rv.implies(min(ivs) != 0)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (rv) -> (IV4 != 0)]")
+        self.assertEqual(f((min(ivs) != 0).implies(rv)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV5), (IV5 != 0) -> (rv)]")

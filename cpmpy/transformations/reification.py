@@ -4,7 +4,7 @@ from ..expressions.globalconstraints import GlobalConstraint, Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
 
 """
   Transformations regarding reification constraints.
@@ -35,13 +35,24 @@ def only_bv_implies(constraints):
     newcons = []
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if cpm_expr.name == '->' and \
-                not isinstance(cpm_expr.args[0], _BoolVarImpl) and \
-                isinstance(cpm_expr.args[1], _BoolVarImpl):
-            # BE -> BV :: ~BV -> ~BE
+        if cpm_expr.name == '->':
             a0,a1 = cpm_expr.args
-            newexpr = (~a1).implies(~a0)
-            newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            if not isinstance(a0, _BoolVarImpl) and \
+                    isinstance(a1, _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                newexpr = (~a1).implies(negated_normal(a0))
+                #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            elif isinstance(a1, Comparison) and \
+                    a1.name == '==' and a1.args[0].is_bool():
+                # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
+                #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
+                #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
+                bv2,bv3 = a1.args
+                newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            else:
+                newcons.append(cpm_expr)
 
         # Comparisons: check BE == BV
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
@@ -52,7 +63,8 @@ def only_bv_implies(constraints):
                 newcons.append(a1.implies(a0))
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a1).implies(~a0), a1.implies(a0))
+                newexprs = ((~a1).implies(negated_normal(a0)), a1.implies(a0))
+                #newexprs = ((~a1).implies(~a0), a1.implies(a0))  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
             # XXX there used to be a weird
             # BE0 == IVar1 :: IVar1 = BVarX, ~BVarX -> ~BE, BVarX -> BE
@@ -68,7 +80,8 @@ def reify_rewrite(constraints, supported=frozenset()):
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
 
-        Input is expected to be in Flat Normal Form (so after `flatten_constraint()`)
+        Input is expected to be in Flat Normal Form without unsupported globals present.
+        (so after `flatten_constraint()` and 'decompose_global()')
         Output will also be in Flat Normal Form
 
         Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
@@ -115,31 +128,30 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = all(boolexpr.decompose())  # decomp() returns list
-                    newcons += flatten_constraint(reifexpr)
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run `cpmpy.transformations.decompose_global.decompose_global` to decompose unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
-                op,(lhs,rhs) = boolexpr.name, boolexpr.args
+                op, (lhs, rhs) = boolexpr.name, boolexpr.args
                 #   have list of supported lhs's such as sum and wsum...
                 #   at the very least, (iv1 == iv2) == bv has to be supported
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
                 elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= len(lhs.args[0])):
                     # special case: (Element(arr,idx) <OP> RHS) == BV (or -> in some way)
-                    # if the domain of 'idx' is larger than the range of 'arr', then 
+                    # if the domain of 'idx' is larger than the range of 'arr', then
                     # this is allowed and BV should be false if it takes a value there
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    decomp = all(lhs.decompose_comparison(op,rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op, rhs))  # decomp() returns list
+                    #print(decomp)
                     if decomp is False:
                         # TODO uh... special case, can't insert a constant here with the current transformations...
                         # use IV < IV.lb which will be false...
                         decomp = (lhs.args[1] < lhs.args[1].lb)
                     reifexpr.args[boolexpr_index] = decomp
                     newcons += flatten_constraint(reifexpr)
-                else:  #   other cases (assuming LHS is a total function):
+                else:  # other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
                     (auxvar, cons) = get_or_make_var(lhs)

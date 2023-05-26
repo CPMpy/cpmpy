@@ -29,8 +29,10 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.decompose_global import decompose_global
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
@@ -54,6 +56,8 @@ class CPM_gurobi(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     - grb_model: object, TEMPLATE's model object
+
+    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
 
     @staticmethod
@@ -264,10 +268,11 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = decompose_global(cpm_cons, supported={"min","max","alldifferent"}) # alldiff has specialized MIP decomp in linearize
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max","mul", "abs","pow","div"}))  # the core of the MIP-linearization
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -358,13 +363,9 @@ class CPM_gurobi(SolverInterface):
             if sub_expr.name == "==":
                 return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
 
-        # Global constraints
-        elif hasattr(cpm_expr, 'decompose'):
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-            return
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.grb_model)
 
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
