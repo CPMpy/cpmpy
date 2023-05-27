@@ -20,8 +20,6 @@
 
         CPM_z3
 """
-from z3 import BoolRef
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -330,38 +328,38 @@ class CPM_z3(SolverInterface):
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
             elif cpm_con.name == 'sub':
                 lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, BoolRef):
+                if isinstance(lhs, z3.BoolRef):
                     lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, BoolRef):
+                if isinstance(rhs, z3.BoolRef):
                     rhs = z3.If(rhs,1,0)
                 return lhs - rhs
             elif cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, BoolRef):
+                if isinstance(lhs, z3.BoolRef):
                     lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, BoolRef):
+                if isinstance(rhs, z3.BoolRef):
                     lhs = z3.If(rhs,1,0)
                 return lhs * rhs
             elif cpm_con.name == "div":
                 lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, BoolRef):
+                if isinstance(lhs, z3.BoolRef):
                     lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, BoolRef):
+                if isinstance(rhs, z3.BoolRef):
                     lhs = z3.If(rhs,1,0)
                 return lhs / rhs
             elif cpm_con.name == "pow":
                 lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, BoolRef):
+                if isinstance(lhs, z3.BoolRef):
                     lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, BoolRef):
+                if isinstance(rhs, z3.BoolRef):
                     lhs = z3.If(rhs,1,0)
                 return lhs ** rhs
             elif cpm_con.name == "mod":
                 lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, BoolRef):
+                if isinstance(lhs, z3.BoolRef):
                     lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, BoolRef):
+                if isinstance(rhs, z3.BoolRef):
                     rhs = z3.If(lhs,1,0)
                 return lhs % rhs
 
