@@ -279,8 +279,13 @@ class Circuit(GlobalConstraint):
         should return something in negated normal form, since flatten_model.negated_normal() returns this
         '''
         from .python_builtins import all
-        decomp = self.decompose()
-        return [~all(decomp[:2])] + decomp[3:]
+        succ = cpm_array(self.args)
+        n = len(succ)
+        order = intvar(0,n-1, shape=n)
+        return [
+            (~AllDifferent(succ) | ~AllDifferent(order)), # negated condition on successors or orders
+            # assignemt to auxiliary variables should hold
+            order[0] == succ[0]] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 class Inverse(GlobalConstraint):
     """
