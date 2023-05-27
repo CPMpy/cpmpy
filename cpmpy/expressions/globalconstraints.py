@@ -164,12 +164,6 @@ class GlobalConstraint(Expression):
         """
         return True
 
-    def is_total(self):
-        """
-            Returns whether the global constraint is a total function.
-            If true, its value is defined for all arguments
-        """
-        return True
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
@@ -448,6 +442,8 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
+        lidx, uidx = get_bounds(idx)
+        assert lidx >= 0 and uidx < len(arr), f"Bounds of index should match dimensions of array, but {idx} has bounds {(lidx, uidx)}"
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
@@ -473,11 +469,6 @@ class Element(GlobalConstraint):
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)]
-
-    def is_total(self):
-        arr, idx = self.args
-        lb, ub = get_bounds(idx)
-        return lb >= 0 & idx.ub < len(arr)
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
