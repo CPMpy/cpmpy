@@ -190,6 +190,7 @@ class AllDifferentExcept0(GlobalConstraint):
         super().__init__("alldifferent_except0", flatlist(args))
 
     def decompose(self):
+        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)]
 
     def value(self):
@@ -209,6 +210,7 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
+        # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])]
 
     def value(self):
