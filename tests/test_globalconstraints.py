@@ -117,21 +117,38 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Circuit(x).value())
 
     def test_not_circuit(self):
-        x = cp.intvar(0, 5, 6)
-        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
-        model = cp.Model(constraints)
+        x = cp.intvar(lb=0, ub=2, shape=3)
+        circuit = cp.Circuit(x)
+
+        model = cp.Model([~circuit, x == [1,2,0]])
         self.assertFalse(model.solve())
 
-        constraints = [~cp.Circuit(x)]
-        model = cp.Model(constraints)
+        model = cp.Model([~circuit])
         self.assertTrue(model.solve())
-        self.assertFalse(cp.Circuit(x).value())
+        self.assertFalse(circuit.value())
 
-        nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
-        nbModels = cp.Model(cp.Circuit(x)).solveAll(display=lambda: self.assertTrue(cp.Circuit(x).value()))
+        self.assertFalse(cp.Model([circuit, ~circuit]).solve())
+
+        circuit_sols = set()
+        not_circuit_sols = set()
+
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+
         total = cp.Model(x == x).solveAll()
 
-        self.assertEqual(str(total), str(nbModels + nbNotModels))
+        for sol in circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertTrue(circuit.value())
+
+        for sol in not_circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertFalse(circuit.value())
+
+        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+
 
     def test_inverse(self):
         # Arrays
