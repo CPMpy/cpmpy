@@ -308,11 +308,11 @@ class _BoolVarImpl(_IntVarImpl):
     def __eq__(self, other):
         # (BV == 1) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (is_int(other) and other == 1) or \
+        if (is_num(other) and other == 1) or \
                 other is True or \
                 other is np.bool_(True):
             return self
-        if (is_int(other) and other == 0) or \
+        if (is_num(other) and other == 0) or \
                 other is False or \
                 other is np.bool_(False):
             return ~self
@@ -320,11 +320,11 @@ class _BoolVarImpl(_IntVarImpl):
     def __ne__(self, other):
         # (BV == 0) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (is_int(other) and other == 1) or \
+        if (is_num(other) and other == 1) or \
                 other is True or \
                 other is np.bool_(True):
             return ~self
-        if (is_int(other) and other == 0) or \
+        if (is_num(other) and other == 0) or \
                 other is False or \
                 other is np.bool_(False):
             return self
