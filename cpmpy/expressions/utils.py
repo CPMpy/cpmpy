@@ -52,7 +52,7 @@ def is_false_cst(arg):
     if arg is False or arg is np.False_:
         return True
     elif isinstance(arg, BoolVal):
-        return not arg.args[0]
+        return not arg.value()
     return False
 
 def is_true_cst(arg):
@@ -61,7 +61,7 @@ def is_true_cst(arg):
     if arg is True or arg is np.True_:
         return True
     elif isinstance(arg, BoolVal):
-        return arg.args[0]
+        return arg.value()
     return False
 def is_boolexpr(expr):
     #boolexpr
