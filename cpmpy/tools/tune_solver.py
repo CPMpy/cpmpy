@@ -103,10 +103,10 @@ class ParameterTuner:
 
     def _get_score(self, combos):
         """
-            Return score for every parameter config in combos
+            Return the hamming distance for each remaining configuration to the current best config.
+            Lower score means better configuration, so exploit the current best configuration by only allowing small changes.
         """
-        mtrx = np.tile(self._best_config, len(combos)).reshape(combos.shape)
-        return np.count_nonzero(combos != mtrx, axis=1)
+        return np.count_nonzero(combos != self._best_config, axis=1)
 
     def _params_to_np(self,combos):
         arr = [[params[key] for key in self._param_order] for params in combos]
