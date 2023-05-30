@@ -55,10 +55,10 @@ class ParameterTuner:
         solver = SolverLookup.get(self.solvername, self.model)
         solver.solve(**self.best_params)
 
-        best_runtime = solver.status().runtime
-        self.base_runtime = best_runtime
+        self.base_runtime = solver.status().runtime
+        self.best_runtime = self.base_runtime
 
-        # Add default's runtime as first entry in configs
+        # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         combos_np = self._params_to_np(combos)
 
@@ -82,14 +82,14 @@ class ParameterTuner:
             params_dict = self._np_to_params(params_np)
             # set fixed params
             params_dict |= fix_params
-            timeout = best_runtime
+            timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
                 timeout = min(timeout, time_limit - (time.time() - start_time))
             # run solver
             solver.solve(**params_dict, time_limit=timeout)
-            if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < best_runtime:
-                best_runtime = solver.status().runtime
+            if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < self.best_runtime:
+                self.best_runtime = solver.status().runtime
                 # update surrogate
                 self._best_config = params_np
 
@@ -99,7 +99,6 @@ class ParameterTuner:
 
         self.best_params = self._np_to_params(self._best_config)
         self.best_params |= fix_params
-        self.best_runtime = best_runtime
         return self.best_params
 
     def _get_score(self, combos):
