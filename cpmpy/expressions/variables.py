@@ -126,7 +126,7 @@ def intvar(lb, ub, shape=1, name=None):
     Arguments:
     lb -- lower bound on the values the variable can take (int)
     ub -- upper bound on the values the variable can take (int)
-    shape -- the shape of the n-dimensional array of variables (int, default: 1)
+    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
     name -- name to give to the variables (string, default: None)
 
     The range of values between lb..ub is called the __domain__ of the integer variable.
