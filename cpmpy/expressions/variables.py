@@ -57,6 +57,8 @@ from .utils import is_num, is_int, flatlist
 def BoolVar(shape=1, name=None):
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
     return boolvar(shape=shape, name=name)
+
+
 def boolvar(shape=1, name=None):
     """
     Boolean decision variables will take either the value `True` or `False`.
@@ -70,7 +72,7 @@ def boolvar(shape=1, name=None):
     If shape is different from 1, then each element of the array will have the location
     of this specific variable in the array append to its name.
 
-    For example, `print(boolvar(shape=3, name="x"))` will print `[x[0],x[1],x[2]]`
+    For example, `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
 
 
     The following examples show how to create Boolean variables of different shapes:
@@ -91,13 +93,13 @@ def boolvar(shape=1, name=None):
             # note that with Python's unpacking, you can assign them
             # to intermediate variables. This allows for fine-grained use of variables when
             # defining the constraints of the model
-            e,x,a,m,p,l = boolvar(shape=6)
+            e, x, a, m, p, l = boolvar(shape=6)
 
     - the creation of a matrix or higher-order tensor of Boolean variables. 
         .. code-block:: python
 
             # creation of a 9x9 matrix of Boolean variables:
-            matrix = boolvar(shape=(9,9), name="matrix")
+            matrix = boolvar(shape=(9, 9), name="matrix")
 
             # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
             # the dimensions of the tensor, a matrix of multiple-dimensions.
@@ -118,6 +120,8 @@ def boolvar(shape=1, name=None):
 def IntVar(lb, ub, shape=1, name=None):
     warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
     return intvar(lb, ub, shape=shape, name=name)
+
+
 def intvar(lb, ub, shape=1, name=None):
     """
     Integer decision variables are constructed by specifying the lowest (lb)
@@ -155,7 +159,7 @@ def intvar(lb, ub, shape=1, name=None):
             x = intvar(3, 8, shape=5, name="x")
 
             # Python's unpacking can assign multiple intermediate variables at once
-            e,x,a,m,p,l = intvar(3, 8, shape=5)
+            e, x, a, m, p, l = intvar(3, 8, shape=5)
 
     - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
         .. code-block:: python
@@ -166,16 +170,19 @@ def intvar(lb, ub, shape=1, name=None):
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
     if shape == 1:
-        return _IntVarImpl(lb,ub, name=name)
+        return _IntVarImpl(lb, ub, name=name)
 
     # create base data
-    data = np.array([_IntVarImpl(lb,ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
+    data = np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
+
 
 def cparray(arr):
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
     return cpm_array(arr)
+
+
 def cpm_array(arr):
     """
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
@@ -190,9 +197,9 @@ def cpm_array(arr):
 
         # Transforming a given numpy-array **m** into a cparray
 
-        iv1,iv2 = intvar(0,9, shape=2)
+        iv1, iv2 = intvar(0, 9, shape=2)
 
-        data = [1,2,3,4]
+        data = [1, 2, 3, 4]
         data = cpm_array(data)
 
         Model([ data[iv1] == iv2 ])
@@ -205,6 +212,9 @@ def cpm_array(arr):
 
 
 class NullShapeError(Exception):
+    """
+    Error returned when providing an empty or size 0 shape for numpy arrays of variables
+    """
     def __init__(self, shape, message="Shape should be non-zero"):
         self.shape = shape
         self.message = message
@@ -212,6 +222,7 @@ class NullShapeError(Exception):
 
     def __str__(self) -> str:
         return f'{self.shape}: {self.message}'
+
 
 class _NumVarImpl(Expression):
     """
@@ -241,6 +252,7 @@ class _NumVarImpl(Expression):
     def get_bounds(self):
         """ the lower and upper bounds"""
         return self.lb, self.ub
+
     def clear(self):
         """ clear the value obtained from the last solve call
         """
@@ -256,15 +268,15 @@ class _NumVarImpl(Expression):
 
 class _IntVarImpl(_NumVarImpl):
     """
-    **Integer** constraint variable with given lowerbound and upperbound.
+    **Integer** variable with given lowerbound and upperbound.
 
     Do not create this object directly, use `intvar()` instead
     """
     counter = 0
 
     def __init__(self, lb, ub, name=None):
-        assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb),lb)
-        assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub),ub)
+        assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb), lb)
+        assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub), ub)
 
         if name is None:
             name = "IV{}".format(_IntVarImpl.counter)
@@ -279,9 +291,10 @@ class _IntVarImpl(_NumVarImpl):
             return self
         return super().__abs__()
 
+
 class _BoolVarImpl(_IntVarImpl):
     """
-    **Boolean** constraint variable with given lowerbound and upperbound.
+    **Boolean** variable with given lowerbound and upperbound.
 
     Do not create this object directly, use `boolvar()` instead
     """
@@ -295,7 +308,6 @@ class _BoolVarImpl(_IntVarImpl):
             name = "BV{}".format(_BoolVarImpl.counter)
             _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
-        
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -317,6 +329,7 @@ class _BoolVarImpl(_IntVarImpl):
                 other is np.bool_(False):
             return ~self
         return super().__eq__(other)
+
     def __ne__(self, other):
         # (BV == 0) <-> BV
         # if other == 1: XXX: dangerous because "=="" is overloaded 
@@ -338,6 +351,7 @@ class _BoolVarImpl(_IntVarImpl):
     def __hash__(self):
         return hash(self.name)
 
+
 class NegBoolView(_BoolVarImpl):
     """
         Represents not(`var`), not an actual variable implementation!
@@ -352,12 +366,17 @@ class NegBoolView(_BoolVarImpl):
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
 
     def value(self):
+        """ the negation of the value obtained in the last solve call by the viewed variable
+            (or 'None')
+        """
         v = self._bv.value()
         if v is None:
             return None
-        return (not v)
+        return not v
 
     def clear(self):
+        """ clear, for the viewed variable, the value obtained from the last solve call
+        """
         self._bv.clear()
 
     def __repr__(self):
@@ -378,7 +397,9 @@ class NDVarArray(Expression, np.ndarray):
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
         Expression.__init__(self, "NDVarArray", self)
-        # somehow, no need to call ndarray constructor
+        # no need to call ndarray __init__ method as specified in the np.ndarray documentation:
+        # "No ``__init__`` method is needed because the array is fully initialized
+        #         after the ``__new__`` method."
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -386,14 +407,17 @@ class NDVarArray(Expression, np.ndarray):
         return False
 
     def value(self):
+        """ the values, for each of the stored variables, obtained in the last solve call
+            (or 'None')
+        """
         return np.reshape([x.value() for x in self], self.shape)
 
-    # clear the currently stored values
     def clear(self):
+        """ clear, for each of the stored variables, the value obtained from the last solve call
+        """
         for e in self.flat:
             e.clear()
 
-    
     def __repr__(self):
         """
             some ways in which np creates this object does not call
@@ -459,15 +483,20 @@ class NDVarArray(Expression, np.ndarray):
         
     # VECTORIZED comparisons
     def __eq__(self, other):
-        return self._vectorized(other, '__eq__') 
+        return self._vectorized(other, '__eq__')
+
     def __ne__(self, other):
-        return self._vectorized(other, '__ne__') 
+        return self._vectorized(other, '__ne__')
+
     def __lt__(self, other):
-        return self._vectorized(other, '__lt__') 
+        return self._vectorized(other, '__lt__')
+
     def __le__(self, other):
-        return self._vectorized(other, '__le__') 
+        return self._vectorized(other, '__le__')
+
     def __gt__(self, other):
-        return self._vectorized(other, '__gt__') 
+        return self._vectorized(other, '__gt__')
+
     def __ge__(self, other):
         return self._vectorized(other, '__ge__') 
 
@@ -476,54 +505,76 @@ class NDVarArray(Expression, np.ndarray):
     # '~' not needed, gets translated to ==0 and that is already handled
     def __abs__(self):
         return cpm_array([abs(s) for s in self])
+
     def __neg__(self):
         return cpm_array([-s for s in self])
+
     def __add__(self, other):
-        return self._vectorized(other, '__add__') 
+        return self._vectorized(other, '__add__')
+
     def __radd__(self, other):
-        return self._vectorized(other, '__radd__') 
+        return self._vectorized(other, '__radd__')
+
     def __sub__(self, other):
-        return self._vectorized(other, '__sub__') 
+        return self._vectorized(other, '__sub__')
+
     def __rsub__(self, other):
-        return self._vectorized(other, '__rsub__') 
+        return self._vectorized(other, '__rsub__')
+
     def __mul__(self, other):
-        return self._vectorized(other, '__mul__') 
+        return self._vectorized(other, '__mul__')
+
     def __rmul__(self, other):
-        return self._vectorized(other, '__rmul__') 
+        return self._vectorized(other, '__rmul__')
+
     def __truediv__(self, other):
         return self._vectorized(other, '__truediv__')
+
     def __rtruediv__(self, other):
         return self._vectorized(other, '__rtruediv__')
+
     def __floordiv__(self, other):
         return self._vectorized(other, '__floordiv__')
+
     def __rfloordiv__(self, other):
         return self._vectorized(other, '__rfloordiv__')
+
     def __mod__(self, other):
-        return self._vectorized(other, '__mod__') 
+        return self._vectorized(other, '__mod__')
+
     def __rmod__(self, other):
-        return self._vectorized(other, '__rmod__') 
+        return self._vectorized(other, '__rmod__')
+
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        return self._vectorized(other, '__pow__') 
+        return self._vectorized(other, '__pow__')
+
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        return self._vectorized(other, '__rpow__') 
-    
+        return self._vectorized(other, '__rpow__')
+
     # VECTORIZED Bool operators
     def __invert__(self):
         return cpm_array([~s for s in self])
+
     def __and__(self, other):
-        return self._vectorized(other, '__and__') 
+        return self._vectorized(other, '__and__')
+
     def __rand__(self, other):
-        return self._vectorized(other, '__rand__') 
+        return self._vectorized(other, '__rand__')
+
     def __or__(self, other):
-        return self._vectorized(other, '__or__') 
+        return self._vectorized(other, '__or__')
+
     def __ror__(self, other):
-        return self._vectorized(other, '__ror__') 
+        return self._vectorized(other, '__ror__')
+
     def __xor__(self, other):
-        return self._vectorized(other, '__xor__') 
+        return self._vectorized(other, '__xor__')
+
     def __rxor__(self, other):
-        return self._vectorized(other, '__rxor__') 
+        return self._vectorized(other, '__rxor__')
+
     def implies(self, other):
         return self._vectorized(other, 'implies') 
 
@@ -547,6 +598,6 @@ def _genname(basename, idxs):
     """
     if basename == None:
         return None
-    stridxs = ",".join(map(str,idxs))
+    stridxs = ",".join(map(str, idxs))
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
     
