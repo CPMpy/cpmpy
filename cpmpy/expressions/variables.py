@@ -349,7 +349,7 @@ class NegBoolView(_BoolVarImpl):
     def __init__(self, bv):
         #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
-        _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
+        _BoolVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
 
     def value(self):
         v = self._bv.value()
