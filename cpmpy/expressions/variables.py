@@ -62,7 +62,7 @@ def boolvar(shape=1, name=None):
     Boolean decision variables will take either the value `True` or `False`.
     
     Arguments:
-    shape -- the shape of the n-dimensional array of variables (int, default: 1)
+    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
     name -- name to give to the variables (string, default: None)
 
     If name is None then a name 'BV<unique number>' will be assigned to it.
