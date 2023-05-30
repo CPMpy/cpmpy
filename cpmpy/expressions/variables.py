@@ -116,7 +116,7 @@ def boolvar(shape=1, name=None):
 
 
 def IntVar(lb, ub, shape=1, name=None):
-    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
     return intvar(lb, ub, shape=shape, name=name)
 def intvar(lb, ub, shape=1, name=None):
     """
@@ -174,7 +174,7 @@ def intvar(lb, ub, shape=1, name=None):
     return NDVarArray(shape, dtype=object, buffer=data)
 
 def cparray(arr):
-    warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
     return cpm_array(arr)
 def cpm_array(arr):
     """
