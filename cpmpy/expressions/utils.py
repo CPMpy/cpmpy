@@ -28,18 +28,24 @@ from itertools import chain, combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
 
-def is_int(arg):
-    """ can it be interpreted as an integer? (incl bool and numpy variants)
-    """
-    return isinstance(arg, (bool, np.bool_, int, np.integer))
-def is_num(arg):
-    """ is it an int or float? (incl numpy variants)
-    """
-    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.floating))
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_))
+
+
+def is_int(arg):
+    """ can it be interpreted as an integer? (incl bool and numpy variants)
+    """
+    return is_bool(arg) or isinstance(arg, (int, np.integer))
+
+
+def is_num(arg):
+    """ is it an int or float? (incl numpy variants)
+    """
+    return is_int(arg) or isinstance(arg, (float, np.floating))
+
+
 def is_false_cst(arg):
     """Is the argument the constant False (can be of type bool, np.bool and BoolVal)"""
     from cpmpy import BoolVal
