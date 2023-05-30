@@ -542,28 +542,40 @@ class CPM_ortools(SolverInterface):
 
     @classmethod
     def tunable_params(cls):
+        """
+            Suggestion of tunable hyperparameters of the solver.
+            List compiled based on Laurents feedback (issue #138)
+        """
         return {
-            'cp_model_probing_level': [0, 1, 2],
-            'preferred_variable_order': [0, 1, 2],
+            'use_branching_in_lp': [False, True],
+            'optimize_with_core' : [False, True],
+            'search_branching': [0,1,2,3,4,5,6],
+            'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'symmetry_level': [0, 1, 2],
-            'minimization_algorithm': [0, 1, 2],
-            'search_branching': [0, 1, 2, 3, 4, 5, 6],
-            'optimize_with_core': [False, True],
-            'use_erwa_heuristic': [False, True]
+            'minimize_core' : [False, True],
+            'cp_model_probing_level': [0, 1, 2, 3],
+            'cp_model_presolve' : [False, True],
+            'clause_cleanup_ordering' : [0,1],
+            'binary_minimization_algorithm' : [0,1,2,3,4],
+            'minimization_algorithm' : [0,1,2,3],
+            'use_phase_saving' : [False, True]
         }
 
     @classmethod
     def default_params(cls):
         return {
-            'cp_model_probing_level': 2,
-            'preferred_variable_order': 0,
-            'linearization_level': 1,
-            'symmetry_level': 2,
-            'minimization_algorithm': 2,
-            'search_branching': 0,
+            'use_branching_in_lp': False,
             'optimize_with_core': False,
-            'use_erwa_heuristic': False
+            'search_branching': 0,
+            'boolean_encoding_level': 1,
+            'linearization_level': 1,
+            'minimize_core': True,
+            'cp_model_probing_level': 2,
+            'cp_model_presolve': True,
+            'clause_cleanup_ordering': 0,
+            'binary_minimization_algorithm': 1,
+            'minimization_algorithm': 2,
+            'use_phase_saving': True
         }
 
 
