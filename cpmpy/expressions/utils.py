@@ -55,6 +55,7 @@ def is_false_cst(arg):
         return not arg.value()
     return False
 
+
 def is_true_cst(arg):
     """Is the argument the constant True (can be of type bool, np.bool and BoolVal)"""
     from cpmpy import BoolVal
@@ -63,25 +64,34 @@ def is_true_cst(arg):
     elif isinstance(arg, BoolVal):
         return arg.value()
     return False
+
+
 def is_boolexpr(expr):
     #boolexpr
     if hasattr(expr, 'is_bool'):
         return expr.is_bool()
     #boolean constant
     return is_bool(expr)
+
+
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
     return isinstance(arg, (list, tuple))
+
+
 def is_any_list(arg):
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
 
+
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
     return list(_flatten(args))
+
+
 def _flatten(args):
     # from: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
     # returns an iterator, not a list
@@ -91,10 +101,12 @@ def _flatten(args):
         else:
             yield el
 
+
 def all_pairs(args):
     """ returns all pairwise combinations of elements in args
     """
     return list(combinations(args, 2))
+
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
@@ -106,6 +118,7 @@ def argval(a):
     except IncompleteFunctionError as e:
         if a.is_bool(): return False
         raise e
+
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -141,7 +154,7 @@ def eval_comparison(str_op, lhs, rhs):
 def get_bounds(expr):
     # can return floats, use floor and ceil when creating an intvar!
     from cpmpy.expressions.core import Expression
-    if isinstance(expr,Expression):
+    if isinstance(expr, Expression):
         return expr.get_bounds()
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
