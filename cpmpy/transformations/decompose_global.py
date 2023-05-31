@@ -1,11 +1,11 @@
 import copy
 
+from .normalize import toplevel_list
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
-from .flatten_model import flatten_constraint
 
 
 def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nested=False, root_call=False):
@@ -16,10 +16,14 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nest
             otherwise, returns a list of CPMpy expressions and new constraints to be added toplevel.
 
         - supported: a set of supported global constraints or global functions
-        - supported_nested: as set of supported global constraints/functions within a reification
+        - supported_nested: as set of supported global constraints/functions within other expressions
+                                these will be part of reifications after flattening
 
-        Unsupported constraints are decomposed in equivalent simpler constraints.
-        Special care taken for global constraints in nested contexts.
+        The basic idea of the algorithm is to traverse the expression tree and
+            replace unsupported expressions inplace. Some new expressions should be added
+            toplevel to link new auxiliary variables created by the decomposition of constraints.
+
+        Special care taken for unsupported global constraints in nested contexts.
 
         Supported numerical global functions are left in nested contexts as they can be rewritten using
             `cpmpy.transformations.reification.reify_rewrite`
@@ -59,7 +63,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nest
                 if not is_supported:
                     if nested is False or expr.equivalent_decomposition():
                         expr, newcons[len(newcons):] = decompose_in_tree(expr.decompose(), supported, supported_nested, nested=True)
-                        newlist.append(all(expr))
+                        newlist.append(all(expr)) # can create top-level AND
                     else:
                         bv = boolvar()
                         newlist.append(bv)
@@ -75,45 +79,55 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nest
                 if expr.name not in supported:
                     aux = intvar(*expr.get_bounds())
                     newlist.append(aux)
-                    newexpr, newcons[len(newcons):] = decompose_in_tree(expr.decompose_comparison("==",rhs=aux),
-                                                                        supported, supported_nested, nested)
+                    newexpr = expr.decompose_comparison("==", aux)
+                    newexpr, newcons[len(newcons):] = decompose_in_tree(newexpr, supported, supported_nested, nested)
                     newcons.extend(newexpr)
                 else:
                     newlist.append(expr)
 
         elif isinstance(expr, Comparison):
-            # Tricky case, if we just recurse into arguments, we risk creating unnesecary auxiliary variables
+            # Tricky case, if we just recurse into arguments, we risk creating unnecessary auxiliary variables
             #  e.g., min(x,y,z) <= a would become `min(x,y,z).decompose_comparison('==',aux) + [aux <= a]`
             #   while more optimally, its just `min(x,y,z).decompose_comparison('<=', a)`
             #    so have to be careful here and operate from 'one level above'
 
             lhs, rhs = expr.args
             if hasattr(lhs, "args"):
-                # recurse into arguments of lhs
-                lhs = copy.copy(lhs)
-                lhs.args, newcons[len(newcons):] = decompose_in_tree(lhs.args, supported, supported_nested, nested=True)
+                # boolean lhs? can be eiter global or other expressions!
+                if lhs.is_bool():
+                    lhs, newcons[len(newcons):] = decompose_in_tree([lhs], supported, supported_nested, nested=True)
+                    lhs = lhs[0]
+                else:
+                    # just recurse into arguments of lhs
+                    lhs = copy.copy(lhs)
+                    lhs.args, newcons[len(newcons):] = decompose_in_tree(lhs.args, supported, supported_nested, nested=True)
             if hasattr(rhs, "args"):
-                # recurse into arguments of rhs
-                rhs = copy.copy(rhs)
-                rhs.args, newcons[len(newcons):] = decompose_in_tree(rhs.args, supported, supported_nested, nested=True)
+                # boolean rhs? can be either global or other expressions
+                if rhs.is_bool():
+                    rhs, newcons[len(newcons):] = decompose_in_tree([rhs], supported, supported_nested, nested=True)
+                    rhs = rhs[0]
+                else:
+                    # just recurse into arguments of rhs
+                    rhs = copy.copy(rhs)
+                    rhs.args, newcons[len(newcons):] = decompose_in_tree(rhs.args, supported, supported_nested, nested=True)
 
             if isinstance(lhs, GlobalConstraint):
-                if lhs.is_bool() and lhs.name not in supported_nested: # boolean global constraint so comparison means nested!!
-                    lhs, newcons[len(newcons):] = decompose_in_tree(lhs.decompose(), supported, supported_nested, True)
-                    lhs = all(lhs)
+                assert not lhs.is_bool() or lhs.name in supported_nested # otherwise should be covered already
 
                 if not lhs.is_bool() and lhs.name not in supported:
+                    # numerical global constraint can always be rewritten as non-nested, so only check if supported
                     newexpr = lhs.decompose_comparison(expr.name, rhs)
                     expr, newcons[len(newcons):] = decompose_in_tree(newexpr, supported, supported_nested, nested=True) # handle rhs
-                    newlist.append(all(expr))
+                    newlist.append(all(expr)) # can create toplevel and
                     continue
 
             if isinstance(rhs, GlobalConstraint):
                 # by now we know lhs is supported, so just flip comparison if unsupported
                 rhs_supported = (rhs.is_bool() and rhs.name in supported_nested) or (not rhs.is_bool() and rhs.name in supported)
                 if not rhs_supported:
-                    newexpr, newcons[len(newcons):] = decompose_in_tree(eval_comparison(flipmap[expr.name], rhs, lhs), supported, supported_nested, nested)
-                    newlist.append(all(newexpr))
+                    newexpr = eval_comparison(flipmap[expr.name], rhs, lhs)
+                    newexpr, newcons[len(newcons):] = decompose_in_tree([newexpr], supported, supported_nested, nested)
+                    newlist.append(all(newexpr)) # can create toplevel and
                     continue
 
             # recreate original comparison
@@ -124,8 +138,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nest
             newlist.append(expr)
 
     if root_call and len(newcons):
-        return newlist + decompose_in_tree(newcons, supported, supported_nested, nested=False)
+        return newlist + decompose_in_tree(newcons, supported, supported_nested, nested=False, root_call=True)
     elif root_call:
-        return newlist
+        return toplevel_list(newlist) # TODO, check for top-level ANDs in transformation?
     else:
         return newlist, newcons
