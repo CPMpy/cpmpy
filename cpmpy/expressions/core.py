@@ -402,7 +402,7 @@ class Operator(Expression):
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
-        arity, is_bool = Operator.allowed[name]
+        arity, _ = Operator.allowed[name]
         if arity == 0:
             arg_list = flatlist(arg_list)
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
@@ -492,8 +492,8 @@ class Operator(Expression):
     def __eq__(self, other):
         if is_num(other) and other == 1:
             # check if bool operator, do not add == 1
-            arity, is_bool = Operator.allowed[self.name]
-            if is_bool:
+            _, is_bool_op = Operator.allowed[self.name]
+            if is_bool_op:
                 return self
         return super().__eq__(other)
 
