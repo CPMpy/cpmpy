@@ -449,7 +449,8 @@ class Element(GlobalConstraint):
 
     def __init__(self, arr, idx):
         lidx, uidx = get_bounds(idx)
-        assert lidx >= 0 and uidx < len(arr), f"Bounds of index should match dimensions of array, but {idx} has bounds {(lidx, uidx)}"
+        if lidx < 0 or uidx >= len(arr):
+            raise IncompleteFunctionError(f"Bounds of index should match dimensions of array of length {len(arr)}, but {idx} has bounds {(lidx, uidx)}")
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
