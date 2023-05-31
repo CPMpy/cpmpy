@@ -125,6 +125,26 @@ class GlobalConstraint(Expression):
         Overwrites the `.is_bool()` method. You can indicate
         in the constructor whether it has Boolean return type or not.
     """
+
+    """
+    Main functionalities:
+    The GlobalConstraint class is an abstract superclass that represents a global constraint in Constraint Programming. 
+    It has a name and a list of arguments, and can be either a Boolean or a numerical expression. It provides methods 
+    for decomposition, negation, and checking whether it is a total function.
+
+    Methods:
+    - __init__(self, name, arg_list, is_bool=True): initializes a GlobalConstraint object with a name, a list of 
+    arguments, and a Boolean flag indicating whether it is a Boolean expression or not.
+    - is_bool(self): returns True if the GlobalConstraint is a Boolean expression, False otherwise.
+    - decompose(self): returns a decomposition of the GlobalConstraint into smaller constraints.
+    - get_bounds(self): returns the bounds of a Boolean GlobalConstraint.
+    - decompose_negation(self): returns the negation of the GlobalConstraint.
+    - is_total(self): returns True if the GlobalConstraint is a total function.
+
+    Fields:
+    - _is_bool: a Boolean flag indicating whether the GlobalConstraint is a Boolean expression or not.
+    """
+
     # is_bool: whether this is normal constraint (True or False)
     #   not is_bool: it computes a numeric value (ex: Minimum, Element)
     def __init__(self, name, arg_list, is_bool=True):
@@ -165,12 +185,30 @@ class GlobalConstraint(Expression):
         return True
 
 # Global Constraints (with Boolean return type)
+
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
+
+    """
+    Main functionalities:
+    The AllDifferent class is a subclass of the GlobalConstraint class and represents the constraint that all arguments 
+    have a different value. It is used to ensure that all variables in a given set of variables have distinct values.
+
+    Methods:
+    - __init__(self, *args): Initializes an instance of the AllDifferent class with a variable number of arguments.
+    - decompose(self): Returns the decomposition of the constraint as a list of constraints that can be used to enforce 
+    the constraint.
+    - value(self): Returns True if all variables have distinct values, False otherwise.
+
+    Fields:
+    - name: The name of the constraint, which is "alldifferent".
+    - args: The list of arguments to the constraint, which are the variables that need to have distinct values.
+    """
+
     def __init__(self, *args):
         super().__init__("alldifferent", flatlist(args))
 
@@ -182,10 +220,27 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
+
 class AllDifferentExcept0(GlobalConstraint):
     """
     All nonzero arguments have a distinct value
     """
+
+    """
+    Main functionalities:
+    The AllDifferentExcept0 class is a subclass of the GlobalConstraint class and represents a constraint that enforces that 
+    all non-zero arguments have distinct values. It is used to model a problem where a set of variables must be assigned 
+    distinct values, except for the value 0.
+
+    Methods:
+    - __init__(self, *args): Initializes an instance of the AllDifferentExcept0 class with a variable number of arguments.
+    - decompose(self): Returns a list of constraints that enforce the AllDifferentExcept0 constraint.
+    - value(self): Returns True if all non-zero arguments have distinct values, False otherwise.
+
+    Fields:
+    - Inherits the fields of the GlobalConstraint class, including name and args.
+    """
+
     def __init__(self, *args):
         super().__init__("alldifferent_except0", flatlist(args))
 
@@ -203,6 +258,22 @@ def allequal(args):
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
+
+    """
+    Main functionalities:
+    The AllEqual class is a subclass of the GlobalConstraint class and represents a global constraint where all the 
+    arguments have the same value. It is used to ensure that a set of variables or expressions take the same value in a 
+    solution.
+
+    Methods:
+    - __init__(self, *args): Initializes an instance of the class with a list of arguments.
+    - decompose(self): Returns a list of constraints that ensure that all the arguments have the same value.
+    - value(self): Returns True if all the arguments have the same value, False otherwise.
+
+    Fields:
+    - Inherits the name and args fields from the GlobalConstraint class.
+    """
+
     def __init__(self, *args):
         super().__init__("allequal", flatlist(args))
 
@@ -221,6 +292,24 @@ def circuit(args):
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
+
+    """
+    Main functionalities:
+    The Circuit class is a subclass of the GlobalConstraint class and represents a constraint that enforces a sequence 
+    of variables to form a circuit, where x[i] = j means that j is the successor of i. The class provides a decomposition 
+    method that returns a list of constraints that enforce the circuit constraint, and a value method that checks if the 
+    current variable assignments satisfy the circuit constraint.
+
+    Methods:
+    - __init__(self, *args): Initializes a Circuit instance with a list of variables that represent the circuit.
+    - decompose(self): Returns a list of constraints that enforce the circuit constraint.
+    - value(self): Checks if the current variable assignments satisfy the circuit constraint.
+    - decompose_negation(self): Returns the decomposition of the negation of the circuit constraint.
+
+    Fields:
+    - args: A list of variables that represent the circuit.
+    """
+
     def __init__(self, *args):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
@@ -298,6 +387,29 @@ class Inverse(GlobalConstraint):
            fwd[i] == x  <==>  rev[x] == i
 
     """
+
+    """
+    Main functionalities:
+    The Inverse class is a subclass of the GlobalConstraint class and represents the inverse (aka channeling/assignment) 
+    constraint. It takes two arguments, fwd and rev, which represent inverse functions. The constraint ensures that if 
+    fwd[i] == x, then rev[x] == i, and vice versa. It is used to establish a one-to-one correspondence between two sets 
+    of variables.
+
+    Methods:
+    - __init__(self, fwd, rev): Initializes the Inverse constraint with the given forward and reverse functions.
+    - decompose(self): Returns a decomposition of the constraint into smaller constraints. It creates auxiliary 
+    variables and uses other global constraints to avoid circular dependencies.
+    - value(self): Returns the value of the constraint. It checks if the constraint is satisfied for the current 
+    variable assignments.
+    - is_total(self): Returns True if the constraint is a total function, i.e., its value is defined for all arguments.
+
+    Fields:
+    - args: A list of the two arguments, fwd and rev, passed to the constructor.
+    - name: The name of the constraint, which is "inverse".
+    - _is_bool: A Boolean flag indicating whether the constraint has a Boolean return type. In this case, 
+    it is always False.
+    """
+
     def __init__(self, fwd, rev):
         flatargs = flatlist([fwd,rev])
         if any(is_boolexpr(arg) for arg in flatargs):
@@ -316,6 +428,24 @@ class Inverse(GlobalConstraint):
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
+
+"""
+Main functionalities:
+The Table class is a subclass of the GlobalConstraint class and represents a constraint that enforces that the values of 
+the variables in the 'array' argument correspond to a row in the 'table' argument. It is used to model table constraints 
+in constraint programming problems.
+
+Methods:
+- __init__(self, array, table): Constructor method that initializes the Table object with the 'array' and 'table' 
+arguments.
+- decompose(self): Method that returns a list of constraints that decompose the Table constraint into smaller 
+constraints. It uses the 'any' and 'all' functions from the 'python_builtins' module to create the decomposition.
+- value(self): Method that returns the value of the Table constraint. It checks if the current values of the variables 
+in the 'array' argument correspond to a row in the 'table' argument.
+
+Fields:
+- args: A list of the 'array' and 'table' arguments passed to the constructor method.
+"""
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -333,10 +463,28 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-
 # syntax of the form 'if b then x == 9 else x == 0' is not supported
 # a little helper:
 class IfThenElse(GlobalConstraint):
+    """
+    Main functionalities:
+    The IfThenElse class is a global constraint that represents an if-then-else statement. It takes in three boolean
+    expressions as arguments: a condition, an expression to evaluate if the condition is true, and an expression to evaluate
+    if the condition is false. The class can be used to model conditional statements in constraint programming problems.
+
+    Methods:
+    - __init__(self, condition, if_true, if_false): Initializes an IfThenElse object with a condition, an expression to
+    evaluate if the condition is true, and an expression to evaluate if the condition is false.
+    - value(self): Returns the value of the IfThenElse expression based on the current values of its arguments.
+    - decompose(self): Returns a list of constraints that are equivalent to the IfThenElse expression.
+    - __repr__(self): Returns a string representation of the IfThenElse expression.
+
+    Fields:
+    - name: The name of the IfThenElse global constraint.
+    - args: A list of the three boolean expressions that make up the IfThenElse expression.
+    - is_bool: A boolean value indicating whether the IfThenElse expression returns a boolean value or not.
+    """
+
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError("only boolean expression allowed in IfThenElse")
@@ -364,6 +512,26 @@ class Minimum(GlobalConstraint):
         Computes the minimum value of the arguments
 
         It is a 'functional' global constraint which implicitly returns a numeric variable
+    """
+
+    """
+    Main functionalities:
+    The Minimum class is a subclass of the GlobalConstraint class and represents a functional global constraint that 
+    computes the minimum value of its arguments. It implicitly returns a numeric variable and can be used in comparisons.
+
+    Methods:
+    - __init__(self, arg_list): Initializes a new instance of the Minimum class with the given argument list. It calls the 
+    constructor of the superclass and sets the is_bool field to False.
+    - value(self): Returns the minimum value of the arguments. It first evaluates the arguments and returns None if any of 
+    them is None. Otherwise, it returns the minimum value using the min() function.
+    - decompose_comparison(self, cpm_op, cpm_rhs): Decomposes the global constraint if it is part of a comparison. It 
+    creates a new integer variable and returns a list of constraints that enforce that the variable is the minimum of the 
+    arguments and satisfies the comparison.
+    - get_bounds(self): Returns the bounds of the numerical global constraint. It computes the bounds of each argument using
+     the get_bounds() function and returns the minimum lower bound and the minimum upper bound.
+
+    Fields:
+    - args: A list of arguments.
     """
     def __init__(self, arg_list):
         super().__init__("min", flatlist(arg_list), is_bool=False)
@@ -398,6 +566,23 @@ class Maximum(GlobalConstraint):
 
         It is a 'functional' global constraint which implicitly returns a numeric variable
     """
+
+    """
+    Main functionalities:
+    The Maximum class is a subclass of the GlobalConstraint class and represents the maximum value of a list of arguments. 
+    It is a 'functional' global constraint which implicitly returns a numeric variable.
+
+    Methods:
+    - __init__(self, arg_list): Constructor method that initializes the Maximum object with a list of arguments.
+    - value(self): Method that returns the maximum value of the arguments.
+    - decompose_comparison(self, cpm_op, cpm_rhs): Method that returns a decomposition of the Maximum object if it's part of 
+    a comparison.
+    - get_bounds(self): Method that returns the bounds of the (numerical) global constraint.
+
+    Fields:
+    - args: A list of arguments.
+    """
+
     def __init__(self, arg_list):
         super().__init__("max", flatlist(arg_list), is_bool=False)
 
@@ -441,6 +626,25 @@ class Element(GlobalConstraint):
         Element is a CPMpy built-in global constraint, so the class implements a few more
         extra things for convenience (.value() and .__repr__()). It is also an example of
         a 'numeric' global constraint.
+    """
+
+    """
+    Main functionalities:
+    The Element class is a CPMpy built-in global constraint that enforces that the result equals Arr[Idx] with 'Arr' an 
+    array of constants of variables (the first argument) and 'Idx' an integer decision variable, representing the index into 
+    the array. It is a numeric global constraint that can be used in comparison relations and can be decomposed if used in a 
+    comparison relation. It is also an example of a numeric global constraint.
+
+    Methods:
+    - __init__(self, arr, idx): Initializes the Element class with the array and index arguments.
+    - value(self): Returns the value of the Element expression.
+    - decompose_comparison(self, cpm_op, cpm_rhs): Decomposes the Element expression if used in a comparison relation.
+    - is_total(self): Returns whether the global constraint is a total function.
+    - __repr__(self): Returns a string representation of the Element expression.
+    - get_bounds(self): Returns the bounds of the (numerical) global constraint.
+
+    Fields:
+    - args: The arguments of the Element expression.
     """
 
     def __init__(self, arr, idx):
@@ -494,6 +698,25 @@ class Xor(GlobalConstraint):
         The 'xor' exclusive-or constraint
     """
 
+    """
+    Main functionalities:
+    The Xor class is a subclass of the GlobalConstraint class and represents the exclusive-or constraint. It takes a list 
+    of Boolean arguments and enforces that exactly one of them is true.
+
+    Methods:
+    - __init__(self, arg_list): initializes the Xor object with a list of Boolean arguments. It raises a TypeError if any 
+    argument is not Boolean.
+    - decompose(self): returns a decomposition of the Xor constraint into smaller constraints. It uses a logic decomposition
+     that enforces that exactly one argument is true.
+    - value(self): returns the value of the Xor constraint. It calculates the sum of the Boolean values of the arguments and
+     returns True if the sum is odd, False otherwise.
+    - __repr__(self): returns a string representation of the Xor constraint. It returns "arg1 xor arg2" if there are two 
+    arguments, or "xor(arg1, arg2, ...)" if there are more than two.
+
+    Fields:
+    - args: a list of Expression objects representing the arguments of the Xor constraint.
+    """
+
     def __init__(self, arg_list):
         flatargs = flatlist(arg_list)
         if not (all(is_boolexpr(arg) for arg in flatargs)):
@@ -531,6 +754,26 @@ class Cumulative(GlobalConstraint):
         Global cumulative constraint. Used for resource aware scheduling.
         Ensures no overlap between tasks and never exceeding the capacity of the resource
         Supports both varying demand across tasks or equal demand for all jobs
+    """
+
+    """
+    Main functionalities:
+    The Cumulative class is a global constraint used for resource aware scheduling. It ensures that there is no overlap 
+    between tasks and that the capacity of the resource is never exceeded. It supports both varying demand across tasks or 
+    equal demand for all jobs.
+
+    Methods:
+    - __init__(self, start, duration, end, demand, capacity): initializes the Cumulative object with start, duration, end, 
+    demand, and capacity arguments.
+    - decompose(self): returns a time-resource decomposition of the Cumulative constraint.
+    - value(self): returns True if the Cumulative constraint is satisfied, False otherwise.
+
+    Fields:
+    - start: a list of start times for each task.
+    - duration: a list of durations for each task.
+    - end: a list of end times for each task.
+    - demand: a list of demands for each task, or a single demand value if all tasks have equal demand.
+    - capacity: the capacity of the resource.
     """
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
@@ -617,6 +860,23 @@ class GlobalCardinalityCount(GlobalConstraint):
     The array gcc must have elements 0..ub (so of size ub+1).
         """
 
+    """
+    Main functionalities:
+    The GlobalCardinalityCount class represents the global cardinality count constraint, which enforces that the number of 
+    occurrences of each value in a given array is equal to the corresponding value in a given global cardinality count 
+    array. The constraint is decomposed into a set of Count constraints, one for each value in the array, and the value of 
+    the constraint is the conjunction of the values of these Count constraints.
+
+    Methods:
+    - __init__(self, a, gcc): Initializes a new instance of the GlobalCardinalityCount class with the given array and global
+     cardinality count array.
+    - decompose(self): Decomposes the constraint into a set of Count constraints, one for each value in the array.
+    - value(self): Computes the value of the constraint as the conjunction of the values of the Count constraints.
+    - get_bounds(self): Returns the bounds of the (numerical) global constraint.
+
+    Fields:
+    - args: The list of arguments to the constraint, consisting of the array and the global cardinality count array.
+    """
     def __init__(self, a, gcc):
         flatargs = flatlist([a, gcc])
         if any(is_boolexpr(arg) for arg in flatargs):
@@ -638,6 +898,23 @@ class GlobalCardinalityCount(GlobalConstraint):
 class Count(GlobalConstraint):
     """
     The Count (numerical) global constraint represents the number of occurrences of val in arr
+    """
+
+    """
+    Main functionalities:
+    The Count class represents the Count (numerical) global constraint, which counts the number of occurrences of a 
+    given value in an array.
+
+    Methods:
+    - __init__(self, arr, val): initializes a Count object with an array and a value to count
+    - decompose_comparison(self, cmp_op, cmp_rhs): decomposes the Count constraint if it is part of a comparison
+    - value(self): returns the number of occurrences of the value in the array
+    - get_bounds(self): returns the lower and upper bounds of the Count constraint
+
+    Fields:
+    - args: a list of the array and value to count
+    - name: the name of the Count constraint ("count")
+    - is_bool: a boolean indicating whether the Count constraint returns a Boolean value (False) or not (True)
     """
 
     def __init__(self,arr,val):
@@ -678,6 +955,29 @@ class DirectConstraint(Expression):
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
         then use `directvar()` instead, or access the solver object from the solver interface directly.
     """
+
+    """
+    Main functionalities:
+    The DirectConstraint class represents a constraint that directly calls a function of the underlying solver when added to
+    a CPMpy solver. It cannot be reified, flattened, or contain other CPMpy expressions than variables. When added to a 
+    CPMpy solver, it will literally just directly call a function on the underlying solver, replacing CPMpy variables by 
+    solver variables along the way. The class is used to interface with a specific solver and call its functions directly.
+
+    Methods:
+    - __init__(self, name, arguments, novar=None): initializes a DirectConstraint object with a name of the solver function 
+    that you wish to call, a tuple of arguments to pass to the solver function with name 'name', and a list of indices 
+    (offset 0) of arguments in `arguments` that contain no variables, that can be passed 'as is' without scanning for 
+    variables.
+    - is_bool(self): returns True, indicating that the return type of the DirectConstraint is Boolean.
+    - callSolver(self, CPMpy_solver, Native_solver): calls the `directname`() function of the native solver, with stored 
+    arguments replacing CPMpy variables with solver variables as needed. SolverInterfaces will call this function when this 
+    constraint is added.
+
+    Fields:
+    - novar: a list of indices (offset 0) of arguments in `arguments` that contain no variables, that can be passed 'as is' 
+    without scanning for variables.
+    """
+
     def __init__(self, name, arguments, novar=None):
         """
             name: name of the solver function that you wish to call
