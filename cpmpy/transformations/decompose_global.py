@@ -8,7 +8,7 @@ from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 
 
-def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nested=False, root_call=False):
+def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nested=False):
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input
@@ -137,9 +137,9 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), nest
         else:  # constants, variables, direct constraints
             newlist.append(expr)
 
-    if root_call and len(newcons):
-        return newlist + decompose_in_tree(newcons, supported, supported_nested, nested=False, root_call=True)
-    elif root_call:
+    if nested is False and len(newcons):
+        return newlist + decompose_in_tree(newcons, supported, supported_nested, nested=False)
+    elif nested is False:
         return toplevel_list(newlist) # TODO, check for top-level ANDs in transformation?
     else:
         return newlist, newcons

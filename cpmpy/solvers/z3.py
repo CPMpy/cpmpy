@@ -249,7 +249,7 @@ class CPM_z3(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported_global = {"alldifferent", "xor","ite"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported_global, supported_global, root_call=True)
+        cpm_cons = decompose_in_tree(cpm_cons, supported_global, supported_global)
         return cpm_cons
 
     def __add__(self, cpm_expr):
