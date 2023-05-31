@@ -506,12 +506,13 @@ class TestTypeChecks(unittest.TestCase):
     def test_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
+        idx = cp.intvar(0,1)
         b = cp.boolvar()
         a = cp.boolvar()
-        self.assertTrue(cp.Model([cp.Element([x,y],x) == x]).solve())
-        self.assertTrue(cp.Model([cp.Element([a,b | a],x) == b]).solve())
+        self.assertTrue(cp.Model([cp.Element([x,y],idx) == x]).solve())
+        self.assertTrue(cp.Model([cp.Element([a,b | a],idx) == b]).solve())
         self.assertRaises(TypeError,cp.Element,[x,y],b)
-        self.assertTrue(cp.Model([cp.Element([y,a],x) == False]).solve())
+        self.assertTrue(cp.Model([cp.Element([y,a],idx) == False]).solve())
 
     def test_xor(self):
         x = cp.intvar(-8, 8)
