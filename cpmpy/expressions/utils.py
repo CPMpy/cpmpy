@@ -139,4 +139,4 @@ def get_bounds(expr):
         return expr.get_bounds()
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
-        return expr, expr
+        return int(expr), int(expr)
