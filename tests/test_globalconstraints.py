@@ -228,7 +228,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_element(self):
         iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
+        idx = cp.intvar(0, 2)
         constraints = [cp.Element(iv,idx) == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
@@ -403,11 +403,11 @@ class TestBounds(unittest.TestCase):
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
-        z = cp.intvar(1, 9)
+        z = cp.intvar(0, 2)
         expr = cp.Element([x, y, z],z)
         lb, ub = expr.get_bounds()
         self.assertEqual(lb,-8)
-        self.assertEqual(ub,9)
+        self.assertEqual(ub,8)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
 
