@@ -208,23 +208,23 @@ class Expression(object):
         return Operator("or", [other, self])
 
     def __xor__(self, other):
-        # avoid cyclic import
-        from .globalconstraints import Xor
         # some simple constant removal
         if is_true_cst(other):
             return ~self
         if is_false_cst(other):
             return self
+        # avoid cyclic import
+        from .globalconstraints import Xor
         return Xor([self, other])
 
     def __rxor__(self, other):
-        # avoid cyclic import
-        from .globalconstraints import Xor
         # some simple constant removal
         if is_true_cst(other):
             return ~self
         if is_false_cst(other):
             return self
+        # avoid cyclic import
+        from .globalconstraints import Xor
         return Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
