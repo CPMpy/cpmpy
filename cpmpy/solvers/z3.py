@@ -27,6 +27,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
 
 
@@ -246,7 +247,10 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
-        return toplevel_list(cpm_expr)
+        cpm_cons = toplevel_list(cpm_expr)
+        supported_global = {"alldifferent", "xor","ite"}
+        cpm_cons = decompose_in_tree(cpm_cons, supported_global, supported_global, root_call=True)
+        return cpm_cons
 
     def __add__(self, cpm_expr):
         """
@@ -378,23 +382,16 @@ class CPM_z3(SolverInterface):
             lhs_is_expr = isinstance(lhs, Expression)
             rhs_is_expr = isinstance(rhs, Expression)
 
-            # 'abs'/1
-            if lhs_is_expr and lhs.name == "abs":
-                arg = lhs.args[0]
-                return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
-            elif rhs_is_expr and rhs.name == "abs":
-                arg = rhs.args[0]
-                return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
+            # 'abs'/1 # TODO is unsupported, abs should become global constraint
+            # if lhs_is_expr and lhs.name == "abs":
+            #     arg = lhs.args[0]
+            #     return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
+            # elif rhs_is_expr and rhs.name == "abs":
+            #     arg = rhs.args[0]
+            #     return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
 
-            elif hasattr(lhs, 'decompose_comparison'):
-                return z3.And(self._z3_expr(lhs.decompose_comparison(cpm_con.name, rhs)))
-            elif hasattr(rhs, 'decompose_comparison'):
-                invertmap = {'>': '<', '<': '>', '<=': '>=', '>=': '<='}
-                #swap lhs and rhs for decomposition
-                if cpm_con.name in invertmap:
-                    cpm_con.name = invertmap[cpm_con.name]
-                return z3.And(self._z3_expr(rhs.decompose_comparison(cpm_con.name, lhs)))
-            elif cpm_con.name == "==":
+
+            if cpm_con.name == "==":
                 # '==' is not supported between a boolean expression and an arithmetic expression
                 if is_boolexpr(lhs) and not is_boolexpr(rhs):
                     # lhs is bool and rhs is arith, make lhs also arith
@@ -451,9 +448,8 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'ite':
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
-            else:
-                # global constraints
-                return self._z3_expr(all(cpm_con.decompose()))
+
+            raise ValueError("Global constraint {cpm_con} should be decomposed already, please report on github.")
 
         # a direct constraint, make with z3 (will be posted to it by calling function)
         elif isinstance(cpm_con, DirectConstraint):
