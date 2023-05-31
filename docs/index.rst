@@ -1,48 +1,21 @@
 CPMpy: Constraint Programming and Modeling in Python
 ====================================================
-
 CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
 
 Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
-CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer.
-   
-Source code and bug reports at https://github.com/CPMpy/cpmpy
+Some of CPMpy's key features are:
 
-Getting started:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Getting started:
-
-   Youtube tutorial video <https://www.youtube.com/watch?v=A4mmmDAdusQ>
-   beginner_tutorial
-   installation_instructions
-   Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
-   More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
+* Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
+* Solver-independent: transparently translating to CP, MIP, SMT, SAT
+* Incremental solving and direct access to the underlying solvers
+* and much more...
 
 .. toctree::
    :maxdepth: 1
-   :caption: User Documentation:
+   :caption: Basic usage
 
    modeling
-   solvers
-   multiple_solutions
-   how_to_debug
-   solver_parameters
-   unsat_core_extraction
-   adding_solver
-   developers
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: API documentation:
-
-   api/expressions
-   api/model
-   api/solvers
-   api/transformations
 
 Supported solvers
 -----------------
@@ -66,6 +39,29 @@ To make clear how well supported and tested these solvers are, we work with a ti
     - "exact" the Exact pseudo-boolean solver
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Advanced guides:
+
+   how_to_debug
+   direct_solver_access
+   unsat_core_extraction
+   developers
+   adding_solver
+
+Source code and bug reports at https://github.com/CPMpy/cpmpy
+
+.. toctree::
+   :maxdepth: 1
+   :caption: API documentation:
+
+   api/expressions
+   api/model
+   api/solvers
+   api/transformations
+
 
 
 FAQ
