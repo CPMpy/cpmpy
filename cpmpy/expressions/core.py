@@ -272,12 +272,12 @@ class Expression(object):
     # other mathematical ones
     def __truediv__(self, other):
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
-        if is_num(other) and other == 1:
-            return self
-        return Operator("div", [self, other])
+        return self.__floordiv__(other)
+
     def __rtruediv__(self, other):
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
-        return Operator("div", [other, self])
+        return self.__rfloordiv__(other)
+
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
             return self
