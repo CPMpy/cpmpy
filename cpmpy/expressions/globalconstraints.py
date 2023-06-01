@@ -590,7 +590,7 @@ class Cumulative(GlobalConstraint):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, cap = argvals
+        start, dur, end, demand, capacity = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -598,7 +598,7 @@ class Cumulative(GlobalConstraint):
         # demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         for t in range(lb, ub+1):
-            if cap < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
         return True
