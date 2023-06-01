@@ -344,7 +344,6 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        condition_val = argval(condition)
         if argval(condition):
             return argval(if_true)
         else:
