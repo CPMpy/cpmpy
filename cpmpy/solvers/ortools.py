@@ -29,6 +29,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
@@ -52,6 +53,8 @@ class CPM_ortools(SolverInterface):
     Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
     ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+
+    The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
 
     @staticmethod
@@ -307,7 +310,6 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -330,6 +332,38 @@ class CPM_ortools(SolverInterface):
                                              # reified expr must go before this
         return cpm_cons
 
+    def __add__(self, cpm_expr):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr, collect=self.user_vars)
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
+
+        return self
+
+    # TODO: 'reifiable' is an artefact from the early days
+    # only 3 constraints support it (and,or,sum),
+    # we can just add reified support for those and not need `reifiable` or returning the constraint
+    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
@@ -459,7 +493,11 @@ class CPM_ortools(SolverInterface):
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             return self.ort_model.Add(cpm_expr.args[0])
-        
+
+        # a direct constraint, pass to solver
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.ort_model)
+
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 

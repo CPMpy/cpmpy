@@ -75,7 +75,7 @@ from types import GeneratorType
 from collections.abc import Iterable
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_bool
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -343,7 +343,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert is_bool(arg), "BoolVal only takes a boolean value as input"
+        assert is_true_cst(arg) or is_false_cst(arg)
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
@@ -352,6 +352,10 @@ class BoolVal(Expression):
     def __invert__(self):
         self.args[0] = not self.args[0]
         return self
+
+    def __bool__(self):
+        """Called to implement truth value testing and the built-in operation bool(), return stored value"""
+        return self.args[0]
 
 
 class Comparison(Expression):
@@ -415,7 +419,12 @@ class Operator(Expression):
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
-        arity, _ = Operator.allowed[name]
+        arity, is_bool = Operator.allowed[name]
+        if is_bool:
+            #only boolean arguments allowed
+            for arg in arg_list:
+                if not is_boolexpr(arg):
+                    raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
             arg_list = flatlist(arg_list)
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"

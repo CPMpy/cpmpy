@@ -35,8 +35,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, flatlist
-from ..transformations.get_variables import get_variables_model, get_variables
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.normalize import toplevel_list
 
@@ -64,6 +65,8 @@ class CPM_minizinc(SolverInterface):
     mzn_model: object, the minizinc.Model instance
     mzn_solve: object, the minizinc.Solver instance
     mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
+
+    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
     @staticmethod
@@ -322,9 +325,14 @@ class CPM_minizinc(SolverInterface):
             might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
+            if cpm_var < -2147483646 or cpm_var > 2147483646:
+                raise MinizincBoundsException(
+                    "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
+            # we assume all variables are user variables (because no transforms)
+            self.user_vars.add(cpm_var)
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
@@ -356,7 +364,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        get_variables(expr, collect=self.user_vars)  # add objvars to vars
+        #get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -369,7 +377,6 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             No transformations, just ensure it is a list of constraints
@@ -381,13 +388,33 @@ class CPM_minizinc(SolverInterface):
         """
         return toplevel_list(cpm_expr)
 
-    def _post_constraint(self, cpm_con):
+    def __add__(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        # Get text expression, add to the solver
-        mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
-        self.mzn_model.add_string(mzn_str)
+        # all variables are user variables, handled in `solver_var()`
+
+        # transform and post the constraints
+        for cpm_con in self.transform(cpm_expr):
+            # Get text expression, add to the solver
+            mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
+            self.mzn_model.add_string(mzn_str)
+
+        return self
 
     def _convert_expression(self, expr) -> str:
         """
@@ -408,6 +435,9 @@ class CPM_minizinc(SolverInterface):
                 else:
                     expr_str = [self._convert_expression(e) for e in expr]
                 return "[{}]".format(",".join(expr_str))
+
+        if isinstance(expr,(bool,np.bool_)):
+            expr = BoolVal(expr)
 
         if not isinstance(expr, Expression):
             return self.solver_var(expr) # constants
@@ -470,6 +500,9 @@ class CPM_minizinc(SolverInterface):
                         'sum': '+', 'sub': '-',
                         'mul': '*', 'pow': '^'}
             op_str = expr.name
+            expr_bounds = expr.get_bounds()
+            if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
+                raise MinizincBoundsException("minizinc does not accept expressions with bounds outside of range (-2147483646..2147483646)")
             if op_str in printmap:
                 op_str = printmap[op_str]
 
@@ -543,6 +576,11 @@ class CPM_minizinc(SolverInterface):
             gcc = self._convert_expression(gcc)
             cover = self._convert_expression(cover)
             return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+
+        # a direct constraint, treat differently for MiniZinc, a text-based language
+        # use the name as, unpack the arguments from the argument tuple
+        elif isinstance(expr, DirectConstraint):
+            return "{}({})".format(expr.name, ",".join(args_str))
 
         print_map = {"allequal":"all_equal", "xor":"xorall"}
         if expr.name in print_map:

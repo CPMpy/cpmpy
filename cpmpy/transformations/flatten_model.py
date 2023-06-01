@@ -120,6 +120,8 @@ def flatten_constraint(expr):
         TODO, what built-in python error is best?
         RE TODO: we now have custom NotImpl/NotSupported
     """
+    from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
+
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
@@ -270,13 +272,17 @@ def flatten_constraint(expr):
             newlist.extend(lcons)
             newlist.extend(rcons)
 
-        else:
+        elif isinstance(expr, GlobalConstraint):
             """
     - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
             """
             (con, flatcons) = normalized_boolexpr(expr)
             newlist.append(con)
             newlist.extend(flatcons)
+
+        else:
+            # any other case (e.g. DirectConstraint), pass as is
+            newlist.append(expr)
 
     return newlist
 
