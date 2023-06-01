@@ -349,6 +349,9 @@ class NegBoolView(_BoolVarImpl):
     def __init__(self, bv):
         #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
+        # as it is always created using the ~ operator (only available for _BoolVarImpl)
+        # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
+        # __init__ from _IntVarImpl
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
 
     def value(self):
