@@ -115,6 +115,7 @@ from .variables import boolvar, intvar, cpm_array, _NumVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from ..transformations.flatten_model import get_or_make_var
 
+
 # Base class GlobalConstraint
 class GlobalConstraint(Expression):
     """
@@ -140,17 +141,17 @@ class GlobalConstraint(Expression):
             Returns a decomposition into smaller constraints.
 
             The decomposition might create auxiliary variables
-            and use other other global constraints as long as
+            and use other global constraints as long as
             it does not create a circular dependency.
         """
-        raise NotImplementedError("Decomposition for",self,"not available")
+        raise NotImplementedError("Decomposition for", self, "not available")
 
     def get_bounds(self):
         """
         Returns the bounds of a Boolean global constraint.
         Numerical global constraints should reimplement this.
         """
-        return (0,1)
+        return 0, 1
 
     def decompose_negation(self):
         from .python_builtins import all
@@ -163,10 +164,13 @@ class GlobalConstraint(Expression):
         """
         return True
 
+
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
+
+
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
@@ -180,6 +184,7 @@ class AllDifferent(GlobalConstraint):
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
+
 
 class AllDifferentExcept0(GlobalConstraint):
     """
@@ -199,6 +204,8 @@ class AllDifferentExcept0(GlobalConstraint):
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
+
+
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
@@ -217,6 +224,8 @@ class AllEqual(GlobalConstraint):
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
+
+
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
@@ -235,7 +244,7 @@ class Circuit(GlobalConstraint):
         """
         succ = cpm_array(self.args)
         n = len(succ)
-        order = intvar(0,n-1, shape=n)
+        order = intvar(0, n-1, shape=n)
         return [
             # different successors
             AllDifferent(succ),
@@ -246,16 +255,15 @@ class Circuit(GlobalConstraint):
             # loop: first one is successor of '0'
             order[0] == succ[0],
             # others: ith one is successor of i-1
-        ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
-
+        ] + [order[i] == succ[order[i-1]] for i in range(1, n)]
 
     def value(self):
         pathlen = 0
         idx = 0
         visited = set()
         arr = [argval(a) for a in self.args]
-        while(idx not in visited):
-            if idx == None:
+        while idx not in visited:
+            if idx is None:
                 return False
             if not (0 <= idx < len(arr)):
                 break
@@ -266,12 +274,12 @@ class Circuit(GlobalConstraint):
         return pathlen == len(self.args) and idx == 0
 
     def decompose_negation(self):
-        '''
+        """
         returns the decomposition of the negation. We can not simply negate the decomposition
         because of the use of auxiliary variables in the decomposition
 
         should return something in negated normal form, since flatten_model.negated_normal() returns this
-        '''
+        """
         from .python_builtins import all
         succ = cpm_array(self.args)
         n = len(succ)
@@ -308,6 +316,7 @@ class Inverse(GlobalConstraint):
         rev = argval(self.args[1])
         return all(rev[x] == i for i, x in enumerate(fwd))
 
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -325,9 +334,9 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-
-# syntax of the form 'if b then x == 9 else x == 0' is not supported
-# a little helper:
+# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
+# same semantic as CPLEX IfThenElse constraint
+# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         assert all([is_boolexpr(condition), is_boolexpr(if_true), is_boolexpr(if_false)]), \
@@ -380,7 +389,7 @@ class Minimum(GlobalConstraint):
         Returns the bounds of the (numerical) global constraint
         """
         bnds = [get_bounds(x) for x in self.args]
-        return min(lb for lb,ub in bnds), min(ub for lb,ub in bnds)
+        return min(lb for lb, _ in bnds), min(ub for _, ub in bnds)
 
 
 class Maximum(GlobalConstraint):
@@ -413,13 +422,15 @@ class Maximum(GlobalConstraint):
         Returns the bounds of the (numerical) global constraint
         """
         bnds = [get_bounds(x) for x in self.args]
-        return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+        return max(lb for lb, _ in bnds), max(ub for _, ub in bnds)
 
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
+
+
 class Element(GlobalConstraint):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
@@ -441,7 +452,7 @@ class Element(GlobalConstraint):
         arr, idx = self.args
         idxval = argval(idx)
         if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
+            if 0 <= idxval < len(arr):
                 return argval(arr[idxval])
             raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
         return None # default
@@ -475,7 +486,7 @@ class Element(GlobalConstraint):
         """
         arr, idx = self.args
         bnds = [get_bounds(x) for x in arr]
-        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+        return min(lb for lb, ub in bnds), max(ub for lb,ub in bnds)
 
 
 class Xor(GlobalConstraint):
@@ -530,8 +541,7 @@ class Cumulative(GlobalConstraint):
             demand = flatlist(demand)
             assert len(demand) == len(start), "Shape of demand should match start, duration and end"
 
-
-        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -588,7 +598,7 @@ class GlobalCardinalityCount(GlobalConstraint):
     def __init__(self, a, gcc):
         ub = max([get_bounds(v)[1] for v in a])
         assert (len(gcc) == ub + 1), f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}"
-        super().__init__("gcc", [a,gcc])
+        super().__init__("gcc", [a, gcc])
 
     def decompose(self):
         a, gcc = self.args
@@ -604,15 +614,15 @@ class Count(GlobalConstraint):
     The Count (numerical) global constraint represents the number of occurrences of val in arr
     """
 
-    def __init__(self,arr,val):
-        super().__init__("count", [arr,val], is_bool=False)
+    def __init__(self, arr, val):
+        super().__init__("count", [arr, val], is_bool=False)
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
         """
         Count(arr,val) can only be decomposed if it's part of a comparison
         """
         arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+        return [eval_comparison(cmp_op, Operator('sum', [ai == val for ai in arr]), cmp_rhs)]
 
     def value(self):
         arr, val = self.args
