@@ -261,6 +261,7 @@ class Circuit(GlobalConstraint):
             # others: ith one is successor of i-1
         ] + [order[i] == succ[order[i-1]] for i in range(1, n)]
 
+
     def value(self):
         pathlen = 0
         idx = 0
