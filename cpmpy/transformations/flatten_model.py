@@ -142,14 +142,17 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
-            if expr.name == 'not':
-                newlist.extend(flatten_constraint(recurse_negation(expr.args[0])))
-                continue
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
                 continue
-
+            if expr.name == 'not':
+                # flatcon in the not, so make negboolview that equals it
+                # This also circumvents the Operator constructor, so that we create negboolviews instead of not(bv)
+                flatvar, flatcons = get_or_make_var(expr.args[0])
+                newlist.append(~flatvar)
+                newlist.extend(flatcons)
+                continue
             elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
