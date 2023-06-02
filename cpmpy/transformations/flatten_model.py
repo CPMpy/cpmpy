@@ -146,13 +146,6 @@ def flatten_constraint(expr):
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
                 continue
-            if expr.name == 'not':
-                # flatcon in the not, so make negboolview that equals it
-                # This also circumvents the Operator constructor, so that we create negboolviews instead of not(bv)
-                flatvar, flatcons = get_or_make_var(expr.args[0])
-                newlist.append(~flatvar)
-                newlist.extend(flatcons)
-                continue
             elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
@@ -369,7 +362,7 @@ def get_or_make_var_or_list(expr):
 
 def normalized_boolexpr(expr):
     """
-        input is any Boolean (is_bool()) expression,
+        input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
             - subexpr == BoolVar
             - subexpr -> BoolVar
@@ -400,10 +393,8 @@ def normalized_boolexpr(expr):
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
-            nnexpr = recurse_negation(expr.args[0])
-            if __is_flat_var(nnexpr):
-                return nnexpr, []
-            return normalized_boolexpr(nnexpr)
+            flatvar, flatcons = get_or_make_var(expr.args[0])
+            return (~flatvar, flatcons)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
