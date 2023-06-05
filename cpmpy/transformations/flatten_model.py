@@ -436,7 +436,7 @@ def normalized_boolexpr(expr):
 
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
-                if expr.name == '!=' and is_boolexpr(rvar):
+                if expr.name == '!=' and rvar.is_bool():
                     # != not needed, negate RHS variable
                     rvar = ~rvar
                     exprname = '=='
