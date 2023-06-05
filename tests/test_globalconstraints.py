@@ -85,6 +85,10 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
         self.assertTrue(cp.AllDifferentExcept0(iv).value())
 
+        #test with mixed types
+        bv = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv[0], bv)]).solve())
+
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
