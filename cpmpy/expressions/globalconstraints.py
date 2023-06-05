@@ -383,6 +383,9 @@ class Minimum(GlobalConstraint):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+        Returns two lists of constraints:
+            1) constraint replacing node in expression tree
+            2) constraints which should be true at toplevel
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var
@@ -390,7 +393,7 @@ class Minimum(GlobalConstraint):
 
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
-        return [any(x <= _min for x in self.args), all(x >= _min for x in self.args), eval_comparison(cpm_op, _min, cpm_rhs)]
+        return [eval_comparison(cpm_op, _min, cpm_rhs)], [any(x <= _min for x in self.args), all(x >= _min for x in self.args),]
 
     def get_bounds(self):
         """
@@ -419,6 +422,9 @@ class Maximum(GlobalConstraint):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+        Returns two lists of constraints:
+            1) constraint replacing node in expression tree
+            2) constraints which should be true at toplevel
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var here
@@ -426,11 +432,12 @@ class Maximum(GlobalConstraint):
 
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
-        return [any(x >= _max for x in self.args), all(x <= _max for x in self.args), eval_comparison(cpm_op, _max, cpm_rhs)]
+        return [eval_comparison(cpm_op, _max, cpm_rhs)], [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
+
         """
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
@@ -477,8 +484,10 @@ class Element(GlobalConstraint):
             It is not a constraint itself, so it can not have a decompose().
             However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
             it is a constraint, and that one can be decomposed.
-            That is what this function does
-            (for now only used in transformations/reification.py)
+            Returns two lists of constraints:
+                1) constraint replacing node in expression tree
+                2) constraints which should be true at toplevel
+
         """
         from .python_builtins import any
 
@@ -659,7 +668,7 @@ class Count(GlobalConstraint):
         Count(arr,val) can only be decomposed if it's part of a comparison
         """
         arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
 
     def value(self):
         arr, val = self.args
