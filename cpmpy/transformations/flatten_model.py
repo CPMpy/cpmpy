@@ -345,7 +345,7 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
+        ivar = _IntVarImpl(lb, ub)
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
