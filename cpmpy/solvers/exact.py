@@ -31,6 +31,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_global
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..expressions.globalconstraints import DirectConstraint
 import numpy as np
 
 class CPM_exact(SolverInterface):
@@ -295,7 +296,7 @@ class CPM_exact(SolverInterface):
         xvars = []
         xrhs = 0
         
-        assert is_num(lhs), "Rhs of inequality should be numeric after transformations"
+        assert is_num(rhs), "Rhs of inequality should be numeric after transformations"
         xrhs += rhs
 
         if is_num(lhs):
@@ -377,107 +378,112 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addLeftReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(xct_rhs))
 
 
-    def _post_constraint(self, cpm_expr, reifiable=False):
+    def __add__(self, cpm_expr_orig):
         """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+            Eagerly add a constraint to the underlying solver.
 
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
         from exact import Exact as xct
 
-        # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
-        # numexpr `comp` bvar|const
-        if isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
-            xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
-            # Thanks to `only_numexpr_equality()` only supported comparisons should remain
-            if cpm_expr.name == '<=':
-                return self._add_xct_constr(xct_coefs, xct_vars, False, 0, True, xct_rhs)
-            elif cpm_expr.name == '>=':
-                return self._add_xct_constr(xct_coefs, xct_vars, True, xct_rhs, False, 0)
-            elif cpm_expr.name == '==':
-                # a BoundedLinearExpression LHS, special case, like in objective
-                return self._add_xct_constr(xct_coefs, xct_vars, True, xct_rhs, True, xct_rhs)
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
+            # numexpr `comp` bvar|const
+            if isinstance(cpm_expr, Comparison):
+                lhs, rhs = cpm_expr.args
+                xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
-            #elif lhs.name == 'mul':
-                #assert len(lhs.args) == 2, "Exact only supports multiplication by a constant"
-                #a, b = self.solver_vars(lhs.args)
-                #assert is_num(b), "Exact only supports multiplication by a constant"
-                #return self._add_xct_constr([b], [a], True, xct_rhs, False, xct_rhs)
+                # Thanks to `only_numexpr_equality()` only supported comparisons should remain
+                if cpm_expr.name == '<=':
+                    self._add_xct_constr(xct_coefs, xct_vars, False, 0, True, xct_rhs)
+                elif cpm_expr.name == '>=':
+                    self._add_xct_constr(xct_coefs, xct_vars, True, xct_rhs, False, 0)
+                elif cpm_expr.name == '==':
+                    # a BoundedLinearExpression LHS, special case, like in objective
+                    self._add_xct_constr(xct_coefs, xct_vars, True, xct_rhs, True, xct_rhs)
+                else:
+                    raise NotImplementedError(
+                        "Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
 
-            #elif lhs.name == 'div':
-                #assert len(lhs.args), "Exact only supports division by a constant"
-                #a, b = self.solver_vars(lhs.args)
-                #assert is_num(b), "Exact only supports division by a constant"
-                #return self._add_xct_constr([1], [a], True, xct_rhs*b, False, xct_rhs*b)
+            elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+                # Indicator constraints
+                # Take form bvar -> sum(x,y,z) >= rvar
+                cond, sub_expr = cpm_expr.args
+                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+                assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
 
-            raise NotImplementedError(
-                "Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
+                lhs, rhs = sub_expr.args
+                assert isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum",f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
 
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            # Indicator constraints
-            # Take form bvar -> sum(x,y,z) >= rvar
-            cond, sub_expr = cpm_expr.args
-            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
-            assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
+                xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
-            lhs, rhs = sub_expr.args
-            assert isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum",f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
+                if isinstance(cond, NegBoolView):
+                    cond, bool_val = self.solver_var_no_num(cond._bv), False
+                else:
+                    cond, bool_val = self.solver_var_no_num(cond), True
 
-            xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
+                if sub_expr.name == "==":
+                    if bool_val:
+                        # a -> b==c
+                        # a -> b>=c and a -> -b>=-c
+                        self._add_xct_reif_right(cond, xct_coefs,xct_vars,xct_rhs)
+                        self._add_xct_reif_right(cond, [-x for x in xct_coefs],xct_vars,-xct_rhs)
+                    else:
+                        # !a -> b==c
+                        # !a -> b>=c and !a -> -b>=-c
+                        #  a <- b<c  and  a <- -b<-c
+                        #  a <- -b>=1-c  and  a <- b>=1+c
+                        self._add_xct_reif_left(cond, xct_coefs,xct_vars,1+xct_rhs)
+                        self._add_xct_reif_left(cond, [-x for x in xct_coefs],xct_vars,1-xct_rhs)
+                elif sub_expr.name == ">=":
+                    if bool_val:
+                        # a -> b >= c
+                        self._add_xct_reif_right(cond, xct_coefs,xct_vars,xct_rhs)
+                    else:
+                        # !a -> b>=c
+                        #  a <- b<c
+                        #  a <- -b>=1-c
+                        self._add_xct_reif_left(cond, [-x for x in xct_coefs],xct_vars,1-xct_rhs)
+                elif sub_expr.name == "<=":
+                    if bool_val:
+                        # a -> b=<c
+                        # a -> -b>=-c
+                        self._add_xct_reif_right(cond, [-x for x in xct_coefs],xct_vars,-xct_rhs)
+                    else:
+                        # !a -> b=<c
+                        #  a <- b>c
+                        #  a <- b>=1+c
+                        self._add_xct_reif_left(cond, xct_coefs,xct_vars,1+xct_rhs)
+                else:
+                    raise NotImplementedError(
+                    "Unexpected condition constraint for Exact '{}' {}".format(lhs.name,cpm_expr))
 
-            if isinstance(cond, NegBoolView):
-                cond, bool_val = self.solver_var_no_num(cond._bv), False
+            # True or False
+            elif isinstance(cpm_expr, BoolVal):
+                self._add_xct_constr([], [], True, 0 if cpm_expr.args[0] else 1, False, 0)
+
+            # a direct constraint, pass to solver
+            elif isinstance(cpm_expr, DirectConstraint):
+                assert False, "Exact does not support direct constraints"
+
             else:
-                cond, bool_val = self.solver_var_no_num(cond), True
-
-            if sub_expr.name == "==":
-                if bool_val:
-                    # a -> b==c
-                    # a -> b>=c and a -> -b>=-c
-                    self._add_xct_reif_right(cond, xct_coefs,xct_vars,xct_rhs)
-                    self._add_xct_reif_right(cond, [-x for x in xct_coefs],xct_vars,-xct_rhs)
-                else:
-                    # !a -> b==c
-                    # !a -> b>=c and !a -> -b>=-c
-                    #  a <- b<c  and  a <- -b<-c
-                    #  a <- -b>=1-c  and  a <- b>=1+c
-                    self._add_xct_reif_left(cond, xct_coefs,xct_vars,1+xct_rhs)
-                    self._add_xct_reif_left(cond, [-x for x in xct_coefs],xct_vars,1-xct_rhs)
-                return
-            elif sub_expr.name == ">=":
-                if bool_val:
-                    # a -> b >= c
-                    return self._add_xct_reif_right(cond, xct_coefs,xct_vars,xct_rhs)
-                else:
-                    # !a -> b>=c
-                    #  a <- b<c
-                    #  a <- -b>=1-c
-                    return self._add_xct_reif_left(cond, [-x for x in xct_coefs],xct_vars,1-xct_rhs)
-            elif sub_expr.name == "<=":
-                if bool_val:
-                    # a -> b=<c
-                    # a -> -b>=-c
-                    return self._add_xct_reif_right(cond, [-x for x in xct_coefs],xct_vars,-xct_rhs)
-                else:
-                    # !a -> b=<c
-                    #  a <- b>c
-                    #  a <- b>=1+c
-                    return self._add_xct_reif_left(cond, xct_coefs,xct_vars,1+xct_rhs)
-            else:
-                raise NotImplementedError(
-                "Unexpected condition constraint for Exact '{}' {}".format(lhs.name,cpm_expr))
-
-        # Global constraints
-        else:
-            self += cpm_expr.decompose()
-            return
-
-        raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+                raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
     def get_core(self):
