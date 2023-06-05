@@ -484,7 +484,8 @@ class CPM_exact(SolverInterface):
 
             else:
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
+            
+        return self
 
     def get_core(self):
         raise NotImplementedError(
