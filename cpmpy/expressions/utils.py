@@ -23,6 +23,7 @@ Internal utilities for expression handling.
 """
 
 import numpy as np
+import math
 from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
 from cpmpy.exceptions import IncompleteFunctionError
@@ -141,4 +142,4 @@ def get_bounds(expr):
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
             return int(expr), int(expr)
-        return expr, expr
+        return math.floor(expr), math.ceil(expr)
