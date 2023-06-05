@@ -20,6 +20,7 @@
         CPM_exact
 """
 import sys  # for stdout checking
+import time
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
@@ -126,13 +127,8 @@ class CPM_exact(SolverInterface):
 
         if not self.solver_is_initialized:
             assert not self.has_objective
-            self.xct_solver.setOption("opt-boundupper", "0")
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
-
-        # TODO: set time limit?
-        if time_limit is not None:
-            self.xct_solver.setOption("timeout",str(time_limit))
 
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
@@ -142,29 +138,34 @@ class CPM_exact(SolverInterface):
         if assumptions is not None:
             assert(all(is_bool(v) for v in assumptions))
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
-            assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
+            assump_vars = [self.solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(assump_vars, assump_vals);
-            # NOTE: setAssumptions clears previous assumptions
+            # NOTE: setAssumptions does not clear previous assumptions, is this ok?
+
 
         # call the solver, with parameters
-        my_status = self.xct_solver.runFull(not self.has_objective)
+        start = time.time()
+        my_status = self.xct_solver.runFull(self.has_objective, time_limit if time_limit is not None else 0)
+        end = time.time()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = 0 # TODO
+        self.cpm_status.runtime = end - start
 
         # translate exit status
-        if my_status == 0:
+        if my_status == 0: # found unsatisfiability
             if self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status == 1:
+        elif my_status == 1: # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status == 2:
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        elif my_status == 2: # found inconsistency
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN # TODO
+        elif my_status == 3: # found timeout
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN # TODO
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
@@ -188,16 +189,11 @@ class CPM_exact(SolverInterface):
             Returns: number of solutions found
         """
 
-        assert not self.has_objective
-        self.xct_solver.setOption("opt-boundupper", "0")
+        assert not self.has_objective # TODO: is this true?
 
         if not self.solver_is_initialized:
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
-
-        # set time limit?
-        if time_limit is not None:
-            self.xct_solver.setOption("timeout",str(time_limit))
 
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
@@ -207,18 +203,20 @@ class CPM_exact(SolverInterface):
 
         solsfound = 0
         while solution_limit == None or solsfound < solution_limit:
-            status = 3
-            while status == 3: # SolveState::INPROCESSED
-                # call the solver, with parameters
-                status = self.xct_solver.runOnce(not self.has_objective)
-            assert status == 0 or status == 1, "Unexpected status code for Exact."
-            if status == 0: # SolveState::UNSAT
+            # call the solver, with parameters
+            my_status = self.xct_solver.runFull(self.has_objective,time_limit if time_limit is not None else 0)
+            assert status in [0,1,2,3], "Unexpected status code for Exact."
+            if my_status == 0: # found unsatisfiability
                 break
-            else: # SolveState::SAT
+            elif my_status == 1: # found solution, but not optimality proven
+                assert self.xct_solver.hasSolution()
                 solsfound += 1
                 self.getSolAndObj()
-                # TODO: call callback / display?
                 self.xct_solver.invalidateLastSol()
+            elif my_status == 2: # found inconsistency
+                pass # TODO
+            elif my_status == 3: # found timeout
+                pass # TODO
 
         return solsfound
 
@@ -228,9 +226,8 @@ class CPM_exact(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        assert not is_num(cpm_var)
-        #if is_num(cpm_var):  # shortcut, eases posting constraints
-            #return cpm_var
+        if is_num(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
 
         # variables to be translated should be positive
         assert(not isinstance(cpm_var, NegBoolView))
@@ -255,6 +252,12 @@ class CPM_exact(SolverInterface):
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
         return revar
+    
+
+    def solver_var_no_num(self, cpm_var, encoding="onehot"):
+        assert not is_num(cpm_var)
+        return self.solver_var(cpm_var, encoding)
+
 
     def objective(self, expr, minimize):
         """
@@ -291,20 +294,15 @@ class CPM_exact(SolverInterface):
         xcoefs = []
         xvars = []
         xrhs = 0
-
-        if is_num(rhs):
-            xrhs += rhs
-        elif isinstance(rhs, _NumVarImpl):
-            xcoefs += [-1]
-            xvars += [self.solver_var(rhs)]
-        else:
-            raise NotImplementedError("Exact: Unexpected rhs {} for expression {}".format(rhs.name,rhs))
+        
+        assert is_num(lhs), "Rhs of inequality should be numeric after transformations"
+        xrhs += rhs
 
         if is_num(lhs):
             xrhs -= lhs
         elif isinstance(lhs, _NumVarImpl):
             xcoefs += [1]
-            xvars += [self.solver_var(lhs)]
+            xvars += [self.solver_var_no_num(lhs)]
         elif lhs.name == "sum":
             xcoefs = [1]*len(lhs.args)
             xvars = self.solver_vars(lhs.args)
@@ -314,7 +312,7 @@ class CPM_exact(SolverInterface):
         elif lhs.name == "sub":
             assert len(lhs.args)==2
             xcoefs += [1, -1]
-            xvars += [self.solver_var(lhs.args[0]), self.solver_var(lhs.args[1])]
+            xvars += [self.solver_var_no_num(lhs.args[0]), self.solver_var_no_num(lhs.args[1])]
         else:
             raise NotImplementedError("Exact: Unexpected lhs {} for expression {}".format(lhs.name,lhs))
 
@@ -433,9 +431,9 @@ class CPM_exact(SolverInterface):
             xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
             if isinstance(cond, NegBoolView):
-                cond, bool_val = self.solver_var(cond._bv), False
+                cond, bool_val = self.solver_var_no_num(cond._bv), False
             else:
-                cond, bool_val = self.solver_var(cond), True
+                cond, bool_val = self.solver_var_no_num(cond), True
 
             if sub_expr.name == "==":
                 if bool_val:
