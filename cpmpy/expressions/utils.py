@@ -134,7 +134,7 @@ def eval_comparison(str_op, lhs, rhs):
 
 
 def get_bounds(expr):
-    # can return floats, use floor and ceil when creating an intvar!
+    # returns appropriately rounded integers
     from cpmpy.expressions.core import Expression
     if isinstance(expr,Expression):
         return expr.get_bounds()
