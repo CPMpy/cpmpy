@@ -29,67 +29,91 @@ from itertools import chain, combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
 
-def is_int(arg):
-    """ can it be interpreted as an integer? (incl bool and numpy variants)
-    """
-    return isinstance(arg, (bool, np.bool_, int, np.integer))
-def is_num(arg):
-    """ is it an int or float? (incl numpy variants)
-    """
-    return isinstance(arg, (bool, np.bool_, int, np.integer, float, np.floating))
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_))
+
+
+def is_int(arg):
+    """ can it be interpreted as an integer? (incl bool and numpy variants)
+    """
+    return is_bool(arg) or isinstance(arg, (int, np.integer))
+
+
+def is_num(arg):
+    """ is it an int or float? (incl numpy variants)
+    """
+    return is_int(arg) or isinstance(arg, (float, np.floating))
+
+
 def is_false_cst(arg):
-    """Is the argument the constant False (can be of type bool, np.bool and BoolVal)"""
+    """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
+    """
     from cpmpy import BoolVal
     if arg is False or arg is np.False_:
         return True
     elif isinstance(arg, BoolVal):
-        return not arg.args[0]
+        return not arg.value()
     return False
 
+
 def is_true_cst(arg):
-    """Is the argument the constant True (can be of type bool, np.bool and BoolVal)"""
+    """ is the argument the constant True (can be of type bool, np.bool and BoolVal)
+    """
     from cpmpy import BoolVal
     if arg is True or arg is np.True_:
         return True
     elif isinstance(arg, BoolVal):
-        return arg.args[0]
+        return arg.value()
     return False
+
+
 def is_boolexpr(expr):
+    """ is the argument a boolean expression or a boolean value
+    """
     #boolexpr
     if hasattr(expr, 'is_bool'):
         return expr.is_bool()
     #boolean constant
     return is_bool(expr)
+
+
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
     return isinstance(arg, (list, tuple))
+
+
 def is_any_list(arg):
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
 
+
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
     return list(_flatten(args))
+
+
 def _flatten(args):
-    # from: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
-    # returns an iterator, not a list
+    """ flattens the irregular nested list into an iterator
+
+        from: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
+    """
     for el in args:
         if isinstance(el, Iterable) and not isinstance(el, (str, bytes)):
             yield from _flatten(el)
         else:
             yield el
 
+
 def all_pairs(args):
     """ returns all pairwise combinations of elements in args
     """
     return list(combinations(args, 2))
+
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
@@ -101,6 +125,7 @@ def argval(a):
     except IncompleteFunctionError as e:
         if a.is_bool(): return False
         raise e
+
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -134,9 +159,12 @@ def eval_comparison(str_op, lhs, rhs):
 
 
 def get_bounds(expr):
-    # returns appropriately rounded integers
+    """ return the bounds of the expression
+    returns appropriately rounded integers
+    """
+
     from cpmpy.expressions.core import Expression
-    if isinstance(expr,Expression):
+    if isinstance(expr, Expression):
         return expr.get_bounds()
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
