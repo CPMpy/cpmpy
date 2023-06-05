@@ -291,6 +291,19 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_cumulative_no_np2(self):
+        start = cp.intvar(0, 10, 4, "start")
+        duration = (1, 2, 2, 1) # smt weird such as a tuple
+        end = [cp.intvar(0,20, name=f"end[{i}]") for i in range(4)] # force smt weird
+        demand = [1,1,1,1]
+        capacity = 1
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        # also test decomposition
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
