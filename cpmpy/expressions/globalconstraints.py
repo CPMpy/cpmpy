@@ -493,7 +493,7 @@ class Element(GlobalConstraint):
 
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)]
+               [idx >= 0, idx < len(arr)], []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
