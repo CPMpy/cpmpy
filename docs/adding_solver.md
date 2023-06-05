@@ -11,21 +11,21 @@ Implementing the template consists of the following parts:
   * `solver_var()` where you create new solver variables and map them to CPMpy decision variables
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
   * `objective()` if your solver supports optimisation
-  * `__add__()` where you call the necessary transformations to transform CPMpy expressions to those that the solver supports
-  * `_post_constraint()` where you directly map the CPMpy expressions that the solver supports, to API function calls on the underlying solver
+  * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports
+  * `__add__()` where you call transform and map the resulting CPMpy expressions that the solver supports, to API function calls on the underlying solver
   * `solveAll()` optionally, if the solver natively supports solution enumeration
 
 ## Transformations and posting constraints
 
-CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and posted to the solver (through `_post_constraint()`).
+CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and then posted to the solver.
 
-CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from *posting* the supported constraints directly to the solver.
+CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from actually *posting* the supported constraints directly to the solver.
 
-For example, a SAT solver only accepts clauses (disjunctions) over Boolean variables as constraints. So, its `_post_constraint()` method should just consists of reading in a CPMpy 'or' expression over decision variables, for which it then calls the solver to create such a clause. All other constraints may not be directly supported by the solver, and can hence be rejected.
+For example, a SAT solver only accepts clauses (disjunctions) over Boolean variables as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
 
-What remains is the difficult part of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory.
+The `__add__()` method will first call this `transform()`. This will return a list of CPMpy 'or' expression over decision variables. It then only has to iterate over those and call the solver its native API to create such clauses. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
-So for any solver you wish to add, chances are that most of the transformations you need are already implemented. You hence only need to chain the right transformations in the solver's `transform()` method. If you need additional transformations, or want to know how they work, read on.
+So for any solver you wish to add, chances are that most of the transformations you need are already implemented. Any solver can use any transformation in any order that the transformations allow. If you need additional transformations, or want to know how they work, read on.
 
 ## Stateless transformation functions
 
@@ -96,7 +96,7 @@ The CPMpy package provides a large testsuite on which newly added solvers can be
 Note that for this testsuite to work, you need to add your solver to the `SolverLookup` utility.
 This is done by adding an import statement in `/solvers/__init__.py` and adding an entry in the list of solvers in  `/solvers/utils.py`.
 
-To run the testsuite on your solver, go to `/tests/test_constraints.py` and set `SOLVERNAME` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
+To run the testsuite on your solver, go to `/tests/test_constraints.py` and set `SOLVERNAMES` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
 As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
