@@ -206,7 +206,7 @@ class CPM_exact(SolverInterface):
         while solution_limit == None or solsfound < solution_limit:
             # call the solver, with parameters
             my_status = self.xct_solver.runFull(self.has_objective,time_limit if time_limit is not None else 0)
-            assert status in [0,1,2,3], "Unexpected status code for Exact."
+            assert my_status in [0,1,2,3], "Unexpected status code for Exact."
             if my_status == 0: # found unsatisfiability
                 break
             elif my_status == 1: # found solution, but not optimality proven
