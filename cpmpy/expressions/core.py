@@ -174,6 +174,9 @@ class Expression(object):
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -182,6 +185,9 @@ class Expression(object):
 
         return Operator("and", [self, other])
     def __rand__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -191,6 +197,9 @@ class Expression(object):
         return Operator("and", [other, self])
 
     def __or__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return BoolVal(True)
@@ -199,6 +208,9 @@ class Expression(object):
 
         return Operator("or", [self, other])
     def __ror__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return BoolVal(True)
@@ -409,12 +421,12 @@ class Operator(Expression):
             #only boolean arguments allowed
             for arg in arg_list:
                 if not is_boolexpr(arg):
-                    raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
+                    raise TypeError(f"{name}-operator only accepts boolean arguments, not {arg}: {name}({arg_list})")
         if arity == 0:
             arg_list = flatlist(arg_list)
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
-            assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
+            assert (len(arg_list) == arity), f"Operator: {name}, number of arguments must be {arity}"
 
         # automatic weighted sum (wsum) creation:
         # if all args are an expression (not a constant)
