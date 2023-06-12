@@ -93,7 +93,7 @@ class CPM_exact(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
 
-    def _getSolAndObj(self):
+    def _fillObjAndVars(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             return False
@@ -172,7 +172,7 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
-        return self._getSolAndObj()
+        return self._fillObjAndVars()
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -214,7 +214,7 @@ class CPM_exact(SolverInterface):
             elif my_status == 1: # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
-                self._getSolAndObj()
+                self._fillObjAndVars()
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
                     if isinstance(display, Expression):
