@@ -189,7 +189,8 @@ class AllDifferentExcept0(GlobalConstraint):
         super().__init__("alldifferent_except0", flatlist(args))
 
     def decompose(self):
-        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
+        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)]
 
     def value(self):
         vals = [a.value() for a in self.args if a.value() != 0]
@@ -208,7 +209,8 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+        # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
+        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])]
 
     def value(self):
         return len(set(a.value() for a in self.args)) == 1
@@ -278,16 +280,11 @@ class Circuit(GlobalConstraint):
         from .python_builtins import all
         succ = cpm_array(self.args)
         n = len(succ)
-        order = intvar(0, n - 1, shape=n)
-        return [~all([AllDifferent(succ),
-                # different orders
-                AllDifferent(order)
-                    ]),
-                # not negating following constraints since they involve the auxiliary variables
-                # loop: first one is successor of '0'
-                order[0] == succ[0]
-                ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]
-
+        order = intvar(0,n-1, shape=n)
+        return [
+            (~AllDifferent(succ) | ~AllDifferent(order)), # negated condition on successors or orders
+            # assignemt to auxiliary variables should hold
+            order[0] == succ[0]] + [order[i] == succ[order[i-1]] for i in range(1,n)]
 
 class Inverse(GlobalConstraint):
     """
@@ -612,22 +609,19 @@ class Cumulative(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-        GlobalCardinalityCount(a,gcc): Collect the number of occurrences of each value 0..a.ub in gcc.
-    The array gcc must have elements 0..ub (so of size ub+1).
-        """
+    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
+    must be equal to occ[i].
+    """
 
-    def __init__(self, a, gcc):
-        flatargs = flatlist([a, gcc])
+    def __init__(self, vars, vals, occ):
+        flatargs = flatlist([self, vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
-        ub = max([get_bounds(v)[1] for v in a])
-        if not (len(gcc) == ub + 1):
-            raise TypeError(f"GCC: length of gcc variables {len(gcc)} must be ub+1 {ub + 1}")
-        super().__init__("gcc", [a,gcc])
+        super().__init__("gcc", [vars,vals,occ])
 
     def decompose(self):
-        a, gcc = self.args
-        return [Count(a, i) == v for i, v in enumerate(gcc)]
+        vars, vals, occ = self.args
+        return [Count(vars, i) == v for i, v in zip(vals, occ)]
 
     def value(self):
         from .python_builtins import all

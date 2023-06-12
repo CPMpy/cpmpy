@@ -327,37 +327,38 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(constraints).solve())
 
     def test_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc), iv == [5,5,4]]).solve())
-        self.assertEqual( str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
-        self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1]], gcc).value())
-
-    def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_count(self):
         iv = cp.intvar(-8, 8, shape=3)
