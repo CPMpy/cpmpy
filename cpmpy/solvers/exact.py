@@ -44,7 +44,13 @@ class CPM_exact(SolverInterface):
     See https://pypi.org/project/exact for more information.
 
     Creates the following attributes (see parent constructor for more):
-    xct_solver: the Exact instance used in solve()
+    - xct_solver: the Exact instance used in solve() and solveAll()
+    - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+    to recover which expressions were in the core
+    - solver_is_initialized: whether xct_solver is initialized
+    - self.objective_given: whether an objective function is given to xct_solver
+    - self.objective_minimize: the direction of the optimization (if false then maximize)
+    as Exact can only minimize
     """
 
     @staticmethod
@@ -64,11 +70,9 @@ class CPM_exact(SolverInterface):
         Requires a CPMpy model as input, and will create the corresponding
         Exact solver object xct_solver.
 
-        xct_solver can be modified externally before
-        calling solve(), a prime way to use more advanced solver features
-
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: None
         """
         if not self.supported():
             raise Exception("Install 'exact' as a python package to use this solver interface")
@@ -87,7 +91,7 @@ class CPM_exact(SolverInterface):
 
         # objective can only be set once, so keep track of this
         self.solver_is_initialized = False
-        self.has_objective = False
+        self.objective_given = False
         self.objective_minimize = True
 
         # initialise everything else and post the constraints/objective
@@ -127,10 +131,11 @@ class CPM_exact(SolverInterface):
         from exact import Exact as xct
 
         if not self.solver_is_initialized:
-            assert not self.has_objective
+            assert not self.objective_given
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
             self.xct_solver.setOption("verbosity","0")
+        self.xct_solver.clearAssumptions()
 
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
@@ -142,13 +147,12 @@ class CPM_exact(SolverInterface):
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self._solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
-            self.xct_solver.clearAssumptions()
             for x,v in zip(assump_vars,assump_vals):
                 self.xct_solver.setAssumption(x, [v])
 
         # call the solver, with parameters
         start = time.time()
-        my_status = self.xct_solver.runFull(self.has_objective, time_limit if time_limit is not None else 0)
+        my_status = self.xct_solver.runFull(self.objective_given, time_limit if time_limit is not None else 0)
         end = time.time()
 
         # new status, translate runtime
@@ -157,7 +161,7 @@ class CPM_exact(SolverInterface):
 
         # translate exit status
         if my_status == 0: # found unsatisfiability
-            if self.has_objective and self.xct_solver.hasSolution():
+            if self.objective_given and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -191,7 +195,7 @@ class CPM_exact(SolverInterface):
 
             Returns: number of solutions found
         """
-        if self.has_objective:
+        if self.objective_given:
             raise NotImplementedError("Exact does not yet support finding all *optimal* solutions.")
 
         if not self.solver_is_initialized:
@@ -234,7 +238,7 @@ class CPM_exact(SolverInterface):
         """
             Returns whether the solver has an objective function or not.
         """
-        return self.has_objective
+        return self.objective_given
 
 
     def solver_var(self, cpm_var, encoding="onehot"):
@@ -290,10 +294,10 @@ class CPM_exact(SolverInterface):
 
             'objective()' can only be called once
         """
-        if self.has_objective:
+        if self.objective_given:
             NotImplementedError("Exact accepts setting the objective function only once.")
 
-        self.has_objective = True
+        self.objective_given = True
         self.objective_minimize = minimize
 
         # make objective function non-nested
@@ -440,7 +444,7 @@ class CPM_exact(SolverInterface):
                 lhs, rhs = cpm_expr.args
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
-                # Thanks to `only_numexpr_equality()` only supported comparisons should remain
+                # linearize removed '<', '>' and '!='
                 if cpm_expr.name == '<=':
                     self._add_xct_constr(xct_coefs, xct_vars, False, 0, True, xct_rhs)
                 elif cpm_expr.name == '>=':
