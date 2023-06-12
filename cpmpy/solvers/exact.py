@@ -290,7 +290,9 @@ class CPM_exact(SolverInterface):
 
             'objective()' can only be called once
         """
-        assert not self.has_objective, "Exact accepts an objective function only once."
+        if self.has_objective:
+            NotImplementedError("Exact accepts setting the objective function only once.")
+
         self.has_objective = True
         self.objective_minimize = minimize
 
@@ -375,7 +377,8 @@ class CPM_exact(SolverInterface):
         return o.item() if isinstance(o, np.generic) else o
 
     def _add_xct_constr(self, xct_coefs,xct_vars,uselb,lb,useub,ub):
-        assert all([isinstance(x, numbers.Integral) for x in xct_coefs+[lb,ub]]), "Exact requires all values to be integral"
+        if any([not isinstance(x, numbers.Integral) for x in xct_coefs+[lb,ub]]):
+            raise NotImplementedError("Exact requires all values to be integral")
         maximum = max([abs(x) for x in xct_coefs]+[abs(lb),abs(ub)])
         if maximum > 1e18:
             self.xct_solver.addConstraint([str(x) for x in xct_coefs],xct_vars,uselb,str(lb),useub,str(ub))
@@ -383,7 +386,8 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addConstraint([self.fix(x) for x in xct_coefs],xct_vars,uselb,self.fix(lb),useub,self.fix(ub))
 
     def _add_xct_reif(self,head,xct_coefs,xct_vars,lb):
-        assert all([isinstance(x, numbers.Integral) for x in xct_coefs+[lb]]), "Exact requires all values to be integral"
+        if any([not isinstance(x, numbers.Integral) for x in xct_coefs+[lb]]):
+            raise NotImplementedError("Exact requires all values to be integral")
         maximum = max([abs(x) for x in xct_coefs]+[abs(lb)])
         if maximum > 1e18:
             self.xct_solver.addReification(head,[str(x) for x in xct_coefs],xct_vars,str(lb))
@@ -524,7 +528,7 @@ class CPM_exact(SolverInterface):
 
             Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
         """
-        assert self.xct_solver.hasCore()
+        assert self.xct_solver.hasCore(), "get_core(): requires a core to be present in the solver, i.e., UNSAT should have been reached at least once"
         assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # return cpm_variables corresponding to Exact core
