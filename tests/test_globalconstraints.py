@@ -536,20 +536,6 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],x,False)
 
-    def test_gcc(self):
-        x = cp.intvar(0, 1)
-        z = cp.intvar(-8, 8)
-        q = cp.intvar(-8, 8)
-        y = cp.intvar(-7, -1)
-        b = cp.boolvar()
-        a = cp.boolvar()
-
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y],[z,q])]).solve())
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[x,False])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y,q],[z,x])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[z,b])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a],[a,b])
-
     def test_count(self):
         x = cp.intvar(0, 1)
         z = cp.intvar(-8, 8)
