@@ -614,7 +614,7 @@ class GlobalCardinalityCount(GlobalConstraint):
     """
 
     def __init__(self, vars, vals, occ):
-        flatargs = flatlist([self, vars, vals, occ])
+        flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         super().__init__("gcc", [vars,vals,occ])
