@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -25,6 +25,21 @@ class TestDirectORTools(unittest.TestCase):
                                   novar=[1, 2, 3])  # optional, what not to scan for vars
 
         self.assertEqual(model.solveAll(), 6)
+
+
+@pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
+class TestDirectExact(unittest.TestCase):
+
+    def test_direct_left_reif(self):
+        x,y = boolvar(2)
+
+        model = SolverLookup.get("exact")
+        print(model)
+        # add x -> y>=1
+        model += DirectConstraint("addRightReification", (x, [1], [y], 1), novar=[1,3])
+        print(model)
+        self.assertEqual(model.solveAll(), 3)
+
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")

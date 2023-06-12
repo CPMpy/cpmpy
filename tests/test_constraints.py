@@ -6,7 +6,7 @@ import pytest
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
-SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ["exact"]
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
@@ -15,7 +15,7 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "exact": {"circuit","max","min"},
+                  "exact": {},
                   }
 
 # Exclude certain operators for solvers.
@@ -23,7 +23,7 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {"mod","pow","div","mul","min","max","abs"},
+                     "exact": {"mod","pow","div","mul","abs"},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints

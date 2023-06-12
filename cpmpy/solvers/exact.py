@@ -93,7 +93,7 @@ class CPM_exact(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
 
-    def getSolAndObj(self):
+    def _getSolAndObj(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             return False
@@ -140,7 +140,7 @@ class CPM_exact(SolverInterface):
         if assumptions is not None:
             assert(all(v.is_bool() for v in assumptions))
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
-            assump_vars = [self.solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
+            assump_vars = [self._solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.clearAssumptions()
             for x,v in zip(assump_vars,assump_vals):
@@ -171,7 +171,7 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
-        return self.getSolAndObj()
+        return self._getSolAndObj()
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -213,8 +213,15 @@ class CPM_exact(SolverInterface):
             elif my_status == 1: # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
-                self.getSolAndObj()
-                self.xct_solver.invalidateLastSol()
+                self._getSolAndObj()
+                self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
+                if display is not None:
+                    if isinstance(display, Expression):
+                        print(display.value())
+                    elif isinstance(display, list):
+                        print([v.value() for v in display])
+                    else:
+                        display()  # callback
             elif my_status == 2: # found inconsistency
                 assert False, "Error: inconsistency during solveAll should not happen, please warn the developers of this bug"
             elif my_status == 3: # found timeout
@@ -262,7 +269,13 @@ class CPM_exact(SolverInterface):
         return revar
     
 
-    def solver_var_no_num(self, cpm_var, encoding="onehot"):
+    def _solver_var_no_num(self, cpm_var, encoding="onehot"):
+        """
+            Creates solver variable for cpmpy variable or returns from cache if previously created
+
+            Internally, we should have the guarantee that these cpm_var cannot be numeric constants,
+            so we check this with this wrapper function.
+        """
         assert not is_num(cpm_var)
         return self.solver_var(cpm_var, encoding)
 
@@ -311,17 +324,13 @@ class CPM_exact(SolverInterface):
             xrhs -= lhs
         elif isinstance(lhs, _NumVarImpl):
             xcoefs += [1]
-            xvars += [self.solver_var_no_num(lhs)]
+            xvars += [self._solver_var_no_num(lhs)]
         elif lhs.name == "sum":
             xcoefs = [1]*len(lhs.args)
             xvars = self.solver_vars(lhs.args)
         elif lhs.name == "wsum":
             xcoefs += lhs.args[0]
             xvars += self.solver_vars(lhs.args[1])
-        elif lhs.name == "sub":
-            assert len(lhs.args)==2
-            xcoefs += [1, -1]
-            xvars += [self.solver_var_no_num(lhs.args[0]), self.solver_var_no_num(lhs.args[1])]
         else:
             raise NotImplementedError("Exact: Unexpected lhs {} for expression {}".format(lhs.name,lhs))
 
@@ -420,6 +429,7 @@ class CPM_exact(SolverInterface):
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
                 # Thanks to `only_numexpr_equality()` only supported comparisons should remain
+                # TODO TRANSFORMATION?: "to greater-equal"
                 if cpm_expr.name == '<=':
                     self._add_xct_constr(xct_coefs, xct_vars, False, 0, True, xct_rhs)
                 elif cpm_expr.name == '>=':
@@ -444,9 +454,9 @@ class CPM_exact(SolverInterface):
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
                 if isinstance(cond, NegBoolView):
-                    cond, bool_val = self.solver_var_no_num(cond._bv), False
+                    cond, bool_val = self._solver_var_no_num(cond._bv), False
                 else:
-                    cond, bool_val = self.solver_var_no_num(cond), True
+                    cond, bool_val = self._solver_var_no_num(cond), True
 
                 if sub_expr.name == "==":
                     if bool_val:
@@ -490,7 +500,8 @@ class CPM_exact(SolverInterface):
 
             # a direct constraint, pass to solver
             elif isinstance(cpm_expr, DirectConstraint):
-                assert False, "Exact does not support direct constraints"
+                cpm_expr.callSolver(self, self.xct_solver)
+                return self
 
             else:
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
