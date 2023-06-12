@@ -33,6 +33,7 @@ from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..expressions.globalconstraints import DirectConstraint
 import numpy as np
+import numbers
 
 class CPM_exact(SolverInterface):
     """
@@ -111,7 +112,6 @@ class CPM_exact(SolverInterface):
         return True
 
     def solve(self, time_limit=None, assumptions=None, **kwargs):
-        # TODO: test this function
         """
             Call Exact
 
@@ -130,6 +130,7 @@ class CPM_exact(SolverInterface):
             assert not self.has_objective
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
+            self.xct_solver.setOption("verbosity","0")
 
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
@@ -137,13 +138,13 @@ class CPM_exact(SolverInterface):
 
         # set assumptions
         if assumptions is not None:
-            assert(all(is_bool(v) for v in assumptions))
+            assert(all(v.is_bool() for v in assumptions))
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
-            self.xct_solver.setAssumptions(assump_vars, assump_vals);
-            # NOTE: setAssumptions does not clear previous assumptions, is this ok?
-
+            self.xct_solver.clearAssumptions()
+            for x,v in zip(assump_vars,assump_vals):
+                self.xct_solver.setAssumption(x, [v])
 
         # call the solver, with parameters
         start = time.time()
@@ -156,15 +157,15 @@ class CPM_exact(SolverInterface):
 
         # translate exit status
         if my_status == 0: # found unsatisfiability
-            if self.xct_solver.hasSolution():
+            if self.has_objective and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == 1: # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status == 2: # found inconsistency
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN # TODO
+        elif my_status == 2: # found inconsistency over assumptions
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == 3: # found timeout
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN # TODO
         else:
@@ -172,8 +173,7 @@ class CPM_exact(SolverInterface):
 
         return self.getSolAndObj()
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
-        # TODO: test this function
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -185,27 +185,28 @@ class CPM_exact(SolverInterface):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
-
-        assert not self.has_objective # TODO: is this true?
+        assert display==None, "Exact does not support a display when solving for all solutions"
+        assert not self.has_objective, "To search for all solutions that are optimal under an objective, add the optimal objective value as a constraint"
 
         if not self.solver_is_initialized:
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
+            self.xct_solver.setOption("verbosity","0")
+        self.xct_solver.clearAssumptions()
 
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
-            print(kw,val)
-            print(type(self.xct_solver))
             self.xct_solver.setOption(kw,str(val))
 
         solsfound = 0
         while solution_limit == None or solsfound < solution_limit:
             # call the solver, with parameters
-            my_status = self.xct_solver.runFull(self.has_objective,time_limit if time_limit is not None else 0)
+            my_status = self.xct_solver.runFull(False,time_limit if time_limit is not None else 0)
             assert my_status in [0,1,2,3], "Unexpected status code for Exact."
             if my_status == 0: # found unsatisfiability
                 break
@@ -215,11 +216,17 @@ class CPM_exact(SolverInterface):
                 self.getSolAndObj()
                 self.xct_solver.invalidateLastSol()
             elif my_status == 2: # found inconsistency
-                pass # TODO
+                assert False, "Error: inconsistency during solveAll should not happen, please warn the developers of this bug"
             elif my_status == 3: # found timeout
-                pass # TODO
+                return solsfound
 
         return solsfound
+
+    def has_objective(self):
+        """
+            Returns whether the solver has an objective function or not.
+        """
+        return self.has_objective
 
 
     def solver_var(self, cpm_var, encoding="onehot"):
@@ -285,6 +292,7 @@ class CPM_exact(SolverInterface):
 
         self.xct_solver.init(xct_coefs,xct_vars)
         self.solver_is_initialized = True
+        self.xct_solver.setOption("verbosity","0")
 
     def _make_numexpr(self, lhs, rhs):
         """
@@ -350,28 +358,30 @@ class CPM_exact(SolverInterface):
         return o.item() if isinstance(o, np.generic) else o
 
     def _add_xct_constr(self, xct_coefs,xct_vars,uselb,lb,useub,ub):
-        maximum = max([max([abs(x) for x in xct_coefs]),abs(lb if uselb else 0),abs(ub if useub else 0)])
+        assert all([isinstance(x, numbers.Integral) for x in xct_coefs+[lb,ub]]), "Exact requires all values to be integral"
+        maximum = max([abs(x) for x in xct_coefs]+[abs(lb),abs(ub)])
         if maximum > 1e18:
             self.xct_solver.addConstraint([str(x) for x in xct_coefs],xct_vars,uselb,str(lb),useub,str(ub))
         else:
             self.xct_solver.addConstraint([self.fix(x) for x in xct_coefs],xct_vars,uselb,self.fix(lb),useub,self.fix(ub))
 
     def _add_xct_reif(self,head,xct_coefs,xct_vars,lb):
-        maximum = max([max([abs(x) for x in xct_coefs]),abs(lb)])
+        assert all([isinstance(x, numbers.Integral) for x in xct_coefs+[lb]]), "Exact requires all values to be integral"
+        maximum = max([abs(x) for x in xct_coefs]+[abs(lb)])
         if maximum > 1e18:
             self.xct_solver.addReification(head,[str(x) for x in xct_coefs],xct_vars,str(lb))
         else:
             self.xct_solver.addReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(lb))
 
     def _add_xct_reif_right(self,head, xct_coefs,xct_vars,xct_rhs):
-        maximum = max([max([abs(x) for x in xct_coefs]),abs(xct_rhs)])
+        maximum = max([abs(x) for x in xct_coefs]+[abs(xct_rhs)])
         if maximum > 1e18:
             self.xct_solver.addRightReification(head,[str(x) for x in xct_coefs],xct_vars,str(xct_rhs))
         else:
             self.xct_solver.addRightReification(head,[self.fix(x) for x in xct_coefs],xct_vars,self.fix(xct_rhs))
 
     def _add_xct_reif_left(self,head, xct_coefs,xct_vars,xct_rhs):
-        maximum = max([max([abs(x) for x in xct_coefs]),abs(xct_rhs)])
+        maximum = max([abs(x) for x in xct_coefs]+[abs(xct_rhs)])
         if maximum > 1e18:
             self.xct_solver.addLeftReification(head,[str(x) for x in xct_coefs],xct_vars,str(xct_rhs))
         else:
@@ -488,6 +498,17 @@ class CPM_exact(SolverInterface):
         return self
 
     def get_core(self):
-        raise NotImplementedError(
-                "TODO: core extraction by Exact")
+        from exact import Exact as xct
+        """
+            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+
+            CPMpy will return only those variables that are False (in the UNSAT core)
+
+            Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+        """
+        assert self.xct_solver.hasCore()
+        assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
+
+        # return cpm_variables corresponding to Exact core
+        return [self.assumption_dict[i] for i in self.xct_solver.getLastCore()]
 
