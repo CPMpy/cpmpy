@@ -167,7 +167,8 @@ class CPM_exact(SolverInterface):
         elif my_status == 2: # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == 3: # found timeout
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN # TODO
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            return 0
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
@@ -190,8 +191,8 @@ class CPM_exact(SolverInterface):
 
             Returns: number of solutions found
         """
-        assert display==None, "Exact does not support a display when solving for all solutions"
-        assert not self.has_objective, "To search for all solutions that are optimal under an objective, add the optimal objective value as a constraint"
+        if self.has_objective:
+            raise NotImplementedError("Exact does not yet support finding all *optimal* solutions.")
 
         if not self.solver_is_initialized:
             self.xct_solver.init([],[])
@@ -317,7 +318,7 @@ class CPM_exact(SolverInterface):
         xvars = []
         xrhs = 0
         
-        assert is_num(rhs), "Rhs of inequality should be numeric after transformations"
+        assert is_num(rhs), "RHS of inequality should be numeric after transformations"
         xrhs += rhs
 
         if is_num(lhs):
@@ -361,6 +362,13 @@ class CPM_exact(SolverInterface):
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
+
+        # NOTE: the transformations that are still done specifically for Exact are two-fold:
+        # 1) transform '==' and '<=' to '>='
+        # 2) transform implications with negative conditions to ones with positive consequences
+        #
+        # 1) seems quite general and is a candidate to function as an independent transformation.
+        # 2) seems very solver-specific.
 
     @staticmethod
     def fix(o):
@@ -429,7 +437,6 @@ class CPM_exact(SolverInterface):
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
                 # Thanks to `only_numexpr_equality()` only supported comparisons should remain
-                # TODO TRANSFORMATION?: "to greater-equal"
                 if cpm_expr.name == '<=':
                     self._add_xct_constr(xct_coefs, xct_vars, False, 0, True, xct_rhs)
                 elif cpm_expr.name == '>=':
