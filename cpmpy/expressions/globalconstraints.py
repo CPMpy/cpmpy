@@ -451,8 +451,13 @@ class in_domain(GlobalConstraint):
 
             # create constraints based on the intervals
             # Create a conjunction of disjunctions
-            cons = [(expr <= intervals[i-1][1]) | (expr >= intervals[i][0]) for i in range(1, len(intervals))]
-            cons.extend([expr >= intervals[0][0], expr <= intervals[-1][1]])
+            cons = []
+            if len(intervals) > 0:
+                cons.extend([(expr <= intervals[i-1][1]) | (expr >= intervals[i][0]) for i in range(1, len(intervals))])
+                cons.extend([expr >= intervals[0][0], expr <= intervals[-1][1]])
+            else:
+                cons.append(False)
+                
             return cons
 
     def value(self):
