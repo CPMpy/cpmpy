@@ -218,9 +218,9 @@ class CPM_exact(SolverInterface):
             elif my_status == 1: # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
-                self._fillObjAndVars()
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
+                    self._fillObjAndVars()
                     if isinstance(display, Expression):
                         print(display.value())
                     elif isinstance(display, list):
