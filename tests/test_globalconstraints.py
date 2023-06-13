@@ -541,14 +541,19 @@ class TestTypeChecks(unittest.TestCase):
         z = cp.intvar(-8, 8)
         q = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
+        h = cp.intvar(-7, 7)
+        v = cp.intvar(-7, 7)
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y],[z,q])]).solve())
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[x,False])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y,q],[z,x])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[z,b])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a],[a,b])
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y], [z,q], [h,v])]).solve())
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [x,False], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [z,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a], [a,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [h, v], [z, b])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [True, v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [v, a])
+
 
     def test_count(self):
         x = cp.intvar(0, 1)
