@@ -310,7 +310,6 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -326,13 +325,45 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table", "cumulative","circuit"})
+        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table","cumulative","circuit","inverse"})
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
         return cpm_cons
 
+    def __add__(self, cpm_expr):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr, collect=self.user_vars)
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
+
+        return self
+
+    # TODO: 'reifiable' is an artefact from the early days
+    # only 3 constraints support it (and,or,sum),
+    # we can just add reified support for those and not need `reifiable` or returning the constraint
+    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API

@@ -10,7 +10,7 @@ To decide if a problem is feasible or finding the best one amongst all the optio
 
 Instead, the paradigm of **constraint programming (CP)** allow you to:
 
-1. Model the space of possible solutions through *decision variables*
+1. Model the space of possible solutions through *decision variables* and their *domains*
 2. Model relations between variables through *constraints* and an *objective function*
 3. Have a state-of-the-art solver compute the answer efficiently.
 
@@ -19,9 +19,9 @@ So despite the word 'Programming' in Constraint Programming (since forever), as 
 Satisfaction versus Optimisation
 --------------------------------
 
-A **constraint satisfaction problem (CSP)** consists of a set of variables and constraints stablishing relationships between them. Each variable has a finite of possible values (its domain). The goal is to assign values to the variables in its domains satisfying all the constraints. 
+A **constraint satisfaction problem (CSP)** consists of a set of variables and constraints establishing relationships between them. Each variable has a finite of possible values (its domain). The goal is to assign values to the variables in its domains satisfying all the constraints. 
 
-A more general version, called **constraint optimization programming (C0P)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'.
+A more general version, called **constraint optimization programming (COP)**, finds amongst all the feasible solutions the one that optimizes some measure, called 'objective function'.
 
 The state-of-the-art CP solvers can perform both very efficiently, so it is up to you to decide wether you have a satisfaction or an optimisation problem.
 
@@ -33,7 +33,7 @@ A typical CP problem is defined by the following elements:
 
 **Variables**: Variables represents the decisions to be made. Depending on the decisions to be made variables can be *Boolean*, whenever a Yes or No decision is needed to be made, or *Integer*, whenever an integer number is necessary to represent a decision. In the first case, we say the **domain** of a Boolean variable is the set {True, False}. For integer variables we represent this as an interval of integer numbers, [a,b].
 
-**Constraints**: Constraints are all the conditions that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or `global constraints <https://cpmpy.readthedocs.io/en/latest/api/expressions/globalconstraints.html>`_.
+**Constraints**: Constraints are all the relations that variables must satisfy. A set of values of the variables satisfying all the constraints is named a *feasible* solution. In CP, constraints can be boolean expressions, arithmetic operations or `global constraints <https://cpmpy.readthedocs.io/en/latest/api/expressions/globalconstraints.html>`_.
 
 Moreover, if we want to model an constrained optimization problem we also need to specify an 
 
@@ -48,7 +48,7 @@ For example, we aim to allocate to the letters S,E,N,D,M,O,R,Y a digit between 0
 
 SEND + MORE = MONEY
 
-is satisfied. This problem lies into the setting of **constraint satisfaction problem (CSP)**. Here the variables are each letter S,E,N,D,M,O,R,Y and their domain is {0,1,2,...,9}. The constraints represents the fact that the values of the ltters need to sum up. And to be mathematically clean, the first letters can not be `0`.
+is satisfied. This problem lies into the setting of **constraint satisfaction problem (CSP)**. Here the variables are each letter S,E,N,D,M,O,R,Y and their domain is {0,1,2,...,9}. The constraints represents the fact that the values of the letters need to sum up. And to be mathematically clean, the first letters can not be `0`.
 
 Cryptarythmetic in CPMpy
 ------------------------
@@ -64,7 +64,7 @@ Secondly, as in every constraint programming model we need to define the decisio
 
 .. code-block:: python
 
-    s,e,n,d,m,o,r,y = intvar(0,9, shape=8)
+    s, e, n, d, m, o, r, y = intvar(0, 9, shape=8)
 
 This line indicates that we are creating 8 integer decision variables, s,e,n,d,m,o,r,y, and each will take a value between 0 and 9 (inclusive) in the solution. The `shape` argument informs the shape of the tensor (in this case, a vector of size 8, unpacked over the individual letters).
 
@@ -76,10 +76,10 @@ Constraints are included in the model as a list. First, we create a list to add 
 .. code-block:: python
 
     model = Model(
-        AllDifferent(s,e,n,d,m,o,r,y),
-        (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
-           + sum(   [m,o,r,e] * np.array([       1000, 100, 10, 1]) ) \
-          == sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+        AllDifferent(s, e, n, d, m, o, r, y),
+        (    sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
+           + sum(    [m, o, r, e] * np.array([       1000, 100, 10, 1]) ) \
+          == sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
         s > 0,
         m > 0,
     )
@@ -106,9 +106,9 @@ The solution will be backpopulated in the decision variables used, and can be ob
 .. code-block:: python
 
     if model.solve():
-        print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
-        print("  M,O,R,E =   ", [x.value() for x in [m,o,r,e]])
-        print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+        print("  S,E,N,D =   ", [x.value() for x in [s, e, n, d]])
+        print("  M,O,R,E =   ", [x.value() for x in [m, o, r, e]])
+        print("M,O,N,E,Y =", [x.value() for x in [m, o, n, e, y]])
     else:
         print("No solution found")
 
@@ -117,7 +117,7 @@ And that is all there is to it...
 Cryptarythmetic optimisation problem
 ------------------------------------
 
-So far we have considered a _satisfaction_ problem, where we needed to find any satisfying solution (it was unique, see `multiple_solutions` doc on how to find out).
+So far we have considered a *satisfaction* problem, where we needed to find any satisfying solution (it was unique, see `multiple_solutions` doc on how to find out).
 
 We now consider the 'SEND + MOST = MONEY' problem, where we wish to maximize the number formed by the letters 'MONEY'.
 
@@ -128,13 +128,13 @@ We first model the constraints as before:
     import numpy as np
     from cpmpy import *
 
-    s,e,n,d,m,o,t,y = intvar(0,9, shape=8)
+    s, e, n, d, m, o, t, y = intvar(0, 9, shape=8)
 
     model = Model(
-        AllDifferent(s,e,n,d,m,o,t,y),
-        (    sum(   [s,e,n,d] * np.array([       1000, 100, 10, 1]) ) \
-           + sum(   [m,o,s,t] * np.array([       1000, 100, 10, 1]) ) \
-          == sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+        AllDifferent(s, e, n, d, m, o, t, y),
+        (    sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
+           + sum(    [m, o, s, t] * np.array([       1000, 100, 10, 1]) ) \
+          == sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
         s > 0,
         m > 0,
     )
@@ -143,26 +143,26 @@ And now the objective function. Note that this just *states* that it is a maximi
 
 .. code-block:: python
 
-   model.maximize(sum( [m,o,n,e,y] * np.array([10000, 1000, 100, 10, 1]) ))
+   model.maximize(sum([m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1])))
 
 And then we solve and print! Now how `solve()` does not return True/False as for a satisfaction problem, but returns the objective's value.
 
 .. code-block:: python
 
     model.solve()
-    print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
-    print("  M,O,S,T =   ", [x.value() for x in [m,o,s,t]])
-    print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+    print("  S,E,N,D =   ", [x.value() for x in [s, e, n, d]])
+    print("  M,O,S,T =   ", [x.value() for x in [m, o, s, t]])
+    print("M,O,N,E,Y =", [x.value() for x in [m, o, n, e, y]])
 
 If you want to maximize the value of the word 'MOST', this is only requires changing the objective (you can overwrite objectives and resolve the same model without any problem):
 
 .. code-block:: python
 
-    model.maximize(sum( [m,o,s,t] * np.array([1000, 100, 10, 1]) ) )
+    model.maximize(sum( [m, o, s, t] * np.array([1000, 100, 10, 1]) ) )
     model.solve()
-    print("  S,E,N,D =   ", [x.value() for x in [s,e,n,d]])
-    print("  M,O,S,T =   ", [x.value() for x in [m,o,s,t]])
-    print("M,O,N,E,Y =", [x.value() for x in [m,o,n,e,y]])
+    print("  S,E,N,D =   ", [x.value() for x in [s, e, n, d]])
+    print("  M,O,S,T =   ", [x.value() for x in [m, o, s, t]])
+    print("M,O,N,E,Y =", [x.value() for x in [m, o, n, e, y]])
 
 
 And much more
@@ -180,3 +180,4 @@ To learn more about theory and practice of constraint programming you may want t
 
 1. Rossi, F., Van Beek, P., & Walsh, T. (Eds.). (2006). Handbook of constraint programming. Elsevier.
 2. Apt, K. (2003). Principles of constraint programming. Cambridge university press.
+3. Schaus, P., Michel, L., & Van Hentenryck, P.. Constraint Programming MOOC (`EDX <https://www.edx.org/course/constraint-programming>`_).
