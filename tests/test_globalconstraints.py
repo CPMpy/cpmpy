@@ -185,6 +185,12 @@ class TestGlobal(unittest.TestCase):
         cons = cp.in_domain(min(iv_arr), vals)
         model = cp.Model(cons)
         self.assertTrue(model.solve())
+        iv2 = cp.intvar(-8, 8)
+        vals = [1, 5, 8, -4, iv2]
+        cons = [cp.in_domain(iv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(iv.value(), vals)
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
