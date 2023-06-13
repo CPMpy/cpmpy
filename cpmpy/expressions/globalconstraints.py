@@ -433,7 +433,6 @@ class in_domain(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any
         expr, arr = self.args
-        lb, ub = expr.get_bounds()
         expressions = any(isinstance(a, Expression) for a in arr)
         if expressions:
             return [any(expr == a for a in arr)]
@@ -448,7 +447,6 @@ class in_domain(GlobalConstraint):
                 if i == len(arr) - 1 or arr[i + 1] != arr[i] + 1:
                     end = arr[i]
                     intervals.append((start, end))
-
             # create constraints based on the intervals
             # Create a conjunction of disjunctions
             cons = []
@@ -457,7 +455,6 @@ class in_domain(GlobalConstraint):
                 cons.extend([expr >= intervals[0][0], expr <= intervals[-1][1]])
             else:
                 cons.append(False)
-                
             return cons
 
     def value(self):
