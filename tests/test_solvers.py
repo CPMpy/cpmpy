@@ -488,6 +488,14 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(s.solve())
 
 
+        def _trixor_callback():
+            assert bv[0]+bv[1]+bv[2] >= 1
+
+        m = cp.Model([bv[0] | bv[1] | bv[2]])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertEqual(s.solveAll(display=_trixor_callback),7)
+
+
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self):
