@@ -438,7 +438,22 @@ class in_domain(GlobalConstraint):
         if expressions:
             return [any(expr == a for a in arr)]
         else:
-            return [expr != val for val in range(lb, ub + 1) if val not in arr]
+            # find intervals in the domain given:
+            arr = sorted(arr)
+            intervals = []
+            start = None
+            for i in range(len(arr)):
+                if i == 0 or arr[i] != arr[i - 1] + 1:
+                    start = arr[i]
+                if i == len(arr) - 1 or arr[i + 1] != arr[i] + 1:
+                    end = arr[i]
+                    intervals.append((start, end))
+
+            # create constraints based on the intervals
+            # Create a conjunction of disjunctions
+            cons = [(expr <= intervals[i-1][1]) | (expr >= intervals[i][0]) for i in range(1, len(intervals))]
+            cons.extend([expr >= intervals[0][0], expr <= intervals[-1][1]])
+            return cons
 
     def value(self):
         return argval(self.args[0]) in argval(self.args[1])
