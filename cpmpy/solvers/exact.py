@@ -75,7 +75,7 @@ class CPM_exact(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("Install 'exact' as a python package to use this solver interface")
+            raise Exception("Install 'exact' as a Python package to use this solver interface")
 
         from exact import Exact as xct
 

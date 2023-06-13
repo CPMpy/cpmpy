@@ -15,7 +15,7 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "exact": {},
+                  "exact": {"circuit"},
                   }
 
 # Exclude certain operators for solvers.
@@ -35,6 +35,9 @@ EXCLUDE_IMPL = {"ortools": {"element"},
                 "pysdd": {"xor"},
                 "exact": {"mod","pow","div","mul","min","max","abs"},
                 }
+# TODO: remove "min", "max", "circuit" from exact once the decompose globals branch is merged
+# TODO: remove "circuit" from the other solvres once the decompose globals branch is merged
+# TODO: remove "abs" from exact when it is a global constraint with a nice decomposition
 
 
 # Variables to use in the rest of the test script
