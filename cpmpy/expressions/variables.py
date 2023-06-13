@@ -46,6 +46,7 @@
     Module details
     ==============
 """
+import math
 from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
@@ -412,22 +413,19 @@ class NDVarArray(Expression, np.ndarray):
         if isinstance(index, Expression):
             return Element(self, index)
 
-        # index is array/tuple with at least one expr in it:
-        # index non-expr part, and create element on expr part
-        if isinstance(index, tuple) and \
-           any(isinstance(el, Expression) for el in index):
-            index_rest = list(index) # mutable view
-            dim_lengths = list(self.shape)
-            # for calculating the index combining the vars given
-            dim_lengths.append(1)
-            new_index = 0
-            for i in range(len(index)):
-                if isinstance(index[i], Expression):
-                    index_rest[i] = slice(0,dim_lengths[i]) # selects all remaining dimensions
-                    new_index += dim_lengths[i+1]*index[i] #  combine the vars given in one index
-            # using index as single var, so flatten rest array
-            array_rest = self[tuple(index_rest)] # non-var array selection
-            return Element(array_rest, new_index)
+        # multi-dimensional index
+        if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
+            # find dimension of expression in index
+            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
+            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
+            index = index[expr_dim:]
+
+            # calculate index for flat array
+            flat_index = index[-1]
+            for dim, idx in enumerate(index[:-1]):
+                flat_index += idx * math.prod(arr.shape[dim+1:])
+            # using index expression as single var for flat array
+            return Element(arr.flatten(), flat_index)
 
         ret = super().__getitem__(index)
         # this is a bit ugly,
