@@ -428,7 +428,6 @@ class in_domain(GlobalConstraint):
     def __init__(self, expr, arr):
         assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
             "The expressions in the in_domain constraint should not be boolean"
-        assert len(arr) > 1, "The array given must contain more than 1 elements"
         super().__init__("in_domain", [expr, arr], is_bool=True)
 
     def decompose(self):
