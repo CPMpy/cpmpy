@@ -238,7 +238,12 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[a.value(), b.value()], 8)
-
+        arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
+        cons = arr[a,b] == 1
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(arr[a.value(), b.value()], 1)
 
     def test_xor(self):
         bv = cp.boolvar(5)
