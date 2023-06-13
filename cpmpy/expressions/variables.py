@@ -53,7 +53,6 @@ import numpy as np
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist
 
-
 def BoolVar(shape=1, name=None):
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
     return boolvar(shape=shape, name=name)
@@ -482,11 +481,12 @@ class NDVarArray(Expression, np.ndarray):
 
             does not actually support axis/out... todo?
         """
+        from .globalconstraints import Maximum
         if not axis is None or not out is None:
             raise NotImplementedError() # please report on github with usecase
 
         # return sum object over all dimensions
-        return Operator("max", self.flat)
+        return Maximum(self.flat)
 
     def min(self, axis=None, out=None):
         """
@@ -494,11 +494,12 @@ class NDVarArray(Expression, np.ndarray):
 
             does not actually support axis/out... todo?
         """
+        from .globalconstraints import Minimum
         if not axis is None or not out is None:
             raise NotImplementedError() # please report on github with usecase
 
         # return sum object over all dimensions
-        return Operator("min", self.flat)
+        return Minimum(self.flat)
 
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):
