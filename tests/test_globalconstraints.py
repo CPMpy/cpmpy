@@ -214,25 +214,26 @@ class TestGlobal(unittest.TestCase):
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
         # test directly the constraint
-        constraints = [cp.Element(iv,idx) == 8]
-        model = cp.Model(constraints)
+        cons = cp.Element(iv,idx) == 8
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
         # test through __get_item__
-        constraints = [iv[idx] == 8]
-        model = cp.Model(constraints)
+        cons = iv[idx] == 8
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv, idx).value() == 8)
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3))
-        idx = cp.intvar(0, 3)
-        idx2 = cp.intvar(0, 3)
-        constraints = [iv[idx,idx2] == 8]
-        model = cp.Model(constraints)
+        a,b = cp.intvar(0, 3, shape=2)
+        cons = iv[a,b] == 8
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[a.value(), b.value()], 8)
+
 
     def test_xor(self):
         bv = cp.boolvar(5)
