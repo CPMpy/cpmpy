@@ -453,7 +453,6 @@ class CPM_exact(SolverInterface):
                 assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
 
                 lhs, rhs = sub_expr.args
-                assert isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum",f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
 
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
