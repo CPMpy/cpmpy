@@ -21,7 +21,7 @@
     ==================
 
     A decision variable is a variable whose value will be determined by the solver.
-
+h
     Boolean and Integer decision variables are the key elements of a CP model.
 
     All variables in CPMpy are n-dimensional array objects and have defined dimensions. Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors with more than 2 dimensions are all supported too. For the implementation of this, CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits (vectorized operators and advanced indexing).
