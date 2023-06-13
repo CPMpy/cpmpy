@@ -145,7 +145,7 @@ class CPM_exact(SolverInterface):
         if assumptions is not None:
             assert(all(v.is_bool() for v in assumptions))
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
-            assump_vars = [self._solver_var_no_num(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
+            assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             for x,v in zip(assump_vars,assump_vals):
                 self.xct_solver.setAssumption(x, [v])
@@ -272,17 +272,6 @@ class CPM_exact(SolverInterface):
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
         return revar
-    
-
-    def _solver_var_no_num(self, cpm_var, encoding="onehot"):
-        """
-            Creates solver variable for cpmpy variable or returns from cache if previously created
-
-            Internally, we should have the guarantee that these cpm_var cannot be numeric constants,
-            so we check this with this wrapper function.
-        """
-        assert not is_num(cpm_var)
-        return self.solver_var(cpm_var, encoding)
 
 
     def objective(self, expr, minimize):
@@ -331,7 +320,7 @@ class CPM_exact(SolverInterface):
             xrhs -= lhs
         elif isinstance(lhs, _NumVarImpl):
             xcoefs += [1]
-            xvars += [self._solver_var_no_num(lhs)]
+            xvars += [self.solver_var(lhs)]
         elif lhs.name == "sum":
             xcoefs = [1]*len(lhs.args)
             xvars = self.solver_vars(lhs.args)
@@ -469,9 +458,9 @@ class CPM_exact(SolverInterface):
                 xct_coefs, xct_vars, xct_rhs = self._make_numexpr(lhs,rhs)
 
                 if isinstance(cond, NegBoolView):
-                    cond, bool_val = self._solver_var_no_num(cond._bv), False
+                    cond, bool_val = self.solver_var(cond._bv), False
                 else:
-                    cond, bool_val = self._solver_var_no_num(cond), True
+                    cond, bool_val = self.solver_var(cond), True
 
                 if sub_expr.name == "==":
                     if bool_val:
