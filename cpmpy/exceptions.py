@@ -25,3 +25,7 @@ class IncompleteFunctionError(CPMpyException):
 
 class TypeError(CPMpyException):
     pass
+
+
+class TransformationNotImplementedError(CPMpyException):
+    pass

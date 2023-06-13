@@ -27,7 +27,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
 class CPM_z3(SolverInterface):
@@ -232,7 +232,6 @@ class CPM_z3(SolverInterface):
             self.z3_solver.maximize(obj)
 
 
-    # most solvers can inherit `__add__()` as is, just implement `transform()` and `__post_constraint()` below
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -250,17 +249,35 @@ class CPM_z3(SolverInterface):
         # Z3 supports nested expressions, so no transformations needed
         # that also means we don't need to extract user variables here
         # we store them directly in `solver_var()` itself.
-        return toplevel_list(cpm_expr)
+        return simplify_boolean(toplevel_list(cpm_expr))
 
-    def _post_constraint(self, cpm_expr):
+    def __add__(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
-
             Z3 supports nested expressions so translate expression tree and post to solver API directly
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        # translate each expression tree, then post straight away
-        z3_cons = self._z3_expr(cpm_expr)
-        return self.z3_solver.add(z3_cons)
+        # all variables are user variables, handled in `solver_var()`
+
+        # transform and post the constraints
+        for cpm_con in self.transform(cpm_expr):
+            # translate each expression tree, then post straight away
+            z3_con = self._z3_expr(cpm_con)
+            self.z3_solver.add(z3_con)
+
+        return self
 
     def _z3_expr(self, cpm_con, reify=False):
         """
@@ -278,7 +295,7 @@ class CPM_z3(SolverInterface):
             if is_bool(cpm_con):
                 return bool(cpm_con)
             elif is_int(cpm_con):
-                return int(cpm_con)
+                return z3.IntVal(int(cpm_con))
             return float(cpm_con)
 
         elif is_any_list(cpm_con):
@@ -314,23 +331,45 @@ class CPM_z3(SolverInterface):
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
             elif cpm_con.name == 'sub':
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, z3.BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, z3.BoolRef):
+                    rhs = z3.If(rhs,1,0)
                 return lhs - rhs
             elif cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, z3.BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, z3.BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs * rhs
             elif cpm_con.name == "div":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, z3.BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, z3.BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs / rhs
             elif cpm_con.name == "pow":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, z3.BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, z3.BoolRef):
+                    lhs = z3.If(rhs,1,0)
                 return lhs ** rhs
             elif cpm_con.name == "mod":
                 lhs , rhs = self._z3_expr(cpm_con.args)
+                if isinstance(lhs, z3.BoolRef):
+                    lhs = z3.If(lhs,1,0)
+                if isinstance(rhs, z3.BoolRef):
+                    rhs = z3.If(lhs,1,0)
                 return lhs % rhs
 
             # '-'/1
             elif cpm_con.name == "-":
+                if is_boolexpr(cpm_con.args[0]):
+                    return -z3.If(self._z3_expr(cpm_con.args[0]), 1, 0)
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
