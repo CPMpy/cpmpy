@@ -166,15 +166,22 @@ class TestGlobal(unittest.TestCase):
     def test_in_domain(self):
         iv = cp.intvar(-8, 8)
         iv_arr = cp.intvar(-8, 8, shape=5)
-        constraints = [cp.in_domain(iv, iv_arr)]
-        model = cp.Model(constraints)
+        cons = [cp.in_domain(iv, iv_arr)]
+        model = cp.Model(cons)
         assert model.solve() == True
         assert iv.value() in iv_arr.value()
         vals = [1, 5, 8, -4]
-        constraints = [cp.in_domain(iv, vals)]
-        model = cp.Model(constraints)
+        cons = [cp.in_domain(iv, vals)]
+        model = cp.Model(cons)
         assert model.solve() == True
         assert iv.value() in vals
+        cons = [cp.in_domain(iv, [])]
+        model = cp.Model(cons)
+        assert model.solve() == False
+        cons = [cp.in_domain(iv, [1])]
+        model = cp.Model(cons)
+        assert model.solve() == True
+        assert iv.value() in [1]
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
