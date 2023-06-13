@@ -433,15 +433,12 @@ class in_domain(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any
         expr, arr = self.args
-        # separate expressions and non-expressions in the domain given
-        expressions = [a for a in arr if isinstance(a, Expression)]
-        nonExpressions = [a for a in arr if a not in expressions]
-        # create constraints for the expressions in the domain
-        cons = [any(expr == a for a in expressions)]
-        # create constraints for the non-expressions in the domain
         lb, ub = expr.get_bounds()
-        cons.extend([expr != val for val in range(lb, ub + 1) if val not in nonExpressions])
-        return cons
+        expressions = any(isinstance(a, Expression) for a in arr)
+        if expressions:
+            return [any(expr == a for a in arr)]
+        else:
+            return [expr != val for val in range(lb, ub + 1) if val not in arr]
 
     def value(self):
         return argval(self.args[0]) in argval(self.args[1])
