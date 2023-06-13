@@ -437,10 +437,11 @@ class Element(GlobalConstraint):
     """
 
     def __init__(self, arr, idx):
+        assert not is_any_list(idx), "For using multiple dimensions in the Element constraint, use comma-separated indices"
         super().__init__("element", [arr, idx], is_bool=False)
 
     def __getitem__(self, index):
-        raise CPMpyException("For using multiple dimensions in the Element constraint use comma separated indices")
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
         arr, idx = self.args
