@@ -476,6 +476,30 @@ class NDVarArray(Expression, np.ndarray):
         # return sum object over all dimensions
         return Operator("sum", self.flat)
 
+    def max(self, axis=None, out=None):
+        """
+            overwrite np.max(NDVarArray) as people might use it
+
+            does not actually support axis/out... todo?
+        """
+        if not axis is None or not out is None:
+            raise NotImplementedError() # please report on github with usecase
+
+        # return sum object over all dimensions
+        return Operator("max", self.flat)
+
+    def min(self, axis=None, out=None):
+        """
+            overwrite np.min(NDVarArray) as people might use it
+
+            does not actually support axis/out... todo?
+        """
+        if not axis is None or not out is None:
+            raise NotImplementedError() # please report on github with usecase
+
+        # return sum object over all dimensions
+        return Operator("min", self.flat)
+
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):
         if not isinstance(other, Iterable):
