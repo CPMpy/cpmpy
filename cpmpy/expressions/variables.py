@@ -51,7 +51,8 @@ from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist
+from .utils import is_num, is_int, flatlist, is_boolexpr
+
 
 def BoolVar(shape=1, name=None):
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
@@ -467,7 +468,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.sum(NDVarArray) as people might use it
 
-            does not actually support axis/out... todo?
+            does not actually support out... todo? I think we should not support out!
         """
         if out is not None:
             raise NotImplementedError() # please report on github with usecase
@@ -479,7 +480,7 @@ class NDVarArray(Expression, np.ndarray):
         arr = self
         # correct type and value checks
         if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .max() should always be an integer")
+            raise TypeError("Axis keyword argument in .sum() should always be an integer")
         if axis >= arr.ndim:
             raise ValueError("Axis out of range")
 
@@ -504,7 +505,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.max(NDVarArray) as people might use it
 
-            does not actually support out... todo?
+            does not actually support out... todo? I think we should not support out!
         """
         from .globalconstraints import Maximum
         if out is not None:
@@ -543,7 +544,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.min(NDVarArray) as people might use it
 
-            does not actually support axis/out... todo?
+            does not actually support out... todo? I think we should not support out!
         """
         from .globalconstraints import Minimum
         if out is not None:
@@ -576,6 +577,89 @@ class NDVarArray(Expression, np.ndarray):
             out.append(Minimum(arr[i, ...]))
 
         # return the NDVarArray that contains the Minimum global constraints
+        return out
+
+    def any(self, axis=None, out=None):
+        """
+            overwrite np.any(NDVarArray)
+
+            does not actually support out... todo? I think we should not support out!
+        """
+        if any(not is_boolexpr(x) for x in self.flatten()):
+            raise TypeError("Cannot call .any() in an array not consisting only of bools")
+
+        from .python_builtins import any
+
+        if out is not None:
+            raise NotImplementedError() # please report on github with usecase
+
+        if axis is None:    # simple case where we want the .any() over the whole array
+            arr = self.flatten()
+            return any(arr)
+
+        arr = self
+        # correct type and value checks
+        if not isinstance(axis,int):
+            raise TypeError("Axis keyword argument in .any() should always be an integer")
+        if axis >= arr.ndim:
+            raise ValueError("Axis out of range")
+
+        if axis < 0:
+            axis += arr.ndim
+
+        # Change the array to make the selected axis the first dimension
+        if axis > 0:
+            iter_axis = list(range(arr.ndim))
+            iter_axis.remove(axis)
+            iter_axis.insert(0, axis)
+            arr = arr.transpose(iter_axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(any(arr[i, ...]))
+
+        # return the NDVarArray that contains the any() constraints
+        return out
+
+    def all(self, axis=None, out=None):
+        """
+            overwrite np.any(NDVarArray)
+
+            does not actually support out... todo? I think we should not support out!
+        """
+        if any(not is_boolexpr(x) for x in self.flatten()):
+            raise TypeError("Cannot call .all() in an array not consisting only of bools")
+
+        from .python_builtins import all
+        if out is not None:
+            raise NotImplementedError() # please report on github with usecase
+
+        if axis is None:    # simple case where we want the .all() over the whole array
+            arr = self.flatten()
+            return all(arr)
+
+        arr = self
+        # correct type and value checks
+        if not isinstance(axis,int):
+            raise TypeError("Axis keyword argument in .all() should always be an integer")
+        if axis >= arr.ndim:
+            raise ValueError("Axis out of range")
+
+        if axis < 0:
+            axis += arr.ndim
+
+        # Change the array to make the selected axis the first dimension
+        if axis > 0:
+            iter_axis = list(range(arr.ndim))
+            iter_axis.remove(axis)
+            iter_axis.insert(0, axis)
+            arr = arr.transpose(iter_axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(all(arr[i, ...]))
+
+        # return the NDVarArray that contains the all() constraints
         return out
 
     # VECTORIZED master function (delegate)
