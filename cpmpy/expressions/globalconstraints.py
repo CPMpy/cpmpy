@@ -14,6 +14,10 @@
 
     If a solver does not support a global constraint (see solvers/) then it will be automatically
     decomposed by calling its `.decompose()` function.
+    The `.decompose()` function returns two arguments:
+        - a list of simpler constraints replacing the global constraint
+        - a list of defining constraints linking potential new variables to the arguments of the constraint
+            these should always hold at toplevel.
 
     As a user you **should almost never subclass GlobalConstraint()** unless you know of a solver that
     supports that specific global constraint, and that you will update its solver interface to support it.
@@ -74,7 +78,7 @@
     .. code-block:: python
 
         def my_circuit_decomp(self):
-            return [self.args[0] == 1] # does not actually enforce circuit
+            return [self.args[0] == 1], [] # does not actually enforce circuit
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
         vars = intvar(1,9, shape=10)
