@@ -501,6 +501,49 @@ class NDVarArray(Expression, np.ndarray):
         # return the NDVarArray that contains the sum constraints
         return out
 
+    def prod(self, axis=None, out=None):
+        """
+            overwrite np.prod(NDVarArray) as people might use it
+
+            does not actually support out... todo? I think we should not support out!
+        """
+        if out is not None:
+            raise NotImplementedError() # please report on github with usecase
+
+        if axis is None:    # simple case where we want the product over the whole array
+            arr = self.flatten()
+            cons = 1
+            for num in arr:
+                cons *= num
+            return cons
+
+        arr = self
+        # correct type and value checks
+        if not isinstance(axis,int):
+            raise TypeError("Axis keyword argument in .sum() should always be an integer")
+        if axis >= arr.ndim:
+            raise ValueError("Axis out of range")
+
+        if axis < 0:
+            axis += arr.ndim
+
+        # Change the array to make the selected axis the first dimension
+        if axis > 0:
+            iter_axis = list(range(arr.ndim))
+            iter_axis.remove(axis)
+            iter_axis.insert(0, axis)
+            arr = arr.transpose(iter_axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            cons = 1
+            for num in arr[i, ...]:
+                cons *= num
+            out.append(cons)
+
+        # return the NDVarArray that contains the sum constraints
+        return out
+
     def mean(self, axis=None, out=None):
         """
             overwrite np.mean(NDVarArray)
