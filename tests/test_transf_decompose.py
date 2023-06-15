@@ -56,21 +56,21 @@ class TestTransfDecomp(unittest.TestCase):
 
         cons = [min(ivs) <= 1]
         self.assertEqual(str(decompose_in_tree(cons)),
-                         "[((x) <= (IV0)) or ((y) <= (IV0)), (x) >= (IV0), (y) >= (IV0), IV0 <= 1]")
+                         "[IV0 <= 1, ((x) <= (IV0)) or ((y) <= (IV0)), (x) >= (IV0), (y) >= (IV0)]")
         # reified
         cons = [bv.implies(min(ivs) <= 1)]
         self.assertEqual(str(decompose_in_tree(cons)),
-                         "[(bv) -> (and([((x) <= (IV1)) or ((y) <= (IV1)), (x) >= (IV1), (y) >= (IV1), IV1 <= 1]))]")
+                         "[(bv) -> (IV1 <= 1), ((x) <= (IV1)) or ((y) <= (IV1)), (x) >= (IV1), (y) >= (IV1)]")
         self.assertEqual(str(decompose_in_tree(cons, supported_nested={"min"})),str(cons))
 
         cons = [(min(ivs) <= 1).implies(bv)]
         self.assertEqual(str(decompose_in_tree(cons)),
-                         "[(and([((x) <= (IV2)) or ((y) <= (IV2)), (x) >= (IV2), (y) >= (IV2), IV2 <= 1])) -> (bv)]")
+                         "[(IV2 <= 1) -> (bv), ((x) <= (IV2)) or ((y) <= (IV2)), (x) >= (IV2), (y) >= (IV2)]")
         self.assertEqual(str(decompose_in_tree(cons, supported_nested={"min"})), str(cons))
 
         cons = [(min(ivs) <= 1) == (bv)]
         self.assertEqual(str(decompose_in_tree(cons)),
-                         "[(and([((x) <= (IV3)) or ((y) <= (IV3)), (x) >= (IV3), (y) >= (IV3), IV3 <= 1])) == (bv)]")
+                         "[(IV3 <= 1) == (bv), ((x) <= (IV3)) or ((y) <= (IV3)), (x) >= (IV3), (y) >= (IV3)]")
         self.assertEqual(str(decompose_in_tree(cons, supported_nested={"min"})), str(cons))
 
 
@@ -89,16 +89,16 @@ class TestTransfDecomp(unittest.TestCase):
 
         cons = [min(ivs) == max(ivs)]
         self.assertEqual(str(decompose_in_tree(cons, supported={"min"}, supported_nested={"min"})),
-                         "[or([(x) == (min(x,y,z)), (y) == (min(x,y,z)), (z) == (min(x,y,z))]), (x) <= (min(x,y,z)), (y) <= (min(x,y,z)), (z) <= (min(x,y,z))]")
+                         "[or([(x) >= (min(x,y,z)), (y) >= (min(x,y,z)), (z) >= (min(x,y,z))]), (x) <= (min(x,y,z)), (y) <= (min(x,y,z)), (z) <= (min(x,y,z))]")
 
         self.assertEqual(str(decompose_in_tree(cons, supported={"max"}, supported_nested={"max"})),
-                         "[or([(x) == (max(x,y,z)), (y) == (max(x,y,z)), (z) == (max(x,y,z))]), (x) >= (max(x,y,z)), (y) >= (max(x,y,z)), (z) >= (max(x,y,z))]")
+                         "[or([(x) <= (max(x,y,z)), (y) <= (max(x,y,z)), (z) <= (max(x,y,z))]), (x) >= (max(x,y,z)), (y) >= (max(x,y,z)), (z) >= (max(x,y,z))]")
 
         # numerical in non-comparison context
         cons = [AllEqual([min(ivs[:-1]),ivs[-1]])]
         self.assertEqual(str(decompose_in_tree(cons, supported={"allequal"})),
-                         "[allequal(IV0,z), ((x) == (IV0)) or ((y) == (IV0)), (x) >= (IV0), (y) >= (IV0)]")
+                         "[allequal(IV0,z), ((x) <= (IV0)) or ((y) <= (IV0)), (x) >= (IV0), (y) >= (IV0)]")
 
-        self.assertEqual(str(decompose_in_tree(cons, supported_nested={"min"})),
+        self.assertEqual(str(decompose_in_tree(cons, supported={"min"}, supported_nested={"min"})),
                          "[(min(x,y)) == (z)]")
 
