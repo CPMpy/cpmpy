@@ -1,6 +1,6 @@
 # Modeling and solving with CPMpy
 
-This page explains and demonstrates how to use CPMpy to model and solve combinatorial problems, so you can use it to solve for example ... and more.
+This page explains and demonstrates how to use CPMpy to model and solve combinatorial problems, so you can use it to solve for example routing, scheduling, assignment and other problems.
 
 ## Installation
 
@@ -18,13 +18,13 @@ To conveniently use CPMpy in your python project, include it as follows:
 ```python
 from cpmpy import *
 ```
-This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create constraints when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code.
+This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code.
 
-You can also import it as a package:
+You can also import it as a package, which does not overload the python built-ins:
 ```python
 import cpmpy as cp
 ```
-which we will use below.
+We will use the latter in this document.
 
 ## Decision variables
 
