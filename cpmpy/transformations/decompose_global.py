@@ -49,9 +49,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
 
         elif isinstance(expr, Operator):
             # just recurse into arguments
-            expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_nested, _toplevel, nested=True)
-            newlist.append(expr)
+            args = decompose_in_tree(expr.args, supported, supported_nested, _toplevel, nested=True)
+            newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
@@ -61,17 +60,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
                 # boolean global constraints
                 is_supported = (nested and expr.name in supported_nested) or (not nested and expr.name in supported)
                 if not is_supported:
-                    if nested is False or expr.equivalent_decomposition():
-                        expr = decompose_in_tree(expr.decompose(), supported, supported_nested, _toplevel, nested=True)
-                        newlist.append(all(expr))  # can create top-level AND
-                    else:
-                        bv = boolvar()
-                        newlist.append(bv)
-                        impl = decompose_in_tree([bv.implies(d) for d in expr.decompose()], supported, supported_nested,
-                                                 _toplevel, nested=True)
-                        neg_impl = decompose_in_tree([(~bv).implies(d) for d in expr.decompose_negation()], supported,
-                                                     supported_nested, _toplevel, nested=True)
-                        _toplevel.extend([all(impl), all(neg_impl)])
+                    cons, define = expr.decompose()
+                    cons = decompose_in_tree(cons, supported,supported_nested, _toplevel, nested=nested)
+                    newlist.append(all(cons))
+                    _toplevel.extend(define)
                 else:
                     newlist.append(expr)
             else:
@@ -79,8 +71,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
                 if (nested and expr.name not in supported_nested) or (not nested and expr.name not in supported):
                     aux = intvar(*expr.get_bounds())
                     newlist.append(aux)
-                    l1, l2 = expr.decompose_comparison("==", aux)
-                    newlist.extend(l1 + l2) # all constraints should be added toplevel, node replaced by aux var
+                    cons, define = expr.decompose_comparison("==", aux)
+                    _toplevel.extend(cons + define) # all constraints should be added toplevel, node replaced by aux var
                 else:
                     newlist.append(expr)
 
@@ -91,25 +83,26 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
             #    so have to be careful here and operate from 'one level above'
 
             lhs, rhs = expr.args
-            if hasattr(lhs, "decompose_comparison"):
+            if hasattr(lhs, "decompose_comparison"):  # TODO: change to global functions
                 lhs = copy.copy(lhs)
                 lhs.args = decompose_in_tree(lhs.args, supported, supported_nested, _toplevel, nested=True)
                 lhs_supported = (nested and lhs.name in supported_nested) or (not nested and lhs.name in supported)
                 if not lhs_supported:
-                    newexpr, _toplevel[len(_toplevel):] = lhs.decompose_comparison(expr.name, rhs)
-                    expr = decompose_in_tree(newexpr, supported, supported_nested, _toplevel, nested=nested)  # handle rhs
-                    newlist.append(all(expr))  # this can create toplevel-and
+                    cons, define = lhs.decompose_comparison(expr.name, rhs)
+                    cons = decompose_in_tree(cons, supported, supported_nested, _toplevel, nested=nested)  # handle rhs
+                    newlist.append(all(cons))  # this can create toplevel-and
+                    _toplevel.extend(define)
                     continue
             else:
                 lhs = decompose_in_tree([lhs], supported, supported_nested, _toplevel, nested=True)
                 lhs = lhs[0]
 
-            if hasattr(rhs, "decompose_comparison"):
+            if hasattr(rhs, "decompose_comparison"): # TODO: change to global functions
                 rhs = copy.copy(rhs)
                 rhs.args = decompose_in_tree(rhs.args, supported, supported_nested, _toplevel, nested=True)
                 rhs_supported = (nested and rhs.name in supported_nested) or (not nested and rhs.name in supported)
                 if not rhs_supported:
-                    # we now lhs is supported, so just flip comparison
+                    # we know lhs is supported, so just flip comparison
                     newexpr = eval_comparison(flipmap[expr.name], rhs, lhs)
                     newexpr = decompose_in_tree([newexpr], supported, supported_nested, _toplevel, nested=nested)
                     newlist.append(all(newexpr))  # can create toplevel and
@@ -127,8 +120,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
 
     if nested is True:
         return newlist
-    elif len(_toplevel):
+    elif len(_toplevel) > 0:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return newlist + decompose_in_tree(_toplevel, supported, supported_nested, nested=False)
+        return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_nested, nested=False)
     else:
         return toplevel_list(newlist)  # TODO, check for top-level ANDs in transformation?

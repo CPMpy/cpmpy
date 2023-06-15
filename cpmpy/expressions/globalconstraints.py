@@ -143,6 +143,9 @@ class GlobalConstraint(Expression):
             The decomposition might create auxiliary variables
             and use other other global constraints as long as
             it does not create a circular dependency.
+
+            To ensure equivalence of decomposition, we split into contraining and defining constraints
+            Defining constraints should always be true at toplevel.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
 
@@ -152,17 +155,6 @@ class GlobalConstraint(Expression):
         Numerical global constraints should reimplement this.
         """
         return (0,1)
-
-    def decompose_negation(self):
-        from .python_builtins import all
-        return [~all(self.decompose())]
-
-
-    def equivalent_decomposition(self):
-        """
-            Returns whether self.decompose() == self holds.
-        """
-        return True
 
 
 # Global Constraints (with Boolean return type)
@@ -178,7 +170,7 @@ class AllDifferent(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 != var2 for var1, var2 in all_pairs(self.args)]
+        return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
@@ -191,7 +183,7 @@ class AllDifferentExcept0(GlobalConstraint):
         super().__init__("alldifferent_except0", flatlist(args))
 
     def decompose(self):
-        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)]
+        return [((var1 != 0) & (var2 != 0)).implies(var1 != var2) for var1, var2 in all_pairs(self.args)],[]
 
     def value(self):
         vals = [a.value() for a in self.args if a.value() != 0]
@@ -210,7 +202,7 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
+        return [var1 == var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
         return len(set(a.value() for a in self.args)) == 1
@@ -241,17 +233,15 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
-        return [
-            # different successors
-            AllDifferent(succ),
-            # different orders
-            AllDifferent(order),
-            # last one is '0'
-            order[n-1] == 0,
-            # loop: first one is successor of '0'
-            order[0] == succ[0],
-            # others: ith one is successor of i-1
-        ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
+        constraining = []
+        constraining += [AllDifferent(succ)] # different successors
+        constraining += [AllDifferent(order)] # different orders
+        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
+
+        defining = [order[0] == succ[0]]
+        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+
+        return constraining, defining
 
 
     def value(self):
@@ -269,30 +259,6 @@ class Circuit(GlobalConstraint):
             idx = arr[idx]
 
         return pathlen == len(self.args) and idx == 0
-
-
-    def equivalent_decomposition(self):
-        return False
-
-    def decompose_negation(self):
-        '''
-        returns the decomposition of the negation. We can not simply negate the decomposition
-        because of the use of auxiliary variables in the decomposition
-
-        should return something in negated normal form, since flatten_model.negated_normal() returns this
-        '''
-        from .python_builtins import all
-        succ = cpm_array(self.args)
-        n = len(succ)
-        order = intvar(0, n - 1, shape=n)
-        return [~all([AllDifferent(succ),
-                # different orders
-                AllDifferent(order)
-                    ]),
-                # not negating following constraints since they involve the auxiliary variables
-                # loop: first one is successor of '0'
-                order[0] == succ[0]
-                ] + [order[i] == succ[order[i - 1]] for i in range(1, n)]
 
 
 class Inverse(GlobalConstraint):
@@ -314,7 +280,7 @@ class Inverse(GlobalConstraint):
         from .python_builtins import all
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [all(rev[x] == i for i, x in enumerate(fwd))]
+        return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
         fwd = [argval(a) for a in self.args[0]]
@@ -330,7 +296,7 @@ class Table(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)]
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
@@ -357,7 +323,7 @@ class IfThenElse(GlobalConstraint):
 
     def decompose(self):
         condition, if_true, if_false = self.args
-        return [condition.implies(if_true), (~condition).implies(if_false)]
+        return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
         condition, if_true, if_false = self.args
@@ -389,11 +355,13 @@ class Minimum(GlobalConstraint):
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var
-            return [any(x == cpm_rhs for x in self.args), all(x >= cpm_rhs for x in self.args)]
+            return [any(x <= cpm_rhs for x in self.args),
+                    all(x >= cpm_rhs for x in self.args)], []
 
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _min, cpm_rhs)], [any(x <= _min for x in self.args), all(x >= _min for x in self.args),]
+        return [eval_comparison(cpm_op, _min, cpm_rhs)], \
+               [any(x <= _min for x in self.args), all(x >= _min for x in self.args),]
 
     def get_bounds(self):
         """
@@ -428,11 +396,13 @@ class Maximum(GlobalConstraint):
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var here
-            return [any(x == cpm_rhs for x in self.args), all(x <= cpm_rhs for x in self.args)]
+            return [any(x >= cpm_rhs for x in self.args),
+                    all(x <= cpm_rhs for x in self.args)], []
 
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _max, cpm_rhs)], [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
+        return [eval_comparison(cpm_op, _max, cpm_rhs)], \
+               [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
 
     def get_bounds(self):
         """
@@ -533,7 +503,7 @@ class Xor(GlobalConstraint):
         # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
             cons = (cons | arg) & (~cons | ~arg)
-        return [cons]
+        return [cons], []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
@@ -605,7 +575,7 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
             cons += [capacity >= demand_at_t]
 
-        return cons
+        return cons, []
 
     def value(self):
         argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
@@ -646,7 +616,7 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def decompose(self):
         a, gcc = self.args
-        return [Count(a, i) == v for i, v in enumerate(gcc)]
+        return [Count(a, i) == v for i, v in enumerate(gcc)], []
 
     def value(self):
         from .python_builtins import all
