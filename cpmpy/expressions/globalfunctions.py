@@ -28,7 +28,7 @@
     This is the burden of the CPMpy framework, not of the user who wants to express a problem formulation.
 
 
-    Subclassing GlobalConstraint
+    Subclassing GlobalFunction
     ----------------------------
 
     If you do wish to add a GlobalFunction, because it is supported by solvers or because you will do
