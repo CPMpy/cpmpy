@@ -27,7 +27,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
 class CPM_z3(SolverInterface):
@@ -246,7 +246,10 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
-        return toplevel_list(cpm_expr)
+        # Z3 supports nested expressions, so no transformations needed
+        # that also means we don't need to extract user variables here
+        # we store them directly in `solver_var()` itself.
+        return simplify_boolean(toplevel_list(cpm_expr))
 
     def __add__(self, cpm_expr):
         """
