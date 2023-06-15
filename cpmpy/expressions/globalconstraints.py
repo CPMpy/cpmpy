@@ -125,7 +125,7 @@ class GlobalConstraint(Expression):
     """
 
     def is_bool(self):
-        """ is it a Boolean (return type) Operator? Should always be bool now
+        """ is it a Boolean (return type) Operator?
         """
         return True
 
