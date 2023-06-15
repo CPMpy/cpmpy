@@ -318,18 +318,12 @@ class _BoolVarImpl(_IntVarImpl):
         return NegBoolView(self)
 
     def __eq__(self, other):
+        if (is_num(other) and other == 0) or \
+                is_false_cst(other):
+            return ~self
         return super().__eq__(other)
 
     def __ne__(self, other):
-        # (BV == 0) <-> BV
-        # if other == 1: XXX: dangerous because "=="" is overloaded
-        if (is_num(other) and other == 1) or \
-                other is True or \
-                other is np.bool_(True):
-            return ~self
-        if (is_num(other) and other == 0) or \
-                is_false_cst(other):
-            return self
         return super().__ne__(other)
 
     def __abs__(self):
