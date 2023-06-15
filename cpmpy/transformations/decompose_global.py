@@ -32,11 +32,13 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
     """
     def _is_supported(cpm_expr, reified):
         if isinstance(cpm_expr, GlobalConstraint):
+            print("here ? is_supported")
             if reified and cpm_expr.name not in supported_reif:
                 return False
             if not reified and cpm_expr.name not in supported:
                 return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalFunction):
+        if isinstance(cpm_expr, Comparison) and (isinstance(cpm_expr.args[0], GlobalFunction)
+                                                 or isinstance(cpm_expr.args[0], GlobalConstraint)):
             if not cpm_expr.args[0].name in supported:
                 # reified numerical global constraints can be rewritten to non-reified versions
                 #  so only have to check for 'supported' set
@@ -59,6 +61,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
         decomp_idx = None
 
         if hasattr(cpm_expr, "decompose") and not _is_supported(cpm_expr, reified=False):
+            print("not here?")
             cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
