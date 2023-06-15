@@ -67,55 +67,52 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
 
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported,supported_nested, _toplevel, nested=nested)
+                    decomposed = decompose_in_tree(decomposed, supported, supported_nested, _toplevel, nested=nested)
                     newlist.append(all(decomposed))
 
                 else:
                     # numeric global constraint, replace by a fresh variable and decompose the equality to this
                     lb,ub = expr.get_bounds()
                     aux = intvar(lb, ub)
+
                     auxdef, otherdef = expr.decompose_comparison("==", aux)
                     _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
                     newlist.append(aux)  # replace original expression by aux
 
         elif isinstance(expr, Comparison):
-            # Tricky case, if we just recurse into arguments, we risk creating unnecessary auxiliary variables
-            #  e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
-            #   while more optimally, its just `min(x,y,z).decompose_comparison('==', a)`
-            #    so have to be careful here and operate from 'one level above'
-
+            # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
+            # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
             lhs, rhs = expr.args
-            if hasattr(lhs, "decompose_comparison"):  # TODO: change to global functions
+            exprname = expr.name  # can change when rhs needs decomp
+
+            # TODO: change hasattr to global functions class check
+            decomp_lhs = hasattr(lhs, "decompose_comparison") and not lhs.name in supported_nested
+            decomp_rhs = hasattr(rhs, "decompose_comparison") and not rhs.name in supported_nested
+
+            if not decomp_lhs:
+                if not decomp_rhs:
+                    # nothing special, create a fresh version and recurse into arguments
+                    expr = copy.copy(expr)
+                    expr.args = decompose_in_tree(expr.args, supported, supported_nested, _toplevel, nested=True)
+                    newlist.append(expr)
+
+                else:
+                    # only rhs needs decomposition, so flip comparison to make lhs needing the decomposition
+                    exprname = flipmap[expr.name]
+                    lhs, rhs = rhs, lhs
+                    decomp_lhs, decomp_rhs = True, False  # continue into next 'if'
+
+            if decomp_lhs:
+                # recurse into lhs args
                 lhs = copy.copy(lhs)
                 lhs.args = decompose_in_tree(lhs.args, supported, supported_nested, _toplevel, nested=True)
-                lhs_supported = (nested and lhs.name in supported_nested) or (not nested and lhs.name in supported)
-                if not lhs_supported:
-                    cons, define = lhs.decompose_comparison(expr.name, rhs)
-                    cons = decompose_in_tree(cons, supported, supported_nested, _toplevel, nested=nested)  # handle rhs
-                    newlist.append(all(cons))  # this can create toplevel-and
-                    _toplevel.extend(define)
-                    continue
-            else:
-                lhs = decompose_in_tree([lhs], supported, supported_nested, _toplevel, nested=True)
-                lhs = lhs[0]
 
-            if hasattr(rhs, "decompose_comparison"): # TODO: change to global functions
-                rhs = copy.copy(rhs)
-                rhs.args = decompose_in_tree(rhs.args, supported, supported_nested, _toplevel, nested=True)
-                rhs_supported = (nested and rhs.name in supported_nested) or (not nested and rhs.name in supported)
-                if not rhs_supported:
-                    # we know lhs is supported, so just flip comparison
-                    newexpr = eval_comparison(flipmap[expr.name], rhs, lhs)
-                    newexpr = decompose_in_tree([newexpr], supported, supported_nested, _toplevel, nested=nested)
-                    newlist.append(all(newexpr))  # can create toplevel and
-                    continue
-            else:
-                rhs = decompose_in_tree([rhs], supported, supported_nested, _toplevel, nested=True)
-                rhs = rhs[0]
-
-            # recreate original comparison
-            newlist.append(eval_comparison(expr.name, lhs, rhs))
-            continue
+                # decompose comparison of lhs and rhs
+                decomposed, define = lhs.decompose_comparison(exprname, rhs)
+                _toplevel.extend(define)  # definitions should be added toplevel
+                # the `decomposed` expression (and rhs) might contain other global constraints, check it
+                decomposed = decompose_in_tree(decomposed, supported, supported_nested, _toplevel, nested=nested)
+                newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
             newlist.append(expr)
