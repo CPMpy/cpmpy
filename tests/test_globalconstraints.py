@@ -486,8 +486,8 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
 
     def test_inverse(self):
-        x = cp.intvar(-8, 8)
-        y = cp.intvar(-7, -1)
+        x = cp.intvar(0, 2)
+        y = cp.intvar(0, 2)
         b = cp.boolvar()
         a = cp.boolvar()
         self.assertFalse(cp.Model([cp.Inverse([x,y,x],[x,y,x])]).solve())
