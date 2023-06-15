@@ -622,7 +622,8 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def value(self):
         from .python_builtins import all
-        return all(self.decompose()).value()
+        decomposed, _ = self.decompose()
+        return all(decomposed).value()
 
 
 class Count(GlobalConstraint):
