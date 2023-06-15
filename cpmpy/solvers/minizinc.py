@@ -39,7 +39,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
 class CPM_minizinc(SolverInterface):
@@ -386,7 +386,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        return toplevel_list(cpm_expr)
+        return simplify_boolean(toplevel_list(cpm_expr))
 
     def __add__(self, cpm_expr):
         """
@@ -570,12 +570,11 @@ class CPM_minizinc(SolverInterface):
                                                         self._convert_expression(fal))
 
         elif expr.name == "gcc":
-            a, gcc = expr.args
-            cover = [x for x in range(len(gcc))]
-            a = self._convert_expression(a)
-            gcc = self._convert_expression(gcc)
-            cover = self._convert_expression(cover)
-            return "global_cardinality_closed({},{},{})".format(a,cover,gcc)
+            vars, vals, occ = expr.args
+            vars = self._convert_expression(vars)
+            vals = self._convert_expression(vals)
+            occ = self._convert_expression(occ)
+            return "global_cardinality({},{},{})".format(vars,vals,occ)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple

@@ -29,6 +29,7 @@ from ..expressions.python_builtins import min, max,any, all
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
 class CPM_z3(SolverInterface):
@@ -247,9 +248,11 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
+
         cpm_cons = toplevel_list(cpm_expr)
         supported_global = {"alldifferent", "xor","ite"}
         cpm_cons = decompose_in_tree(cpm_cons, supported_global, supported_global)
+        cpm_cons = simplify_boolean(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr):
@@ -449,7 +452,7 @@ class CPM_z3(SolverInterface):
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
 
-            raise ValueError("Global constraint {cpm_con} should be decomposed already, please report on github.")
+            raise ValueError(f"Global constraint {cpm_con} should be decomposed already, please report on github.")
 
         # a direct constraint, make with z3 (will be posted to it by calling function)
         elif isinstance(cpm_con, DirectConstraint):

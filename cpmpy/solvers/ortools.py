@@ -98,7 +98,8 @@ class CPM_ortools(SolverInterface):
         self.assumption_dict = None
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="ortools", cpm_model=cpm_model)
+        super().__init__(name="ortools"from ..transformations.decompose_global import decompose_in_tree
+, cpm_model=cpm_model)
 
 
     def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
