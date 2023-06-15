@@ -665,10 +665,10 @@ class NDVarArray(Expression, np.ndarray):
 
             does not actually support out... todo? I think we should not support out!
         """
+        from .python_builtins import any
+
         if any(not is_boolexpr(x) for x in self.flatten()):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
-
-        from .python_builtins import any
 
         if out is not None:
             raise NotImplementedError() # please report on github with usecase
