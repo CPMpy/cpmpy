@@ -68,7 +68,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other global constraints, check it
                     decomposed = decompose_in_tree(decomposed, supported,supported_nested, _toplevel, nested=nested)
-                    newlist.extend(decomposed)
+                    newlist.append(all(decomposed))
 
                 else:
                     # numeric global constraint, replace by a fresh variable and decompose the equality to this
