@@ -2,6 +2,7 @@ import copy
 import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError
 
 class TestGlobal(unittest.TestCase):
@@ -240,15 +241,15 @@ class TestGlobal(unittest.TestCase):
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
-        self.assertIsInstance(min(iv), GlobalConstraint) 
-        self.assertIsInstance(max(iv), GlobalConstraint) 
+        self.assertIsInstance(min(iv), GlobalFunction)
+        self.assertIsInstance(max(iv), GlobalFunction)
 
     def test_minimax_cpm(self):
         iv = cp.intvar(1,9, 10)
         mi = cp.min(iv)
         ma = cp.max(iv)
-        self.assertIsInstance(mi, GlobalConstraint) 
-        self.assertIsInstance(ma, GlobalConstraint)
+        self.assertIsInstance(mi, GlobalFunction)
+        self.assertIsInstance(ma, GlobalFunction)
         
         def solve_return(model):
             model.solve()

@@ -1,5 +1,6 @@
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
+from cpmpy.expressions.globalfunctions import *
 
 import pytest
 

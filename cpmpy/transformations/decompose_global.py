@@ -1,6 +1,7 @@
 import copy
 
 from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
@@ -30,12 +31,12 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
     """
     def _is_supported(cpm_expr, reified):
-        if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
+        if isinstance(cpm_expr, GlobalConstraint):
             if reified and cpm_expr.name not in supported_reif:
                 return False
             if not reified and cpm_expr.name not in supported:
                 return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint):
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalFunction):
             if not cpm_expr.args[0].name in supported:
                 # reified numerical global constraints can be rewritten to non-reified versions
                 #  so only have to check for 'supported' set

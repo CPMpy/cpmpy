@@ -433,7 +433,7 @@ class NDVarArray(Expression, np.ndarray):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalconstraints import Element # here to avoid circular
+        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
