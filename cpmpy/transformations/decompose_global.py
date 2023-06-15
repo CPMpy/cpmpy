@@ -48,33 +48,35 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
             continue
 
         elif isinstance(expr, Operator):
-            # just recurse into arguments
+            # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_nested, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint):
+            # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
             expr.args = decompose_in_tree(expr.args, supported, supported_nested, _toplevel, nested=True)
 
-            if expr.is_bool():
-                # boolean global constraints
-                is_supported = (nested and expr.name in supported_nested) or (not nested and expr.name in supported)
-                if not is_supported:
-                    cons, define = expr.decompose()
-                    cons = decompose_in_tree(cons, supported,supported_nested, _toplevel, nested=nested)
-                    newlist.append(all(cons))
-                    _toplevel.extend(define)
-                else:
-                    newlist.append(expr)
+            is_supported = (nested and expr.name in supported_nested) or (not nested and expr.name in supported)
+            if is_supported:
+                newlist.append(expr)
             else:
-                # numerical global function (e.g. min, max, count, element...) in non-comparison context
-                if (nested and expr.name not in supported_nested) or (not nested and expr.name not in supported):
-                    aux = intvar(*expr.get_bounds())
-                    newlist.append(aux)
-                    cons, define = expr.decompose_comparison("==", aux)
-                    _toplevel.extend(cons + define) # all constraints should be added toplevel, node replaced by aux var
+                if expr.is_bool():
+                    # boolean global constraints
+                    decomposed, define = expr.decompose()
+
+                    _toplevel.extend(define)  # definitions should be added toplevel
+                    # the `decomposed` expression might contain other global constraints, check it
+                    decomposed = decompose_in_tree(decomposed, supported,supported_nested, _toplevel, nested=nested)
+                    newlist.extend(decomposed)
+
                 else:
-                    newlist.append(expr)
+                    # numeric global constraint, replace by a fresh variable and decompose the equality to this
+                    lb,ub = expr.get_bounds()
+                    aux = intvar(lb, ub)
+                    auxdef, otherdef = expr.decompose_comparison("==", aux)
+                    _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
+                    newlist.append(aux)  # replace original expression by aux
 
         elif isinstance(expr, Comparison):
             # Tricky case, if we just recurse into arguments, we risk creating unnecessary auxiliary variables
