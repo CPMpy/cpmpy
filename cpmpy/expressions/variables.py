@@ -51,7 +51,7 @@ from collections.abc import Iterable
 import warnings # for deprecation warning
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_false_cst
+from .utils import is_num, is_int, flatlist, is_true_cst
 
 
 def BoolVar(shape=1, name=None):
@@ -318,9 +318,11 @@ class _BoolVarImpl(_IntVarImpl):
         return NegBoolView(self)
 
     def __eq__(self, other):
-        if (is_num(other) and other == 0) or \
-                is_false_cst(other):
-            return ~self
+        # (BV == 1) <-> BV
+        # if other == 1: XXX: dangerous because "=="" is overloaded
+        if (is_num(other) and other == 1) or \
+                is_true_cst(other):
+            return self
         return super().__eq__(other)
 
     def __ne__(self, other):
