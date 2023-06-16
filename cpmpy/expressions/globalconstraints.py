@@ -16,8 +16,8 @@
     decomposed by calling its `.decompose()` function.
     The `.decompose()` function returns two arguments:
         - a list of simpler constraints replacing the global constraint
-        - a list of defining constraints linking potential new variables to the arguments of the constraint
-            these should always hold at toplevel.
+        - if the decomposition introduces *new variables*, then the second argument has to be a list
+            of constraints that (totally) define those new variables
 
     As a user you **should almost never subclass GlobalConstraint()** unless you know of a solver that
     supports that specific global constraint, and that you will update its solver interface to support it.
