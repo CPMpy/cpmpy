@@ -8,6 +8,8 @@ from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 
 
+## TODO Tias: backward compatibility
+## TODO Tias: rename arguments supported/supported_nested
 def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _toplevel=None, nested=False):
     """
         Decomposes any global constraint not supported by the solver
@@ -111,7 +113,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
                 decomposed, define = lhs.decompose_comparison(exprname, rhs)
                 _toplevel.extend(define)  # definitions should be added toplevel
                 # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, supported, supported_nested, _toplevel, nested=nested)
+                decomposed = decompose_in_tree(decomposed, supported, supported_nested, _toplevel, nested=True)
                 newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
