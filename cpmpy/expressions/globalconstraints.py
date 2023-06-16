@@ -147,8 +147,9 @@ class GlobalConstraint(Expression):
             and use other other global constraints as long as
             it does not create a circular dependency.
 
-            To ensure equivalence of decomposition, we split into contraining and defining constraints
-            Defining constraints should always be true at toplevel.
+            To ensure equivalence of decomposition, we split into contraining and defining constraints.
+            Defining constraints (totally) define new auxiliary variables needed for the decomposition,
+            they can always be enforced top-level.
         """
         raise NotImplementedError("Decomposition for",self,"not available")
 
@@ -356,7 +357,8 @@ class Minimum(GlobalConstraint):
         Decomposition if it's part of a comparison
         Returns two lists of constraints:
             1) constraint replacing node in expression tree
-            2) constraints which should be true at toplevel
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var
