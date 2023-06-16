@@ -31,8 +31,8 @@ EXCLUDE_OPERATORS = {"z3":{"abs"},
 EXCLUDE_IMPL = {"ortools": {},
                 "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
                 "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
-                "pysat": {"xor"}, # xors: temporarily avoid till #209 is fixed
-                "pysdd": {"xor"},
+                "pysat": {},
+                "pysdd": {},
                 }
 
 
