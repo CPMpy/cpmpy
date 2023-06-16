@@ -64,7 +64,9 @@ def recurse_negation(expr, negative_context=True):
 
     # global constraints
     if hasattr(expr, "decompose"):
-        return ~expr if negative_context else expr #TODO: recurse into arguments? This should be re-called after decompose_globals anyway...
+        newexpr = copy.copy(expr)
+        newexpr.args = [recurse_negation(arg, negative_context=False) for arg in expr.args]
+        return ~newexpr if negative_context else newexpr
 
     # numvars or direct constraint
     if negative_context:
