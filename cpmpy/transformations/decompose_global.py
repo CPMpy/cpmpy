@@ -119,10 +119,11 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_nested=set(), _top
         else:  # constants, variables, direct constraints
             newlist.append(expr)
 
-    if nested is True:
+    if nested:
         return newlist
-    elif len(_toplevel) > 0:
+
+    if len(_toplevel) == 0:
+        return toplevel_list(newlist)
+    else:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
         return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_nested, nested=False)
-    else:
-        return toplevel_list(newlist)  # TODO, check for top-level ANDs in transformation?
