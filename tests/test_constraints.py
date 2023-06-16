@@ -30,7 +30,7 @@ EXCLUDE_OPERATORS = {"z3":{"abs"},
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {},
                 "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
-                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
+                "z3": {},
                 "pysat": {},
                 "pysdd": {},
                 }
