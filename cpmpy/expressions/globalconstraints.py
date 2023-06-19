@@ -442,9 +442,6 @@ class Element(GlobalConstraint):
     def __init__(self, arr, idx):
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        lidx, uidx = get_bounds(idx)
-        if lidx < 0 or uidx >= len(arr):
-            raise IncompleteFunctionError(f"Bounds of index should match dimensions of array of length {len(arr)}, but {idx} has bounds {(lidx, uidx)}")
         super().__init__("element", [arr, idx], is_bool=False)
 
     def value(self):
