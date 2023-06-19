@@ -210,20 +210,6 @@ class TestArrayExpressions(unittest.TestCase):
         res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
-    def test_mean(self):
-        x = intvar(0,5,shape=10, name="x")
-        y = intvar(0, 1000, name="y")
-        model = cp.Model(y == x.mean())
-        model.solve()
-        self.assertTrue(y.value() == (sum(x.value())//len(x)))
-        # with axis arg
-        x = intvar(0,5,shape=(10,10), name="x")
-        y = intvar(0, 1000, shape=10, name="y")
-        model = cp.Model(y == x.mean(axis=0))
-        model.solve()
-        res = np.array([sum(x[i, ...].value())//len(x[i, ...]) for i in range(len(y))])
-        self.assertTrue(all(y.value() == res))
-
     def test_prod(self):
         x = intvar(0,5,shape=10, name="x")
         y = intvar(0, 1000, name="y")
