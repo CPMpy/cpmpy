@@ -707,9 +707,7 @@ class NDVarArray(Expression, np.ndarray):
 
             does not actually support out... todo? I think we should not support out!
         """
-        if any(not is_boolexpr(x) for x in self.flatten()):
-            raise TypeError("Cannot call .all() in an array not consisting only of bools")
-
+        
         from .python_builtins import all
         if out is not None:
             raise NotImplementedError() # please report on github with usecase
