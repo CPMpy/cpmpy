@@ -466,18 +466,13 @@ class NDVarArray(Expression, np.ndarray):
             return bool(ret)
         return ret
 
-    def sum(self, axis=None, out=None):
-        """
-            overwrite np.sum(NDVarArray) as people might use it
-        """
-        if out is not None:
-            raise NotImplementedError()
-
-        if axis is None:    # simple case where we want the sum over the whole array
-            arr = self.flatten()
-            return Operator("sum", arr)
+    """
+    make the given array the first dimension in the returned array
+    """
+    def __axis(self, axis):
 
         arr = self
+
         # correct type and value checks
         if not isinstance(axis,int):
             raise TypeError("Axis keyword argument in .sum() should always be an integer")
@@ -494,12 +489,28 @@ class NDVarArray(Expression, np.ndarray):
             iter_axis.insert(0, axis)
             arr = arr.transpose(iter_axis)
 
+        return arr
+
+    def sum(self, axis=None, out=None):
+        """
+            overwrite np.sum(NDVarArray) as people might use it
+        """
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the sum over the whole array
+            arr = self.flatten()
+            return Operator("sum", arr)
+
+        arr = self.__axis(axis=axis)
+
         out = []
         for i in range(0, arr.shape[0]):
             out.append(Operator("sum", arr[i, ...]))
 
         # return the NDVarArray that contains the sum constraints
         return out
+
 
     def prod(self, axis=None, out=None):
         """
@@ -512,27 +523,11 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return reduce(lambda a, b: a * b, arr)
 
-        arr = self
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .sum() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
             out.append(reduce(lambda a, b: a * b, arr[i, ...]))
-
 
         # return the NDVarArray that contains the sum constraints
         return out
@@ -548,22 +543,7 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return Operator("sum", arr)//len(arr)
 
-        arr = self
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .mean() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
@@ -584,23 +564,7 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return Maximum(arr)
 
-        arr = self
-
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .max() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
@@ -621,23 +585,7 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return Minimum(arr)
 
-        arr = self
-
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .max() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
@@ -662,22 +610,7 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return any(arr)
 
-        arr = self
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .any() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
@@ -699,22 +632,7 @@ class NDVarArray(Expression, np.ndarray):
             arr = self.flatten()
             return all(arr)
 
-        arr = self
-        # correct type and value checks
-        if not isinstance(axis,int):
-            raise TypeError("Axis keyword argument in .all() should always be an integer")
-        if axis >= arr.ndim:
-            raise ValueError("Axis out of range")
-
-        if axis < 0:
-            axis += arr.ndim
-
-        # Change the array to make the selected axis the first dimension
-        if axis > 0:
-            iter_axis = list(range(arr.ndim))
-            iter_axis.remove(axis)
-            iter_axis.insert(0, axis)
-            arr = arr.transpose(iter_axis)
+        arr = self.__axis(axis=axis)
 
         out = []
         for i in range(0, arr.shape[0]):
