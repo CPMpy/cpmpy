@@ -415,8 +415,8 @@ class CPM_exact(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :param cpm_expr_orig: CPMpy expression, or list thereof
+        :type cpm_expr_orig: Expression or list of Expression
 
         :return: self
         """
