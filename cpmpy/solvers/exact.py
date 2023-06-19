@@ -58,6 +58,8 @@ class CPM_exact(SolverInterface):
         # try to import the package
         try:
             import exact
+            import pkg_resources
+            pkg_resources.require("exact>=1.1.3")
             return True
         except ImportError as e:
             return False
@@ -94,13 +96,19 @@ class CPM_exact(SolverInterface):
         self.objective_given = False
         self.objective_minimize = True
 
+        # encoding for integer variables in Exact - one of "log", "onehot", "order"
+        # for domain sizes > 10, the most efficient one is probably "log", so that is the default.
+        # "onehot" is less efficient, but required to prune domains with Exact (TODO: implement this).
+        self.encoding="log"
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
 
     def _fillObjAndVars(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
-            return False
+            for cpm_var in lst_vars:
+                cpm_var._value = None
 
         # fill in variable values
         lst_vars = list(self.user_vars)
@@ -113,25 +121,35 @@ class CPM_exact(SolverInterface):
         if not self.objective_minimize:
             self.objective_value_ = -self.objective_value_
 
-        return True
-
     def solve(self, time_limit=None, assumptions=None, **kwargs):
         """
             Call Exact
 
-            Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+            Overwrites self.cpm_status
+
+            :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
+            :type assumptions: list of CPMpy Boolean variables
+
+            :param time_limit: optional, time limit in seconds
+            :type time_limit: int or float
 
             Additional keyword arguments:
             The Exact solver parameters are defined by https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp#L207
+
+            :return: Bool:
+                - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+                - False     if no solution is found
         """
         from exact import Exact as xct
 
         if not self.solver_is_initialized:
             assert not self.objective_given
+            # NOTE: initialization of exact is also how it fixes the objective function.
+            # So we cannot call it before self.objective() (e.g., in the constructor).
+            # And if self.objective() is not called, we still need to call it before solving.
+            # This is something Exact needs to fix at some point.
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
             self.xct_solver.setOption("verbosity","0")
@@ -143,7 +161,7 @@ class CPM_exact(SolverInterface):
 
         # set assumptions
         if assumptions is not None:
-            assert(all(v.is_bool() for v in assumptions))
+            assert all(v.is_bool() for v in assumptions), "Non-Boolean assumptions given to Exact: " + str([v for v in assumptions if not v.is_bool()])
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
@@ -172,18 +190,17 @@ class CPM_exact(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == 3: # found timeout
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-            return 0
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
-
-        return self._fillObjAndVars()
+        
+        self._fillObjAndVars()
+        
+        # True/False depending on self.cpm_status
+        return self._solve_return(self.cpm_status)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
-
-            This is the generic implementation, solvers can overwrite this with
-            a more efficient native implementation
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
@@ -199,6 +216,10 @@ class CPM_exact(SolverInterface):
             raise NotImplementedError("Exact does not yet support finding all *optimal* solutions.")
 
         if not self.solver_is_initialized:
+            # NOTE: initialization of exact is also how it fixes the objective function.
+            # So we cannot call it before self.objective() (e.g., in the constructor).
+            # And if self.objective() is not called, we still need to call it before solving.
+            # This is something Exact needs to fix at some point.
             self.xct_solver.init([],[])
             self.solver_is_initialized=True
             self.xct_solver.setOption("verbosity","0")
@@ -214,6 +235,7 @@ class CPM_exact(SolverInterface):
             my_status = self.xct_solver.runFull(False,time_limit if time_limit is not None else 0)
             assert my_status in [0,1,2,3], "Unexpected status code for Exact."
             if my_status == 0: # found unsatisfiability
+                self._fillObjAndVars() # erases the solution
                 break
             elif my_status == 1: # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
@@ -241,7 +263,7 @@ class CPM_exact(SolverInterface):
         return self.objective_given
 
 
-    def solver_var(self, cpm_var, encoding="onehot"):
+    def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
@@ -250,7 +272,7 @@ class CPM_exact(SolverInterface):
             return cpm_var
 
         # variables to be translated should be positive
-        assert(not isinstance(cpm_var, NegBoolView))
+        assert not isinstance(cpm_var, NegBoolView), "Internal error: found negative Boolean variables where only positive ones were expected, please report."
 
         # return it if it already exists
         if cpm_var in self._varmap:
@@ -264,9 +286,9 @@ class CPM_exact(SolverInterface):
             lb, ub = cpm_var.get_bounds()
             if max(abs(lb),abs(ub)) > 1e18:
                 # larger than 64 bit should be passed by string
-                self.xct_solver.addVariable(revar,str(lb), str(ub), encoding)
+                self.xct_solver.addVariable(revar,str(lb), str(ub), self.encoding)
             else:
-                self.xct_solver.addVariable(revar,lb,ub, encoding)
+                self.xct_solver.addVariable(revar,lb,ub, self.encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
@@ -298,6 +320,10 @@ class CPM_exact(SolverInterface):
         if not self.objective_minimize:
             xct_coefs = [-x for x in xct_coefs]
 
+        # NOTE: initialization of exact is also how it fixes the objective function.
+        # So we cannot call it before self.objective() (e.g., in the constructor).
+        # And if self.objective() is not called, we still need to call it before solving.
+        # This is something Exact needs to fix at some point.
         self.xct_solver.init(xct_coefs,xct_vars)
         self.solver_is_initialized = True
         self.xct_solver.setOption("verbosity","0")
