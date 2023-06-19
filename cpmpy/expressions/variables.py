@@ -467,11 +467,9 @@ class NDVarArray(Expression, np.ndarray):
     def sum(self, axis=None, out=None):
         """
             overwrite np.sum(NDVarArray) as people might use it
-
-            does not actually support out... todo? I think we should not support out!
         """
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the sum over the whole array
             arr = self.flatten()
@@ -504,11 +502,9 @@ class NDVarArray(Expression, np.ndarray):
     def prod(self, axis=None, out=None):
         """
             overwrite np.prod(NDVarArray) as people might use it
-
-            does not actually support out... todo? I think we should not support out!
         """
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the product over the whole array
             arr = self.flatten()
@@ -547,11 +543,9 @@ class NDVarArray(Expression, np.ndarray):
     def mean(self, axis=None, out=None):
         """
             overwrite np.mean(NDVarArray)
-
-            does not actually support out... todo? I think we should not support out!
         """
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the mean over the whole array
             arr = self.flatten()
@@ -584,12 +578,10 @@ class NDVarArray(Expression, np.ndarray):
     def max(self, axis=None, out=None):
         """
             overwrite np.max(NDVarArray) as people might use it
-
-            does not actually support out... todo? I think we should not support out!
         """
         from .globalconstraints import Maximum
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the maximum over the whole array
             arr = self.flatten()
@@ -623,12 +615,10 @@ class NDVarArray(Expression, np.ndarray):
     def min(self, axis=None, out=None):
         """
             overwrite np.min(NDVarArray) as people might use it
-
-            does not actually support out... todo? I think we should not support out!
         """
         from .globalconstraints import Minimum
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the Minimum over the whole array
             arr = self.flatten()
@@ -662,8 +652,6 @@ class NDVarArray(Expression, np.ndarray):
     def any(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
-
-            does not actually support out... todo? I think we should not support out!
         """
         from .python_builtins import any
 
@@ -671,7 +659,7 @@ class NDVarArray(Expression, np.ndarray):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the .any() over the whole array
             arr = self.flatten()
@@ -704,13 +692,11 @@ class NDVarArray(Expression, np.ndarray):
     def all(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
-
-            does not actually support out... todo? I think we should not support out!
         """
-        
+
         from .python_builtins import all
         if out is not None:
-            raise NotImplementedError() # please report on github with usecase
+            raise NotImplementedError()
 
         if axis is None:    # simple case where we want the .all() over the whole array
             arr = self.flatten()
