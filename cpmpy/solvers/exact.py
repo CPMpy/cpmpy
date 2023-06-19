@@ -76,10 +76,10 @@ class CPM_exact(SolverInterface):
         """
         if not self.supported():
             raise Exception("Install 'exact' as a Python package to use this solver interface")
+        
+        assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
-
-        assert subsolver is None, "Exact does not allow subsolvers."
 
         # initialise the native solver object
         self.xct_solver = xct()
@@ -261,8 +261,7 @@ class CPM_exact(SolverInterface):
         if isinstance(cpm_var, _BoolVarImpl):
             self.xct_solver.addVariable(revar,0,1)
         elif isinstance(cpm_var, _IntVarImpl):
-            lb = cpm_var.lb
-            ub = cpm_var.ub
+            lb, ub = cpm_var.get_bounds()
             if max(abs(lb),abs(ub)) > 1e18:
                 # larger than 64 bit should be passed by string
                 self.xct_solver.addVariable(revar,str(lb), str(ub), encoding)
@@ -370,7 +369,7 @@ class CPM_exact(SolverInterface):
         return o.item() if isinstance(o, np.generic) else o
 
     def _add_xct_constr(self, xct_coefs,xct_vars,uselb,lb,useub,ub):
-        if any([not isinstance(x, numbers.Integral) for x in xct_coefs+[lb,ub]]):
+        if any(not isinstance(x, numbers.Integral) for x in xct_coefs+[lb,ub]):
             raise NotImplementedError("Exact requires all values to be integral")
         maximum = max([abs(x) for x in xct_coefs]+[abs(lb),abs(ub)])
         if maximum > 1e18:
@@ -379,7 +378,7 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addConstraint([self.fix(x) for x in xct_coefs],xct_vars,uselb,self.fix(lb),useub,self.fix(ub))
 
     def _add_xct_reif(self,head,xct_coefs,xct_vars,lb):
-        if any([not isinstance(x, numbers.Integral) for x in xct_coefs+[lb]]):
+        if any(not isinstance(x, numbers.Integral) for x in xct_coefs+[lb]):
             raise NotImplementedError("Exact requires all values to be integral")
         maximum = max([abs(x) for x in xct_coefs]+[abs(lb)])
         if maximum > 1e18:
