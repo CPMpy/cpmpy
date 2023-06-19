@@ -532,26 +532,6 @@ class NDVarArray(Expression, np.ndarray):
         # return the NDVarArray that contains the sum constraints
         return out
 
-    def mean(self, axis=None, out=None):
-        """
-            overwrite np.mean(NDVarArray)
-        """
-        if out is not None:
-            raise NotImplementedError()
-
-        if axis is None:    # simple case where we want the mean over the whole array
-            arr = self.flatten()
-            return Operator("sum", arr)//len(arr)
-
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(Operator("sum", arr[i, ...])//len(arr[i, ...]))
-
-        # return the NDVarArray that contains the mean constraints
-        return out
-
     def max(self, axis=None, out=None):
         """
             overwrite np.max(NDVarArray) as people might use it
