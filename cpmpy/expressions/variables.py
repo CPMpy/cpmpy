@@ -49,6 +49,8 @@
 
 from collections.abc import Iterable
 import warnings # for deprecation warning
+from functools import reduce
+
 import numpy as np
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr
@@ -508,10 +510,7 @@ class NDVarArray(Expression, np.ndarray):
 
         if axis is None:    # simple case where we want the product over the whole array
             arr = self.flatten()
-            cons = 1
-            for num in arr:
-                cons *= num
-            return cons
+            return reduce(lambda a, b: a * b, arr)
 
         arr = self
         # correct type and value checks
@@ -532,10 +531,8 @@ class NDVarArray(Expression, np.ndarray):
 
         out = []
         for i in range(0, arr.shape[0]):
-            cons = 1
-            for num in arr[i, ...]:
-                cons *= num
-            out.append(cons)
+            out.append(reduce(lambda a, b: a * b, arr[i, ...]))
+
 
         # return the NDVarArray that contains the sum constraints
         return out
