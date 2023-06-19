@@ -356,7 +356,7 @@ class Minimum(GlobalConstraint):
         """
         Decomposition if it's part of a comparison
         Returns two lists of constraints:
-            1) constraint replacing node in expression tree
+            1) constraints representing the comparison
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
@@ -398,8 +398,9 @@ class Maximum(GlobalConstraint):
         """
         Decomposition if it's part of a comparison
         Returns two lists of constraints:
-            1) constraint replacing node in expression tree
-            2) constraints which should be true at toplevel
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
         from .python_builtins import any, all
         if cpm_op == "==": # can avoid creating aux var here
@@ -462,8 +463,9 @@ class Element(GlobalConstraint):
             However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
             it is a constraint, and that one can be decomposed.
             Returns two lists of constraints:
-                1) constraint replacing node in expression tree
-                2) constraints which should be true at toplevel
+                1) constraints representing the comparison
+                2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+                   they should be enforced toplevel.
 
         """
         from .python_builtins import any
