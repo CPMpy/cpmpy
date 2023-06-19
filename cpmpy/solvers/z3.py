@@ -250,8 +250,8 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported_global = {"alldifferent", "xor","ite"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported_global, supported_global)
+        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         cpm_cons = simplify_boolean(cpm_cons)
         return cpm_cons
 
