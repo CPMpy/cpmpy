@@ -7,6 +7,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
+from .flatten_model import flatten_constraint
 
 
 def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
