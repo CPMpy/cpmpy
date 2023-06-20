@@ -276,7 +276,7 @@ def flatten_constraint(expr):
 
         elif isinstance(expr, GlobalConstraint):
             """
-    - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+    - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
             (con, flatcons) = normalized_boolexpr(expr)
             newlist.append(con)
@@ -375,7 +375,7 @@ def normalized_boolexpr(expr):
         Currently, this is the case for subexpr:
         - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
-        - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+        - Global constraint: global([Var]*)                    (CPMpy class 'GlobalConstraint')
         - Comparison constraint (see elsewhere)                (CPMpy class 'Comparison')
 
         output: (base_expr, base_cons) with:
