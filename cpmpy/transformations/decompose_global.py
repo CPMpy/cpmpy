@@ -54,7 +54,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
 
-        elif isinstance(expr, GlobalConstraint):
+        elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
             expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
@@ -175,7 +175,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
     """
     def _is_supported(cpm_expr, reified):
-        if isinstance(cpm_expr, GlobalConstraint):
+        if isinstance(cpm_expr, GlobalConstraint) or isinstance(cpm_expr, GlobalFunction):
             if reified and cpm_expr.name not in supported_reif:
                 return False
             if not reified and cpm_expr.name not in supported:
