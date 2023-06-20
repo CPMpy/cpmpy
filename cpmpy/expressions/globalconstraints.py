@@ -420,15 +420,15 @@ class Maximum(GlobalConstraint):
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
-class in_domain(GlobalConstraint):
+class InDomain(GlobalConstraint):
     """
-        The "in_domain" constraint, defining non-interval domains for an expression
+        The "InDomain" constraint, defining non-interval domains for an expression
     """
 
     def __init__(self, expr, arr):
         assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
-            "The expressions in the in_domain constraint should not be boolean"
-        super().__init__("in_domain", [expr, arr], is_bool=True)
+            "The expressions in the InDomain constraint should not be boolean"
+        super().__init__("InDomain", [expr, arr], is_bool=True)
 
     def decompose(self):
         from .python_builtins import any

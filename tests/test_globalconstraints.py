@@ -180,31 +180,31 @@ class TestGlobal(unittest.TestCase):
         # constraint can be used as value
         self.assertTrue(inv.value())
 
-    def test_in_domain(self):
+    def test_InDomain(self):
         iv = cp.intvar(-8, 8)
         iv_arr = cp.intvar(-8, 8, shape=5)
-        cons = [cp.in_domain(iv, iv_arr)]
+        cons = [cp.InDomain(iv, iv_arr)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), iv_arr.value())
         vals = [1, 5, 8, -4]
-        cons = [cp.in_domain(iv, vals)]
+        cons = [cp.InDomain(iv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
-        cons = [cp.in_domain(iv, [])]
+        cons = [cp.InDomain(iv, [])]
         model = cp.Model(cons)
         self.assertFalse(model.solve())
-        cons = [cp.in_domain(iv, [1])]
+        cons = [cp.InDomain(iv, [1])]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertEqual(iv.value(),1)
-        cons = cp.in_domain(min(iv_arr), vals)
+        cons = cp.InDomain(min(iv_arr), vals)
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         iv2 = cp.intvar(-8, 8)
         vals = [1, 5, 8, -4, iv2]
-        cons = [cp.in_domain(iv, vals)]
+        cons = [cp.InDomain(iv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
