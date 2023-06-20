@@ -1,4 +1,5 @@
 import copy
+import warnings  # for deprecation warning
 import numpy as np
 
 from .normalize import toplevel_list
@@ -105,3 +106,8 @@ def recurse_negation(expr):
     # numvars or direct constraint
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
+
+
+def negated_normal(expr):
+    warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in the expression (or use `push_down_negation` on the full expression tree); will be removed in stable version", DeprecationWarning)
+    return recurse_negation(expr)
