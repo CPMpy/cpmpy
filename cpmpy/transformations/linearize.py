@@ -47,7 +47,8 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+
 
 def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
     """
@@ -206,6 +207,30 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         for arg, row in zip(cpm_expr.args, sigma):
             constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
+
+        return constraints
+
+    elif cpm_expr.name == "circuit" and cpm_expr.name not in supported:
+        """
+            Decomposition inspired by Miller-Tucker-Zemlin formulation for TSPs
+        """
+        succ = cpm_expr.args
+        n = len(succ)
+        order = intvar(0, n-1, shape=n, name="order") # indicates the order of the stops
+        x = boolvar(shape=(n, n), name="x")           # indicates if we go from stop i to j
+
+        constraints = []
+        constraints += [sum(row) == 1 for row in x]
+        constraints += [sum(col) == 1 for col in x.T]
+
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    constraints += [x[i,j] <= 0] # cannot go from and to the same city
+                else:
+                    constraints += [x[i,j].implies(succ[i] == j)] # link to `succ` variables
+                if j != 0:
+                    constraints += [x[i,j].implies(-1*order[i] + 1*order[j] == 1)] # eliminate subcircuits from solution
 
         return constraints
 
