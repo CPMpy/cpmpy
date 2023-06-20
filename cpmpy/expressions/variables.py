@@ -535,7 +535,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .globalconstraints import Maximum
+        from .globalfunctions import Maximum
         if out is not None:
             raise NotImplementedError()
 
@@ -556,7 +556,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .globalconstraints import Minimum
+        from .globalfunctions import Minimum
         if out is not None:
             raise NotImplementedError()
 
