@@ -129,8 +129,8 @@ def flatten_constraint(expr):
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
     lst_of_expr = toplevel_list(expr)               # ensure it is a list
-    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
+    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     for expr in lst_of_expr:
 
         if isinstance(expr, _BoolVarImpl):
