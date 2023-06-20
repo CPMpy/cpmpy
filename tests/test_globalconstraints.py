@@ -233,7 +233,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_element(self):
         iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(0, 2)
+        idx = cp.intvar(-8, 8)
         constraints = [cp.Element(iv,idx) == 8]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
@@ -422,11 +422,11 @@ class TestBounds(unittest.TestCase):
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
-        z = cp.intvar(0, 2)
+        z = cp.intvar(1, 9)
         expr = cp.Element([x, y, z],z)
         lb, ub = expr.get_bounds()
         self.assertEqual(lb,-8)
-        self.assertEqual(ub,8)
+        self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
 
@@ -486,8 +486,8 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
 
     def test_inverse(self):
-        x = cp.intvar(0, 2)
-        y = cp.intvar(0, 2)
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
         b = cp.boolvar()
         a = cp.boolvar()
         self.assertFalse(cp.Model([cp.Inverse([x,y,x],[x,y,x])]).solve())
@@ -524,13 +524,12 @@ class TestTypeChecks(unittest.TestCase):
     def test_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
-        idx = cp.intvar(0,1)
         b = cp.boolvar()
         a = cp.boolvar()
-        self.assertTrue(cp.Model([cp.Element([x,y],idx) == x]).solve())
-        self.assertTrue(cp.Model([cp.Element([a,b | a],idx) == b]).solve())
+        self.assertTrue(cp.Model([cp.Element([x,y],x) == x]).solve())
+        self.assertTrue(cp.Model([cp.Element([a,b | a],x) == b]).solve())
         self.assertRaises(TypeError,cp.Element,[x,y],b)
-        self.assertTrue(cp.Model([cp.Element([y,a],idx) == False]).solve())
+        self.assertTrue(cp.Model([cp.Element([y,a],x) == False]).solve())
 
     def test_xor(self):
         x = cp.intvar(-8, 8)

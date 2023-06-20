@@ -81,7 +81,7 @@ class TestFlattenExpr(unittest.TestCase):
     def setUp(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
-        self.ivars = cp.intvar(1, 2, shape=(5,))
+        self.ivars = cp.intvar(1, 10, shape=(5,))
         self.bvars = cp.boolvar((3,))
 
     # not directly tested on its own, new functions 'normalized_boolexpr' and 'normalized_numexpr'

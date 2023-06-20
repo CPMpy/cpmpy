@@ -42,7 +42,6 @@ NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
 NN_VAR = intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = intvar(1,10, name="s_pos")                # A strictly positive variable
 NUM_VAR = intvar(0, 10, name="l")                   # A numerical variable
-IDX = intvar(0, len(NUM_ARGS)-1, name="idx")
 
 BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = boolvar(name="p")                        # A boolean variable
@@ -158,7 +157,7 @@ def global_constraints(solver):
 
     # "special" constructors
     if solver not in EXCLUDE_GLOBAL or "element" not in EXCLUDE_GLOBAL[solver]:
-        yield cpm_array(NUM_ARGS)[IDX]
+        yield cpm_array(NUM_ARGS)[NUM_VAR]
 
     if solver not in EXCLUDE_GLOBAL or "xor" not in EXCLUDE_GLOBAL[solver]:
         yield Xor(BOOL_ARGS)
