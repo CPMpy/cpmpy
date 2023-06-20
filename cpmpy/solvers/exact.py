@@ -225,6 +225,8 @@ class CPM_exact(SolverInterface):
             self.xct_solver.setOption("verbosity","0")
         self.xct_solver.clearAssumptions()
 
+        if(time_limit): self.xct_solver.setOption("timeout",str(time_limit))
+
         # set additional keyword arguments
         for (kw, val) in kwargs.items():
             self.xct_solver.setOption(kw,str(val))
@@ -372,10 +374,11 @@ class CPM_exact(SolverInterface):
 
         :return: list of Expression
         """
+
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported=frozenset({})) # alldiff has specialized MIP decomp in linearize
+        cpm_cons = decompose_global(cpm_cons, supported=frozenset({'alldifferent'})) # alldiff has specialized MIP decomp in linearize
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
