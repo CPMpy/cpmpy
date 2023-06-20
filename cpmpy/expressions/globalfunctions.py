@@ -123,12 +123,20 @@ class Minimum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+        Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
         from .python_builtins import any, all
+        if cpm_op == "==":  # can avoid creating aux var
+            return [any(x <= cpm_rhs for x in self.args),
+                    all(x >= cpm_rhs for x in self.args)], []
+
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
-        return [any(x <= _min for x in self.args), all(x >= _min for x in self.args),
-                eval_comparison(cpm_op, _min, cpm_rhs)]
+        return [eval_comparison(cpm_op, _min, cpm_rhs)], \
+               [any(x <= _min for x in self.args), all(x >= _min for x in self.args), ]
 
     def get_bounds(self):
         """
@@ -141,8 +149,6 @@ class Minimum(GlobalFunction):
 class Maximum(GlobalFunction):
     """
         Computes the maximum value of the arguments
-
-        It is a 'functional' global constraint which implicitly returns a numeric variable
     """
 
     def __init__(self, arg_list):
@@ -158,12 +164,20 @@ class Maximum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+        Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
         from .python_builtins import any, all
+        if cpm_op == "==":  # can avoid creating aux var here
+            return [any(x >= cpm_rhs for x in self.args),
+                    all(x <= cpm_rhs for x in self.args)], []
+
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
-        return [any(x >= _max for x in self.args), all(x <= _max for x in self.args),
-                eval_comparison(cpm_op, _max, cpm_rhs)]
+        return [eval_comparison(cpm_op, _max, cpm_rhs)], \
+               [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
 
     def get_bounds(self):
         """
@@ -194,7 +208,12 @@ class Element(GlobalFunction):
     def __init__(self, arr, idx):
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
+        if is_any_list(idx):
+            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
         super().__init__("element", [arr, idx])
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
         arr, idx = self.args
@@ -202,29 +221,25 @@ class Element(GlobalFunction):
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
                 return argval(arr[idxval])
-            raise IncompleteFunctionError(
-                f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
-        return None  # default
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
+        return None # default
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
             `Element(arr,ix)` represents the array lookup itself (a numeric variable)
-            It is not a constraint itself, so it can not have a decompose().
-            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
             it is a constraint, and that one can be decomposed.
-            That is what this function does
-            (for now only used in transformations/reification.py)
+            Returns two lists of constraints:
+                1) constraints representing the comparison
+                2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+                   they should be enforced toplevel.
+
         """
         from .python_builtins import any
 
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)]
-
-    def is_total(self):
-        arr, idx = self.args
-        lb, ub = get_bounds(idx)
-        return lb >= 0 & idx.ub < len(arr)
+               [idx >= 0, idx < len(arr)], []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -235,7 +250,7 @@ class Element(GlobalFunction):
         """
         arr, idx = self.args
         bnds = [get_bounds(x) for x in arr]
-        return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
+        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 
 class Count(GlobalFunction):
@@ -253,7 +268,7 @@ class Count(GlobalFunction):
         Count(arr,val) can only be decomposed if it's part of a comparison
         """
         arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)]
+        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
 
     def value(self):
         arr, val = self.args
