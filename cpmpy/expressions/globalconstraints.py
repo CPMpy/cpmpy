@@ -442,7 +442,12 @@ class Element(GlobalConstraint):
     def __init__(self, arr, idx):
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
+        if is_any_list(idx):
+            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
         super().__init__("element", [arr, idx], is_bool=False)
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
         arr, idx = self.args

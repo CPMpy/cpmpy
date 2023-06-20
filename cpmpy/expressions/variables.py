@@ -46,7 +46,7 @@
     Module details
     ==============
 """
-
+import math
 from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
@@ -442,20 +442,19 @@ class NDVarArray(Expression, np.ndarray):
         if isinstance(index, Expression):
             return Element(self, index)
 
-        # index is array/tuple with at least one expr in it:
-        # index non-expr part, and create element on expr part
-        if isinstance(index, tuple) and \
-           any(isinstance(el, Expression) for el in index):
-            index_rest = list(index) # mutable view
-            var = [] # collector of variables
-            for i in range(len(index)):
-                if isinstance(index[i], Expression):
-                    index_rest[i] = Ellipsis # selects all remaining dimensions
-                    var.append(index[i])
-            assert (len(var)==1), "variable indexing (element) only supported with 1 variable at this moment"
-            # single var, so flatten rest array
-            array_rest = self[tuple(index_rest)] # non-var array selection
-            return Element(array_rest, var[0])
+        # multi-dimensional index
+        if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
+            # find dimension of expression in index
+            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
+            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
+            index = index[expr_dim:]
+
+            # calculate index for flat array
+            flat_index = index[-1]
+            for dim, idx in enumerate(index[:-1]):
+                flat_index += idx * math.prod(arr.shape[dim+1:])
+            # using index expression as single var for flat array
+            return Element(arr.flatten(), flat_index)
 
         ret = super().__getitem__(index)
         # this is a bit ugly,

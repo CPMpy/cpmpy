@@ -232,13 +232,35 @@ class TestGlobal(unittest.TestCase):
         self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_element(self):
+        # test 1-D
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
-        constraints = [cp.Element(iv,idx) == 8]
-        model = cp.Model(constraints)
+        # test directly the constraint
+        cons = cp.Element(iv,idx) == 8
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test through __get_item__
+        cons = iv[idx] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        a,b = cp.intvar(0, 3, shape=2)
+        cons = iv[a,b] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[a.value(), b.value()], 8)
+        arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
+        cons = arr[a,b] == 1
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(arr[a.value(), b.value()], 1)
 
     def test_xor(self):
         bv = cp.boolvar(5)
