@@ -12,8 +12,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {"circuit"},
-                  "gurobi": {"circuit"},
+EXCLUDE_GLOBAL = {"ortools": {},
+                  "gurobi": {},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
@@ -21,18 +21,19 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {"mod"},
+EXCLUDE_OPERATORS = {"z3":{"abs"},
+                     "gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {"element"},
+EXCLUDE_IMPL = {"ortools": {},
                 "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
-                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
-                "pysat": {"xor"}, # xors: temporarily avoid till #209 is fixed
-                "pysdd": {"xor"},
+                "z3": {},
+                "pysat": {},
+                "pysdd": {},
                 }
 
 

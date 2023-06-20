@@ -10,6 +10,9 @@
     as CPMpy should also work without this solver installed.
     To ensure that, include it inside supported() and other functions that need it...
 """
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.normalize import toplevel_list
+
 """
     Interface to TEMPLATE's API
 
@@ -238,6 +241,8 @@ class CPM_template(SolverInterface):
         """
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"AllDifferent"})
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
         #cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         #cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=

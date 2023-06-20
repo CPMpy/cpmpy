@@ -28,7 +28,9 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
+from ..transformations.normalize import toplevel_list
 from ..transformations.to_cnf import to_cnf
 
 class CPM_pysdd(SolverInterface):
@@ -219,7 +221,9 @@ class CPM_pysdd(SolverInterface):
             self.pysdd_root = self.pysdd_manager.true()
 
         # actually supports nested Boolean operators natively...
-        return to_cnf(cpm_expr)
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons)
+        return to_cnf(cpm_cons)
 
     def __add__(self, cpm_expr_orig):
       """
