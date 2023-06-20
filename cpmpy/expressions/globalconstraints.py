@@ -435,7 +435,7 @@ class in_domain(GlobalConstraint):
         expr, arr = self.args
         expressions = any(isinstance(a, Expression) for a in arr)
         if expressions:
-            return [any(expr == a for a in arr)]
+            return [any(expr == a for a in arr)], []
         else:
             # find intervals in the domain given:
             arr = sorted(arr)
@@ -455,7 +455,7 @@ class in_domain(GlobalConstraint):
                 cons.extend([expr >= intervals[0][0], expr <= intervals[-1][1]])
             else:
                 cons.append(False)
-            return cons
+            return cons, []
 
     def value(self):
         return argval(self.args[0]) in argval(self.args[1])
