@@ -82,7 +82,7 @@ import math
 import builtins
 import numpy as np
 
-from .normalize import toplevel_list
+from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -128,6 +128,9 @@ def flatten_constraint(expr):
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
+    normalized_list = toplevel_list(expr)
+    normalized_list = simplify_boolean(normalized_list)
+    for expr in normalized_list:
     lst_of_expr = toplevel_list(expr)
     lst_of_expr = push_down_negation(lst_of_expr)
     for expr in lst_of_expr:
@@ -344,7 +347,7 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
+        ivar = _IntVarImpl(lb, ub)
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
@@ -433,7 +436,7 @@ def normalized_boolexpr(expr):
 
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
-                if expr.name == '!=':
+                if expr.name == '!=' and rvar.is_bool():
                     # != not needed, negate RHS variable
                     rvar = ~rvar
                     exprname = '=='

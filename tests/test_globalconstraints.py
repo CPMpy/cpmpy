@@ -85,6 +85,10 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
         self.assertTrue(cp.AllDifferentExcept0(iv).value())
 
+        #test with mixed types
+        bv = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv[0], bv)]).solve())
+
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
@@ -118,21 +122,38 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Circuit(x).value())
 
     def test_not_circuit(self):
-        x = cp.intvar(0, 5, 6)
-        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
-        model = cp.Model(constraints)
+        x = cp.intvar(lb=0, ub=2, shape=3)
+        circuit = cp.Circuit(x)
+
+        model = cp.Model([~circuit, x == [1,2,0]])
         self.assertFalse(model.solve())
 
-        constraints = [~cp.Circuit(x)]
-        model = cp.Model(constraints)
+        model = cp.Model([~circuit])
         self.assertTrue(model.solve())
-        self.assertFalse(cp.Circuit(x).value())
+        self.assertFalse(circuit.value())
 
-        nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
-        nbModels = cp.Model(cp.Circuit(x)).solveAll(display=lambda: self.assertTrue(cp.Circuit(x).value()))
+        self.assertFalse(cp.Model([circuit, ~circuit]).solve())
+
+        circuit_sols = set()
+        not_circuit_sols = set()
+
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+
         total = cp.Model(x == x).solveAll()
 
-        self.assertEqual(str(total), str(nbModels + nbNotModels))
+        for sol in circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertTrue(circuit.value())
+
+        for sol in not_circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertFalse(circuit.value())
+
+        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+
 
     def test_inverse(self):
         # Arrays
@@ -211,13 +232,35 @@ class TestGlobal(unittest.TestCase):
         self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_element(self):
+        # test 1-D
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
-        constraints = [cp.Element(iv,idx) == 8]
-        model = cp.Model(constraints)
+        # test directly the constraint
+        cons = cp.Element(iv,idx) == 8
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test through __get_item__
+        cons = iv[idx] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        a,b = cp.intvar(0, 3, shape=2)
+        cons = iv[a,b] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[a.value(), b.value()], 8)
+        arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
+        cons = arr[a,b] == 1
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(arr[a.value(), b.value()], 1)
 
     def test_xor(self):
         bv = cp.boolvar(5)
@@ -323,37 +366,38 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(constraints).solve())
 
     def test_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc), iv == [5,5,4]]).solve())
-        self.assertEqual( str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
-        self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1]], gcc).value())
-
-    def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_count(self):
         iv = cp.intvar(-8, 8, shape=3)
@@ -536,14 +580,19 @@ class TestTypeChecks(unittest.TestCase):
         z = cp.intvar(-8, 8)
         q = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
+        h = cp.intvar(-7, 7)
+        v = cp.intvar(-7, 7)
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y],[z,q])]).solve())
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[x,False])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y,q],[z,x])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[z,b])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a],[a,b])
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y], [z,q], [h,v])]).solve())
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [x,False], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [z,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a], [a,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [h, v], [z, b])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [True, v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [v, a])
+
 
     def test_count(self):
         x = cp.intvar(0, 1)
