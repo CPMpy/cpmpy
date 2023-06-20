@@ -49,9 +49,11 @@
 import math
 from collections.abc import Iterable
 import warnings # for deprecation warning
+from functools import reduce
+
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist
+from .utils import is_num, is_int, flatlist, is_boolexpr
 
 
 def BoolVar(shape=1, name=None):
@@ -110,7 +112,7 @@ def boolvar(shape=1, name=None):
         raise NullShapeError(shape)
     if shape == 1:
         return _BoolVarImpl(name=name)
-    
+
     # create base data
     data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
@@ -257,7 +259,7 @@ class _NumVarImpl(Expression):
         """ clear the value obtained from the last solve call
         """
         self._value = None
-    
+
     def __repr__(self):
         return self.name
 
@@ -463,17 +465,160 @@ class NDVarArray(Expression, np.ndarray):
             return bool(ret)
         return ret
 
+    """
+    make the given array the first dimension in the returned array
+    """
+    def __axis(self, axis):
+
+        arr = self
+
+        # correct type and value checks
+        if not isinstance(axis,int):
+            raise TypeError("Axis keyword argument in .sum() should always be an integer")
+        if axis >= arr.ndim:
+            raise ValueError("Axis out of range")
+
+        if axis < 0:
+            axis += arr.ndim
+
+        # Change the array to make the selected axis the first dimension
+        if axis > 0:
+            iter_axis = list(range(arr.ndim))
+            iter_axis.remove(axis)
+            iter_axis.insert(0, axis)
+            arr = arr.transpose(iter_axis)
+
+        return arr
+
     def sum(self, axis=None, out=None):
         """
             overwrite np.sum(NDVarArray) as people might use it
-
-            does not actually support axis/out... todo?
         """
-        if not axis is None or not out is None:
-            raise NotImplementedError() # please report on github with usecase
+        if out is not None:
+            raise NotImplementedError()
 
-        # return sum object over all dimensions
-        return Operator("sum", self.flat)
+        if axis is None:    # simple case where we want the sum over the whole array
+            arr = self.flatten()
+            return Operator("sum", arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(Operator("sum", arr[i, ...]))
+
+        # return the NDVarArray that contains the sum constraints
+        return out
+
+
+    def prod(self, axis=None, out=None):
+        """
+            overwrite np.prod(NDVarArray) as people might use it
+        """
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the product over the whole array
+            arr = self.flatten()
+            return reduce(lambda a, b: a * b, arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(reduce(lambda a, b: a * b, arr[i, ...]))
+
+        # return the NDVarArray that contains the sum constraints
+        return out
+
+    def max(self, axis=None, out=None):
+        """
+            overwrite np.max(NDVarArray) as people might use it
+        """
+        from .globalconstraints import Maximum
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the maximum over the whole array
+            arr = self.flatten()
+            return Maximum(arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(Maximum(arr[i, ...]))
+
+        # return the NDVarArray that contains the Maximum global constraints
+        return out
+
+    def min(self, axis=None, out=None):
+        """
+            overwrite np.min(NDVarArray) as people might use it
+        """
+        from .globalconstraints import Minimum
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the Minimum over the whole array
+            arr = self.flatten()
+            return Minimum(arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(Minimum(arr[i, ...]))
+
+        # return the NDVarArray that contains the Minimum global constraints
+        return out
+
+    def any(self, axis=None, out=None):
+        """
+            overwrite np.any(NDVarArray)
+        """
+        from .python_builtins import any
+
+        if any(not is_boolexpr(x) for x in self.flatten()):
+            raise TypeError("Cannot call .any() in an array not consisting only of bools")
+
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the .any() over the whole array
+            arr = self.flatten()
+            return any(arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(any(arr[i, ...]))
+
+        # return the NDVarArray that contains the any() constraints
+        return out
+
+    def all(self, axis=None, out=None):
+        """
+            overwrite np.any(NDVarArray)
+        """
+
+        from .python_builtins import all
+        if out is not None:
+            raise NotImplementedError()
+
+        if axis is None:    # simple case where we want the .all() over the whole array
+            arr = self.flatten()
+            return all(arr)
+
+        arr = self.__axis(axis=axis)
+
+        out = []
+        for i in range(0, arr.shape[0]):
+            out.append(all(arr[i, ...]))
+
+        # return the NDVarArray that contains the all() constraints
+        return out
 
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):
@@ -482,7 +627,7 @@ class NDVarArray(Expression, np.ndarray):
         # this is a bit cryptic, but it calls 'attr' on s with o as arg
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
         return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
-        
+
     # VECTORIZED comparisons
     def __eq__(self, other):
         return self._vectorized(other, '__eq__')
@@ -500,7 +645,7 @@ class NDVarArray(Expression, np.ndarray):
         return self._vectorized(other, '__gt__')
 
     def __ge__(self, other):
-        return self._vectorized(other, '__ge__') 
+        return self._vectorized(other, '__ge__')
 
     # VECTORIZED math operators
     # only 'abs' 'neg' and binary ones
@@ -578,7 +723,7 @@ class NDVarArray(Expression, np.ndarray):
         return self._vectorized(other, '__rxor__')
 
     def implies(self, other):
-        return self._vectorized(other, 'implies') 
+        return self._vectorized(other, 'implies')
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False
@@ -602,4 +747,4 @@ def _genname(basename, idxs):
         return None
     stridxs = ",".join(map(str, idxs))
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
-    
+
