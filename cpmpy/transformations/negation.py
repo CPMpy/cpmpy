@@ -1,73 +1,107 @@
 import copy
+import numpy as np
 
 from .normalize import toplevel_list
-from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl
-def push_down_negation(lst_of_expr):
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.variables import _BoolVarImpl, _NumVarImpl
+from ..expressions.utils import is_any_list
+
+def push_down_negation(lst_of_expr, toplevel=True):
+    """
+        Transformation that checks all elements from the list,
+        and pushes down any negation it finds with the `recurse_negation()` function.
+
+        Assumes the input is a list (typically from `toplevel_list()`) en ensures the output is
+        a toplevel_list if the input was.
+    """
+    if isinstance(lst_of_expr, np.ndarray) and not (lst_of_expr.dtype == object):
+        # shortcut for data array, return as is
+        return lst_of_expr
 
     newlist = []
     for expr in lst_of_expr:
-        if expr.name == "not":
-            newlist.append(recurse_negation(expr.args[0], negative_context=True))
+        if is_any_list(expr):
+            # can be a nested list with expressions?
+            newlist.append(push_down_negation(expr, toplevel=toplevel))
+
+        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal)):
+            # nothing to do
+            newlist.append(expr)
+
+        elif expr.name == "not":
+            # the negative case, negate
+            arg_neg = recurse_negation(expr.args[0])
+            if toplevel:
+                # make sure there is no toplevel 'and' (could do explicit check for and?)
+                newlist.extend(toplevel_list(arg_neg))
+            else:
+                newlist.append(arg_neg)
+
         else:
-            newlist.append(recurse_negation(expr, negative_context=False))
+            # an Expression, we remain in the positive case
+            newexpr = copy.copy(expr)
+            # TODO, check that an arg changed? otherwise no copy needed here...
+            newexpr.args = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
+            newlist.append(newexpr)
 
-    return toplevel_list(newlist)
+    return newlist
 
-def recurse_negation(expr, negative_context=True):
+def recurse_negation(expr):
     """
         Negate 'expr' by pushing the negation down into it and its args
 
         Comparison: swap comparison sign
         Operator.is_bool(): apply DeMorgan
         Global: leave "NOT" operator before global constraint. Use `decompose_globals` for this (AFTER ISSUE #293)
-
-        This function only ensures 'negated normal' for the top-level
-        constraint (negating arguments recursively as needed),
-        it does not ensure flatness (except if the input is flat)
     """
 
     if isinstance(expr, (_BoolVarImpl,BoolVal)):
-        return ~expr if negative_context else expr
+        return ~expr
 
-    if isinstance(expr, Comparison):
-
+    elif isinstance(expr, Comparison):
         newexpr = copy.copy(expr)
-        newexpr.args = [recurse_negation(arg, False) for arg in newexpr.args] # check if new 'not' is present in arguments
-        if negative_context is True:
-            if   expr.name == '==': newexpr.name = '!='
-            elif expr.name == '!=': newexpr.name = '=='
-            elif expr.name == '<=': newexpr.name = '>'
-            elif expr.name == '<':  newexpr.name = '>='
-            elif expr.name == '>=': newexpr.name = '<'
-            elif expr.name == '>':  newexpr.name = '<='
+        if   expr.name == '==': newexpr.name = '!='
+        elif expr.name == '!=': newexpr.name = '=='
+        elif expr.name == '<=': newexpr.name = '>'
+        elif expr.name == '<':  newexpr.name = '>='
+        elif expr.name == '>=': newexpr.name = '<'
+        elif expr.name == '>':  newexpr.name = '<='
+        else: raise ValueError(f"Unknown comparison to negate {expr}")
+        # args are positive now, still check if no 'not' in its arguments
+        newexpr.args = push_down_negation(expr.args, toplevel=False)
         return newexpr
 
     elif isinstance(expr, Operator):
-        assert(not negative_context or expr.is_bool()), f"Can only negate boolean expressions but got {expr}"
+        assert(expr.is_bool()), f"Can only negate boolean expressions but got {expr}"
 
         if expr.name == "not":
-            return recurse_negation(expr.args[0], not negative_context)
+            # negation while in negative context = switch back to positive case
+            neg_args = push_down_negation(expr.args, toplevel=False)
+            return neg_args[0]  # not has only 1 argument
 
-        if negative_context and expr.name == "->":
-            # XXX this might create a top-level and
-            return expr.args[0] & recurse_negation(expr.args[1], True)
+        elif expr.name == "->":
+            # ~(x -> y) :: x & ~y
+            # arg0 remains positive, but check its arguments
+            # (must wrap awkwardly in a list, but can make no assumption about expr.args[0] has .args)
+            newarg0_lst = push_down_negation([expr.args[0]], toplevel=False)
+            return newarg0_lst[0] & recurse_negation(expr.args[1])
 
-        newexpr = copy.copy(expr)
-        newexpr.args = [recurse_negation(arg, negative_context) for arg in expr.args]
-        if negative_context:
+        else:
+            newexpr = copy.copy(expr)
             if   expr.name == "and": newexpr.name = "or"
             elif expr.name == "or": newexpr.name = "and"
-            else:
-                raise ValueError(f"Unknown operator to negate {expr}")
-        return newexpr
+            else: raise ValueError(f"Unknown operator to negate {expr}")
+            # continue negating the args
+            newexpr.args = [recurse_negation(a) for a in expr.args]
+            return newexpr
 
     # global constraints
-    if hasattr(expr, "decompose"):
-        return ~expr if negative_context else expr #TODO: recurse into arguments? This should be re-called after decompose_globals anyway...
+    elif hasattr(expr, "decompose"):
+        newexpr = copy.copy(expr)
+        # args are positive as we will negate the global, still check if no 'not' in its arguments
+        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        return ~newexpr
 
     # numvars or direct constraint
-    if negative_context:
+    else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
-
-    return expr
