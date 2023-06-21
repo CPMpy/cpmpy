@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
 from ..expressions.variables import NDVarArray, _BoolVarImpl, _IntVarImpl
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -105,7 +105,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
-            if isinstance(lhs, int) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
+            if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
                 if name == "<": name = ">"
                 elif name == ">": name=  "<"
                 elif name == "<=" : name = ">="
@@ -113,16 +113,16 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 lhs, rhs = rhs, lhs
             """
             Simplify expressions according to this table:
-            x  | <0	 0	 1	>1
-            --------------------
-            == |  F	~x	 x	 F
-            != |  T	 x	~x	 T
-            >  |  T	 x	 F	 F
-            <  |  F	 F	~x	 T
-            >= |  T	 T	 x	 F
-            <= |  F	~x	 T	 T
+            x  | <0	 0  0.n	 1	>1
+            ----------------------
+            == |  F	~x	 F   x	 F
+            != |  T	 x	 T  ~x	 T
+            >  |  T	 x	 x   F	 F
+            <  |  F	 F	~x  ~x	 T
+            >= |  T	 T	 x   x	 F   
+            <= |  F	~x	~x   T	 T
             """
-            if is_boolexpr(lhs) and isinstance(rhs, int):
+            if is_boolexpr(lhs) and is_num(rhs):
                 # direct simplification of boolean comparisons
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
@@ -135,6 +135,16 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         newlist.append(BoolVal(False))
                     if name == ">=":
                         newlist.append(BoolVal(True))
+                elif 0 < rhs < 1:
+                    # a floating point value
+                    if name == "==":
+                        newlist.append(BoolVal(False))
+                    if name == "!=":
+                        newlist.append(BoolVal(True))
+                    if name == "<" or name == "<=":
+                        newlist.append(~lhs)
+                    if name == ">" or name == ">=":
+                        newlist.append(lhs) # TODO: add recuse_negation here after merging #310
                 elif rhs == 1:
                     if name == "==" or name == ">=":
                         newlist.append(lhs)
