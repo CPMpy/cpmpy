@@ -37,12 +37,10 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Xor([x,y])  # a global constraint
     - ~x            Operator("not", [x])
-                    which in turn creates a NegBoolView()` in case x is a Boolean variable
+                    or NegBoolView(x) in case x is a Boolean variable
+    - x ^ y         Xor([x,y])  # a global constraint
 
-    Finally there are two special cases for logical operators 'implies' and '~/not'.
-    
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
 
