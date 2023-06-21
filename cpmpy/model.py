@@ -31,7 +31,8 @@ import copy
 import warnings
 
 import numpy as np
-from .expressions.core import Operator
+from .expressions.core import Expression
+from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -80,13 +81,23 @@ class Model(object):
             m = Model()
             m += [x > 0]
         """
-        # ignore empty clause
-        if is_any_list(con) and len(con)==0:
-            return self
+        if is_any_list(con):
+            # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
+            for elem in con:
+                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
+                    raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
-        if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
-            # top level list of constraints
-            con = con[0]
+            if len(con) == 0:
+                # ignore empty list
+                return self
+            elif len(con) == 1:
+                # unpack size 1 list
+                con = con[0]
+
+        elif isinstance(con, Expression) and not con.is_bool():
+            # catch some beginner mistakes: ensure that a top-level Expression has Boolean return type
+            raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{con}` does not.")
+
         self.constraints.append(con)
         return self
 
