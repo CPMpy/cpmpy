@@ -172,13 +172,14 @@ For reverse implication, you switch the arguments yourself; it is difficult to r
 
 We overload Pythons comparison operators: `==, !=, <, <=, >, >=`. Comparisons are allowed between any CPMpy expressions as well as Boolean and integer constants.
 
-On a technical note, we treat Booleans as a subclass of integer expressions. This means that a Boolean (output) expression can be used anywhere a numeric expression can be used. But the inverse is not true: integers can NOT be used with Boolean operators:
+On a technical note, we treat Booleans as a subclass of integer expressions. This means that a Boolean (output) expression can be used anywhere a numeric expression can be used, where `True` is treated as `1` and `False` as `0`. But the inverse is not true: integers can NOT be used with Boolean operators, even when you intialise their domain to (0,1) they are still not Boolean:
 
 ```python
 import cpmpy as cp
 
 bv = cp.boolvar()
 iv = cp.intvar(0,10)
+iv01 = cp.intvar(0,1)
 
 m = cp.Model(
     bv == True,         # allowed
@@ -190,6 +191,7 @@ m = cp.Model(
     # bv & iv,          # not allowed, choose one of:
     bv & (iv == 1),     # allowed
     bv & (iv != 0),     # allowed
+    # bv & iv01,        # not allowed, still an integer
 )
 ```
 
@@ -263,7 +265,7 @@ You may wonder if you are allowed to use functions like `abs(),min(),max()` beca
 
 In constraint solving, a global constraint is a function that expresses a relation between decision variables. There are **two pathways when solving** a model with global constraints: 1) the solver natively supports them, or 2) the constraint modelling library automatically _decomposes_ the constraint into an equivalent set of simpler constraints.
 
-A good example is the `AllDifferent()` global constraint that ensures all its arguments have distinct values. `AllDifferent(x,y,z)` can be decomposed into `[x!=y, x!=z, y!=z]`. In general, the decomposition consists of _n*(n-1)_ pairwise inequalities, which are simpler constraints that most solvers support.
+A good example is the `AllDifferent()` global constraint that ensures all its arguments have distinct values. `AllDifferent(x,y,z)` can be decomposed into `[x!=y, x!=z, y!=z]`. For AllDifferent, the decomposition consists of _n*(n-1)_ pairwise inequalities, which are simpler constraints that most solvers support.
 
 However, a solver that has specialised datastructures for this constraint specifically does not need to create the decomposition. Furthermore, for AllDifferent solvers can implement specialised algorithms that can propagate strictly stronger than the decomposed constraints can.
 
@@ -318,7 +320,7 @@ print(s.transform(cp.min(x) + cp.max(x) - 5 > 2*cp.Count(x, 2)))
 
 ```
 
-#### the Element numeric global constraint
+#### The Element numeric global constraint
 
 The `Element(Arr,Idx)` global constraint enforces that the result equals `Arr[Idx]` with `Arr` an array of constants or variables (the first argument) and `Idx` an integer decision variable, representing the index into the array.
 
@@ -326,7 +328,7 @@ The `Element(Arr,Idx)` global constraint enforces that the result equals `Arr[Id
 import cpmpy as cp
 
 arr = cp.intvar(1,10, shape=4)
-idx = cp.intvar(0,len(arr))  # indexing is offset 0
+idx = cp.intvar(0,len(arr)-1)  # indexing is offset 0
 
 m = cp.Model(
     cp.AllDifferent(arr),
@@ -337,7 +339,7 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` python function.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
 
 This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrapped the array** in our `cpm_array()` or call `Element()` directly:
 
@@ -443,7 +445,7 @@ There is much more to say on enumerating solutions and the use of callbacks or b
 
 ## Debugging a model
 
-The best place to start is to **print** the model you have created, or the individual constraints. If that looks fine (e.g. no integers, or shorter or longer expressions then what you intended), then have a look at what the constraint(s) look like after transformation:
+If the solver is complaining about your model, then a place to start debugging is to **print** the model you have created, or the individual constraints. If that looks fine (e.g. no integers, or shorter or longer expressions then what you intended) and you don't know which constraint specifically is causing the error, then you can feed the constraints incrementally to the solver you are using:
 
 ```python
 import cpmpy as cp
@@ -452,17 +454,21 @@ cons = []  # ... imagine a list of constraints
 print(cons)
 
 m = cp.Model(cons)  # any model created
+# visually inspect that the constraints match what you wanted to express
+# e.g. if you wrote `all(x)` instead of `cp.all(x)` it will contain 'True' instead of the conjunction
 print(m)
 
 s = cp.SolverLookup.get("ortools")
-print(s.transform(m.constraints))  # print the list of constraints after solver-specific transformations
+# feed the constraints one-by-one 
+for c in m.constraints:
+    s += c  # add the constraints incrementally until you hit the error
 ```
 
-If that is not sufficient, have a look at our detailed [Debugging guide](how_to_debug.md).
+If that is not sufficient or you want to debug an unexpected (non)solution, have a look at our detailed [Debugging guide](how_to_debug.md).
 
 ## Selecting a solver
 
-The default solver is ortools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
 See the full list of solvers known by CPMpy with:
 
@@ -564,18 +570,18 @@ gs += sum(ivar) == 3
 gs.solve()
 ```
  
-_Technical note_: ortools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
+_Technical note_: OR-Tools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
 
 ## Using solver-specific CPMpy functions
 
-We sometimes add solver-specific features to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OrTools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
+We sometimes add solver-specific features to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
 
 `solution_hint()` tells the solver that it could use these variable-values first during search, e.g. typically from a previous solution:
 ```python
-from cpmpy import *
-x = intvar(0,10, shape=3)
-s = SolverLookup.get("ortools")
-s += sum(x) <= 5
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3)
+s = cp.SolverLookup.get("ortools")
+s += cp.sum(x) <= 5
 # we are operating on a ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
@@ -596,24 +602,23 @@ The `DirectConstraint` will directly call a function of the underlying solver wh
 You provide it with the name of the function you want to call, as well as the arguments:
 
 ```python
-from cpmpy import *
-iv = intvar(1,9, shape=3)
+import cpmpy as cp
+iv = cp.intvar(1,9, shape=3)
 
-s = SolverLookup.get("ortools")
-
-s += AllDifferent(iv)
-s += DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OrTools
+s =  cp.SolverLookup.get("ortools")
+s += cp.AllDifferent(iv)
+s += cp.DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OR-Tools
 ```
 
 This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the argument to the native solver variable.
 
-Note that any argument given will be checked for whether it needs to be mapped to a native solver variable. This may give errors on complex arguments, or be inefficient. You can tell the `DirectConstraint` not to scan for variables with `noarg` argument, for example:
+Note that any argument given will be checked for whether it needs to be mapped to a native solver variable. This may give errors on complex arguments, or be inefficient. You can tell the `DirectConstraint` not to scan for variables with the `novar` argument, for example:
 
 ```python
-from cpmpy import *
-trans_vars = boolvar(shape=4, name="trans")
+import cpmpy as cp
+trans_vars = cp.boolvar(shape=4, name="trans")
 
-s = SolverLookup.get("ortools")
+s = cp.SolverLookup.get("ortools")
 
 trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (0, 0, 0),
@@ -622,23 +627,24 @@ trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (1, 0, 2),
     (2, 0, 2)
 ]
-s += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                      novar=[1, 2, 3])  # optional, what not to scan for vars
+s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                         novar=[1, 2, 3])  # optional, what arguments not to scan for vars
 ```
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
 
-The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) using of a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use ortools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
+The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) using of a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
 
 ### Directly accessing the underlying solver
 
 The `DirectConstraint("AddAllDifferent", iv)` is equivalent to the following code, which demonstrates that you can mix the use of CPMpy with calling the underlying solver directly: 
 
 ```python
-from cpmpy import *
-iv = intvar(1,9, shape=3)
+import cpmpy as cp
 
-s = SolverLookup.get("ortools")
+iv = cp.intvar(1,9, shape=3)
+
+s = cp.SolverLookup.get("ortools")
 
 s += AllDifferent(iv)  # the traditional way, equivalent to:
 s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
@@ -646,7 +652,7 @@ s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has 
 
 observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly.  This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint.
 
-While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so its use is identical to other constraints.
+While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so it can be part of a model like any other CPMpy constraint. Note that it can only be used as top-level (non-nested, non-reified) constraint.
 
 ## Hyperparameter search across different parameters
 Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
@@ -663,10 +669,10 @@ The parameter tuner is based on the following publication:
 Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.tools import ParameterTuner
 
-model = Model(...)
+model = cp.Model(...)
 
 tunables = {
     "search_branching":[0,1,2],
