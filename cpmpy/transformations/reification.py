@@ -44,7 +44,7 @@ def only_bv_implies(constraints):
                 #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
             elif isinstance(a1, Comparison) and \
-                    a1.name == '==' and a1.args[0].is_bool():
+                    a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
@@ -128,7 +128,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run `cpmpy.transformations.decompose_global.decompose_global` to decompose unsupported global constraints")
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition transformation from `cpmpy.transformations.decompose_global` to decompose unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op, (lhs, rhs) = boolexpr.name, boolexpr.args
@@ -143,7 +143,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    decomp = all(lhs.decompose_comparison(op, rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op, rhs)[0])  # decomp() returns list
                     #print(decomp)
                     if decomp is False:
                         # TODO uh... special case, can't insert a constant here with the current transformations...

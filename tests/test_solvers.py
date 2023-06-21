@@ -6,6 +6,7 @@ import cpmpy as cp
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
+from cpmpy.solvers.gurobi import CPM_gurobi
 
 from cpmpy.exceptions import MinizincNameException
 
@@ -404,6 +405,27 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_gcc(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+
+        iv = cp.intvar(-8, 8, shape=5)
+        occ = cp.intvar(0, len(iv), shape=3)
+        val = [1, 4, 5]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
+
     @pytest.mark.skipif(not CPM_z3.supported(),
                         reason="Z3 not installed")
     def test_z3(self):
@@ -466,3 +488,32 @@ class TestSolvers(unittest.TestCase):
             if cls.supported():
                 self.assertFalse(m.solve(solver=name))
 
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
+    def test_gurobi_element(self):
+        # test 1-D
+        iv = cp.intvar(-8, 8, 3)
+        idx = cp.intvar(-8, 8)
+        # test directly the constraint
+        constraints = [cp.Element(iv,idx) == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        # test through __get_item__
+        constraints = [iv[idx] == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv, idx).value() == 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        idx = cp.intvar(0, 3)
+        idx2 = cp.intvar(0, 3)
+        constraints = [iv[idx,idx2] == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)

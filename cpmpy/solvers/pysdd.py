@@ -27,8 +27,9 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list, is_bool
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 
 class CPM_pysdd(SolverInterface):
     """
@@ -207,10 +208,16 @@ class CPM_pysdd(SolverInterface):
         :return: list of Expression
         """
         # works on list of nested expressions
-        return toplevel_list(cpm_expr)
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_expr)
+        cpm_cons = simplify_boolean(cpm_expr)
+        return decompose_in_tree(toplevel_list(cpm_expr))
+
+        # actually supports nested Boolean operators natively...
+        return to_cnf(cpm_expr)
 
     def __add__(self, cpm_expr):
-        """
+      """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
@@ -277,9 +284,9 @@ class CPM_pysdd(SolverInterface):
                 return self.pysdd_manager.true()
             else:
                 return self.pysdd_manager.false()
-        
+
         elif not isinstance(cpm_con, Expression):
-            # a number or so 
+            # a number or so
             raise NotImplementedError(f"CPM_pysdd: Non supported object {cpm_con}")
 
         elif cpm_con.name == 'and':
@@ -312,9 +319,9 @@ class CPM_pysdd(SolverInterface):
 
         elif cpm_con.name == '!=':
             # ~(a0 == a1)
-            equiv = self._pysdd_expr(cpm_con.args[0] == cpm_con.args[1]) 
+            equiv = self._pysdd_expr(cpm_con.args[0] == cpm_con.args[1])
             return self.pysdd_manager.negate(equiv)
-            
+
         elif hasattr(cpm_con, 'decompose'):
             # for all global constraints: attempt to convert the decomposition
             all_cons = cpm_con.decompose()  # all of these must be true, conjoin
