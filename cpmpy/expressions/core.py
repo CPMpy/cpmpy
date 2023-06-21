@@ -70,11 +70,11 @@
 import copy
 import warnings
 from types import GeneratorType
-from collections.abc import Iterable
 import numpy as np
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
+
 
 class Expression(object):
     """
@@ -94,7 +94,7 @@ class Expression(object):
     def __init__(self, name, arg_list):
         self.name = name
 
-        if isinstance(arg_list, (tuple,GeneratorType)):
+        if isinstance(arg_list, (tuple, GeneratorType)):
             arg_list = list(arg_list)
         elif isinstance(arg_list, np.ndarray):
             # must flatten
@@ -107,16 +107,15 @@ class Expression(object):
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.args = arg_list
 
-
     def __repr__(self):
         strargs = []
         for arg in self.args:
             if isinstance(arg, np.ndarray):
                 # flatten
-                strarg = ",".join(map(str,arg.flat))
-                strargs.append( f"[{strarg}]" )
+                strarg = ",".join(map(str, arg.flat))
+                strargs.append(f"[{strarg}]")
             else:
-                strargs.append( f"{arg}" )
+                strargs.append(f"{arg}")
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
@@ -133,7 +132,7 @@ class Expression(object):
 
     def get_bounds(self):
         if self.is_bool():
-            return 0,1 #default for boolean expressions
+            return 0, 1 #default for boolean expressions
         raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
     # keep for backwards compatibility
@@ -158,14 +157,19 @@ class Expression(object):
         if self.is_bool() and is_num(other) and other == 1:
             return self
         return Comparison("==", self, other)
+
     def __ne__(self, other):
         return Comparison("!=", self, other)
+
     def __lt__(self, other):
         return Comparison("<", self, other)
+
     def __le__(self, other):
         return Comparison("<=", self, other)
+
     def __gt__(self, other):
         return Comparison(">", self, other)
+
     def __ge__(self, other):
         return Comparison(">=", self, other)
 
@@ -180,8 +184,8 @@ class Expression(object):
             return self
         if is_false_cst(other):
             return BoolVal(False)
-
         return Operator("and", [self, other])
+
     def __rand__(self, other):
         # catch beginner mistake
         if is_num(other):
@@ -191,7 +195,6 @@ class Expression(object):
             return self
         if is_false_cst(other):
             return BoolVal(False)
-
         return Operator("and", [other, self])
 
     def __or__(self, other):
@@ -203,8 +206,8 @@ class Expression(object):
             return BoolVal(True)
         if is_false_cst(other):
             return self
-
         return Operator("or", [self, other])
+
     def __ror__(self, other):
         # catch beginner mistake
         if is_num(other):
@@ -214,27 +217,26 @@ class Expression(object):
             return BoolVal(True)
         if is_false_cst(other):
             return self
-
         return Operator("or", [other, self])
 
     def __xor__(self, other):
-        # avoid cyclic import
-        from .globalconstraints import Xor
         # some simple constant removal
         if is_true_cst(other):
             return ~self
         if is_false_cst(other):
             return self
+        # avoid cyclic import
+        from .globalconstraints import Xor
         return Xor([self, other])
 
     def __rxor__(self, other):
-        # avoid cyclic import
-        from .globalconstraints import Xor
         # some simple constant removal
         if is_true_cst(other):
             return ~self
         if is_false_cst(other):
             return self
+        # avoid cyclic import
+        from .globalconstraints import Xor
         return Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
@@ -243,6 +245,7 @@ class Expression(object):
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [self, other])
+
     def __radd__(self, other):
         if is_num(other) and other == 0:
             return self
@@ -254,6 +257,7 @@ class Expression(object):
         #     return self
         # return Operator("sub", [self, other])
         return self.__add__(-other)
+
     def __rsub__(self, other):
         # if is_num(other) and other == 0:
         #     return -self
@@ -268,6 +272,7 @@ class Expression(object):
         #if is_num(other) and other == 0:
         #    return other
         return Operator("mul", [self, other])
+
     def __rmul__(self, other):
         if is_num(other) and other == 1:
             return self
@@ -282,21 +287,23 @@ class Expression(object):
     # other mathematical ones
     def __truediv__(self, other):
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
-        if is_num(other) and other == 1:
-            return self
-        return Operator("div", [self, other])
+        return self.__floordiv__(other)
+
     def __rtruediv__(self, other):
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
-        return Operator("div", [other, self])
+        return self.__rfloordiv__(other)
+
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
             return self
         return Operator("div", [self, other])
+
     def __rfloordiv__(self, other):
         return Operator("div", [other, self])
 
     def __mod__(self, other):
         return Operator("mod", [self, other])
+
     def __rmod__(self, other):
         return Operator("mod", [other, self])
 
@@ -307,12 +314,12 @@ class Expression(object):
         elif other == 1:
             return self
         return Operator("pow", [self, other])
+
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [other, self])
 
     # Not implemented: (yet?)
-    #object.__floordiv__(self, other)
     #object.__divmod__(self, other)
 
     # unary mathematical operators
@@ -324,14 +331,18 @@ class Expression(object):
             # negate the constant weights
             return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
         return Operator("-", [self])
+
     def __pos__(self):
         return self
+
     def __abs__(self):
         return Operator("abs", [self])
+
     def __invert__(self):
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
+
 
 class BoolVal(Expression):
     """
@@ -352,6 +363,7 @@ class BoolVal(Expression):
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
+
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
@@ -377,12 +389,12 @@ class Comparison(Expression):
     def value(self):
         arg_vals = [argval(a) for a in self.args]
         if any(a is None for a in arg_vals): return None
-        if   self.name == "==": return (arg_vals[0] == arg_vals[1])
-        elif self.name == "!=": return (arg_vals[0] != arg_vals[1])
-        elif self.name == "<":  return (arg_vals[0] < arg_vals[1])
-        elif self.name == "<=": return (arg_vals[0] <= arg_vals[1])
-        elif self.name == ">":  return (arg_vals[0] > arg_vals[1])
-        elif self.name == ">=": return (arg_vals[0] >= arg_vals[1])
+        if   self.name == "==": return arg_vals[0] == arg_vals[1]
+        elif self.name == "!=": return arg_vals[0] != arg_vals[1]
+        elif self.name == "<":  return arg_vals[0] < arg_vals[1]
+        elif self.name == "<=": return arg_vals[0] <= arg_vals[1]
+        elif self.name == ">":  return arg_vals[0] > arg_vals[1]
+        elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
 
 
@@ -414,8 +426,8 @@ class Operator(Expression):
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
-        arity, is_bool = Operator.allowed[name]
-        if is_bool:
+        arity, is_bool_op = Operator.allowed[name]
+        if is_bool_op:
             #only boolean arguments allowed
             for arg in arg_list:
                 if not is_boolexpr(arg):
@@ -435,10 +447,10 @@ class Operator(Expression):
                 all(not is_num(a) for a in arg_list) and \
                 any(_wsum_should(a) for a in arg_list):
             we = [_wsum_make(a) for a in arg_list]
-            w = [wi for w,_ in we for wi in w]
-            e = [ei for _,e in we for ei in e]
+            w = [wi for w, _ in we for wi in w]
+            e = [ei for _, e in we for ei in e]
             name = 'wsum'
-            arg_list = [w,e]
+            arg_list = [w, e]
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
@@ -458,8 +470,8 @@ class Operator(Expression):
                 i += 1
 
         # another cleanup, translate -(v*c) to v*-c
-        if hasattr(arg_list[0],'name'):
-            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args)==2:
+        if hasattr(arg_list[0], 'name'):
+            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args) == 2:
                 mul_args = arg_list[0].args
                 if is_num(mul_args[0]):
                     name = 'mul'
@@ -509,8 +521,8 @@ class Operator(Expression):
     def __eq__(self, other):
         if is_num(other) and other == 1:
             # check if bool operator, do not add == 1
-            arity, is_bool = Operator.allowed[self.name]
-            if is_bool:
+            _, is_bool_op = Operator.allowed[self.name]
+            if is_bool_op:
                 return self
         return super().__eq__(other)
 
@@ -555,8 +567,8 @@ class Operator(Expression):
         if self.is_bool():
             return 0, 1 #boolean
         elif self.name == 'mul':
-            lb1,ub1 = get_bounds(self.args[0])
-            lb2,ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
             bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             return min(bounds), max(bounds)
         elif self.name == 'sum':
@@ -567,7 +579,6 @@ class Operator(Expression):
             var_bounds = np.array([get_bounds(arg) for arg in vars]).T
             bounds = var_bounds * weights
             return bounds.min(axis=0).sum(), bounds.max(axis=0).sum()  # for every column is axis=0...
-
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
