@@ -81,23 +81,21 @@ class Model(object):
             m += [x > 0]
         """
         if is_any_list(con):
-            # ignore empty list
-            if len(con) == 0:
-                return self
-
-            # check that all Expressions are constraints
+            # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
             for elem in con:
-                if isinstance(elem, Expression) and not elem.is_bool():
-                    # TODO: fails on an ndvararray...
+                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
                     raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
-            # unpack size 1 list
-            if len(con) == 1:
+            if len(con) == 0:
+                # ignore empty list
+                return self
+            elif len(con) == 1:
+                # unpack size 1 list
                 con = con[0]
 
-        else:
-            if isinstance(con, Expression) and not con.is_bool():
-                raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{con}` does not.")
+        elif isinstance(con, Expression) and not con.is_bool():
+            # catch some beginner mistakes: ensure that a top-level Expression has Boolean return type
+            raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{con}` does not.")
 
         self.constraints.append(con)
         return self
