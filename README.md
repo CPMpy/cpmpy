@@ -1,3 +1,8 @@
+![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
+![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
+![PyPI downloads](https://img.shields.io/pypi/dm/cpmpy?label=Pypi%20Downloads&logo=pypi&logoColor=white)
+![Licence](https://img.shields.io/github/license/CPMpy/cpmpy?label=Licence)
+
 CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
 
 * Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
