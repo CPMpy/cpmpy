@@ -28,9 +28,10 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
-from ..transformations.decompose_global import decompose_global
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 import numpy as np
 import numbers
@@ -340,7 +341,7 @@ class CPM_exact(SolverInterface):
         xvars = []
         xrhs = 0
         
-        assert is_num(rhs), "RHS of inequality should be numeric after transformations"
+        assert is_num(rhs), "RHS of inequality should be numeric after transformations: {}".format(rhs)
         xrhs += rhs
 
         if is_num(lhs):
@@ -377,8 +378,9 @@ class CPM_exact(SolverInterface):
 
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'}))
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported=frozenset({'alldifferent'})) # alldiff has specialized MIP decomp in linearize
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
