@@ -32,6 +32,7 @@ import warnings
 
 import numpy as np
 from .expressions.core import Expression
+from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
