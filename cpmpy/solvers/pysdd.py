@@ -210,11 +210,8 @@ class CPM_pysdd(SolverInterface):
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
-        cpm_cons = simplify_boolean(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
-
-        # actually supports nested Boolean operators natively...
-        return to_cnf(cpm_expr)
 
     def __add__(self, cpm_expr):
         """
