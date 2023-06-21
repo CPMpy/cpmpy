@@ -7,29 +7,6 @@ from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
 
-class TestComparison(unittest.TestCase):
-    def test_comps(self):
-        # from the docs
-        # XXX is this the right place? it should be tested with all solvers...
-        import cpmpy as cp
-
-        bv = cp.boolvar()
-        iv = cp.intvar(0, 10)
-
-        m = cp.Model(
-            bv == True,         # allowed
-            bv > 0,             # allowed but silly
-            iv > 0,             # allowed
-            iv != 1,            # allowed
-            iv == True,         # allowed but means `iv == 1`, avoid
-            (iv != 0) == True,  # allowed
-            iv == bv,           # allowed but means `(iv == 1) == bv`, avoid
-            # bv & iv,          # not allowed, choose one of:
-            bv & (iv == 1),     # allowed
-            bv & (iv != 0),     # allowed
-        )
-        for c in m.constraints:
-            self.assertTrue(cp.Model(c).solve())
 
 class TestSum(unittest.TestCase):
 

@@ -61,15 +61,13 @@ def only_bv_implies(constraints):
                 # BVar0 == BVar1 special case, no need to re-transform
                 newcons.append(a0.implies(a1))
                 newcons.append(a1.implies(a0))
-            elif not a1.is_bool():
-                # if a rhs integer is involved with a lhs bool,
-                # then it is actually an integer expression, keep
-                newcons.append(cpm_expr)
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
                 newexprs = ((~a1).implies(negated_normal(a0)), a1.implies(a0))
                 #newexprs = ((~a1).implies(~a0), a1.implies(a0))  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
+            # XXX there used to be a weird
+            # BE0 == IVar1 :: IVar1 = BVarX, ~BVarX -> ~BE, BVarX -> BE
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
