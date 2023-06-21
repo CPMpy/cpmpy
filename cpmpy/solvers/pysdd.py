@@ -209,15 +209,15 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_expr)
-        cpm_cons = simplify_boolean(cpm_expr)
-        return decompose_in_tree(toplevel_list(cpm_expr))
+        cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons)
+        return cpm_cons
 
         # actually supports nested Boolean operators natively...
         return to_cnf(cpm_expr)
 
     def __add__(self, cpm_expr):
-      """
+        """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
@@ -234,6 +234,7 @@ class CPM_pysdd(SolverInterface):
 
         :return: self
         """
+
         newvars = get_variables(cpm_expr)
 
         # check only Boolean variables
@@ -321,11 +322,6 @@ class CPM_pysdd(SolverInterface):
             # ~(a0 == a1)
             equiv = self._pysdd_expr(cpm_con.args[0] == cpm_con.args[1])
             return self.pysdd_manager.negate(equiv)
-
-        elif hasattr(cpm_con, 'decompose'):
-            # for all global constraints: attempt to convert the decomposition
-            all_cons = cpm_con.decompose()  # all of these must be true, conjoin
-            return reduce(self.pysdd_manager.conjoin, [self._pysdd_expr(a) for a in all_cons])
 
         # a direct constraint, call on manager
         # WARNING: will only work when all args are variables or constants!
