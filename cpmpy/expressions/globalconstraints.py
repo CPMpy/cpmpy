@@ -116,7 +116,7 @@ import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, _NumVarImpl
+from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 
 # Base class GlobalConstraint
@@ -431,15 +431,28 @@ class InDomain(GlobalConstraint):
         super().__init__("InDomain", [expr, arr], is_bool=True)
 
     def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
+        """
         from .python_builtins import any
         expr, arr = self.args
         lb, ub = expr.get_bounds()
+
+        defining = []
+        #if expr is not a var
+        if not isinstance(expr,_IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
         expressions = any(isinstance(a, Expression) for a in arr)
         if expressions:
-            return [any(expr == a for a in arr)], []
+            return [any(expr == a for a in arr)], defining
         else:
-            # find intervals in the domain given:
-            return [expr != val for val in range(lb, ub + 1) if val not in arr]
+            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
 
 
     def value(self):
