@@ -298,6 +298,7 @@ def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
 
+    expr = simplify_boolean([expr])[0]
     (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)
