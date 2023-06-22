@@ -125,26 +125,20 @@ class GlobalConstraint(Expression):
         Abstract superclass of GlobalConstraints
 
         Like all expressions it has a `.name` and `.args` property.
-        Overwrites the `.is_bool()` method. You can indicate
-        in the constructor whether it has Boolean return type or not.
+        Overwrites the `.is_bool()` method.
     """
-    # is_bool: whether this is normal constraint (True or False)
-    #   not is_bool: it computes a numeric value (ex: Minimum, Element)
-    def __init__(self, name, arg_list, is_bool=True):
-        super().__init__(name, arg_list)
-        self._is_bool = is_bool
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
-        return self._is_bool
+        return True
 
     def decompose(self):
         """
             Returns a decomposition into smaller constraints.
 
             The decomposition might create auxiliary variables
-            and use other other global constraints as long as
+            and use other global constraints as long as
             it does not create a circular dependency.
 
             To ensure equivalence of decomposition, we split into contraining and defining constraints.
@@ -317,7 +311,7 @@ class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError("only boolean expression allowed in IfThenElse")
-        super().__init__("ite", [condition, if_true, if_false], is_bool=True)
+        super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
         condition, if_true, if_false = self.args
@@ -336,90 +330,7 @@ class IfThenElse(GlobalConstraint):
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
-class Minimum(GlobalConstraint):
-    """
-        Computes the minimum value of the arguments
-
-        It is a 'functional' global constraint which implicitly returns a numeric variable
-    """
-    def __init__(self, arg_list):
-        super().__init__("min", flatlist(arg_list), is_bool=False)
-
-    def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
-            return None
-        else:
-            return min(argvals)
-
-    def decompose_comparison(self, cpm_op, cpm_rhs):
-        """
-        Decomposition if it's part of a comparison
-        Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
-        """
-        from .python_builtins import any, all
-        if cpm_op == "==": # can avoid creating aux var
-            return [any(x <= cpm_rhs for x in self.args),
-                    all(x >= cpm_rhs for x in self.args)], []
-
-        lb, ub = self.get_bounds()
-        _min = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _min, cpm_rhs)], \
-               [any(x <= _min for x in self.args), all(x >= _min for x in self.args),]
-
-    def get_bounds(self):
-        """
-        Returns the bounds of the (numerical) global constraint
-        """
-        bnds = [get_bounds(x) for x in self.args]
-        return min(lb for lb,ub in bnds), min(ub for lb,ub in bnds)
-
-
-class Maximum(GlobalConstraint):
-    """
-        Computes the maximum value of the arguments
-
-        It is a 'functional' global constraint which implicitly returns a numeric variable
-    """
-    def __init__(self, arg_list):
-        super().__init__("max", flatlist(arg_list), is_bool=False)
-
-    def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
-            return None
-        else:
-            return max(argvals)
-
-    def decompose_comparison(self, cpm_op, cpm_rhs):
-        """
-        Decomposition if it's part of a comparison
-        Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
-        """
-        from .python_builtins import any, all
-        if cpm_op == "==": # can avoid creating aux var here
-            return [any(x >= cpm_rhs for x in self.args),
-                    all(x <= cpm_rhs for x in self.args)], []
-
-        lb, ub = self.get_bounds()
-        _max = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _max, cpm_rhs)], \
-               [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
-
-    def get_bounds(self):
-        """
-        Returns the bounds of the (numerical) global constraint
-
-        """
-        bnds = [get_bounds(x) for x in self.args]
-        return max(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
-
+      
 class InDomain(GlobalConstraint):
     """
         The "InDomain" constraint, defining non-interval domains for an expression
@@ -460,68 +371,6 @@ class InDomain(GlobalConstraint):
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
-
-
-def element(arg_list):
-    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
-    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
-    return Element(arg_list[0], arg_list[1])
-class Element(GlobalConstraint):
-    """
-        The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants of variables (the first argument)
-        and 'Idx' an integer decision variable, representing the index into the array.
-
-        Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
-        an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
-
-        Element is a CPMpy built-in global constraint, so the class implements a few more
-        extra things for convenience (.value() and .__repr__()). It is also an example of
-        a 'numeric' global constraint.
-    """
-
-    def __init__(self, arr, idx):
-        if is_boolexpr(idx):
-            raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        super().__init__("element", [arr, idx], is_bool=False)
-
-    def value(self):
-        arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
-        return None # default
-
-    def decompose_comparison(self, cpm_op, cpm_rhs):
-        """
-            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
-            It is not a constraint itself, so it can not have a decompose().
-            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
-            it is a constraint, and that one can be decomposed.
-            Returns two lists of constraints:
-                1) constraints representing the comparison
-                2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-                   they should be enforced toplevel.
-
-        """
-        from .python_builtins import any
-
-        arr, idx = self.args
-        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)], []
-
-    def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
-
-    def get_bounds(self):
-        """
-        Returns the bounds of the (numerical) global constraint
-        """
-        arr, idx = self.args
-        bnds = [get_bounds(x) for x in arr]
-        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 
 class Xor(GlobalConstraint):
@@ -659,6 +508,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         super().__init__("gcc", [vars,vals,occ])
 
     def decompose(self):
+        from .globalfunctions import Count
         vars, vals, occ = self.args
         return [Count(vars, i) == v for i, v in zip(vals, occ)], []
 
@@ -666,36 +516,6 @@ class GlobalCardinalityCount(GlobalConstraint):
         from .python_builtins import all
         decomposed, _ = self.decompose()
         return all(decomposed).value()
-
-
-class Count(GlobalConstraint):
-    """
-    The Count (numerical) global constraint represents the number of occurrences of val in arr
-    """
-
-    def __init__(self,arr,val):
-        if is_any_list(val) or not is_any_list(arr):
-            raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
-        super().__init__("count", [arr,val], is_bool=False)
-
-    def decompose_comparison(self, cmp_op, cmp_rhs):
-        """
-        Count(arr,val) can only be decomposed if it's part of a comparison
-        """
-        arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
-
-    def value(self):
-        arr, val = self.args
-        val = argval(val)
-        return sum([argval(a) == val for a in arr])
-
-    def get_bounds(self):
-        """
-        Returns the bounds of the (numerical) global constraint
-        """
-        arr, val = self.args
-        return 0, len(arr)
 
 
 class DirectConstraint(Expression):

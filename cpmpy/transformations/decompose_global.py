@@ -3,6 +3,7 @@ import warnings  # for deprecation warning
 
 from .normalize import toplevel_list
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
@@ -50,7 +51,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
 
-        elif isinstance(expr, GlobalConstraint):
+        elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
             expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
@@ -64,6 +65,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 newlist.append(expr)
             else:
                 if expr.is_bool():
+                    assert isinstance(expr, GlobalConstraint)
                     # boolean global constraints
                     dec = expr.decompose()
                     if not isinstance(dec, tuple):
@@ -77,7 +79,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     newlist.append(all(decomposed))
 
                 else:
-                    # numeric global constraint, replace by a fresh variable and decompose the equality to this
+                    # global function, replace by a fresh variable and decompose the equality to this
+                    assert isinstance(expr, GlobalFunction)
                     lb,ub = expr.get_bounds()
                     aux = intvar(lb, ub)
 
@@ -96,9 +99,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             lhs, rhs = expr.args
             exprname = expr.name  # can change when rhs needs decomp
 
-            # TODO: change hasattr to global functions class check
-            decomp_lhs = hasattr(lhs, "decompose_comparison") and not lhs.name in supported
-            decomp_rhs = hasattr(rhs, "decompose_comparison") and not rhs.name in supported
+            decomp_lhs = isinstance(lhs, GlobalFunction) and not lhs.name in supported
+            decomp_rhs = isinstance(rhs, GlobalFunction) and not rhs.name in supported
 
             if not decomp_lhs:
                 if not decomp_rhs:
@@ -171,12 +173,12 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
     """
     def _is_supported(cpm_expr, reified):
-        if isinstance(cpm_expr, GlobalConstraint) and cpm_expr.is_bool():
+        if isinstance(cpm_expr, GlobalConstraint):
             if reified and cpm_expr.name not in supported_reif:
                 return False
             if not reified and cpm_expr.name not in supported:
                 return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalConstraint):
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalFunction):
             if not cpm_expr.args[0].name in supported:
                 # reified numerical global constraints can be rewritten to non-reified versions
                 #  so only have to check for 'supported' set

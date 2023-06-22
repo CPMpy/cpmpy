@@ -46,7 +46,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
     only resulting boolean constant is literal 'false'
     - list_of_expr: list of CPMpy expressions
     """
-
+    from .negation import recurse_negation # avoid circular import
     newlist = []
     for expr in lst_of_expr:
 
@@ -87,7 +87,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 elif is_true_cst(cond):
                     newlist.append(bool_expr)
                 elif is_false_cst(bool_expr):
-                    newlist += simplify_boolean([~cond])
+                    newlist += simplify_boolean([recurse_negation(cond)])
                 else:
                     newlist.append(cond.implies(bool_expr))
 
@@ -130,7 +130,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "!=" or name == ">":
                         newlist.append(lhs)
                     if name == "==" or name == "<=":
-                        newlist.append(~lhs)
+                        newlist.append(recurse_negation(lhs))
                     if name == "<":
                         newlist.append(BoolVal(False))
                     if name == ">=":
@@ -139,7 +139,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "==" or name == ">=":
                         newlist.append(lhs)
                     if name == "!=" or name == "<":
-                        newlist.append(~lhs)
+                        newlist.append(recurse_negation(lhs))
                     if name == ">":
                         newlist.append(BoolVal(False))
                     if name == "<=":
