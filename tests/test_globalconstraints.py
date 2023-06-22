@@ -2,7 +2,7 @@ import copy
 import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
-from cpmpy.expressions.globalfunctions import GlobalFunction
+from cpmpy.expressions.globalfunctions import GlobalFunction, Abs
 from cpmpy.exceptions import TypeError
 
 class TestGlobal(unittest.TestCase):
@@ -469,6 +469,15 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr<lb).solve())
         self.assertFalse(cp.Model(expr>ub).solve())
+
+    def test_bounds_abs(self):
+        x = cp.intvar(-8, 5)
+        y = cp.intvar(-7, -2)
+        z = cp.intvar(1, 9)
+        for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
+            lb, ub = Abs(var).get_bounds()
+            self.assertEqual(test_lb,lb)
+            self.assertEqual(test_ub,ub)
 
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
