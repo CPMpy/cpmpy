@@ -339,7 +339,7 @@ class InDomain(GlobalConstraint):
     def __init__(self, expr, arr):
         assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
             "The expressions in the InDomain constraint should not be boolean"
-        super().__init__("InDomain", [expr, arr], is_bool=True)
+        super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
         """
