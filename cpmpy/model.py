@@ -58,21 +58,12 @@ class Model(object):
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # list of constraints
-        if len(args) == 0:
-            self.constraints = []
-        elif len(args) == 1 and is_any_list(args[0]):
-            for elem in args[0]:
-                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
-                    raise Exception(
-                        f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
+        self.constraints = []
+        if len(args) == 1 and is_any_list(args[0]):
             # top level list of constraints
-            self.constraints = list(args[0]) # make sure it is a Python list
+            self += args[0]
         else:
-            for elem in args:
-                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
-                    raise Exception(
-                        f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
-            self.constraints = list(args) # instead of tuple
+            self += args
 
         # objective: an expresion or None
         self.objective_ = None
