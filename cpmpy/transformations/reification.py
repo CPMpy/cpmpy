@@ -1,6 +1,7 @@
 import copy
 from ..expressions.core import Operator, Comparison, Expression
-from ..expressions.globalconstraints import GlobalConstraint, Element
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list

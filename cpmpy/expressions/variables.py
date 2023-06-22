@@ -435,7 +435,7 @@ class NDVarArray(Expression, np.ndarray):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalconstraints import Element # here to avoid circular
+        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
@@ -535,7 +535,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .globalconstraints import Maximum
+        from .globalfunctions import Maximum
         if out is not None:
             raise NotImplementedError()
 
@@ -556,7 +556,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .globalconstraints import Minimum
+        from .globalfunctions import Minimum
         if out is not None:
             raise NotImplementedError()
 
