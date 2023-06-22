@@ -94,7 +94,7 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
 
         expr = (self.ivs[0] <= self.ivs[1]) < 0.8
-        self.assertEqual(str(self.transform(expr)), '[not([(iv[0]) <= (iv[1])])]')
+        self.assertEqual(str(self.transform(expr)), '[(iv[0]) > (iv[1])]')
 
         expr = (self.ivs[0] == self.ivs[1]) == 1.0
         self.assertEqual(str(self.transform(expr)), '[(iv[0]) == (iv[1])]')
