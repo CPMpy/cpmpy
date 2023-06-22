@@ -108,8 +108,9 @@ class CPM_exact(SolverInterface):
     def _fillObjAndVars(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
-            for cpm_var in lst_vars:
+            for cpm_var in self.user_vars:
                 cpm_var._value = None
+            return
 
         # fill in variable values
         lst_vars = list(self.user_vars)
