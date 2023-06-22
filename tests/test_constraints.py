@@ -21,8 +21,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"z3":{"abs"},
-                     "gurobi": {"mod"},
+EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      }
