@@ -61,9 +61,9 @@ class Model(object):
         self.constraints = []
         if len(args) == 1 and is_any_list(args[0]):
             # top level list of constraints
-            self += list(args[0])
+            self += args[0]
         else:
-            self += list(args)
+            self += args
 
         # objective: an expresion or None
         self.objective_ = None
