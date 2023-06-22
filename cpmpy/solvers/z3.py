@@ -25,10 +25,8 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
-from ..expressions.python_builtins import min, max,any, all
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.normalize import toplevel_list
 from ..transformations.normalize import toplevel_list, simplify_boolean
 
 
@@ -314,6 +312,7 @@ class CPM_z3(SolverInterface):
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         elif isinstance(cpm_con, Operator):
+            arity, _ = Operator.allowed[cpm_con.name]
             # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
                 return z3.And(self._z3_expr(cpm_con.args))
@@ -332,43 +331,25 @@ class CPM_z3(SolverInterface):
                 x = self._z3_expr(cpm_con.args[1])
                 return z3.Sum([wi*xi for wi,xi in zip(w,x)])
 
-            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'mod'/2
-            elif cpm_con.name == 'sub':
-                lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, z3.BoolRef):
-                    rhs = z3.If(rhs,1,0)
-                return lhs - rhs
-            elif cpm_con.name == "mul":
+            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
+            elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
-                lhs , rhs = self._z3_expr(cpm_con.args)
+                lhs, rhs = self._z3_expr(cpm_con.args)
                 if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs,1,0)
+                    lhs = z3.If(lhs, 1, 0)
                 if isinstance(rhs, z3.BoolRef):
-                    lhs = z3.If(rhs,1,0)
-                return lhs * rhs
-            elif cpm_con.name == "div":
-                lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, z3.BoolRef):
-                    lhs = z3.If(rhs,1,0)
-                return lhs / rhs
-            elif cpm_con.name == "pow":
-                lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, z3.BoolRef):
-                    lhs = z3.If(rhs,1,0)
-                return lhs ** rhs
-            elif cpm_con.name == "mod":
-                lhs , rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs,1,0)
-                if isinstance(rhs, z3.BoolRef):
-                    rhs = z3.If(lhs,1,0)
-                return lhs % rhs
+                    rhs = z3.If(rhs, 1, 0)
+
+                if cpm_con.name == 'sub':
+                    return lhs - rhs
+                elif cpm_con.name == "mul":
+                    return lhs * rhs
+                elif cpm_con.name == "div":
+                    return lhs / rhs
+                elif cpm_con.name == "pow":
+                    return lhs ** rhs
+                elif cpm_con.name == "mod":
+                    return lhs % rhs
 
             # '-'/1
             elif cpm_con.name == "-":
@@ -382,8 +363,6 @@ class CPM_z3(SolverInterface):
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
-            lhs_is_expr = isinstance(lhs, Expression)
-            rhs_is_expr = isinstance(rhs, Expression)
 
             # 'abs'/1 # TODO is unsupported, abs should become global constraint
             # if lhs_is_expr and lhs.name == "abs":
@@ -393,47 +372,28 @@ class CPM_z3(SolverInterface):
             #     arg = rhs.args[0]
             #     return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
 
+            lhs_bexpr = is_boolexpr(lhs)
+            rhs_bexpr = is_boolexpr(rhs)
 
-            if cpm_con.name == "==":
-                # '==' is not supported between a boolean expression and an arithmetic expression
-                if is_boolexpr(lhs) and not is_boolexpr(rhs):
-                    # lhs is bool and rhs is arith, make lhs also arith
-                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
-                else:
-                    lhs = self._z3_expr(lhs)
-                rhs = self._z3_expr(rhs)
-                return (lhs == rhs)
+            lhs, rhs = self._z3_expr(cpm_con.args)
 
-            elif cpm_con.name == '!=':
-                # '!=' is supported between 2 boolrefs
-                if is_boolexpr(lhs) and not is_boolexpr(rhs):
-                    # lhs is bool and rhs is arith, make lhs also arith
-                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
-                else:
-                    lhs = self._z3_expr(lhs)
-                rhs = self._z3_expr(rhs)
-                return (lhs != rhs)
+            if cpm_con.name == "==" or cpm_con.name == "!=":
+                # z3 supports bool <-> bool comparison but not bool <-> arith
+                if lhs_bexpr and not rhs_bexpr:
+                    # upcast lhs to integer
+                    lhs = z3.If(lhs, 1, 0)
+                elif rhs_bexpr and not lhs_bexpr:
+                    # upcase rhs to integer
+                    rhs = z3.If(rhs, 1, 0)
             else:
-                # other comparisons are not supported on boolrefs, so convert with if then else
-                if is_boolexpr(lhs):
-                    lhs = z3.If(self._z3_expr(lhs), 1, 0)
-                else:
-                    lhs = self._z3_expr(lhs)
+                # other comparisons are not supported on boolexpr
+                if lhs_bexpr: # upcast lhs
+                    lhs = z3.If(lhs, 1, 0)
+                if rhs_bexpr: # upcase rhs
+                    rhs = z3.If(rhs, 1, 0)
 
-                if is_boolexpr(rhs):
-                    rhs = z3.If(self._z3_expr(rhs), 1, 0)
-                else:
-                    rhs = self._z3_expr(rhs)
-
-                # post the comparison
-                if cpm_con.name == '<=':
-                    return (lhs <= rhs)
-                elif cpm_con.name == '<':
-                    return (lhs < rhs)
-                elif cpm_con.name == '>=':
-                    return (lhs >= rhs)
-                elif cpm_con.name == '>':
-                    return (lhs > rhs)
+            # post the comparison
+            return eval_comparison(cpm_con.name, lhs, rhs)
 
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
