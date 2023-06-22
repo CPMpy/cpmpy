@@ -71,7 +71,7 @@ def numexprs(solver):
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,2]
         elif name == "mod":
-            operator_args = [NUM_ARGS[0],POS_VAR]
+            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
