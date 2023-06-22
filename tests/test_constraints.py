@@ -36,8 +36,6 @@ EXCLUDE_IMPL = {"ortools": {},
                 "pysdd": {},
                 "exact": {"mod","pow","div","mul"},
                 }
-# TODO: remove "min", "max", "circuit" from exact once the decompose globals branch is merged
-# TODO: remove "circuit" from the other solvres once the decompose globals branch is merged
 # TODO: remove "abs" from exact when it is a global constraint with a nice decomposition
 
 
