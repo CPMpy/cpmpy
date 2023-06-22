@@ -60,6 +60,8 @@ Also callback with an anonymous lambda function possible:
 n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={sum(x.value())}") 
 ```
 
+See the [set_game.ipynb](https://github.com/CPMpy/cpmpy/blob/master/examples/set_game.ipynb) for an example of how we use it as a callback to call a plotting function, to plot all the solutions as they are found.
+
 A callback is also the (only) way to go if you want to store information about all the found solutions (only recommended for small numbers of solutions).
 ```python
 solutions = []
