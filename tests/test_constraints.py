@@ -72,7 +72,7 @@ def numexprs(solver):
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,2]
         elif name == "mod":
-            operator_args = [NUM_ARGS[0],POS_VAR]
+            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
@@ -93,19 +93,19 @@ def comp_constraints(solver):
     """
     for comp_name in Comparison.allowed:
         for numexpr in numexprs(solver):
-            for rhs in [NUM_VAR, 1, BoolVal(True)]:
+            for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
                 yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
-                for rhs in [NUM_VAR,1, BoolVal(True)]:
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
                     yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
         for comp_name in Comparison.allowed:
             for boolexpr in bool_exprs(solver):
-                for rhs in [NUM_VAR, 1, BoolVal(True)]:
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
                     if comp_name == '>':
                         # >1 is unsat for boolean expressions, so change it to 0
                         if isinstance(rhs, int) and rhs == 1:
