@@ -115,6 +115,8 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(get_or_make_var( (a > 10) )), "(BV26, [(IV0 > 10) == (BV26)])" )
         self.assertEqual( str(get_or_make_var( (a > 10)&x&y )), "(BV28, [(and([BV27, BV0, BV1])) == (BV28), (IV0 > 10) == (BV27)])" )
 
+        self.assertEqual( str(get_or_make_var(Operator('not', [x]) == y)), '(BV29, [((~BV0) == (BV1)) == (BV29)])' )
+
     def test_get_or_make_var__num(self):
         (a,b,c,d,e) = self.ivars[:5]
 
@@ -215,3 +217,5 @@ class TestFlattenExpr(unittest.TestCase):
 
         # != in boolexpr, bug #170
         self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])" )
+        #simplify output
+        self.assertEqual( str(normalized_boolexpr(Operator('not',[x]) == y)), "((~BV0) == (BV1), [])" )
