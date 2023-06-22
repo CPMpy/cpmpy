@@ -37,12 +37,10 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Xor([x,y])  # a global constraint
     - ~x            Operator("not", [x])
-                    which in turn creates a NegBoolView()` in case x is a Boolean variable
+                    or NegBoolView(x) in case x is a Boolean variable
+    - x ^ y         Xor([x,y])  # a global constraint
 
-    Finally there are two special cases for logical operators 'implies' and '~/not'.
-    
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
 
@@ -155,9 +153,12 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
-        # BoolExpr == 1|true, then simply BoolExpr
-        if self.is_bool() and is_num(other) and other == 1:
-            return self
+        # BoolExpr == 1|true|0|false, common case, simply BoolExpr
+        if self.is_bool() and is_num(other):
+            if other is True or other == 1:
+                return self
+            if other is False or other == 0:
+                return ~self
         return Comparison("==", self, other)
 
     def __ne__(self, other):
@@ -370,10 +371,6 @@ class Comparison(Expression):
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
 
-    def __hash__(self):
-        # __hash__ is None be default as __eq__ is overwritten
-        return super().__hash__()
-
     # return the value of the expression
     # optional, default: None
     def value(self):
@@ -502,19 +499,6 @@ class Operator(Expression):
                                      wrap_bracket(self.args[1]))
 
         return "{}({})".format(self.name, self.args)
-
-    def __hash__(self):
-        # __hash__ is None be default as __eq__ is overwritten
-        return super().__hash__()
-
-    # if self is bool, special case
-    def __eq__(self, other):
-        if is_num(other) and other == 1:
-            # check if bool operator, do not add == 1
-            _, is_bool_op = Operator.allowed[self.name]
-            if is_bool_op:
-                return self
-        return super().__eq__(other)
 
     def value(self):
         if self.name == "wsum":
