@@ -87,6 +87,8 @@ from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from .negation import recurse_negation, push_down_negation
+
 
 def flatten_model(orig_model):
     """
@@ -126,9 +128,10 @@ def flatten_constraint(expr):
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
-    normalized_list = toplevel_list(expr)
-    normalized_list = simplify_boolean(normalized_list)
-    for expr in normalized_list:
+    lst_of_expr = toplevel_list(expr)               # ensure it is a list
+    lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
+    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
+    for expr in lst_of_expr:
 
         if isinstance(expr, _BoolVarImpl):
             newlist.append(expr)
@@ -140,14 +143,10 @@ def flatten_constraint(expr):
             - Implication: Boolexpr -> Var                         (CPMpy class 'Operator', is_bool())
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
-            if expr.name == 'not':
-                newlist.extend(flatten_constraint(negated_normal(expr.args[0])))
-                continue
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
                 continue
-
             elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
@@ -174,7 +173,6 @@ def flatten_constraint(expr):
             elif expr.name == '->':
                 # some rewrite rules that avoid creating auxiliary variables
                 # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
-                # XXX ideally negations are already pushed down, so a0->~(or(...)) is also covered
                 if expr.args[1].name == 'and':
                     a1s = expr.args[1].args
                     a0 = expr.args[0]
@@ -365,7 +363,7 @@ def get_or_make_var_or_list(expr):
 
 def normalized_boolexpr(expr):
     """
-        input is any Boolean (is_bool()) expression,
+        input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
             - subexpr == BoolVar
             - subexpr -> BoolVar
@@ -396,10 +394,8 @@ def normalized_boolexpr(expr):
             (rhs,rcons) = get_or_make_var(expr.args[1])
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
-            nnexpr = negated_normal(expr.args[0])
-            if __is_flat_var(nnexpr):
-                return nnexpr, []
-            return normalized_boolexpr(nnexpr)
+            flatvar, flatcons = get_or_make_var(expr.args[0])
+            return (~flatvar, flatcons)
         if all(__is_flat_var(arg) for arg in expr.args):
             return (expr, [])
         else:
@@ -431,7 +427,7 @@ def normalized_boolexpr(expr):
                     # BoolExpr == 0|False
                     assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
                     if exprname == '==':
-                        nnexpr = negated_normal(lexpr)
+                        nnexpr = recurse_negation(lexpr)
                         return normalized_boolexpr(nnexpr)
                     else: # !=, should only be possible in dubble negation
                         return normalized_boolexpr(lexpr)
@@ -552,66 +548,3 @@ def normalized_numexpr(expr):
 
     raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug
 
-def negated_normal(expr):
-    """
-        WORK IN PROGRESS
-        Negate 'expr' by pushing the negation down into it and its args
-
-        Comparison: swap comparison sign
-        Operator.is_bool(): apply DeMorgan
-        Global: decompose and negate that
-
-        This function only ensures 'negated normal' for the top-level
-        constraint (negating arguments recursively as needed),
-        it does not ensure flatness (except if the input is flat)
-    """
-
-    if __is_flat_var(expr):
-        return ~expr
-
-    elif isinstance(expr, Comparison):
-        if expr.name == '==' and is_boolexpr(expr.args[0]) \
-           and is_boolexpr(expr.args[1]):
-            # Boolean case, double reification, keep == and negate arg1
-            return Comparison('==', expr.args[0], negated_normal(expr.args[1]))
-
-        newexpr = copy.copy(expr)
-        if   expr.name == '==': newexpr.name = '!='
-        elif expr.name == '!=': newexpr.name = '=='
-        elif expr.name == '<=': newexpr.name = '>'
-        elif expr.name == '<':  newexpr.name = '>='
-        elif expr.name == '>=': newexpr.name = '<'
-        elif expr.name == '>':  newexpr.name = '<='
-        return newexpr
-
-    elif isinstance(expr, Operator):
-        assert(expr.is_bool())
-
-        if expr.name == 'and':
-            return Operator('or', [negated_normal(arg) for arg in expr.args])
-        elif expr.name == 'or':
-            # XXX this might create a top-level and
-            return Operator('and', [negated_normal(arg) for arg in expr.args])
-        elif expr.name == '->':
-            # XXX this might create a top-level and
-            return expr.args[0] & negated_normal(expr.args[1])
-        elif expr.name == 'not':
-            return expr.args[0]
-        else:
-            #raise NotImplementedError("negate_normal {}".format(expr))
-            # XXX do raise, better safe then sorry
-            return expr == 0 # can't do better than this...
-
-    elif isinstance(expr,BoolVal):
-        return BoolVal(not expr.args[0])
-
-    else: # circular if I import GlobalConstraint here...
-        if hasattr(expr, "decompose_negation"):
-            # for global constraints where the negation of the decomposition is not equivalent
-            # to the negated global constraint (due to auxiliary variables, i.e. Circuit)
-            return Operator('and', expr.decompose_negation())
-        if hasattr(expr, "decompose"):
-            # global... decompose and negate that
-            return negated_normal(Operator('and', expr.decompose()))
-        else:
-            raise NotImplementedError("negate_normal {}".format(expr))
