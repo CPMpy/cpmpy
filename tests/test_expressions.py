@@ -7,6 +7,29 @@ from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
 
+class TestComparison(unittest.TestCase):
+    def test_comps(self):
+        # from the docs
+        # XXX is this the right place? it should be tested with all solvers...
+        import cpmpy as cp
+
+        bv = cp.boolvar()
+        iv = cp.intvar(0, 10)
+
+        m = cp.Model(
+            bv == True,         # allowed
+            bv > 0,             # allowed but silly
+            iv > 0,             # allowed
+            iv != 1,            # allowed
+            iv == True,         # allowed but means `iv == 1`, avoid
+            (iv != 0) == True,  # allowed
+            iv == bv,           # allowed but means `(iv == 1) == bv`, avoid
+            # bv & iv,          # not allowed, choose one of:
+            bv & (iv == 1),     # allowed
+            bv & (iv != 0),     # allowed
+        )
+        for c in m.constraints:
+            self.assertTrue(cp.Model(c).solve())
 
 class TestSum(unittest.TestCase):
 
@@ -194,7 +217,101 @@ class TestMul(unittest.TestCase):
         for expr in prod.args:
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
+class TestArrayExpressions(unittest.TestCase):
 
+    def test_sum(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.sum())
+        model.solve()
+        self.assertTrue(y.value() == sum(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.sum(axis=0))
+        model.solve()
+        res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_prod(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.prod())
+        model.solve()
+        res = 1
+        for v in x:
+            res *= v.value()
+        self.assertTrue(y.value() == res)
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.prod(axis=0))
+        model.solve()
+        for i,vv in enumerate(x):
+            res = 1
+            for v in vv:
+                res *= v.value()
+            self.assertTrue(y[i].value() == res)
+
+    def test_max(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.max())
+        model.solve()
+        self.assertTrue(y.value() == max(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.max(axis=0))
+        model.solve()
+        res = np.array([max(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_min(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.min())
+        model.solve()
+        self.assertTrue(y.value() == min(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.min(axis=0))
+        model.solve()
+        res = np.array([min(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_any(self):
+        from cpmpy.expressions.python_builtins import any
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
+        model = cp.Model(y == x.any())
+        model.solve()
+        self.assertTrue(y.value() == any(x.value()))
+        # with axis arg
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
+        model = cp.Model(y == x.any(axis=0))
+        model.solve()
+        res = np.array([any(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_all(self):
+        from cpmpy.expressions.python_builtins import all
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
+        model = cp.Model(y == x.all())
+        model.solve()
+        self.assertTrue(y.value() == all(x.value()))
+        # with axis arg
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
+        model = cp.Model(y == x.all(axis=0))
+        model.solve()
+        res = np.array([all(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+        
 def inclusive_range(lb,ub):
         return range(lb,ub+1)
 
