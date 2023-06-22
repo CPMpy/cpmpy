@@ -5,7 +5,8 @@ from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
+from .flatten_model import flatten_constraint, get_or_make_var
+from .negation import recurse_negation
 
 """
   Transformations regarding reification constraints.
@@ -41,7 +42,7 @@ def only_bv_implies(constraints):
             if not isinstance(a0, _BoolVarImpl) and \
                     isinstance(a1, _BoolVarImpl):
                 # BE -> BV :: ~BV -> ~BE
-                newexpr = (~a1).implies(negated_normal(a0))
+                newexpr = (~a1).implies(recurse_negation(a0))
                 #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
             elif isinstance(a1, Comparison) and \
@@ -64,7 +65,7 @@ def only_bv_implies(constraints):
                 newcons.append(a1.implies(a0))
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a1).implies(negated_normal(a0)), a1.implies(a0))
+                newexprs = ((~a1).implies(recurse_negation(a0)), a1.implies(a0))
                 #newexprs = ((~a1).implies(~a0), a1.implies(a0))  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
             # XXX there used to be a weird

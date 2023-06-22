@@ -82,5 +82,5 @@ class TransSimplify(unittest.TestCase):
 
         # very nested one
         expr = Operator("and", self.bvs[:1].tolist() + [BoolVal(False)]) == Operator("or", self.bvs)
-        self.assertEqual(str(self.transform(expr)), '[not([or([bv[0], bv[1], bv[2]])])]')
+        self.assertEqual(str(self.transform(expr)), '[and([~bv[0], ~bv[1], ~bv[2]])]')
 

@@ -79,10 +79,10 @@ class TestTransfDecomp(unittest.TestCase):
         ivs = [intvar(1,9,name=n) for n in "xyz"]
 
         cons = [AllDifferent(ivs) == 0]
-        self.assertEqual(str(decompose_in_tree(cons)), "[and([(x) != (y), (x) != (z), (y) != (z)]) == 0]")
+        self.assertEqual(str(decompose_in_tree(cons)), "[not([and([(x) != (y), (x) != (z), (y) != (z)])])]")
 
         cons = [0 == AllDifferent(ivs)]
-        self.assertEqual(str(decompose_in_tree(cons)), "[and([(x) != (y), (x) != (z), (y) != (z)]) == 0]")
+        self.assertEqual(str(decompose_in_tree(cons)), "[not([and([(x) != (y), (x) != (z), (y) != (z)])])]")
 
         cons = [AllDifferent(ivs) == AllEqual(ivs[:-1])]
         self.assertEqual(str(decompose_in_tree(cons)), "[(and([(x) != (y), (x) != (z), (y) != (z)])) == ((x) == (y))]")
