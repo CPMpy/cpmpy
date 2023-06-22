@@ -217,3 +217,5 @@ class TestFlattenExpr(unittest.TestCase):
 
         # != in boolexpr, bug #170
         self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])" )
+        #simplify output
+        self.assertEqual( str(normalized_boolexpr(Operator('not',[x]) == y)), "((~BV0) == (BV1), [])" )
