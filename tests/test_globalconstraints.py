@@ -1,8 +1,7 @@
 import copy
 import unittest
 import cpmpy as cp
-from cpmpy.expressions.globalconstraints import GlobalConstraint
-from cpmpy.expressions.globalfunctions import GlobalFunction, Abs
+from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError
 
 class TestGlobal(unittest.TestCase):
@@ -260,6 +259,21 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertNotEqual(str(max(iv.value())), '4')
 
+    def test_abs(self):
+        iv = cp.intvar(-8, 8)
+        constraints = [cp.Abs(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Abs(iv - 4) + 1 > 12]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(model.solve('z3')) #test with decomposition
+
+        model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(abs(iv.value())), '4')
+
     def test_element(self):
         # test 1-D
         iv = cp.intvar(-8, 8, 3)
@@ -475,7 +489,7 @@ class TestBounds(unittest.TestCase):
         y = cp.intvar(-7, -2)
         z = cp.intvar(1, 9)
         for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
-            lb, ub = Abs(var).get_bounds()
+            lb, ub = cp.Abs(var).get_bounds()
             self.assertEqual(test_lb,lb)
             self.assertEqual(test_ub,ub)
 
