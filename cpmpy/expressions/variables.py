@@ -53,7 +53,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst
 
 
 def BoolVar(shape=1, name=None):
@@ -319,32 +319,6 @@ class _BoolVarImpl(_IntVarImpl):
     def __invert__(self):
         return NegBoolView(self)
 
-    def __eq__(self, other):
-        # (BV == 1) <-> BV
-        # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (is_int(other) and other == 1) or \
-                other is True or \
-                other is np.bool_(True):
-            return self
-        if (is_int(other) and other == 0) or \
-                other is False or \
-                other is np.bool_(False):
-            return ~self
-        return super().__eq__(other)
-
-    def __ne__(self, other):
-        # (BV == 0) <-> BV
-        # if other == 1: XXX: dangerous because "=="" is overloaded 
-        if (is_int(other) and other == 1) or \
-                other is True or \
-                other is np.bool_(True):
-            return ~self
-        if (is_int(other) and other == 0) or \
-                other is False or \
-                other is np.bool_(False):
-            return self
-        return super().__ne__(other)
-
     def __abs__(self):
         return self
 
@@ -435,7 +409,7 @@ class NDVarArray(Expression, np.ndarray):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalconstraints import Element # here to avoid circular
+        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
@@ -535,7 +509,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .globalconstraints import Maximum
+        from .globalfunctions import Maximum
         if out is not None:
             raise NotImplementedError()
 
@@ -556,7 +530,7 @@ class NDVarArray(Expression, np.ndarray):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .globalconstraints import Minimum
+        from .globalfunctions import Minimum
         if out is not None:
             raise NotImplementedError()
 

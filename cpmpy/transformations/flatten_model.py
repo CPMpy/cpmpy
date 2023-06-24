@@ -274,7 +274,7 @@ def flatten_constraint(expr):
 
         elif isinstance(expr, GlobalConstraint):
             """
-    - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+    - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
             (con, flatcons) = normalized_boolexpr(expr)
             newlist.append(con)
@@ -298,6 +298,7 @@ def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
 
+    expr = simplify_boolean([expr])[0]
     (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)
@@ -336,6 +337,9 @@ def get_or_make_var(expr):
         # normalize expr into a boolexpr LHS, reify LHS == bvar
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
+        if isinstance(flatexpr,_BoolVarImpl):
+            #avoids unnecessary bv == bv or bv == ~bv assignments
+            return flatexpr,flatcons
         bvar = _BoolVarImpl()
         return (bvar, [flatexpr == bvar]+flatcons)
 
@@ -373,7 +377,7 @@ def normalized_boolexpr(expr):
         Currently, this is the case for subexpr:
         - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
-        - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
+        - Global constraint: global([Var]*)                    (CPMpy class 'GlobalConstraint')
         - Comparison constraint (see elsewhere)                (CPMpy class 'Comparison')
 
         output: (base_expr, base_cons) with:
