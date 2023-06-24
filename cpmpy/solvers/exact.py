@@ -323,14 +323,26 @@ class CPM_exact(SolverInterface):
         xct_coefs,xct_vars,xct_rhs = self._make_numexpr(flat_obj,0)
         if not self.objective_minimize:
             xct_coefs = [-x for x in xct_coefs]
+        
+        # TODO: make this a custom transformation?
+        newcoefs = []
+        newvars = []
+        for c,v in zip(xct_coefs,xct_vars):
+            if is_num(v):
+                xct_rhs += c*v
+            else:
+                newcoefs += [int(c)]
+                newvars += [v]
 
         # NOTE: initialization of exact is also how it fixes the objective function.
         # So we cannot call it before self.objective() (e.g., in the constructor).
         # And if self.objective() is not called, we still need to call it before solving.
         # This is something Exact needs to fix at some point.
-        self.xct_solver.init(xct_coefs,xct_vars)
+        self.xct_solver.init(newcoefs,newvars,xct_rhs)
         self.solver_is_initialized = True
         self.xct_solver.setOption("verbosity","0")
+
+        # TODO: arbitrary sized bool case
 
     def _make_numexpr(self, lhs, rhs):
         """
