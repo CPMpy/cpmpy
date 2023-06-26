@@ -236,7 +236,7 @@ def flatten_constraint(expr):
                 rewritten = True
 
             # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            if exprname == '!=' and lexpr.is_bool():
+            if exprname == '!=' and lexpr.is_bool() and is_boolexpr(rexpr):
                 exprname = '=='
                 rexpr = ~rexpr
                 rewritten = True
