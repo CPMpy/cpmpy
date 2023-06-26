@@ -118,6 +118,7 @@ from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .globalfunctions import * # XXX make this file backwards compatible
 
 # Base class GlobalConstraint
 class GlobalConstraint(Expression):
