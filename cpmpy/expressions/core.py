@@ -23,7 +23,6 @@
     Mathematical operators:
 
     - -x            Operator("-", [x])
-    - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
     - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
@@ -71,6 +70,7 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
+
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
@@ -339,7 +339,8 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        return Operator("abs", [self])
+        from .globalfunctions import Abs
+        return Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):
@@ -418,7 +419,6 @@ class Operator(Expression):
         'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
-        'abs': (1, False),
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
@@ -529,7 +529,6 @@ class Operator(Expression):
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
         elif self.name == "div":
             try:
                 return arg_vals[0] // arg_vals[1]
@@ -602,13 +601,6 @@ class Operator(Expression):
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
             return -ub1, -lb1
-        elif self.name == 'abs':
-            lb, ub = get_bounds(self.args[0])
-            if lb >= 0: 
-                return lb,ub
-            if ub <= 0: 
-                return -ub,-lb
-            return 0, max(-lb,ub)
         
         raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         

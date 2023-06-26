@@ -416,16 +416,7 @@ class TestBounds(unittest.TestCase):
                 val = Operator(name, [lhs]).value()
                 self.assertGreaterEqual(val,lb)
                 self.assertLessEqual(val,ub)
-        for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
-            name = 'abs'
-            op = Operator(name,[var])
-            lb, ub = op.get_bounds()
-            self.assertEqual(test_lb,lb)
-            self.assertEqual(test_ub,ub)
-            for lhs in inclusive_range(*var.get_bounds()):
-                val = Operator(name, [lhs]).value()
-                self.assertGreaterEqual(val,lb)
-                self.assertLessEqual(val,ub)
+
 
     def test_incomplete_func(self):
         # element constraint

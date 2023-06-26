@@ -293,7 +293,6 @@ class CPM_z3(SolverInterface):
 
         if is_num(cpm_con):
             # translate numpy to python native
-            # TODO: z3 BoolVal/IntVal?
             if is_bool(cpm_con):
                 return bool(cpm_con)
             elif is_int(cpm_con):
@@ -363,14 +362,6 @@ class CPM_z3(SolverInterface):
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
             lhs, rhs = cpm_con.args
-
-            # 'abs'/1 # TODO is unsupported, abs should become global constraint
-            # if lhs_is_expr and lhs.name == "abs":
-            #     arg = lhs.args[0]
-            #     return self._z3_expr(Comparison(cpm_con.name, max([arg, -arg]), rhs))
-            # elif rhs_is_expr and rhs.name == "abs":
-            #     arg = rhs.args[0]
-            #     return self._z3_expr(Comparison(cpm_con.name, lhs, max([arg, -arg])))
 
             lhs_bexpr = is_boolexpr(lhs)
             rhs_bexpr = is_boolexpr(rhs)
