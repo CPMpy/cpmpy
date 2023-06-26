@@ -139,7 +139,7 @@ class GridSearchTuner(ParameterTuner):
         self.base_runtime = solver.status().runtime
         self.best_runtime = self.base_runtime
 
-        # Add default's runtime as first entry in configs
+        # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         shuffle(combos) # test in random order
 
