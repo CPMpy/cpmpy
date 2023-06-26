@@ -544,7 +544,7 @@ class CPM_ortools(SolverInterface):
     def tunable_params(cls):
         """
             Suggestion of tunable hyperparameters of the solver.
-            List compiled based on Laurents feedback (issue #138)
+            List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
         """
         return {
             'use_branching_in_lp': [False, True],
