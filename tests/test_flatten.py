@@ -15,7 +15,7 @@ class TestFlattenModel(unittest.TestCase):
         model2 = flatten_model(model)
         self.assertTrue(isinstance(model2, cp.Model))
         self.assertTrue(hasattr(model2, 'constraints'))
-        self.assertTrue(len(toplevel_list(model2.constraints)) > 1)
+        self.assertTrue(len(model2.constraints) > 1)
 
     def test_objective(self):
         obj = self.ivars.sum()

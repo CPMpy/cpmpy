@@ -57,21 +57,27 @@ class Model(object):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
-        # list of constraints
+        # init list of constraints and objective
         self.constraints = []
-        if len(args) == 1 and is_any_list(args[0]):
-            # top level list of constraints
-            self += args[0]
+        self.objective_ = None
+        self.objective_is_min = None
+
+        if len(args) == 1 and is_any_list(args):
+            args = args[0]  # historical shortcut, treat as *args
+        # use `__add__()` for typecheck
+        if is_any_list(args):
+            # add (and type-check) one by one
+            for a in args:
+                self += a
         else:
             self += args
 
-        # objective: an expresion or None
-        self.objective_ = None
-        self.objective_is_min = None
+        # store objective if present
         if maximize is not None:
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
+
         
     def __add__(self, con):
         """

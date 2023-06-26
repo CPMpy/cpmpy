@@ -68,7 +68,7 @@ class TestModel(unittest.TestCase):
 
         cons1 = x > y
         cons2 = x + y == 1
-        m = cp.Model([cons1, cons2])
+        m = cp.Model(cons1, cons2)
 
         memodict = dict()
         m_dcopy = m.copy()
@@ -82,8 +82,8 @@ class TestModel(unittest.TestCase):
 
         m2 = m.copy()
 
-        self.assertTrue(m2.constraints[0][0].value())
-        self.assertTrue(m2.constraints[0][1].value())
+        self.assertTrue(m2.constraints[0].value())
+        self.assertTrue(m2.constraints[1].value())
 
 
     def test_deepcopy(self):
