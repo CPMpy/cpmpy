@@ -15,7 +15,7 @@
     Searching and time-out start at the default configuration for a solver (if available in the solver class)
 """
 import time
-from random import randint
+from random import shuffle
 
 import numpy as np
 
@@ -141,16 +141,14 @@ class GridSearchTuner(ParameterTuner):
 
         # Add default's runtime as first entry in configs
         combos = list(param_combinations(self.all_params))
+        shuffle(combos) # test in random order
 
-        i = 0
-        if max_tries is None:
-            max_tries = len(combos)
-        while len(combos) and i < max_tries:
+        if max_tries is not None:
+            combos = combos[:max_tries]
+
+        for params_dict in combos:
             # Make new solver
             solver = SolverLookup.get(self.solvername, self.model)
-            # Pick random config to test next
-            config_idx = randint(0, len(combos)-1)
-            params_dict = combos.pop(config_idx)
             # set fixed params
             params_dict |= fix_params
             timeout = self.best_runtime
@@ -166,7 +164,6 @@ class GridSearchTuner(ParameterTuner):
 
             if time_limit is not None and (time.time() - start_time) >= time_limit:
                 break
-            i += 1
 
         return self.best_params
 
