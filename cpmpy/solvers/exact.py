@@ -60,7 +60,7 @@ class CPM_exact(SolverInterface):
         try:
             import exact
             import pkg_resources
-            pkg_resources.require("exact>=1.1.3")
+            pkg_resources.require("exact>=1.1.4")
             return True
         except ImportError as e:
             return False
