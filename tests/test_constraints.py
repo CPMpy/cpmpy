@@ -4,7 +4,6 @@ from cpmpy.expressions.globalfunctions import *
 
 import pytest
 
-
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
@@ -17,6 +16,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "exact": {},
                   }
 
 # Exclude certain operators for solvers.
@@ -24,6 +24,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "exact": {"mod","pow","div","mul"},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
@@ -33,9 +34,8 @@ EXCLUDE_IMPL = {"ortools": {},
                 "z3": {},
                 "pysat": {},
                 "pysdd": {},
+                "exact": {"mod","pow","div","mul"},
                 }
-
-
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables

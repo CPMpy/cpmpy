@@ -7,6 +7,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
+from cpmpy.solvers.exact import CPM_exact
 
 from cpmpy.exceptions import MinizincNameException
 
@@ -479,6 +480,43 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(minimize=sum([v]))
         self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
+
+
+    @pytest.mark.skipif(not CPM_exact.supported(),
+                        reason="Exact not installed")
+    def test_exact(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertFalse(s.solve(assumptions=bv))
+        self.assertTrue({x for x in s.get_core()}=={x for x in bv})
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+
+        def _trixor_callback():
+            assert bv[0]+bv[1]+bv[2] >= 1
+
+        m = cp.Model([bv[0] | bv[1] | bv[2]])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertEqual(s.solveAll(display=_trixor_callback),7)
+
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
