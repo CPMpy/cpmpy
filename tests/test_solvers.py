@@ -329,8 +329,8 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
 
         indmodel = cp.Model()
-        inds = cp.boolvar(shape=len(model.constraints))
-        for i,c in enumerate(model.constraints):
+        inds = cp.boolvar(shape=len(model.constraints[0]))
+        for i,c in enumerate(model.constraints[0]):
             indmodel += [c | ~inds[i]] # implication
         ps2 = CPM_pysat(indmodel)
 

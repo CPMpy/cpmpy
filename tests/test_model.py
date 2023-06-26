@@ -82,8 +82,8 @@ class TestModel(unittest.TestCase):
 
         m2 = m.copy()
 
-        self.assertTrue(m2.constraints[0].value())
-        self.assertTrue(m2.constraints[1].value())
+        self.assertTrue(m2.constraints[0][0].value())
+        self.assertTrue(m2.constraints[0][1].value())
 
 
     def test_deepcopy(self):
