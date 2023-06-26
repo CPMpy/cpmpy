@@ -179,6 +179,9 @@ class Expression(object):
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -187,6 +190,9 @@ class Expression(object):
         return Operator("and", [self, other])
 
     def __rand__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -195,6 +201,9 @@ class Expression(object):
         return Operator("and", [other, self])
 
     def __or__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return BoolVal(True)
@@ -203,6 +212,9 @@ class Expression(object):
         return Operator("or", [self, other])
 
     def __ror__(self, other):
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return BoolVal(True)
