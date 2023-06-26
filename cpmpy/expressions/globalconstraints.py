@@ -102,12 +102,8 @@
         Circuit
         Inverse
         Table
-        Minimum
-        Maximum
-        Element
         Xor
         Cumulative
-        Count
         GlobalCardinalityCount
 
 """

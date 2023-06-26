@@ -128,14 +128,14 @@ import cpmpy as cp
 bv = cp.boolvar(shape=3)
 
 m = cp.Model(
-    any([bv[0], bv[1], bv[2]]),
-    any(v for v in bv),  # equivalent to above
-    any(bv),  # equivalent to above
-    ~all(bv)
+    cp.any([bv[0], bv[1], bv[2]]),
+    cp.any(v for v in bv),  # equivalent to above
+    cp.any(bv),  # equivalent to above
+    ~cp.all(bv)
 )
 ```
 
-Note how these functions accept manually created arrays, iterators or n-dimensional arrays alike.
+These functions accept manually created arrays, iterators or n-dimensional arrays alike.
 
 For **equivalence**, also called reification, we overload the `==` comparison:
 ```python
@@ -145,8 +145,8 @@ import cpmpy as cp
 a,b,c = cp.boolvar(shape=3)
 
 m = cp.Model(
-    a == b,  # equivalence: a -> b & b -> a
-    a != b   # same as ~(a==b) and a == ~b
+    a == b,  # equivalence: (a -> b) & (b -> a)
+    a != b   # same as ~(a==b) and same as (a == ~b)
 )
 ```
 
@@ -249,15 +249,13 @@ w = np.array([1,3,-5])
 
 m = cp.Model( 
     cp.sum(w*xs) > 3,  # 1*xs[0] + 3*xs[1] + (-5)*xs[2] > 3
-    # wsum(w,xs) > 3,  # XXX, I think we should add this fast-path...
     xs + w != 0,  # [xs[0] + 1 != 0, xs[1] + 3 != 0, xs[2] + (-5) != 0]
     cp.max(xs - w) == np.arange(3),  # max(xs[0] - 1) == 0, max(xs[1] - 3) == 1, max(xs[2] + 5) == 2]
 )
 ```
 
-Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` or `some_array.sum()` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions.
+Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum(), `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()/.max()` (including the axis= argument), so these are safe to use.
 
--- XXX I was wrong, we should overload NDVarArray.min and max
 
 ### Global constraints
 
@@ -290,7 +288,7 @@ cp.Model(
     cp.Xor(b, cp.AllDifferent(x)),  # etc...
 )
 ```
--- XXX smth on non-equivalent decompositions? see ongoing thread...
+`decompose()` returns two arguments, one that represents the constraints and an optional one that defines any new variables needed. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](api/expressions/globalconstraints.html).
 
 #### Numeric global constraints
 
@@ -298,11 +296,11 @@ Coming back to the Python-builtin functions `min(),max(),abs()`, these are a bit
 
 However, CPMpy also wishes to support the expressions `min(xs) > v` as well as `v + min(xs) != 4` and other nested expressions.
 
-In CPMpy we do this by instantiating min/max/abs as **numeric global constraints**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalConstraint` but has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the numeric global constraint is used in a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` on the numeric global constraint, which will decompose e.g. `min(xs) == v`.
+In CPMpy we do this by instantiating min/max/abs as **numeric global constraints**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the numeric global constraint is used in a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` on the numeric global constraint, which will decompose e.g. `min(xs) == v`.
 
 A non-exhaustive list of **numeric global constraints** that are available in CPMpy is: `Minimum(), Maximum(), Count(), Element()`.   
 
-For their meaning and more information on how to define your own global constraints, see [the API documentation on global constraints](api/expressions/globalconstraints.html).
+For their meaning and more information on how to define your own global constraints, see [the API documentation on global functions](api/expressions/globalfunctions.html).
 
 ```python
 import cpmpy as cp
@@ -322,7 +320,7 @@ print(s.transform(cp.min(x) + cp.max(x) - 5 > 2*cp.Count(x, 2)))
 
 #### The Element numeric global constraint
 
-The `Element(Arr,Idx)` global constraint enforces that the result equals `Arr[Idx]` with `Arr` an array of constants or variables (the first argument) and `Idx` an integer decision variable, representing the index into the array.
+The `Element(Arr,Idx)` global function enforces that the result equals `Arr[Idx]` with `Arr` an array of constants or variables (the first argument) and `Idx` an integer decision variable, representing the index into the array.
 
 ```python
 import cpmpy as cp
@@ -341,7 +339,7 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 
 The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
 
-This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrapped the array** in our `cpm_array()` or call `Element()` directly:
+This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
 
 ```python
 import numpy as np
@@ -445,7 +443,7 @@ There is much more to say on enumerating solutions and the use of callbacks or b
 
 ## Debugging a model
 
-If the solver is complaining about your model, then a place to start debugging is to **print** the model you have created, or the individual constraints. If that looks fine (e.g. no integers, or shorter or longer expressions then what you intended) and you don't know which constraint specifically is causing the error, then you can feed the constraints incrementally to the solver you are using:
+If the solver is complaining about your model, then a good place to start debugging is to **print** the model you have created, or the individual constraints. If they look fine (e.g. no integers, or shorter or longer expressions then what you intended) and you don't know which constraint specifically is causing the error, then you can feed the constraints incrementally to the solver you are using:
 
 ```python
 import cpmpy as cp
@@ -486,10 +484,10 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 m = cp.Model(cp.sum(x) <= 5)
 # use named solver
-m.solve(solver="ortools")
+m.solve(solver="minizinc:chuffed")
 ```
 
-Note that for other solvers, you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](api/solvers.html) of the solver for detailed installation instructions.
+Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "minizinc", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](api/solvers.html) of the solver for detailed installation instructions.
 
 ## Model versus solver interface
 
@@ -514,7 +512,7 @@ s.solve()
 print(s.status())
 ```
 
-On a technical note, observe that a solver object does not modify the Model object with which it is initialised. So adding constraints to the solver does not add them to that model, and calling `s.solve()` does not update the status of `m.status()`, only `m.solve()` does that.
+On a technical note, remark that a solver object does not modify the Model object with which it is initialised. So adding constraints to the solver does not add them to that model, and calling `s.solve()` does not update the status of `m.status()`, only of `s.status()`.
 
 ## Setting solver parameters
 
@@ -528,9 +526,9 @@ s = cp.SolverLookup.get("ortools", m)
 s.solve(num_search_workers=8, log_search_progress=True)
 ```
 
-Modern CP-solvers support a variety of hyperparameters. ([OR-tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
-Using the solver interface, any solver parameter can be passed using the `.solve()` call.
-These parameters will then be posted to the native solver object before solving the model.
+Modern CP-solvers support a variety of hyperparameters. (See the full list of [OR-tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
+Using the solver interface, any parameter that the solver supports can be passed using the `.solve()` call.
+These parameters will be posted to the native solver before solving the model.
 
 ```python
 s.solve(cp_model_probing_level = 2,
@@ -542,16 +540,8 @@ See [the API documentation of the solvers](api/solvers.html) for information and
 
 
 
-You can use any of these solvers by passing its name to the `Model.solve()` parameter 'solver' as such:
-
-```python
-a,b = boolvar(2)
-Model(a|b).solve(solver='minizinc:chuffed')
-```
-
-
 ## Incremental solving
-It is important to realize that a CPMpy solver interface is _eager_. That means that when a CPMpy constraint is added to a solver object, CPMpy _immediately_ translates it and posts the constraints to the underlying solver.
+It is important to realize that a CPMpy solver interface is _eager_. That means that when a CPMpy constraint is added to a solver object, CPMpy _immediately_ translates it and posts the constraints to the underlying solver. That is why the debugging trick of posting it one-by-one works.
 
 This has two potential benefits for incremental solving, whereby you add more constraints and variables inbetween solve calls:
 
@@ -572,9 +562,9 @@ gs.solve()
  
 _Technical note_: OR-Tools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
 
-## Using solver-specific CPMpy functions
+## Using solver-specific CPMpy features
 
-We sometimes add solver-specific features to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
+We sometimes add solver-specific functions to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
 
 `solution_hint()` tells the solver that it could use these variable-values first during search, e.g. typically from a previous solution:
 ```python
@@ -597,9 +587,9 @@ See [the API documentation of the solvers](api/solvers.html) to learn about thei
 Some solvers implement more constraints then available in CPMpy. But CPMpy offers direct access to the underlying solver, so there are two ways to post such solver-specific constraints.
 
 ### DirectConstraint
-The `DirectConstraint` will directly call a function of the underlying solver when added to a CPMpy solver. 
+The `DirectConstraint` will directly call a function of the underlying solver, when the constraint is added to a CPMpy solver. 
 
-You provide it with the name of the function you want to call, as well as the arguments:
+You provide the DirectConstraint with the name of the function you want to call, as well as the arguments:
 
 ```python
 import cpmpy as cp
@@ -610,7 +600,7 @@ s += cp.AllDifferent(iv)
 s += cp.DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OR-Tools
 ```
 
-This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the argument to the native solver variable.
+This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the arguments to the native solver variable.
 
 Note that any argument given will be checked for whether it needs to be mapped to a native solver variable. This may give errors on complex arguments, or be inefficient. You can tell the `DirectConstraint` not to scan for variables with the `novar` argument, for example:
 
@@ -633,7 +623,7 @@ s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
 
-The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) using of a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
+The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) which uses a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
 
 ### Directly accessing the underlying solver
 
@@ -658,13 +648,6 @@ While directly calling the solver offers a lot of freedom, it is a bit more cumb
 Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
 
 The tools directory contains a utility to efficiently search through the hyperparameter space defined by the solvers `tunable_params`.
-This utlity is based on the SMBO framework and speeds up the search by implementing adaptive capping.
-
-The parameter tuner is based on the following publication: 
->Ignace Bleukx, Senne Berden, Lize Coenen, Nicholas Decleyre, Tias Guns (2022). Model-Based Algorithm
->Configuration with Adaptive Capping and Prior Distributions. In: Schaus, P. (eds) Integration of Constraint
->Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
->vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
 
 Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
 
@@ -688,3 +671,11 @@ tuner = ParameterTuner("ortools", model, tunables, defaults)
 best_params = tuner.tune(max_tries=100)
 best_runtime = tuner.best_runtime
 ```
+
+This utlity is based on the SMBO framework and speeds up the search by implementing adaptive capping.
+
+The parameter tuner is based on the following publication: 
+>Ignace Bleukx, Senne Berden, Lize Coenen, Nicholas Decleyre, Tias Guns (2022). Model-Based Algorithm
+>Configuration with Adaptive Capping and Prior Distributions. In: Schaus, P. (eds) Integration of Constraint
+>Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
+>vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
