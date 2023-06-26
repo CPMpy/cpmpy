@@ -24,7 +24,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {"mod","pow","div","mul","abs"},
+                     "exact": {"mod","pow","div","mul"},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
@@ -36,8 +36,6 @@ EXCLUDE_IMPL = {"ortools": {},
                 "pysdd": {},
                 "exact": {"mod","pow","div","mul"},
                 }
-# TODO: remove "abs" from exact when it is a global constraint with a nice decomposition
-
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
