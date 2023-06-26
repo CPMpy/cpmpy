@@ -81,7 +81,7 @@ defaults = {
     "FlowCoverCuts": -1
 }
 
-tuner = ParameterTuner("pysat", model, tunables, defaults)
+tuner = ParameterTuner("gurobi", model, tunables, defaults)
 print(f"Tuner reduced runtime from {tuner.base_runtime}s to {tuner.best_runtime}s")
 
 best_params = tuner.tune(time_limit=10)
