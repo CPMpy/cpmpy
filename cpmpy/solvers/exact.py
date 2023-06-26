@@ -568,8 +568,8 @@ class CPM_exact(SolverInterface):
             Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
         """
         assert self.xct_solver.hasCore(), "get_core(): requires a core to be present in the solver, i.e., UNSAT should have been reached at least once"
-        assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
+        assert self.assumption_dict is not None,  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # return cpm_variables corresponding to Exact core
-        return [self.assumption_dict[i] for i in self.xct_solver.getLastCore()]
+        return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
 

@@ -495,7 +495,7 @@ class TestSolvers(unittest.TestCase):
         ])
         s = cp.SolverLookup.get("exact", m)
         self.assertFalse(s.solve(assumptions=bv))
-        self.assertTrue(len(s.get_core()) == 3)
+        self.assertTrue({x for x in s.get_core()}=={x for x in bv})
 
         m = cp.Model(~(iv[0] != iv[1]))
         s = cp.SolverLookup.get("exact", m)
