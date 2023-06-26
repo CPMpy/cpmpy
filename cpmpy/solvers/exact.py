@@ -338,7 +338,11 @@ class CPM_exact(SolverInterface):
         # So we cannot call it before self.objective() (e.g., in the constructor).
         # And if self.objective() is not called, we still need to call it before solving.
         # This is something Exact needs to fix at some point.
-        self.xct_solver.init(newcoefs,newvars,xct_rhs)
+
+        if max(max(abs(x) for x in newcoefs),xct_rhs) > 1e18:
+            self.xct_solver.init([str(x) for x in newcoefs],newvars,str(xct_rhs))
+        else:
+            self.xct_solver.init(newcoefs,newvars,xct_rhs)
         self.solver_is_initialized = True
         self.xct_solver.setOption("verbosity","0")
 
