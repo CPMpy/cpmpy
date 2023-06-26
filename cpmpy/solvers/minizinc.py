@@ -576,6 +576,9 @@ class CPM_minizinc(SolverInterface):
             occ = self._convert_expression(occ)
             return "global_cardinality({},{},{})".format(vars,vals,occ)
 
+        elif expr.name == "abs":
+            return "abs({})".format(args_str[0])
+
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):

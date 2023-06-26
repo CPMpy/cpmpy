@@ -186,6 +186,40 @@ class Maximum(GlobalFunction):
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
+class Abs(GlobalFunction):
+    """
+        Computes the maximum value of the arguments
+    """
+
+    def __init__(self, expr):
+        super().__init__("abs", [expr])
+
+    def value(self):
+        return abs(argval(self.args[0]))
+
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+        Decomposition if it's part of a comparison
+        Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
+        """
+        arg = self.args[0]
+        return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
+
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        lb,ub = get_bounds(self.args[0])
+        if lb >= 0:
+            return lb, ub
+        if ub <= 0:
+            return -ub, -lb
+        return 0, max(-lb, ub)
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
