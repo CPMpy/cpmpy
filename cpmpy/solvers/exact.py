@@ -33,6 +33,7 @@ from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
+from ..exceptions import NotSupportedError
 import numpy as np
 import numbers
 
@@ -215,7 +216,7 @@ class CPM_exact(SolverInterface):
             Returns: number of solutions found
         """
         if self.objective_given:
-            raise NotImplementedError("Exact does not yet support finding all *optimal* solutions.")
+            raise NotSupportedError("Exact does not support finding all optimal solutions.")
 
         if not self.solver_is_initialized:
             # NOTE: initialization of exact is also how it fixes the objective function.
