@@ -82,6 +82,8 @@ class CPM_ortools(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: None
         """
+        if cpm_model is not None:
+            cpm_model.to_file("Pickled" + (str(time.time())).replace('.', ""))
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this solver interface")
 
