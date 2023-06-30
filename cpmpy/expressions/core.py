@@ -107,6 +107,15 @@ class Expression(object):
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.args = arg_list
 
+    def set_description(self, txt):
+        self.desc = txt
+
+    def __str__(self):
+        if hasattr(self, "desc"):
+            return self.desc
+        return self.__repr__()
+
+
     def __repr__(self):
         strargs = []
         for arg in self.args:
@@ -119,7 +128,7 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash(self.__str__())
+        return hash(self.__repr__())
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
