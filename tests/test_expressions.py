@@ -462,5 +462,26 @@ class TestBounds(unittest.TestCase):
         self.assertTrue(cp.Model([~~p == ~q]).solve())
         self.assertTrue(cp.Model([Operator('not',[p]) == q]).solve())
         self.assertTrue(cp.Model([Operator('not',[p])]).solve())
+
+    def test_description(self):
+
+        a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
+        cons = a ^ b
+        cons.set_description("either a or be should be true, but not both")
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "either a or be should be true, but not both")
+
+        # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
+        for solver,cls in cp.SolverLookup.base_solvers():
+            if not cls.supported():
+                continue
+            print("Testing", solver)
+            self.assertTrue(cp.Model(cons).solve(solver=solver))
+
+
+
+
+
 if __name__ == '__main__':
     unittest.main()
