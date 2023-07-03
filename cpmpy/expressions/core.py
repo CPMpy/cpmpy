@@ -361,8 +361,7 @@ class BoolVal(Expression):
         return self.args[0]
 
     def __invert__(self):
-        self.args[0] = not self.args[0]
-        return self
+        return BoolVal(not self.args[0])
 
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
