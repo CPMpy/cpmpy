@@ -36,6 +36,7 @@ from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .transformations.normalize import toplevel_list
 
 import pickle
 
@@ -67,6 +68,7 @@ class Model(object):
         # use `__add__()` for typecheck
         if is_any_list(args):
             # add (and type-check) one by one
+            args = toplevel_list(args)
             for a in args:
                 self += a
         else:
