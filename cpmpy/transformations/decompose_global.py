@@ -8,7 +8,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
-from .flatten_model import flatten_constraint
+from .flatten_model import flatten_constraint, normalized_numexpr
 
 
 def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
@@ -47,6 +47,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             continue
 
         elif isinstance(expr, Operator):
+            expr, base_con = normalized_numexpr(expr)
+            _toplevel.extend(base_con)  # should be added toplevel
             # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
