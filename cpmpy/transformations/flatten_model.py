@@ -536,7 +536,7 @@ def normalized_numexpr(expr):
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
     else:
-        # Global constraint (non-Boolean) (examples: Max,Min,Element)
+        # Globalfunction (examples: Max,Min,Element)
 
         # just recursively flatten args, which can be lists
         if all(__is_flat_var_or_list(arg) for arg in expr.args):
