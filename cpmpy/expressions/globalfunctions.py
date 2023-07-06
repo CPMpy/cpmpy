@@ -57,6 +57,7 @@
         Maximum
         Element
         Count
+        Abs
 
 """
 import copy
