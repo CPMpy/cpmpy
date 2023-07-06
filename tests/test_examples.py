@@ -34,53 +34,41 @@ class TestExamples(unittest.TestCase):
         example ([string]): Loaded with parametrized example filename
     """
 
-    if example.endswith('lpcp21_p1_frog.py')\
-        or example.endswith('prob013_progressive_party.py')\
-        or example.endswith('prob008_vessel_loading.py')\
-        or example.endswith('prob012_nonogram.py'):
-        try:
-            import requests
-        except ModuleNotFoundError:
-            #skip these examples as they require module requests
-            pytest.skip('skipped, module requests is required')
+    try:
+        # do not run, dependency local to that folder
+        if example.endswith('explain_satisfaction.py'):
+            return
+        loader = importlib.machinery.SourceFileLoader("example", example)
+        mod = types.ModuleType(loader.name)
+        loader.exec_module(mod)
 
-    if example.endswith('prob026_sport_scheduling.py'):
-        try:
-            import pandas
-        except ModuleNotFoundError:
-            pytest.skip('skipped, module pandas is required')
+        # run again with gurobi, if installed on system
+        gbi_slv = SolverLookup.lookup("gurobi")
+        if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
+            # exclude those, too slow or solver specific
+            return
+        if gbi_slv.supported():
+            # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
+            f = SolverLookup.base_solvers
+            try:
+                SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]+f()
+                loader.exec_module(mod)
+            finally:
+                SolverLookup.base_solvers = f
 
-    # do not run, dependency local to that folder
-    if example.endswith('explain_satisfaction.py'):
-        return
-    loader = importlib.machinery.SourceFileLoader("example", example)
-    mod = types.ModuleType(loader.name)
-    loader.exec_module(mod)
+        # run again with minizinc, if installed on system
+        if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py']:
+            # except for these too slow ones
+            return
+        mzn_slv = SolverLookup.lookup('minizinc')
+        if mzn_slv.supported():
+            # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
+            f = SolverLookup.base_solvers
+            try:
+                SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]+f()
+                loader.exec_module(mod)
+            finally:
+                SolverLookup.base_solvers = f
 
-    # run again with gurobi, if installed on system
-    gbi_slv = SolverLookup.lookup("gurobi")
-    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
-        # exclude those, too slow or solver specific
-        return
-    if gbi_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
-        f = SolverLookup.base_solvers
-        try:
-            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]+f()
-            loader.exec_module(mod)
-        finally:
-            SolverLookup.base_solvers = f
-
-    # run again with minizinc, if installed on system
-    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py']:
-        # except for these too slow ones
-        return
-    mzn_slv = SolverLookup.lookup('minizinc')
-    if mzn_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
-        f = SolverLookup.base_solvers
-        try:
-            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]+f()
-            loader.exec_module(mod)
-        finally:
-            SolverLookup.base_solvers = f
+    except ModuleNotFoundError as e:
+        pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))
