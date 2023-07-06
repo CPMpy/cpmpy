@@ -393,7 +393,7 @@ class CPM_minizinc(SolverInterface):
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
 
-        return simplify_boolean(toplevel_list(cpm_cons))
+        return simplify_boolean(cpm_cons)
 
     def __add__(self, cpm_expr):
         """
