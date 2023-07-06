@@ -33,6 +33,23 @@ class TestExamples(unittest.TestCase):
     Args:
         example ([string]): Loaded with parametrized example filename
     """
+
+    if example.endswith('lpcp21_p1_frog.py')\
+        or example.endswith('prob013_progressive_party.py')\
+        or example.endswith('prob008_vessel_loading.py')\
+        or example.endswith('prob012_nonogram.py'):
+        try:
+            import requests
+        except ModuleNotFoundError:
+            #skip these examples as they require module requests
+            pytest.skip('skipped, module requests is required')
+
+    if example.endswith('prob026_sport_scheduling.py'):
+        try:
+            import pandas
+        except ModuleNotFoundError:
+            pytest.skip('skipped, module pandas is required')
+
     # do not run, dependency local to that folder
     if example.endswith('explain_satisfaction.py'):
         return
