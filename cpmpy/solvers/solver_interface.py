@@ -254,7 +254,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
 
         return solution_count
 
