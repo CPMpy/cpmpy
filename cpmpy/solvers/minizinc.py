@@ -37,6 +37,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -379,14 +380,20 @@ class CPM_minizinc(SolverInterface):
 
     def transform(self, cpm_expr):
         """
-            No transformations, just ensure it is a list of constraints
+            Decompose globals not supported (and flatten globalfunctions)
+            ensure it is a list of constraints
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
 
         :return: list of Expression
         """
-        return simplify_boolean(toplevel_list(cpm_expr))
+        cpm_cons = toplevel_list(cpm_expr)
+        supported = {"min", "max", "abs", "element", "count", "alldifferent", "alldifferent_except0", "allequal",
+                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
+
+        return simplify_boolean(cpm_cons)
 
     def __add__(self, cpm_expr):
         """
@@ -468,6 +475,10 @@ class CPM_minizinc(SolverInterface):
             str_fwd = zero_based(expr.args[0])
             str_rev = zero_based(expr.args[1])
             return "inverse({}, {})".format(str_fwd, str_rev)
+
+        if expr.name == "alldifferent_except0":
+            args_str = [self._convert_expression(e) for e in expr.args]
+            return "alldifferent_except_0({})".format(args_str)
 
         # count: we need the lhs and rhs together
         if isinstance(expr, Comparison) and expr.args[0].name == 'count':
