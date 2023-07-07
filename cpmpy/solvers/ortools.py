@@ -192,9 +192,12 @@ class CPM_ortools(SolverInterface):
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
-                if isinstance(cpm_var, _BoolVarImpl):
-                    cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                try:
+                    cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                except IndexError:
+                    cpm_var._value = None  # probably got optimized away by our transformations
 
             # translate objective
             if self.has_objective():
