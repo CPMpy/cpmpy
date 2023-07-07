@@ -67,10 +67,12 @@ class Model(object):
             args = args[0]  # historical shortcut, treat as *args
         # use `__add__()` for typecheck
         if is_any_list(args):
-            # add (and type-check) one by one
-            args = toplevel_list(args)
             for a in args:
-                self += a
+                if is_any_list(a):
+                    for b in a:
+                        self += b
+                else:
+                    self += a
         else:
             self += args
 
