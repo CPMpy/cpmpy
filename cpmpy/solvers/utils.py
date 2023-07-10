@@ -28,6 +28,8 @@ from .pysat import CPM_pysat
 from .z3 import CPM_z3
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
+from .int2bool_direct import CPM_int2bool_direct
+
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -76,6 +78,7 @@ class SolverLookup():
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
+                ("int2bool", CPM_int2bool_direct)
                ]
 
     @staticmethod

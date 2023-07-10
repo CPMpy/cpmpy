@@ -1,6 +1,8 @@
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Table, DirectConstraint
 from cpmpy.expressions.utils import is_any_list, is_int, is_bool
+from cpmpy.transformations.comparison import only_numexpr_equality
+from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables, get_variables_model
@@ -29,6 +31,14 @@ class CPM_int2bool_direct(SolverInterface):
     def supported():
         return True  # well, depends on the subsolver, will be checked in constructor
 
+    @staticmethod
+    def solvernames():
+        """
+            Returns subsolvers supported by PySAT on your system
+        """
+        from cpmpy import SolverLookup
+        return [s for s,_ in SolverLookup.base_solvers() if s != "int2bool"]
+
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -40,6 +50,7 @@ class CPM_int2bool_direct(SolverInterface):
         """
         assert(subsolver is not None), "CPM_Meta_int2bool: you must supply the name of a CPMpy solver"
 
+        from .utils import SolverLookup
         # init the subsolver with an empty model
         self.subsolver = SolverLookup.get(subsolver)
         self.ivarmap = dict()
