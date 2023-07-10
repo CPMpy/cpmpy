@@ -4,6 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError
 
+
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -260,6 +261,7 @@ class TestGlobal(unittest.TestCase):
         self.assertNotEqual(str(max(iv.value())), '4')
 
     def test_abs(self):
+        from cpmpy.transformations.decompose_global import decompose_in_tree
         iv = cp.intvar(-8, 8)
         constraints = [cp.Abs(iv) + 9 <= 8]
         model = cp.Model(constraints)
@@ -268,7 +270,7 @@ class TestGlobal(unittest.TestCase):
         constraints = [cp.Abs(iv - 4) + 1 > 12]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
-        self.assertTrue(model.solve('z3')) #test with decomposition
+        self.assertTrue(cp.Model(decompose_in_tree(constraints)).solve()) #test with decomposition
 
         model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())

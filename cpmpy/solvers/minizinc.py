@@ -566,9 +566,7 @@ class CPM_minizinc(SolverInterface):
         # rest: global constraints
         elif expr.name.endswith('circuit'):  # circuit, subcircuit
             # minizinc is offset 1, which can be problematic here...
-            if any(isinstance(e, _IntVarImpl) and e.lb == 0 for e in expr.args):
-                # redo args_str[0]
-                args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
