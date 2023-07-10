@@ -607,7 +607,7 @@ class Operator(Expression):
             raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         if lowerbound > upperbound:
             #overflow happened
-            raise OverflowError('Overflow when calculating bounds, your expression exceeds int64 bounds.')
+            raise OverflowError('Overflow when calculating bounds, your expression exceeds integer bounds.')
         return int(lowerbound), upperbound
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
