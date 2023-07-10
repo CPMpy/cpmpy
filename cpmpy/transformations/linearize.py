@@ -205,7 +205,7 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
         constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
 
         for arg, row in zip(cpm_expr.args, sigma):
-            constraints += [sum(np.arange(lb, ub + 1) * row) == arg]
+            constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
 
         return constraints
 

@@ -35,7 +35,10 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list, is_int
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
+from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_implies
 
 class CPM_pysat(SolverInterface):
@@ -210,7 +213,6 @@ class CPM_pysat(SolverInterface):
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -225,19 +227,34 @@ class CPM_pysat(SolverInterface):
 
         :return: list of Expression
         """
-        fnf = flatten_constraint(cpm_expr)
-        fnf = only_bv_implies(fnf)
-        return fnf
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = only_bv_implies(cpm_cons)
+        return cpm_cons
 
-    def _post_constraint(self, cpm_expr):
-        """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+    def __add__(self, cpm_expr_orig):
+      """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
-        """
+      """
+      # add new user vars to the set
+      get_variables(cpm_expr_orig, collect=self.user_vars)
+
+      # transform and post the constraints
+      for cpm_expr in self.transform(cpm_expr_orig):
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
@@ -270,15 +287,10 @@ class CPM_pysat(SolverInterface):
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
-            # for all global constraints:
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                return self.pysat_solver.add_clause([])
+                self.pysat_solver.add_clause([])
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -286,11 +298,12 @@ class CPM_pysat(SolverInterface):
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
-            return cpm_expr.callSolver(self, self.pysat_solver)
+            cpm_expr.callSolver(self, self.pysat_solver)
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
 
+      return self
 
     def solution_hint(self, cpm_vars, vals):
         """
@@ -334,10 +347,14 @@ class CPM_pysat(SolverInterface):
     def _pysat_cardinality(self, cpm_compsum):
         """ convert CPMpy comparison of sum into PySAT list of clauses """
         # we assume transformations are applied such that the below is true
-        assert (isinstance(cpm_compsum, Comparison)), f"PySAT card: input constraint must be Comparison -- {cpm_compsum}"
-        assert (is_int(cpm_compsum.args[1])), f"PySAT card: sum must have constant at rhs not {cpm_compsum.args[1]} -- {cpm_compsum}"
-        assert (cpm_compsum.args[0].name == "sum"), f"PySAT card: input constraint must be sum, got {cpm_compsum.args[0].name} -- {cpm_compsum}"
-        assert (all(isinstance(v, _BoolVarImpl) for v in cpm_compsum.args[0].args)), f"PySAT card: sum must be over Boolvars only -- {cpm_compsum.args[0]}"
+        if not isinstance(cpm_compsum, Comparison):
+            raise NotSupportedError(f"PySAT card: input constraint must be Comparison -- {cpm_compsum}")
+        if not is_int(cpm_compsum.args[1]):
+            raise NotSupportedError(f"PySAT card: sum must have constant at rhs not {cpm_compsum.args[1]} -- {cpm_compsum}")
+        if not cpm_compsum.args[0].name == "sum":
+            raise NotSupportedError(f"PySAT card: input constraint must be sum, got {cpm_compsum.args[0].name} -- {cpm_compsum}")
+        if not (all(isinstance(v, _BoolVarImpl) for v in cpm_compsum.args[0].args)):
+            raise NotSupportedError(f"PySAT card: sum must be over Boolvars only -- {cpm_compsum.args[0]}")
 
         from pysat.card import CardEnc
 

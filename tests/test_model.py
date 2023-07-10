@@ -68,7 +68,7 @@ class TestModel(unittest.TestCase):
 
         cons1 = x > y
         cons2 = x + y == 1
-        m = cp.Model([cons1, cons2])
+        m = cp.Model(cons1, cons2)
 
         memodict = dict()
         m_dcopy = m.copy()

@@ -1,96 +1,38 @@
+![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
+![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
+![PyPI downloads](https://img.shields.io/pypi/dm/cpmpy?label=Pypi%20Downloads&logo=pypi&logoColor=white)
+![Tests](https://github.com/CPMpy/cpmpy/actions/workflows/python-test.yml/badge.svg)
+![Licence](https://img.shields.io/github/license/CPMpy/cpmpy?label=Licence)
+
 CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
 
-Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
+* Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
+* Solver-independent: transparently translating to CP, MIP, SMT, SAT
+* Incremental solving and direct access to the underlying solvers
+* and much more...
 
-CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer. 
+**Documentation: [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)**
 
-Getting started:
+CPMpy is still in Beta stage, and bugs can occur. If so, please report the issue on Github!
 
-- Watch the [tutorial video](https://www.youtube.com/watch?v=A4mmmDAdusQ) on YouTube
-- Try it out [online without installation](https://mybinder.org/v2/gh/CPMpy/cpmpy/HEAD?labpath=examples%2Fquickstart_sudoku.ipynb) or browse the [examples/](examples/)
-- Install as easily as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/installation_instructions.html)
-- Full documentation at [read the docs](https://cpmpy.readthedocs.io/) for more.
+## Open Source
 
-Here is a quick highlight of some key features:
+CPMpy has the open-source [Apache 2.0 license]( https://github.com/cpmpy/cpmpy/blob/master/LICENSE) and is run as an open-source project. All discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests. 
 
-- conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
-- logging search progress and arbitrarily [modifying solver parameters](https://cpmpy.readthedocs.io/en/latest/solver_parameters.html)
-- intuitive [hyperparameter search](examples/advanced/hyperparameter_search.py) for a solver
-- easy UNSAT core extraction and computing [Minimal Unsatisfiable Subsets](https://cpmpy.readthedocs.io/en/latest/unsat_core_extraction.html) (MUS) of CP problems
+Join us! We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the examples folder.
 
 
-It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
+Are you a solver developer? We are keen to integrate solvers that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
 
-### An example
-```python
-import numpy as np
-from cpmpy import *
+## Teaching with CPMpy
 
-e = 0 # value for empty cells
-given = np.array([
-    [e, e, e,  2, e, 5,  e, e, e],
-    [e, 9, e,  e, e, e,  7, 3, e],
-    [e, e, 2,  e, e, 9,  e, 6, e],
+CPMpy can be a good library for courses and projects on **modeling constrained optimisation problems**, because its usage is similar to that of other data science libraries, and because it translates to the fundamental languages of SAT, SMT, MIP, and CP transparently.
 
-    [2, e, e,  e, e, e,  4, e, 9],
-    [e, e, e,  e, 7, e,  e, e, e],
-    [6, e, 9,  e, e, e,  e, e, 1],
+Contact Prof. Tias Guns if you are interested in, or are going to develop, teaching material using CPMpy. For example we have CPMpy snippets of part of Pierre Flener's excellent ["Modelling for Combinatorial Optimisation [M4CO]"](https://user.it.uu.se/~pierref/courses/COCP/slides/).
 
-    [e, 8, e,  4, e, e,  1, e, e],
-    [e, 6, 3,  e, e, e,  e, 8, e],
-    [e, e, e,  6, e, 8,  e, e, e]])
+## Acknowledgments
 
-
-# Variables
-puzzle = intvar(1,9, shape=given.shape, name="puzzle")
-
-model = Model(
-    # Constraints on rows and columns
-    [AllDifferent(row) for row in puzzle],
-    [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
-)
-
-# Constraints on blocks
-for i in range(0,9, 3):
-    for j in range(0,9, 3):
-        model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
-
-# Constraints on values (cells that are not empty)
-model += (puzzle[given!=e] == given[given!=e]) # numpy's indexing
-
-
-# Solve and print
-if model.solve():
-    print(puzzle.value())
-else:
-    print("No solution found")
-```
-
-You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/master/examples/quickstart_sudoku.ipynb).
-
-
-### Helping out
-We welcome any feedback, as well as hearing about how you are using it. You are also welcome to reuse any parts in your own project.
-
-A good starting point to help with the development, would be to write more CP problems in CPMpy, and add them to the examples folder.
-
-CPMpy is still in Beta stage, and bugs can still occur. If so, please report the issue on Github!
-
-Are you a solver developer? We are willing to integrate solvers that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
-
-### FAQ
-Problem: I get the following error:
-```python
-"IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
-```
-
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CPMpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
-```python
-m = cparray(m); m[X] == True
-```
-
-### Acknowledgments
-Part of the development received funding from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
+Part of the development received funding through Prof. Tias Guns his European Research Council (ERC) Consolidator grant, under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
 
 You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language convenience with a universal n-dimensional array, CPpy as python-embedded example. The 18th workshop on Constraint Modelling and Reformulation at CP (ModRef 2019).
 

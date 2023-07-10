@@ -33,9 +33,10 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
-from ..transformations.decompose_global import decompose_global
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 
@@ -191,9 +192,12 @@ class CPM_ortools(SolverInterface):
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
-                if isinstance(cpm_var, _BoolVarImpl):
-                    cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                try:
+                    cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                except IndexError:
+                    cpm_var._value = None  # probably got optimized away by our transformations
 
             # translate objective
             if self.has_objective():
@@ -310,7 +314,6 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -325,14 +328,48 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
-        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table", "cumulative","circuit"})
+        cpm_cons = toplevel_list(cpm_expr)
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit"}
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
         return cpm_cons
 
+    def __add__(self, cpm_expr):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr, collect=self.user_vars)
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
+
+        return self
+
+    # TODO: 'reifiable' is an artefact from the early days
+    # only 3 constraints support it (and,or,sum),
+    # we can just add reified support for those and not need `reifiable` or returning the constraint
+    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
@@ -494,7 +531,7 @@ class CPM_ortools(SolverInterface):
 
             CPMpy will return only those variables that are False (in the UNSAT core)
 
-            Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+            Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
 
             For pure or-tools example, see http://github.com/google/or-tools/blob/master/ortools/sat/samples/assumptions_sample_sat.py
 
@@ -511,28 +548,40 @@ class CPM_ortools(SolverInterface):
 
     @classmethod
     def tunable_params(cls):
+        """
+            Suggestion of tunable hyperparameters of the solver.
+            List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
+        """
         return {
-            'cp_model_probing_level': [0, 1, 2],
-            'preferred_variable_order': [0, 1, 2],
+            'use_branching_in_lp': [False, True],
+            'optimize_with_core' : [False, True],
+            'search_branching': [0,1,2,3,4,5,6],
+            'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'symmetry_level': [0, 1, 2],
-            'minimization_algorithm': [0, 1, 2],
-            'search_branching': [0, 1, 2, 3, 4, 5, 6],
-            'optimize_with_core': [False, True],
-            'use_erwa_heuristic': [False, True]
+            'minimize_core' : [False, True],
+            'cp_model_probing_level': [0, 1, 2, 3],
+            'cp_model_presolve' : [False, True],
+            'clause_cleanup_ordering' : [0,1],
+            'binary_minimization_algorithm' : [0,1,2,3,4],
+            'minimization_algorithm' : [0,1,2,3],
+            'use_phase_saving' : [False, True]
         }
 
     @classmethod
     def default_params(cls):
         return {
-            'cp_model_probing_level': 2,
-            'preferred_variable_order': 0,
-            'linearization_level': 1,
-            'symmetry_level': 2,
-            'minimization_algorithm': 2,
-            'search_branching': 0,
+            'use_branching_in_lp': False,
             'optimize_with_core': False,
-            'use_erwa_heuristic': False
+            'search_branching': 0,
+            'boolean_encoding_level': 1,
+            'linearization_level': 1,
+            'minimize_core': True,
+            'cp_model_probing_level': 2,
+            'cp_model_presolve': True,
+            'clause_cleanup_ordering': 0,
+            'binary_minimization_algorithm': 1,
+            'minimization_algorithm': 2,
+            'use_phase_saving': True
         }
 
 
