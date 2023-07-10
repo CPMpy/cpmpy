@@ -562,7 +562,9 @@ class Operator(Expression):
             weights, vars = self.args
             bounds = []
             for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
-                bounds += [(list(weights[i] * x for x in varbounds))]
+                sortbounds = (list(weights[i] * x for x in varbounds))
+                sortbounds.sort()
+                bounds += [sortbounds]
             lbs, ubs = (zip(*bounds))
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'sub':
