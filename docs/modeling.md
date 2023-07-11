@@ -683,12 +683,14 @@ The parameter tuner is based on the following publication:
 
 Another built-in tuner is `GridSearchTuner`, which does random gridsearch (with adaptive capping).
 
-## External tuners
+### External tuners
 
 You can also use external hyperparameter optimisation libraries, such as `hyperopt`:
-```
+```python
 from hyperopt import tpe, hp, fmin
 import cpmpy as cp
+
+# model = Model(...)
 
 def time_solver(model, solver, param_dict):
     s = cp.SolverLookup.get(solver, model)
@@ -709,6 +711,6 @@ best = fmin(
     max_evals=10 # Number of optimization attempts
 )
 print(best)
-get_time(best)
+time_solver(model, "ortools", best)
 ```
 
