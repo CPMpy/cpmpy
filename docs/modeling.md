@@ -647,6 +647,8 @@ While directly calling the solver offers a lot of freedom, it is a bit more cumb
 ## Hyperparameter search across different parameters
 Because CPMpy offers programmatic access to the solver API, hyperparameter search can be straightforwardly done with little overhead between the calls.
 
+### Built-in tuners
+
 The tools directory contains a utility to efficiently search through the hyperparameter space defined by the solvers `tunable_params`.
 
 Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
@@ -671,11 +673,42 @@ tuner = ParameterTuner("ortools", model, tunables, defaults)
 best_params = tuner.tune(max_tries=100)
 best_runtime = tuner.best_runtime
 ```
-
-This utlity is based on the SMBO framework and speeds up the search by implementing adaptive capping.
+This utlity is based on the SMBO framework and speeds up the search by starting from the default configuration, and implementing adaptive capping meaning that the best runtime is used as timeout to avoid wasting time.
 
 The parameter tuner is based on the following publication: 
 >Ignace Bleukx, Senne Berden, Lize Coenen, Nicholas Decleyre, Tias Guns (2022). Model-Based Algorithm
 >Configuration with Adaptive Capping and Prior Distributions. In: Schaus, P. (eds) Integration of Constraint
 >Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
 >vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
+
+Another built-in tuner is `GridSearchTuner`, which does random gridsearch (with adaptive capping).
+
+## External tuners
+
+You can also use external hyperparameter optimisation libraries, such as `hyperopt`:
+```
+from hyperopt import tpe, hp, fmin
+import cpmpy as cp
+
+def time_solver(model, solver, param_dict):
+    s = cp.SolverLookup.get(solver, model)
+    s.solve(**param_dict)
+    return s.status().runtime
+
+space = {
+    'cp_model_probing_level': hp.choice('cp_model_probing_level', [0, 1, 2, 3]),
+    'linearization_level': hp.choice('linearization_level', [0, 1, 2]),
+    'symmetry_level': hp.choice('symmetry_level', [0, 1, 2]),
+    'search_branching': hp.choice('search_branching', [0, 1, 2]),
+}
+
+best = fmin(
+    fn=lambda p: time_solver(model, "ortools", p), # Objective Function to optimize
+    space=space, # Hyperparameter's Search Space
+    algo=tpe.suggest, # Optimization algorithm (representative TPE)
+    max_evals=10 # Number of optimization attempts
+)
+print(best)
+get_time(best)
+```
+
