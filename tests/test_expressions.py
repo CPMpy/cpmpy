@@ -426,8 +426,9 @@ class TestBounds(unittest.TestCase):
 
         cons = (arr[i] == 1).implies(p)
         m = cp.Model([cons, i == 5])
-        self.assertTrue(m.solve())
-        self.assertTrue(cons.value())
+        self.assertFalse(m.solve())
+        #index i is None (since previous model has no solutions) so the value of cons is also None.
+        self.assertIsNone(cons.value())
 
         # div constraint
         a,b = intvar(1,2,shape=2)

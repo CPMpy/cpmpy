@@ -53,16 +53,16 @@ class TestTransfReif(unittest.TestCase):
         # than the array range, needs a reified equality decomposition.
         arr = cpm_array([0,1,2])
 
-        cases = [(-1,3,5), # idx.lb, idx.ub, cnt
-                 (-1,2,4),
-                 (-1,1,3),
-                 (-1,0,2),
-                 (0,3,4),
+        cases = [(-1,3,3), # idx.lb, idx.ub, cnt
+                 (-1,2,3),
+                 (-1,1,2),
+                 (-1,0,1),
+                 (0,3,3),
                  (0,2,3),
                  (0,1,2),
                  (1,2,2),
-                 (1,3,3),
-                 (2,3,2),
+                 (1,3,2),
+                 (2,3,1),
                 ]
 
         for (lb,ub,cnt) in cases:
