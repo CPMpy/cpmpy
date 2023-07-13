@@ -1,14 +1,17 @@
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import AllDifferent, AllEqual, Circuit, GlobalConstraint, Table, DirectConstraint
-from cpmpy.expressions.utils import is_any_list, is_int, is_bool
+from cpmpy.expressions.python_builtins import sum
+from cpmpy.expressions.utils import is_any_list, is_int, is_bool, eval_comparison
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.flatten_model import flatten_constraint
+from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv
+from cpmpy.transformations.normalize import toplevel_list
+from cpmpy.transformations.reification import reify_rewrite, only_bv_implies
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables, get_variables_model
 from cpmpy.expressions.variables import  _BoolVarImpl, _IntVarImpl, boolvar
 from cpmpy.solvers.solver_interface import SolverInterface
-from cpmpy import SolverLookup
 import numpy as np
 import builtins
 
@@ -104,7 +107,19 @@ class CPM_int2bool_direct(SolverInterface):
 
         :return: list of Expression
         """
-        return int2bool_direct_constraints(cpm_expr, ivarmap=self.ivarmap)
+
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=frozenset({'alldifferent'}))  # Alldiff has a specialzed MIP decomp
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons,
+                                        supported=frozenset({"sum", "wsum"}))  # the core of the MIP-linearization
+        # cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+
+        return int2bool_direct_linear(cpm_cons, ivarmap=self.ivarmap)
 
 
     def __add__(self, cpm_expr):
@@ -318,84 +333,151 @@ def int2bool_direct_flatconstraint(constraint, ivarmap):
     else:
         raise f"to bool: Constraint {constraint=} of type {type(constraint)} not handled yet"
 
+def int2bool_direct_linear(lst_of_cons, ivarmap):
 
-def int2bool_direct_linear(con, ivarmap):
-    """Encode the linear sum integer variable constraint with direct
-    variable encoding.
+    newlist = []
 
-    Args:
-        con (cpmpy.Expression.Comparison): Comparison operator with 
-        ivarmap ([type]): [description]
-    """
-    left, right = constraint.args
-    if isinstance(left, Operator) and isinstance(right, _IntVarImpl):
-        # TODO
-        raise "TODO: check that this case is properly coved"
-        cons = int2bool_direct_flatconstraint(
-            Comparison(name=constraint.name, left=left-right, right=0),
-            ivarmap
-        )
+    cons_vars = get_variables(lst_of_cons)
+    for var in cons_vars:
+        if not var.is_bool() and not var in ivarmap:
+            newlist += int2bool_direct_encode(var, ivarmap)
 
-    op, val = con.args[0].name, con.args[1]
-    w, x = [], []
-    # SUM CASE
-    if op == "sum":
-        op_args = con.args[0].args
+    for cons in lst_of_cons:
 
-        for expr in op_args:
-            # unweighted sum
-            if isinstance(expr, _IntVarImpl):
-                for wi, bv in ivarmap[expr].items():
-                    w.append(wi)
-                    x.append(bv)
-            # Weighted sum
-            elif isinstance(expr, Operator) and expr.name == "mul":
-                coeff = expr.args[0]
-                var = expr.args[1]
-                for wi, bv in ivarmap[var].items():
-                    w.append(wi * coeff)
-                    x.append(bv)
-            # Other functions
-            elif isinstance(expr, Operator) and expr.name == "-":
-                sub_expr = expr.args[0]
-                if isinstance(sub_expr, _IntVarImpl):
-                    for wi, bv in ivarmap[sub_expr].items():
-                        w.append(-wi)
-                        x.append(bv)
-                elif isinstance(sub_expr, Operator) and sub_expr.name == "mul" and isinstance(sub_expr.args[1], _IntVarImpl):
-                    coeff = sub_expr.args[0]
-                    var = sub_expr.args[1]
-                    for wi, bv in ivarmap[var].items():
-                        w.append(wi * coeff)
-                        x.append(bv)
+        if isinstance(cons, _BoolVarImpl):
+            newlist.append(cons)
+
+        elif isinstance(cons, Operator) and cons.name == "->":
+            cond, expr = cons.args
+            new_expr = int2bool_direct_linear([expr], ivarmap)
+            assert len(new_expr) == 1
+            newlist.append(cond.implies(new_expr[0]))
+
+        elif isinstance(cons, Comparison):
+            lhs, rhs = cons.args
+            assert is_int(rhs), f"rhs should be int but is {rhs} with type {type(rhs)}"
+
+            new_lhs = 0
+            if isinstance(lhs, _IntVarImpl):
+                if isinstance(lhs, _BoolVarImpl):
+                    new_lhs = lhs
                 else:
-                    raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
+                    new_lhs = sum([w * var for w, var in ivarmap[lhs].items()])
+
+            elif lhs.name == "sum":
+                for var in lhs.args:
+                    if var.is_bool():
+                        new_lhs += 1 * var
+                    else:
+                        new_lhs += sum([w * var for w, var in ivarmap[var].items()])
+
+            elif lhs.name == "wsum":
+                weights, ivars = lhs.args
+                for i, var in enumerate(ivars):
+                    if var.is_bool():
+                        new_lhs += weights[i] * var
+                    else:
+                        new_lhs += sum([w * weights[i] * var for w, var in ivarmap[var].items()])
             else:
-                raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
-        if val < 0:
-            w = [-wi for wi in w]
-        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
-        # return [Comparison(con.name, Operator("wsum", (w, x)), val)]
-    elif op == "mul" and is_int(con.args[0].args[0]) and isinstance(con.args[0].args[1], _IntVarImpl):
-        coeff = con.args[0].args[0]
-        var = con.args[0].args[1]
-        for wi, bv in ivarmap[var].items():
-            w.append(wi * coeff)
-            x.append(bv)
-        return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
-    elif op == "-":
-        if val < 0:
-            return [-con]
-        return [con]
-    elif op == "abs" and isinstance(con.args[0].args[0], _IntVarImpl):
-        var = con.args[0].args[0]
-        bool_cons = []# # print(f"\t abs: {var=} {var.lb=} {var.ub=}")
-        for wi, bv in ivarmap[var].items():
-            if abs(wi) != val:
-                bool_cons.append([~bv])
-        return bool_cons
-    else:
-        raise NotImplementedError(f"Comparison {con=} {op=} {con.args[0].args=} not supported yet...")
+                raise ValueError(f"Not supported lhs of comparison: {lhs}")
+
+            is_sum = isinstance(new_lhs, Operator) and (new_lhs.name == "sum" or new_lhs.name == "wsum")
+            is_var = isinstance(new_lhs, _BoolVarImpl)
+            assert is_sum or is_var, f"Should be sum/wsum or bvar but is {new_lhs}"
+
+
+            # if rhs < 0:
+            #     if isinstance(new_lhs, Operator) and new_lhs.name == "sum":
+            #         new_lhs = sum(-1 * var for var in new_lhs.args)
+            #     if isinstance(new_lhs, Operator) and new_lhs.name == "wsum":
+            #             new_lhs = sum([-w * var for w, var in zip(*new_lhs.args)])
+            #     if is_var:
+            #         new_lhs = Operator("wsum", [[-1],[new_lhs]])
+
+            newlist.append(eval_comparison(cons.name, new_lhs,rhs))
+
+    for i, cons in enumerate(newlist):
+        print(i, cons)
+    return newlist
+
+
+# def int2bool_direct_linear(con, ivarmap):
+#     """Encode the linear sum integer variable constraint with direct
+#     variable encoding.
+#
+#     Args:
+#         con (cpmpy.Expression.Comparison): Comparison operator with
+#         ivarmap ([type]): [description]
+#     """
+#     left, right = constraint.args
+#     if isinstance(left, Operator) and isinstance(right, _IntVarImpl):
+#         # TODO
+#         raise "TODO: check that this case is properly coved"
+#         cons = int2bool_direct_flatconstraint(
+#             Comparison(name=constraint.name, left=left-right, right=0),
+#             ivarmap
+#         )
+#
+#     op, val = con.args[0].name, con.args[1]
+#     w, x = [], []
+#     # SUM CASE
+#     if op == "sum":
+#         op_args = con.args[0].args
+#
+#         for expr in op_args:
+#             # unweighted sum
+#             if isinstance(expr, _IntVarImpl):
+#                 for wi, bv in ivarmap[expr].items():
+#                     w.append(wi)
+#                     x.append(bv)
+#             # Weighted sum
+#             elif isinstance(expr, Operator) and expr.name == "mul":
+#                 coeff = expr.args[0]
+#                 var = expr.args[1]
+#                 for wi, bv in ivarmap[var].items():
+#                     w.append(wi * coeff)
+#                     x.append(bv)
+#             # Other functions
+#             elif isinstance(expr, Operator) and expr.name == "-":
+#                 sub_expr = expr.args[0]
+#                 if isinstance(sub_expr, _IntVarImpl):
+#                     for wi, bv in ivarmap[sub_expr].items():
+#                         w.append(-wi)
+#                         x.append(bv)
+#                 elif isinstance(sub_expr, Operator) and sub_expr.name == "mul" and isinstance(sub_expr.args[1], _IntVarImpl):
+#                     coeff = sub_expr.args[0]
+#                     var = sub_expr.args[1]
+#                     for wi, bv in ivarmap[var].items():
+#                         w.append(wi * coeff)
+#                         x.append(bv)
+#                 else:
+#                     raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
+#             else:
+#                 raise NotImplementedError(f"Other sum expressions {expr=} not supported yet...")
+#         if val < 0:
+#             w = [-wi for wi in w]
+#         return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
+#         # return [Comparison(con.name, Operator("wsum", (w, x)), val)]
+#     elif op == "mul" and is_int(con.args[0].args[0]) and isinstance(con.args[0].args[1], _IntVarImpl):
+#         coeff = con.args[0].args[0]
+#         var = con.args[0].args[1]
+#         for wi, bv in ivarmap[var].items():
+#             w.append(wi * coeff)
+#             x.append(bv)
+#         return [Comparison(con.name, Operator("sum", [wi *xi for wi, xi in zip(w, x)]), abs(val))]
+#     elif op == "-":
+#         if val < 0:
+#             return [-con]
+#         return [con]
+#     elif op == "abs" and isinstance(con.args[0].args[0], _IntVarImpl):
+#         var = con.args[0].args[0]
+#         bool_cons = []# # print(f"\t abs: {var=} {var.lb=} {var.ub=}")
+#         for wi, bv in ivarmap[var].items():
+#             if abs(wi) != val:
+#                 bool_cons.append([~bv])
+#         return bool_cons
+#     else:
+#         raise NotImplementedError(f"Comparison {con=} {op=} {con.args[0].args=} not supported yet...")
 
 
 def int2bool_direct_comparison(con, ivarmap):
