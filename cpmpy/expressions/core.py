@@ -610,7 +610,7 @@ class Operator(Expression):
         if lowerbound > upperbound:
             #overflow happened
             raise OverflowError('Overflow when calculating bounds, your expression exceeds integer bounds.')
-        return int(lowerbound), upperbound
+        return lowerbound, upperbound
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
