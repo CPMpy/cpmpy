@@ -18,6 +18,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "exact": {},
+                  "int2bool:ortools":{}
                   }
 
 # Exclude certain operators for solvers.
@@ -26,6 +27,7 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {"mod","pow","div","mul"},
+                     "int2bool:ortools": {"mod","pow","div","mul"}
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
@@ -36,6 +38,7 @@ EXCLUDE_IMPL = {"ortools": {},
                 "pysat": {},
                 "pysdd": {},
                 "exact": {"mod","pow","div","mul"},
+                "int2bool:ortools": {"mod","pow","div","mul"}
                 }
 
 # Variables to use in the rest of the test script
