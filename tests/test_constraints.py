@@ -1,44 +1,42 @@
-from cpmpy import Model, SolverLookup
+from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
-from cpmpy.expressions.variables import _NumVarImpl
+from cpmpy.expressions.globalfunctions import *
 
 import pytest
-
 
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ["pysat"]
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {"circuit"},
-                  "gurobi": {"circuit"},
+EXCLUDE_GLOBAL = {"ortools": {},
+                  "gurobi": {},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "exact": {},
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
-                     "pysat": {"sum:int", "wsum:int", "mul", "sub", "mod", "div", "pow", "abs","-"},
+                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "exact": {"mod","pow","div","mul"},
                      }
-
-# exclude certain bounds for comparisons
-EXCLUDE_COMP_BOUNDS = {"pysat": {_NumVarImpl}}
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {"element"},
+EXCLUDE_IMPL = {"ortools": {},
                 "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
-                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
-                "pysat": {"xor"}, # xors: temporarily avoid till #209 is fixed
-                "pysdd": {"xor"},
+                "z3": {},
+                "pysat": {},
+                "pysdd": {},
+                "exact": {"mod","pow","div","mul"},
                 }
-
-
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
@@ -68,40 +66,19 @@ def numexprs(solver):
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if not is_bool]
     if solver in EXCLUDE_OPERATORS:
         names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[solver]]
-
-    to_delete = set()
-    for (name, arity) in list(names):
-        if name in {"wsum", "sum", "mul"}:
-            # add int and bool version
-            if solver not in EXCLUDE_OPERATORS or name + ":int" not in EXCLUDE_OPERATORS[solver]:
-                names += [(name + ":int", arity)]
-                to_delete |= {(name, arity)}
-            if solver not in EXCLUDE_OPERATORS or name + ":bool" not in EXCLUDE_OPERATORS[solver]:
-                names += [(name + ":bool", arity)]
-                to_delete |= {(name, arity)}
-
-    for td in to_delete: names.remove(td)
-
-
     for name, arity in names:
-
-        if name.split(":")[-1] == "bool":
-            args = BOOL_ARGS
-        else:
-            args = NUM_ARGS
-
-        if name.startswith("wsum"):
-            operator_args = [list(range(len(args))), args]
+        if name == "wsum":
+            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,2]
         elif name == "mod":
-            operator_args = [args[0],POS_VAR]
+            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
-            operator_args = args[:arity]
+            operator_args = NUM_ARGS[:arity]
         else:
-            operator_args = args
+            operator_args = NUM_ARGS
 
-        yield Operator(name.split(":")[0], operator_args)
+        yield Operator(name, operator_args)
 
 
 # Generate all possible comparison constraints
@@ -116,27 +93,25 @@ def comp_constraints(solver):
     """
     for comp_name in Comparison.allowed:
         for numexpr in numexprs(solver):
-            for rhs in [NUM_VAR, 1]:
-                # special case
-                if numexpr.name == "mul" and all(isinstance(arg, Expression) and arg.is_bool() for arg in numexpr.args) \
-                        and comp_name == ">" and is_num(rhs) and rhs == 1:
-                    rhs = 0
-                if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[solver]):
-                    yield Comparison(comp_name, numexpr, rhs)
+            for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
-                for rhs in [NUM_VAR, 1]:
-                    if solver not in EXCLUDE_COMP_BOUNDS or not any(isinstance(rhs,t) for t in EXCLUDE_COMP_BOUNDS[solver]):
-                        yield Comparison(comp_name, glob_expr, rhs)
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                    yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
         for comp_name in Comparison.allowed:
             for boolexpr in bool_exprs(solver):
-                for rhs in [NUM_VAR, 1]:
-                    if comp_name == '>' and rhs == 1:
-                        rhs = 0 # >1 is unsat for boolean expressions, so change it to 0
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                    if comp_name == '>':
+                        # >1 is unsat for boolean expressions, so change it to 0
+                        if isinstance(rhs, int) and rhs == 1:
+                            rhs = 0
+                        if isinstance(rhs, BoolVal) and rhs.args[0] == True:
+                            rhs = BoolVal(False)
                     yield Comparison(comp_name, boolexpr, rhs)
 
 

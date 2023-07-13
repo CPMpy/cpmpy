@@ -10,6 +10,9 @@
     as CPMpy should also work without this solver installed.
     To ensure that, include it inside supported() and other functions that need it...
 """
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.normalize import toplevel_list
+
 """
     Interface to TEMPLATE's API
 
@@ -29,7 +32,7 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
@@ -221,7 +224,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
+    # `__add__()` first calls `transform()`
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -236,35 +239,55 @@ class CPM_template(SolverInterface):
 
         :return: list of Expression
         """
-        # apply transformations, then post internally
+        # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"AllDifferent"})
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
         #cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         #cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         # ...
         return cpm_cons
 
-    def _post_constraint(self, cpm_con):
+    def __add__(self, cpm_expr_orig):
         """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+            Eagerly add a constraint to the underlying solver.
 
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        if isinstance(cpm_con, _BoolVarImpl):
-            # base case, just var or ~var
-            self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
-        elif isinstance(cpm_con, Operator) and cpm_con.name == 'or':
-            self.TEMPLATE_solver.add_clause([ self.solver_var(var) for var in cpm_con.args ]) # TODO, soon: .add_clause(self.solver_vars(cpm_con.args))
-        elif hasattr(cpm_expr, 'decompose'):
-            # global constraint not known, try posting generic decomposition
-            # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-        
-        raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
+
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+
+            if isinstance(cpm_con, _BoolVarImpl):
+                # base case, just var or ~var
+                self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
+            elif cpm_con.name == 'or':
+                self.TEMPLATE_solver.add_clause(self.solver_vars(cpm_con.args))
+            elif hasattr(cpm_expr, 'decompose'):
+                # global constraint not known, try posting generic decomposition
+                # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
+                for con in self.transform(cpm_expr.decompose()):
+                    self._post_constraint(con)
+
+            raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+
+        return self
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core

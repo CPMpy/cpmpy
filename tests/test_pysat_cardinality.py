@@ -9,7 +9,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 class TestCardinality(unittest.TestCase):
     def setUp(self):
         self.bv_before = boolvar(shape=7)
-        self.bvs = boolvar(shape=3)
+        self.bvs = cpm_array(boolvar(shape=2).tolist() + [~boolvar()])
 
     def test_pysat_atmost(self):
 
@@ -104,6 +104,27 @@ class TestCardinality(unittest.TestCase):
         ps = CPM_pysat(differrent)
         self.assertTrue(ps.solve())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
+
+    def test_pysat_card_implied(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [b.implies(sum(x) > 3),
+                b.implies(sum(x) <= 1),
+                b.implies(sum(x) != 4),
+                b == (sum(x) >= 2),
+                b == (sum(x) < 3),
+                b == (sum(x) == 2),
+                b == (sum(x) != 2),
+                (sum(x) > 3).implies(b),
+                (sum(x) <= 4).implies(b),
+                (sum(x) == 3).implies(b),
+                (sum(x) != 3).implies(b),
+               ]
+        for c in cons:
+            cp.Model(c).solve("pysat")
+            self.assertTrue(c.value())
+
 
 if __name__ == '__main__':
     unittest.main()
