@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 from cpmpy import *
+from cpmpy.exceptions import NotSupportedError
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
@@ -90,7 +91,7 @@ class TestTransfReif(unittest.TestCase):
         self.assertEqual(f(rv == all(bvs)), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]")
         self.assertEqual(f(rv.implies(any(bvs))), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]")
         self.assertEqual(f((bvs[0].implies(bvs[1])).implies(rv)), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]")
-        self.assertRaises(ValueError, lambda : f(rv == AllDifferent(ivs)))
+        self.assertRaises(NotSupportedError, lambda : f(rv == AllDifferent(ivs)))
         self.assertEqual(fd([rv.implies(AllDifferent(ivs))]), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]")
         self.assertEqual(f(rv == (arr[intvar(0, 2)] != 1)), "[([0 1 2][IV0]) == (IV1), (IV1 != 1) == (rv)]")
         self.assertEqual(f(rv == (max(ivs) > 5)), "[(max(ivs[0],ivs[1],ivs[2])) == (IV2), (IV2 > 5) == (rv)]")
