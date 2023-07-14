@@ -281,7 +281,7 @@ class _IntVarImpl(_NumVarImpl):
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub), ub)
 
         if name is None:
-            name = "IV{}".format(_IntVarImpl.counter)
+            name = "IVV{}".format(_IntVarImpl.counter)
             _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
@@ -307,7 +307,7 @@ class _BoolVarImpl(_IntVarImpl):
         assert(ub == 0 or ub == 1)
 
         if name is None:
-            name = "BV{}".format(_BoolVarImpl.counter)
+            name = "BVV{}".format(_BoolVarImpl.counter)
             _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
 
