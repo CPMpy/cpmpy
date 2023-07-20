@@ -390,6 +390,8 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
+        iv = intvar(0,(len(self.args) // 2))
+        return [sum(self.args) == iv * 2 + 1], [(iv * 2 == sum(self.args)) | (iv * 2 + 1 == sum(self.args))]
         a0, a1 = self.args[:2]
         cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 

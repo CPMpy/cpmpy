@@ -318,6 +318,8 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Xor(bv).value())
         nbNotModels = cp.Model(~cp.Xor(bv)).solveAll(display=lambda: self.assertFalse(cp.Xor(bv).value()))
         nbModels = cp.Model(cp.Xor(bv)).solveAll(display=lambda: self.assertTrue(cp.Xor(bv).value()))
+        nbModelsDecomp = cp.Model(cp.Xor(bv).decompose()).solveAll(display=lambda: self.assertTrue(cp.Xor(bv).value()))
+        self.assertEqual(nbModelsDecomp,nbModels)
         total = cp.Model(bv == bv).solveAll()
         self.assertEqual(str(total), str(nbModels + nbNotModels))
 
