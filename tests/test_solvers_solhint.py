@@ -13,6 +13,8 @@ class TestSolutionHinting(unittest.TestCase):
         model = cp.Model(a ^ b)
 
         for n, solver_class in cp.SolverLookup.base_solvers():
+            if not solver_class.supported():
+                continue
             slv = solver_class(model)
             try:
                 args = {"cp_model_presolve": False} if n == "ortools" else {}  # hints are not taken into account in presolve
