@@ -267,7 +267,7 @@ class SolverInterface(object):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        raise NotImplementedError("Solver does not support solution hinting")
+        raise NotSupportedError("Solver does not support solution hinting")
 
     def get_core(self):
         """
@@ -279,7 +279,7 @@ class SolverInterface(object):
         (a literal is either a `_BoolVarImpl` or a `NegBoolView` in case of its negation, e.g. x or ~x)
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
-        raise NotImplementedError("Solver does not support unsat core extraction")
+        raise NotSupportedError("Solver does not support unsat core extraction")
 
 
     # shared helper functions
