@@ -22,6 +22,9 @@
 import sys  # for stdout checking
 import time
 
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -64,6 +67,9 @@ class CPM_exact(SolverInterface):
             pkg_resources.require("exact>=1.1.5")
             return True
         except ImportError as e:
+            return False
+        except VersionConflict:
+            warnings.warn(f"CPMpy requires Exact version >=1.1.5 is required but you have version {pkg_resources.get_distribution('exact').version}")
             return False
 
 
@@ -574,3 +580,16 @@ class CPM_exact(SolverInterface):
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
 
+
+    def solution_hint(self, cpm_vars, vals):
+        """
+        Exact supports warmstarting the solver with a partial feasible assignment.
+            Requires version >= 1.2.1
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        try:
+            pkg_resources.require("exact>=1.1.5")
+            self.xct_solver.setSolutionHints(self.solver_vars(cpm_vars), vals)
+        except VersionConflict:
+            raise NotSupportedError("Upgrade Exact version to >=1.2.1 to support solution hinting")
