@@ -192,9 +192,12 @@ class CPM_ortools(SolverInterface):
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
-                if isinstance(cpm_var, _BoolVarImpl):
-                    cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                try:
+                    cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(cpm_var._value) # ort value is always an int
+                except IndexError:
+                    cpm_var._value = None  # probably got optimized away by our transformations
 
             # translate objective
             if self.has_objective():
@@ -326,7 +329,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification

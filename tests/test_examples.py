@@ -36,15 +36,20 @@ class TestExamples(unittest.TestCase):
     # do not run, dependency local to that folder
     if example.endswith('explain_satisfaction.py'):
         return
-    loader = importlib.machinery.SourceFileLoader("example", example)
-    mod = types.ModuleType(loader.name)
-    loader.exec_module(mod)
+
+    # catch ModuleNotFoundError if example imports stuff that may not be installed
+    try:
+        loader = importlib.machinery.SourceFileLoader("example", example)
+        mod = types.ModuleType(loader.name)
+        loader.exec_module(mod)  # this runs the scripts
+    except ModuleNotFoundError as e:
+        pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))  # returns
 
     # run again with gurobi, if installed on system
-    gbi_slv = SolverLookup.lookup("gurobi")
     if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
         # exclude those, too slow or solver specific
         return
+    gbi_slv = SolverLookup.lookup("gurobi")
     if gbi_slv.supported():
         # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
         f = SolverLookup.base_solvers

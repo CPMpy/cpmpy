@@ -188,47 +188,47 @@ class Expression(object):
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
+        # some simple constant removal
+        if is_true_cst(other):
+            return self
+        if is_false_cst(other):
+            return BoolVal(False)
         # catch beginner mistake
         if is_num(other):
             raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
-        # some simple constant removal
-        if is_true_cst(other):
-            return self
-        if is_false_cst(other):
-            return BoolVal(False)
         return Operator("and", [self, other])
 
     def __rand__(self, other):
-        # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return self
         if is_false_cst(other):
             return BoolVal(False)
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
+        # some simple constant removal
+        if is_true_cst(other):
+            return BoolVal(True)
+        if is_false_cst(other):
+            return self
         # catch beginner mistake
         if is_num(other):
             raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
-        # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
-        if is_false_cst(other):
-            return self
         return Operator("or", [self, other])
 
     def __ror__(self, other):
-        # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         # some simple constant removal
         if is_true_cst(other):
             return BoolVal(True)
         if is_false_cst(other):
             return self
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
     def __xor__(self, other):
@@ -370,8 +370,7 @@ class BoolVal(Expression):
         return self.args[0]
 
     def __invert__(self):
-        self.args[0] = not self.args[0]
-        return self
+        return BoolVal(not self.args[0])
 
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
