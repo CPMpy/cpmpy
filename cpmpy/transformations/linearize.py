@@ -96,6 +96,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
                     newlist += [cond.implies(lin) for lin in lin_sub]
+                    # ensure no new solutions are created
+                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
+                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified)
+
 
         # comparisons
         elif isinstance(cpm_expr, Comparison):
@@ -267,6 +271,7 @@ def only_positive_bv(lst_of_expr):
             if isinstance(cond, _BoolVarImpl): # BV -> Expr
                 subexpr = only_positive_bv([subexpr])
                 newlist += [cond.implies(expr) for expr in subexpr]
+
 
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
