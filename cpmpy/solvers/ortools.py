@@ -243,9 +243,9 @@ class CPM_ortools(SolverInterface):
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
+                revar = self.ort_model.NewBoolVar(str(cpm_var)+str(cpm_var.id))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var)+str(cpm_var.id))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar

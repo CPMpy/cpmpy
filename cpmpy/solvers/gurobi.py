@@ -185,9 +185,9 @@ class CPM_gurobi(SolverInterface):
         if cpm_var not in self._varmap:
             from gurobipy import GRB
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
+                revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name+str(cpm_var.id))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
+                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=cpm_var.name+str(cpm_var.id))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar

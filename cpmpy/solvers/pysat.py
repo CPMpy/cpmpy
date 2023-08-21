@@ -206,9 +206,9 @@ class CPM_pysat(SolverInterface):
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
             # just a view, get actual var identifier, return -id
-            return -self.pysat_vpool.id(cpm_var._bv.name)
+            return -self.pysat_vpool.id(cpm_var._bv.name + str(cpm_var.id))
         elif isinstance(cpm_var, _BoolVarImpl):
-            return self.pysat_vpool.id(cpm_var.name)
+            return self.pysat_vpool.id(cpm_var.name + str(cpm_var.id))
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 

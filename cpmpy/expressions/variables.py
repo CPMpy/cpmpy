@@ -47,6 +47,7 @@
     ==============
 """
 import math
+import uuid
 from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
@@ -238,6 +239,7 @@ class _NumVarImpl(Expression):
         self.lb = lb
         self.ub = ub
         self.name = name
+        self.id = uuid.uuid4()
         self._value = None
 
     def is_bool(self):
@@ -263,9 +265,9 @@ class _NumVarImpl(Expression):
     def __repr__(self):
         return self.name
 
-    # for sets/dicts. Because names are unique, so is the str repr
+    # for sets/dicts. Because id's are unique, so is the str repr
     def __hash__(self):
-        return hash(self.name)
+        return hash(self.id)
 
 
 class _IntVarImpl(_NumVarImpl):
@@ -285,6 +287,8 @@ class _IntVarImpl(_NumVarImpl):
             _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
+
+
 
     # special casing for intvars (and boolvars)
     def __abs__(self):
