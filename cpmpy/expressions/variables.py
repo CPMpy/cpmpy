@@ -347,6 +347,7 @@ class NegBoolView(_BoolVarImpl):
         # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
         # __init__ from _IntVarImpl
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
+        self.id = bv.id
 
     def value(self):
         """ the negation of the value obtained in the last solve call by the viewed variable
