@@ -266,7 +266,7 @@ class CPM_ortools(SolverInterface):
             are premanently posted to the solver)
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr,expr_dict=self.expr_dict)
         self += flat_cons  # add potentially created constraints
         get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
 
@@ -331,10 +331,10 @@ class CPM_ortools(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
+        cpm_cons = flatten_constraint(cpm_cons,expr_dict=self.expr_dict)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']),expr_dict=self.expr_dict)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),expr_dict=self.expr_dict)  # supports >, <, !=
+        cpm_cons = only_bv_implies(cpm_cons,expr_dict=self.expr_dict) # everything that can create
                                              # reified expr must go before this
         return cpm_cons
 

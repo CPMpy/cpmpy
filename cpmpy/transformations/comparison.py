@@ -18,7 +18,7 @@ from ..expressions.variables import _NumVarImpl
     - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
-def only_numexpr_equality(constraints, supported=frozenset()):
+def only_numexpr_equality(constraints, supported=frozenset(),expr_dict={}):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 
@@ -34,7 +34,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
             lhs = con.args[0]
             if not isinstance(lhs, _NumVarImpl) and not lhs.name in supported:
                 # LHS is unsupported for LHS <op> IV, rewrite to `(LHS == A) & (A <op> IV)`
-                (lhsvar, lhscons) = get_or_make_var(lhs)
+                (lhsvar, lhscons) = get_or_make_var(lhs,expr_dict=expr_dict)
                 # replace comparison by A <op> IV
                 newcons[i] = Comparison(con.name, lhsvar, con.args[1])
                 # add lhscon(s), which will be [(LHS == A)]

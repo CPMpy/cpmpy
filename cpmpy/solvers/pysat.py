@@ -229,8 +229,8 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
-        cpm_cons = flatten_constraint(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons,expr_dict=self.expr_dict)
+        cpm_cons = only_bv_implies(cpm_cons,expr_dict=self.expr_dict)
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
