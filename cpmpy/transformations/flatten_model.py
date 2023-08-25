@@ -111,7 +111,7 @@ def flatten_model(orig_model):
             return Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr):
+def flatten_constraint(expr,expr_dict={}):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -199,7 +199,7 @@ def flatten_constraint(expr):
                 else:
                     # make LHS normalized 'Boolexpr', RHS must be a var
                     lhs,lcons = normalized_boolexpr(expr.args[0])
-                    rhs,rcons = get_or_make_var(expr.args[1])
+                    rhs,rcons = get_or_make_var(expr.args[1],expr_dict)
 
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
@@ -250,7 +250,7 @@ def flatten_constraint(expr):
                 continue
 
             # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr)
+            (rvar, rcons) = get_or_make_var(rexpr,expr_dict)
 
             # Reification (double implication): Boolexpr == Var
             if exprname == '==' and lexpr.is_bool():
@@ -321,12 +321,14 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr):
+def get_or_make_var(expr,expr_dict={}):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
+    if str(expr) in expr_dict:
+        return expr_dict[str(expr)], []
     if __is_flat_var(expr):
         return (expr, [])
 
@@ -340,7 +342,12 @@ def get_or_make_var(expr):
         if isinstance(flatexpr,_BoolVarImpl):
             #avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
+
         bvar = _BoolVarImpl()
+        if str(flatexpr) in expr_dict:
+            return expr_dict[str(flatexpr)], []
+        else:
+            expr_dict[str(flatexpr)] = bvar
         return (bvar, [flatexpr == bvar]+flatcons)
 
     else:
@@ -350,6 +357,10 @@ def get_or_make_var(expr):
 
         lb, ub = flatexpr.get_bounds()
         ivar = _IntVarImpl(lb, ub)
+        if str(flatexpr) in expr_dict:
+            return expr_dict[str(flatexpr)], []
+        else:
+            expr_dict[str(flatexpr)] = ivar
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
