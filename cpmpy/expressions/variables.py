@@ -358,11 +358,6 @@ class NegBoolView(_BoolVarImpl):
         """
         self._bv.clear()
 
-    def __str__(self):
-        if hasattr(self._bv, "desc"):
-            return f"not({self._bv.desc})"
-        return self.__repr__()
-
     def __repr__(self):
         return "~{}".format(self._bv.name)
 
