@@ -111,7 +111,7 @@ def flatten_model(orig_model):
             return Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr,expr_dict={}):
+def flatten_constraint(expr,expr_dict=None):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -123,7 +123,8 @@ def flatten_constraint(expr,expr_dict={}):
         RE TODO: we now have custom NotImpl/NotSupported
     """
     from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
-
+    if expr_dict is None:
+        expr_dict = dict()
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
@@ -287,13 +288,15 @@ def flatten_constraint(expr,expr_dict={}):
     return newlist
 
 
-def flatten_objective(expr, supported=frozenset(["sum","wsum"]),expr_dict={}):
+def flatten_objective(expr, supported=frozenset(["sum","wsum"]),expr_dict=None):
     """
     - Decision variable: Var
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
               wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
     """
     # lets be very explicit here
+    if expr_dict is None:
+        expr_dict = dict()
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
@@ -321,12 +324,14 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr,expr_dict={}):
+def get_or_make_var(expr,expr_dict=None):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
+    if expr_dict is None:
+        expr_dict = dict()
     if str(expr) in expr_dict:
         return expr_dict[str(expr)], []
     if __is_flat_var(expr):
@@ -363,10 +368,12 @@ def get_or_make_var(expr,expr_dict={}):
             expr_dict[str(flatexpr)] = ivar
         return (ivar, [flatexpr == ivar]+flatcons)
 
-def get_or_make_var_or_list(expr,expr_dict={}):
+def get_or_make_var_or_list(expr,expr_dict=None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
         Used to convert arguments of globals
     """
+    if expr_dict is None:
+        expr_dict = dict()
     if __is_flat_var_or_list(expr):
         return (expr,[])
     elif is_any_list(expr):
@@ -376,7 +383,7 @@ def get_or_make_var_or_list(expr,expr_dict={}):
         return get_or_make_var(expr,expr_dict)
 
 
-def normalized_boolexpr(expr,expr_dict={}):
+def normalized_boolexpr(expr,expr_dict=None):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -397,7 +404,8 @@ def normalized_boolexpr(expr,expr_dict={}):
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
-
+    if expr_dict is None:
+        expr_dict = dict()
     if isinstance(expr, Operator):
         # and, or, ->
 
@@ -476,7 +484,7 @@ def normalized_boolexpr(expr,expr_dict={}):
             return (newexpr, [c for con in flatcons for c in con])
 
 
-def normalized_numexpr(expr,expr_dict={}):
+def normalized_numexpr(expr,expr_dict=None):
     """
         all 'flat normal form' numeric expressions...
 
@@ -491,6 +499,8 @@ def normalized_numexpr(expr,expr_dict={}):
             base_expr: same as 'expr', but all arguments are variables
             base_cons: list of flat normal constraints
     """
+    if expr_dict is None:
+        expr_dict = dict()
     # XXX a boolexpr is also a valid numexpr... e.g. 30*(iv > 5) + ... see mario obj.
     if __is_flat_var(expr):
         return (expr, [])

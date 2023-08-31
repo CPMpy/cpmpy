@@ -49,7 +49,7 @@ from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
-def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False, expr_dict={}):
+def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False, expr_dict=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -59,7 +59,8 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False, expr
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
 
     """
-
+    if expr_dict is None:
+        expr_dict = dict()
     if is_any_list(cpm_expr):
         lin_cons = [linearize_constraint(expr, supported=supported, reified=reified,expr_dict=expr_dict) for expr in cpm_expr]
         return [c for l in lin_cons for c in l]
@@ -215,13 +216,15 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False, expr
     return [cpm_expr]
 
 
-def only_positive_bv(cpm_expr,expr_dict={}):
+def only_positive_bv(cpm_expr,expr_dict=None):
     """
         Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
         cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
 
         Resulting expression is linear.
     """
+    if expr_dict is None:
+        expr_dict = dict()
     if is_any_list(cpm_expr):
         nn_cons = [only_positive_bv(expr,expr_dict=expr_dict) for expr in cpm_expr]
         return [c for l in nn_cons for c in l]

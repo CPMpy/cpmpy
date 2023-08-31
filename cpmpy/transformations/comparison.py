@@ -18,7 +18,7 @@ from ..expressions.variables import _NumVarImpl
     - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
-def only_numexpr_equality(constraints, supported=frozenset(),expr_dict={}):
+def only_numexpr_equality(constraints, supported=frozenset(),expr_dict=None):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 
@@ -26,6 +26,8 @@ def only_numexpr_equality(constraints, supported=frozenset(),expr_dict={}):
     """
 
     # shallow copy (could support inplace too this way...)
+    if expr_dict is None:
+        expr_dict = dict()
     newcons = copy.copy(constraints)
 
     for i,con in enumerate(newcons):
@@ -38,7 +40,9 @@ def only_numexpr_equality(constraints, supported=frozenset(),expr_dict={}):
                 # replace comparison by A <op> IV
                 newcons[i] = Comparison(con.name, lhsvar, con.args[1])
                 # add lhscon(s), which will be [(LHS == A)]
-                assert(len(lhscons) == 1), "only_numexpr_eq: lhs surprisingly non-flat"
-                newcons.insert(i, lhscons[0])
+                if len(lhscons) == 1:
+                    newcons.insert(i, lhscons[0])
+                else:
+                    assert(len(lhscons) == 0), "only_numexpr_eq: lhs surprisingly non-flat" #can be 0 because of CSE
 
     return newcons
