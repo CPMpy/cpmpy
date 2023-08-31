@@ -467,10 +467,10 @@ class TestBounds(unittest.TestCase):
 
         a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
         cons = a ^ b
-        cons.set_description("either a or be should be true, but not both")
+        cons.set_description("either a or b should be true, but not both")
 
         self.assertEqual(repr(cons), "a xor b")
-        self.assertEqual(str(cons), "either a or be should be true, but not both")
+        self.assertEqual(str(cons), "either a or b should be true, but not both")
 
         # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
         for solver,cls in cp.SolverLookup.base_solvers():
@@ -478,6 +478,21 @@ class TestBounds(unittest.TestCase):
                 continue
             print("Testing", solver)
             self.assertTrue(cp.Model(cons).solve(solver=solver))
+
+        ## test extra attributes of set_description
+        cons = a ^ b
+        cons.set_description("either a or b should be true, but not both",
+                             override_print=False)
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "a xor b")
+
+        cons = a ^ b
+        cons.set_description("either a or b should be true, but not both",
+                             full_print=True)
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "either a or b should be true, but not both -- a xor b")
 
 
 
