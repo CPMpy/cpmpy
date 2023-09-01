@@ -35,8 +35,10 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_any_list, is_int
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
+from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_implies
 
 class CPM_pysat(SolverInterface):
@@ -225,9 +227,11 @@ class CPM_pysat(SolverInterface):
 
         :return: list of Expression
         """
-        fnf = flatten_constraint(cpm_expr)
-        fnf = only_bv_implies(fnf)
-        return fnf
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = only_bv_implies(cpm_cons)
+        return cpm_cons
 
     def __add__(self, cpm_expr_orig):
       """
@@ -282,10 +286,6 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.append_formula(clauses)
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
-
-        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
-            # for all global constraints:
-            self += cpm_expr.decompose()
 
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
@@ -347,10 +347,14 @@ class CPM_pysat(SolverInterface):
     def _pysat_cardinality(self, cpm_compsum):
         """ convert CPMpy comparison of sum into PySAT list of clauses """
         # we assume transformations are applied such that the below is true
-        assert (isinstance(cpm_compsum, Comparison)), f"PySAT card: input constraint must be Comparison -- {cpm_compsum}"
-        assert (is_int(cpm_compsum.args[1])), f"PySAT card: sum must have constant at rhs not {cpm_compsum.args[1]} -- {cpm_compsum}"
-        assert (cpm_compsum.args[0].name == "sum"), f"PySAT card: input constraint must be sum, got {cpm_compsum.args[0].name} -- {cpm_compsum}"
-        assert (all(isinstance(v, _BoolVarImpl) for v in cpm_compsum.args[0].args)), f"PySAT card: sum must be over Boolvars only -- {cpm_compsum.args[0]}"
+        if not isinstance(cpm_compsum, Comparison):
+            raise NotSupportedError(f"PySAT card: input constraint must be Comparison -- {cpm_compsum}")
+        if not is_int(cpm_compsum.args[1]):
+            raise NotSupportedError(f"PySAT card: sum must have constant at rhs not {cpm_compsum.args[1]} -- {cpm_compsum}")
+        if not cpm_compsum.args[0].name == "sum":
+            raise NotSupportedError(f"PySAT card: input constraint must be sum, got {cpm_compsum.args[0].name} -- {cpm_compsum}")
+        if not (all(isinstance(v, _BoolVarImpl) for v in cpm_compsum.args[0].args)):
+            raise NotSupportedError(f"PySAT card: sum must be over Boolvars only -- {cpm_compsum.args[0]}")
 
         from pysat.card import CardEnc
 

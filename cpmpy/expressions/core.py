@@ -23,7 +23,6 @@
     Mathematical operators:
 
     - -x            Operator("-", [x])
-    - abs(x)        Operator("abs", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
     - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
@@ -37,12 +36,10 @@
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
-    - x ^ y         Xor([x,y])  # a global constraint
     - ~x            Operator("not", [x])
-                    which in turn creates a NegBoolView()` in case x is a Boolean variable
+                    or NegBoolView(x) in case x is a Boolean variable
+    - x ^ y         Xor([x,y])  # a global constraint
 
-    Finally there are two special cases for logical operators 'implies' and '~/not'.
-    
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
 
@@ -73,6 +70,7 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
+
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
@@ -155,9 +153,12 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
-        # BoolExpr == 1|true, then simply BoolExpr
-        if self.is_bool() and is_num(other) and other == 1:
-            return self
+        # BoolExpr == 1|true|0|false, common case, simply BoolExpr
+        if self.is_bool() and is_num(other):
+            if other is True or other == 1:
+                return self
+            if other is False or other == 0:
+                return ~self
         return Comparison("==", self, other)
 
     def __ne__(self, other):
@@ -183,6 +184,9 @@ class Expression(object):
             return self
         if is_false_cst(other):
             return BoolVal(False)
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
     def __rand__(self, other):
@@ -191,6 +195,9 @@ class Expression(object):
             return self
         if is_false_cst(other):
             return BoolVal(False)
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
@@ -199,6 +206,9 @@ class Expression(object):
             return BoolVal(True)
         if is_false_cst(other):
             return self
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
     def __ror__(self, other):
@@ -207,6 +217,9 @@ class Expression(object):
             return BoolVal(True)
         if is_false_cst(other):
             return self
+        # catch beginner mistake
+        if is_num(other):
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
     def __xor__(self, other):
@@ -326,7 +339,8 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        return Operator("abs", [self])
+        from .globalfunctions import Abs
+        return Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):
@@ -347,8 +361,7 @@ class BoolVal(Expression):
         return self.args[0]
 
     def __invert__(self):
-        self.args[0] = not self.args[0]
-        return self
+        return BoolVal(not self.args[0])
 
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
@@ -369,10 +382,6 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
-
-    def __hash__(self):
-        # __hash__ is None be default as __eq__ is overwritten
-        return super().__hash__()
 
     # return the value of the expression
     # optional, default: None
@@ -409,7 +418,6 @@ class Operator(Expression):
         'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
-        'abs': (1, False),
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
@@ -503,19 +511,6 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
-    def __hash__(self):
-        # __hash__ is None be default as __eq__ is overwritten
-        return super().__hash__()
-
-    # if self is bool, special case
-    def __eq__(self, other):
-        if is_num(other) and other == 1:
-            # check if bool operator, do not add == 1
-            _, is_bool_op = Operator.allowed[self.name]
-            if is_bool_op:
-                return self
-        return super().__eq__(other)
-
     def value(self):
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
@@ -533,7 +528,6 @@ class Operator(Expression):
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "abs": return -arg_vals[0] if arg_vals[0] < 0 else arg_vals[0]
         elif self.name == "div":
             try:
                 return arg_vals[0] // arg_vals[1]
@@ -606,13 +600,6 @@ class Operator(Expression):
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
             return -ub1, -lb1
-        elif self.name == 'abs':
-            lb, ub = get_bounds(self.args[0])
-            if lb >= 0: 
-                return lb,ub
-            if ub <= 0: 
-                return -ub,-lb
-            return 0, max(-lb,ub)
         
         raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         

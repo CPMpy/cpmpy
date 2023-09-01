@@ -1,10 +1,12 @@
 import copy
 from ..expressions.core import Operator, Comparison, Expression
-from ..expressions.globalconstraints import GlobalConstraint, Element
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
 from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var, negated_normal
+from .flatten_model import flatten_constraint, get_or_make_var
+from .negation import recurse_negation
 
 """
   Transformations regarding reification constraints.
@@ -40,11 +42,11 @@ def only_bv_implies(constraints):
             if not isinstance(a0, _BoolVarImpl) and \
                     isinstance(a1, _BoolVarImpl):
                 # BE -> BV :: ~BV -> ~BE
-                newexpr = (~a1).implies(negated_normal(a0))
+                newexpr = (~a1).implies(recurse_negation(a0))
                 #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
             elif isinstance(a1, Comparison) and \
-                    a1.name == '==' and a1.args[0].is_bool():
+                    a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
@@ -61,13 +63,15 @@ def only_bv_implies(constraints):
                 # BVar0 == BVar1 special case, no need to re-transform
                 newcons.append(a0.implies(a1))
                 newcons.append(a1.implies(a0))
+            elif not a1.is_bool():
+                # if a rhs integer is involved with a lhs bool,
+                # then it is actually an integer expression, keep
+                newcons.append(cpm_expr)
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a1).implies(negated_normal(a0)), a1.implies(a0))
+                newexprs = ((~a1).implies(recurse_negation(a0)), a1.implies(a0))
                 #newexprs = ((~a1).implies(~a0), a1.implies(a0))  # XXX when push_down_neg is separate, negated_normal no longer needed separately
                 newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
-            # XXX there used to be a weird
-            # BE0 == IVar1 :: IVar1 = BVarX, ~BVarX -> ~BE, BVarX -> BE
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
@@ -128,7 +132,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run `cpmpy.transformations.decompose_global.decompose_global` to decompose unsupported global constraints")
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition transformation from `cpmpy.transformations.decompose_global` to decompose unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op, (lhs, rhs) = boolexpr.name, boolexpr.args
@@ -143,7 +147,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                     # so we can not use Element (which would restruct the domain of idx)
                     # and have to work with an element-wise decomposition instead
                     reifexpr = copy.copy(cpm_expr)
-                    decomp = all(lhs.decompose_comparison(op, rhs))  # decomp() returns list
+                    decomp = all(lhs.decompose_comparison(op, rhs)[0])  # decomp() returns list
                     #print(decomp)
                     if decomp is False:
                         # TODO uh... special case, can't insert a constant here with the current transformations...

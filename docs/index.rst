@@ -1,48 +1,20 @@
 CPMpy: Constraint Programming and Modeling in Python
 ====================================================
 
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
-
 Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
-CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer.
-   
-Source code and bug reports at https://github.com/CPMpy/cpmpy
+CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access. Key features are:
 
-Getting started:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Getting started:
-
-   Youtube tutorial video <https://www.youtube.com/watch?v=A4mmmDAdusQ>
-   beginner_tutorial
-   installation_instructions
-   Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
-   More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
+* Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
+* Solver-independent: transparently translating to CP, MIP, SMT and SAT solvers
+* Incremental solving and direct access to the underlying solvers
+* and much more...
 
 .. toctree::
    :maxdepth: 1
-   :caption: User Documentation:
+   :caption: Usage
 
    modeling
-   solvers
-   multiple_solutions
-   how_to_debug
-   solver_parameters
-   unsat_core_extraction
-   adding_solver
-   developers
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: API documentation:
-
-   api/expressions
-   api/model
-   api/solvers
-   api/transformations
 
 Supported solvers
 -----------------
@@ -68,31 +40,36 @@ To make clear how well supported and tested these solvers are, we work with a ti
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 
 
-FAQ
----
+.. toctree::
+   :maxdepth: 1
+   :caption: Advanced guides:
 
-**Problem**: I get the following error:
+   how_to_debug
+   direct_solver_access
+   multiple_solutions
+   unsat_core_extraction
+   developers
+   adding_solver
+
+Open Source
+-----------
+
+Source code and bug reports at https://github.com/CPMpy/cpmpy
+
+CPMpy has the open-source `Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/master/LICENSE>`_ and is run as an open-source project. All discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests.
+
+**Join us!** We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the examples folder.
 
 
-.. code-block:: python
+Are you a solver developer? We are keen to integrate solvers that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
 
-   "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
 
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cpm_array()` wrapper:
+.. toctree::
+   :maxdepth: 1
+   :caption: API documentation:
 
-.. code-block:: python
-   :linenos:
+   api/expressions
+   api/model
+   api/solvers
+   api/transformations
 
-   # x is a variable 
-   X = intvar(0,3)
-
-   # Transforming a given numpy-array **m** into a CPMpy array
-   m = cpm_array(m)
-   
-   # apply constraint
-   m[X] == 8
-
-License
--------
-
-This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).

@@ -73,6 +73,9 @@ def mus_naive(soft, hard=[], solver="ortools"):
         :param: hard: hard constraints, optional, list of expressions
         :param: solver: name of a solver, see SolverLookup.solvernames()
     """
+    # ensure toplevel list
+    soft = toplevel_list(soft, merge_and=False)
+
     m = Model(hard+soft)
     assert not m.solve(solver=solver), "MUS: model must be UNSAT"
 

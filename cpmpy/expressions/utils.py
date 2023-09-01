@@ -23,6 +23,7 @@ Internal utilities for expression handling.
 """
 
 import numpy as np
+import math
 from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
 from cpmpy.exceptions import IncompleteFunctionError
@@ -159,13 +160,14 @@ def eval_comparison(str_op, lhs, rhs):
 
 def get_bounds(expr):
     """ return the bounds of the expression
+    returns appropriately rounded integers
     """
-    # can return floats, use floor and ceil when creating an intvar!
+
     from cpmpy.expressions.core import Expression
     if isinstance(expr, Expression):
         return expr.get_bounds()
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
-            return 0, 1
-        return expr, expr
+            return int(expr), int(expr)
+        return math.floor(expr), math.ceil(expr)
