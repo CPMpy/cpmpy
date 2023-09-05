@@ -194,6 +194,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
+        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
+            newlist.append(cpm_expr)
         elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
             """
                 More efficient implementations possible
