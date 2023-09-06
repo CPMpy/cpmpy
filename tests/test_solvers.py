@@ -555,3 +555,14 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("gurobi", model)
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
+
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
+    def test_gurobi_element(self):
+        iv = cp.intvar(-1, 3, shape=3)
+        x1 = cp.intvar(0, 3, name="x1")
+        cons = [x1 // 2 == iv, x1 > 0]
+        m = cp.Model(cons)
+        self.assertEqual(m.solveAll('gurobi', solution_limit=90),m.solveAll)
+        print('___')
+        Model(cons).solveAll(display=[x1, iv])
