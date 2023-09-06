@@ -332,8 +332,16 @@ class CPM_gurobi(SolverInterface):
 
                 elif lhs.name == 'div':
                     assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    x = lhs.args[0]
                     a, b = self.solver_vars(lhs.args)
-                    self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
+                    #integer division is not the same as floordivision, so we need to use continuous variables
+                    cont_a = self.grb_model.addVar(x.lb, x.ub, vtype=GRB.CONTINUOUS, name=str(x.name) + '_cont')
+                    cont_rhs = self.grb_model.addVar(rhs.lb, rhs.ub, vtype=GRB.CONTINUOUS, name=str(rhs.name) + '_cont')
+                    self.grb_model.addLConstr(cont_a/b, GRB.EQUAL, cont_rhs)
+                    self.grb_model.addConstr(cont_a == a)
+                    #grbrhs is the result of integer division, so it's the rounded down version of cont_rhs
+                    self.grb_model.addLConstr(cont_rhs - grbrhs, GRB.LESS_EQUAL, 0.999999) #closest we can get to 1
+                    self.grb_model.addLConstr(grbrhs - cont_rhs, GRB.LESS_EQUAL, 0)
 
                 else:
                     # General constraints
