@@ -40,6 +40,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_implies
+import numpy as np
 
 class CPM_pysat(SolverInterface):
     """
