@@ -78,7 +78,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=nested)
+                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, [], nested=nested)
                     newlist.append(all(decomposed))
 
                 else:
