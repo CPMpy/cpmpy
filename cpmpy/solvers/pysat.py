@@ -314,6 +314,15 @@ class CPM_pysat(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        if not hasattr(cpm_vars, "flat"):
+            cpm_vars = np.array(cpm_vars)
+        cpm_vars=cpm_vars.flat
+
+        if not hasattr(vals, "flat"):
+            vals = np.array(vals)
+        vals=vals.flat
+
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
             lit = self.solver_var(cpm_var)

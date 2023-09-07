@@ -588,6 +588,15 @@ class CPM_exact(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        if not hasattr(cpm_vars, "flat"):
+            cpm_vars = np.array(cpm_vars)
+        cpm_vars=cpm_vars.flat
+
+        if not hasattr(vals, "flat"):
+            vals = np.array(vals)
+        vals=vals.flat
+        
         try:
             pkg_resources.require("exact>=1.1.5")
             self.xct_solver.setSolutionHints(self.solver_vars(cpm_vars), vals)
