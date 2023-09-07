@@ -521,15 +521,13 @@ class CPM_ortools(SolverInterface):
         """
         self.ort_model.ClearHints() # because add just appends
 
-        if hasattr(cpm_vars, "flat"):
-            cpm_vars= cpm_vars.flat
-        else:
-            cpm_vars = np.concatenate(cpm_vars).flat
+        if not hasattr(cpm_vars, "flat"):
+            cpm_vars = np.array(cpm_vars)
+        cpm_vars=cpm_vars.flat
 
-        if hasattr(vals, "flat"):
-            vals = vals.flat
-        else:
-            vals = np.concatenate(vals).flat
+        if not hasattr(vals, "flat"):
+            vals = np.array(vals)
+        vals=vals.flat
 
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
 
