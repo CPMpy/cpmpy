@@ -90,6 +90,7 @@ class CPM_gurobi(SolverInterface):
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.cons = []
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
@@ -313,27 +314,28 @@ class CPM_gurobi(SolverInterface):
             # Thanks to `only_numexpr_equality()` only supported comparisons should remain
             if cpm_expr.name == '<=':
                 grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs)
+                self.cons.append([self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs), cpm_expr_orig])
+
             elif cpm_expr.name == '>=':
                 grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
+                self.cons.append([self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs), cpm_expr_orig])
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
                         or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     grblhs = self._make_numexpr(lhs)
-                    self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
+                    self.cons.append([self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs), cpm_expr_orig])
 
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
                     a, b = self.solver_vars(lhs.args)
-                    self.grb_model.setParam("NonConvex", 2)
-                    self.grb_model.addConstr(a * b == grbrhs)
+                    self.cons.append([self.grb_model.setParam("NonConvex", 2), cpm_expr_orig])
+                    self.cons.append([self.grb_model.addConstr(a * b == grbrhs), cpm_expr_orig])
 
                 elif lhs.name == 'div':
                     assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
                     a, b = self.solver_vars(lhs.args)
-                    self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
+                    self.cons.append([self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs), cpm_expr_orig])
 
                 else:
                     # General constraints
@@ -342,15 +344,15 @@ class CPM_gurobi(SolverInterface):
                         grbrhs = self.solver_var(intvar(lb=grbrhs, ub=grbrhs))
 
                     if lhs.name == 'min':
-                        self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
+                        self.cons.append([self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args)), cpm_expr_orig])
                     elif lhs.name == 'max':
-                        self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
+                        self.cons.append([self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args)), cpm_expr_orig])
                     elif lhs.name == 'abs':
-                        self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
+                        self.cons.append([self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0])), cpm_expr_orig])
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
                         assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
-                        self.grb_model.addGenConstrPow(x, grbrhs, a)
+                        self.cons.append([self.grb_model.addGenConstrPow(x, grbrhs, a), cpm_expr_orig])
                     else:
                         raise NotImplementedError(
                         "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
@@ -375,26 +377,38 @@ class CPM_gurobi(SolverInterface):
             else:
                 raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             if sub_expr.name == "<=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
+                self.cons.append([self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs)), cpm_expr_orig])
             elif sub_expr.name == ">=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
+                self.cons.append([self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs)), cpm_expr_orig])
             elif sub_expr.name == "==":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
+                self.cons.append([self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs)), cpm_expr_orig])
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.grb_model.addConstr(cpm_expr.args[0])
+            self.cons.append([self.grb_model.addConstr(cpm_expr.args[0]), cpm_expr_orig])
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
-            cpm_expr.callSolver(self, self.grb_model)
+            self.cons.append([cpm_expr.callSolver(self, self.grb_model), cpm_expr_orig])
 
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
       return self
+
+
+    def __sub__(self, cpm_expr_orig):
+
+        for c in self.cons:
+            if c[1] == cpm_expr_orig:
+                print(c[0])
+                self.grb_model.remove(c[0])
+                self.cons.remove(c)
+                print("asflwbha;ekfwgaerbfgar")
+
+        return self
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
