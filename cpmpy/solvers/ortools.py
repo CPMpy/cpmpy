@@ -520,6 +520,19 @@ class CPM_ortools(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         self.ort_model.ClearHints() # because add just appends
+
+        if hasattr(cpm_vars, "flat"):
+            cpm_vars= cpm_vars.flat
+        else:
+            cpm_vars = np.concatenate(cpm_vars).flat
+
+        if hasattr(vals, "flat"):
+            vals = vals.flat
+        else:
+            vals = np.concatenate(vals).flat
+
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.solver_var(cpm_var), val)
 
