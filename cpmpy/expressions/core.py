@@ -561,12 +561,13 @@ class Operator(Expression):
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
+            #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
             for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
                 sortbounds = (list(weights[i] * x for x in varbounds))
                 sortbounds.sort()
                 bounds += [sortbounds]
             lbs, ubs = (zip(*bounds))
-            lowerbound, upperbound = sum(lbs), sum(ubs)
+            lowerbound, upperbound = sum(lbs), sum(ubs) #this is builtins sum, not numpy sum
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
