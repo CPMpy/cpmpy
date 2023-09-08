@@ -281,7 +281,9 @@ class TestGlobal(unittest.TestCase):
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
         # test directly the constraint
-        cons = cp.Element(iv,idx) == 8
+        #self.assertRaises(TypeError,cons = cp.Element(iv,idx) == 8)
+        idx = cp.intvar(0,2)
+        cons = cp.Element(iv, idx) == 8
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
@@ -294,13 +296,14 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3))
-        a,b = cp.intvar(0, 3, shape=2)
+        a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[a.value(), b.value()], 8)
         arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
+        a.ub = 1
         cons = arr[a,b] == 1
         model = cp.Model(cons)
         self.assertTrue(model.solve())
@@ -499,7 +502,8 @@ class TestBounds(unittest.TestCase):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
         z = cp.intvar(1, 9)
-        expr = cp.Element([x, y, z],z)
+        w = cp.intvar(0,2)
+        expr = cp.Element([x, y, z],w)
         lb, ub = expr.get_bounds()
         self.assertEqual(lb,-8)
         self.assertEqual(ub,9)
@@ -600,12 +604,14 @@ class TestTypeChecks(unittest.TestCase):
     def test_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
+        i = cp.intvar(0,1)
         b = cp.boolvar()
         a = cp.boolvar()
-        self.assertTrue(cp.Model([cp.Element([x,y],x) == x]).solve())
-        self.assertTrue(cp.Model([cp.Element([a,b | a],x) == b]).solve())
-        self.assertRaises(TypeError,cp.Element,[x,y],b)
-        self.assertTrue(cp.Model([cp.Element([y,a],x) == False]).solve())
+        self.assertTrue(cp.Model([cp.Element([x,y],i) == x]).solve())
+        self.assertTrue(cp.Model([cp.Element([a,b | a],i) == b]).solve())
+        self.assertRaises(TypeError,cp.Element,[x,y],b) #boolean index
+        self.assertRaises(TypeError,cp.Element,[x,y],x) #index out of bounds
+        self.assertTrue(cp.Model([cp.Element([y,a],i) == False]).solve())
 
     def test_xor(self):
         x = cp.intvar(-8, 8)
