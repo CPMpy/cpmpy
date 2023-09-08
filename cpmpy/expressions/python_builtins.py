@@ -26,6 +26,7 @@ from .variables import NDVarArray
 from .core import Expression, Operator
 from .globalfunctions import Minimum, Maximum
 
+
 # Overwriting all/any python built-ins
 # all: listwise 'and'
 def all(iterable):
@@ -42,7 +43,7 @@ def all(iterable):
         elif is_true_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
-            collect.append( elem )
+            collect.append(elem)
         else:
             raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
@@ -50,6 +51,7 @@ def all(iterable):
     if len(collect) >= 2:
         return Operator("and", collect)
     return True
+
 
 # any: listwise 'or'
 def any(iterable):
@@ -66,7 +68,7 @@ def any(iterable):
         elif is_false_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
-            collect.append( elem )
+            collect.append(elem)
         else:
             raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
     if len(collect) == 1:
@@ -74,6 +76,7 @@ def any(iterable):
     if len(collect) >= 2:
         return Operator("or", collect)
     return False
+
 
 def max(iterable):
     """
@@ -84,6 +87,7 @@ def max(iterable):
         return np.max(iterable)
     return Maximum(iterable)
 
+
 def min(iterable):
     """
         min() overwrites python built-in,
@@ -92,6 +96,7 @@ def min(iterable):
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
         return np.min(iterable)
     return Minimum(iterable)
+
 
 def sum(iterable):
     """
