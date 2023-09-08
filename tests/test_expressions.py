@@ -7,6 +7,29 @@ from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
 
+class TestComparison(unittest.TestCase):
+    def test_comps(self):
+        # from the docs
+        # XXX is this the right place? it should be tested with all solvers...
+        import cpmpy as cp
+
+        bv = cp.boolvar()
+        iv = cp.intvar(0, 10)
+
+        m = cp.Model(
+            bv == True,         # allowed
+            bv > 0,             # allowed but silly
+            iv > 0,             # allowed
+            iv != 1,            # allowed
+            iv == True,         # allowed but means `iv == 1`, avoid
+            (iv != 0) == True,  # allowed
+            iv == bv,           # allowed but means `(iv == 1) == bv`, avoid
+            # bv & iv,          # not allowed, choose one of:
+            bv & (iv == 1),     # allowed
+            bv & (iv != 0),     # allowed
+        )
+        for c in m.constraints:
+            self.assertTrue(cp.Model(c).solve())
 
 class TestSum(unittest.TestCase):
 
@@ -194,7 +217,101 @@ class TestMul(unittest.TestCase):
         for expr in prod.args:
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
+class TestArrayExpressions(unittest.TestCase):
 
+    def test_sum(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.sum())
+        model.solve()
+        self.assertTrue(y.value() == sum(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.sum(axis=0))
+        model.solve()
+        res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_prod(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.prod())
+        model.solve()
+        res = 1
+        for v in x:
+            res *= v.value()
+        self.assertTrue(y.value() == res)
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.prod(axis=0))
+        model.solve()
+        for i,vv in enumerate(x):
+            res = 1
+            for v in vv:
+                res *= v.value()
+            self.assertTrue(y[i].value() == res)
+
+    def test_max(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.max())
+        model.solve()
+        self.assertTrue(y.value() == max(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.max(axis=0))
+        model.solve()
+        res = np.array([max(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_min(self):
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
+        model = cp.Model(y == x.min())
+        model.solve()
+        self.assertTrue(y.value() == min(x.value()))
+        # with axis arg
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
+        model = cp.Model(y == x.min(axis=0))
+        model.solve()
+        res = np.array([min(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_any(self):
+        from cpmpy.expressions.python_builtins import any
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
+        model = cp.Model(y == x.any())
+        model.solve()
+        self.assertTrue(y.value() == any(x.value()))
+        # with axis arg
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
+        model = cp.Model(y == x.any(axis=0))
+        model.solve()
+        res = np.array([any(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+    def test_all(self):
+        from cpmpy.expressions.python_builtins import all
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
+        model = cp.Model(y == x.all())
+        model.solve()
+        self.assertTrue(y.value() == all(x.value()))
+        # with axis arg
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
+        model = cp.Model(y == x.all(axis=0))
+        model.solve()
+        res = np.array([all(x[i, ...].value()) for i in range(len(y))])
+        self.assertTrue(all(y.value() == res))
+
+        
 def inclusive_range(lb,ub):
         return range(lb,ub+1)
 
@@ -299,16 +416,7 @@ class TestBounds(unittest.TestCase):
                 val = Operator(name, [lhs]).value()
                 self.assertGreaterEqual(val,lb)
                 self.assertLessEqual(val,ub)
-        for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
-            name = 'abs'
-            op = Operator(name,[var])
-            lb, ub = op.get_bounds()
-            self.assertEqual(test_lb,lb)
-            self.assertEqual(test_ub,ub)
-            for lhs in inclusive_range(*var.get_bounds()):
-                val = Operator(name, [lhs]).value()
-                self.assertGreaterEqual(val,lb)
-                self.assertLessEqual(val,ub)
+
 
     def test_incomplete_func(self):
         # element constraint
@@ -354,5 +462,41 @@ class TestBounds(unittest.TestCase):
         self.assertTrue(cp.Model([~~p == ~q]).solve())
         self.assertTrue(cp.Model([Operator('not',[p]) == q]).solve())
         self.assertTrue(cp.Model([Operator('not',[p])]).solve())
+
+    def test_description(self):
+
+        a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
+        cons = a ^ b
+        cons.set_description("either a or b should be true, but not both")
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "either a or b should be true, but not both")
+
+        # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
+        for solver,cls in cp.SolverLookup.base_solvers():
+            if not cls.supported():
+                continue
+            print("Testing", solver)
+            self.assertTrue(cp.Model(cons).solve(solver=solver))
+
+        ## test extra attributes of set_description
+        cons = a ^ b
+        cons.set_description("either a or b should be true, but not both",
+                             override_print=False)
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "a xor b")
+
+        cons = a ^ b
+        cons.set_description("either a or b should be true, but not both",
+                             full_print=True)
+
+        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(str(cons), "either a or b should be true, but not both -- a xor b")
+
+
+
+
+
 if __name__ == '__main__':
     unittest.main()

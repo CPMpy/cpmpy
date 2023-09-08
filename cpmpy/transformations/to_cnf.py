@@ -1,7 +1,7 @@
 from ..expressions.core import Operator, Comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .reification import only_bv_implies
-from .flatten_model import flatten_constraint, negated_normal
+from .flatten_model import flatten_constraint
 """
   Converts the logical constraints into disjuctions using the tseitin transform,
         including flattening global constraints that are is_bool() and not in `supported`.

@@ -24,7 +24,7 @@ import builtins  # to use the original Python-builtins
 from .utils import is_false_cst, is_true_cst
 from .variables import NDVarArray
 from .core import Expression, Operator
-from .globalconstraints import Minimum, Maximum
+from .globalfunctions import Minimum, Maximum
 
 
 # Overwriting all/any python built-ins
