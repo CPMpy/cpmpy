@@ -96,10 +96,10 @@ def min(iterable):
 def sum(iterable):
     """
         sum() overwrites python built-in,
-        checks if all constants and computes builtins.sum() in that case
+        checks if all constants and computes np.sum() in that case
         otherwise, makes a sum Operator directly on `iterable`
     """
     iterable = list(iterable) # Fix generator polling
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.sum(iterable) #numpy sum is only faster on numpy arrays. builtin sum also avoids overflow of int32
+        return np.sum(iterable)
     return Operator("sum", iterable)
