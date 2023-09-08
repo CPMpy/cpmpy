@@ -406,7 +406,6 @@ class CPM_gurobi(SolverInterface):
                 print(c[0])
                 self.grb_model.remove(c[0])
                 self.cons.remove(c)
-                print("asflwbha;ekfwgaerbfgar")
 
         return self
 
