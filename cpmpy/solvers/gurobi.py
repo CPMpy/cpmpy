@@ -395,17 +395,15 @@ class CPM_gurobi(SolverInterface):
 
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
+      #self.grb_model.update()
       return self
 
 
     def __sub__(self, cpm_expr_orig):
 
-        for c in self.cons:
-            if c[1] == cpm_expr_orig:
-                print(c[0])
-                self.grb_model.remove(c[0])
-                self.cons.remove(c)
+        [self.grb_model.remove(c[0]) for c in self.cons if str(c[1]) == str(cpm_expr_orig)]
+        self.cons = [c for c in self.cons if str(c[1]) != str(cpm_expr_orig)]
+        #self.grb_model.update()
 
         return self
 
