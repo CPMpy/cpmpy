@@ -151,10 +151,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                             new_args.append(arg)
                     lhs = Operator("wsum",[new_weights, new_args])
 
-            if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
-                # convert to wsum
-                lhs = Operator("wsum",[[lhs.args[0]],[lhs.args[1]]])
-
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
                 new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
