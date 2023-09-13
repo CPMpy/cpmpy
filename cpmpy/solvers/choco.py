@@ -187,7 +187,7 @@ class CPM_choco(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).Not()
+            return self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
 
         # create if it does not exist
         if cpm_var not in self._varmap:
@@ -287,7 +287,8 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "alldifferent_except0", "table",
+                     "cumulative", "circuit", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -358,10 +359,8 @@ class CPM_choco(SolverInterface):
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
-                    print(lhs)
-                    print(cpm_expr.args[1])
-                    return lhs.__ge__(self.solver_var(cpm_expr.args[1]))
-                    return lhs.imp(self.solver_var(cpm_expr.args[1])).post()
+                    # PyChoco does not have "implies" constraint
+                    return self.chc_model.arithm(lhs, "<=", self.solver_var(cpm_expr.args[1])).post()
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
@@ -400,11 +399,7 @@ class CPM_choco(SolverInterface):
                                     f"Expression '{lhs}': Choco does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                     return self.chc_model.mod(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1], chcrhs).post()
                 elif lhs.name == 'pow':
-                    # only `POW(b,2) == IV` supported, post as b*b == IV
-                    #assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
-                    chclhs = self.solver_var(lhs.args[0])
                     return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1], chcrhs).post()
-                    #return self.chc_model.arithm(chcrhs, "=", chclhs.pow()).post()
             raise NotImplementedError(
                         "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -412,36 +407,25 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             if cpm_expr.name == 'alldifferent':
-                return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
+                return self.chc_model.all_different(self.solver_vars(cpm_expr.args)).post()
+            elif cpm_expr.name == 'alldifferent_except0':
+                return self.chc_model.all_different_except_0(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
-                return self.ort_model.AddAllowedAssignments(array, table)
+                return self.chc_model.table(array,table).post()
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 if is_num(demand):
                     demand = [demand] * len(start)
-                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-                return self.ort_model.AddCumulative(intervals, demand, cap)
+                tasks = self.chc_model.task(start, dur, end)
+                return self.chc_model.cumulative(tasks, demand, cap)
             elif cpm_expr.name == "circuit":
-                # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars direclty is recommended
-                # (see PCTSP-path model in the future)
-                x = cpm_expr.args
-                N = len(x)
-                arcvars = boolvar(shape=(N,N), name="circuit_arcs")
-                # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
-                # post the global constraint
-                # when posting arcs on diagonal (i==j), it would do subcircuit
-                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
-                return self.ort_model.AddCircuit(ort_arcs)
+                return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
-                return self.ort_model.AddInverse(fwd, rev)
-            elif cpm_expr.name == 'xor':
-                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+                return self.chc_model.inverse_channeling(fwd,rev).post()
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
@@ -452,6 +436,7 @@ class CPM_choco(SolverInterface):
 
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
+            # Choco does not allow to post True or False. Post "certainly True or False" constraints instead
             if cpm_expr:
                 return self.chc_model.arithm(self.helper_var, ">=", 0).post()
             else:
