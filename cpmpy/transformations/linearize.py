@@ -151,10 +151,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                             new_args.append(arg)
                     lhs = Operator("wsum",[new_weights, new_args])
 
-            if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
-                # convert to wsum
-                lhs = Operator("wsum",[[lhs.args[0]],[lhs.args[1]]])
-
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
                 new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
@@ -280,5 +276,54 @@ def only_positive_bv(lst_of_expr):
 
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
+
+    return newlist
+
+def canonical_comparison(lst_of_expr):
+
+    newlist = []
+    for cpm_expr in lst_of_expr:
+
+        lhs, rhs = cpm_expr.args
+
+        if isinstance(cpm_expr, Comparison):
+            if is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+                # bring all vars to lhs
+                if isinstance(rhs, _NumVarImpl):
+                    if isinstance(lhs, Operator) and lhs.name == "sum":
+                        lhs, rhs = sum([1 * a for a in lhs.args] + [-1 * rhs]), 0
+                    elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                        lhs, rhs = lhs + -1 * rhs, 0
+                    else:
+                        raise ValueError(
+                            f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
+
+                assert not is_num(lhs), "lhs cannot be an integer at this point!"
+
+                # bring all const to rhs
+                if lhs.name == "sum":
+                    new_args = []
+                    for i, arg in enumerate(lhs.args):
+                        if is_num(arg):
+                            rhs -= arg
+                        else:
+                            new_args.append(arg)
+                    lhs = Operator("sum", new_args)
+
+                elif lhs.name == "wsum":
+                    new_weights, new_args = [], []
+                    for i, (w, arg) in enumerate(zip(*lhs.args)):
+                        if is_num(arg):
+                            rhs -= w * arg
+                        else:
+                            new_weights.append(w)
+                            new_args.append(arg)
+                    lhs = Operator("wsum", [new_weights, new_args])
+
+            if isinstance(lhs, Operator) and lhs.name == "mul" and len(lhs.args) == 2 and is_num(lhs.args[0]):
+                # convert to wsum
+                lhs = Operator("wsum", [[lhs.args[0]], [lhs.args[1]]])
+
+        newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
     return newlist
