@@ -20,6 +20,7 @@
 """
 import sys  # for stdout checking
 import numpy as np
+from cpmpy.transformations.normalize import toplevel_list
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -28,11 +29,12 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
-from ..transformations.decompose_global import decompose_global
+from ..transformations.decompose_global import decompose_global, decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
+from ..transformations.linearize import canonical_comparison
 
 class CPM_choco(SolverInterface):
     """
@@ -84,7 +86,7 @@ class CPM_choco(SolverInterface):
         # initialise the native solver objects
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
-
+        self.helper_var = self.chc_model.intvar(0,2)
         # for solving with assumption variables, TO-CHECK
 
         # initialise everything else and post the constraints/objective
@@ -110,21 +112,15 @@ class CPM_choco(SolverInterface):
         """
         import pychoco as chc
 
-        if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback") \
-                and (sys.stdout != sys.__stdout__):
-            # ortools>9.0, for IPython use, force output redirecting
-            # see https://github.com/google/or-tools/issues/1903
-            # but only if a nonstandard stdout, otherwise duplicate output
-            # see https://github.com/CPMpy/cpmpy/issues/84
-            self.ort_solver.log_callback = print
-
         # call the solver, with parameters
-        self.ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
+        self.chc_solver = self.chc_model.get_solver()
+        self.chc_status = self.chc_solver.solve()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.ort_solver.WallTime()
+        #self.cpm_status.runtime = self.chc_status.WallTime()
 
+        """
         # translate exit status
         if self.ort_status == ort.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -155,8 +151,8 @@ class CPM_choco(SolverInterface):
             # translate objective
             if self.has_objective():
                 self.objective_value_ = self.ort_solver.ObjectiveValue()
-
-        return has_sol
+        """
+        return True
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -179,7 +175,6 @@ class CPM_choco(SolverInterface):
         self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
         return cb.solution_count()
 
-
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
@@ -196,9 +191,9 @@ class CPM_choco(SolverInterface):
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
+                revar = self.chc_model.boolvar(name=str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -225,13 +220,15 @@ class CPM_choco(SolverInterface):
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
-        if minimize:
-            self.ort_model.Minimize(obj)
-        else:
-            self.ort_model.Maximize(obj)
+        #if minimize:
+        #    self.ort_model.Minimize(obj)
+        #else:
+        #    self.ort_model.Maximize(obj)
 
     def has_objective(self):
-        return self.ort_model.HasObjective()
+        pass
+        #return self.chc_model.
+        #return self.ort_model.HasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -245,24 +242,31 @@ class CPM_choco(SolverInterface):
             - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
                       wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
         """
-        if is_num(cpm_expr):
+
+        lhs = cpm_expr.args[0]
+        rhs = cpm_expr.args[1]
+        op = cpm_expr.name
+        if op == "==": op = "="
+
+        if is_num(lhs):    #TODO     can this happen to be num in lhs?? I think no
             return cpm_expr
 
         # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
-            return self.solver_var(cpm_expr)
+        if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
+            return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
 
+        print("cpm_expr: ", cpm_expr)
         # sum or weighted sum
-        if isinstance(cpm_expr, Operator):
-            if cpm_expr.name == 'sum':
-                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
-            elif cpm_expr.name == "sub":
-                a,b = self.solver_vars(cpm_expr.args)
-                return a - b
-            elif cpm_expr.name == 'wsum':
-                w = cpm_expr.args[0]
-                x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
+        if isinstance(lhs, Operator):
+            if lhs.name == 'sum':
+                self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
+            elif lhs.name == "sub":
+                a,b = self.solver_vars(lhs.args)
+                return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
+            elif lhs.name == 'wsum':
+                w = lhs.args[0]
+                x = self.solver_vars(lhs.args[1])
+                return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
@@ -281,12 +285,17 @@ class CPM_choco(SolverInterface):
 
         :return: list of Expression
         """
-        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        cpm_cons = decompose_global(cpm_cons, supported={"min","max","element","alldifferent","xor","table", "cumulative","circuit"})
+
+        cpm_cons = toplevel_list(cpm_expr)
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
+
         return cpm_cons
 
     def __add__(self, cpm_expr):
@@ -316,12 +325,11 @@ class CPM_choco(SolverInterface):
 
         return self
 
-    # TODO: 'reifiable' is an artefact from the early days
     # only 3 constraints support it (and,or,sum),
     # we can just add reified support for those and not need `reifiable` or returning the constraint
     # then we can remove _post_constraint and have its code inside the for loop of __add__
     # like for other solvers
-    def _post_constraint(self, cpm_expr, reifiable=False):
+    def _post_constraint(self, cpm_expr):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
 
@@ -336,60 +344,56 @@ class CPM_choco(SolverInterface):
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
+        import pychoco as chc
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         if isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
-                return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
+                return self.chc_model.and_(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == 'or':
-                return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
+                return self.chc_model.or_(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == '->':
                 assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
-                    return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr.args[1]))
-                else:
-                    # bv -> boolexpr
-                    # the `reify_rewrite()` transformation ensures that only
-                    # the natively reifiable 'and', 'or' and 'sum' remain here
-                    return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
+                    return lhs.implies(self.solver_var(cpm_expr.args[1]))
             else:
-                raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
+                raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
-        # Comparisons: only numeric ones as the `only_bv_implies()` transformation
+        # Comparisons: only numeric ones as the `only_bv_implies()` transformation #TODO: Choco allows == in bools
         # has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
-            ortrhs = self.solver_var(cpm_expr.args[1])
+            chcrhs = self.solver_var(cpm_expr.args[1])
 
             if isinstance(lhs, _NumVarImpl):
                 # both are variables, do python comparison over ORT variables
-                return self.ort_model.Add(eval_comparison(cpm_expr.name, self.solver_var(lhs), ortrhs))
+                print("Arithm")
+                return self.chc_model.arithm(self.solver_var(lhs), cpm_expr.name, chcrhs).post()
             elif isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
                 # a BoundedLinearExpression LHS, special case, like in objective
-                ortlhs = self._make_numexpr(lhs)
-                # ortools accepts sum(x) >= y over ORT variables
-                return self.ort_model.Add(eval_comparison(cpm_expr.name, ortlhs, ortrhs))
+                chc_numexpr = self._make_numexpr(cpm_expr)
+                return chc_numexpr.post()
             elif cpm_expr.name == '==':
                 # NumExpr == IV, supported by ortools (thanks to `only_numexpr_equality()` transformation)
                 if lhs.name == 'min':
-                    return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.chc_model.min(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.chc_model.max(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
-                    return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs.args[0]))
+                    return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'mul':
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs)
                 elif lhs.name == 'div':
-                    return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
+                    return self.chc_model.div(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs)
                 elif lhs.name == 'element':
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    return self.chc_model.element(self.solver_var(lhs.args[1]),
+                                                     self.solver_vars(lhs.args[0]), chcrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     divisor = lhs.args[1]
@@ -445,15 +449,19 @@ class CPM_choco(SolverInterface):
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
-            return self.ort_model.AddBoolOr([self.solver_var(cpm_expr)])
+            print(cpm_expr)
+            return self.chc_model.and_([self.solver_var(cpm_expr)]).post()
 
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
-            return self.ort_model.Add(cpm_expr.args[0])
+            if cpm_expr:
+                return self.chc_model.arithm(self.helper_var, ">=", 0).post()
+            else:
+                return self.chc_model.arithm(self.helper_var, "<", 0).post()
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
-            return cpm_expr.callSolver(self, self.ort_model)
+            return cpm_expr.callSolver(self, self.chc_model)
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
