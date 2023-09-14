@@ -403,7 +403,6 @@ class CPM_gurobi(SolverInterface):
 
         [self.grb_model.remove(c[0]) for c in self.cons if str(c[1]) == str(cpm_expr_orig)]
         self.cons = [c for c in self.cons if str(c[1]) != str(cpm_expr_orig)]
-        #self.grb_model.update()
 
         return self
 
