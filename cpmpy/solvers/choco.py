@@ -87,7 +87,7 @@ class CPM_choco(SolverInterface):
         # initialise the native solver objects
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
-        self.helper_var = self.chc_model.intvar(0,2)
+        self.helper_var = self.chc_model.intvar(0, 2)
 
         # for the objective
         self.has_obj = False
@@ -127,8 +127,6 @@ class CPM_choco(SolverInterface):
             self.chc_status = self.chc_solver.solve(time_limit=time_limit)
         end = time.time()
 
-        self.chc_solver.find_optimal_solution()
-
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
@@ -159,7 +157,7 @@ class CPM_choco(SolverInterface):
             if self.has_objective():
                 self.objective_value_ = self.solver_var(self.obj).get_value()
 
-        return True
+        return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -449,7 +447,6 @@ class CPM_choco(SolverInterface):
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
-            print(cpm_expr)
             return self.chc_model.and_([self.solver_var(cpm_expr)]).post()
 
         # unlikely base case: True or False
