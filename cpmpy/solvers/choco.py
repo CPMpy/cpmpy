@@ -88,6 +88,12 @@ class CPM_choco(SolverInterface):
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
         self.helper_var = self.chc_model.intvar(0,2)
+
+        # for the objective
+        self.has_obj = False
+        self.obj = None
+        self.maximize_obj = None
+
         # for solving with assumption variables, TO-CHECK
 
         # initialise everything else and post the constraints/objective
@@ -111,36 +117,35 @@ class CPM_choco(SolverInterface):
              for example: log_output=True, var_ordering=3, num_cores=8, ...>
             <Add link to documentation of all solver parameters>
         """
-        import pychoco as chc
-
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
         start = time.time()
-        self.chc_status = self.chc_solver.solve()
+        if self.has_objective():
+            self.chc_status = self.chc_solver.find_optimal_solution(time_limit=time_limit,maximize=self.maximize_obj,
+                                                                    objective=self.solver_var(self.obj))
+        else:
+            self.chc_status = self.chc_solver.solve(time_limit=time_limit)
         end = time.time()
 
-        # new status, translate runtime
+        self.chc_solver.find_optimal_solution()
+
+        # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
 
-        """
         # translate exit status
-        if self.ort_status == ort.FEASIBLE:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif self.ort_status == ort.OPTIMAL:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-        elif self.ort_status == ort.INFEASIBLE:
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif self.ort_status == ort.MODEL_INVALID:
-            raise Exception("OR-Tools says: model invalid:", self.ort_model.Validate())
-        elif self.ort_status == ort.UNKNOWN:
-            # can happen when timeout is reached...
+        if self.chc_status:
+            if self.has_objective() and (time_limit is None or self.cpm_status.runtime < time_limit):
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif not self.chc_status and time_limit is not None and self.cpm_status.runtime >= time_limit:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else:  # another?
-            raise NotImplementedError(self.ort_status)  # a new status type was introduced, please report on github
-        """
+        else:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            # can happen when timeout is reached...
 
-        # True/False depending on self.cpm_status
+        # True/False depending on self.chc_status
         has_sol = self.chc_status
 
         # translate solution values (of user specified variables only)
@@ -151,8 +156,9 @@ class CPM_choco(SolverInterface):
                 cpm_var._value = self.solver_var(cpm_var).get_value()
 
             # translate objective
-#            if self.has_objective():
-#                self.objective_value_ = self.ort_solver.ObjectiveValue()
+            if self.has_objective():
+                self.objective_value_ = self.solver_var(self.obj).get_value()
+
         return True
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
@@ -211,25 +217,29 @@ class CPM_choco(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
+            (technical side note: constraints created during conversion of the objective
+            are premanently posted to the solver. Choco accepts variables to maximize or minimize
+            so it is needed to post constraints and create auxiliary variables)
         """
+
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons  # add potentially created constraints
         get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
 
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
-        #if minimize:
-        #    self.ort_model.Minimize(obj)
-        #else:
-        #    self.ort_model.Maximize(obj)
+        obj = self.chc_model.intvar()
+        obj_con = expr == obj
+        # add constraint for objective variable
+        self += obj_con
+
+        self.has_obj = True
+        self.obj = obj
+        self.maximize_obj = not minimize    # Choco has as default to maximize
+
+
 
     def has_objective(self):
-        pass
-        #return self.chc_model.
-        #return self.ort_model.HasObjective()
+        return self.has_obj
 
     def _make_numexpr(self, cpm_expr):
         """
@@ -249,7 +259,7 @@ class CPM_choco(SolverInterface):
         op = cpm_expr.name
         if op == "==": op = "=" # choco uses "=" for equality
 
-        if is_num(lhs):    #TODO     can this happen to be num in lhs?? I think no
+        if is_num(lhs):    #TODO  can this happen to be num in lhs?? I think no. Maybe yes, in objective!!
             return cpm_expr
 
         # decision variables, check in varmap
@@ -261,7 +271,7 @@ class CPM_choco(SolverInterface):
             if lhs.name == 'sum':
                 self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
             elif lhs.name == "sub":
-                a,b = self.solver_vars(lhs.args)
+                a, b = self.solver_vars(lhs.args)
                 return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
             elif lhs.name == 'wsum':
                 w = lhs.args[0]
@@ -293,7 +303,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=     TODO: Maybe not needed
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = only_bv_implies(cpm_cons) # everything that can create
                                              # reified expr must go before this
 
@@ -547,7 +557,7 @@ try:
             - verbose whether to print info on every solution found (bool, default: False)
     """
 
-        def __init__(self, verbose=False):
+        def __init__(self):
             super().__init__()
             self.__solution_count = 0
             self.__verbose = verbose
