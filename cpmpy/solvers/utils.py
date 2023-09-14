@@ -136,7 +136,7 @@ class SolverLookup():
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
 # Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact]
+builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, CPM_choco]
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
