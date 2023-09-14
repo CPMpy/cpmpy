@@ -267,7 +267,7 @@ class CPM_choco(SolverInterface):
         # sum or weighted sum
         if isinstance(lhs, Operator):
             if lhs.name == 'sum':
-                self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
+                return self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
             elif lhs.name == "sub":
                 a, b = self.solver_vars(lhs.args)
                 return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
@@ -276,7 +276,7 @@ class CPM_choco(SolverInterface):
                 x = self.solver_vars(lhs.args[1])
                 return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
-        raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("Choco: Not a known supported numexpr {}".format(cpm_expr))
 
 
     def transform(self, cpm_expr):
@@ -378,6 +378,7 @@ class CPM_choco(SolverInterface):
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
+            rhs = cpm_expr.args[1]
             chcrhs = self.solver_var(cpm_expr.args[1])
 
             if isinstance(lhs, _NumVarImpl) or isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
@@ -398,7 +399,21 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'mul':
                     return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs).post()
                 elif lhs.name == 'div':
-                    return self.chc_model.div(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs).post()
+                    # Choco needs divisor to be a variable
+                    if isinstance(lhs.args[1], int):
+                        divisor = self.chc_model.intvar(lhs.args[1],lhs.args[1])    # convert to "variable"
+                    elif isinstance(lhs.args[1], _NumVarImpl):
+                        divisor = self.solver_var(lhs.args[1])      # use variable
+                    else:
+                        raise Exception(f"Cannot accept division with the divisor being: {lhs.args[1]}")
+                    # Choco needs result to be a variable
+                    if isinstance(rhs, int):
+                        result = self.chc_model.intvar(rhs,rhs)    # convert to "variable"
+                    elif isinstance(rhs, _NumVarImpl):
+                        result = chcrhs      # use variable
+                    else:
+                        raise Exception(f"Cannot accept division with the result being: {rhs}")
+                    return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result).post()
                 elif lhs.name == 'element':
                     return self.chc_model.element(chcrhs, self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1])).post()
                 elif lhs.name == 'mod':
@@ -429,15 +444,30 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.table(array,table).post()
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
-                if is_num(demand):
+                # Everything given to cumulative in Choco needs to be a variable.
+                # Convert demands to variables
+                if is_num(demand):  # Create list for demand per task
                     demand = [demand] * len(start)
-                tasks = self.chc_model.task(start, dur, end)
-                return self.chc_model.cumulative(tasks, demand, cap)
+                if isinstance(demand, _NumVarImpl):
+                    demand = self.solver_vars(demand)
+                else:
+                    demand = [self.chc_model.intvar(d, d) for d in demand]  # Create variables for demand
+                # Create task variables. Choco can create them only one by one
+                tasks = [self.chc_model.task(s, d, e) for s,d,e in zip(start,dur,end)]
+                # Convert capacity to variable
+                # Choco needs result to be a variable
+                if isinstance(cap, int):
+                    capacity = self.chc_model.intvar(cap, cap)  # convert to "variable"
+                elif isinstance(cap, _NumVarImpl):
+                    capacity = self.solver_var(cap)  # use variable
+                else:
+                    raise Exception(f"Choco cannot accept cumulative with the capacity being: {cap}")
+                return self.chc_model.cumulative(tasks, demand, capacity).post()
             elif cpm_expr.name == "circuit":
-                return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
+                return self.chc_model.circuit(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = self.solver_vars(cpm_expr.args)
-                return self.chc_model.global_cardinality(vars,vals,occ)
+                return self.chc_model.global_cardinality(vars,vals,occ).post()
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
