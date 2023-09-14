@@ -68,7 +68,7 @@ If that does not help, try printing the 'transformed' **constraints**, the way t
 
 ```python
 s = SolverLookup.get("ortools")  # or whatever solver you are using
-print(s.tranform(model.constraints))
+print(s.transform(model.constraints))
 ```
 
 Note that you can also print individual expressions like this, e.g. `print(s.transform(expression))` which helps to zoom in on the curlpit.
@@ -77,7 +77,7 @@ If you want to know about the **variable domains** as well, to see whether somet
 
 ```python
 s = SolverLookup.get("ortools")  # or whatever solver you are using
-ct = s.tranform(model.constraints)
+ct = s.transform(model.constraints)
 from cpmpy.transformations.get_variables import print_variables
 print_variables(ct)
 print(ct)
