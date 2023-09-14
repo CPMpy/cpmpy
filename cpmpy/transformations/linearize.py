@@ -187,7 +187,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             newlist += constraints
 
-        elif isinstance(cpm_expr, DirectConstraint):
+        elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
