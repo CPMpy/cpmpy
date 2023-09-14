@@ -287,8 +287,8 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "alldifferent_except0", "table",
-                     "cumulative", "circuit", "inverse"}
+        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
+                     "table", "cumulative", "circuit", "gcc", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -384,6 +384,9 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.max(chcrhs, self.solver_vars(lhs.args)).post()
                 elif lhs.name == 'abs':
                     return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0])).post()
+                elif lhs.name == 'count':
+                    arr, val = self.solver_vars(lhs)
+                    return self.chc_model.count(val, arr, chcrhs)
                 elif lhs.name == 'mul':
                     return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs).post()
                 elif lhs.name == 'div':
@@ -410,6 +413,8 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.all_different(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == 'alldifferent_except0':
                 return self.chc_model.all_different_except_0(self.solver_vars(cpm_expr.args)).post()
+            elif cpm_expr.name == 'allequal':
+                return self.chc_model.all_equal(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
@@ -422,6 +427,9 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.cumulative(tasks, demand, cap)
             elif cpm_expr.name == "circuit":
                 return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == "gcc":
+                vars, vals, occ = self.solver_vars(cpm_expr.args)
+                return self.chc_model.global_cardinality(vars,vals,occ)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
@@ -450,7 +458,7 @@ class CPM_choco(SolverInterface):
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars, vals):    #TODO
         """
         or-tools supports warmstarting the solver with a feasible solution
 
