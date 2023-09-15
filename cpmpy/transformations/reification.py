@@ -70,8 +70,10 @@ def only_bv_implies(constraints):
             else:
                 # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
                 newexprs = ((~a1).implies(recurse_negation(a0)), a1.implies(a0))
-                #newexprs = ((~a1).implies(~a0), a1.implies(a0))  # XXX when push_down_neg is separate, negated_normal no longer needed separately
-                newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
+                if isinstance(a0, GlobalConstraint):
+                    newcons.extend(newexprs)
+                else:
+                    newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)

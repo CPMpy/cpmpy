@@ -116,6 +116,7 @@ from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from .globalfunctions import * # XXX make this file backwards compatible
 
+
 # Base class GlobalConstraint
 class GlobalConstraint(Expression):
     """
@@ -142,20 +143,22 @@ class GlobalConstraint(Expression):
             Defining constraints (totally) define new auxiliary variables needed for the decomposition,
             they can always be enforced top-level.
         """
-        raise NotImplementedError("Decomposition for",self,"not available")
+        raise NotImplementedError("Decomposition for", self, "not available")
 
     def get_bounds(self):
         """
         Returns the bounds of a Boolean global constraint.
         Numerical global constraints should reimplement this.
         """
-        return (0,1)
+        return 0, 1
 
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
+
+
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
@@ -169,6 +172,7 @@ class AllDifferent(GlobalConstraint):
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
+
 
 class AllDifferentExcept0(GlobalConstraint):
     """
@@ -189,6 +193,8 @@ class AllDifferentExcept0(GlobalConstraint):
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
+
+
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
@@ -208,6 +214,8 @@ class AllEqual(GlobalConstraint):
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
+
+
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
@@ -240,14 +248,13 @@ class Circuit(GlobalConstraint):
 
         return constraining, defining
 
-
     def value(self):
         pathlen = 0
         idx = 0
         visited = set()
         arr = [argval(a) for a in self.args]
-        while(idx not in visited):
-            if idx == None:
+        while idx not in visited:
+            if idx is None:
                 return False
             if not (0 <= idx < len(arr)):
                 break
@@ -284,6 +291,7 @@ class Inverse(GlobalConstraint):
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -301,9 +309,9 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-
-# syntax of the form 'if b then x == 9 else x == 0' is not supported
-# a little helper:
+# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
+# same semantic as CPLEX IfThenElse constraint
+# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
@@ -312,7 +320,6 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        condition_val = argval(condition)
         if argval(condition):
             return argval(if_true)
         else:
@@ -327,7 +334,7 @@ class IfThenElse(GlobalConstraint):
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
-      
+
 class InDomain(GlobalConstraint):
     """
         The "InDomain" constraint, defining non-interval domains for an expression
@@ -438,7 +445,7 @@ class Cumulative(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
 
-        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -478,7 +485,7 @@ class Cumulative(GlobalConstraint):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, cap = argvals
+        start, dur, end, demand, capacity = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -486,7 +493,7 @@ class Cumulative(GlobalConstraint):
         # demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         for t in range(lb, ub+1):
-            if cap < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
         return True
