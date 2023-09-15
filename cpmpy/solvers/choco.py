@@ -37,6 +37,7 @@ from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 
+
 class CPM_choco(SolverInterface):
     """
     Interface to the Choco solver python API
@@ -62,7 +63,6 @@ class CPM_choco(SolverInterface):
         except ImportError:
             return False
 
-
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -82,7 +82,7 @@ class CPM_choco(SolverInterface):
 
         import pychoco as chc
 
-        assert(subsolver is None)
+        assert (subsolver is None)
 
         # initialise the native solver objects
         self.chc_model = chc.Model()
@@ -98,7 +98,6 @@ class CPM_choco(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="choco", cpm_model=cpm_model)
-
 
     def solve(self, time_limit=None, **kwargs):
         """
@@ -117,14 +116,18 @@ class CPM_choco(SolverInterface):
              for example: log_output=True, var_ordering=3, num_cores=8, ...>
             <Add link to documentation of all solver parameters>
         """
+
+        if time_limit is not None:
+            raise Exception("Pychoco time_limit is not working properly. Not implemented in CPMpy")
+
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
-            self.chc_status = self.chc_solver.find_optimal_solution(time_limit=time_limit,maximize=self.maximize_obj,
+            self.chc_status = self.chc_solver.find_optimal_solution(maximize=self.maximize_obj,
                                                                     objective=self.solver_var(self.obj))
         else:
-            self.chc_status = self.chc_solver.solve(time_limit=time_limit)
+            self.chc_status = self.chc_solver.solve()
         end = time.time()
 
         # new status, get runtime
@@ -173,12 +176,43 @@ class CPM_choco(SolverInterface):
 
             Returns: number of solutions found
         """
-        if self.has_objective():
-            raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
 
-        cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
-        self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
-        return cb.solution_count()
+        if time_limit is not None:
+            raise Exception("Pychoco time_limit is not working properly. Not implemented in CPMpy")
+
+        self.chc_solver = self.chc_model.get_solver()
+        start = time.time()
+        if self.has_objective():
+            sols = self.chc_solver.find_all_optimal_solutions(maximize=self.maximize_obj,
+                                                                         solution_limit=solution_limit,
+                                                                         objective=self.solver_var(self.obj))
+        else:
+            sols = self.chc_solver.find_all_solutions(solution_limit=solution_limit)
+        end = time.time()
+
+        # new status, get runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = end - start
+
+        #        cb = OrtSolutionPrinter(self, display=display, solution_limit=solution_limit)
+        #        self.solve(enumerate_all_solutions=True, solution_callback=cb, time_limit=time_limit, **kwargs)
+        #        return cb.solution_count()
+
+        # display if needed
+        if display is not None:
+            for sol in sols:
+                # map the solution to user vars
+                for cpm_var in self.user_vars:
+                    cpm_var._value = sol.get_int_val(self.solver_var(cpm_var))
+                # print the desired display
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print([v.value() for v in display])
+                else:
+                    display()  # callback
+
+        return len(sols)
 
     def solver_var(self, cpm_var):
         """
@@ -204,7 +238,6 @@ class CPM_choco(SolverInterface):
             self._varmap[cpm_var] = revar
 
         return self._varmap[cpm_var]
-
 
     def objective(self, expr, minimize):
         """
@@ -232,9 +265,7 @@ class CPM_choco(SolverInterface):
 
         self.has_obj = True
         self.obj = obj
-        self.maximize_obj = not minimize    # Choco has as default to maximize
-
-
+        self.maximize_obj = not minimize  # Choco has as default to maximize
 
     def has_objective(self):
         return self.has_obj
@@ -255,9 +286,9 @@ class CPM_choco(SolverInterface):
         lhs = cpm_expr.args[0]
         rhs = cpm_expr.args[1]
         op = cpm_expr.name
-        if op == "==": op = "=" # choco uses "=" for equality
+        if op == "==": op = "="  # choco uses "=" for equality
 
-        if is_num(lhs):    #TODO  can this happen to be num in lhs?? I think no. Maybe yes, in objective!!
+        if is_num(lhs):  # TODO  can this happen to be num in lhs?? I think no. Maybe yes, in objective!!
             return cpm_expr
 
         # decision variables, check in varmap
@@ -277,7 +308,6 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
         raise NotImplementedError("Choco: Not a known supported numexpr {}".format(cpm_expr))
-
 
     def transform(self, cpm_expr):
         """
@@ -302,8 +332,8 @@ class CPM_choco(SolverInterface):
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
-        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
-                                             # reified expr must go before this
+        cpm_cons = only_bv_implies(cpm_cons)  # everything that can create
+        # reified expr must go before this
 
         return cpm_cons
 
@@ -363,7 +393,7 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == '->':
-                assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
+                assert (isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
@@ -371,7 +401,7 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.arithm(lhs, "<=", self.solver_var(cpm_expr.args[1])).post()
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
-                        cpm_expr.name, cpm_expr))
+                    cpm_expr.name, cpm_expr))
 
         # Comparisons: only numeric ones as the `only_bv_implies()` transformation #TODO: Choco allows == in bools
         # has removed the '==' reification for Boolean expressions
@@ -381,7 +411,8 @@ class CPM_choco(SolverInterface):
             rhs = cpm_expr.args[1]
             chcrhs = self.solver_var(cpm_expr.args[1])
 
-            if isinstance(lhs, _NumVarImpl) or isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
+            if isinstance(lhs, _NumVarImpl) or isinstance(lhs, Operator) and (
+                    lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
                 # a BoundedLinearExpression LHS, special case, like in objective
                 chc_numexpr = self._make_numexpr(cpm_expr)
                 return chc_numexpr.post()
@@ -397,37 +428,41 @@ class CPM_choco(SolverInterface):
                     arr, val = self.solver_vars(lhs)
                     return self.chc_model.count(val, arr, chcrhs)
                 elif lhs.name == 'mul':
-                    return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]), chcrhs).post()
+                    return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
+                                                chcrhs).post()
                 elif lhs.name == 'div':
                     # Choco needs divisor to be a variable
                     if isinstance(lhs.args[1], int):
-                        divisor = self.chc_model.intvar(lhs.args[1],lhs.args[1])    # convert to "variable"
+                        divisor = self.chc_model.intvar(lhs.args[1], lhs.args[1])  # convert to "variable"
                     elif isinstance(lhs.args[1], _NumVarImpl):
-                        divisor = self.solver_var(lhs.args[1])      # use variable
+                        divisor = self.solver_var(lhs.args[1])  # use variable
                     else:
                         raise Exception(f"Cannot accept division with the divisor being: {lhs.args[1]}")
                     # Choco needs result to be a variable
                     if isinstance(rhs, int):
-                        result = self.chc_model.intvar(rhs,rhs)    # convert to "variable"
+                        result = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif isinstance(rhs, _NumVarImpl):
-                        result = chcrhs      # use variable
+                        result = chcrhs  # use variable
                     else:
                         raise Exception(f"Cannot accept division with the result being: {rhs}")
                     return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result).post()
                 elif lhs.name == 'element':
-                    return self.chc_model.element(chcrhs, self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1])).post()
+                    return self.chc_model.element(chcrhs, self.solver_vars(lhs.args[0]),
+                                                  self.solver_var(lhs.args[1])).post()
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     divisor = lhs.args[1]
                     if not is_num(divisor):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
-                                    f"Expression '{lhs}': Choco does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                    return self.chc_model.mod(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1], chcrhs).post()
+                                f"Expression '{lhs}': Choco does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                    return self.chc_model.mod(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
+                                              chcrhs).post()
                 elif lhs.name == 'pow':
-                    return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1], chcrhs).post()
+                    return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
+                                              chcrhs).post()
             raise NotImplementedError(
-                        "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+                "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
         # base (Boolean) global constraints
         elif isinstance(cpm_expr, GlobalConstraint):
@@ -441,7 +476,7 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
-                return self.chc_model.table(array,table).post()
+                return self.chc_model.table(array, table).post()
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 # Everything given to cumulative in Choco needs to be a variable.
@@ -453,7 +488,7 @@ class CPM_choco(SolverInterface):
                 else:
                     demand = [self.chc_model.intvar(d, d) for d in demand]  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
-                tasks = [self.chc_model.task(s, d, e) for s,d,e in zip(start,dur,end)]
+                tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 # Convert capacity to variable
                 # Choco needs result to be a variable
                 if isinstance(cap, int):
@@ -467,13 +502,14 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.circuit(self.solver_vars(cpm_expr.args)).post()
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = self.solver_vars(cpm_expr.args)
-                return self.chc_model.global_cardinality(vars,vals,occ).post()
+                return self.chc_model.global_cardinality(vars, vals, occ).post()
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
-                return self.chc_model.inverse_channeling(fwd,rev).post()
+                return self.chc_model.inverse_channeling(fwd, rev).post()
             else:
-                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
+                raise NotImplementedError(
+                    f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
@@ -494,8 +530,7 @@ class CPM_choco(SolverInterface):
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
-
-    def solution_hint(self, cpm_vars, vals):    #TODO
+    def solution_hint(self, cpm_vars, vals):  # TODO
         """
         or-tools supports warmstarting the solver with a feasible solution
 
@@ -506,10 +541,9 @@ class CPM_choco(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        self.ort_model.ClearHints() # because add just appends
+        self.ort_model.ClearHints()  # because add just appends
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.solver_var(cpm_var), val)
-
 
     def get_core(self):
         from ortools.sat.python import cp_model as ort
@@ -525,7 +559,8 @@ class CPM_choco(SolverInterface):
             Requires or-tools >= 8.2!!!
         """
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
-        assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
+        assert (
+                    self.assumption_dict is not None), "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
         assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
@@ -558,118 +593,3 @@ class CPM_choco(SolverInterface):
             'optimize_with_core': False,
             'use_erwa_heuristic': False
         }
-
-
-# solvers are optional, so this file should be interpretable
-# even if ortools is not installed...
-try:
-    from ortools.sat.python import cp_model as ort
-    import time
-
-
-    class OrtSolutionCounter(ort.CpSolverSolutionCallback):
-        """
-        Native or-tools callback for solution counting.
-
-        It is based on ortools' built-in `ObjectiveSolutionPrinter`
-        but with output printing being optional
-
-        use with CPM_ortools as follows:
-        `cb = OrtSolutionCounter()`
-        `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
-
-        then retrieve the solution count with `cb.solution_count()`
-
-        Arguments:
-            - verbose whether to print info on every solution found (bool, default: False)
-    """
-
-        def __init__(self):
-            super().__init__()
-            self.__solution_count = 0
-            self.__verbose = verbose
-            if self.__verbose:
-                self.__start_time = time.time()
-
-        def on_solution_callback(self):
-            """Called on each new solution."""
-            if self.__verbose:
-                current_time = time.time()
-                obj = self.ObjectiveValue()
-                print('Solution %i, time = %0.2f s, objective = %i' %
-                      (self.__solution_count, current_time - self.__start_time, obj))
-            self.__solution_count += 1
-
-        def solution_count(self):
-            """Returns the number of solutions found."""
-            return self.__solution_count
-
-    class OrtSolutionPrinter(OrtSolutionCounter):
-        """
-            Native or-tools callback for solution printing.
-
-            Subclasses OrtSolutionCounter, see those docs too
-
-            use with CPM_ortools as follows:
-            `cb = OrtSolutionPrinter(s, display=vars)`
-            `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
-
-            for multiple variabes (single or NDVarArray), use:
-            `cb = OrtSolutionPrinter(s, display=[v, x, z])`
-
-            for a custom print function, use for example:
-            ```def myprint():
-        print(f"x0={x[0].value()}, x1={x[1].value()}")
-        cb = OrtSolutionPrinter(s, printer=myprint)```
-
-            optionally retrieve the solution count with `cb.solution_count()`
-
-            Arguments:
-                - verbose: whether to print info on every solution found (bool, default: False)
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                            default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
-        """
-        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
-            super().__init__(verbose)
-            self._solution_limit = solution_limit
-            # we only need the cpmpy->solver varmap from the solver
-            self._varmap = solver._varmap
-            # identify which variables to populate with their values
-            self._cpm_vars = []
-            self._display = display
-            if isinstance(display, (list,Expression)):
-                self._cpm_vars = get_variables(display)
-            elif callable(display):
-                # might use any, so populate all (user) variables with their values
-                self._cpm_vars = solver.user_vars
-
-        def on_solution_callback(self):
-            """Called on each new solution."""
-            super().on_solution_callback()
-            if len(self._cpm_vars):
-                # populate values before printing
-                for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
-                    elif isinstance(cpm_var, _BoolVarImpl):
-                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
-                    else:
-                        cpm_var._value = self.Value(self._varmap[cpm_var])
-
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
-                    print([v.value() for v in self._display])
-                else: # callable
-                    self._display()
-
-            # check for count limit
-            if self.solution_count() == self._solution_limit:
-                self.StopSearch()
-
-except ImportError:
-    pass  # Ok, no ortools installed...
