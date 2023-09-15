@@ -22,6 +22,7 @@ import sys  # for stdout checking
 import numpy as np
 import time
 
+import cpmpy
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -116,10 +117,10 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
-            self.chc_status = self.chc_solver.find_optimal_solution(maximize=self.maximize_obj,
+            sol = self.chc_solver.find_optimal_solution(maximize=self.maximize_obj,
                                                                     objective=self.solver_var(self.obj))
         else:
-            self.chc_status = self.chc_solver.solve()
+            sol = self.chc_solver.find_solution()
         end = time.time()
 
         # new status, get runtime
@@ -127,30 +128,30 @@ class CPM_choco(SolverInterface):
         self.cpm_status.runtime = end - start
 
         # translate exit status
-        if self.chc_status:
+        if sol is not None:
             if self.has_objective() and (time_limit is None or self.cpm_status.runtime < time_limit):
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif not self.chc_status and time_limit is not None and self.cpm_status.runtime >= time_limit:
+        elif (sol is None) and time_limit is not None and self.cpm_status.runtime >= time_limit:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             # can happen when timeout is reached...
 
         # True/False depending on self.chc_status
-        has_sol = self.chc_status
+        has_sol = sol is not None
 
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                cpm_var._value = self.solver_var(cpm_var).get_value()
+                cpm_var._value = sol.get_int_val(self.solver_var(cpm_var))
 
             # translate objective
             if self.has_objective():
-                self.objective_value_ = self.solver_var(self.obj).get_value()
+                self.objective_value_ = sol.get_int_val(self.solver_var(self.obj))
 
         return has_sol
 
@@ -243,9 +244,10 @@ class CPM_choco(SolverInterface):
         (flat_obj, flat_cons) = flatten_objective(expr)
         self += flat_cons  # add potentially created constraints
         get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+        lb, ub= flat_obj.get_bounds()
+        obj = cpmpy.intvar(lb, ub)
+        obj_con = flat_obj == obj
 
-        obj = self.chc_model.intvar()
-        obj_con = expr == obj
         # add constraint for objective variable
         self += obj_con
 
