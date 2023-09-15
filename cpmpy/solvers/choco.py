@@ -18,23 +18,19 @@
 
         CPM_choco
 """
-import sys  # for stdout checking
-import numpy as np
 import time
 
 import cpmpy
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison
-from ..transformations.decompose_global import decompose_global, decompose_in_tree
+from ..expressions.utils import is_num
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
-from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 
@@ -318,7 +314,6 @@ class CPM_choco(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
 
         return cpm_cons
@@ -346,46 +341,45 @@ class CPM_choco(SolverInterface):
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
-            self._post_constraint(con)
+            self._get_constraint(con).post()
 
         return self
 
-    # only 3 constraints support it (and,or,sum),
-    # we can just add reified support for those and not need `reifiable` or returning the constraint
-    # then we can remove _post_constraint and have its code inside the for loop of __add__
-    # like for other solvers
-    def _post_constraint(self, cpm_expr):
+    def _get_constraint(self, cpm_expr):
         """
-            Post a supported CPMpy constraint directly to the underlying solver's API
-
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+        Get a solver's constraint by a supported CPMpy constraint
 
         :param cpm_expr: CPMpy expression
         :type cpm_expr: Expression
 
         """
+        import pychoco as chc
+        from pychoco.variables.intvar import IntVar
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         if isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
-                return self.chc_model.and_(self.solver_vars(cpm_expr.args)).post()
+                return self.chc_model.and_(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'or':
-                return self.chc_model.or_(self.solver_vars(cpm_expr.args)).post()
+                return self.chc_model.or_(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == '->':
                 assert (isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
                 lhs = self.solver_var(cpm_expr.args[0])
                 if isinstance(cpm_expr.args[1], _BoolVarImpl):
                     # bv -> bv
                     # PyChoco does not have "implies" constraint
-                    return self.chc_model.arithm(lhs, "<=", self.solver_var(cpm_expr.args[1])).post()
+                    return self.chc_model.arithm(lhs, "<=", self.solver_var(cpm_expr.args[1]))
+                else:
+                    # bv -> boolexpr
+                    # the `reify_rewrite()` transformation ensures that only reifiable rhs remain here
+                    bv = self._get_constraint(cpm_expr.args[1]).reify()
+                    return self.chc_model.arithm(lhs, "<=", bv)
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
                     cpm_expr.name, cpm_expr))
 
-        # Comparisons: only numeric ones as the `only_bv_implies()` transformation #TODO: Choco allows == in bools
-        # has removed the '==' reification for Boolean expressions
+        # Comparisons: both numeric and boolean ones
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs = cpm_expr.args[0]
@@ -396,21 +390,21 @@ class CPM_choco(SolverInterface):
                     lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"):
                 # a BoundedLinearExpression LHS, special case, like in objective
                 chc_numexpr = self._make_numexpr(cpm_expr)
-                return chc_numexpr.post()
+                return chc_numexpr
             elif cpm_expr.name == '==':
                 # NumExpr == IV, supported by Choco (thanks to `only_numexpr_equality()` transformation)
                 if lhs.name == 'min':
-                    return self.chc_model.min(chcrhs, self.solver_vars(lhs.args)).post()
+                    return self.chc_model.min(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
-                    return self.chc_model.max(chcrhs, self.solver_vars(lhs.args)).post()
+                    return self.chc_model.max(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
-                    return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0])).post()
+                    return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'count':
                     arr, val = self.solver_vars(lhs)
                     return self.chc_model.count(val, arr, chcrhs)
                 elif lhs.name == 'mul':
                     return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
-                                                chcrhs).post()
+                                                chcrhs)
                 elif lhs.name == 'div':
                     # Choco needs divisor to be a variable
                     if isinstance(lhs.args[1], int):
@@ -426,10 +420,16 @@ class CPM_choco(SolverInterface):
                         result = chcrhs  # use variable
                     else:
                         raise Exception(f"Cannot accept division with the result being: {rhs}")
-                    return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result).post()
+                    return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result)
                 elif lhs.name == 'element':
-                    return self.chc_model.element(chcrhs, self.solver_vars(lhs.args[0]),
-                                                  self.solver_var(lhs.args[1])).post()
+                    if isinstance(rhs, int):
+                        result = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                    elif isinstance(rhs, _NumVarImpl):
+                        result = chcrhs  # use variable
+                    else:
+                        raise Exception(f"Cannot accept the right hand side of the element constraint being: {rhs}")
+                    return self.chc_model.element(result, self.solver_vars(lhs.args[0]),
+                                                  self.solver_var(lhs.args[1]))
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation       #TODO: check
                     divisor = lhs.args[1]
@@ -438,10 +438,10 @@ class CPM_choco(SolverInterface):
                             raise Exception(
                                 f"Expression '{lhs}': Choco does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
                     return self.chc_model.mod(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
-                                              chcrhs).post()
+                                              chcrhs)
                 elif lhs.name == 'pow':
                     return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
-                                              chcrhs).post()
+                                              chcrhs)
             raise NotImplementedError(
                 "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -449,19 +449,43 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             if cpm_expr.name == 'alldifferent':
-                return self.chc_model.all_different(self.solver_vars(cpm_expr.args)).post()
+                vars = self.solver_vars(cpm_expr.args)
+                for i in range(len(vars)):
+                    if isinstance(vars[i], int):
+                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                    elif isinstance(vars[i], IntVar):
+                        vars[i] = vars[i]  # use variable
+                    else:
+                        raise Exception(f"Choco cannot accept alldifferent with: {vars[i]}")
+                return self.chc_model.all_different(vars)
             elif cpm_expr.name == 'alldifferent_except0':
-                return self.chc_model.all_different_except_0(self.solver_vars(cpm_expr.args)).post()
+                vars = self.solver_vars(cpm_expr.args)
+                for i in range(len(vars)):
+                    if isinstance(vars[i], int):
+                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                    elif isinstance(vars[i], IntVar):
+                        vars[i] = vars[i]  # use variable
+                    else:
+                        raise Exception(f"Choco cannot accept alldifferent_except0 with: {vars[i]}")
+                return self.chc_model.all_different_except_0(vars)
             elif cpm_expr.name == 'allequal':
-                return self.chc_model.all_equal(self.solver_vars(cpm_expr.args)).post()
+                vars = self.solver_vars(cpm_expr.args)
+                for i in range(len(vars)):
+                    if isinstance(vars[i], int):
+                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                    elif isinstance(vars[i], IntVar):
+                        vars[i] = vars[i]  # use variable
+                    else:
+                        raise Exception(f"Choco cannot accept allequal with: {vars[i]}")
+                return self.chc_model.all_equal(vars)
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
-                return self.chc_model.table(array, table).post()
+                return self.chc_model.table(array, table)
             elif cpm_expr.name == 'InDomain':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 expr, table = self.solver_vars(cpm_expr.args)
-                return self.chc_model.member(expr, table).post()
+                return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 # Everything given to cumulative in Choco needs to be a variable.
@@ -478,41 +502,47 @@ class CPM_choco(SolverInterface):
                 # Choco needs result to be a variable
                 if isinstance(cap, int):
                     capacity = self.chc_model.intvar(cap, cap)  # convert to "variable"
-                elif isinstance(cap, _NumVarImpl):
+                elif isinstance(cap, IntVar):
                     capacity = self.solver_var(cap)  # use variable
                 else:
                     raise Exception(f"Choco cannot accept cumulative with the capacity being: {cap}")
-                return self.chc_model.cumulative(tasks, demand, capacity).post()
+                return self.chc_model.cumulative(tasks, demand, capacity)
             elif cpm_expr.name == "circuit":
-                return self.chc_model.circuit(self.solver_vars(cpm_expr.args)).post()
+                return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = self.solver_vars(cpm_expr.args)
-                return self.chc_model.global_cardinality(vars, vals, occ).post()
+                for i in range(len(occ)):
+                    if isinstance(occ[i], int):
+                        occ[i] = self.chc_model.intvar(occ[i], occ[i])  # convert to "variable"
+                    elif isinstance(occ[i], IntVar):
+                        occ[i] = occ[i]  # use variable
+                    else:
+                        raise Exception(f"Choco cannot accept gcc including the following in the occurrences: {occ[i]}")
+                return self.chc_model.global_cardinality(vars, vals, occ)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
-                return self.chc_model.inverse_channeling(fwd, rev).post()
+                return self.chc_model.inverse_channeling(fwd, rev)
             else:
                 raise NotImplementedError(
                     f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
-            return self.chc_model.and_([self.solver_var(cpm_expr)]).post()
+            return self.chc_model.and_([self.solver_var(cpm_expr)])
 
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             # Choco does not allow to post True or False. Post "certainly True or False" constraints instead
             if cpm_expr:
-                return self.chc_model.arithm(self.helper_var, ">=", 0).post()
+                return self.chc_model.arithm(self.helper_var, ">=", 0)
             else:
-                return self.chc_model.arithm(self.helper_var, "<", 0).post()
+                return self.chc_model.arithm(self.helper_var, "<", 0)
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
             c = cpm_expr.callSolver(self, self.chc_model)
-            print(c)
-            return c.post()
+            return c
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
