@@ -606,6 +606,8 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
         self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_inverse(self):
         from cpmpy.solvers.ortools import CPM_ortools
 
@@ -623,6 +625,8 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_objective(self):
         iv = cp.intvar(0,10, shape=2)
         m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
