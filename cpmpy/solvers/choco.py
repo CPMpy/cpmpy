@@ -272,9 +272,6 @@ class CPM_choco(SolverInterface):
         op = cpm_expr.name
         if op == "==": op = "="  # choco uses "=" for equality
 
-        if is_num(lhs):  # TODO  can this happen to be num in lhs?? I think no. Maybe yes, in objective!!
-            return cpm_expr
-
         # decision variables, check in varmap
         if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
@@ -431,16 +428,14 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.element(result, self.solver_vars(lhs.args[0]),
                                                   self.solver_var(lhs.args[1]))
                 elif lhs.name == 'mod':
-                    # catch tricky-to-find ortools limitation       #TODO: check
                     divisor = lhs.args[1]
-                    if not is_num(divisor):
-                        if divisor.lb <= 0 and divisor.ub >= 0:
-                            raise Exception(
-                                f"Expression '{lhs}': Choco does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                    return self.chc_model.mod(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
-                                              chcrhs)
+                    if not isinstance(rhs, _NumVarImpl): # if divisor is variable then result must be variable too
+                        rhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                    else:
+                        rhs = self.solver_vars(rhs)  # get choco variable
+                    return self.chc_model.mod(self.solver_var(lhs.args[0]), self.solver_var(divisor), rhs)
                 elif lhs.name == 'pow':
-                    return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args)[1],
+                    return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
                                               chcrhs)
             raise NotImplementedError(
                 "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
