@@ -24,7 +24,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
@@ -369,7 +369,10 @@ class CPM_scip(SolverInterface):
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.scip_model.addConstr(cpm_expr.args[0])
+            # not sure how else to do it
+            if cpm_expr.args[0] is False:
+                bv = self.solver_var(boolvar())
+                self.scip_model.addCons(bv <= -1)
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
