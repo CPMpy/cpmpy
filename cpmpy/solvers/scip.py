@@ -21,6 +21,7 @@
     Module details
     ==============
 """
+import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
@@ -400,60 +401,13 @@ class CPM_scip(SolverInterface):
 
             Returns: number of solutions found
         """
-        raise NotImplementedError(f"Not actually implemented (yet?)")
 
-        """ OLD GUROBI code
-        if time_limit is not None:
-            self.scip_model.setParam("TimeLimit", time_limit)
-
-        if solution_limit is None:
-            raise Exception(
-                "scip does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
-
-        # Force scip to keep searching in the tree for optimal solutions
-        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
-
-        # solve the model
-        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
-
-        optimal_val = None
-        solution_count = self.scip_model.SolCount
-        opt_sol_count = 0
-
-        for i in range(solution_count):
-            # Specify which solution to query
-            self.scip_model.setParam("SolutionNumber", i)
-            sol_obj_val = self.scip_model.PoolObjVal
-            if optimal_val is None:
-                optimal_val = sol_obj_val
-            if optimal_val is not None:
-                # sub-optimal solutions
-                if sol_obj_val != optimal_val:
-                    break
-            opt_sol_count += 1
-
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                solver_val = self.solver_var(cpm_var).Xn
-                if cpm_var.is_bool():
-                    cpm_var._value = solver_val >= 0.5
-                else:
-                    cpm_var._value = int(solver_val)
-
-            # Translate objective
-            if self.has_objective():
-                self.objective_value_ = self.scip_model.PoolObjVal
-
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
-                else:
-                    display()  # callback
-
-        # Reset pool search mode to default
-        self.scip_model.setParam("PoolSearchMode", 0)
-
-        return opt_sol_count
+        warnings.warn("Solution enumeration is not implemented in PyScipOPT, defaulting to CPMpy's naive implementation")
         """
+            Issues to track for future reference:
+                https://github.com/scipopt/PySCIPOpt/issues/549 and
+                https://github.com/scipopt/PySCIPOpt/issues/248
+        """
+        
+        return super().solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
+
