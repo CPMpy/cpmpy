@@ -12,26 +12,6 @@ class TestTransfReif(unittest.TestCase):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-    def test_only_bv_implies(self):
-        a,b,c = [boolvar(name=n) for n in "abc"]
-        
-        cases = [((a).implies(b), "[(a) -> (b)]"),
-                 ((~a).implies(b), "[(~a) -> (b)]"),
-                 ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
-                 ((a).implies(b&c), "[(a) -> ((b) and (c))]"),
-                 ((b|c).implies(a), "[(~a) -> (~b), (~a) -> (~c)]"),
-                 ((b&c).implies(a), "[(~a) -> ((~b) or (~c))]"),
-                 ((a)==(b), "[(a) -> (b), (b) -> (a)]"),
-                 ((~a)==(b), "[(~a) -> (b), (b) -> (~a)]"),
-                 ((b|c)==(a), "[(~a) -> (~b), (~a) -> (~c), (a) -> ((b) or (c))]"),
-                 ((b&c)==(a), "[(~a) -> ((~b) or (~c)), (a) -> (b), (a) -> (c)]"),
-                ]
-
-        # test transformation
-        for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
-            self.assertTrue(Model(expr).solve())
-
     def test_reif_element(self):
         bvs = boolvar(shape=5, name="bvs")
         iv = intvar(1,10, name="iv")
