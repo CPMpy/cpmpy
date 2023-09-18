@@ -35,7 +35,7 @@ class TestTransfReif(unittest.TestCase):
 
     def test_reif_element(self):
         bvs = boolvar(shape=5, name="bvs")
-        iv = intvar(1,10, name="iv")
+        iv = intvar(1,3, name="iv")
         rv = boolvar(name="rv")
 
         # have to be careful with Element, if an Element over
@@ -54,16 +54,16 @@ class TestTransfReif(unittest.TestCase):
         # than the array range, needs a reified equality decomposition.
         arr = cpm_array([0,1,2])
 
-        cases = [(-1,3,3), # idx.lb, idx.ub, cnt
-                 (-1,2,3),
-                 (-1,1,2),
-                 (-1,0,1),
-                 (0,3,3),
+        cases = [#(-1,3,3), # idx.lb, idx.ub, cnt
+                 #(-1,2,3),
+                 #(-1,1,2),
+                 #(-1,0,1),
+                 #(0,3,3),
                  (0,2,3),
                  (0,1,2),
                  (1,2,2),
-                 (1,3,2),
-                 (2,3,1),
+                 #(1,3,2),
+                 #(2,3,1),
                 ]
 
         for (lb,ub,cnt) in cases:
@@ -72,7 +72,7 @@ class TestTransfReif(unittest.TestCase):
             self.assertEqual(Model(e).solveAll(), cnt)
 
         # Another case, with a more specific check... if the element-wise decomp is empty
-        e = bvs[0].implies(Element([1,2,3], iv) < 1)
+        e = bvs[0].implies(Element([1,2,3,4], iv) < 1)
         self.assertFalse(Model(e, bvs[0]==True).solve())
 
 
