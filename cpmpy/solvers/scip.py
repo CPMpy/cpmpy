@@ -361,34 +361,30 @@ class CPM_scip(SolverInterface):
             cond, sub_expr = cpm_expr.args
             assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
-            if isinstance(cond, NegBoolView):
-                cond, bool_val = self.solver_var(cond._bv), False
-            else:
-                cond, bool_val = self.solver_var(cond), True
 
             lhs, rhs = sub_expr.args
-            if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
-                lin_expr = self._make_numexpr(lhs)
-            else:
-                raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+            assert isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum", f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
+
             if sub_expr.name == "<=":  # XXX, docs say only this one?
-                if bool_val: # positive Boolean
-                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs), cond)
-                else: # negation of `cond` variable is the indicator
-                    raise Exception(f"This code uncertain to work, test at your own risk")
-                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs), ~cond)
-            elif sub_expr.name == ">=":
-                raise Exception(f"This code uncertain to work, test at your own risk")
-                if bool_val: # positive Boolean
-                    self.scip_model.addConsIndicator(lin_expr >= self.solver_var(rhs), cond)
-                else: # negation of `cond` variable is the indicator
-                    self.scip_model.addConsIndicator(lin_expr >= self.solver_var(rhs), ~cond)
-            elif sub_expr.name == "==":
-                raise Exception(f"This code uncertain to work, test at your own risk")
-                if bool_val: # positive Boolean
-                    self.scip_model.addConsIndicator(lin_expr == self.solver_var(rhs), cond)
-                else: # negation of `cond` variable is the indicator
-                    self.scip_model.addConsIndicator(lin_expr == self.solver_var(rhs), ~cond)
+                lin_expr = self._make_numexpr(lhs)
+                if isinstance(cond, NegBoolView):
+                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs),
+                                                     binvar=self.solver_var(cond._bv), activeone=False)
+                else:
+                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs),
+                                                     binvar=self.solver_var(cond), activeone=True)
+
+            elif sub_expr.name == ">=": # change sign
+                if lhs.name == "sum":
+                    lhs = Operator("wsum", [[-1]*len(lhs.args), lhs.args])
+                elif lhs.name == "wsum":
+                    lhs = Operator("wsum", [[-w for w in lhs.args[0]], lhs.args[1]])
+                else:
+                    lhs = -lhs
+                self += cond.implies(lhs <= -rhs)
+
+            elif sub_expr.name == "==": # split into <= and >=
+                self += [cond.implies(lhs <= rhs), cond.implies(lhs >= rhs)]
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
