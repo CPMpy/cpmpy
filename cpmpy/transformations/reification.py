@@ -23,6 +23,27 @@ from .negation import recurse_negation
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
+def only_bv_reifies(constraints):
+    newcons = []
+    for cpm_expr in constraints:
+        if cpm_expr.name in ['->', "=="]:
+            a0, a1 = cpm_expr.args
+            if not isinstance(a0, _BoolVarImpl) and \
+                    isinstance(a1, _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                if cpm_expr.name == '->':
+                    newexpr = [(~a1).implies(recurse_negation(a0))]
+                else:
+                    newexpr = [a1 == a0]  # BE == BV :: BV == BE
+                    if not a0.is_bool():
+                        newexpr = flatten_constraint(newexpr)
+                newcons.extend(newexpr)
+            else:
+                newcons.append(cpm_expr)
+        else:
+            newcons.append(cpm_expr)
+    return newcons
+
 def only_bv_implies(constraints):
     """
         Transforms all reifications to BV -> BE form
