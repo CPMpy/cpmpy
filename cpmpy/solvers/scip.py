@@ -321,7 +321,7 @@ class CPM_scip(SolverInterface):
                 elif lhs.name == 'div':
                     assert is_num(lhs.args[1]), "scip only supports division by constants"
                     a, b = self.solver_vars(lhs.args)
-                    self.scip_model.addLConstr(a / b == sciprhs)
+                    self.scip_model.addCons(a / b == sciprhs)
 
                 else:
                     raise NotImplementedError(
