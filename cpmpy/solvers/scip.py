@@ -73,7 +73,7 @@ class CPM_scip(SolverInterface):
         import pyscipopt as scip
 
         self.scip_model = scip.Model("From CPMpy")
-
+        self.scip_model.setParam("display/verblevel", 0) # remove solver logs from output
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="scip", cpm_model=cpm_model)
