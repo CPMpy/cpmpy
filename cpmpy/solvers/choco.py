@@ -20,6 +20,8 @@
 """
 import time
 
+import numpy as np
+
 from cpmpy.exceptions import NotSupportedError
 
 import cpmpy
@@ -276,6 +278,7 @@ class CPM_choco(SolverInterface):
         rhs = cpm_expr.args[1]
         op = cpm_expr.name
         if op == "==": op = "="  # choco uses "=" for equality
+        if not isinstance(rhs,Expression): rhs = int(rhs)
 
         # decision variables, check in varmap
         if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
@@ -289,7 +292,7 @@ class CPM_choco(SolverInterface):
                 a, b = self.solver_vars(lhs.args)
                 return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
             elif lhs.name == 'wsum':
-                w = lhs.args[0]
+                w = [int(wght) for wght in lhs.args[0]]
                 x = self.solver_vars(lhs.args[1])
                 return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
@@ -318,9 +321,9 @@ class CPM_choco(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse"]))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
 
         return cpm_cons
@@ -394,7 +397,11 @@ class CPM_choco(SolverInterface):
 
         # Comparisons: both numeric and boolean ones
         # numexpr `comp` bvar|const
+        # Choco accepts only int32, not int64
         elif isinstance(cpm_expr, Comparison):
+            for i in range(len(cpm_expr.args)):
+                if isinstance(cpm_expr.args[i], np.integer):
+                    cpm_expr.args[i] = int(cpm_expr.args[i])
             lhs = cpm_expr.args[0]
             rhs = cpm_expr.args[1]
 
