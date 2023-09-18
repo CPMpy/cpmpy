@@ -23,6 +23,27 @@ from .negation import recurse_negation
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
+def only_bv_reifies(constraints):
+    newcons = []
+    for cpm_expr in constraints:
+        if cpm_expr.name in ['->', "=="]:
+            a0, a1 = cpm_expr.args
+            if not isinstance(a0, _BoolVarImpl) and \
+                    isinstance(a1, _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                if cpm_expr.name == '->':
+                    newexpr = [(~a1).implies(recurse_negation(a0))]
+                else:
+                    newexpr = [a1 == a0]  # BE == BV :: BV == BE
+                    if not a0.is_bool():
+                        newexpr = flatten_constraint(newexpr)
+                newcons.extend(newexpr)
+            else:
+                newcons.append(cpm_expr)
+        else:
+            newcons.append(cpm_expr)
+    return newcons
+
 def only_bv_implies(constraints):
     """
         Transforms all reifications to BV -> BE form
@@ -35,17 +56,13 @@ def only_bv_implies(constraints):
         AFTER `flatten()`
     """
     newcons = []
+    constraints = flatten_constraint(only_bv_reifies(constraints))
+
     for cpm_expr in constraints:
         # Operators: check BE -> BV
         if cpm_expr.name == '->':
             a0,a1 = cpm_expr.args
-            if not isinstance(a0, _BoolVarImpl) and \
-                    isinstance(a1, _BoolVarImpl):
-                # BE -> BV :: ~BV -> ~BE
-                newexpr = (~a1).implies(recurse_negation(a0))
-                #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
-                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
-            elif isinstance(a1, Comparison) and \
+            if isinstance(a1, Comparison) and \
                     a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
