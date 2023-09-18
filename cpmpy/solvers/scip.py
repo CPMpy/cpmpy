@@ -330,27 +330,6 @@ class CPM_scip(SolverInterface):
                     # SCIP does have 'addConsAnd', 'addConsOr', 'addConsXor'
                     #   'addConsCardinality' (atmost constant nr non-zero)
                     #   'addConsSOS1' (at most 1 non-zero?) 'addConsSOS2'
-
-                    """
-                    # General constraints, gurobi leftover...
-                    # sciprhs should be a variable for scip in the subsequent, fake it
-                    if is_num(sciprhs):
-                        sciprhs = self.solver_var(intvar(lb=sciprhs, ub=sciprhs))
-
-                    if lhs.name == 'min':
-                        self.scip_model.addGenConstrMin(sciprhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'max':
-                        self.scip_model.addGenConstrMax(sciprhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'abs':
-                        self.scip_model.addGenConstrAbs(sciprhs, self.solver_var(lhs.args[0]))
-                    elif lhs.name == 'pow':
-                        x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "scip: 'pow', only support quadratic constraints (x**2)"
-                        self.scip_model.addGenConstrPow(x, sciprhs, a)
-                    else:
-                        raise NotImplementedError(
-                        "Not a known supported scip comparison '{}' {}".format(lhs.name, cpm_expr))
-                    """
             else:
                 raise NotImplementedError(
                 "Not a known supported scip comparison '{}' {}".format(lhs.name, cpm_expr))
