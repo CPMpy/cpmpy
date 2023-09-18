@@ -4,6 +4,7 @@ import numpy as np
 import cpmpy as cp
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -555,3 +556,23 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("gurobi", model)
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
+
+    @pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+    def test_scip_special_cardinality(self):
+        bvs = cp.boolvar(shape=4)
+        sos1 = cp.sum(bvs) <= 1
+
+        model = cp.Model(sos1)
+        s = cp.SolverLookup.get("scip", model)
+        constraints = s.scip_model.getConss()
+        self.assertEquals("SOS1cons", constraints[0].name) # should be translated to SOS1 constraint
+        self.assertTrue(s.solve())
+        self.assertLessEqual(bvs.value().sum(), 1)
+
+        card = cp.sum(bvs) <= 3
+        model = cp.Model(card)
+        s = cp.SolverLookup.get("scip", model)
+        constraints = s.scip_model.getConss()
+        self.assertEquals("CardinalityCons", constraints[0].name)  # should be translated to SOS1 constraint
+        self.assertTrue(s.solve())
+        self.assertLessEqual(bvs.value().sum(), 3)

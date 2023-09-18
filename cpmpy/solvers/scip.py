@@ -301,8 +301,15 @@ class CPM_scip(SolverInterface):
 
             # Thanks to `only_numexpr_equality()` only supported comparisons should remain
             if cpm_expr.name == '<=':
-                sciplhs = self._make_numexpr(lhs)
-                self.scip_model.addCons(sciplhs <= sciprhs)
+                if (isinstance(lhs, Operator) and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
+                    if rhs == 1: # special SOS1 constraint?
+                        self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
+                    else: # cardinality constraint
+                        self.scip_model.addConsCardinality(self.solver_vars(lhs.args), rhs)
+                else:
+                    sciplhs = self._make_numexpr(lhs)
+                    self.scip_model.addCons(sciplhs <= sciprhs)
+
             elif cpm_expr.name == '>=':
                 sciplhs = self._make_numexpr(lhs)
                 self.scip_model.addCons(sciplhs >= sciprhs)
@@ -328,9 +335,7 @@ class CPM_scip(SolverInterface):
                     raise NotImplementedError(
                         "Not a known supported scip comparison '{}' {}".format(lhs.name, cpm_expr))
 
-                    # SCIP does have 'addConsAnd', 'addConsOr', 'addConsXor'
-                    #   'addConsCardinality' (atmost constant nr non-zero)
-                    #   'addConsSOS1' (at most 1 non-zero?) 'addConsSOS2'
+                    # SCIP does have 'addConsAnd', 'addConsOr', 'addConsXor', 'addConsSOS2' #TODO?
             else:
                 raise NotImplementedError(
                 "Not a known supported scip comparison '{}' {}".format(lhs.name, cpm_expr))
