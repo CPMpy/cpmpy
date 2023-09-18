@@ -20,6 +20,8 @@
 """
 import time
 
+from cpmpy.exceptions import NotSupportedError
+
 import cpmpy
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -108,7 +110,7 @@ class CPM_choco(SolverInterface):
         """
 
         if time_limit is not None:
-            raise Exception("Pychoco time_limit is not working properly. Not implemented in CPMpy")
+            raise NotSupportedError("Pychoco time_limit is not working properly. Not implemented in CPMpy")
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
@@ -171,9 +173,11 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
-            sols = self.chc_solver.find_all_optimal_solutions(maximize=self.maximize_obj,
-                                                                         solution_limit=solution_limit,
-                                                                         objective=self.solver_var(self.obj))
+            raise NotSupportedError("Pychoco does not support finding all optimal solutions currently.")
+            # Normally the following, but currently have a bug
+#            sols = self.chc_solver.find_all_optimal_solutions(maximize=self.maximize_obj,
+#                                                                         solution_limit=solution_limit,
+#                                                                         objective=self.solver_var(self.obj))
         else:
             sols = self.chc_solver.find_all_solutions(solution_limit=solution_limit)
         end = time.time()
