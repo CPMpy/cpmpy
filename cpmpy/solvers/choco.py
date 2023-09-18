@@ -89,7 +89,7 @@ class CPM_choco(SolverInterface):
         # initialise the native solver objects
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
-        self.helper_var = self.chc_model.intvar(0, 2)
+        self.helper_var = self.chc_model.intvar(0, 0)
 
         # for the objective
         self.has_obj = False
