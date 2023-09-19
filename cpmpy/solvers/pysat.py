@@ -34,7 +34,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_int
+from ..expressions.utils import is_any_list, is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
@@ -316,13 +316,9 @@ class CPM_pysat(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
 
-        if not hasattr(cpm_vars, "flat"):
-            cpm_vars = np.array(cpm_vars)
-        cpm_vars=cpm_vars.flat
+        cpm_vars = flatlist(cpm_vars)
 
-        if not hasattr(vals, "flat"):
-            vals = np.array(vals)
-        vals=vals.flat
+        vals = flatlist(vals)
 
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):

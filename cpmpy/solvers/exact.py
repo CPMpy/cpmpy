@@ -37,6 +37,8 @@ from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
+from ..expressions.utils import flatlist
+
 import numpy as np
 import numbers
 
@@ -589,13 +591,9 @@ class CPM_exact(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
 
-        if not hasattr(cpm_vars, "flat"):
-            cpm_vars = np.array(cpm_vars)
-        cpm_vars=cpm_vars.flat
+        cpm_vars = flatlist(cpm_vars)
 
-        if not hasattr(vals, "flat"):
-            vals = np.array(vals)
-        vals=vals.flat
+        vals = flatlist(vals)
         
         try:
             pkg_resources.require("exact>=1.1.5")
