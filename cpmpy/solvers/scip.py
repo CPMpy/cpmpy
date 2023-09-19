@@ -7,6 +7,7 @@
 
     Then install the 'pyscipopt' python package:
         $ pip install pyscipopt
+    (more information on https://github.com/scipopt/PySCIPOpt)
     
     ===============
     List of classes
