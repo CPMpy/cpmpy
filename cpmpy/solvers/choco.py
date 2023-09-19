@@ -8,6 +8,7 @@
 
     Documentation of the solver's own Python API:
     https://pypi.org/project/pychoco/
+    https://pychoco.readthedocs.io/en/latest/
 
     ===============
     List of classes
@@ -49,6 +50,7 @@ class CPM_choco(SolverInterface):
 
     See detailed installation instructions at:
     https://pypi.org/project/pychoco/
+    https://pychoco.readthedocs.io/en/latest/
 
     Creates the following attributes (see parent constructor for more):
     chc_model: the pychoco.Model() created by _model()
