@@ -37,7 +37,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.reification import only_bv_reifies, only_bv_implies, reify_rewrite
+from ..transformations.reification import only_bv_reifies, reify_rewrite
 
 
 class CPM_choco(SolverInterface):
