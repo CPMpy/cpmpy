@@ -239,6 +239,7 @@ class _NumVarImpl(Expression):
         self.lb = lb
         self.ub = ub
         self.name = name
+        self.id = uuid.uuid4()
         self._value = None
 
     def is_bool(self):
@@ -268,7 +269,7 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         # for backwards compatability
         if not hasattr(self, 'id'):
-            self.id = self.id = uuid.uuid4()
+            self.id = uuid.uuid4()
         return hash(self.id)
 
 
