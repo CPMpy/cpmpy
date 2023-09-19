@@ -4,7 +4,7 @@ from cpmpy import *
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
-from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
+from cpmpy.transformations.reification import only_implies, reify_rewrite
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
 class TestTransfReif(unittest.TestCase):

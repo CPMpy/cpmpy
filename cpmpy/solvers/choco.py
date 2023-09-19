@@ -8,6 +8,7 @@
 
     Documentation of the solver's own Python API:
     https://pypi.org/project/pychoco/
+    https://pychoco.readthedocs.io/en/latest/
 
     ===============
     List of classes
@@ -19,6 +20,8 @@
         CPM_choco
 """
 import time
+
+import numpy as np
 
 from cpmpy.exceptions import NotSupportedError
 
@@ -35,7 +38,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.reification import only_bv_reifies, only_bv_implies, reify_rewrite
+from ..transformations.reification import only_bv_reifies, reify_rewrite
 
 
 class CPM_choco(SolverInterface):
@@ -47,6 +50,7 @@ class CPM_choco(SolverInterface):
 
     See detailed installation instructions at:
     https://pypi.org/project/pychoco/
+    https://pychoco.readthedocs.io/en/latest/
 
     Creates the following attributes (see parent constructor for more):
     chc_model: the pychoco.Model() created by _model()
@@ -82,12 +86,12 @@ class CPM_choco(SolverInterface):
 
         import pychoco as chc
 
-        assert (subsolver is None)
+        assert (subsolver is None), "Choco does not support any subsolver"
 
         # initialise the native solver objects
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
-        self.helper_var = self.chc_model.intvar(0, 2)
+        self.helper_var = self.chc_model.intvar(0, 0)
 
         # for the objective
         self.has_obj = False
@@ -276,6 +280,7 @@ class CPM_choco(SolverInterface):
         rhs = cpm_expr.args[1]
         op = cpm_expr.name
         if op == "==": op = "="  # choco uses "=" for equality
+        if not isinstance(rhs,Expression): rhs = int(rhs)
 
         # decision variables, check in varmap
         if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
@@ -289,7 +294,7 @@ class CPM_choco(SolverInterface):
                 a, b = self.solver_vars(lhs.args)
                 return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
             elif lhs.name == 'wsum':
-                w = lhs.args[0]
+                w = [int(wght) for wght in lhs.args[0]]
                 x = self.solver_vars(lhs.args[1])
                 return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
@@ -318,9 +323,9 @@ class CPM_choco(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse"]))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
 
         return cpm_cons
@@ -394,7 +399,11 @@ class CPM_choco(SolverInterface):
 
         # Comparisons: both numeric and boolean ones
         # numexpr `comp` bvar|const
+        # Choco accepts only int32, not int64
         elif isinstance(cpm_expr, Comparison):
+            for i in range(len(cpm_expr.args)):
+                if isinstance(cpm_expr.args[i], np.integer):
+                    cpm_expr.args[i] = int(cpm_expr.args[i])
             lhs = cpm_expr.args[0]
             rhs = cpm_expr.args[1]
 
@@ -561,7 +570,7 @@ class CPM_choco(SolverInterface):
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             # Choco does not allow to post True or False. Post "certainly True or False" constraints instead
-            if cpm_expr:
+            if cpm_expr.args[0] is True:
                 return self.chc_model.arithm(self.helper_var, ">=", 0)
             else:
                 return self.chc_model.arithm(self.helper_var, "<", 0)
