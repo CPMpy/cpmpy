@@ -86,7 +86,7 @@ class CPM_choco(SolverInterface):
 
         import pychoco as chc
 
-        assert (subsolver is None)
+        assert (subsolver is None), "Choco does not support any subsolver"
 
         # initialise the native solver objects
         self.chc_model = chc.Model()
@@ -570,7 +570,7 @@ class CPM_choco(SolverInterface):
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
             # Choco does not allow to post True or False. Post "certainly True or False" constraints instead
-            if cpm_expr:
+            if cpm_expr.args[0] is True:
                 return self.chc_model.arithm(self.helper_var, ">=", 0)
             else:
                 return self.chc_model.arithm(self.helper_var, "<", 0)
