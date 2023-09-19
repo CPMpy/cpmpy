@@ -332,8 +332,8 @@ def get_or_make_var(expr,expr_dict=None):
     """
     if expr_dict is None:
         expr_dict = dict()
-    if str(expr) in expr_dict:
-        return expr_dict[str(expr)], []
+    if expr in expr_dict:
+        return expr_dict[expr], []
     if __is_flat_var(expr):
         return (expr, [])
 
@@ -349,10 +349,10 @@ def get_or_make_var(expr,expr_dict=None):
             return flatexpr,flatcons
 
         bvar = _BoolVarImpl()
-        if str(flatexpr) in expr_dict:
-            return expr_dict[str(flatexpr)], []
+        if flatexpr in expr_dict:
+            return expr_dict[flatexpr], []
         else:
-            expr_dict[str(flatexpr)] = bvar
+            expr_dict[flatexpr] = bvar
         return (bvar, [flatexpr == bvar]+flatcons)
 
     else:
@@ -362,10 +362,10 @@ def get_or_make_var(expr,expr_dict=None):
 
         lb, ub = flatexpr.get_bounds()
         ivar = _IntVarImpl(lb, ub)
-        if str(flatexpr) in expr_dict:
-            return expr_dict[str(flatexpr)], []
+        if flatexpr in expr_dict:
+            return expr_dict[flatexpr], []
         else:
-            expr_dict[str(flatexpr)] = ivar
+            expr_dict[flatexpr] = ivar
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr,expr_dict=None):
@@ -380,7 +380,7 @@ def get_or_make_var_or_list(expr,expr_dict=None):
         flatvars, flatcons = zip(*[get_or_make_var(arg,expr_dict) for arg in expr])
         return (flatvars, [c for con in flatcons for c in con])
     else:
-        return get_or_make_var(expr,expr_dict)
+        return get_or_make_var(expr, expr_dict)
 
 
 def normalized_boolexpr(expr,expr_dict=None):
