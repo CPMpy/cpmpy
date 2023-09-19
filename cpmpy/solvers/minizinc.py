@@ -73,7 +73,6 @@ class CPM_minizinc(SolverInterface):
     @staticmethod
     def supported():
         # try to import the package
-        return False
         try:
             import minizinc
             return True
