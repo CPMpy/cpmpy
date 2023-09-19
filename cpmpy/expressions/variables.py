@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#-*- coding:utf-8 -*-
 ##
 ## variables.py
 ##
@@ -49,7 +49,7 @@
 import math
 import uuid
 from collections.abc import Iterable
-import warnings  # for deprecation warning
+import warnings # for deprecation warning
 from functools import reduce
 
 import numpy as np
@@ -115,7 +115,7 @@ def boolvar(shape=1, name=None):
         return _BoolVarImpl(name=name)
 
     # create base data
-    data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)])  # repeat new instances
+    data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -176,8 +176,7 @@ def intvar(lb, ub, shape=1, name=None):
         return _IntVarImpl(lb, ub, name=name)
 
     # create base data
-    data = np.array(
-        [_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)])  # repeat new instances
+    data = np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -219,7 +218,6 @@ class NullShapeError(Exception):
     """
     Error returned when providing an empty or size 0 shape for numpy arrays of variables
     """
-
     def __init__(self, shape, message="Shape should be non-zero"):
         self.shape = shape
         self.message = message
@@ -235,14 +233,12 @@ class _NumVarImpl(Expression):
 
     Abstract class, only mean to be subclassed
     """
-
     def __init__(self, lb, ub, name):
         assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
         self.lb = lb
         self.ub = ub
         self.name = name
-        self.id = uuid.uuid4()
         self._value = None
 
     def is_bool(self):
@@ -268,7 +264,7 @@ class _NumVarImpl(Expression):
     def __repr__(self):
         return self.name
 
-    # for sets/dicts. Because id's are unique, so is the str repr
+    # for sets/dicts. Use the unique ID
     def __hash__(self):
         # for backwards compatability
         if not hasattr(self, 'id'):
@@ -290,9 +286,9 @@ class _IntVarImpl(_NumVarImpl):
 
         if name is None:
             name = "IV{}".format(_IntVarImpl.counter)
-            _IntVarImpl.counter = _IntVarImpl.counter + 1  # static counter
+            _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
-        super().__init__(int(lb), int(ub), name=name)  # explicit cast: can be numpy
+        super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
     # special casing for intvars (and boolvars)
     def __abs__(self):
@@ -311,12 +307,12 @@ class _BoolVarImpl(_IntVarImpl):
     counter = 0
 
     def __init__(self, lb=0, ub=1, name=None):
-        assert (lb == 0 or lb == 1)
-        assert (ub == 0 or ub == 1)
+        assert(lb == 0 or lb == 1)
+        assert(ub == 0 or ub == 1)
 
         if name is None:
             name = "BV{}".format(_BoolVarImpl.counter)
-            _BoolVarImpl.counter = _BoolVarImpl.counter + 1  # static counter
+            _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
 
     def is_bool(self):
@@ -344,9 +340,8 @@ class NegBoolView(_BoolVarImpl):
 
         Do not create this object directly, use the `~` operator instead: `~bv`
     """
-
     def __init__(self, bv):
-        # assert(isinstance(bv, _BoolVarImpl))
+        #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
         # as it is always created using the ~ operator (only available for _BoolVarImpl)
         # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
@@ -382,7 +377,6 @@ class NDVarArray(np.ndarray, Expression):
 
     Do not create this object directly, use one of the functions in this module
     """
-
     def __init__(self, shape, **kwargs):
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
@@ -420,7 +414,7 @@ class NDVarArray(np.ndarray, Expression):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalfunctions import Element  # here to avoid circular
+        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
@@ -430,14 +424,14 @@ class NDVarArray(np.ndarray, Expression):
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
             # find dimension of expression in index
-            expr_dim = next(dim for dim, idx in enumerate(index) if isinstance(idx, Expression))
-            arr = self[tuple(index[:expr_dim])]  # select remaining dimensions
+            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
+            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
             index = index[expr_dim:]
 
             # calculate index for flat array
             flat_index = index[-1]
             for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim + 1:])
+                flat_index += idx * math.prod(arr.shape[dim+1:])
             # using index expression as single var for flat array
             return Element(arr.flatten(), flat_index)
 
@@ -453,13 +447,12 @@ class NDVarArray(np.ndarray, Expression):
     """
     make the given array the first dimension in the returned array
     """
-
     def __axis(self, axis):
 
         arr = self
 
         # correct type and value checks
-        if not isinstance(axis, int):
+        if not isinstance(axis,int):
             raise TypeError("Axis keyword argument in .sum() should always be an integer")
         if axis >= arr.ndim:
             raise ValueError("Axis out of range")
@@ -483,7 +476,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the sum over the whole array
+        if axis is None:    # simple case where we want the sum over the whole array
             arr = self.flatten()
             return Operator("sum", arr)
 
@@ -496,6 +489,7 @@ class NDVarArray(np.ndarray, Expression):
         # return the NDVarArray that contains the sum constraints
         return out
 
+
     def prod(self, axis=None, out=None):
         """
             overwrite np.prod(NDVarArray) as people might use it
@@ -503,7 +497,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the product over the whole array
+        if axis is None:    # simple case where we want the product over the whole array
             arr = self.flatten()
             return reduce(lambda a, b: a * b, arr)
 
@@ -524,7 +518,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the maximum over the whole array
+        if axis is None:    # simple case where we want the maximum over the whole array
             arr = self.flatten()
             return Maximum(arr)
 
@@ -545,7 +539,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the Minimum over the whole array
+        if axis is None:    # simple case where we want the Minimum over the whole array
             arr = self.flatten()
             return Minimum(arr)
 
@@ -570,7 +564,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the .any() over the whole array
+        if axis is None:    # simple case where we want the .any() over the whole array
             arr = self.flatten()
             return any(arr)
 
@@ -592,7 +586,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the .all() over the whole array
+        if axis is None:    # simple case where we want the .all() over the whole array
             arr = self.flatten()
             return all(arr)
 
@@ -608,10 +602,10 @@ class NDVarArray(np.ndarray, Expression):
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):
         if not isinstance(other, Iterable):
-            other = [other] * len(self)
+            other = [other]*len(self)
         # this is a bit cryptic, but it calls 'attr' on s with o as arg
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        return cpm_array([getattr(s, attr)(o) for s, o in zip(self, other)])
+        return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
 
     # VECTORIZED comparisons
     def __eq__(self, other):
@@ -710,12 +704,12 @@ class NDVarArray(np.ndarray, Expression):
     def implies(self, other):
         return self._vectorized(other, 'implies')
 
-    # in	  __contains__(self, value) 	Check membership
+    #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False
     # regardless of what you return in the __contains__ function
 
     # TODO?
-    # object.__matmul__(self, other)
+    #object.__matmul__(self, other)
 
 
 def _genname(basename, idxs):
@@ -731,4 +725,5 @@ def _genname(basename, idxs):
     if basename == None:
         return None
     stridxs = ",".join(map(str, idxs))
-    return f"{basename}[{stridxs}]"  # "<name>[<idx0>,<idx1>,...]"
+    return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
+
