@@ -376,7 +376,7 @@ class NegBoolView(_BoolVarImpl):
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
-class NDVarArray(Expression, np.ndarray):
+class NDVarArray(np.ndarray, Expression):
     """
     N-dimensional numpy array of variables.
 
