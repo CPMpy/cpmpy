@@ -251,22 +251,9 @@ def flatten_constraint(expr):
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
-
-            # Reification (double implication): Boolexpr == Var
-            if exprname == '==' and lexpr.is_bool():
-                if is_num(rexpr):
-                    # shortcut, full original one is normalizable BoolExpr
-                    # such as And(v1,v2,v3) == 0
-                    # TODO: should be normalized away in earlier transform
-                    (con, flatcons) = normalized_boolexpr(expr)
-                    newlist.append(con)
-                    newlist.extend(flatcons)
-                    continue
-                else:
-                    (lhs, lcons) = normalized_boolexpr(lexpr)
-            else:
-                # other cases: LHS is numexpr
-                (lhs, lcons) = normalized_numexpr(lexpr)
+            # in a comparison context we can treat lhs as a numexpr
+            # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
+            (lhs, lcons) = normalized_numexpr(lexpr)
 
             newlist.append(Comparison(exprname, lhs, rvar))
             newlist.extend(lcons)
@@ -486,8 +473,8 @@ def normalized_numexpr(expr):
 
     elif expr.is_bool():
         # unusual case, but its truth-value is a valid numexpr
-        # so reify and return the boolvar
-        return get_or_make_var(expr)
+        # so return the normalized boolexpr
+        return normalized_boolexpr(expr)
 
     elif isinstance(expr, Operator):
         # rewrite -a, const*a and a*const into a weighted sum, so it can be used as objective
