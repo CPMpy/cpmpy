@@ -82,7 +82,7 @@ import math
 import builtins
 import numpy as np
 
-from .normalize import toplevel_list, simplify_boolean
+from .normalize import toplevel_list, simplify_boolean, normalize_boolexpr
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
@@ -128,9 +128,7 @@ def flatten_constraint(expr):
     # for backwards compatibility reasons, we now consider it a meta-
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
-    lst_of_expr = toplevel_list(expr)               # ensure it is a list
-    lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
-    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
+    lst_of_expr = normalize_boolexpr(expr)
     for expr in lst_of_expr:
 
         if isinstance(expr, _BoolVarImpl):
@@ -147,52 +145,9 @@ def flatten_constraint(expr):
             if all(__is_flat_var(arg) for arg in expr.args):
                 newlist.append(expr)
                 continue
-            elif expr.name == 'or':
-                # rewrites that avoid auxiliary var creation, should go to normalize?
-                # in case of an implication in a disjunction, merge in
-                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
-                    newargs = list(expr.args)  # take copy
-                    for i,a in enumerate(newargs):
-                        if isinstance(a, Operator) and a.name == '->':
-                            newargs[i:i+1] = [~a.args[0],a.args[1]]
-                    # there could be nested implications
-                    newlist.extend(flatten_constraint(Operator('or', newargs)))
-                    continue
-                else:
-                    # check if disjunction contains conjunctions, and if so split out
-                    newexprs = None
-                    for i,a in enumerate(expr.args):
-                        if isinstance(a, Operator) and a.name == 'and':
-                            # can avoid aux var creation by splitting over the and
-                            newexprs = [Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args]
-                            break
-                    if newexprs is not None:
-                        newlist.extend(flatten_constraint(newexprs))
-                        continue
-
             elif expr.name == '->':
-                # some rewrite rules that avoid creating auxiliary variables
-                # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
-                if expr.args[1].name == 'and':
-                    a1s = expr.args[1].args
-                    a0 = expr.args[0]
-                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s]))
-                    continue
-                # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
-                elif expr.args[0].name == 'or':
-                    a0s = expr.args[0].args
-                    a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s]))
-                    continue
-                # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
-                elif expr.args[0].name == '->':
-                    a01,a02 = expr.args[0].args
-                    a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)]))
-                    continue
-
                 # ->, allows a boolexpr on one side
-                elif isinstance(expr.args[0], _BoolVarImpl):
+                if isinstance(expr.args[0], _BoolVarImpl):
                     # LHS is var, ensure RHS is normalized 'Boolexpr'
                     lhs,lcons = expr.args[0], ()
                     rhs,rcons = normalized_boolexpr(expr.args[1])
@@ -205,8 +160,6 @@ def flatten_constraint(expr):
                 newlist.extend(lcons)
                 newlist.extend(rcons)
                 continue
-
-
 
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
