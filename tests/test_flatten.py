@@ -213,9 +213,9 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
 
         # boolexpr as numexpr
-        self.assertEqual( str(flatten_constraint((a + b == 2) <= c)), "[(BV11) <= (IV2), ((IV0) + (IV1) == 2) == (BV11)]" )
+        self.assertEqual( str(flatten_constraint((a + b == 2) <= c)), '[((IV0) + (IV1) == 2) <= (IV2)]' )
 
         # != in boolexpr, bug #170
-        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])" )
+        self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV11) == (~BV0), [(IV0 == 1) == (BV11)])" )
         #simplify output
         self.assertEqual( str(normalized_boolexpr(Operator('not',[x]) == y)), "((~BV0) == (BV1), [])" )

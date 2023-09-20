@@ -1,6 +1,8 @@
 import copy
 
 import numpy as np
+import builtins
+
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
@@ -164,4 +166,60 @@ def simplify_boolean(lst_of_expr, num_context=False):
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)
+    return newlist
+
+
+def normalize_boolexpr(lst_of_expr):
+    from .negation import push_down_negation #circular import..
+    newlist = []
+    lst_of_expr = toplevel_list(lst_of_expr)  # ensure it is a list
+    lst_of_expr = push_down_negation(lst_of_expr)  # push negation into the arguments to simplify expressions
+    lst_of_expr = simplify_boolean(lst_of_expr)  # simplify boolean expressions, and ensure types are correct
+    for expr in lst_of_expr:
+        if isinstance(expr, Operator):
+            if expr.name == 'or':
+                # rewrites that avoid auxiliary var creation, should go to normalize?
+                # in case of an implication in a disjunction, merge in
+                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
+                    newargs = list(expr.args)  # take copy
+                    for i, a in enumerate(newargs):
+                        if isinstance(a, Operator) and a.name == '->':
+                            newargs[i:i + 1] = [~a.args[0], a.args[1]]
+                    # there could be nested implications
+                    newlist.extend(normalize_boolexpr(Operator('or', newargs)))
+                    continue
+                else:
+                    # check if disjunction contains conjunctions, and if so split out
+                    newexprs = None
+                    for i, a in enumerate(expr.args):
+                        if isinstance(a, Operator) and a.name == 'and':
+                            # can avoid aux var creation by splitting over the and
+                            newexprs = [Operator("or", expr.args[:i] + [e] + expr.args[i + 1:]) for e in a.args]
+                            break
+                    if newexprs is not None:
+
+                        newlist.extend(normalize_boolexpr(newexprs))
+                        continue
+
+            elif expr.name == '->':
+                # some rewrite rules that avoid creating auxiliary variables
+                # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
+                if expr.args[1].name == 'and':
+                    a1s = expr.args[1].args
+                    a0 = expr.args[0]
+                    newlist.extend(normalize_boolexpr([a0.implies(a1) for a1 in a1s]))
+                    continue
+                # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
+                elif expr.args[0].name == 'or':
+                    a0s = expr.args[0].args
+                    a1 = expr.args[1]
+                    newlist.extend(normalize_boolexpr([(~a1).implies(~a0) for a0 in a0s]))
+                    continue
+                # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
+                elif expr.args[0].name == '->':
+                    a01, a02 = expr.args[0].args
+                    a1 = expr.args[1]
+                    newlist.extend(normalize_boolexpr([(~a1).implies(a01), (~a1).implies(~a02)]))
+                    continue
+        newlist.append(expr)
     return newlist
