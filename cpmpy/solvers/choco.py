@@ -331,8 +331,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse"]))  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported=supported_reified | {"sum", "wsum"})  # constraints that support reification
         cpm_cons = only_bv_reifies(cpm_cons)
 
         return cpm_cons
@@ -411,8 +410,7 @@ class CPM_choco(SolverInterface):
             for i in range(len(cpm_expr.args)):
                 if isinstance(cpm_expr.args[i], np.integer):
                     cpm_expr.args[i] = int(cpm_expr.args[i])
-            lhs = cpm_expr.args[0]
-            rhs = cpm_expr.args[1]
+            lhs, rhs = cpm_expr.args
 
             if lhs.is_bool() and rhs.is_bool(): #boolean equality -- Reification
                 if isinstance(rhs, _NumVarImpl):
@@ -432,19 +430,19 @@ class CPM_choco(SolverInterface):
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
-                        raise Exception(f"Choco cannot accept min operation equal to: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.min(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
-                        raise Exception(f"Choco cannot accept max operation equal to: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.max(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
-                        raise Exception(f"Choco cannot accept absolute operation equal to: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'count':
                     arr, val = self.solver_vars(lhs)
@@ -459,14 +457,14 @@ class CPM_choco(SolverInterface):
                     elif isinstance(lhs.args[1], _NumVarImpl):
                         divisor = self.solver_var(lhs.args[1])  # use variable
                     else:
-                        raise Exception(f"Cannot accept division with the divisor being: {lhs.args[1]}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     # Choco needs result to be a variable
                     if isinstance(rhs, int):
                         result = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif isinstance(rhs, _NumVarImpl):
                         result = self.solver_var(rhs)  # use variable
                     else:
-                        raise Exception(f"Cannot accept division with the result being: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result)
                 elif lhs.name == 'element':
                     if isinstance(rhs, int):
@@ -474,7 +472,7 @@ class CPM_choco(SolverInterface):
                     elif isinstance(rhs, _NumVarImpl):
                         result = self.solver_var(rhs)  # use variable
                     else:
-                        raise Exception(f"Cannot accept the right hand side of the element constraint being: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.element(result, self.solver_vars(lhs.args[0]),
                                                   self.solver_var(lhs.args[1]))
                 elif lhs.name == 'mod':
@@ -488,7 +486,7 @@ class CPM_choco(SolverInterface):
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
-                        raise Exception(f"Choco cannot accept power operation equal to: {rhs}")
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
                                               chcrhs)
             raise NotImplementedError(
