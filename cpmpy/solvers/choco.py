@@ -229,9 +229,9 @@ class CPM_choco(SolverInterface):
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.chc_model.boolvar(name=str(cpm_var))
+                revar = self.chc_model.boolvar(name=str(cpm_var.name))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
+                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -283,8 +283,7 @@ class CPM_choco(SolverInterface):
                       wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
         """
 
-        lhs = cpm_expr.args[0]
-        rhs = cpm_expr.args[1]
+        lhs, rhs = cpm_expr.args
         op = cpm_expr.name
         if op == "==": op = "="  # choco uses "=" for equality
         if not isinstance(rhs,Expression): rhs = int(rhs)
@@ -385,17 +384,19 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == '->':
-                lhs = self.solver_var(cpm_expr.args[0]) # should always be boolvar due to only_bv_reifies
+                cond, subexpr = cpm_expr.args
+                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+                lhs = self.solver_var(cond) # should always be boolvar due to only_bv_reifies
                 # right hand side
-                if isinstance(cpm_expr.args[1], _BoolVarImpl):
+                if isinstance(subexpr, _BoolVarImpl):
                     # bv -> bv
                     # PyChoco does not have "implies" constraint
-                    return self.chc_model.or_([~lhs, self.solver_var(cpm_expr.args[1])])
+                    return self.chc_model.or_([~lhs, self.solver_var(subexpr)])
                 else:
                     # bv -> boolexpr
                     # the `reify_rewrite()` transformation ensures that only reifiable rhs remain here
-                    if cpm_expr.args[1].name == 'not':
-                        bv = self._get_constraint(cpm_expr.args[1].args[0]).reify()
+                    if subexpr.name == 'not':
+                        bv = self._get_constraint(subexpr.args[0]).reify()
                         return self.chc_model.or_([~lhs, ~bv])
                     else:
                         bv = self._get_constraint(cpm_expr.args[1]).reify()
