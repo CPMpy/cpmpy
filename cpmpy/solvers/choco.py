@@ -149,7 +149,11 @@ class CPM_choco(SolverInterface):
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                cpm_var._value = sol.get_int_val(self.solver_var(cpm_var))
+                value = sol.get_int_val(self.solver_var(cpm_var))
+                if isinstance(cpm_var, _BoolVarImpl):
+                    cpm_var._value = bool(value)
+                else:
+                    cpm_var._value = value
 
             # translate objective
             if self.has_objective():
@@ -194,7 +198,11 @@ class CPM_choco(SolverInterface):
             for sol in sols:
                 # map the solution to user vars
                 for cpm_var in self.user_vars:
-                    cpm_var._value = sol.get_int_val(self.solver_var(cpm_var))
+                    value = sol.get_int_val(self.solver_var(cpm_var))
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(value)
+                    else:
+                        cpm_var._value = value
                 # print the desired display
                 if isinstance(display, Expression):
                     print(display.value())
