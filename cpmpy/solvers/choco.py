@@ -536,7 +536,7 @@ class CPM_choco(SolverInterface):
                 if isinstance(demand, _NumVarImpl):
                     demand = self.solver_vars(demand)
                 else:
-                    demand = [self.chc_model.intvar(d, d) for d in demand]  # Create variables for demand
+                    demand = [self.chc_model.intvar(d, d) if is_num(d) else self.solver_var(d) for d in demand]  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 # Convert capacity to variable
