@@ -180,27 +180,10 @@ def flatten_constraint(expr):
             """
             exprname = expr.name  # so it can be modified
             lexpr, rexpr = expr.args
-            rewritten = False
-
-            # rewrite 'Var == Expr' to normalzed 'Expr == Var'
-            if (expr.name == '==' or expr.name == '!=') \
-                    and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
-                lexpr, rexpr = rexpr, lexpr
-                rewritten = True
-
-            # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            if exprname == '!=' and lexpr.is_bool() and rexpr.is_bool():
-                exprname = '=='
-                rexpr = ~rexpr
-                rewritten = True
 
             # already flat?
             if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
-                if not rewritten:
-                    newlist.append(expr)  # original
-                else:
-                    newlist.append(Comparison(exprname, lexpr, rexpr))
-                continue
+                newlist.append(expr)  # original
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)

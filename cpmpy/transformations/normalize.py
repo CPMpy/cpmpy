@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import builtins
 
+from cpmpy.transformations.flatten_model import __is_flat_var
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
@@ -221,5 +222,34 @@ def normalize_boolexpr(lst_of_expr):
                     a1 = expr.args[1]
                     newlist.extend(normalize_boolexpr([(~a1).implies(a01), (~a1).implies(~a02)]))
                     continue
+        elif isinstance(expr, Comparison):
+                    """
+            - Base Boolean equality: Var == Var                         (CPMpy class 'Comparison')
+                                     Var == Constant                    (CPMpy class 'Comparison')
+            - Numeric equality:  Numexpr == Var                    (CPMpy class 'Comparison')
+                                 Numexpr == Constant               (CPMpy class 'Comparison')
+            - Numeric disequality: Numexpr != Var                  (CPMpy class 'Comparison')
+                                   Numexpr != Constant             (CPMpy class 'Comparison')
+            - Numeric inequality (>=,>,<,<=,): Numexpr >=< Var     (CPMpy class 'Comparison')
+            - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
+                    """
+                    exprname = expr.name  # so it can be modified
+                    lexpr, rexpr = expr.args
+                    rewritten = False
+
+                    # rewrite 'Var == Expr' to normalzed 'Expr == Var'
+                    if (expr.name == '==' or expr.name == '!=') \
+                            and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                        lexpr, rexpr = rexpr, lexpr
+                        newlist.append(Comparison(exprname, lexpr, rexpr))
+                        continue
+
+                    # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+                    if exprname == '!=' and lexpr.is_bool() and rexpr.is_bool():
+                        exprname = '=='
+                        rexpr = ~rexpr
+                        newlist.append(Comparison(exprname, lexpr, rexpr))
+                        continue
+
         newlist.append(expr)
     return newlist
