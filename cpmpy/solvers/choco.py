@@ -300,6 +300,9 @@ class CPM_choco(SolverInterface):
 
         raise NotImplementedError("Choco: Not a known supported numexpr {}".format(cpm_expr))
 
+    def to_var(self, val):
+        return self.chc_model.intvar(val, val)  # convert to "variable"
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -366,7 +369,6 @@ class CPM_choco(SolverInterface):
         :type cpm_expr: Expression
 
         """
-        import pychoco as chc
         from pychoco.variables.intvar import IntVar
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -423,25 +425,25 @@ class CPM_choco(SolverInterface):
                 # NumExpr == IV, supported by Choco (thanks to `only_numexpr_equality()` transformation)
                 if lhs.name == 'min':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
-                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.min(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'max':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
-                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.max(chcrhs, self.solver_vars(lhs.args))
                 elif lhs.name == 'abs':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
-                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'count':
                     if isinstance(rhs, int):  # Choco does not accept an int in rhs
-                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(
                             f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
@@ -453,14 +455,14 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'div':
                     # Choco needs divisor to be a variable
                     if isinstance(lhs.args[1], int):
-                        divisor = self.chc_model.intvar(lhs.args[1], lhs.args[1])  # convert to "variable"
+                        divisor = self.to_var(lhs.args[1])  # convert to "variable"
                     elif isinstance(lhs.args[1], _NumVarImpl):
                         divisor = self.solver_var(lhs.args[1])  # use variable
                     else:
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     # Choco needs result to be a variable
                     if isinstance(rhs, int):
-                        result = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        result = self.to_var(rhs)  # convert to "variable"
                     elif isinstance(rhs, _NumVarImpl):
                         result = self.solver_var(rhs)  # use variable
                     else:
@@ -468,7 +470,7 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.div(self.solver_var(lhs.args[0]), divisor, result)
                 elif lhs.name == 'element':
                     if isinstance(rhs, int):
-                        result = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        result = self.to_var(rhs)  # convert to "variable"
                     elif isinstance(rhs, _NumVarImpl):
                         result = self.solver_var(rhs)  # use variable
                     else:
@@ -478,13 +480,13 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'mod':
                     divisor = lhs.args[1]
                     if not isinstance(rhs, _NumVarImpl): # if divisor is variable then result must be variable too
-                        rhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        rhs = self.to_var(rhs)  # convert to "variable"
                     else:
                         rhs = self.solver_vars(rhs)  # get choco variable
                     return self.chc_model.mod(self.solver_var(lhs.args[0]), self.solver_var(divisor), rhs)
                 elif lhs.name == 'pow':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
-                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                        chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
@@ -499,7 +501,7 @@ class CPM_choco(SolverInterface):
                 vars = self.solver_vars(cpm_expr.args)
                 for i in range(len(vars)):
                     if isinstance(vars[i], int):
-                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                        vars[i] = self.to_var(vars[i])  # convert to "variable"
                     elif not isinstance(vars[i], IntVar):
                         raise Exception(f"Choco cannot accept alldifferent with: {vars[i]}")
                 return self.chc_model.all_different(vars)
@@ -507,7 +509,7 @@ class CPM_choco(SolverInterface):
                 vars = self.solver_vars(cpm_expr.args)
                 for i in range(len(vars)):
                     if isinstance(vars[i], int):
-                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                        vars[i] = self.to_var(vars[i])  # convert to "variable"
                     elif not isinstance(vars[i], IntVar):
                         raise Exception(f"Choco cannot accept alldifferent_except0 with: {vars[i]}")
                 return self.chc_model.all_different_except_0(vars)
@@ -515,7 +517,7 @@ class CPM_choco(SolverInterface):
                 vars = self.solver_vars(cpm_expr.args)
                 for i in range(len(vars)):
                     if isinstance(vars[i], int):
-                        vars[i] = self.chc_model.intvar(vars[i], vars[i])  # convert to "variable"
+                        vars[i] = self.to_var(vars[i])  # convert to "variable"
                     elif not isinstance(vars[i], IntVar):
                         raise Exception(f"Choco cannot accept allequal with: {vars[i]}")
                 return self.chc_model.all_equal(vars)
@@ -533,31 +535,25 @@ class CPM_choco(SolverInterface):
                 # Convert demands to variables
                 if is_num(demand):  # Create list for demand per task
                     demand = [demand] * len(start)
-                if isinstance(demand, _NumVarImpl):
-                    demand = self.solver_vars(demand)
-                else:
-                    demand = [self.chc_model.intvar(d, d) if is_num(d) else self.solver_var(d) for d in demand]  # Create variables for demand
+                elif not isinstance(demand, IntVar):
+                    demand = [self.to_var(d) if is_num(d) else d for d in demand]  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 # Convert capacity to variable
                 # Choco needs result to be a variable
                 if isinstance(cap, int):
-                    capacity = self.chc_model.intvar(cap, cap)  # convert to "variable"
-                elif isinstance(cap, IntVar):
-                    capacity = self.solver_var(cap)  # use variable
-                else:
+                    cap = self.to_var(cap)  # convert to "variable"
+                elif not isinstance(cap, IntVar):
                     raise Exception(f"Choco cannot accept cumulative with the capacity being: {cap}")
-                return self.chc_model.cumulative(tasks, demand, capacity)
+                return self.chc_model.cumulative(tasks, demand, cap)
             elif cpm_expr.name == "circuit":
                 return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = self.solver_vars(cpm_expr.args)
                 for i in range(len(occ)):
                     if isinstance(occ[i], int):
-                        occ[i] = self.chc_model.intvar(occ[i], occ[i])  # convert to "variable"
-                    elif isinstance(occ[i], IntVar):
-                        occ[i] = occ[i]  # use variable
-                    else:
+                        occ[i] = self.to_var(occ[i])  # convert to "variable"
+                    elif not isinstance(occ[i], IntVar):
                         raise Exception(f"Choco cannot accept gcc including the following in the occurrences: {occ[i]}")
                 return self.chc_model.global_cardinality(vars, vals, occ)
             elif cpm_expr.name == 'inverse':
