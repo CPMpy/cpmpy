@@ -184,6 +184,7 @@ def flatten_constraint(expr):
             # already flat?
             if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
                 newlist.append(expr)  # original
+                continue
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
