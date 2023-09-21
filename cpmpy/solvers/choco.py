@@ -301,7 +301,8 @@ class CPM_choco(SolverInterface):
                 a, b = self.solver_vars(lhs.args)
                 return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
             elif lhs.name == 'wsum':
-                w = [int(wght) for wght in lhs.args[0]]
+                wgt, x = lhs.args
+                w = np.array(wgt).tolist()
                 x = self.solver_vars(lhs.args[1])
                 return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
