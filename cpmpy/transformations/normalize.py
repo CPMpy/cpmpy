@@ -5,7 +5,7 @@ import builtins
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
-from ..expressions.variables import NDVarArray
+from ..expressions.variables import NDVarArray, _NumVarImpl
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
 
@@ -233,7 +233,6 @@ def normalize_boolexpr(lst_of_expr):
                     """
                     exprname = expr.name  # so it can be modified
                     lexpr, rexpr = expr.args
-                    rewritten = False
 
                     # rewrite 'Var == Expr' to normalzed 'Expr == Var'
                     if (expr.name == '==' or expr.name == '!=') \

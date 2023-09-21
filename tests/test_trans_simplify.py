@@ -117,3 +117,5 @@ class TransSimplify(unittest.TestCase):
                          ('[(~BV5) -> (~BV1), (~BV5) -> (~BV3), (~BV0) -> (~BV1), (~BV0) -> (~BV3), '
                           '(~BV2) -> (~BV1), (~BV2) -> (~BV3)]'))
         self.assertEqual(str(normalize_boolexpr([(b.implies(c)).implies(f & a)])),('[(~BV5) -> (BV1), (~BV5) -> (~BV2), (~BV0) -> (BV1), (~BV0) -> (~BV2)]'))
+        #self.assertEqual(str(normalize_boolexpr([b == a + c])),'')
+        self.assertEqual(str(normalize_boolexpr([b + d == a + c])),'')
