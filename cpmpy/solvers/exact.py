@@ -592,9 +592,8 @@ class CPM_exact(SolverInterface):
         """
 
         cpm_vars = flatlist(cpm_vars)
-
         vals = flatlist(vals)
-        
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         try:
             pkg_resources.require("exact>=1.1.5")
             self.xct_solver.setSolutionHints(self.solver_vars(cpm_vars), vals)

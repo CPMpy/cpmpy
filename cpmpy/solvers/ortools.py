@@ -522,11 +522,8 @@ class CPM_ortools(SolverInterface):
         self.ort_model.ClearHints() # because add just appends
 
         cpm_vars = flatlist(cpm_vars)
-
         vals = flatlist(vals)
-
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
-
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.solver_var(cpm_var), val)
 

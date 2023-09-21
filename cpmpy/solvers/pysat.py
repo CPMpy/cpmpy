@@ -317,8 +317,8 @@ class CPM_pysat(SolverInterface):
         """
 
         cpm_vars = flatlist(cpm_vars)
-
         vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
 
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
