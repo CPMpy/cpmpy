@@ -253,18 +253,11 @@ class CPM_choco(SolverInterface):
         """
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
-        lb, ub= flat_obj.get_bounds()
-        obj = cpmpy.intvar(lb, ub)
-        obj_con = flat_obj == obj
-
-        # add constraint for objective variable
-        self += obj_con
+        obj_var = cpmpy.intvar(*expr.get_bounds())
+        self += obj_var == expr
 
         self.has_obj = True
-        self.obj = obj
+        self.obj = obj_var
         self.maximize_obj = not minimize  # Choco has as default to maximize
 
     def has_objective(self):
