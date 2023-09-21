@@ -39,6 +39,7 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .get_variables import get_variables
@@ -255,14 +256,16 @@ def only_positive_bv(lst_of_expr):
 
 def canonical_comparison(lst_of_expr):
 
+    lst_of_expr = toplevel_list(lst_of_expr)               # ensure it is a list
+
     newlist = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
 
+            # bring all vars to lhs
             if is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                # bring all vars to lhs
                 if isinstance(rhs, _NumVarImpl):
                     if isinstance(lhs, Operator) and lhs.name == "sum":
                         lhs, rhs = sum([1 * a for a in lhs.args] + [-1 * rhs]), 0
@@ -271,6 +274,24 @@ def canonical_comparison(lst_of_expr):
                     else:
                         raise ValueError(
                             f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
+                elif isinstance(rhs, Operator) and rhs.name == "sum":
+                    if isinstance(lhs, Operator) and lhs.name == "sum":
+                        lhs, rhs = sum([1 * a for a in lhs.args] + [-1 * b for b in rhs.args
+                                    if isinstance(b, _NumVarImpl)]), sum(b for b in rhs.args if is_num(b))
+                    elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                        lhs, rhs = lhs + [-1 * b for b in rhs.args
+                                    if isinstance(b, _NumVarImpl)], sum(b for b in rhs.args if is_num(b))
+                elif isinstance(rhs, Operator) and rhs.name == "wsum":
+                    if isinstance(lhs, Operator) and lhs.name == "sum":
+                        lhs, rhs = sum([1 * a for a in lhs.args] + [-a * b for a, b in zip(rhs.args[0], rhs.args[1])
+                                    if isinstance(b, _NumVarImpl)]), \
+                                   sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
+                                     if not isinstance(b, _NumVarImpl))
+                    elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                        lhs, rhs = lhs + sum([-a * b for a, b in zip(rhs.args[0], rhs.args[1])
+                                    if isinstance(b, _NumVarImpl)]), \
+                                   sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
+                                    if not isinstance(b, _NumVarImpl))
 
                 assert not is_num(lhs), "lhs cannot be an integer at this point!"
 
