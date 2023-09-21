@@ -445,6 +445,11 @@ class CPM_choco(SolverInterface):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'count':
+                    if isinstance(rhs, int):  # Choco does not accept an int in rhs
+                        chcrhs = self.chc_model.intvar(rhs, rhs)  # convert to "variable"
+                    elif not isinstance(rhs, _NumVarImpl):
+                        raise Exception(
+                            f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     arr, val = self.solver_vars(lhs)
                     return self.chc_model.count(val, arr, chcrhs)
                 elif lhs.name == 'mul':
