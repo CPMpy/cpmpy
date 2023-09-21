@@ -91,7 +91,6 @@ class CPM_choco(SolverInterface):
         # initialise the native solver objects
         self.chc_model = chc.Model()
         self.chc_solver = chc.Model().get_solver()
-        self.helper_var = self.chc_model.intvar(0, 0)
 
         # for the objective
         self.has_obj = False
@@ -571,8 +570,9 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, BoolVal):
             # Choco does not allow to post True or False. Post "certainly True or False" constraints instead
             if cpm_expr.args[0] is True:
-                return self.chc_model.arithm(self.helper_var, ">=", 0)
+                return None
             else:
+                self.helper_var = self.chc_model.intvar(0, 0)
                 return self.chc_model.arithm(self.helper_var, "<", 0)
 
         # a direct constraint, pass to solver
