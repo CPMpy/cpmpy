@@ -3,8 +3,6 @@ import copy
 import numpy as np
 import builtins
 
-from cpmpy.transformations.flatten_model import __is_flat_var
-
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
 from ..expressions.variables import NDVarArray
@@ -253,3 +251,9 @@ def normalize_boolexpr(lst_of_expr):
 
         newlist.append(expr)
     return newlist
+
+
+def __is_flat_var(arg):
+    """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
+    """
+    return is_num(arg) or isinstance(arg, _NumVarImpl)
