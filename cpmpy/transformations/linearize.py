@@ -270,7 +270,7 @@ def canonical_comparison(lst_of_expr):
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
                 elif isinstance(rhs, Operator) and rhs.name == "sum":
-                    lhs2, rhs = [-1 * b if isinstance(b, _NumVarImpl) else 1 * b for b in rhs.args
+                    lhs2, rhs = [-1 * b if isinstance(b, _NumVarImpl) else 1 * b.args[0] for b in rhs.args
                                  if isinstance(b, _NumVarImpl) or isinstance(b, Operator)], \
                                  sum(b for b in rhs.args if is_num(b))
                 elif isinstance(rhs, Operator) and rhs.name == "wsum":
@@ -278,7 +278,6 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
-
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
