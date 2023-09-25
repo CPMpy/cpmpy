@@ -1,6 +1,6 @@
 from ..expressions.core import Operator, Comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView
-from .reification import only_implies
+from .reification import only_bv_implies
 from .flatten_model import flatten_constraint
 """
   Converts the logical constraints into disjuctions using the tseitin transform,
@@ -32,7 +32,7 @@ def to_cnf(constraints):
         - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
     fnf = flatten_constraint(constraints)
-    fnf = only_implies(fnf)
+    fnf = only_bv_implies(fnf)
     return flat2cnf(fnf)
 
 def flat2cnf(constraints):

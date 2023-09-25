@@ -33,7 +33,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.linearize import linearize_constraint, only_positive_bv
-from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from ..transformations.reification import only_bv_implies, reify_rewrite
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
@@ -407,8 +407,7 @@ class CPM_exact(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
@@ -482,7 +481,7 @@ class CPM_exact(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
-            # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
+            # Comparisons: only numeric ones as 'only_bv_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(cpm_expr, Comparison):
                 lhs, rhs = cpm_expr.args

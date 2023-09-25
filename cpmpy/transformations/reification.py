@@ -19,64 +19,44 @@ from .negation import recurse_negation
   Using logical operations, they can be decomposed and rewritten to each other.
 
   This file implements:
-    - only_bv_reifies():    transforms all reifications to BV -> BE or BV == BE
-    - only_implies():       transforms all reifications to BV -> BE form
+    - only_bv_implies():    transforms all reifications to BV -> BE form
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
-def only_bv_reifies(constraints):
-    newcons = []
-    for cpm_expr in constraints:
-        if cpm_expr.name in ['->', "=="]:
-            a0, a1 = cpm_expr.args
-            if not isinstance(a0, _BoolVarImpl) and \
-                    isinstance(a1, _BoolVarImpl):
-                # BE -> BV :: ~BV -> ~BE
-                if cpm_expr.name == '->':
-                    newexpr = (~a1).implies(recurse_negation(a0))
-                    newexpr = only_bv_reifies(flatten_constraint(newexpr))
-                else:
-                    newexpr = [a1 == a0]  # BE == BV :: BV == BE
-                    if not a0.is_bool():
-                        newexpr = flatten_constraint(newexpr)
-                newcons.extend(newexpr)
-            else:
-                newcons.append(cpm_expr)
-        else:
-            newcons.append(cpm_expr)
-    return newcons
-
-def only_implies(constraints):
+def only_bv_implies(constraints):
     """
         Transforms all reifications to BV -> BE form
 
         More specifically:
-            BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
-                              :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
-                              :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
-            BV == BE :: ~BV -> ~BE, BV -> BE
+            BE -> BV :: ~BV -> ~BE
+            BE == BV :: ~BV -> ~BE, BV -> BE
 
-        Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
-        AFTER `flatten()` and 'only_bv_reifies()'.
+        Assumes all constraints are in 'flat normal form'. Hence only apply
+        AFTER `flatten()`
     """
     newcons = []
-
     for cpm_expr in constraints:
         # Operators: check BE -> BV
         if cpm_expr.name == '->':
             a0,a1 = cpm_expr.args
-            if isinstance(a1, Comparison) and \
+            if not isinstance(a0, _BoolVarImpl) and \
+                    isinstance(a1, _BoolVarImpl):
+                # BE -> BV :: ~BV -> ~BE
+                newexpr = (~a1).implies(recurse_negation(a0))
+                #newexpr = (~a1).implies(~a0)  # XXX when push_down_neg is separate, negated_normal no longer needed separately
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
+            elif isinstance(a1, Comparison) and \
                     a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
                 bv2,bv3 = a1.args
                 newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
-                newcons.extend(only_implies(flatten_constraint(newexpr)))
+                newcons.extend(only_bv_implies(flatten_constraint(newexpr)))
             else:
                 newcons.append(cpm_expr)
 
-        # Comparisons: transform bV == BE
+        # Comparisons: check BE == BV
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
             a0,a1 = cpm_expr.args
             if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
@@ -88,12 +68,12 @@ def only_implies(constraints):
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
             else:
-                # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a0).implies(recurse_negation(a1)), a0.implies(a1))
-                if isinstance(a1, GlobalConstraint):
+                # BE0 == BVar1 :: ~BVar1 -> ~BE0, BVar1 -> BE0
+                newexprs = ((~a1).implies(recurse_negation(a0)), a1.implies(a0))
+                if isinstance(a0, GlobalConstraint):
                     newcons.extend(newexprs)
                 else:
-                    newcons.extend(only_implies(only_bv_reifies(flatten_constraint(newexprs))))
+                    newcons.extend(only_bv_implies(flatten_constraint(newexprs)))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
