@@ -323,8 +323,8 @@ class CPM_choco(SolverInterface):
         supported_reified = {"alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
-        cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
         cpm_cons = reify_rewrite(cpm_cons, supported=supported_reified | {"sum", "wsum"})  # constraints that support reification
         cpm_cons = only_bv_reifies(cpm_cons)
