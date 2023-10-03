@@ -106,12 +106,8 @@ class CPM_scip(SolverInterface):
             raise Exception("SCIP: solution callback not (yet?) implemented")
 
         # call the solver, with parameters
-        #for param, val in kwargs.items():
-        #    self.scip_model.setParam(param, val)
         self.scip_model.setParams(kwargs)
-
         _ = self.scip_model.optimize()
-        scip_objective = self.scip_model.getObjective()
 
         scip_status = self.scip_model.getStatus()
 
