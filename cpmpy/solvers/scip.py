@@ -321,13 +321,13 @@ class CPM_scip(SolverInterface):
                     self.scip_model.addCons(sciplhs == sciprhs)
 
                 elif lhs.name == 'mul':
-                    assert len(lhs.args) == 2, "scip only supports multiplication with 2 variables"
-                    a, b = self.solver_vars(lhs.args)
-                    #self.scip_model.setParam("NonConvex", 2)  # gurobi leftover
-                    self.scip_model.addCons(a * b == sciprhs)
+                    scp_vars = self.solver_vars(lhs.args)
+                    scp_lhs = scp_vars[0] * scp_vars[1]
+                    for v in scp_vars[2:]:
+                        scp_lhs *= v
+                    self.scip_model.addCons(scp_lhs == sciprhs)
 
                 elif lhs.name == 'div':
-                    assert is_num(lhs.args[1]), "scip only supports division by constants"
                     a, b = self.solver_vars(lhs.args)
                     self.scip_model.addCons(a / b == sciprhs)
 
