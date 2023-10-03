@@ -150,7 +150,7 @@ class CPM_scip(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if self.has_objective():
-                self.objective_value_ = scip_objective.getObjVal()
+                self.objective_value_ = self.scip_model.getObjVal()
 
         self.scip_model.freeTransform()  # Mark Turner from SCIP told me you need to do this if you want to support adding additional vars/constraints later...
 
