@@ -119,20 +119,23 @@ class CPM_scip(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.scip_model.getSolvingTime()
 
+        unknown_stati = {"unknown", "userinterrupt", "unbounded", "inforunbd", "terminate"}
+
         # translate exit status
         if scip_status == "optimal":
             if self.has_objective():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif scip_status == "infeasible":
+        elif scip_status == "infeasible": # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif scip_status.endswith("limit"):  # timelimit, nodelimit, ...
+        elif self.scip_model.getSols() > 0: # at least one feasible solution found, not proven optimal
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif scip_status == "unknown":
+        elif scip_status.endswith("limit"): # some limit was reached
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        # TODO: "userinterrupt" and check if there is a solution?
-        else: # there are many more, e.g. one for each limit
+        elif scip_status in unknown_stati:
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        else:
             raise NotImplementedError(
                 f"Translation of scip status {scip_status} to CPMpy status not implemented")  # a non-mapped status type, please report on github
 
