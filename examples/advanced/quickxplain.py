@@ -1,6 +1,7 @@
 """
     CPMpy implementation of the QuickXplain algorithm by Junker.
         Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
+        https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
 """
 
 import cpmpy as cp
@@ -15,10 +16,10 @@ def quickXplain(soft, hard=[], order=lambda x : 0, solver="ortools"):
         Constraints with lower order are preferred to ones with higher order
 
         :param: soft: soft constraints, list of expressions
-        :param: hard: hard constraints, optional, list of expressions
+        :param: hard: hard constraints which cannot be relaxed, optional, list of expressions
         :param: order: optional function to compute order of constraints
         :param: solver: name of a solver, see SolverLookup.solvernames()
-            "z3" and "gurobi" are incremental, "ortools" restarts the solver
+            "z3", "pysat" and "gurobi" are incremental, "ortools" restarts the solver
     """
 
     soft = toplevel_list(soft, merge_and=False)
