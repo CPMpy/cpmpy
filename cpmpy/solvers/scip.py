@@ -260,7 +260,7 @@ class CPM_scip(SolverInterface):
         supported = {"alldifferent"}  # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum','sub']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub", "mul", "div"})) # the core of the MIP-linearization
@@ -348,26 +348,29 @@ class CPM_scip(SolverInterface):
 
             lhs, rhs = sub_expr.args
             assert isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum", f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
+            assert is_num(rhs), f"linearize should only leave constants on rhs of comparison but got {rhs}"
 
-            if sub_expr.name == "<=":  # XXX, docs say only this one?
-                lin_expr = self._make_numexpr(lhs)
-                if isinstance(cond, NegBoolView):
-                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs),
-                                                     binvar=self.solver_var(cond._bv), activeone=False)
-                else:
-                    self.scip_model.addConsIndicator(lin_expr <= self.solver_var(rhs),
-                                                     binvar=self.solver_var(cond), activeone=True)
-
-            elif sub_expr.name == ">=": # change sign
+            if sub_expr.name == ">=":  # change sign
                 if lhs.name == "sum":
-                    lhs = Operator("wsum", [[-1]*len(lhs.args), lhs.args])
+                    lhs = Operator("wsum", [[-1] * len(lhs.args), lhs.args])
                 elif lhs.name == "wsum":
                     lhs = Operator("wsum", [[-w for w in lhs.args[0]], lhs.args[1]])
                 else:
-                    lhs = -lhs
-                self += cond.implies(lhs <= -rhs)
+                    lhs = Operator("wsum",[[-1], [lhs]])
+                sub_expr = lhs <= -rhs
+
+            if sub_expr.name == "<=":
+                lhs, rhs = sub_expr.args
+                lin_expr = self._make_numexpr(lhs)
+                if isinstance(cond, NegBoolView):
+                    self.scip_model.addConsIndicator(lin_expr <= rhs,
+                                                     binvar=self.solver_var(cond._bv), activeone=False)
+                else:
+                    self.scip_model.addConsIndicator(lin_expr <= rhs,
+                                                     binvar=self.solver_var(cond), activeone=True)
 
             elif sub_expr.name == "==": # split into <= and >=
+                # TODO: refactor to avoid re-transforming constraints?
                 self += [cond.implies(lhs <= rhs), cond.implies(lhs >= rhs)]
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
