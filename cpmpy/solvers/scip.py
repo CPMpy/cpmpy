@@ -285,7 +285,6 @@ class CPM_scip(SolverInterface):
 
         :return: self
       """
-      import pyscipopt as scip
 
       # add new user vars to the set
       get_variables(cpm_expr_orig, collect=self.user_vars)
