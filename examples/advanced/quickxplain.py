@@ -46,7 +46,7 @@ def recurse_explain(soft, hard, delta, order, dmap, solver):
 
     soft = sorted(soft, key=lambda a : order(dmap[a]))
     split = len(soft) // 2 # determine split point
-    more_preffered, less_preffered = soft[:split], soft[split:] # split constraints into two sets
+    more_preferred, less_preferred = soft[:split], soft[split:] # split constraints into two sets
 
     # treat more preferred part as hard and find extra constants from less preferred
     delta2 = recurse_explain(less_preffered, hard+more_preffered, more_preffered, order=order, dmap=dmap, solver=solver)
