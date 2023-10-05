@@ -430,29 +430,19 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        args = self.args
-        if len(args) == 2:
-            return sum(args) == 1
+        # there are multiple decompositions possible
+        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
+        # mod or div is not linearizable, so here we have to use a different one
+        if len(self.args) == 2:
+            return sum(self.args) == 1
 
-        return [(sum(args) % 2) == 1], []
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-def decompose_linear(self):
-    # there are multiple decompositions possible
-    # sum(args) mod 2 == 1, for size 2: sum(args) == 1
-    # mod or div is not linearizable, so here we have to use a different one
-
-    args = self.args
-    if len(args) == 2:
-        return [sum(args) == 1], []
-
-    a0, a1 = args[:2]
-    cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
-
-    # for more than 2 variables, we cascade (decomposed) xors
-    for arg in self.args[2:]:
-        cons = (cons | arg) & (~cons | ~arg)
-
-    return [cons], []
+        # for more than 2 variables, we cascade (decomposed) xors
+        for arg in self.args[2:]:
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons], []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
