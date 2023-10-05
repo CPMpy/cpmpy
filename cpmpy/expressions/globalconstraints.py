@@ -434,7 +434,7 @@ class Xor(GlobalConstraint):
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # mod or div is not linearizable, so here we have to use a different one
         if len(self.args) == 2:
-            return sum(self.args) == 1
+            return [sum(self.args) == 1], []
 
         a0, a1 = self.args[:2]
         cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
