@@ -145,6 +145,18 @@ class GlobalConstraint(Expression):
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
+    def decompose_linear(self):
+        '''
+
+        Returns a decomposition suitable for linearization.
+        This only needs to be implemented when there is a significant performance differential between decompositions
+        used for linear and non-linear solvers.
+
+        '''
+
+        #if not implemented return normal decomposition
+        return self.decompose()
+
     def get_bounds(self):
         """
         Returns the bounds of a Boolean global constraint.
@@ -169,6 +181,30 @@ class AllDifferent(GlobalConstraint):
         """Returns the decomposition
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
+
+    def decompose_linear(self):
+        """
+        More efficient implementations possible
+        http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
+        This method avoids bounds computation
+        Introduces n^2 new boolean variables
+        """
+        # TODO check performance of implementation
+        # Boolean variables
+        args = self.args
+        lbs, ubs = zip(*[get_bounds(arg) for arg in args])
+        lb = min(lbs)
+        ub = max(ubs)
+        # Linear decomposition of alldifferent using bipartite matching
+        sigma = boolvar(shape=(len(args), 1 + ub - lb))
+
+        constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
+        constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
+
+        for arg, row in zip(args, sigma):
+            constraints += [sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0]
+
+        return constraints
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
@@ -394,16 +430,29 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        # there are multiple decompositions possible
-        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
-        # since Xor is logical constraint, the default is a logic decomposition
-        a0, a1 = self.args[:2]
-        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
+        args = self.args
+        if len(args) == 2:
+            return sum(args) == 1
 
-        # for more than 2 variables, we cascade (decomposed) xors
-        for arg in self.args[2:]:
-            cons = (cons | arg) & (~cons | ~arg)
-        return [cons], []
+        return [(sum(args) % 2) == 1], []
+
+def decompose_linear(self):
+    # there are multiple decompositions possible
+    # sum(args) mod 2 == 1, for size 2: sum(args) == 1
+    # mod or div is not linearizable, so here we have to use a different one
+
+    args = self.args
+    if len(args) == 2:
+        return [sum(args) == 1], []
+
+    a0, a1 = args[:2]
+    cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
+
+    # for more than 2 variables, we cascade (decomposed) xors
+    for arg in self.args[2:]:
+        cons = (cons | arg) & (~cons | ~arg)
+
+    return [cons], []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
