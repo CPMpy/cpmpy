@@ -155,6 +155,41 @@ class TestGlobal(unittest.TestCase):
 
         self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
 
+    def test_linear_circuit(self):
+        from cpmpy.transformations.decompose_global import decompose_in_tree
+        x = cp.intvar(lb=0, ub=2, shape=3)
+        circuit = decompose_in_tree([cp.Circuit(x)],linear=True)
+
+        notcircuit = decompose_in_tree([~cp.Circuit(x)],linear=True)
+
+
+        (cp.Model([circuit, notcircuit]).solve())
+        print(x.value())
+        self.assertFalse(cp.Model([circuit, notcircuit]).solve())
+
+        circuit_sols = set()
+        not_circuit_sols = set()
+
+        circuit_models = cp.Model(circuit).solveAll(display=lambda: circuit_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(notcircuit).solveAll(display=lambda: not_circuit_sols.add(tuple(x.value())))
+
+        total = cp.Model(x == x).solveAll()
+
+        for sol in circuit_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertTrue(cp.Circuit(x).value())
+
+        for sol in not_circuit_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertFalse(cp.Circuit(x).value())
+
+        self.assertEqual(len(circuit_sols),1)
+        self.assertEqual(len(not_circuit_sols),2)
+
+        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+
 
     def test_inverse(self):
         # Arrays

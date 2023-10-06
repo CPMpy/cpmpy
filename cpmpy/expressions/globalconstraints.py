@@ -284,6 +284,38 @@ class Circuit(GlobalConstraint):
 
         return constraining, defining
 
+    def decompose_linear(self):
+        """
+            Decomposition inspired by Miller-Tucker-Zemlin formulation for TSPs
+        """
+        succ = self.args
+        n = len(succ)
+        order = intvar(0, n - 1, shape=n, name="order")  # indicates the order of the stops
+        x = boolvar(shape=(n, n), name="x")  # indicates if we go from stop i to j
+
+        constraining = []
+        defining = []
+        defining += [AllDifferent(order)]
+        defining += [sum(row) == 1 for row in x] #every stop only has one successor
+        constraining += [sum(col) == 1 for col in x.T] #every stop only has one predecessor
+        constraining += [succ[n-1] == 0] # symmetry breaking, last one is '0'
+        defining += [order[0] == 0] # symmetry breaking, last one is '0'
+
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    constraining += [x[i, j] <= 0]  # cannot go from and to the same city
+                else:
+                    defining += [x[i, j].implies(succ[i] == j)]  # link to `succ` variables
+                if j != 0:
+                    defining += [
+                        x[i, j].implies(-1 * order[i] + 1 * order[j] == 1)]  # eliminate subcircuits from solution
+                else:
+                    constraining += [x[i,j].implies(order[i] == n - 1)] #the node that goes back to 0 is the last node, and therefor has the largest order_nb, being n - 1
+                    pass
+
+        return constraining, defining
+
     def value(self):
         pathlen = 0
         idx = 0
