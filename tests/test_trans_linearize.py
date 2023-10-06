@@ -228,14 +228,12 @@ class testCanonical_comparison(unittest.TestCase):
 
         cons = [cond.implies(Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs)]
         cons = canonical_comparison(cons)[0]
-        #if we make canonical comparison recursive:
-        #self.assertEqual("(bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
-        self.assertEqual("(bv) -> (sum([1, 2, 3, -1] * [a, b, c, 10]) <= 5)", str(cons))
+        self.assertEqual("(bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
+
 
         cons = [(~cond).implies(Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs)]
         cons = canonical_comparison(cons)[0]
-        #recursive: self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
-        self.assertEqual("(~bv) -> (sum([1, 2, 3, -1] * [a, b, c, 10]) <= 5)", str(cons))
+        self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
 
     def test_others(self):
 
