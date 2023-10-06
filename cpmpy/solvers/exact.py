@@ -37,6 +37,8 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
+from ..expressions.utils import flatlist
+
 import numpy as np
 import numbers
 
@@ -589,6 +591,10 @@ class CPM_exact(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         try:
             pkg_resources.require("exact>=1.1.5")
             self.xct_solver.setSolutionHints(self.solver_vars(cpm_vars), vals)

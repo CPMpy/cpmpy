@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -521,6 +521,10 @@ class CPM_ortools(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         self.ort_model.ClearHints() # because add just appends
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.solver_var(cpm_var), val)
 
