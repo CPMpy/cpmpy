@@ -277,6 +277,12 @@ class Inverse(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         assert len(fwd) == len(rev)
+        lbs, ubs = zip(*[get_bounds(arg) for arg in flatargs])
+        lb = min(lbs)
+        ub = max(ubs)
+        if lb < 0 or ub >= len(fwd):
+            raise TypeError("All arguments must be within array bounds for Inverse to have meaning over the whole domain!")
+
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
