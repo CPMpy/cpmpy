@@ -281,7 +281,7 @@ class TestGlobal(unittest.TestCase):
         iv = cp.intvar(-8, 8, 3)
         idx = cp.intvar(-8, 8)
         # test directly the constraint
-        #self.assertRaises(TypeError,cons = cp.Element(iv,idx) == 8)
+        self.assertRaises(TypeError, cp.Element, iv,idx)
         idx = cp.intvar(0,2)
         cons = cp.Element(iv, idx) == 8
         model = cp.Model(cons)
@@ -557,13 +557,15 @@ class TestTypeChecks(unittest.TestCase):
         #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
 
     def test_circuit(self):
-        x = cp.intvar(-8, 8)
+        x = cp.intvar(-2, 0)
         y = cp.intvar(-7, -1)
         b = cp.boolvar()
         a = cp.boolvar()
+        self.assertRaises(TypeError, cp.Circuit,x+2,3,0)
         self.assertTrue(cp.Model([cp.Circuit(x+2,2,0)]).solve())
         self.assertRaises(TypeError,cp.Circuit,(a,b))
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
+
 
     def test_inverse(self):
         x = cp.intvar(-8, 8)

@@ -215,6 +215,12 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
+        lbs, ubs = zip(*[get_bounds(arg) for arg in flatargs])
+        lb = min(lbs)
+        ub = max(ubs)
+        if lb < 0 or ub >= len(flatargs):
+            raise TypeError("Circuit global constraint is only defined if all bounds are between 0 and the length of the array.")
+
         super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
