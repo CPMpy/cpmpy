@@ -185,8 +185,8 @@ class TestGlobal(unittest.TestCase):
                 var._value = val
             self.assertFalse(cp.Circuit(x).value())
 
-        self.assertEqual(len(circuit_sols),1)
-        self.assertEqual(len(not_circuit_sols),2)
+        self.assertEqual(len(circuit_sols),2)
+        self.assertEqual(len(not_circuit_sols),5)
 
         self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
 
