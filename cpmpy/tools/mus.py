@@ -141,5 +141,5 @@ def quickxplain(soft, hard=[], solver="ortools"):
     solver_core = set(m.get_core())
     max_idx = max(i for i,a in enumerate(assump) if a in solver_core)
 
-    core = do_recursion(list(assump)[:max_idx], [], [])
+    core = do_recursion(list(assump)[:max_idx+1], [], [])
     return [dmap[a] for a in core]
