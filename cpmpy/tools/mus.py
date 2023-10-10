@@ -6,10 +6,11 @@ https://github.com/pysathq/pysat/blob/master/examples/musx.py
 
 """
 import numpy as np
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
+
 
 def mus(soft, hard=[], solver="ortools"):
     """
@@ -36,28 +37,28 @@ def mus(soft, hard=[], solver="ortools"):
     # order so that constraints with many variables are tried and removed first
     candidates = sorted(soft, key=lambda c: -len(get_variables(c)))
 
-    assump = boolvar(shape=len(soft), name="assump")
+    assump = cp.boolvar(shape=len(soft), name="assump")
     if len(soft) == 1:
         assump = NDVarArray(shape=1, dtype=object, buffer=np.array([assump]))
 
-    m = Model(hard+[assump.implies(candidates)]) # each assumption variable implies a candidate
-    s = SolverLookup.get(solver, m)
+    m = cp.Model(hard + [assump.implies(candidates)])  # each assumption variable implies a candidate
+    s = cp.SolverLookup.get(solver, m)
     assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
 
     mus = []
-    core = sorted(s.get_core()) # start from solver's UNSAT core
+    core = sorted(s.get_core())  # start from solver's UNSAT core
     for i in range(len(core)):
-        subassump = mus + core[i+1:]  # check if all but 'i' makes constraints SAT
-        
+        subassump = mus + core[i + 1:]  # check if all but 'i' makes constraints SAT
+
         if s.solve(assumptions=subassump):
             # removing it makes it SAT, must keep for UNSAT
             mus.append(core[i])
         # else: still UNSAT so don't need this candidate
-    
+
     # create dictionary from assump to candidate
-    dmap = dict(zip(assump,candidates))
+    dmap = dict(zip(assump, candidates))
     return [dmap[assump] for assump in mus]
-    
+
 
 def mus_naive(soft, hard=[], solver="ortools"):
     """
