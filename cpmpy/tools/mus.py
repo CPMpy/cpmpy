@@ -92,3 +92,54 @@ def mus_naive(soft, hard=[], solver="ortools"):
         # else: still UNSAT so don't need this candidate
 
     return mus
+
+
+def quickxplain(soft, hard=[], solver="ortools"):
+    """
+        CPMpy implementation of the QuickXplain algorithm by Junker:
+            Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
+            https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
+
+        Find a preferred minimal unsatisfiable subset of constraints
+        A partial order is imposed on the constraints using the order of `soft`.
+        Constraints with lower index are preferred over ones with higher index
+    """
+
+    soft = toplevel_list(soft, merge_and=False)
+
+    assump = cp.boolvar(shape=len(soft), name="assump")
+    if len(soft) == 1:
+        assump = NDVarArray(shape=1, dtype=object, buffer=np.array([assump]))
+
+    m = cp.SolverLookup.get(solver, cp.Model(hard))
+    m += assump.implies(soft)
+
+    assert m.solve(assumptions=assump) is False, "The model should be UNSAT!"
+    dmap = dict(zip(assump, soft))
+
+    # the recursive call
+    def do_recursion(soft, hard, delta):
+
+        if len(delta) != 0 and m.solve(assumptions=hard) is False:
+            # conflict is in hard constraints, no need to recurse
+            return []
+
+        if len(soft) == 1:
+            # conflict is not in hard constraints, but only 1 soft constraint
+            return list(soft)  # base case of recursion
+
+        split = len(soft) // 2  # determine split point
+        more_preferred, less_preferred = soft[:split], soft[split:]  # split constraints into two sets
+
+        # treat more preferred part as hard and find extra constants from less preferred
+        delta2 = do_recursion(less_preferred, hard + more_preferred, more_preferred)
+        # find which preferred constraints exactly
+        delta1 = do_recursion(more_preferred, hard + delta2, delta2)
+        return delta1 + delta2
+
+    # optimization: find max index of solver core
+    solver_core = set(m.get_core())
+    max_idx = max(i for i,a in enumerate(assump) if a in solver_core)
+
+    core = do_recursion(list(assump)[:max_idx], [], [])
+    return [dmap[a] for a in core]
