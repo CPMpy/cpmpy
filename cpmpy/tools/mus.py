@@ -77,18 +77,18 @@ def mus_naive(soft, hard=[], solver="ortools"):
     # ensure toplevel list
     soft = toplevel_list(soft, merge_and=False)
 
-    m = Model(hard+soft)
+    m = cp.Model(hard + soft)
     assert not m.solve(solver=solver), "MUS: model must be UNSAT"
 
     mus = []
     # order so that constraints with many variables are tried and removed first
     core = sorted(soft, key=lambda c: -len(get_variables(c)))
     for i in range(len(core)):
-        subcore = mus + core[i+1:]  # check if all but 'i' makes core SAT
-        
-        if Model(hard+subcore).solve(solver=solver):
+        subcore = mus + core[i + 1:]  # check if all but 'i' makes core SAT
+
+        if cp.Model(hard + subcore).solve(solver=solver):
             # removing it makes it SAT, must keep for UNSAT
             mus.append(core[i])
         # else: still UNSAT so don't need this candidate
-    
+
     return mus
