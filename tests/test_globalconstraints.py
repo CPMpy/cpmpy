@@ -157,7 +157,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_linear_circuit(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
-        x = cp.intvar(lb=0, ub=2, shape=3)
+        x = cp.intvar(lb=0, ub=3, shape=3)
         circuit = decompose_in_tree([cp.Circuit(x)],linear=True)
 
         notcircuit = decompose_in_tree([~cp.Circuit(x)],linear=True)
@@ -170,8 +170,8 @@ class TestGlobal(unittest.TestCase):
         circuit_sols = set()
         not_circuit_sols = set()
 
-        circuit_models = cp.Model(circuit).solveAll(display=lambda: circuit_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(notcircuit).solveAll(display=lambda: not_circuit_sols.add(tuple(x.value())))
+        cp.Model(circuit).solveAll(display=lambda: circuit_sols.add(tuple(x.value())))
+        cp.Model(notcircuit).solveAll(display=lambda: not_circuit_sols.add(tuple(x.value())))
 
         total = cp.Model(x == x).solveAll()
 
@@ -186,8 +186,6 @@ class TestGlobal(unittest.TestCase):
             self.assertFalse(cp.Circuit(x).value())
 
         self.assertEqual(len(circuit_sols),2)
-        self.assertEqual(len(not_circuit_sols),5)
-
         self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
 
 

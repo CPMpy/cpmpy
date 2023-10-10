@@ -291,35 +291,34 @@ class Circuit(GlobalConstraint):
         """
         succ = self.args
         n = len(succ)
-        order = intvar(0, n - 1, shape=n, name="order")  # indicates the order of the stops
-        x = boolvar(shape=(n, n), name="x")  # indicates if we go from stop i to j
+        x = boolvar(shape=(n, n), name="x")  # x[i,j] indicates if we go from stop i to j
+        r = boolvar(shape=(n, n), name="r")  # r[k,j] indicates if we will reach j in k steps, and only in k steps
+        u = boolvar(shape=n, name="u")  # u[i] indicates that only one node goes to i
 
         constraining = []
         defining = []
-        constraining += [AllDifferent(order)]
-        defining += [sum(row) <= 1 for row in x] #every stop only has one successor
-        constraining += [sum(col) == 1 for col in x.T] #every stop only has one predecessor
-        defining += [order[0] == 0] # symmetry breaking, last one is '0'
+        constraining += [sum(row) == 1 for row in r] #every step we only reach one stop
+        constraining += [sum(col) == 1 for col in r.T] #every stop is only visited once
+
 
         for i in range(n):
+            defining += [u[i] == (sum(x.T[i]) == 1)]
+            # if 0 goes to i, and nothing elso goes to i then i is only reached at step 0
+            defining += [(u[i] & (x[0,i])).implies(r[0,i])]
+            # if 0 does not go to i, then i is not reachable at step 0
+            defining += [(~x[0,i]).implies(~r[0,i])]
+            #if i is not uniquely reached, column i of r must be 0
+            defining += [(~u[i]).implies(sum(r.T[i]) == 0)]
             for j in range(n):
-                if i == j:
-                    defining += [x[i, j] <= 0]  # cannot go from and to the same city
-                else:
-                    defining += [x[i, j].implies(succ[i] == j)]  # link to `succ` variables
-                    defining += [(succ[i] == j).implies(x[i, j])]  # link to `succ` variables
-                if j != 0:
-                    if i != j:
-                        defining += [
-                        x[i, j].implies(order[i] <= order[j])]  # eliminate subcircuits from solution
-                    else:
-                        pass
-                        #defining += [x[i,j].implies(order[i] == i)] #symmetry breaking for negated circuits
-                elif j == 0:
-                    constraining += [x[i,j].implies(order[i] == n - 1)] #the node that goes back to 0 is the last node, and therefor has the largest order_nb, being n - 1
-                    pass
-
+                defining += [x[i,j] == (succ[i] == j)] #definition of connection graph x
+                for k in range(n-1):
+                    # definition of reachability graph
+                    # if you can reach j at step k, and only j connects to i, then you can reach i at step k + 1
+                    defining += [((r[k,j]) & (x[j,i]) & (u[i])).implies(r[k+1,i])]
+                    #if j connects to i, but j is not reachable in step k-1, then i is not reachable at step k, or multiple nodes go to i.
+                    defining += [(x[j,i] & (~r[k,j])).implies(~r[k+1,i])]
         return constraining, defining
+
 
     def value(self):
         pathlen = 0
