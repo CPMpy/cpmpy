@@ -34,12 +34,13 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_int
+from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_bv_implies
+from ..transformations.reification import only_implies, only_bv_reifies
+
 
 class CPM_pysat(SolverInterface):
     """
@@ -230,7 +231,8 @@ class CPM_pysat(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
@@ -258,7 +260,7 @@ class CPM_pysat(SolverInterface):
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
-        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_implies
+        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
             a0,a1 = cpm_expr.args
 
             # BoolVar() -> BoolVar()
@@ -314,6 +316,11 @@ class CPM_pysat(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
             lit = self.solver_var(cpm_var)
