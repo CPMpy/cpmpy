@@ -261,10 +261,18 @@ def canonical_comparison(lst_of_expr):
     newlist = []
     for cpm_expr in lst_of_expr:
 
+        if isinstance(cpm_expr, Operator) and cpm_expr.name == '->':    # half reification of comparison
+            lhs, rhs = cpm_expr.args
+            if isinstance(rhs, Comparison):
+                rhs = canonical_comparison(rhs)[0]
+                newlist.append(lhs.implies(rhs))
+            elif isinstance(lhs, Comparison):
+                lhs = canonical_comparison(lhs)[0]
+                newlist.append(lhs.implies(rhs))
+
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-
-            if isinstance(lhs, Comparison) and cpm_expr.name == "==":       # reification
+            if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
                 # bring all vars to lhs
@@ -311,7 +319,7 @@ def canonical_comparison(lst_of_expr):
                     lhs = Operator("wsum", [new_weights, new_args])
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-        else:
+        else:   # rest of expressions
             newlist.append(cpm_expr)
 
     return newlist
