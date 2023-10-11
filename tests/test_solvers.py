@@ -2,9 +2,14 @@ import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
+
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
+from cpmpy.solvers.gurobi import CPM_gurobi
+from cpmpy.solvers.exact import CPM_exact
+
+from cpmpy.exceptions import MinizincNameException
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -105,6 +110,24 @@ class TestSolvers(unittest.TestCase):
 
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
+
+    def test_ortools_inverse(self):
+        from cpmpy.solvers.ortools import CPM_ortools
+
+        fwd = cp.intvar(0, 9, shape=10)
+        rev = cp.intvar(0, 9, shape=10)
+
+        # Fixed value for `fwd`
+        fixed_fwd = [9, 4, 7, 2, 1, 3, 8, 6, 0, 5]
+        # Inverse of the above
+        expected_inverse = [8, 4, 3, 5, 1, 9, 7, 2, 6, 0]
+
+        model = cp.Model(cp.Inverse(fwd, rev), fwd == fixed_fwd)
+
+        solver = CPM_ortools(model)
+        self.assertTrue(solver.solve())
+        self.assertEqual(list(rev.value()), expected_inverse)
+
 
     def test_ortools_direct_solver(self):
         """
@@ -237,6 +260,44 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
+    # this test fails on OR-tools version <9.6
+    def test_ortools_version(self):
+
+        a,b,c,d = [cp.intvar(0,3, name=n) for n in "abcd"]
+        p,q,r,s = [cp.intvar(0,3, name=n) for n in "pqrs"]
+
+        bv1, bv2, bv3 = [cp.boolvar(name=f"bv{i}") for i in range(1,4)]
+
+        model = cp.Model()
+
+        model += b != 1
+        model += b != 2
+
+        model += c != 0
+        model += c != 3
+
+        model += d != 0
+
+        model += p != 2
+        model += p != 3
+
+        model += q != 1
+
+        model += r != 1
+
+        model += s != 2
+
+        model += cp.AllDifferent([a,b,c,d])
+        model += cp.AllDifferent([p,q,r,s])
+
+        model += bv1.implies(a == 0)
+        model += bv2.implies(r == 0)
+        model += bv3.implies(a == 2)
+        model += (~bv1).implies(p == 0)
+
+        model += bv2 | bv3
+
+        self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -313,6 +374,59 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
 
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_names(self):
+        a = cp.boolvar(name='5var')#has to start with alphabetic character
+        b = cp.boolvar(name='va+r')#no special characters
+        c = cp.boolvar(name='solve')#no keywords
+        with self.assertRaises(MinizincNameException):
+            cp.Model(a == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(b == 0).solve(solver="minizinc")
+        with self.assertRaises(MinizincNameException):
+            cp.Model(c == 0).solve(solver="minizinc")
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_inverse(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+
+        fwd = cp.intvar(0, 9, shape=10)
+        rev = cp.intvar(0, 9, shape=10)
+
+        # Fixed value for `fwd`
+        fixed_fwd = [9, 4, 7, 2, 1, 3, 8, 6, 0, 5]
+        # Inverse of the above
+        expected_inverse = [8, 4, 3, 5, 1, 9, 7, 2, 6, 0]
+
+        model = cp.Model(cp.Inverse(fwd, rev), fwd == fixed_fwd)
+
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertEqual(list(rev.value()), expected_inverse)
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
+    def test_minizinc_gcc(self):
+        from cpmpy.solvers.minizinc import CPM_minizinc
+
+        iv = cp.intvar(-8, 8, shape=5)
+        occ = cp.intvar(0, len(iv), shape=3)
+        val = [1, 4, 5]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        model = cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)])
+        solver = CPM_minizinc(model)
+        self.assertTrue(solver.solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
+
     @pytest.mark.skipif(not CPM_z3.supported(),
                         reason="Z3 not installed")
     def test_z3(self):
@@ -328,6 +442,22 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("z3", m)
+        self.assertTrue(s.solve())
+
+        x = cp.intvar(0, 1)
+        m = cp.Model((x >= 0.1) & (x != 1))
+        s = cp.SolverLookup.get("z3", m)
+        self.assertFalse(s.solve()) # upgrade z3 with pip install --upgrade z3-solver
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -350,5 +480,78 @@ class TestSolvers(unittest.TestCase):
         model = cp.Model(minimize=sum([v]))
         self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
-        
 
+
+    @pytest.mark.skipif(not CPM_exact.supported(),
+                        reason="Exact not installed")
+    def test_exact(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertFalse(s.solve(assumptions=bv))
+        self.assertTrue({x for x in s.get_core()}=={x for x in bv})
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertTrue(s.solve())
+
+
+        def _trixor_callback():
+            assert bv[0]+bv[1]+bv[2] >= 1
+
+        m = cp.Model([bv[0] | bv[1] | bv[2]])
+        s = cp.SolverLookup.get("exact", m)
+        self.assertEqual(s.solveAll(display=_trixor_callback),7)
+
+
+    # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
+    @pytest.mark.filterwarnings("ignore:model inconsistency detected")
+    def test_false(self):
+        m = cp.Model([cp.boolvar(), False])
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                self.assertFalse(m.solve(solver=name))
+
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
+    def test_gurobi_element(self):
+        # test 1-D
+        iv = cp.intvar(-8, 8, 3)
+        idx = cp.intvar(-8, 8)
+        # test directly the constraint
+        constraints = [cp.Element(iv,idx) == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        # test through __get_item__
+        constraints = [iv[idx] == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value()] == 8)
+        self.assertTrue(cp.Element(iv, idx).value() == 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        idx = cp.intvar(0, 3)
+        idx2 = cp.intvar(0, 3)
+        constraints = [iv[idx,idx2] == 8]
+        model = cp.Model(constraints)
+        s = cp.SolverLookup.get("gurobi", model)
+        self.assertTrue(s.solve())
+        self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)

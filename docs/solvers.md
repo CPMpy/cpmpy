@@ -2,7 +2,7 @@
 
 CPMpy can be used as a declarative modeling language: you create a `Model()`, add constraints and call `solve()` on it.
 
-The default solver is ortools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT) and any CP solver supported by the text-based MiniZinc language. 
+The default solver is ortools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
 See the list of solvers known by CPMpy with:
 
@@ -43,7 +43,12 @@ s += sum(x) <= 5
 s.solve()
 ```
 
+Creating a solver object using an initialized `Model` instance will not alter the `Model` in any way during or after solving. This is especially important when querying the _status_ to get the result of a solve call. For example, in the following, `m.status()` and `s.status()` will not yield the same result!
 
+```python
+s = SolverLookup.get("ortools",m)
+s.solve()
+```
 ## Setting solver parameters
 
 Now lets use our solver-specific powers: ortools has a parameter _log_search_progress_ that make it show information during solving for example:
@@ -101,48 +106,74 @@ gs += sum(ivar) <= 5
 gs.solve()
 
 gs += sum(ivar) == 3
-# underlying solver instance is reused, only the new constraint is added to it
-# gurobi can start looking for solutions at previous solution
+# the underlying gurobi instance is reused, only the new constraint is added to it.
+# gurobi is an incremental solver and will look for solutions starting from the previous one.
 gs.solve()
 ```
  
-_Technical note_: ortools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental. The text-based MiniZinc language is not incremental.
+_Technical note_: ortools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
 
-## Native solver access and constraints
-Another benefit of using a solver interface directly is access to low level solver features not implemented in CPMpy.
-The solver interface implemented by CPMpy encapsulates the native solver object and allows users to access these objects directly.
+## Direct solver access
+Some solvers implement more constraints then available in CPMpy. But CPMpy offers direct access to the underlying solver, so there are two ways to post such solver-specific constraints.
 
-That means that you can mix posting CPMpy expressions as constraints, and posting __solver-specific global constraints__ directly.
+### DirectConstraint
+The `DirectConstraint` will directly call a function of the underlying solver when added to a CPMpy solver. 
 
-To get you started, the following simple model:
-```python
-ffrom cpmpy import *
-x = intvar(0,10, shape=3)
-s = SolverLookup.get("ortools")
+You provide it with the name of the function you want to call, as well as the arguments:
 
-s += sum(x) > 10
-s += AllDifferent(x)
-s += x[1] == 5
-
-s.solve()
-print(x.value())
-```
-
-can equivalently be written by posting the native `AddAllDifferent()` directly on the underlying ortools object:
 ```python
 from cpmpy import *
-x = intvar(0,10, shape=3)
+iv = intvar(1,9, shape=3)
+
 s = SolverLookup.get("ortools")
 
-s += sum(x) > 10
-s.ort_model.AddAllDifferent(s.solver_vars(x))
-s += x[1] == 5
-
-s.solve()
-print(x.value())
+s += AllDifferent(iv)
+s += DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OrTools
 ```
 
-observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly.  This is in fact what happens behind the scenes when posting a constraint.
+This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the argument to the native solver variable.
+
+Note that any argument given will be checked for whether it needs to be mapped to a native solver variable. This may give errors on complex arguments, or be inefficient. You can tell the `DirectConstraint` not to scan for variables with `noarg` argument, for example:
+
+```python
+from cpmpy import *
+trans_vars = boolvar(shape=4, name="trans")
+
+s = SolverLookup.get("ortools")
+
+trans_tabl = [ # corresponds to regex 0* 1+ 0+
+    (0, 0, 0),
+    (0, 1, 1),
+    (1, 1, 1),
+    (1, 0, 2),
+    (2, 0, 2)
+]
+s += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                      novar=[1, 2, 3])  # optional, what not to scan for vars
+```
+
+A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
+
+The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) using of a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use ortools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
+
+### Directly accessing the underlying solver
+
+The `DirectConstraint("AddAllDifferent", iv)` is equivalent to the following code, which demonstrates that you can mix the use of CPMpy with calling the underlying solver directly: 
+
+```python
+from cpmpy import *
+iv = intvar(1,9, shape=3)
+
+s = SolverLookup.get("ortools")
+
+s += AllDifferent(iv)  # the traditional way, equivalent to:
+s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
+```
+
+observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly.  This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint.
+
+While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so its use is identical to other constraints.
+
 
 
 

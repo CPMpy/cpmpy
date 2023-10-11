@@ -28,6 +28,7 @@ from .z3 import CPM_z3
 from .glasgowconstraintsolver import CPM_glasgowconstraintsolver
 from .pysat import CPM_pysat
 from .pysdd import CPM_pysdd
+from .exact import CPM_exact
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -76,6 +77,7 @@ class SolverLookup():
                 ("gurobi", CPM_gurobi),
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
+                ("exact", CPM_exact),
                ]
 
     @staticmethod
@@ -123,19 +125,18 @@ class SolverLookup():
         if ':' in solvername:
             solvername,_ = solvername.split(':',maxsplit=1)
 
-        # find CPM_slv
-        CPM_slv = None
+
         for (basename, CPM_slv) in SolverLookup.base_solvers():
             if basename == solvername:
-                # CPM_slv is assigned the right one
-                break
+                # found the right solver
+                return CPM_slv
 
-        return CPM_slv
+        return None
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
 # Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat]
+builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact]
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.

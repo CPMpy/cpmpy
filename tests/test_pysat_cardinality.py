@@ -9,7 +9,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 class TestCardinality(unittest.TestCase):
     def setUp(self):
         self.bv_before = boolvar(shape=7)
-        self.bvs = boolvar(shape=3)
+        self.bvs = cpm_array(boolvar(shape=2).tolist() + [~boolvar()])
 
     def test_pysat_atmost(self):
 
@@ -17,7 +17,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) < 2
         )
         ps = CPM_pysat(atmost)
-        ps.solve()
+        self.assertTrue(ps.solve())
         # all must be true
 
         self.assertLess(sum(self.bvs.value()), 2)
@@ -29,7 +29,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) < 1,
         )
         ps = CPM_pysat(atmost)
-        ps.solve()
+        self.assertTrue(ps.solve())
         # all must be true
         self.assertLess(sum(self.bvs.value()), 2)
 
@@ -39,7 +39,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) > 2
         )
         ps = CPM_pysat(atmost)
-        ps.solve()
+        self.assertTrue(ps.solve())
         # all must be true
         self.assertEqual(sum(self.bvs.value()), 3)
 
@@ -58,7 +58,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) == 2
         )
         ps = CPM_pysat(equals)
-        ps.solve()
+        self.assertTrue(ps.solve())
         self.assertEqual(sum(self.bvs.value()), 2)
 
         equals2 = cp.Model(
@@ -66,7 +66,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) <= 2,
         )
         ps2 = CPM_pysat(equals2)
-        ps2.solve()
+        self.assertTrue(ps2.solve())
         self.assertEqual(sum(self.bvs.value()), 2)
 
         equals3 = cp.Model(
@@ -74,7 +74,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) < 3,
         )
         ps3 = CPM_pysat(equals3)
-        ps3.solve()
+        self.assertTrue(ps3.solve())
         self.assertEqual(sum(self.bvs.value()), 2)
 
     def test_pysat_atmost_equals(self):
@@ -82,7 +82,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) <= 2,
         )
         ps = CPM_pysat(atmost_equals)
-        ps.solve()
+        self.assertTrue(ps.solve())
         self.assertLessEqual(sum(self.bvs.value()), 2)
 
     def test_pysat_atleast_equals(self):
@@ -90,7 +90,7 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) >= 2,
         )
         ps = CPM_pysat(atleast_equals)
-        ps.solve()
+        self.assertTrue(ps.solve())
 
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
@@ -102,8 +102,29 @@ class TestCardinality(unittest.TestCase):
             sum(self.bvs) != 0,
         )
         ps = CPM_pysat(differrent)
-        ps.solve()
+        self.assertTrue(ps.solve())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
+
+    def test_pysat_card_implied(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [b.implies(sum(x) > 3),
+                b.implies(sum(x) <= 1),
+                b.implies(sum(x) != 4),
+                b == (sum(x) >= 2),
+                b == (sum(x) < 3),
+                b == (sum(x) == 2),
+                b == (sum(x) != 2),
+                (sum(x) > 3).implies(b),
+                (sum(x) <= 4).implies(b),
+                (sum(x) == 3).implies(b),
+                (sum(x) != 3).implies(b),
+               ]
+        for c in cons:
+            cp.Model(c).solve("pysat")
+            self.assertTrue(c.value())
+
 
 if __name__ == '__main__':
     unittest.main()

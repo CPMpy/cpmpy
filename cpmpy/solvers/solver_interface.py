@@ -20,16 +20,15 @@
     Each solver has its own class that inherits from `SolverInterface`.
 
 """
+import warnings
+import time
+from enum import Enum
+
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
+from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_num, is_any_list
 from ..expressions.python_builtins import any,all
-#
-#==============================================================================
-from enum import Enum
-import time
-
-#==============================================================================
-from cpmpy.transformations.get_variables import get_variables_model
 
 
 class SolverInterface(object):
@@ -118,13 +117,6 @@ class SolverInterface(object):
         """
         raise NotImplementedError("Solver does not support objective functions")
 
-    def __add__(self, cpm_cons):
-        """
-            Adds a constraint to the solver, eagerly (e.g. instantly passed to API)
-        """
-        raise NotImplementedError("Solver does not support eagerly adding constraints")
-
-
     def status(self):
         return self.cpm_status
 
@@ -144,6 +136,12 @@ class SolverInterface(object):
         :return: Bool:
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
+        """
+        return False
+
+    def has_objective(self):
+        """
+            Returns whether the solver has an objective function or not.
         """
         return False
 
@@ -170,20 +168,53 @@ class SolverInterface(object):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
 
-    def _post_constraint(self, cpm_expr):
+    def transform(self, cpm_expr):
         """
-            Post a primitive CPMpy constraint to the native solver API
+            Transform arbitrary CPMpy expressions to constraints the solver supports
 
-            What 'primitive' means depends on the solver capabilities,
-            more specifically on the transformations applied in `__add__()`
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
 
-            Solvers do not need to support all constraints.
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
         """
-        return None
+        return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
+
+    def __add__(self, cpm_expr):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr, collect=self.user_vars)
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            raise NotImplementedError("solver __add__(): abstract function, overwrite")
+
+        return self
+
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -195,11 +226,17 @@ class SolverInterface(object):
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
             Returns: number of solutions found
         """
-        # XXX: check that no objective function??
+        if self.has_objective():
+            raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
+
+        if not call_from_model:
+            warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
+
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):
             # display if needed
@@ -217,7 +254,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
 
         return solution_count
 
@@ -230,7 +267,7 @@ class SolverInterface(object):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        raise NotImplementedError("Solver does not support solution hinting")
+        raise NotSupportedError("Solver does not support solution hinting")
 
     def get_core(self):
         """
@@ -242,7 +279,7 @@ class SolverInterface(object):
         (a literal is either a `_BoolVarImpl` or a `NegBoolView` in case of its negation, e.g. x or ~x)
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
-        raise NotImplementedError("Solver does not support unsat core extraction")
+        raise NotSupportedError("Solver does not support unsat core extraction")
 
 
     # shared helper functions

@@ -46,7 +46,7 @@ If you have a model that fails in this way, try the following code snippet to se
 
 ```python
 model = ... # your code, a `Model()`
-`
+
 for c in model.constraints:
     print("Trying",c)
     Model(c).solve()
@@ -60,26 +60,37 @@ Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with 
 
 First, print the model:
 
-`print(model)` and check that the output matches what you want to express. Do you see anything unusual? Start there, see why the expression is now what you intended to express, as described in 'Debugging a modeling error'.
+```print(model)```
 
-If that does not help, try printing the 'flat normal form' of the model, which also shows the intermediate variables that are automatically created by CPMpy:
+and check that the output matches what you want to express. Do you see anything unusual? Start there, see why the expression is not what you intended to express, as described in 'Debugging a modeling error'.
+
+If that does not help, try printing the 'transformed' **constraints**, the way that the solver actually sees them, including decompositions and rewrites:
 
 ```python
-from cpmpy.transformations.flatten_model import flatten_constraint, flatten_model
-print(flatten_model(model))
+s = SolverLookup.get("ortools")  # or whatever solver you are using
+print(s.transform(model.constraints))
 ```
 
-Note that you can also print individual flattened expressions with `print(flatten_constraint(expression))` which helps to zoom in on the curlpit.
+Note that you can also print individual expressions like this, e.g. `print(s.transform(expression))` which helps to zoom in on the curlpit.
 
-If you want to know about the variable domains as well, to see whether something is wrong there, you can do so as follows:
+If you want to know about the **variable domains** as well, to see whether something is wrong there, you can do so as follows:
 
 ```python
-from cpmpy.transformations.flatten_model import flatten_constraint, flatten_model
+s = SolverLookup.get("ortools")  # or whatever solver you are using
+ct = s.transform(model.constraints)
 from cpmpy.transformations.get_variables import print_variables
-mf = flatten_model(model)
-print_variables(mf)
-print(mf)`
+print_variables(ct)
+print(ct)
 ```
+
+Printing the **objective** as the solver sees it requires you to look into the solver interface code of that solver. However, the following is a good first check that can already reveal potentially problematic things:
+
+```python
+s = SolverLookup.get("ortools")  # or whatever solver you are using
+from cpmpy.transformations.flatten_model import flatten_objective
+(obj_var, obj_expr) = flatten_objective(model.objective)
+print(f"Optimizing {obj_var} subject to", s.transform(obj_expr))
+``` 
 
 ### Automatically minimising the UNSAT program
 If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to a 'Minimal Unsatisfiable Subset' (MUS).

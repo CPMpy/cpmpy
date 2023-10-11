@@ -139,6 +139,9 @@ cython_debug/
 .DS_Store
 bugs/
 
+# Intellij
+.idea/
+
 # VeriPB proof log files (from Glasgow Constraint solver)
-*.veripb 
+*.veripb
 *.opb

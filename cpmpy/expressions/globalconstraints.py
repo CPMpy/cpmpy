@@ -14,6 +14,10 @@
 
     If a solver does not support a global constraint (see solvers/) then it will be automatically
     decomposed by calling its `.decompose()` function.
+    The `.decompose()` function returns two arguments:
+        - a list of simpler constraints replacing the global constraint
+        - if the decomposition introduces *new variables*, then the second argument has to be a list
+            of constraints that (totally) define those new variables
 
     As a user you **should almost never subclass GlobalConstraint()** unless you know of a solver that
     supports that specific global constraint, and that you will update its solver interface to support it.
@@ -74,7 +78,7 @@
     .. code-block:: python
 
         def my_circuit_decomp(self):
-            return [self.args[0] == 1] # does not actually enforce circuit
+            return [self.args[0] == 1], [] # does not actually enforce circuit
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
         vars = intvar(1,9, shape=10)
@@ -93,21 +97,25 @@
         :nosignatures:
 
         AllDifferent
+        AllDifferentExcept0
         AllEqual
         Circuit
+        Inverse
         Table
-        Minimum
-        Maximum
-        Element
+        Xor
+        Cumulative
+        GlobalCardinalityCount
 
 """
+import copy
 import warnings # for deprecation warning
 import numpy as np
-
+from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list
-from ..transformations.flatten_model import get_or_make_var
+from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .globalfunctions import * # XXX make this file backwards compatible
+
 
 # Base class GlobalConstraint
 class GlobalConstraint(Expression):
@@ -115,41 +123,42 @@ class GlobalConstraint(Expression):
         Abstract superclass of GlobalConstraints
 
         Like all expressions it has a `.name` and `.args` property.
-        Overwrites the `.is_bool()` method. You can indicate
-        in the constructer whether it has Boolean return type or not.
+        Overwrites the `.is_bool()` method.
     """
-    # is_bool: whether this is normal constraint (True or False)
-    #   not is_bool: it computes a numeric value (ex: Minimum, Element)
-    def __init__(self, name, arg_list, is_bool=True):
-        super().__init__(name, arg_list)
-        self._is_bool = is_bool
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
-        return self._is_bool
+        return True
 
     def decompose(self):
         """
             Returns a decomposition into smaller constraints.
 
             The decomposition might create auxiliary variables
-            and use other other global constraints as long as
+            and use other global constraints as long as
             it does not create a circular dependency.
-        """
-        raise NotImplementedError("Decomposition for",self,"not available")
 
-    def deepcopy(self, memodict={}):
-        copied_args = self._deepcopy_args(memodict)
-        return type(self)(self.name, copied_args, self._is_bool)
+            To ensure equivalence of decomposition, we split into contraining and defining constraints.
+            Defining constraints (totally) define new auxiliary variables needed for the decomposition,
+            they can always be enforced top-level.
+        """
+        raise NotImplementedError("Decomposition for", self, "not available")
+
+    def get_bounds(self):
+        """
+        Returns the bounds of a Boolean global constraint.
+        Numerical global constraints should reimplement this.
+        """
+        return 0, 1
 
 
 # Global Constraints (with Boolean return type)
-
-
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
+
+
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
@@ -159,22 +168,33 @@ class AllDifferent(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 != var2 for var1, var2 in all_pairs(self.args)]
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Alldifferent global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return AllDifferent(*copied_args)
+        return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
+
+class AllDifferentExcept0(GlobalConstraint):
+    """
+    All nonzero arguments have a distinct value
+    """
+    def __init__(self, *args):
+        super().__init__("alldifferent_except0", flatlist(args))
+
+    def decompose(self):
+        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
+        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
+
+    def value(self):
+        vals = [a.value() for a in self.args if a.value() != 0]
+        return len(set(vals)) == len(vals)
+
+
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
+
+
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
@@ -184,15 +204,8 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 == var2 for var1, var2 in all_pairs(self.args)]
-
-    def deepcopy(self, memdict={}):
-        """
-            Return a deep copy of the AllEqual global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memdict)
-        return AllEqual(*copied_args)
+        # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
+        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
         return len(set(a.value() for a in self.args)) == 1
@@ -201,11 +214,18 @@ class AllEqual(GlobalConstraint):
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
+
+
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
     def __init__(self, *args):
-        super().__init__("circuit", flatlist(args))
+        flatargs = flatlist(args)
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
+        super().__init__("circuit", flatargs)
+        if len(flatargs) < 2:
+            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
 
     def decompose(self):
         """
@@ -218,29 +238,58 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
-        return [
-            # different successors
-            AllDifferent(succ),
-            # different orders
-            AllDifferent(order),
-            # last one is '0'
-            order[n-1] == 0,
-            # loop: first one is successor of '0'
-            order[0] == succ[0],
-            # others: ith one is successor of i-1
-        ] + [order[i] == succ[order[i-1]] for i in range(1,n)]
+        constraining = []
+        constraining += [AllDifferent(succ)] # different successors
+        constraining += [AllDifferent(order)] # different orders
+        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
+
+        defining = [order[0] == succ[0]]
+        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+
+        return constraining, defining
+
+    def value(self):
+        pathlen = 0
+        idx = 0
+        visited = set()
+        arr = [argval(a) for a in self.args]
+        while idx not in visited:
+            if idx is None:
+                return False
+            if not (0 <= idx < len(arr)):
+                break
+            visited.add(idx)
+            pathlen += 1
+            idx = arr[idx]
+
+        return pathlen == len(self.args) and idx == 0
 
 
-    def deepcopy(self, memdict={}):
-        """
-            Return a deep copy of the Circuit global constraint
-           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memdict)
-        return Circuit(*copied_args)
+class Inverse(GlobalConstraint):
+    """
+       Inverse (aka channeling / assignment) constraint. 'fwd' and
+       'rev' represent inverse functions; that is,
 
+           fwd[i] == x  <==>  rev[x] == i
 
-    # TODO: value()
+    """
+    def __init__(self, fwd, rev):
+        flatargs = flatlist([fwd,rev])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
+        assert len(fwd) == len(rev)
+        super().__init__("inverse", [fwd, rev])
+
+    def decompose(self):
+        from .python_builtins import all
+        fwd, rev = self.args
+        rev = cpm_array(rev)
+        return [all(rev[x] == i for i, x in enumerate(fwd))], []
+
+    def value(self):
+        fwd = [argval(a) for a in self.args[0]]
+        rev = [argval(a) for a in self.args[1]]
+        return all(rev[x] == i for i, x in enumerate(fwd))
 
 
 class Table(GlobalConstraint):
@@ -250,122 +299,82 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
-        raise NotImplementedError("TODO: table decomposition")
-
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Table global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        array, table = self._deepcopy_args(memodict)
-        return Table(array, table)
-
-    # TODO: value()
-
-# Numeric Global Constraints (with integer-valued return type)
-
-
-class Minimum(GlobalConstraint):
-    """
-        Computes the minimum value of the arguments
-
-        It is a 'functional' global constraint which implicitly returns a numeric variable
-    """
-    def __init__(self, arg_list):
-        super().__init__("min", flatlist(arg_list), is_bool=False)
+        from .python_builtins import any, all
+        arr, tab = self.args
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
-            return None
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        return arrval in tab
+
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
+# same semantic as CPLEX IfThenElse constraint
+# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
+            raise TypeError("only boolean expression allowed in IfThenElse")
+        super().__init__("ite", [condition, if_true, if_false])
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        if argval(condition):
+            return argval(if_true)
         else:
-            return min(argvals)
+            return argval(if_false)
 
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Minimum global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(self.args)
-        return Minimum(copied_args)
-
-class Maximum(GlobalConstraint):
-    """
-        Computes the maximum value of the arguments
-
-        It is a 'functional' global constraint which implicitly returns a numeric variable
-    """
-    def __init__(self, arg_list):
-        super().__init__("max", flatlist(arg_list), is_bool=False)
-
-    def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
-            return None
-        else:
-            return max(argvals)
-
-    def deepcopy(self, memodict={}):
-        """
-            Return a deep copy of the Maximum global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-        """
-        copied_args = self._deepcopy_args(memodict)
-        return Maximum(copied_args)
-
-def element(arg_list):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
-    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
-    return Element(arg_list[0], arg_list[1])
-class Element(GlobalConstraint):
-    """
-        The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants of variables (the first argument)
-        and 'Idx' an integer decision variable, representing the index into the array.
-
-        Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
-        an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
-
-        Element is a CPMpy built-in global constraint, so the class implements a few more
-        extra things for convenience (.value() and .__repr__()). It is also an example of
-        a 'numeric' global constraint.
-    """
-
-    def __init__(self, arr, idx):
-        super().__init__("element", [arr, idx], is_bool=False)
-
-    def value(self):
-        arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            return argval(arr[idxval])
-        return None # default
-
-    def decompose_comparison(self, cmp_op, cmp_rhs):
-        """
-            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
-            It is not a constraint itself, so it can not have a decompose().
-            However, when used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
-            it is a constraint, and that one can be decomposed.
-            That is what this function does
-            (for now only used in transformations/reification.py)
-        """
-        from .python_builtins import any
-
-        arr,idx = self.args
-        return [any(eval_comparison(cmp_op, arr[j], cmp_rhs) & (idx == j) for j in range(len(arr)))]
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
-    def deepcopy(self, memodict={}):
+
+
+class InDomain(GlobalConstraint):
+    """
+        The "InDomain" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
+            "The expressions in the InDomain constraint should not be boolean"
+        super().__init__("InDomain", [expr, arr])
+
+    def decompose(self):
         """
-            Return a deep copy of the Element global constraint
-            :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
+        Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
-        arr, idx = self._deepcopy_args(memodict)
-        return Element(arr, idx)
+        from .python_builtins import any
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        defining = []
+        #if expr is not a var
+        if not isinstance(expr,_IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
+        expressions = any(isinstance(a, Expression) for a in arr)
+        if expressions:
+            return [any(expr == a for a in arr)], defining
+        else:
+            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+
+
+    def value(self):
+        return argval(self.args[0]) in argval(self.args[1])
+
+    def __repr__(self):
+        return "{} in {}".format(self.args[0], self.args[1])
 
 
 class Xor(GlobalConstraint):
@@ -374,27 +383,27 @@ class Xor(GlobalConstraint):
     """
 
     def __init__(self, arg_list):
+        flatargs = flatlist(arg_list)
+        if not (all(is_boolexpr(arg) for arg in flatargs)):
+            raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(flatargs))
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        super().__init__("xor", arg_list)
+            flatargs = arg_list
+        super().__init__("xor", flatargs)
 
     def decompose(self):
         # there are multiple decompositions possible
         # sum(args) mod 2 == 1, for size 2: sum(args) == 1
         # since Xor is logical constraint, the default is a logic decomposition
-        if len(self.args) == 2:
-            a0, a1 = self.args
-            return [(a0 | a1), (~a0 | ~a1)]  # one true and one false
+        a0, a1 = self.args[:2]
+        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
 
-        # for more than 2 variables, we chain reified xors
-        # XXX this will involve many calls to the above decomp, shortcut?
-        prev_var, cons = get_or_make_var(self.args[0] ^ self.args[1])
+        # for more than 2 variables, we cascade (decomposed) xors
         for arg in self.args[2:]:
-            prev_var, new_cons = get_or_make_var(prev_var ^ arg)
-            cons += new_cons
-        return cons + [prev_var]
+            cons = (cons | arg) & (~cons | ~arg)
+        return [cons], []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
@@ -404,13 +413,6 @@ class Xor(GlobalConstraint):
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
 
-    def deepcopy(self, memodict={}):
-        """
-           Return a deep copy of the xor global constraint
-           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-       """
-        copied_args = self._deepcopy_args(memodict)
-        return Xor(copied_args)
 
 class Cumulative(GlobalConstraint):
     """
@@ -423,6 +425,9 @@ class Cumulative(GlobalConstraint):
         start = flatlist(start)
         assert is_any_list(duration), "duration should be a list"
         duration = flatlist(duration)
+        for d in duration:
+            if get_bounds(d)[0]<0:
+                raise TypeError("durations should be non-negative")
         assert is_any_list(end), "end should be a list"
         end = flatlist(end)
         assert len(start) == len(duration) == len(end), "Lists should be equal length"
@@ -430,9 +435,17 @@ class Cumulative(GlobalConstraint):
         if is_any_list(demand):
             demand = flatlist(demand)
             assert len(demand) == len(start), "Shape of demand should match start, duration and end"
+            for d in demand:
+                if is_boolexpr(d):
+                    raise TypeError("demands must be non-boolean: {}".format(d))
+        else:
+            if is_boolexpr(demand):
+                raise TypeError("demand must be non-boolean: {}".format(demand))
+        flatargs = flatlist([start, duration, end, demand, capacity])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
 
-
-        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -462,7 +475,7 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
             cons += [capacity >= demand_at_t]
 
-        return cons
+        return cons, []
 
     def value(self):
         argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
@@ -472,7 +485,7 @@ class Cumulative(GlobalConstraint):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, cap = argvals
+        start, dur, end, demand, capacity = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -480,17 +493,83 @@ class Cumulative(GlobalConstraint):
         # demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         for t in range(lb, ub+1):
-            if cap < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
         return True
 
-    def deepcopy(self, memodict={}):
-        """
-           Return a deep copy of the cumulative global constraint
-           :param: memodict: dictionary with already copied objects, similar to copy.deepcopy()
-       """
-        copied_args = self._deepcopy_args(memodict)
-        return Cumulative(*copied_args)
 
+class GlobalCardinalityCount(GlobalConstraint):
+    """
+    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
+    must be equal to occ[i].
+    """
+
+    def __init__(self, vars, vals, occ):
+        flatargs = flatlist([vars, vals, occ])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
+        super().__init__("gcc", [vars,vals,occ])
+
+    def decompose(self):
+        from .globalfunctions import Count
+        vars, vals, occ = self.args
+        return [Count(vars, i) == v for i, v in zip(vals, occ)], []
+
+    def value(self):
+        from .python_builtins import all
+        decomposed, _ = self.decompose()
+        return all(decomposed).value()
+
+
+class DirectConstraint(Expression):
+    """
+        A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
+
+        It can not be reified, it is not flattened, it can not contain other CPMpy expressions than variables.
+        When added to a CPMpy solver, it will literally just directly call a function on the underlying solver,
+        replacing CPMpy variables by solver variables along the way.
+
+        See the documentation of the solver (constructor) for details on how that solver handles them.
+
+        If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
+        then use `directvar()` instead, or access the solver object from the solver interface directly.
+    """
+    def __init__(self, name, arguments, novar=None):
+        """
+            name: name of the solver function that you wish to call
+            arguments: tuple of arguments to pass to the solver function with name 'name'
+            novar: list of indices (offset 0) of arguments in `arguments` that contain no variables,
+                   that can be passed 'as is' without scanning for variables
+        """
+        if not isinstance(arguments, tuple):
+            arguments = (arguments,)  # force tuple
+        super().__init__(name, arguments)
+        self.novar = novar
+
+    def is_bool(self):
+        """ is it a Boolean (return type) Operator?
+        """
+        return True
+
+    def callSolver(self, CPMpy_solver, Native_solver):
+        """
+            Call the `directname`() function of the native solver,
+            with stored arguments replacing CPMpy variables with solver variables as needed.
+
+            SolverInterfaces will call this function when this constraint is added.
+
+        :param CPMpy_solver: a CPM_solver object, that has a `solver_vars()` function
+        :param Native_solver: the python interface to some specific solver
+        :return: the response of the solver when calling the function
+        """
+        # get the solver function, will raise an AttributeError if it does not exist
+        solver_function = getattr(Native_solver, self.name)
+        solver_args = copy.copy(self.args)
+        for i in range(len(solver_args)):
+            if self.novar is None or i not in self.novar:
+                # it may contain variables, replace
+                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+        # len(native_args) should match nr of arguments of `native_function`
+        return solver_function(*solver_args)
 

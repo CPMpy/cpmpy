@@ -1,5 +1,124 @@
 # Change log
 
+## 0.9.16
+One of our most substantial releases so far, with special focus on extending and improving the
+transformations for all allowed input and all solvers.
+
+### Solver tier updates:
+* MiniZinc and Z3 are now Tier1 solvers (passes all internal tests, passes our bigtest suit, will be fuzztested in the near future)
+* new solver: Exact in Tier2 (passes all internal tests, might fail on edge cases in bigtest)
+  Currently Exact is not supported on Windows
+
+### Revamped documentation
+* simpler readme on github, with badges
+* simpler index file on readthedocs
+* consolidated scattered documentation into one prominent 'modeling.html' file on readthedocs
+
+### Global constraints
+* Global functions (Minimum, Maximum, Element, Count, Abs) now separated from Global constraints in the class diagram
+* New global constraint: InDomain, to specify non-interval domains.
+* Abs is now a global
+* Multi-dimensional element constraint supported
+
+### New transformations:
+* decompose_in_tree. Unsupported globals now get decomposed at tree-level.
+* simplify_boolean, that simplifies boolean (and equivalent-to-Boolean) expressions.
+* push_down_negation. Pushes down the not-operator so that it only occurs at the leaves of the expression tree
+
+### What else is new?
+* Warning messages for common beginner mistakes.
+* type-checks in operator constructor and in global constraints/functions.
+* our NDVarArray now support NumPy-like method 'prod', and supports the axis argument for min, max, sum, prod, any and all
+* Updated tuner tool: added a (random) grid search tuner
+* pysat: accept reified cardinality constraints
+* z3: handle mixed integer/boolean expressions
+* Add explicit requirements for jupyter notebooks examples
+* Add n-queens 1000 example.
+* solver interfaces: make `__add__()` directly call transform, simpler and more explicit (#312)
+
+### Bugfixes:
+* Allow numpy booleans in boolvals
+* negating boolval fix
+* check for bv == iv in normalized boolexpr and only_bv_implies
+* Inverse decomposition with non vararrays
+* Minizinc integer bounds fix
+* Minizinc False literal now gets correctly translated.
+
+
+## 0.9.15
+Re-release of 0.9.14 due to github action pip-release screw-up
+
+## 0.9.14
+Hotfix release
+
+Our builtin-overwrites 'any' and 'all' returned BoolVal's, and they did not yet have a `__bool__()` property so they would be correctly evaluated when used in 'if' functions and other standard python contexts. This can easily break user code that uses `any` or `all` when doing 'from cpmpy import \*'.
+
+Unfortunately we merged the BoolVal branch with the above behaviour, even though we had a version that fixed it, but this was not yet pushed to the branch.
+
+* This hotfix release fixes it so that `any` and `all` return standard Booleans again (and BoolVal has a `__bool__()` also).
+
+* We also include a small fix to make the Inverse global constraint decomposition work for non-variable arrays too.
+
+
+## 0.9.13
+Solid progress release.
+
+To make more clear how well-supported each of the solvers are, we introduced a tiered classification:
+
+* Tier 1 solvers: passes all internal tests, passes our bigtest suit, will be fuzztested in the near future
+    - "ortools" the OR-Tools CP-SAT solver
+    - "pysat" the PySAT library and its many SAT solvers ("pysat:glucose4", "pysat:lingeling", etc)
+
+* Tier 2 solvers: passes all internal tests, might fail on edge cases in bigtest
+    - "minizinc" the MiniZinc modeling system and its many solvers ("minizinc:gecode", "minizinc:chuffed", etc)
+    - "z3" the SMT solver and theorem prover
+    - "gurobi" the MIP solver
+    - "PySDD" a Boolean knowledge compiler
+
+* Tier 3 solvers: they are work in progress and live in a pull request
+    - "gcs" the Glasgow Constraint Solver
+    - "exact" the Exact pseudo-boolean solver
+
+We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
+
+New above the hood:
+* added 'DirectConstraint', a generic way to post solver-specific constraints which CPMpy does not implement, with multiple examples such as ortools' automaton, circuit, multicircuit
+* added 'Count' global constraint with decomposition
+* added 'GlobalCardinalityCount' (GCC) global constraint with decomposition
+* added 'Inverse' global constraint with with decomposition
+* a Boolean 'IfThenElse' global constraint with decomposition c->if_true & (~c)->if_false
+
+New under the hood:
+* a BoolVal() expression object for constants True/False, better handling/cleaning of Bool constants as a result
+* added a highly efficient 'toplevel_list' transformation that all solvers call to get a list of CPMpy expressions, simplifies what to expect as input for transformations
+* 'decompose_globals' is now a transformation that decomposes the unsupported globals, it also does it best to properly handle 'numeric' globals, reified globals and negated globals
+
+Changed:
+* added missing decomposition for 'Table' global constraint
+* highly optimized the 'get_variables' transformation
+* pushed bounds computation into the expressions, more robust and extensible
+* removed custom deepcopy() for Python's better built-in one
+* slightly better handling of incomplete (partial) functions, e.g. in bounds computation (ongoing work)
+* fixed bugs in MiniZinc and Z3's rewriting, related to int vs bool
+
+## 0.9.12
+New:
+* examples/ use notebooks with graphic visualisation whenever possible
+* examples/ add pareto optimal enumeration
+* new global: AllDifferentExcept0, with tests
+
+Changed:
+* minizinc: status time in seconds
+* reify_rewrite: very special case, if (non-total) element elemnt-wise decomp returns false,
+* flatten: avoid unnecessary sum decompositions
+* SolverLookup: would select the last one if an invalid was given
+* solveAll() return warning if an objective function is present
+* comparing a boolean expression with an intvar crashed most solvers (#208)
+* z3: bugfixes in translation
+* globals: give xor a logic-based decomposition
+* tests: multiple improvements, run with all solvers
+
+
 ## 0.9.11
 FuzzTest bugfix release
 

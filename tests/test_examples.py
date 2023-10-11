@@ -8,15 +8,21 @@ Will only run solver tests on solvers that are installed
 """
 from glob import glob
 from os.path import join
+from os import getcwd
 import types
 import importlib.machinery
 import pytest
 from cpmpy import *
 
-EXAMPLES = glob(join(".", "examples", "*.py")) + \
-           glob(join(".", "examples", "advanced", "*.py")) + \
-           glob(join(".", "examples", "csplib", "*.py"))
-
+cwd = getcwd()
+if 'y' in cwd[-2:]:
+    EXAMPLES =  glob(join(".", "examples", "*.py")) + \
+                glob(join(".", "examples", "advanced", "*.py")) + \
+                glob(join(".", "examples", "csplib", "*.py"))
+else:
+    EXAMPLES = glob(join("..", "examples", "*.py")) + \
+               glob(join("..", "examples", "advanced", "*.py")) + \
+               glob(join("..", "examples", "csplib", "*.py"))
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples(example):
@@ -30,20 +36,25 @@ class TestExamples(unittest.TestCase):
     # do not run, dependency local to that folder
     if example.endswith('explain_satisfaction.py'):
         return
-    loader = importlib.machinery.SourceFileLoader("example", example)
-    mod = types.ModuleType(loader.name)
-    loader.exec_module(mod)
 
-    # run again with gurobi
+    # catch ModuleNotFoundError if example imports stuff that may not be installed
+    try:
+        loader = importlib.machinery.SourceFileLoader("example", example)
+        mod = types.ModuleType(loader.name)
+        loader.exec_module(mod)  # this runs the scripts
+    except ModuleNotFoundError as e:
+        pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))  # returns
+
+    # run again with gurobi, if installed on system
     if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
+        # exclude those, too slow or solver specific
         return
-
     gbi_slv = SolverLookup.lookup("gurobi")
     if gbi_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers
+        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
         f = SolverLookup.base_solvers
         try:
-            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]
+            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]+f()
             loader.exec_module(mod)
         finally:
             SolverLookup.base_solvers = f
@@ -54,10 +65,10 @@ class TestExamples(unittest.TestCase):
         return
     mzn_slv = SolverLookup.lookup('minizinc')
     if mzn_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers
+        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
         f = SolverLookup.base_solvers
         try:
-            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]
+            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]+f()
             loader.exec_module(mod)
         finally:
             SolverLookup.base_solvers = f

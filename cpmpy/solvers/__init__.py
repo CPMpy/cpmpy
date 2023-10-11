@@ -16,6 +16,7 @@
         gurobi
         pysdd
         z3
+        exact
         utils
 
     ===============
@@ -29,6 +30,7 @@
         CPM_gurobi
         CPM_pysdd
         CPM_z3
+        CPM_exact
 
     =================
     List of functions
@@ -46,3 +48,4 @@ from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
+from .exact import CPM_exact

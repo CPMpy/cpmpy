@@ -27,10 +27,12 @@
 
         Model
 """
+import copy
 import warnings
 
 import numpy as np
-from .expressions.core import Operator
+from .expressions.core import Expression
+from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -55,22 +57,27 @@ class Model(object):
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
-        # list of constraints
-        if len(args) == 0:
-            self.constraints = []
-        elif len(args) == 1 and is_any_list(args[0]):
-            # top level list of constraints
-            self.constraints = list(args[0]) # make sure it is a Python list
-        else:
-            self.constraints = list(args) # instead of tuple
-
-        # objective: an expresion or None
+        # init list of constraints and objective
+        self.constraints = []
         self.objective_ = None
         self.objective_is_min = None
+
+        if len(args) == 1 and is_any_list(args):
+            args = args[0]  # historical shortcut, treat as *args
+        # use `__add__()` for typecheck
+        if is_any_list(args):
+            # add (and type-check) one by one
+            for a in args:
+                self += a
+        else:
+            self += args
+
+        # store objective if present
         if maximize is not None:
             self.maximize(maximize)
         if minimize is not None:
             self.minimize(minimize)
+
         
     def __add__(self, con):
         """
@@ -79,13 +86,23 @@ class Model(object):
             m = Model()
             m += [x > 0]
         """
-        # ignore empty clause
-        if is_any_list(con) and len(con)==0:
-            return self
+        if is_any_list(con):
+            # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
+            for elem in con:
+                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
+                    raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
-        if is_any_list(con) and len(con) == 1 and is_any_list(con[0]):
-            # top level list of constraints
-            con = con[0]
+            if len(con) == 0:
+                # ignore empty list
+                return self
+            elif len(con) == 1:
+                # unpack size 1 list
+                con = con[0]
+
+        elif isinstance(con, Expression) and not con.is_bool():
+            # catch some beginner mistakes: ensure that a top-level Expression has Boolean return type
+            raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{con}` does not.")
+
         self.constraints.append(con)
         return self
 
@@ -164,7 +181,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
@@ -257,17 +274,8 @@ class Model(object):
             return Model(self.constraints, maximize=self.objective_)
 
 
+
+    # keep for backwards compatibility
     def deepcopy(self, memodict={}):
-        """
-            Deep copies a the model to a new instance.
-            :return: an object of :class: 'Model' with equivalent constraints as the current model. There are no shared variables/constraints between the original model and its copied version.
-        """
-        copied_cons = [cpm_cons.deepcopy(memodict) for cpm_cons in self.constraints]
-        if self.objective_ is not None:
-            copied_obj = self.objective_.deepcopy(memodict)
-
-        copied_model = Model(copied_cons)
-        if self.objective_ is not None:
-            copied_model.objective(copied_obj, self.objective_is_min)
-
-        return copied_model
+        warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
+        return copy.deepcopy(self, memodict)
