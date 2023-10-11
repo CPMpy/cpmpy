@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num
+from ..expressions.utils import is_num, is_boolexpr
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -408,7 +408,7 @@ class CPM_choco(SolverInterface):
                     cpm_expr.args[i] = int(cpm_expr.args[i])
             lhs, rhs = cpm_expr.args
 
-            if lhs.is_bool() and rhs.is_bool(): #boolean equality -- Reification
+            if is_boolexpr(lhs) and is_boolexpr(rhs): #boolean equality -- Reification
                 if isinstance(rhs, _NumVarImpl):
                     return self.chc_model.all_equal(self.solver_vars([lhs, rhs]))
                 else:
