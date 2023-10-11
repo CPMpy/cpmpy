@@ -10,17 +10,21 @@
         GlasgowConstraintSolver
 """
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
+from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 
 import shutil # For renaming the proof file
 import os
+
+from ..transformations.normalize import toplevel_list
+
 
 class CPM_glasgowconstraintsolver(SolverInterface):
     """
@@ -202,7 +206,34 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         self += obj_cons
         return self.solver_var(obj_var)
 
-    def __add__(self, cpm_con):
+    def transform(self, cpm_expr):
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
+        """
+        # apply transformations, then post internally
+        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+        cpm_cons = toplevel_list(cpm_expr)
+        supported = {"min", "max", "abs", "alldifferent", "element", 'table', }  # alldiff has a specialized MIP decomp in linearize
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['xor','sum','wsum']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
+        return cpm_cons
+
+
+    def __add__(self, cpm_cons):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -212,17 +243,9 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_con))
+        self.user_vars.update(get_variables(cpm_cons))
 
-        # apply transformations, then post internally
-        cpm_cons = flatten_constraint(cpm_con)
-
-        # Only less than and equals are fully reifiable.
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['xor']))
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset())
-        cpm_cons = only_bv_implies(cpm_cons)
-
-        for con in cpm_cons:
+        for con in self.transform(cpm_cons):
             self._post_constraint(con)
 
         return self
@@ -242,7 +265,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 return self.gcs.post_or(self.solver_vars(cpm_expr.args))
 
             # Part-Reified constraint: Var -> Boolexpr
-            # LHS must be boolvar due to only_bv_implies
+            # LHS must be boolvar due to only_bv_reifies
             elif cpm_expr.name == '->':
                 assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  
                 bool_lhs = cpm_expr.args[0]
