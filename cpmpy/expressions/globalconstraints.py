@@ -302,19 +302,19 @@ class Circuit(GlobalConstraint):
 
 
         for i in range(n):
-            defining += [u[i] == (sum(x.T[i]) == 1)]
+            defining += [u[i] ==  (Count(succ,i) == 1)]
             # if 0 goes to i, and nothing elso goes to i then i is only reached at step 0
-            defining += [(u[i] & (x[0,i])).implies(r[0,i])]
+            defining += [((x[0,i])).implies(r[0,i])]
             # if 0 does not go to i, then i is not reachable at step 0
             defining += [(~x[0,i]).implies(~r[0,i])]
             #if i is not uniquely reached, column i of r must be 0
             defining += [(~u[i]).implies(sum(r.T[i]) == 0)]
             for j in range(n):
-                defining += [x[i,j] == (succ[i] == j)] #definition of connection graph x
+                defining += [x[i,j] == ((succ[i] == j) & u[j])] #definition of connection graph x, we only want unique connections
                 for k in range(n-1):
                     # definition of reachability graph
                     # if you can reach j at step k, and only j connects to i, then you can reach i at step k + 1
-                    defining += [((r[k,j]) & (x[j,i]) & (u[i])).implies(r[k+1,i])]
+                    defining += [((r[k,j]) & (x[j,i])).implies(r[k+1,i])]
                     #if j connects to i, but j is not reachable in step k-1, then i is not reachable at step k, or multiple nodes go to i.
                     defining += [(x[j,i] & (~r[k,j])).implies(~r[k+1,i])]
         return constraining, defining
