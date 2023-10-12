@@ -473,8 +473,17 @@ class CPM_choco(SolverInterface):
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(
                             f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    arr, val = self.solver_vars(lhs)
-                    return self.chc_model.count(val, arr, chcrhs)
+                    arr, val = lhs.args
+                    chcarr = []
+                    for v in arr:  # Choco accepts only variables in lhs
+                        if isinstance(v, int):
+                            chcarr.append(self.to_var(v))
+                        elif isinstance(v, _NumVarImpl):
+                            chcarr.append(self.solver_var(v))
+                        else:
+                            raise Exception(
+                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
+                    return self.chc_model.count(self.solver_var(val), chcarr, chcrhs)
                 elif lhs.name == 'mul':
                     return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
                                                 chcrhs)
