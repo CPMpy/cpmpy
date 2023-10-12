@@ -511,6 +511,22 @@ class CPM_choco(SolverInterface):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.div(dividend, divisor, result)
                 elif lhs.name == 'element':
+                    arr, idx = lhs.args
+                    chcarr = []
+                    for v in arr:  # Choco accepts only variables in lhs
+                        if isinstance(v, int):
+                            chcarr.append(self.to_var(v))
+                        elif isinstance(v, _NumVarImpl):
+                            chcarr.append(self.solver_var(v))
+                        else:
+                            raise Exception(
+                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
+                    if isinstance(idx, int):
+                        index = self.to_var(idx)  # convert to "variable"
+                    elif isinstance(idx, _NumVarImpl):
+                        index = self.solver_var(idx)  # use variable
+                    else:
+                        raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     if isinstance(rhs, int):
                         result = self.to_var(rhs)  # convert to "variable"
                     elif isinstance(rhs, _NumVarImpl):
@@ -518,8 +534,8 @@ class CPM_choco(SolverInterface):
                     else:
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
 
-                    return self.chc_model.element(result, self.solver_vars(lhs.args[0]),
-                                                  self.solver_var(lhs.args[1]))
+                    return self.chc_model.element(result, chcarr,
+                                                  index)
                 elif lhs.name == 'mod':
                     # Choco needs dividend to be a variable
                     if isinstance(lhs.args[0], int):
