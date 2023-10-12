@@ -427,18 +427,45 @@ class CPM_choco(SolverInterface):
                         chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.min(chcrhs, self.solver_vars(lhs.args))
+                    chclhs = []
+                    for v in lhs.args:      # Choco accepts only variables in lhs
+                        if isinstance(v, int):
+                            chclhs.append(self.to_var(v))
+                        elif isinstance(v, _NumVarImpl):
+                            chclhs.append(self.solver_var(v))
+                        else:
+                            raise Exception(
+                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
+                    return self.chc_model.min(chcrhs, chclhs)
                 elif lhs.name == 'max':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.max(chcrhs, self.solver_vars(lhs.args))
+                    chclhs = []
+                    for v in lhs.args:      # Choco accepts only variables in lhs
+                        if isinstance(v, int):
+                            chclhs.append(self.to_var(v))
+                        elif isinstance(v, _NumVarImpl):
+                            chclhs.append(self.solver_var(v))
+                        else:
+                            raise Exception(
+                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
+                    return self.chc_model.max(chcrhs, chclhs)
                 elif lhs.name == 'abs':
                     if isinstance(rhs, int):     # Choco does not accept an int in rhs
                         chcrhs = self.to_var(rhs)  # convert to "variable"
                     elif not isinstance(rhs, _NumVarImpl):
                         raise Exception(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
+                    chclhs = []
+                    for v in lhs.args:      # Choco accepts only variables in lhs
+                        if isinstance(v, int):
+                            chclhs.append(self.to_var(v))
+                        elif isinstance(v, _NumVarImpl):
+                            chclhs.append(self.solver_var(v))
+                        else:
+                            raise Exception(
+                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
                     return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
                 elif lhs.name == 'count':
                     if isinstance(rhs, int):  # Choco does not accept an int in rhs
