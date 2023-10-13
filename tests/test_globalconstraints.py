@@ -123,10 +123,10 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Circuit(x).value())
 
     def test_not_circuit(self):
-        x = cp.intvar(lb=0, ub=2, shape=3)
+        x = cp.intvar(lb=-1, ub=5, shape=4)
         circuit = cp.Circuit(x)
 
-        model = cp.Model([~circuit, x == [1,2,0]])
+        model = cp.Model([~circuit, x == [1,2,3,0]])
         self.assertFalse(model.solve())
 
         model = cp.Model([~circuit])
