@@ -272,15 +272,23 @@ class Circuit(GlobalConstraint):
             https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
         succ = cpm_array(self.args)
+
         n = len(succ)
-        order = intvar(0,n-1, shape=n)
+        order = intvar(0,n-1, shape=n,name='order')
         constraining = []
         constraining += [AllDifferent(succ)] # different successors
         constraining += [AllDifferent(order)] # different orders
         constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
+        a = boolvar(name = 'a')
 
-        defining = [order[0] == succ[0]]
-        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+        #defining = [a == ((min(succ) >= 0) & (max(succ)<n))]
+        defining = [a == ((Minimum(succ) >= 0) & (Maximum(succ)<n))]
+        for i in range(n):
+            defining += [(~a).implies(order[i] == 0)]
+            if i == 0:
+                defining += [a.implies(order[0] == succ[0])]
+            else:
+                defining += [a.implies(order[i] == succ[order[i-1]])] # first one is successor of '0', ith one is successor of i-1
 
         return constraining, defining
 
