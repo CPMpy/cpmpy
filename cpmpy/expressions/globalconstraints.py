@@ -387,9 +387,8 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        # there are multiple decompositions possible, this one is another way to write a modulo, so that all solvers can use it.
+        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
-
         if len(self.args) > 2:
             decomp = Xor([decomp,self.args[2:]]).decompose()[0]
         return decomp, []
