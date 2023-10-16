@@ -143,3 +143,45 @@ def quickxplain(soft, hard=[], solver="ortools"):
 
     core = do_recursion(list(assump)[:max_idx+1], [], [])
     return [dmap[a] for a in core]
+
+
+def quickxplain_naive(soft, hard=[], solver="ortools"):
+    """
+        CPMpy implementation of the QuickXplain algorithm by Junker:
+            Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
+            https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
+
+        Naive implementation of the quickXplain algorithm without assumptions.
+        Can be faster when using many global constraints and a solver not support reification of globals.
+
+        Find a preferred minimal unsatisfiable subset of constraints
+        A partial order is imposed on the constraints using the order of `soft`.
+        Constraints with lower index are preferred over ones with higher index
+    """
+
+    soft = toplevel_list(soft, merge_and=False)
+    assert cp.Model(hard + soft).solve(solver) is False, "The model should be UNSAT!"
+
+    # the recursive call
+    def do_recursion(soft, hard, delta):
+
+        m = cp.Model(hard)
+        if len(delta) != 0 and m.solve(solver) is False:
+            # conflict is in hard constraints, no need to recurse
+            return []
+
+        if len(soft) == 1:
+            # conflict is not in hard constraints, but only 1 soft constraint
+            return list(soft)  # base case of recursion
+
+        split = len(soft) // 2  # determine split point
+        more_preferred, less_preferred = soft[:split], soft[split:]  # split constraints into two sets
+
+        # treat more preferred part as hard and find extra constants from less preferred
+        delta2 = do_recursion(less_preferred, hard + more_preferred, more_preferred)
+        # find which preferred constraints exactly
+        delta1 = do_recursion(more_preferred, hard + delta2, delta2)
+        return delta1 + delta2
+
+    core = do_recursion(soft, hard, [])
+    return core
