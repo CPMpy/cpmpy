@@ -158,18 +158,6 @@ def flatten_constraint(expr):
                     # there could be nested implications
                     newlist.extend(flatten_constraint(Operator('or', newargs)))
                     continue
-                else:
-                    # check if disjunction contains conjunctions, and if so split out
-                    newexprs = None
-                    for i,a in enumerate(expr.args):
-                        if isinstance(a, Operator) and a.name == 'and':
-                            # can avoid aux var creation by splitting over the and
-                            newexprs = [Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args]
-                            break
-                    if newexprs is not None:
-                        newlist.extend(flatten_constraint(newexprs))
-                        continue
-
             elif expr.name == '->':
                 # some rewrite rules that avoid creating auxiliary variables
                 # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
