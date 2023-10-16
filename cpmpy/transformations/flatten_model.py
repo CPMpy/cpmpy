@@ -251,21 +251,11 @@ def flatten_constraint(expr):
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
-
             # Reification (double implication): Boolexpr == Var
+            # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
-                if is_num(rexpr):
-                    # shortcut, full original one is normalizable BoolExpr
-                    # such as And(v1,v2,v3) == 0
-                    # TODO: should be normalized away in earlier transform
-                    (con, flatcons) = normalized_boolexpr(expr)
-                    newlist.append(con)
-                    newlist.extend(flatcons)
-                    continue
-                else:
-                    (lhs, lcons) = normalized_boolexpr(lexpr)
+                (lhs, lcons) = normalized_boolexpr(lexpr)
             else:
-                # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
             newlist.append(Comparison(exprname, lhs, rvar))
@@ -427,15 +417,6 @@ def normalized_boolexpr(expr):
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
-                if is_num(rexpr):
-                    # BoolExpr == 0|False
-                    assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
-                    if exprname == '==':
-                        nnexpr = recurse_negation(lexpr)
-                        return normalized_boolexpr(nnexpr)
-                    else: # !=, should only be possible in dubble negation
-                        return normalized_boolexpr(lexpr)
-
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=' and rvar.is_bool():

@@ -30,7 +30,7 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
 EXCLUDE_IMPL = {"ortools": {},
-                "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
+                "minizinc": {},
                 "z3": {},
                 "pysat": {},
                 "pysdd": {},
