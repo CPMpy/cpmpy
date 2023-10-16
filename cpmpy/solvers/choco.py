@@ -32,13 +32,14 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_boolexpr
+from ..expressions.utils import is_num, is_boolexpr, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.reification import only_bv_reifies, reify_rewrite
+from ..exceptions import ChocoBoundsException, ChocoTypeException
 
 
 class CPM_choco(SolverInterface):
@@ -300,7 +301,24 @@ class CPM_choco(SolverInterface):
         raise NotImplementedError("Choco: Not a known supported numexpr {}".format(cpm_expr))
 
     def to_var(self, val):
-        return self.chc_model.intvar(val, val)  # convert to "variable"
+        from pychoco.variables.intvar import IntVar
+        if isinstance(val, int):
+            if val < -2147483646 or val > 2147483646:
+                raise ChocoBoundsException(
+                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
+            var = self.chc_model.intvar(val, val)  # convert to "variable"
+        elif isinstance(val, _NumVarImpl):
+            var = self.solver_var(val)  # use variable
+        elif isinstance(val, IntVar):
+            var = val
+        else:
+            var = None
+        return var
+
+    def to_vars(self, vals):
+        if is_any_list(vals):
+            return [self.to_vars(v) for v in vals]
+        return self.to_var(vals)
 
     def transform(self, cpm_expr):
         """
