@@ -96,13 +96,17 @@ def mus_naive(soft, hard=[], solver="ortools"):
 
 def quickxplain(soft, hard=[], solver="ortools"):
     """
+        Find a preferred minimal unsatisfiable subset of constraints, based on the ordering of constraints.
+
+        A total order is imposed on the constraints using the ordering of `soft`.
+        Constraints with lower index are preferred over ones with higher index
+
+        Assumption-based implementation for solvers that support s.solve(assumptions=...) and s.get_core()
+        More naive version available as `quickxplain_naive` to use with other solvers.
+
         CPMpy implementation of the QuickXplain algorithm by Junker:
             Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
-
-        Find a preferred minimal unsatisfiable subset of constraints
-        A partial order is imposed on the constraints using the order of `soft`.
-        Constraints with lower index are preferred over ones with higher index
     """
 
     soft = toplevel_list(soft, merge_and=False)
@@ -147,17 +151,19 @@ def quickxplain(soft, hard=[], solver="ortools"):
 
 def quickxplain_naive(soft, hard=[], solver="ortools"):
     """
+        Find a preferred minimal unsatisfiable subset of constraints, based on the ordering of constraints.
+
+        A total order is imposed on the constraints using the ordering of `soft`.
+        Constraints with lower index are preferred over ones with higher index
+
+        Naive implementation, re-solving the model from scratch.
+        Can be slower depending on the number of global constraints used and solver support for reified constraints.
+
         CPMpy implementation of the QuickXplain algorithm by Junker:
             Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
-
-        Naive implementation of the quickXplain algorithm without assumptions.
-        Can be faster when using many global constraints and a solver not support reification of globals.
-
-        Find a preferred minimal unsatisfiable subset of constraints
-        A partial order is imposed on the constraints using the order of `soft`.
-        Constraints with lower index are preferred over ones with higher index
     """
+
 
     soft = toplevel_list(soft, merge_and=False)
     assert cp.Model(hard + soft).solve(solver) is False, "The model should be UNSAT!"
