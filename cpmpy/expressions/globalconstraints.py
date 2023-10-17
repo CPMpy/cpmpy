@@ -394,16 +394,11 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        # there are multiple decompositions possible
-        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
-        # since Xor is logical constraint, the default is a logic decomposition
-        a0, a1 = self.args[:2]
-        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
-
-        # for more than 2 variables, we cascade (decomposed) xors
-        for arg in self.args[2:]:
-            cons = (cons | arg) & (~cons | ~arg)
-        return [cons], []
+        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
+        decomp = [sum(self.args[:2]) == 1]
+        if len(self.args) > 2:
+            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+        return decomp, []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
