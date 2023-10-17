@@ -29,54 +29,43 @@ def quickXplain(soft, hard=[], solver="ortools"):
     assert solver.solve(assumptions=assump) is False, "The model should be UNSAT!"
 
     dmap = dict(zip(assump, soft))
-    core = recurse_explain(list(assump),[],[], solver=solver)
+    core = recurse_explain(list(assump), [], [], solver=solver)
     return [dmap[a] for a in core]
 
 
 def recurse_explain(soft, hard, delta, solver):
-
     if len(delta) != 0 and solver.solve(assumptions=hard) is False:
         # conflict is in hard constraints, no need to recurse
         return []
 
     if len(soft) == 1:
         # conflict is not in hard constraints, but only 1 soft constraint
-        return list(soft) # base case of recursion
+        return list(soft)  # base case of recursion
 
-    split = len(soft) // 2 # determine split point
-    more_preferred, less_preferred = soft[:split], soft[split:] # split constraints into two sets
+    split = len(soft) // 2  # determine split point
+    more_preferred, less_preferred = soft[:split], soft[split:]  # split constraints into two sets
 
     # treat more preferred part as hard and find extra constants from less preferred
-    delta2 = recurse_explain(less_preferred, hard+more_preferred, more_preferred, solver=solver)
+    delta2 = recurse_explain(less_preferred, hard + more_preferred, more_preferred, solver=solver)
     # find which preferred constraints exactly
-    delta1 = recurse_explain(more_preferred, hard+delta2, delta2, solver=solver)
+    delta1 = recurse_explain(more_preferred, hard + delta2, delta2, solver=solver)
     return delta1 + delta2
 
 
 if __name__ == "__main__":
+    # example of quickXplain paper
+    options = {"roof racks": 500,
+               "CD-player": 500,
+               "one additional seat": 800,
+               "metal color": 500,
+               "special luxury version": 2600}
 
-    x = cp.intvar(-9, 9, name="x")
-    y = cp.intvar(-9, 9, name="y")
-    m = cp.Model(
-        (x + y > 0) | (y < 0),
-        (y >= 0) | (x >= 0),
-        (y < 0) | (x < 0),
-        (y > 0) | (x < 0),
-        x < 0,
-        x < 1,
-        x > 2,
-        cp.AllDifferent(x, y)
-    )
+    preferences = [cp.boolvar(name=name) for name in options.keys()]
+    p1, p2, p3, p4, p5 = preferences
 
-    print(m)
-    assert (m.solve() is False)
+    hard = cp.sum(var * options[var.name] for var in preferences) <= 3000
+    core1 = quickXplain([p1, p2, p3, p4, p5], hard)
+    print("One cannot combine these options:", core1)
 
-    #  prefer constraints with less variables
-    soft = sorted(m.constraints, key = lambda c: len(get_variables(c)))
-    core1 = quickXplain(soft, solver="ortools")
-    print("Preferred MUS with constraints containing little variables:\n",core1)
-
-    # prefer constraints with more variables
-    soft = sorted(m.constraints, key = lambda c : -len(get_variables(c)))
-    core2 = quickXplain(soft=m.constraints, solver="ortools")
-    print("Preferred MUS with constraints containing many variables:\n",core2)
+    core2 = quickXplain([p3, p1, p2, p5, p4], hard)
+    print("One cannot combine these options:", core2)
