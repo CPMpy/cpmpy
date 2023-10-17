@@ -219,6 +219,9 @@ class CPM_choco(SolverInterface):
             or returns from cache if previously created
         """
         if is_num(cpm_var):  # shortcut, eases posting constraints
+            if cpm_var < -2147483646 or cpm_var > 2147483646:
+                raise ChocoBoundsException(
+                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return cpm_var
 
         # special case, negative-bool-view
@@ -231,6 +234,9 @@ class CPM_choco(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.chc_model.boolvar(name=str(cpm_var.name))
             elif isinstance(cpm_var, _IntVarImpl):
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise ChocoBoundsException(
+                        "Choco does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
