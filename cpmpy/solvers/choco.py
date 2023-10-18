@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_boolexpr, is_any_list
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -308,7 +308,7 @@ class CPM_choco(SolverInterface):
 
     def to_var(self, val):
         from pychoco.variables.intvar import IntVar
-        if isinstance(val, int):
+        if is_int(val):
             if val < -2147483646 or val > 2147483646:
                 raise ChocoBoundsException(
                     "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
