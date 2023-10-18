@@ -222,7 +222,7 @@ class CPM_choco(SolverInterface):
             if cpm_var < -2147483646 or cpm_var > 2147483646:
                 raise ChocoBoundsException(
                     "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
-            return cpm_var
+            return int(cpm_var)
 
         # special case, negative-bool-view
         # work directly on var inside the view
