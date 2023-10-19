@@ -296,6 +296,9 @@ class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
     def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
         super().__init__("table", [array, table])
 
     def decompose(self):
