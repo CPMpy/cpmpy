@@ -1,6 +1,7 @@
 numpy>=1.17.0
 m2r2>=0.2.7
 sphinx-automodapi
+sphinx_rtd_theme
 sphinx==5.3.0
 sphinx_rtd_theme==1.1.1
 readthedocs-sphinx-search==0.1.1
