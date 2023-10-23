@@ -42,7 +42,9 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'm2r2'
+    'm2r2',
+    'sphinx_automodapi.automodapi',
+    'sphinx_automodapi.smart_resolver'
 ]
 
 numpydoc_show_class_members = False
