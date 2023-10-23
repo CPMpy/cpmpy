@@ -71,7 +71,7 @@ autodoc_default_flags = ['members', 'special-members']
 
 # -- Options for HTML output -------------------------------------------------
 html_theme_options = {
-    'navigation_depth': 4
+    'navigation_depth': 1
 }
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
