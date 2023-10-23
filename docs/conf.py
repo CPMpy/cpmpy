@@ -66,17 +66,6 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
-html_theme_options = {
-    'logo': 'cpmpy.png',
-    'github_user': 'tias',
-    'github_repo': 'cppy',
-    'github_button': True,
-    'github_type': 'star',
-    'sidebar_width': '152px',
-    'body_text_align': 'justify'
-}
-
-
 # Autodoc settings
 autodoc_default_flags = ['members', 'special-members']
 
