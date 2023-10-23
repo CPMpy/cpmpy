@@ -70,8 +70,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 autodoc_default_flags = ['members', 'special-members']
 
 # -- Options for HTML output -------------------------------------------------
-html_theme_options = {
-}
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
