@@ -49,7 +49,6 @@ class CPM_ortools(SolverInterface):
 
     See detailed installation instructions at:
     https://developers.google.com/optimization/install
-    and if you are on Apple M1: https://cpmpy.readthedocs.io/en/latest/installation_M1.html
 
     Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()

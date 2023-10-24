@@ -42,8 +42,10 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'm2r2',
+    'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
-    'm2r2'
+    'sphinx_automodapi.smart_resolver'
 ]
 
 numpydoc_show_class_members = False
@@ -64,17 +66,6 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
-html_theme_options = {
-    'logo': 'cpmpy.png',
-    'github_user': 'tias',
-    'github_repo': 'cppy',
-    'github_button': True,
-    'github_type': 'star',
-    'sidebar_width': '152px',
-    'body_text_align': 'justify'
-}
-
-
 # Autodoc settings
 autodoc_default_flags = ['members', 'special-members']
 
@@ -83,7 +74,7 @@ autodoc_default_flags = ['members', 'special-members']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = 'alabaster'
+html_theme = "sphinx_rtd_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
