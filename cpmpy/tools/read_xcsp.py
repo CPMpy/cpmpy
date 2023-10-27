@@ -64,11 +64,27 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         str_shape = xml_element.attrib['size']
         shape = tuple([int(i.strip("[]")) for i in str_shape.split("][")])
 
-        lb, ub = self.parse_domain(xml_element.text)
-        if lb == 0 and ub == 1:
-            self.varpool[varname] = cp.boolvar(shape=shape, name=varname)
-        else:
-            self.varpool[varname] = cp.intvar(lb, ub, shape=shape, name=varname)
+        domains = xml_element.findall('domain')
+        if domains == []: #domain is same for all vars
+            lb, ub = self.parse_text_domain(xml_element.text)
+            if lb == 0 and ub == 1:
+                self.varpool[varname] = cp.boolvar(shape=shape, name=varname)
+            else:
+                self.varpool[varname] = cp.intvar(lb, ub, shape=shape, name=varname)
+        else: #different domains
+            #start by making the vars with arbitrary domain, correct it later
+            self.varpool[varname] = cp.intvar(1,1, shape =shape, name=varname)
+            for domain in domains:
+                vrs, lb, ub = self.parse_domain(domain)
+                for var in vrs:
+                    cpm_vars = self.get_vars(var)
+                    if isinstance(cpm_vars, list):
+                        for cpm_var in cpm_vars:
+                            cpm_var.lb = lb
+                            cpm_var.ub= ub
+                    else:
+                        cpm_vars.lb = lb
+                        cpm_vars.ub = ub
 
     def get_vars(self, str_var: str):
         """
@@ -78,6 +94,9 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         if re.fullmatch("\%[0-9]", str_var):
             return self.abstract_args[int(str_var.strip("%"))]
 
+        if re.fullmatch("\%...", str_var):
+            return self.abstract_args
+
         if "[" not in str_var:  # simple var
             return self.varpool.get(str_var, int(str_var))
 
@@ -86,13 +105,13 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         name, indices = str_var[:split], str_var[split:]
 
         np_index = ""
-        for idx in re.findall("\[[0-9]*\]", indices):
+        for idx in re.findall("\[[0-9]*\.*[0-9]*\]", indices):
             idx = idx.strip("[]")
             if idx == "":
                 np_index += ":,"
             elif ".." in idx:
                 i, j = idx.split("..")
-                np_index += f"{int(i)}:{int(j)},"
+                np_index += f"{int(i)}:{int(j) +1},"
             else:
                 np_index += idx + ","
 
@@ -102,7 +121,13 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
             return var.flatten().tolist()
         return var
 
-    def parse_domain(self, txt):
+    def parse_domain(self, domain):
+        lb, ub = self.parse_text_domain(domain.text)
+        vars = domain.attrib['for']
+        return vars.split(' '), lb, ub
+
+
+    def parse_text_domain(self, txt):
 
         if ".." in txt:
             # integer range
@@ -232,8 +257,16 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         cpm_vars = self._cpm_vars_from_attr(xml_cons.find("./list"))
         condition = xml_cons.find("./condition")
         operator, rhs = condition.text.strip()[1:-1].split(",")
-
+        cpm_rhs = self.get_vars(rhs)
         arity, cpm_op = self.funcmap[operator]
+
+        #if var pattern is just %... we will take all of them, including the rhs (because we only learn here which one it is)
+        #so remove it from the lhs.
+
+        try:
+            cpm_vars.remove(cpm_rhs)
+        except ValueError:
+            pass
 
         coeffs = xml_cons.find("./coeffs")
         if coeffs is None:
@@ -306,15 +339,11 @@ if __name__ == "__main__":
     from cpmpy.transformations.get_variables import get_variables
     from cpmpy.transformations.normalize import toplevel_list
 
-    dir = "/home/ignace/Downloads/XCSP23_V2/CSP23"
+    dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-
-    for fname in sorted(fnames):
+    for fname in sorted(fnames)[:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
-        if not model.solve():
-            for var in sorted(get_variables(model.constraints), key=str):
-                print(var, var.lb, var.ub)
-
-            for i,cons in enumerate(toplevel_list(model.constraints, merge_and=False)):
-                print(i,cons)
+        if model.solve(time_limit=20):
+            print('sat')
+        print(model.status())
