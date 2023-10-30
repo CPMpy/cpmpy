@@ -8,7 +8,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-
+SOLVERNAMES = ['glasgowconstraintsolver']
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {},
@@ -17,6 +17,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
                   "exact": {},
+                  "glasgowconstraintsolver": {"circuit"},
                   }
 
 # Exclude certain operators for solvers.
@@ -25,6 +26,7 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {"mod","pow","div","mul"},
+                     "glasgowconstraintsolver": {},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
@@ -35,6 +37,7 @@ EXCLUDE_IMPL = {"ortools": {},
                 "pysat": {},
                 "pysdd": {},
                 "exact": {"mod","pow","div","mul"},
+                "glasgowconstraintsolver": {},
                 }
 
 # Variables to use in the rest of the test script

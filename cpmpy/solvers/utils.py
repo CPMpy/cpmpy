@@ -24,8 +24,9 @@ import warnings # for deprecation warning
 from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
-from .pysat import CPM_pysat
 from .z3 import CPM_z3
+from .glasgowconstraintsolver import CPM_glasgowconstraintsolver
+from .pysat import CPM_pysat
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
 
@@ -72,6 +73,7 @@ class SolverLookup():
         return [("ortools", CPM_ortools),
                 ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
+                ("glasgowconstraintsolver", CPM_glasgowconstraintsolver),
                 ("gurobi", CPM_gurobi),
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
