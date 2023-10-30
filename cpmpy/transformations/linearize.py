@@ -277,17 +277,28 @@ def canonical_comparison(lst_of_expr):
             lhs, rhs = cpm_expr.args
 
             # put all vars to lhs
-            if not is_num(rhs) and isinstance(lhs, _NumVarImpl) or lhs.name =="sum" or lhs.name == "wsum":
+            if not is_num(rhs) and (isinstance(lhs, _NumVarImpl) or lhs.name =="sum" or lhs.name == "wsum"):
+
+                if isinstance(rhs, Operator):
+                    if rhs.name == "sum":
+                        extra_weights = [-1] * len(rhs.args)
+                        extra_vars = rhs.args
+                    elif rhs.name == "wsum":
+                        extra_weights=  [-w for w in rhs.args[0]]
+                        extra_vars = rhs.args[1]
+                elif isinstance(rhs, _NumVarImpl):
+                    extra_weights = [-1]
+                    extra_vars = [rhs]
 
                 if lhs.name == "sum":
-                    lhs_weights = [1]*len(lhs.args) + [-1]
-                    lhs_args = lhs.args + [rhs]
+                    lhs_weights = [1]*len(lhs.args) + extra_weights
+                    lhs_args = lhs.args + extra_vars
                 elif lhs.name == "wsum":
-                    lhs_weights = lhs.args[0] + [-1]
-                    lhs_args = lhs.args[1] + [rhs]
-                else: # lsh is constant
-                    lhs_weights = [1,-1]
-                    lhs_args = [lhs, rhs]
+                    lhs_weights = lhs.args[0] + extra_weights
+                    lhs_args = lhs.args[1] + extra_vars
+                else: # lhs is constant
+                    lhs_weights = [1] + extra_weights
+                    lhs_args = [lhs] + extra_vars
 
                 lhs = Operator("wsum", [lhs_weights, lhs_args])
                 rhs = 0
