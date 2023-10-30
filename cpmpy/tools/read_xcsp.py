@@ -13,11 +13,15 @@ from cpmpy.expressions.variables import NDVarArray
     
     Currently implemented:
         - variable creation with arrays
+        - array of variables with different domains
         - constraint groups
+        - constraint blocks
         - constraints:
             - simple arithmetic
             - alldiff
             - gcc
+            - minimum
+            - maximum
 
     Features to add for sure:
         - creating variables without arrays
@@ -25,7 +29,7 @@ from cpmpy.expressions.variables import NDVarArray
         - objective functions
         - rest of constraints
     Nice to haves:
-        - array of variables with different domains (e.g., with InDomain constraint?)
+        - 
         - ...?
     NOT to add:
         - set variables
@@ -168,6 +172,12 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
 
         return constraints
 
+    def parse_block(self, block):
+        cons = []
+        for constraint in block:
+            cons.append(self.parse_constraint(constraint))
+        return cons
+
     funcmap = {
         # Arithmetic
         "neg": (1, lambda x: -x),
@@ -261,8 +271,7 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         arity, cpm_op = self.funcmap[operator]
 
         #if var pattern is just %... we will take all of them, including the rhs (because we only learn here which one it is)
-        #so remove it from the lhs.
-
+        #so remove it from the lhs. #TODO same for other constraints?
         try:
             cpm_vars.remove(cpm_rhs)
         except ValueError:
@@ -300,10 +309,20 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         raise NotImplementedError("MDD is not supported")
 
     def parse_minimum(self, xml_cons):
-        raise NotImplementedError()
+        cpm_vars = self._cpm_vars_from_attr(xml_cons.find("./list"))
+        condition = xml_cons.find("./condition")
+        operator, rhs = condition.text.strip()[1:-1].split(",")
+        cpm_rhs = self.get_vars(rhs)
+        arity, cpm_op = self.funcmap[operator]
+        return cpm_op([cp.Minimum(cpm_vars), cpm_rhs])
 
     def parse_maximum(self, xml_cons):
-        raise NotImplementedError()
+        cpm_vars = self._cpm_vars_from_attr(xml_cons.find("./list"))
+        condition = xml_cons.find("./condition")
+        operator, rhs = condition.text.strip()[1:-1].split(",")
+        cpm_rhs = self.get_vars(rhs)
+        arity, cpm_op = self.funcmap[operator]
+        return cpm_op([cp.Maximum(cpm_vars), cpm_rhs])
 
     def parse_element(self, xml_cons):
         raise NotImplementedError()
@@ -341,9 +360,10 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[:]:
+    for fname in sorted(fnames)[10:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
+        print(model)
         if model.solve(time_limit=20):
             print('sat')
         print(model.status())
