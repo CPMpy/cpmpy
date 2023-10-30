@@ -101,8 +101,12 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         if re.fullmatch("\%...", str_var):
             return self.abstract_args
 
-        if "[" not in str_var:  # simple var
-            return self.varpool.get(str_var, int(str_var))
+        if "[" not in str_var:  # simple var, value or interval
+            if '..' in str_var:  # interval of values (not vars)
+                i, j = str_var.split('..')
+                return [x for x in range(int(i), int(j) + 1)]
+            else: #simple var/value
+                return self.varpool.get(str_var, int(str_var))
 
         # multi-dimensional var, find indices to pass
         split = str_var.index("[")
@@ -199,6 +203,8 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         "gt": (2, lambda x, y: x > y),
         "ne": (2, lambda x, y: x != y),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
+        # Set
+        'in': (2, lambda x, y: cp.InDomain(x,y)),
         # Logic
         "not": (1, lambda x: ~x),
         "and": (0, lambda x: cp.all(x)),
@@ -360,7 +366,7 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[10:]:
+    for fname in sorted(fnames)[20:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
         print(model)
