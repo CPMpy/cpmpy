@@ -269,8 +269,8 @@ def canonical_comparison(lst_of_expr):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], Expression) and \
-            isinstance(cpm_expr.args[0], _NumVarImpl) or \
-                (isinstance(cpm_expr.args[0], Operator) and (cpm_expr.args[0].name == "sum" or cpm_expr.args[0].name == "wsum")):
+                (isinstance(cpm_expr.args[0], _NumVarImpl) or \
+                (isinstance(cpm_expr.args[0], Operator) and (cpm_expr.args[0].name == "sum" or cpm_expr.args[0].name == "wsum"))):
 
             # LHS is sum/wsum/var
             comp_name = cpm_expr.name
