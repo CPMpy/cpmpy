@@ -118,7 +118,7 @@ class CPM_ortools(SolverInterface):
 
             You can use any of these parameters as keyword argument to `solve()` and they will
             be forwarded to the solver. Examples include:
-                - num_search_workers=8          number of parallel workers (default: 1)
+                - num_search_workers=8          number of parallel workers (default: 8)
                 - log_search_progress=True      to log the search process to stdout (default: False)
                 - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
                 - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
