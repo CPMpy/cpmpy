@@ -299,7 +299,22 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         return cpm_op(lhs, self.get_vars(rhs))
 
     def parse_count(self, xml_cons):
-        raise NotImplementedError()
+        cpm_list = self._cpm_vars_from_attr(xml_cons.find("./list"))
+        cpm_values = self._cpm_vars_from_attr(xml_cons.find("./values"))
+        assert len(cpm_values) == 1 #only 1 value is supported
+        cpm_value = cpm_values[0]
+        condition = xml_cons.find("./condition")
+        operator, rhs = condition.text.strip()[1:-1].split(",")
+        cpm_rhs = self.get_vars(rhs)
+
+        # if var pattern is just %... we will take all of them, including the rhs (because we only learn here which one it is)
+        # so remove it from the lhs.
+        try:
+            cpm_list.remove(cpm_rhs)
+        except ValueError:
+            pass
+        arity, cpm_op = self.funcmap[operator]
+        return cpm_op([cp.Count(cpm_list,cpm_value), cpm_rhs])
 
     def parse_nvalues(self, xml_cons):
         raise NotImplementedError()
