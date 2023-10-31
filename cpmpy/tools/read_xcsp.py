@@ -221,6 +221,7 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
             Parse recursive functions
         """
         if isinstance(xml_cons, ET.Element):
+            #TODO: expression can be in <function> block
             txt = xml_cons.text.strip()
         elif isinstance(xml_cons, str):
             txt = xml_cons.strip()
