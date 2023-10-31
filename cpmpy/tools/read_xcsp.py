@@ -57,14 +57,26 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         for xml_el in lst_of_defs:
             if xml_el.tag == "array":  # dispatch to multidim
                 self.parse_n_dimvar(xml_el)
+            elif xml_el.tag =='var':
+                self.parse_singular_var(xml_el)
             else:
                 raise ValueError(f"Unknown variable {xml_el}, todo?")
+
+    def parse_singular_var(self,xml_element):
+        varname = xml_element.attrib['id']
+        description = xml_element.attrib['note']
+        lb, ub = self.parse_text_domain(xml_element.text)
+        if lb == 0 and ub == 1:
+            self.varpool[varname] = cp.boolvar(name=varname,description=description)
+        else:
+            self.varpool[varname] = cp.intvar(lb, ub, name=varname)
 
     def parse_n_dimvar(self, xml_element):
 
         assert xml_element.tag == "array"
 
         varname = xml_element.attrib['id']
+        #TODO we can add the note as a description
         str_shape = xml_element.attrib['size']
         shape = tuple([int(i.strip("[]")) for i in str_shape.split("][")])
 
@@ -403,6 +415,10 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
     def parse_cumulative(self, xml_cons):
         raise NotImplementedError()
 
+    def parse_ordered(self, xml_cons):
+        #TODO when we have a global constraint for this
+        raise NotImplementedError()
+
     def get_table_values(self, suptxt):
         if '..' in suptxt: #split intervals
             if '(' in suptxt: #tuples
@@ -472,7 +488,7 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[102:]:
+    for fname in sorted(fnames)[114:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
         print(model)
