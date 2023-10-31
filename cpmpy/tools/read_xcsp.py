@@ -108,6 +108,9 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
             else: #simple var/value
                 return self.varpool.get(str_var, int(str_var))
 
+        if '(' in str_var: #it's a subexpression used as a var
+            return self.parse_intension(str_var)
+
         # multi-dimensional var, find indices to pass
         split = str_var.index("[")
         name, indices = str_var[:split], str_var[split:]
@@ -367,7 +370,7 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[20:]:
+    for fname in sorted(fnames)[32:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
         print(model)
