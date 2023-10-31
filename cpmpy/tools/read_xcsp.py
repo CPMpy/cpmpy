@@ -3,6 +3,7 @@ from cpmpy.expressions.core import Operator
 
 from xml.etree import ElementTree as ET
 import re
+import numpy as np
 
 from cpmpy.expressions.variables import NDVarArray
 
@@ -423,6 +424,44 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         #TODO when we have a global constraint for this
         raise NotImplementedError()
 
+    def parse_instantiation(self, xml_cons):
+        cpm_vars = self._cpm_vars_from_attr(xml_cons.find("./list"))
+        cpm_vals = self.parse_integer_sequence(xml_cons.find("./values"))
+        cpm_vars = cp.cpm_array(cpm_vars)
+        return cpm_vars == cpm_vals
+
+    def parse_integer_sequence(self, xml_vals):
+
+        if isinstance(xml_vals, list):
+            return [self.parse_integer_sequence(val) for val in xml_vals]
+        if isinstance(xml_vals, ET.Element):
+            txt = xml_vals.text.strip()
+        elif isinstance(xml_vals, str):
+            txt = xml_vals.strip()
+        else:
+            raise ValueError(f"Unknown argument {xml_vals}")
+
+        if ' ' in txt:
+            vals = txt.split(" ")
+            out = []
+            for val in vals:
+                parsedvals = self.parse_integer_sequence(val)
+                if isinstance(parsedvals, list):
+                    for parsedval in parsedvals:
+                        out.append(parsedval)
+                else:
+                    out.append(parsedvals)
+            return out
+
+        if '*' in txt:
+            raise NotImplementedError('wildcards not supported')
+        elif 'x' in txt: #expand list
+            a, b = txt.split('x')
+            return self.parse_integer_sequence((a + ' ') * int(b))
+        else: #just numbers left now
+            return int(txt)
+
+
     def get_table_values(self, suptxt):
         if '..' in suptxt: #split intervals
             if '(' in suptxt: #tuples
@@ -481,8 +520,6 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
 
 
 
-
-
 if __name__ == "__main__":
 
 
@@ -492,7 +529,7 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[114:]:
+    for fname in sorted(fnames)[122:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
         print(model)
