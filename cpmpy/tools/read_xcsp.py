@@ -270,7 +270,18 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         return cpm_vars
 
     def parse_extension(self, xml_cons): # table constraint
-        raise NotImplementedError()
+        cpm_list = self._cpm_vars_from_attr(xml_cons.find("./list"))
+        if xml_cons.find("./supports") is not None: #positife table constraint
+            suptxt = xml_cons.find("./supports").text.strip()
+            if '*' in suptxt: #wildcards
+                raise NotImplementedError()
+            else:
+                tab = self.get_table_values(suptxt)
+                return cp.Table(cpm_list,tab)
+        elif xml_cons.find("./conflicts") is not None: #negative table constraint
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError()
 
     def parse_sum(self, xml_cons):
 
@@ -353,7 +364,24 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         raise NotImplementedError()
 
     def parse_channel(self, xml_cons):
-        raise NotImplementedError()
+        lists = xml_cons.findall("./list")
+        if len(lists) == 0: #simplified form
+            raise NotImplementedError()
+        elif len(lists) == 1:
+            value = xml_cons.find("./value/")
+            if value is None: # just one list
+                raise NotImplementedError()
+            else: # list and value
+                raise NotImplementedError()
+        elif len(lists) == 2:
+            for list in lists:
+                if list.find('./startIndex') is not None:
+                    raise NotImplementedError()
+            cpm_list1 = self._cpm_vars_from_attr(lists[0])
+            cpm_list2 = self._cpm_vars_from_attr(lists[1])[0:len(cpm_list1)] #make them same length, since last part is irrelevant anyway
+            return cp.Inverse(cpm_list1,cpm_list2)
+        else:
+            raise NotImplementedError()
 
     def parse_alldifferent(self, xml_cons):
         if xml_cons.text != "":
@@ -375,6 +403,65 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
     def parse_cumulative(self, xml_cons):
         raise NotImplementedError()
 
+    def get_table_values(self, suptxt):
+        if '..' in suptxt: #split intervals
+            if '(' in suptxt: #tuples
+                ii = suptxt.index("..")
+                nn = suptxt.index(')', ii)
+                mm = suptxt.rindex('(', 0, ii)
+                splice = suptxt[mm:nn + 1]
+                i = splice.index('..')
+                n = splice.find(',', i)
+                m = splice.rfind(',', 0, i)
+                if m == -1:
+                    ssplice = splice[m + 2:n]
+                else:
+                    ssplice = splice[m + 1:n]
+                a, b = ssplice.split("..")
+                extended = suptxt[:mm] + suptxt[nn + 1:]
+                if m == -1: #if interval is first element of tuple we need an extra '('
+                    m += 1
+                for j in range(int(a), int(b) + 1):
+                    extended += splice[:m + 1] + str(j) + splice[n:]
+                return self.get_table_values(extended)
+            else: #singular values
+                i = suptxt.index("..")
+                n = suptxt.find(' ', i)
+                m = suptxt.rfind(' ', 0, i)
+
+                if n == -1:
+                    splice = suptxt[m + 1:]
+                else:
+                    splice = suptxt[m + 1:n]
+                a, b = splice.split("..")
+
+                if m == -1 and n == -1:  # it's the only element
+                    extended = ""
+                elif m == -1:
+                    extended = suptxt[n + 1:]
+                elif n == -1:
+                    extended = suptxt[:m]
+                else:
+                    extended = suptxt[:m] + suptxt[n:]
+                for j in range(int(a), int(b) + 1):
+                    extended += ' '
+                    extended += str(j)
+
+                return self.get_table_values(extended)
+        elif '(' in suptxt: #multiple options
+            tab = []
+            for tpl in suptxt[1:-1].split(')('):
+                vals = tuple([int(val) for val in tpl.split(',')])
+                tab.append(vals)
+            return tab
+        elif '*' in suptxt:
+            raise NotImplementedError()
+        else: #just one option
+            return [tuple([int(val)]) for val in suptxt.split(" ")]
+
+
+
+
 
 if __name__ == "__main__":
 
@@ -385,7 +472,7 @@ if __name__ == "__main__":
 
     dir = "C:\\Users\\wout\\Downloads\\CSP23"
     fnames = [fname for fname in os.listdir(dir) if fname.endswith(".xml")]
-    for fname in sorted(fnames)[32:]:
+    for fname in sorted(fnames)[102:]:
         print(fname)
         model = XCSPParser(os.path.join(dir,fname))
         print(model)
