@@ -158,8 +158,12 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
             return int(lb), int(ub)
         elif txt.strip() == "0 1":
             return 0, 1
-
-        raise ValueError("Unknown domain:", txt)
+        else:
+            try:
+                lb = int(txt.strip())
+            except Exception:
+                raise ValueError("Unknown domain:", txt)
+            return lb, lb #var is actually a val (this is not xcsp core)
 
     # parsers for all constraints
     def parse_constraint(self, xml_cons):
