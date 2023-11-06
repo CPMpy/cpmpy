@@ -6,6 +6,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
+from cpmpy.expressions.utils import get_bounds
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -443,6 +444,27 @@ class TestBounds(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3"))
             self.assertTrue(cons.value())
+
+
+    def test_list(self):
+
+        # cpm_array
+        iv = cp.intvar(0,10,shape=3)
+        lbs, ubs = iv.get_bounds()
+        self.assertListEqual([0,0,0], lbs.tolist())
+        self.assertListEqual([10,10,10], ubs.tolist())
+        # list
+        iv = [cp.intvar(0,10) for _ in range(3)]
+        lbs, ubs = get_bounds(iv)
+        self.assertListEqual([0, 0, 0], lbs)
+        self.assertListEqual([10, 10, 10], ubs)
+        # nested list
+        exprs = [intvar(0,1), [intvar(2,3), intvar(4,5)], [intvar(5,6)]]
+        lbs, ubs = get_bounds(exprs)
+        self.assertListEqual([0,[2,4],[5]], lbs)
+        self.assertListEqual([1,[3,5],[6]], ubs)
+
+
 
     def test_not_operator(self):
         p = boolvar()
