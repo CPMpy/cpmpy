@@ -197,6 +197,9 @@ class testCanonical_comparison(unittest.TestCase):
         cons = canonical_comparison([cp.sum([a,b,c,10]) <= rhs])[0]
         self.assertEqual("sum([a, b, c]) <= -5", str(cons))
 
+        cons = canonical_comparison([(cp.sum([a, b, c, 10]) <= rhs) == (cp.sum([a]) <= b)])[0]
+        self.assertEqual('(sum([a, b, c]) <= -5) == (sum([1, -1] * [a, b]) <= 0)', str(cons))
+
         rhs = cp.sum([b,c])
         cons = canonical_comparison([cp.sum([a, b]) <= rhs])[0]
         self.assertEqual("sum([1, 1, -1, -1] * [a, b, b, c]) <= 0", str(cons))
@@ -209,8 +212,11 @@ class testCanonical_comparison(unittest.TestCase):
         self.assertEqual("(a) // (b) <= 5", str(cons))
 
         #when adding division
-        #cons = canonical_comparison([a / b <= c / rhs])[0]
-        #cons = canonical_comparison([a + b <= c/rhs])[0]
+        cons = canonical_comparison([a / b <= c / rhs])[0]
+        self.assertEqual('?', str(cons))
+
+        cons = canonical_comparison([a + b <= c * a])[0]
+        self.assertEqual('(sum([a, b]) - c * a <= 0)', str(cons))
 
 
     def test_wsum(self):
