@@ -464,7 +464,8 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
                 else:
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
-            cons += [capacity >= demand_at_t]
+
+            cons += [demand_at_t <= capacity]
 
         return cons, []
 
