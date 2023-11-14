@@ -570,7 +570,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
             self += [s + d == e for s,d,e in zip(start,dur,end)]
-            if not isinstance(args_str[0], list):
+            if len(start) == 1:
                 assert len(start) == 1
                 format_str = "cumulative([{}],[{}],[{}],{})"
             else:
