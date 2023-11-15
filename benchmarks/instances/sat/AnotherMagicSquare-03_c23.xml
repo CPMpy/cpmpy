@@ -1,0 +1,40 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i,j] is the value at row i and column j" size="[3][3]"> 1..9 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[9]">
+      <domain for="aux_gb[0] aux_gb[2] aux_gb[6] aux_gb[8]"> 3..27 </domain>
+      <domain for="aux_gb[1] aux_gb[3] aux_gb[5] aux_gb[7]"> 5..45 </domain>
+      <domain for="aux_gb[4]"> 8..72 </domain>
+    </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[][] </allDifferent>
+    <group note="ensuring that the numbers surrounding a number v add to a multiple of v">
+      <intension> eq(mod(%0,%1),0) </intension>
+      <args> aux_gb[0] x[0][0] </args>
+      <args> aux_gb[1] x[0][1] </args>
+      <args> aux_gb[2] x[0][2] </args>
+      <args> aux_gb[3] x[1][0] </args>
+      <args> aux_gb[4] x[1][1] </args>
+      <args> aux_gb[5] x[1][2] </args>
+      <args> aux_gb[6] x[2][0] </args>
+      <args> aux_gb[7] x[2][1] </args>
+      <args> aux_gb[8] x[2][2] </args>
+    </group>
+    <group>
+      <sum>
+        <list> %... </list>
+        <condition> (eq,%0) </condition>
+      </sum>
+      <args> aux_gb[0] x[0][1] x[1][0..1] </args>
+      <args> aux_gb[1] x[0][0] x[0][2] x[1][] </args>
+      <args> aux_gb[2] x[0..1][1] x[1][2] </args>
+      <args> aux_gb[3] x[0][0..1] x[1][1] x[2][0..1] </args>
+      <args> aux_gb[4] x[0][] x[1][0] x[1][2] x[2][] </args>
+      <args> aux_gb[5] x[0][1..2] x[1..2][1] x[2][2] </args>
+      <args> aux_gb[6] x[1][0..1] x[2][1] </args>
+      <args> aux_gb[7] x[1][] x[2][0] x[2][2] </args>
+      <args> aux_gb[8] x[1][1..2] x[2][1] </args>
+    </group>
+  </constraints>
+</instance>

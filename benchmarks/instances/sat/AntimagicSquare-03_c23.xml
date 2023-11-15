@@ -1,0 +1,43 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i][j] is the value put in cell of the matrix at coordinates (i,j)" size="[3][3]"> 1..9 </array>
+    <array id="y" note="y[k] is the sum of values in the kth line (row, column or diagonal)" size="[8]"> 6..45 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[2]"> 6..45 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="all values must be different"> x[][] </allDifferent>
+    <group note="computing sums">
+      <sum>
+        <list> %0 %1 %2 </list>
+        <condition> (eq,%3) </condition>
+      </sum>
+      <args> x[0][] y[0] </args>
+      <args> x[1][] y[1] </args>
+      <args> x[2][] y[2] </args>
+      <args> x[][0] y[3] </args>
+      <args> x[][1] y[4] </args>
+      <args> x[][2] y[5] </args>
+      <args> x[0][0] x[1][1] x[2][2] y[6] </args>
+      <args> x[2][0] x[1][1] x[0][2] y[7] </args>
+    </group>
+    <block note="all sums must be consecutive">
+      <allDifferent> y[] </allDifferent>
+      <intension> eq(sub(aux_gb[0],aux_gb[1]),7) </intension>
+    </block>
+    <group class="symmetry-breaking" note="ensuring Frenicle standard form">
+      <intension> lt(%0,%1) </intension>
+      <args> x[0][0] x[0][2] </args>
+      <args> x[0][0] x[2][0] </args>
+      <args> x[0][0] x[2][2] </args>
+      <args> x[0][1] x[1][0] </args>
+    </group>
+    <maximum>
+      <list> y[] </list>
+      <condition> (eq,aux_gb[0]) </condition>
+    </maximum>
+    <minimum>
+      <list> y[] </list>
+      <condition> (eq,aux_gb[1]) </condition>
+    </minimum>
+  </constraints>
+</instance>

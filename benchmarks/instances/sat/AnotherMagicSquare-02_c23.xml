@@ -1,0 +1,26 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i,j] is the value at row i and column j" size="[2][2]"> 1..4 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[4]"> 3..12 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[][] </allDifferent>
+    <group note="ensuring that the numbers surrounding a number v add to a multiple of v">
+      <intension> eq(mod(%0,%1),0) </intension>
+      <args> aux_gb[0] x[0][0] </args>
+      <args> aux_gb[1] x[0][1] </args>
+      <args> aux_gb[2] x[1][0] </args>
+      <args> aux_gb[3] x[1][1] </args>
+    </group>
+    <group>
+      <sum>
+        <list> %0 %1 %2 </list>
+        <condition> (eq,%3) </condition>
+      </sum>
+      <args> x[0][1] x[1][] aux_gb[0] </args>
+      <args> x[][0] x[1][1] aux_gb[1] </args>
+      <args> x[0][] x[1][1] aux_gb[2] </args>
+      <args> x[0][] x[1][0] aux_gb[3] </args>
+    </group>
+  </constraints>
+</instance>

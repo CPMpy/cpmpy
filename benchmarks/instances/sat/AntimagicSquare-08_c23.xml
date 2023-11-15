@@ -1,0 +1,53 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i][j] is the value put in cell of the matrix at coordinates (i,j)" size="[8][8]"> 1..64 </array>
+    <array id="y" note="y[k] is the sum of values in the kth line (row, column or diagonal)" size="[18]"> 36..2080 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[2]"> 36..2080 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="all values must be different"> x[][] </allDifferent>
+    <group note="computing sums">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,%0) </condition>
+      </sum>
+      <args> y[0] x[0][] </args>
+      <args> y[1] x[1][] </args>
+      <args> y[2] x[2][] </args>
+      <args> y[3] x[3][] </args>
+      <args> y[4] x[4][] </args>
+      <args> y[5] x[5][] </args>
+      <args> y[6] x[6][] </args>
+      <args> y[7] x[7][] </args>
+      <args> y[8] x[][0] </args>
+      <args> y[9] x[][1] </args>
+      <args> y[10] x[][2] </args>
+      <args> y[11] x[][3] </args>
+      <args> y[12] x[][4] </args>
+      <args> y[13] x[][5] </args>
+      <args> y[14] x[][6] </args>
+      <args> y[15] x[][7] </args>
+      <args> y[16] x[0][0] x[1][1] x[2][2] x[3][3] x[4][4] x[5][5] x[6][6] x[7][7] </args>
+      <args> y[17] x[7][0] x[6][1] x[5][2] x[4][3] x[3][4] x[2][5] x[1][6] x[0][7] </args>
+    </group>
+    <block note="all sums must be consecutive">
+      <allDifferent> y[] </allDifferent>
+      <intension> eq(sub(aux_gb[0],aux_gb[1]),17) </intension>
+    </block>
+    <group class="symmetry-breaking" note="ensuring Frenicle standard form">
+      <intension> lt(%0,%1) </intension>
+      <args> x[0][0] x[0][7] </args>
+      <args> x[0][0] x[7][0] </args>
+      <args> x[0][0] x[7][7] </args>
+      <args> x[0][1] x[1][0] </args>
+    </group>
+    <maximum>
+      <list> y[] </list>
+      <condition> (eq,aux_gb[0]) </condition>
+    </maximum>
+    <minimum>
+      <list> y[] </list>
+      <condition> (eq,aux_gb[1]) </condition>
+    </minimum>
+  </constraints>
+</instance>

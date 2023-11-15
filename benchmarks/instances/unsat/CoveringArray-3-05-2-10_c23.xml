@@ -1,0 +1,77 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="p" note="p[i][j] is one of the position of the jth value of the ith 3-combination" size="[10][8]"> 0..9 </array>
+    <array id="v" note="v[i][j] is the jth value of the ith 3-combination" size="[10][10]"> 0..7 </array>
+  </variables>
+  <constraints>
+    <group note="all values must be present in each 3-combination">
+      <allDifferent> %... </allDifferent>
+      <args> p[0][] </args>
+      <args> p[1][] </args>
+      <args> p[2][] </args>
+      <args> p[3][] </args>
+      <args> p[4][] </args>
+      <args> p[5][] </args>
+      <args> p[6][] </args>
+      <args> p[7][] </args>
+      <args> p[8][] </args>
+      <args> p[9][] </args>
+    </group>
+    <channel>
+      <list> p[0][] </list>
+      <list> v[0][] </list>
+    </channel>
+    <channel>
+      <list> p[1][] </list>
+      <list> v[1][] </list>
+    </channel>
+    <channel>
+      <list> p[2][] </list>
+      <list> v[2][] </list>
+    </channel>
+    <channel>
+      <list> p[3][] </list>
+      <list> v[3][] </list>
+    </channel>
+    <channel>
+      <list> p[4][] </list>
+      <list> v[4][] </list>
+    </channel>
+    <channel>
+      <list> p[5][] </list>
+      <list> v[5][] </list>
+    </channel>
+    <channel>
+      <list> p[6][] </list>
+      <list> v[6][] </list>
+    </channel>
+    <channel>
+      <list> p[7][] </list>
+      <list> v[7][] </list>
+    </channel>
+    <channel>
+      <list> p[8][] </list>
+      <list> v[8][] </list>
+    </channel>
+    <channel>
+      <list> p[9][] </list>
+      <list> v[9][] </list>
+    </channel>
+    <group note="computing values">
+      <extension>
+        <list> %... </list>
+        <supports> (0,0,0,0,0,0,0,0,0,0)(0,0,1,0,1,1,0,1,1,1)(0,1,0,1,0,2,1,0,2,2)(0,1,1,1,1,3,1,1,3,3)(1,0,0,2,2,0,2,2,0,4)(1,0,1,2,3,1,2,3,1,5)(1,1,0,3,2,2,3,2,2,6)(1,1,1,3,3,3,3,3,3,7)(2,2,2,0,0,0,4,4,4,0)(2,2,3,0,1,1,4,5,5,1)(2,3,2,1,0,2,5,4,6,2)(2,3,3,1,1,3,5,5,7,3)(3,2,2,2,2,0,6,6,4,4)(3,2,3,2,3,1,6,7,5,5)(3,3,2,3,2,2,7,6,6,6)(3,3,3,3,3,3,7,7,7,7)(4,4,4,4,4,4,0,0,0,0)(4,4,5,4,5,5,0,1,1,1)(4,5,4,5,4,6,1,0,2,2)(4,5,5,5,5,7,1,1,3,3)(5,4,4,6,6,4,2,2,0,4)(5,4,5,6,7,5,2,3,1,5)(5,5,4,7,6,6,3,2,2,6)(5,5,5,7,7,7,3,3,3,7)(6,6,6,4,4,4,4,4,4,0)(6,6,7,4,5,5,4,5,5,1)(6,7,6,5,4,6,5,4,6,2)(6,7,7,5,5,7,5,5,7,3)(7,6,6,6,6,4,6,6,4,4)(7,6,7,6,7,5,6,7,5,5)(7,7,6,7,6,6,7,6,6,6)(7,7,7,7,7,7,7,7,7,7) </supports>
+      </extension>
+      <args> v[][0] </args>
+      <args> v[][1] </args>
+      <args> v[][2] </args>
+      <args> v[][3] </args>
+      <args> v[][4] </args>
+      <args> v[][5] </args>
+      <args> v[][6] </args>
+      <args> v[][7] </args>
+      <args> v[][8] </args>
+      <args> v[][9] </args>
+    </group>
+  </constraints>
+</instance>

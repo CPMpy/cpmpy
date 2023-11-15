@@ -1,0 +1,155 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i][j] is the value in the grid at row i and column j" size="[8][8]"> 1..64 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[64]">
+      <domain for="aux_gb[0..1] aux_gb[6..9] aux_gb[14..15] aux_gb[48..49] aux_gb[54..57] aux_gb[62..63]"> 0..3 </domain>
+      <domain for="aux_gb[2] aux_gb[5] aux_gb[10] aux_gb[13] aux_gb[16..17] aux_gb[22..23] aux_gb[40..41] aux_gb[46..47] aux_gb[50] aux_gb[53] aux_gb[58] aux_gb[61]"> 0..4 </domain>
+      <domain for="aux_gb[3..4] aux_gb[11..12] aux_gb[24..25] aux_gb[30..33] aux_gb[38..39] aux_gb[51..52] aux_gb[59..60]"> 0..5 </domain>
+      <domain for="aux_gb[18] aux_gb[21] aux_gb[42] aux_gb[45]"> 0..6 </domain>
+      <domain for="aux_gb[19..20] aux_gb[26] aux_gb[29] aux_gb[34] aux_gb[37] aux_gb[43..44]"> 0..7 </domain>
+      <domain for="aux_gb[27..28] aux_gb[35..36]"> 0..8 </domain>
+    </array>
+  </variables>
+  <constraints>
+    <allDifferent note="putting all values from 1 to n*n in the grid"> x[][] </allDifferent>
+    <intension note="tag(symmetry-breaking"> eq(x[0][0],1) </intension>
+    <group note="each cell must be linked to its neighbors">
+      <intension> or(eq(%0,64),ge(%1,1)) </intension>
+      <args> x[0][0] aux_gb[0] </args>
+      <args> x[0][1] aux_gb[1] </args>
+      <args> x[0][2] aux_gb[2] </args>
+      <args> x[0][3] aux_gb[3] </args>
+      <args> x[0][4] aux_gb[4] </args>
+      <args> x[0][5] aux_gb[5] </args>
+      <args> x[0][6] aux_gb[6] </args>
+      <args> x[0][7] aux_gb[7] </args>
+      <args> x[1][0] aux_gb[8] </args>
+      <args> x[1][1] aux_gb[9] </args>
+      <args> x[1][2] aux_gb[10] </args>
+      <args> x[1][3] aux_gb[11] </args>
+      <args> x[1][4] aux_gb[12] </args>
+      <args> x[1][5] aux_gb[13] </args>
+      <args> x[1][6] aux_gb[14] </args>
+      <args> x[1][7] aux_gb[15] </args>
+      <args> x[2][0] aux_gb[16] </args>
+      <args> x[2][1] aux_gb[17] </args>
+      <args> x[2][2] aux_gb[18] </args>
+      <args> x[2][3] aux_gb[19] </args>
+      <args> x[2][4] aux_gb[20] </args>
+      <args> x[2][5] aux_gb[21] </args>
+      <args> x[2][6] aux_gb[22] </args>
+      <args> x[2][7] aux_gb[23] </args>
+      <args> x[3][0] aux_gb[24] </args>
+      <args> x[3][1] aux_gb[25] </args>
+      <args> x[3][2] aux_gb[26] </args>
+      <args> x[3][3] aux_gb[27] </args>
+      <args> x[3][4] aux_gb[28] </args>
+      <args> x[3][5] aux_gb[29] </args>
+      <args> x[3][6] aux_gb[30] </args>
+      <args> x[3][7] aux_gb[31] </args>
+      <args> x[4][0] aux_gb[32] </args>
+      <args> x[4][1] aux_gb[33] </args>
+      <args> x[4][2] aux_gb[34] </args>
+      <args> x[4][3] aux_gb[35] </args>
+      <args> x[4][4] aux_gb[36] </args>
+      <args> x[4][5] aux_gb[37] </args>
+      <args> x[4][6] aux_gb[38] </args>
+      <args> x[4][7] aux_gb[39] </args>
+      <args> x[5][0] aux_gb[40] </args>
+      <args> x[5][1] aux_gb[41] </args>
+      <args> x[5][2] aux_gb[42] </args>
+      <args> x[5][3] aux_gb[43] </args>
+      <args> x[5][4] aux_gb[44] </args>
+      <args> x[5][5] aux_gb[45] </args>
+      <args> x[5][6] aux_gb[46] </args>
+      <args> x[5][7] aux_gb[47] </args>
+      <args> x[6][0] aux_gb[48] </args>
+      <args> x[6][1] aux_gb[49] </args>
+      <args> x[6][2] aux_gb[50] </args>
+      <args> x[6][3] aux_gb[51] </args>
+      <args> x[6][4] aux_gb[52] </args>
+      <args> x[6][5] aux_gb[53] </args>
+      <args> x[6][6] aux_gb[54] </args>
+      <args> x[6][7] aux_gb[55] </args>
+      <args> x[7][0] aux_gb[56] </args>
+      <args> x[7][1] aux_gb[57] </args>
+      <args> x[7][2] aux_gb[58] </args>
+      <args> x[7][3] aux_gb[59] </args>
+      <args> x[7][4] aux_gb[60] </args>
+      <args> x[7][5] aux_gb[61] </args>
+      <args> x[7][6] aux_gb[62] </args>
+      <args> x[7][7] aux_gb[63] </args>
+    </group>
+    <group>
+      <count>
+        <list> %... </list>
+        <values> 1 </values>
+        <condition> (eq,%0) </condition>
+      </count>
+      <args> aux_gb[0] eq(x[3][0],add(x[0][0],1)) eq(x[0][3],add(x[0][0],1)) eq(x[2][2],add(x[0][0],1)) </args>
+      <args> aux_gb[1] eq(x[3][1],add(x[0][1],1)) eq(x[0][4],add(x[0][1],1)) eq(x[2][3],add(x[0][1],1)) </args>
+      <args> aux_gb[2] eq(x[3][2],add(x[0][2],1)) eq(x[0][5],add(x[0][2],1)) eq(x[2][0],add(x[0][2],1)) eq(x[2][4],add(x[0][2],1)) </args>
+      <args> aux_gb[3] eq(x[3][3],add(x[0][3],1)) eq(x[0][0],add(x[0][3],1)) eq(x[0][6],add(x[0][3],1)) eq(x[2][1],add(x[0][3],1)) eq(x[2][5],add(x[0][3],1)) </args>
+      <args> aux_gb[4] eq(x[3][4],add(x[0][4],1)) eq(x[0][1],add(x[0][4],1)) eq(x[0][7],add(x[0][4],1)) eq(x[2][2],add(x[0][4],1)) eq(x[2][6],add(x[0][4],1)) </args>
+      <args> aux_gb[5] eq(x[3][5],add(x[0][5],1)) eq(x[0][2],add(x[0][5],1)) eq(x[2][3],add(x[0][5],1)) eq(x[2][7],add(x[0][5],1)) </args>
+      <args> aux_gb[6] eq(x[3][6],add(x[0][6],1)) eq(x[0][3],add(x[0][6],1)) eq(x[2][4],add(x[0][6],1)) </args>
+      <args> aux_gb[7] eq(x[3][7],add(x[0][7],1)) eq(x[0][4],add(x[0][7],1)) eq(x[2][5],add(x[0][7],1)) </args>
+      <args> aux_gb[8] eq(x[4][0],add(x[1][0],1)) eq(x[1][3],add(x[1][0],1)) eq(x[3][2],add(x[1][0],1)) </args>
+      <args> aux_gb[9] eq(x[4][1],add(x[1][1],1)) eq(x[1][4],add(x[1][1],1)) eq(x[3][3],add(x[1][1],1)) </args>
+      <args> aux_gb[10] eq(x[4][2],add(x[1][2],1)) eq(x[1][5],add(x[1][2],1)) eq(x[3][0],add(x[1][2],1)) eq(x[3][4],add(x[1][2],1)) </args>
+      <args> aux_gb[11] eq(x[4][3],add(x[1][3],1)) eq(x[1][0],add(x[1][3],1)) eq(x[1][6],add(x[1][3],1)) eq(x[3][1],add(x[1][3],1)) eq(x[3][5],add(x[1][3],1)) </args>
+      <args> aux_gb[12] eq(x[4][4],add(x[1][4],1)) eq(x[1][1],add(x[1][4],1)) eq(x[1][7],add(x[1][4],1)) eq(x[3][2],add(x[1][4],1)) eq(x[3][6],add(x[1][4],1)) </args>
+      <args> aux_gb[13] eq(x[4][5],add(x[1][5],1)) eq(x[1][2],add(x[1][5],1)) eq(x[3][3],add(x[1][5],1)) eq(x[3][7],add(x[1][5],1)) </args>
+      <args> aux_gb[14] eq(x[4][6],add(x[1][6],1)) eq(x[1][3],add(x[1][6],1)) eq(x[3][4],add(x[1][6],1)) </args>
+      <args> aux_gb[15] eq(x[4][7],add(x[1][7],1)) eq(x[1][4],add(x[1][7],1)) eq(x[3][5],add(x[1][7],1)) </args>
+      <args> aux_gb[16] eq(x[5][0],add(x[2][0],1)) eq(x[2][3],add(x[2][0],1)) eq(x[0][2],add(x[2][0],1)) eq(x[4][2],add(x[2][0],1)) </args>
+      <args> aux_gb[17] eq(x[5][1],add(x[2][1],1)) eq(x[2][4],add(x[2][1],1)) eq(x[0][3],add(x[2][1],1)) eq(x[4][3],add(x[2][1],1)) </args>
+      <args> aux_gb[18] eq(x[5][2],add(x[2][2],1)) eq(x[2][5],add(x[2][2],1)) eq(x[0][0],add(x[2][2],1)) eq(x[0][4],add(x[2][2],1)) eq(x[4][0],add(x[2][2],1)) eq(x[4][4],add(x[2][2],1)) </args>
+      <args> aux_gb[19] eq(x[5][3],add(x[2][3],1)) eq(x[2][0],add(x[2][3],1)) eq(x[2][6],add(x[2][3],1)) eq(x[0][1],add(x[2][3],1)) eq(x[0][5],add(x[2][3],1)) eq(x[4][1],add(x[2][3],1)) eq(x[4][5],add(x[2][3],1)) </args>
+      <args> aux_gb[20] eq(x[5][4],add(x[2][4],1)) eq(x[2][1],add(x[2][4],1)) eq(x[2][7],add(x[2][4],1)) eq(x[0][2],add(x[2][4],1)) eq(x[0][6],add(x[2][4],1)) eq(x[4][2],add(x[2][4],1)) eq(x[4][6],add(x[2][4],1)) </args>
+      <args> aux_gb[21] eq(x[5][5],add(x[2][5],1)) eq(x[2][2],add(x[2][5],1)) eq(x[0][3],add(x[2][5],1)) eq(x[0][7],add(x[2][5],1)) eq(x[4][3],add(x[2][5],1)) eq(x[4][7],add(x[2][5],1)) </args>
+      <args> aux_gb[22] eq(x[5][6],add(x[2][6],1)) eq(x[2][3],add(x[2][6],1)) eq(x[0][4],add(x[2][6],1)) eq(x[4][4],add(x[2][6],1)) </args>
+      <args> aux_gb[23] eq(x[5][7],add(x[2][7],1)) eq(x[2][4],add(x[2][7],1)) eq(x[0][5],add(x[2][7],1)) eq(x[4][5],add(x[2][7],1)) </args>
+      <args> aux_gb[24] eq(x[0][0],add(x[3][0],1)) eq(x[6][0],add(x[3][0],1)) eq(x[3][3],add(x[3][0],1)) eq(x[1][2],add(x[3][0],1)) eq(x[5][2],add(x[3][0],1)) </args>
+      <args> aux_gb[25] eq(x[0][1],add(x[3][1],1)) eq(x[6][1],add(x[3][1],1)) eq(x[3][4],add(x[3][1],1)) eq(x[1][3],add(x[3][1],1)) eq(x[5][3],add(x[3][1],1)) </args>
+      <args> aux_gb[26] eq(x[0][2],add(x[3][2],1)) eq(x[6][2],add(x[3][2],1)) eq(x[3][5],add(x[3][2],1)) eq(x[1][0],add(x[3][2],1)) eq(x[1][4],add(x[3][2],1)) eq(x[5][0],add(x[3][2],1)) eq(x[5][4],add(x[3][2],1)) </args>
+      <args> aux_gb[27] eq(x[0][3],add(x[3][3],1)) eq(x[6][3],add(x[3][3],1)) eq(x[3][0],add(x[3][3],1)) eq(x[3][6],add(x[3][3],1)) eq(x[1][1],add(x[3][3],1)) eq(x[1][5],add(x[3][3],1)) eq(x[5][1],add(x[3][3],1)) eq(x[5][5],add(x[3][3],1)) </args>
+      <args> aux_gb[28] eq(x[0][4],add(x[3][4],1)) eq(x[6][4],add(x[3][4],1)) eq(x[3][1],add(x[3][4],1)) eq(x[3][7],add(x[3][4],1)) eq(x[1][2],add(x[3][4],1)) eq(x[1][6],add(x[3][4],1)) eq(x[5][2],add(x[3][4],1)) eq(x[5][6],add(x[3][4],1)) </args>
+      <args> aux_gb[29] eq(x[0][5],add(x[3][5],1)) eq(x[6][5],add(x[3][5],1)) eq(x[3][2],add(x[3][5],1)) eq(x[1][3],add(x[3][5],1)) eq(x[1][7],add(x[3][5],1)) eq(x[5][3],add(x[3][5],1)) eq(x[5][7],add(x[3][5],1)) </args>
+      <args> aux_gb[30] eq(x[0][6],add(x[3][6],1)) eq(x[6][6],add(x[3][6],1)) eq(x[3][3],add(x[3][6],1)) eq(x[1][4],add(x[3][6],1)) eq(x[5][4],add(x[3][6],1)) </args>
+      <args> aux_gb[31] eq(x[0][7],add(x[3][7],1)) eq(x[6][7],add(x[3][7],1)) eq(x[3][4],add(x[3][7],1)) eq(x[1][5],add(x[3][7],1)) eq(x[5][5],add(x[3][7],1)) </args>
+      <args> aux_gb[32] eq(x[1][0],add(x[4][0],1)) eq(x[7][0],add(x[4][0],1)) eq(x[4][3],add(x[4][0],1)) eq(x[2][2],add(x[4][0],1)) eq(x[6][2],add(x[4][0],1)) </args>
+      <args> aux_gb[33] eq(x[1][1],add(x[4][1],1)) eq(x[7][1],add(x[4][1],1)) eq(x[4][4],add(x[4][1],1)) eq(x[2][3],add(x[4][1],1)) eq(x[6][3],add(x[4][1],1)) </args>
+      <args> aux_gb[34] eq(x[1][2],add(x[4][2],1)) eq(x[7][2],add(x[4][2],1)) eq(x[4][5],add(x[4][2],1)) eq(x[2][0],add(x[4][2],1)) eq(x[2][4],add(x[4][2],1)) eq(x[6][0],add(x[4][2],1)) eq(x[6][4],add(x[4][2],1)) </args>
+      <args> aux_gb[35] eq(x[1][3],add(x[4][3],1)) eq(x[7][3],add(x[4][3],1)) eq(x[4][0],add(x[4][3],1)) eq(x[4][6],add(x[4][3],1)) eq(x[2][1],add(x[4][3],1)) eq(x[2][5],add(x[4][3],1)) eq(x[6][1],add(x[4][3],1)) eq(x[6][5],add(x[4][3],1)) </args>
+      <args> aux_gb[36] eq(x[1][4],add(x[4][4],1)) eq(x[7][4],add(x[4][4],1)) eq(x[4][1],add(x[4][4],1)) eq(x[4][7],add(x[4][4],1)) eq(x[2][2],add(x[4][4],1)) eq(x[2][6],add(x[4][4],1)) eq(x[6][2],add(x[4][4],1)) eq(x[6][6],add(x[4][4],1)) </args>
+      <args> aux_gb[37] eq(x[1][5],add(x[4][5],1)) eq(x[7][5],add(x[4][5],1)) eq(x[4][2],add(x[4][5],1)) eq(x[2][3],add(x[4][5],1)) eq(x[2][7],add(x[4][5],1)) eq(x[6][3],add(x[4][5],1)) eq(x[6][7],add(x[4][5],1)) </args>
+      <args> aux_gb[38] eq(x[1][6],add(x[4][6],1)) eq(x[7][6],add(x[4][6],1)) eq(x[4][3],add(x[4][6],1)) eq(x[2][4],add(x[4][6],1)) eq(x[6][4],add(x[4][6],1)) </args>
+      <args> aux_gb[39] eq(x[1][7],add(x[4][7],1)) eq(x[7][7],add(x[4][7],1)) eq(x[4][4],add(x[4][7],1)) eq(x[2][5],add(x[4][7],1)) eq(x[6][5],add(x[4][7],1)) </args>
+      <args> aux_gb[40] eq(x[2][0],add(x[5][0],1)) eq(x[5][3],add(x[5][0],1)) eq(x[3][2],add(x[5][0],1)) eq(x[7][2],add(x[5][0],1)) </args>
+      <args> aux_gb[41] eq(x[2][1],add(x[5][1],1)) eq(x[5][4],add(x[5][1],1)) eq(x[3][3],add(x[5][1],1)) eq(x[7][3],add(x[5][1],1)) </args>
+      <args> aux_gb[42] eq(x[2][2],add(x[5][2],1)) eq(x[5][5],add(x[5][2],1)) eq(x[3][0],add(x[5][2],1)) eq(x[3][4],add(x[5][2],1)) eq(x[7][0],add(x[5][2],1)) eq(x[7][4],add(x[5][2],1)) </args>
+      <args> aux_gb[43] eq(x[2][3],add(x[5][3],1)) eq(x[5][0],add(x[5][3],1)) eq(x[5][6],add(x[5][3],1)) eq(x[3][1],add(x[5][3],1)) eq(x[3][5],add(x[5][3],1)) eq(x[7][1],add(x[5][3],1)) eq(x[7][5],add(x[5][3],1)) </args>
+      <args> aux_gb[44] eq(x[2][4],add(x[5][4],1)) eq(x[5][1],add(x[5][4],1)) eq(x[5][7],add(x[5][4],1)) eq(x[3][2],add(x[5][4],1)) eq(x[3][6],add(x[5][4],1)) eq(x[7][2],add(x[5][4],1)) eq(x[7][6],add(x[5][4],1)) </args>
+      <args> aux_gb[45] eq(x[2][5],add(x[5][5],1)) eq(x[5][2],add(x[5][5],1)) eq(x[3][3],add(x[5][5],1)) eq(x[3][7],add(x[5][5],1)) eq(x[7][3],add(x[5][5],1)) eq(x[7][7],add(x[5][5],1)) </args>
+      <args> aux_gb[46] eq(x[2][6],add(x[5][6],1)) eq(x[5][3],add(x[5][6],1)) eq(x[3][4],add(x[5][6],1)) eq(x[7][4],add(x[5][6],1)) </args>
+      <args> aux_gb[47] eq(x[2][7],add(x[5][7],1)) eq(x[5][4],add(x[5][7],1)) eq(x[3][5],add(x[5][7],1)) eq(x[7][5],add(x[5][7],1)) </args>
+      <args> aux_gb[48] eq(x[3][0],add(x[6][0],1)) eq(x[6][3],add(x[6][0],1)) eq(x[4][2],add(x[6][0],1)) </args>
+      <args> aux_gb[49] eq(x[3][1],add(x[6][1],1)) eq(x[6][4],add(x[6][1],1)) eq(x[4][3],add(x[6][1],1)) </args>
+      <args> aux_gb[50] eq(x[3][2],add(x[6][2],1)) eq(x[6][5],add(x[6][2],1)) eq(x[4][0],add(x[6][2],1)) eq(x[4][4],add(x[6][2],1)) </args>
+      <args> aux_gb[51] eq(x[3][3],add(x[6][3],1)) eq(x[6][0],add(x[6][3],1)) eq(x[6][6],add(x[6][3],1)) eq(x[4][1],add(x[6][3],1)) eq(x[4][5],add(x[6][3],1)) </args>
+      <args> aux_gb[52] eq(x[3][4],add(x[6][4],1)) eq(x[6][1],add(x[6][4],1)) eq(x[6][7],add(x[6][4],1)) eq(x[4][2],add(x[6][4],1)) eq(x[4][6],add(x[6][4],1)) </args>
+      <args> aux_gb[53] eq(x[3][5],add(x[6][5],1)) eq(x[6][2],add(x[6][5],1)) eq(x[4][3],add(x[6][5],1)) eq(x[4][7],add(x[6][5],1)) </args>
+      <args> aux_gb[54] eq(x[3][6],add(x[6][6],1)) eq(x[6][3],add(x[6][6],1)) eq(x[4][4],add(x[6][6],1)) </args>
+      <args> aux_gb[55] eq(x[3][7],add(x[6][7],1)) eq(x[6][4],add(x[6][7],1)) eq(x[4][5],add(x[6][7],1)) </args>
+      <args> aux_gb[56] eq(x[4][0],add(x[7][0],1)) eq(x[7][3],add(x[7][0],1)) eq(x[5][2],add(x[7][0],1)) </args>
+      <args> aux_gb[57] eq(x[4][1],add(x[7][1],1)) eq(x[7][4],add(x[7][1],1)) eq(x[5][3],add(x[7][1],1)) </args>
+      <args> aux_gb[58] eq(x[4][2],add(x[7][2],1)) eq(x[7][5],add(x[7][2],1)) eq(x[5][0],add(x[7][2],1)) eq(x[5][4],add(x[7][2],1)) </args>
+      <args> aux_gb[59] eq(x[4][3],add(x[7][3],1)) eq(x[7][0],add(x[7][3],1)) eq(x[7][6],add(x[7][3],1)) eq(x[5][1],add(x[7][3],1)) eq(x[5][5],add(x[7][3],1)) </args>
+      <args> aux_gb[60] eq(x[4][4],add(x[7][4],1)) eq(x[7][1],add(x[7][4],1)) eq(x[7][7],add(x[7][4],1)) eq(x[5][2],add(x[7][4],1)) eq(x[5][6],add(x[7][4],1)) </args>
+      <args> aux_gb[61] eq(x[4][5],add(x[7][5],1)) eq(x[7][2],add(x[7][5],1)) eq(x[5][3],add(x[7][5],1)) eq(x[5][7],add(x[7][5],1)) </args>
+      <args> aux_gb[62] eq(x[4][6],add(x[7][6],1)) eq(x[7][3],add(x[7][6],1)) eq(x[5][4],add(x[7][6],1)) </args>
+      <args> aux_gb[63] eq(x[4][7],add(x[7][7],1)) eq(x[7][4],add(x[7][7],1)) eq(x[5][5],add(x[7][7],1)) </args>
+    </group>
+  </constraints>
+</instance>

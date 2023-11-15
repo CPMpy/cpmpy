@@ -1,0 +1,2231 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="e" note="e[k][l] is 1 if the edge in the intermediate cell at coordinates (k,l) is an upward downward, 0 if a downward diagonal" size="[15][15]"> 0 1 </array>
+    <array id="x" note="x[i][j] is the number of connected nodes (effective neighbors, or bridges) to node (i,j)" size="[16][16]">
+      <domain for="x[0][0] x[0][2..3] x[0][8..9] x[0][12..13] x[1][0..2] x[1][4] x[1][7] x[1][11] x[1][14] x[2][0] x[2][3..4] x[2][6..8] x[2][10] x[2][12] x[2][14..15] x[3][0..6] x[3][8..10] x[3][12..13] x[3][15] x[4][0..1] x[4][6..7] x[4][9] x[4][11..14] x[5][1..3] x[5][5..6] x[5][9..11] x[5][14..15] x[6][0..1] x[6][4] x[6][9] x[6][11..12] x[6][14..15] x[7][0..1] x[7][4..5] x[7][7] x[7][10..13] x[7][15] x[8][0] x[8][2..4] x[8][6..7] x[8][10] x[8][13..14] x[9][0] x[9][3..4] x[9][6] x[9][9..10] x[9][12] x[9][14..15] x[10][1] x[10][3] x[10][5..6] x[10][8..9] x[10][11] x[11][4..5] x[11][8..9] x[11][11..13] x[11][15] x[12][0] x[12][2] x[12][4] x[12][6..7] x[12][9] x[12][11..12] x[12][14] x[13][0] x[13][2..3] x[13][6] x[13][10..15] x[14][0..3] x[14][5..8] x[14][11] x[14][13] x[14][15] x[15][0] x[15][2] x[15][4] x[15][8..9] x[15][12] x[15][14..15]"> 0..4 </domain>
+      <domain for="x[0][1] x[0][5] x[0][10] x[1][6] x[2][1] x[2][5] x[2][9] x[2][11] x[3][7] x[3][11] x[4][2] x[4][4] x[4][15] x[5][8] x[6][2..3] x[6][5..8] x[6][10] x[7][2] x[7][8] x[8][5] x[8][9] x[8][11..12] x[8][15] x[9][1] x[9][8] x[10][4] x[10][10] x[10][12..13] x[11][3] x[12][5] x[12][10] x[12][13] x[13][1] x[13][4] x[13][8..9] x[14][12] x[15][1] x[15][3] x[15][13]"> 2 </domain>
+      <domain for="x[0][4] x[5][0] x[15][7]"> 0 </domain>
+      <domain for="x[0][6..7] x[0][11] x[0][14..15] x[1][5] x[1][9..10] x[1][12] x[1][15] x[2][2] x[2][13] x[3][14] x[4][5] x[4][10] x[5][4] x[5][12..13] x[8][1] x[9][7] x[10][0] x[10][2] x[10][14..15] x[11][0] x[11][2] x[11][7] x[12][1] x[12][15] x[13][7] x[14][10] x[15][5..6] x[15][10..11]"> 1 </domain>
+      <domain for="x[1][3] x[1][8] x[1][13] x[4][3] x[4][8] x[5][7] x[6][13] x[7][9] x[8][8] x[9][2] x[9][5] x[9][11] x[9][13] x[10][7] x[11][1] x[11][6] x[11][10] x[12][3] x[12][8] x[13][5] x[14][4] x[14][9]"> 3 </domain>
+      <domain for="x[7][3] x[7][6] x[7][14] x[11][14] x[14][14]"> 4 </domain>
+    </array>
+    <array id="d" note="d[i][j] is the distance of node (i,j) from the root to the chain/tree it belongs" size="[16][16]"> 0..256 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[256]">
+      <domain for="aux_gb[0] aux_gb[15] aux_gb[240] aux_gb[255]"> 0 1 </domain>
+      <domain for="aux_gb[1..14] aux_gb[16] aux_gb[31..32] aux_gb[47..48] aux_gb[63..64] aux_gb[79..80] aux_gb[95..96] aux_gb[111..112] aux_gb[127..128] aux_gb[143..144] aux_gb[159..160] aux_gb[175..176] aux_gb[191..192] aux_gb[207..208] aux_gb[223..224] aux_gb[239] aux_gb[241..254]"> 0..2 </domain>
+      <domain for="aux_gb[17..30] aux_gb[33..46] aux_gb[49..62] aux_gb[65..78] aux_gb[81..94] aux_gb[97..110] aux_gb[113..126] aux_gb[129..142] aux_gb[145..158] aux_gb[161..174] aux_gb[177..190] aux_gb[193..206] aux_gb[209..222] aux_gb[225..238]"> 0..4 </domain>
+    </array>
+  </variables>
+  <constraints>
+    <block note="computing the number of neighbors">
+      <group>
+        <intension> eq(%0,eq(%1,%2)) </intension>
+        <args> x[0][0] e[0][0] 0 </args>
+        <args> x[0][15] e[0][14] 1 </args>
+        <args> x[15][0] e[14][0] 1 </args>
+        <args> x[15][15] e[14][14] 0 </args>
+      </group>
+      <group>
+        <sum>
+          <list> %... </list>
+          <condition> (eq,%0) </condition>
+        </sum>
+        <args> x[0][1] eq(e[0][0],1) eq(e[0][1],0) </args>
+        <args> x[0][2] eq(e[0][1],1) eq(e[0][2],0) </args>
+        <args> x[0][3] eq(e[0][2],1) eq(e[0][3],0) </args>
+        <args> x[0][4] eq(e[0][3],1) eq(e[0][4],0) </args>
+        <args> x[0][5] eq(e[0][4],1) eq(e[0][5],0) </args>
+        <args> x[0][6] eq(e[0][5],1) eq(e[0][6],0) </args>
+        <args> x[0][7] eq(e[0][6],1) eq(e[0][7],0) </args>
+        <args> x[0][8] eq(e[0][7],1) eq(e[0][8],0) </args>
+        <args> x[0][9] eq(e[0][8],1) eq(e[0][9],0) </args>
+        <args> x[0][10] eq(e[0][9],1) eq(e[0][10],0) </args>
+        <args> x[0][11] eq(e[0][10],1) eq(e[0][11],0) </args>
+        <args> x[0][12] eq(e[0][11],1) eq(e[0][12],0) </args>
+        <args> x[0][13] eq(e[0][12],1) eq(e[0][13],0) </args>
+        <args> x[0][14] eq(e[0][13],1) eq(e[0][14],0) </args>
+        <args> x[1][0] eq(e[0][0],1) eq(e[1][0],0) </args>
+        <args> x[1][1] eq(e[0][0],0) eq(e[0][1],1) eq(e[1][0],1) eq(e[1][1],0) </args>
+        <args> x[1][2] eq(e[0][1],0) eq(e[0][2],1) eq(e[1][1],1) eq(e[1][2],0) </args>
+        <args> x[1][3] eq(e[0][2],0) eq(e[0][3],1) eq(e[1][2],1) eq(e[1][3],0) </args>
+        <args> x[1][4] eq(e[0][3],0) eq(e[0][4],1) eq(e[1][3],1) eq(e[1][4],0) </args>
+        <args> x[1][5] eq(e[0][4],0) eq(e[0][5],1) eq(e[1][4],1) eq(e[1][5],0) </args>
+        <args> x[1][6] eq(e[0][5],0) eq(e[0][6],1) eq(e[1][5],1) eq(e[1][6],0) </args>
+        <args> x[1][7] eq(e[0][6],0) eq(e[0][7],1) eq(e[1][6],1) eq(e[1][7],0) </args>
+        <args> x[1][8] eq(e[0][7],0) eq(e[0][8],1) eq(e[1][7],1) eq(e[1][8],0) </args>
+        <args> x[1][9] eq(e[0][8],0) eq(e[0][9],1) eq(e[1][8],1) eq(e[1][9],0) </args>
+        <args> x[1][10] eq(e[0][9],0) eq(e[0][10],1) eq(e[1][9],1) eq(e[1][10],0) </args>
+        <args> x[1][11] eq(e[0][10],0) eq(e[0][11],1) eq(e[1][10],1) eq(e[1][11],0) </args>
+        <args> x[1][12] eq(e[0][11],0) eq(e[0][12],1) eq(e[1][11],1) eq(e[1][12],0) </args>
+        <args> x[1][13] eq(e[0][12],0) eq(e[0][13],1) eq(e[1][12],1) eq(e[1][13],0) </args>
+        <args> x[1][14] eq(e[0][13],0) eq(e[0][14],1) eq(e[1][13],1) eq(e[1][14],0) </args>
+        <args> x[1][15] eq(e[0][14],0) eq(e[1][14],1) </args>
+        <args> x[2][0] eq(e[1][0],1) eq(e[2][0],0) </args>
+        <args> x[2][1] eq(e[1][0],0) eq(e[1][1],1) eq(e[2][0],1) eq(e[2][1],0) </args>
+        <args> x[2][2] eq(e[1][1],0) eq(e[1][2],1) eq(e[2][1],1) eq(e[2][2],0) </args>
+        <args> x[2][3] eq(e[1][2],0) eq(e[1][3],1) eq(e[2][2],1) eq(e[2][3],0) </args>
+        <args> x[2][4] eq(e[1][3],0) eq(e[1][4],1) eq(e[2][3],1) eq(e[2][4],0) </args>
+        <args> x[2][5] eq(e[1][4],0) eq(e[1][5],1) eq(e[2][4],1) eq(e[2][5],0) </args>
+        <args> x[2][6] eq(e[1][5],0) eq(e[1][6],1) eq(e[2][5],1) eq(e[2][6],0) </args>
+        <args> x[2][7] eq(e[1][6],0) eq(e[1][7],1) eq(e[2][6],1) eq(e[2][7],0) </args>
+        <args> x[2][8] eq(e[1][7],0) eq(e[1][8],1) eq(e[2][7],1) eq(e[2][8],0) </args>
+        <args> x[2][9] eq(e[1][8],0) eq(e[1][9],1) eq(e[2][8],1) eq(e[2][9],0) </args>
+        <args> x[2][10] eq(e[1][9],0) eq(e[1][10],1) eq(e[2][9],1) eq(e[2][10],0) </args>
+        <args> x[2][11] eq(e[1][10],0) eq(e[1][11],1) eq(e[2][10],1) eq(e[2][11],0) </args>
+        <args> x[2][12] eq(e[1][11],0) eq(e[1][12],1) eq(e[2][11],1) eq(e[2][12],0) </args>
+        <args> x[2][13] eq(e[1][12],0) eq(e[1][13],1) eq(e[2][12],1) eq(e[2][13],0) </args>
+        <args> x[2][14] eq(e[1][13],0) eq(e[1][14],1) eq(e[2][13],1) eq(e[2][14],0) </args>
+        <args> x[2][15] eq(e[1][14],0) eq(e[2][14],1) </args>
+        <args> x[3][0] eq(e[2][0],1) eq(e[3][0],0) </args>
+        <args> x[3][1] eq(e[2][0],0) eq(e[2][1],1) eq(e[3][0],1) eq(e[3][1],0) </args>
+        <args> x[3][2] eq(e[2][1],0) eq(e[2][2],1) eq(e[3][1],1) eq(e[3][2],0) </args>
+        <args> x[3][3] eq(e[2][2],0) eq(e[2][3],1) eq(e[3][2],1) eq(e[3][3],0) </args>
+        <args> x[3][4] eq(e[2][3],0) eq(e[2][4],1) eq(e[3][3],1) eq(e[3][4],0) </args>
+        <args> x[3][5] eq(e[2][4],0) eq(e[2][5],1) eq(e[3][4],1) eq(e[3][5],0) </args>
+        <args> x[3][6] eq(e[2][5],0) eq(e[2][6],1) eq(e[3][5],1) eq(e[3][6],0) </args>
+        <args> x[3][7] eq(e[2][6],0) eq(e[2][7],1) eq(e[3][6],1) eq(e[3][7],0) </args>
+        <args> x[3][8] eq(e[2][7],0) eq(e[2][8],1) eq(e[3][7],1) eq(e[3][8],0) </args>
+        <args> x[3][9] eq(e[2][8],0) eq(e[2][9],1) eq(e[3][8],1) eq(e[3][9],0) </args>
+        <args> x[3][10] eq(e[2][9],0) eq(e[2][10],1) eq(e[3][9],1) eq(e[3][10],0) </args>
+        <args> x[3][11] eq(e[2][10],0) eq(e[2][11],1) eq(e[3][10],1) eq(e[3][11],0) </args>
+        <args> x[3][12] eq(e[2][11],0) eq(e[2][12],1) eq(e[3][11],1) eq(e[3][12],0) </args>
+        <args> x[3][13] eq(e[2][12],0) eq(e[2][13],1) eq(e[3][12],1) eq(e[3][13],0) </args>
+        <args> x[3][14] eq(e[2][13],0) eq(e[2][14],1) eq(e[3][13],1) eq(e[3][14],0) </args>
+        <args> x[3][15] eq(e[2][14],0) eq(e[3][14],1) </args>
+        <args> x[4][0] eq(e[3][0],1) eq(e[4][0],0) </args>
+        <args> x[4][1] eq(e[3][0],0) eq(e[3][1],1) eq(e[4][0],1) eq(e[4][1],0) </args>
+        <args> x[4][2] eq(e[3][1],0) eq(e[3][2],1) eq(e[4][1],1) eq(e[4][2],0) </args>
+        <args> x[4][3] eq(e[3][2],0) eq(e[3][3],1) eq(e[4][2],1) eq(e[4][3],0) </args>
+        <args> x[4][4] eq(e[3][3],0) eq(e[3][4],1) eq(e[4][3],1) eq(e[4][4],0) </args>
+        <args> x[4][5] eq(e[3][4],0) eq(e[3][5],1) eq(e[4][4],1) eq(e[4][5],0) </args>
+        <args> x[4][6] eq(e[3][5],0) eq(e[3][6],1) eq(e[4][5],1) eq(e[4][6],0) </args>
+        <args> x[4][7] eq(e[3][6],0) eq(e[3][7],1) eq(e[4][6],1) eq(e[4][7],0) </args>
+        <args> x[4][8] eq(e[3][7],0) eq(e[3][8],1) eq(e[4][7],1) eq(e[4][8],0) </args>
+        <args> x[4][9] eq(e[3][8],0) eq(e[3][9],1) eq(e[4][8],1) eq(e[4][9],0) </args>
+        <args> x[4][10] eq(e[3][9],0) eq(e[3][10],1) eq(e[4][9],1) eq(e[4][10],0) </args>
+        <args> x[4][11] eq(e[3][10],0) eq(e[3][11],1) eq(e[4][10],1) eq(e[4][11],0) </args>
+        <args> x[4][12] eq(e[3][11],0) eq(e[3][12],1) eq(e[4][11],1) eq(e[4][12],0) </args>
+        <args> x[4][13] eq(e[3][12],0) eq(e[3][13],1) eq(e[4][12],1) eq(e[4][13],0) </args>
+        <args> x[4][14] eq(e[3][13],0) eq(e[3][14],1) eq(e[4][13],1) eq(e[4][14],0) </args>
+        <args> x[4][15] eq(e[3][14],0) eq(e[4][14],1) </args>
+        <args> x[5][0] eq(e[4][0],1) eq(e[5][0],0) </args>
+        <args> x[5][1] eq(e[4][0],0) eq(e[4][1],1) eq(e[5][0],1) eq(e[5][1],0) </args>
+        <args> x[5][2] eq(e[4][1],0) eq(e[4][2],1) eq(e[5][1],1) eq(e[5][2],0) </args>
+        <args> x[5][3] eq(e[4][2],0) eq(e[4][3],1) eq(e[5][2],1) eq(e[5][3],0) </args>
+        <args> x[5][4] eq(e[4][3],0) eq(e[4][4],1) eq(e[5][3],1) eq(e[5][4],0) </args>
+        <args> x[5][5] eq(e[4][4],0) eq(e[4][5],1) eq(e[5][4],1) eq(e[5][5],0) </args>
+        <args> x[5][6] eq(e[4][5],0) eq(e[4][6],1) eq(e[5][5],1) eq(e[5][6],0) </args>
+        <args> x[5][7] eq(e[4][6],0) eq(e[4][7],1) eq(e[5][6],1) eq(e[5][7],0) </args>
+        <args> x[5][8] eq(e[4][7],0) eq(e[4][8],1) eq(e[5][7],1) eq(e[5][8],0) </args>
+        <args> x[5][9] eq(e[4][8],0) eq(e[4][9],1) eq(e[5][8],1) eq(e[5][9],0) </args>
+        <args> x[5][10] eq(e[4][9],0) eq(e[4][10],1) eq(e[5][9],1) eq(e[5][10],0) </args>
+        <args> x[5][11] eq(e[4][10],0) eq(e[4][11],1) eq(e[5][10],1) eq(e[5][11],0) </args>
+        <args> x[5][12] eq(e[4][11],0) eq(e[4][12],1) eq(e[5][11],1) eq(e[5][12],0) </args>
+        <args> x[5][13] eq(e[4][12],0) eq(e[4][13],1) eq(e[5][12],1) eq(e[5][13],0) </args>
+        <args> x[5][14] eq(e[4][13],0) eq(e[4][14],1) eq(e[5][13],1) eq(e[5][14],0) </args>
+        <args> x[5][15] eq(e[4][14],0) eq(e[5][14],1) </args>
+        <args> x[6][0] eq(e[5][0],1) eq(e[6][0],0) </args>
+        <args> x[6][1] eq(e[5][0],0) eq(e[5][1],1) eq(e[6][0],1) eq(e[6][1],0) </args>
+        <args> x[6][2] eq(e[5][1],0) eq(e[5][2],1) eq(e[6][1],1) eq(e[6][2],0) </args>
+        <args> x[6][3] eq(e[5][2],0) eq(e[5][3],1) eq(e[6][2],1) eq(e[6][3],0) </args>
+        <args> x[6][4] eq(e[5][3],0) eq(e[5][4],1) eq(e[6][3],1) eq(e[6][4],0) </args>
+        <args> x[6][5] eq(e[5][4],0) eq(e[5][5],1) eq(e[6][4],1) eq(e[6][5],0) </args>
+        <args> x[6][6] eq(e[5][5],0) eq(e[5][6],1) eq(e[6][5],1) eq(e[6][6],0) </args>
+        <args> x[6][7] eq(e[5][6],0) eq(e[5][7],1) eq(e[6][6],1) eq(e[6][7],0) </args>
+        <args> x[6][8] eq(e[5][7],0) eq(e[5][8],1) eq(e[6][7],1) eq(e[6][8],0) </args>
+        <args> x[6][9] eq(e[5][8],0) eq(e[5][9],1) eq(e[6][8],1) eq(e[6][9],0) </args>
+        <args> x[6][10] eq(e[5][9],0) eq(e[5][10],1) eq(e[6][9],1) eq(e[6][10],0) </args>
+        <args> x[6][11] eq(e[5][10],0) eq(e[5][11],1) eq(e[6][10],1) eq(e[6][11],0) </args>
+        <args> x[6][12] eq(e[5][11],0) eq(e[5][12],1) eq(e[6][11],1) eq(e[6][12],0) </args>
+        <args> x[6][13] eq(e[5][12],0) eq(e[5][13],1) eq(e[6][12],1) eq(e[6][13],0) </args>
+        <args> x[6][14] eq(e[5][13],0) eq(e[5][14],1) eq(e[6][13],1) eq(e[6][14],0) </args>
+        <args> x[6][15] eq(e[5][14],0) eq(e[6][14],1) </args>
+        <args> x[7][0] eq(e[6][0],1) eq(e[7][0],0) </args>
+        <args> x[7][1] eq(e[6][0],0) eq(e[6][1],1) eq(e[7][0],1) eq(e[7][1],0) </args>
+        <args> x[7][2] eq(e[6][1],0) eq(e[6][2],1) eq(e[7][1],1) eq(e[7][2],0) </args>
+        <args> x[7][3] eq(e[6][2],0) eq(e[6][3],1) eq(e[7][2],1) eq(e[7][3],0) </args>
+        <args> x[7][4] eq(e[6][3],0) eq(e[6][4],1) eq(e[7][3],1) eq(e[7][4],0) </args>
+        <args> x[7][5] eq(e[6][4],0) eq(e[6][5],1) eq(e[7][4],1) eq(e[7][5],0) </args>
+        <args> x[7][6] eq(e[6][5],0) eq(e[6][6],1) eq(e[7][5],1) eq(e[7][6],0) </args>
+        <args> x[7][7] eq(e[6][6],0) eq(e[6][7],1) eq(e[7][6],1) eq(e[7][7],0) </args>
+        <args> x[7][8] eq(e[6][7],0) eq(e[6][8],1) eq(e[7][7],1) eq(e[7][8],0) </args>
+        <args> x[7][9] eq(e[6][8],0) eq(e[6][9],1) eq(e[7][8],1) eq(e[7][9],0) </args>
+        <args> x[7][10] eq(e[6][9],0) eq(e[6][10],1) eq(e[7][9],1) eq(e[7][10],0) </args>
+        <args> x[7][11] eq(e[6][10],0) eq(e[6][11],1) eq(e[7][10],1) eq(e[7][11],0) </args>
+        <args> x[7][12] eq(e[6][11],0) eq(e[6][12],1) eq(e[7][11],1) eq(e[7][12],0) </args>
+        <args> x[7][13] eq(e[6][12],0) eq(e[6][13],1) eq(e[7][12],1) eq(e[7][13],0) </args>
+        <args> x[7][14] eq(e[6][13],0) eq(e[6][14],1) eq(e[7][13],1) eq(e[7][14],0) </args>
+        <args> x[7][15] eq(e[6][14],0) eq(e[7][14],1) </args>
+        <args> x[8][0] eq(e[7][0],1) eq(e[8][0],0) </args>
+        <args> x[8][1] eq(e[7][0],0) eq(e[7][1],1) eq(e[8][0],1) eq(e[8][1],0) </args>
+        <args> x[8][2] eq(e[7][1],0) eq(e[7][2],1) eq(e[8][1],1) eq(e[8][2],0) </args>
+        <args> x[8][3] eq(e[7][2],0) eq(e[7][3],1) eq(e[8][2],1) eq(e[8][3],0) </args>
+        <args> x[8][4] eq(e[7][3],0) eq(e[7][4],1) eq(e[8][3],1) eq(e[8][4],0) </args>
+        <args> x[8][5] eq(e[7][4],0) eq(e[7][5],1) eq(e[8][4],1) eq(e[8][5],0) </args>
+        <args> x[8][6] eq(e[7][5],0) eq(e[7][6],1) eq(e[8][5],1) eq(e[8][6],0) </args>
+        <args> x[8][7] eq(e[7][6],0) eq(e[7][7],1) eq(e[8][6],1) eq(e[8][7],0) </args>
+        <args> x[8][8] eq(e[7][7],0) eq(e[7][8],1) eq(e[8][7],1) eq(e[8][8],0) </args>
+        <args> x[8][9] eq(e[7][8],0) eq(e[7][9],1) eq(e[8][8],1) eq(e[8][9],0) </args>
+        <args> x[8][10] eq(e[7][9],0) eq(e[7][10],1) eq(e[8][9],1) eq(e[8][10],0) </args>
+        <args> x[8][11] eq(e[7][10],0) eq(e[7][11],1) eq(e[8][10],1) eq(e[8][11],0) </args>
+        <args> x[8][12] eq(e[7][11],0) eq(e[7][12],1) eq(e[8][11],1) eq(e[8][12],0) </args>
+        <args> x[8][13] eq(e[7][12],0) eq(e[7][13],1) eq(e[8][12],1) eq(e[8][13],0) </args>
+        <args> x[8][14] eq(e[7][13],0) eq(e[7][14],1) eq(e[8][13],1) eq(e[8][14],0) </args>
+        <args> x[8][15] eq(e[7][14],0) eq(e[8][14],1) </args>
+        <args> x[9][0] eq(e[8][0],1) eq(e[9][0],0) </args>
+        <args> x[9][1] eq(e[8][0],0) eq(e[8][1],1) eq(e[9][0],1) eq(e[9][1],0) </args>
+        <args> x[9][2] eq(e[8][1],0) eq(e[8][2],1) eq(e[9][1],1) eq(e[9][2],0) </args>
+        <args> x[9][3] eq(e[8][2],0) eq(e[8][3],1) eq(e[9][2],1) eq(e[9][3],0) </args>
+        <args> x[9][4] eq(e[8][3],0) eq(e[8][4],1) eq(e[9][3],1) eq(e[9][4],0) </args>
+        <args> x[9][5] eq(e[8][4],0) eq(e[8][5],1) eq(e[9][4],1) eq(e[9][5],0) </args>
+        <args> x[9][6] eq(e[8][5],0) eq(e[8][6],1) eq(e[9][5],1) eq(e[9][6],0) </args>
+        <args> x[9][7] eq(e[8][6],0) eq(e[8][7],1) eq(e[9][6],1) eq(e[9][7],0) </args>
+        <args> x[9][8] eq(e[8][7],0) eq(e[8][8],1) eq(e[9][7],1) eq(e[9][8],0) </args>
+        <args> x[9][9] eq(e[8][8],0) eq(e[8][9],1) eq(e[9][8],1) eq(e[9][9],0) </args>
+        <args> x[9][10] eq(e[8][9],0) eq(e[8][10],1) eq(e[9][9],1) eq(e[9][10],0) </args>
+        <args> x[9][11] eq(e[8][10],0) eq(e[8][11],1) eq(e[9][10],1) eq(e[9][11],0) </args>
+        <args> x[9][12] eq(e[8][11],0) eq(e[8][12],1) eq(e[9][11],1) eq(e[9][12],0) </args>
+        <args> x[9][13] eq(e[8][12],0) eq(e[8][13],1) eq(e[9][12],1) eq(e[9][13],0) </args>
+        <args> x[9][14] eq(e[8][13],0) eq(e[8][14],1) eq(e[9][13],1) eq(e[9][14],0) </args>
+        <args> x[9][15] eq(e[8][14],0) eq(e[9][14],1) </args>
+        <args> x[10][0] eq(e[9][0],1) eq(e[10][0],0) </args>
+        <args> x[10][1] eq(e[9][0],0) eq(e[9][1],1) eq(e[10][0],1) eq(e[10][1],0) </args>
+        <args> x[10][2] eq(e[9][1],0) eq(e[9][2],1) eq(e[10][1],1) eq(e[10][2],0) </args>
+        <args> x[10][3] eq(e[9][2],0) eq(e[9][3],1) eq(e[10][2],1) eq(e[10][3],0) </args>
+        <args> x[10][4] eq(e[9][3],0) eq(e[9][4],1) eq(e[10][3],1) eq(e[10][4],0) </args>
+        <args> x[10][5] eq(e[9][4],0) eq(e[9][5],1) eq(e[10][4],1) eq(e[10][5],0) </args>
+        <args> x[10][6] eq(e[9][5],0) eq(e[9][6],1) eq(e[10][5],1) eq(e[10][6],0) </args>
+        <args> x[10][7] eq(e[9][6],0) eq(e[9][7],1) eq(e[10][6],1) eq(e[10][7],0) </args>
+        <args> x[10][8] eq(e[9][7],0) eq(e[9][8],1) eq(e[10][7],1) eq(e[10][8],0) </args>
+        <args> x[10][9] eq(e[9][8],0) eq(e[9][9],1) eq(e[10][8],1) eq(e[10][9],0) </args>
+        <args> x[10][10] eq(e[9][9],0) eq(e[9][10],1) eq(e[10][9],1) eq(e[10][10],0) </args>
+        <args> x[10][11] eq(e[9][10],0) eq(e[9][11],1) eq(e[10][10],1) eq(e[10][11],0) </args>
+        <args> x[10][12] eq(e[9][11],0) eq(e[9][12],1) eq(e[10][11],1) eq(e[10][12],0) </args>
+        <args> x[10][13] eq(e[9][12],0) eq(e[9][13],1) eq(e[10][12],1) eq(e[10][13],0) </args>
+        <args> x[10][14] eq(e[9][13],0) eq(e[9][14],1) eq(e[10][13],1) eq(e[10][14],0) </args>
+        <args> x[10][15] eq(e[9][14],0) eq(e[10][14],1) </args>
+        <args> x[11][0] eq(e[10][0],1) eq(e[11][0],0) </args>
+        <args> x[11][1] eq(e[10][0],0) eq(e[10][1],1) eq(e[11][0],1) eq(e[11][1],0) </args>
+        <args> x[11][2] eq(e[10][1],0) eq(e[10][2],1) eq(e[11][1],1) eq(e[11][2],0) </args>
+        <args> x[11][3] eq(e[10][2],0) eq(e[10][3],1) eq(e[11][2],1) eq(e[11][3],0) </args>
+        <args> x[11][4] eq(e[10][3],0) eq(e[10][4],1) eq(e[11][3],1) eq(e[11][4],0) </args>
+        <args> x[11][5] eq(e[10][4],0) eq(e[10][5],1) eq(e[11][4],1) eq(e[11][5],0) </args>
+        <args> x[11][6] eq(e[10][5],0) eq(e[10][6],1) eq(e[11][5],1) eq(e[11][6],0) </args>
+        <args> x[11][7] eq(e[10][6],0) eq(e[10][7],1) eq(e[11][6],1) eq(e[11][7],0) </args>
+        <args> x[11][8] eq(e[10][7],0) eq(e[10][8],1) eq(e[11][7],1) eq(e[11][8],0) </args>
+        <args> x[11][9] eq(e[10][8],0) eq(e[10][9],1) eq(e[11][8],1) eq(e[11][9],0) </args>
+        <args> x[11][10] eq(e[10][9],0) eq(e[10][10],1) eq(e[11][9],1) eq(e[11][10],0) </args>
+        <args> x[11][11] eq(e[10][10],0) eq(e[10][11],1) eq(e[11][10],1) eq(e[11][11],0) </args>
+        <args> x[11][12] eq(e[10][11],0) eq(e[10][12],1) eq(e[11][11],1) eq(e[11][12],0) </args>
+        <args> x[11][13] eq(e[10][12],0) eq(e[10][13],1) eq(e[11][12],1) eq(e[11][13],0) </args>
+        <args> x[11][14] eq(e[10][13],0) eq(e[10][14],1) eq(e[11][13],1) eq(e[11][14],0) </args>
+        <args> x[11][15] eq(e[10][14],0) eq(e[11][14],1) </args>
+        <args> x[12][0] eq(e[11][0],1) eq(e[12][0],0) </args>
+        <args> x[12][1] eq(e[11][0],0) eq(e[11][1],1) eq(e[12][0],1) eq(e[12][1],0) </args>
+        <args> x[12][2] eq(e[11][1],0) eq(e[11][2],1) eq(e[12][1],1) eq(e[12][2],0) </args>
+        <args> x[12][3] eq(e[11][2],0) eq(e[11][3],1) eq(e[12][2],1) eq(e[12][3],0) </args>
+        <args> x[12][4] eq(e[11][3],0) eq(e[11][4],1) eq(e[12][3],1) eq(e[12][4],0) </args>
+        <args> x[12][5] eq(e[11][4],0) eq(e[11][5],1) eq(e[12][4],1) eq(e[12][5],0) </args>
+        <args> x[12][6] eq(e[11][5],0) eq(e[11][6],1) eq(e[12][5],1) eq(e[12][6],0) </args>
+        <args> x[12][7] eq(e[11][6],0) eq(e[11][7],1) eq(e[12][6],1) eq(e[12][7],0) </args>
+        <args> x[12][8] eq(e[11][7],0) eq(e[11][8],1) eq(e[12][7],1) eq(e[12][8],0) </args>
+        <args> x[12][9] eq(e[11][8],0) eq(e[11][9],1) eq(e[12][8],1) eq(e[12][9],0) </args>
+        <args> x[12][10] eq(e[11][9],0) eq(e[11][10],1) eq(e[12][9],1) eq(e[12][10],0) </args>
+        <args> x[12][11] eq(e[11][10],0) eq(e[11][11],1) eq(e[12][10],1) eq(e[12][11],0) </args>
+        <args> x[12][12] eq(e[11][11],0) eq(e[11][12],1) eq(e[12][11],1) eq(e[12][12],0) </args>
+        <args> x[12][13] eq(e[11][12],0) eq(e[11][13],1) eq(e[12][12],1) eq(e[12][13],0) </args>
+        <args> x[12][14] eq(e[11][13],0) eq(e[11][14],1) eq(e[12][13],1) eq(e[12][14],0) </args>
+        <args> x[12][15] eq(e[11][14],0) eq(e[12][14],1) </args>
+        <args> x[13][0] eq(e[12][0],1) eq(e[13][0],0) </args>
+        <args> x[13][1] eq(e[12][0],0) eq(e[12][1],1) eq(e[13][0],1) eq(e[13][1],0) </args>
+        <args> x[13][2] eq(e[12][1],0) eq(e[12][2],1) eq(e[13][1],1) eq(e[13][2],0) </args>
+        <args> x[13][3] eq(e[12][2],0) eq(e[12][3],1) eq(e[13][2],1) eq(e[13][3],0) </args>
+        <args> x[13][4] eq(e[12][3],0) eq(e[12][4],1) eq(e[13][3],1) eq(e[13][4],0) </args>
+        <args> x[13][5] eq(e[12][4],0) eq(e[12][5],1) eq(e[13][4],1) eq(e[13][5],0) </args>
+        <args> x[13][6] eq(e[12][5],0) eq(e[12][6],1) eq(e[13][5],1) eq(e[13][6],0) </args>
+        <args> x[13][7] eq(e[12][6],0) eq(e[12][7],1) eq(e[13][6],1) eq(e[13][7],0) </args>
+        <args> x[13][8] eq(e[12][7],0) eq(e[12][8],1) eq(e[13][7],1) eq(e[13][8],0) </args>
+        <args> x[13][9] eq(e[12][8],0) eq(e[12][9],1) eq(e[13][8],1) eq(e[13][9],0) </args>
+        <args> x[13][10] eq(e[12][9],0) eq(e[12][10],1) eq(e[13][9],1) eq(e[13][10],0) </args>
+        <args> x[13][11] eq(e[12][10],0) eq(e[12][11],1) eq(e[13][10],1) eq(e[13][11],0) </args>
+        <args> x[13][12] eq(e[12][11],0) eq(e[12][12],1) eq(e[13][11],1) eq(e[13][12],0) </args>
+        <args> x[13][13] eq(e[12][12],0) eq(e[12][13],1) eq(e[13][12],1) eq(e[13][13],0) </args>
+        <args> x[13][14] eq(e[12][13],0) eq(e[12][14],1) eq(e[13][13],1) eq(e[13][14],0) </args>
+        <args> x[13][15] eq(e[12][14],0) eq(e[13][14],1) </args>
+        <args> x[14][0] eq(e[13][0],1) eq(e[14][0],0) </args>
+        <args> x[14][1] eq(e[13][0],0) eq(e[13][1],1) eq(e[14][0],1) eq(e[14][1],0) </args>
+        <args> x[14][2] eq(e[13][1],0) eq(e[13][2],1) eq(e[14][1],1) eq(e[14][2],0) </args>
+        <args> x[14][3] eq(e[13][2],0) eq(e[13][3],1) eq(e[14][2],1) eq(e[14][3],0) </args>
+        <args> x[14][4] eq(e[13][3],0) eq(e[13][4],1) eq(e[14][3],1) eq(e[14][4],0) </args>
+        <args> x[14][5] eq(e[13][4],0) eq(e[13][5],1) eq(e[14][4],1) eq(e[14][5],0) </args>
+        <args> x[14][6] eq(e[13][5],0) eq(e[13][6],1) eq(e[14][5],1) eq(e[14][6],0) </args>
+        <args> x[14][7] eq(e[13][6],0) eq(e[13][7],1) eq(e[14][6],1) eq(e[14][7],0) </args>
+        <args> x[14][8] eq(e[13][7],0) eq(e[13][8],1) eq(e[14][7],1) eq(e[14][8],0) </args>
+        <args> x[14][9] eq(e[13][8],0) eq(e[13][9],1) eq(e[14][8],1) eq(e[14][9],0) </args>
+        <args> x[14][10] eq(e[13][9],0) eq(e[13][10],1) eq(e[14][9],1) eq(e[14][10],0) </args>
+        <args> x[14][11] eq(e[13][10],0) eq(e[13][11],1) eq(e[14][10],1) eq(e[14][11],0) </args>
+        <args> x[14][12] eq(e[13][11],0) eq(e[13][12],1) eq(e[14][11],1) eq(e[14][12],0) </args>
+        <args> x[14][13] eq(e[13][12],0) eq(e[13][13],1) eq(e[14][12],1) eq(e[14][13],0) </args>
+        <args> x[14][14] eq(e[13][13],0) eq(e[13][14],1) eq(e[14][13],1) eq(e[14][14],0) </args>
+        <args> x[14][15] eq(e[13][14],0) eq(e[14][14],1) </args>
+        <args> x[15][1] eq(e[14][0],0) eq(e[14][1],1) </args>
+        <args> x[15][2] eq(e[14][1],0) eq(e[14][2],1) </args>
+        <args> x[15][3] eq(e[14][2],0) eq(e[14][3],1) </args>
+        <args> x[15][4] eq(e[14][3],0) eq(e[14][4],1) </args>
+        <args> x[15][5] eq(e[14][4],0) eq(e[14][5],1) </args>
+        <args> x[15][6] eq(e[14][5],0) eq(e[14][6],1) </args>
+        <args> x[15][7] eq(e[14][6],0) eq(e[14][7],1) </args>
+        <args> x[15][8] eq(e[14][7],0) eq(e[14][8],1) </args>
+        <args> x[15][9] eq(e[14][8],0) eq(e[14][9],1) </args>
+        <args> x[15][10] eq(e[14][9],0) eq(e[14][10],1) </args>
+        <args> x[15][11] eq(e[14][10],0) eq(e[14][11],1) </args>
+        <args> x[15][12] eq(e[14][11],0) eq(e[14][12],1) </args>
+        <args> x[15][13] eq(e[14][12],0) eq(e[14][13],1) </args>
+        <args> x[15][14] eq(e[14][13],0) eq(e[14][14],1) </args>
+      </group>
+    </block>
+    <group note="isolated nodes are roots (are a distance 0)">
+      <intension> or(ne(%0,0),eq(%1,0)) </intension>
+      <args> x[0][0] d[0][0] </args>
+      <args> x[0][1] d[0][1] </args>
+      <args> x[0][2] d[0][2] </args>
+      <args> x[0][3] d[0][3] </args>
+      <args> x[0][4] d[0][4] </args>
+      <args> x[0][5] d[0][5] </args>
+      <args> x[0][6] d[0][6] </args>
+      <args> x[0][7] d[0][7] </args>
+      <args> x[0][8] d[0][8] </args>
+      <args> x[0][9] d[0][9] </args>
+      <args> x[0][10] d[0][10] </args>
+      <args> x[0][11] d[0][11] </args>
+      <args> x[0][12] d[0][12] </args>
+      <args> x[0][13] d[0][13] </args>
+      <args> x[0][14] d[0][14] </args>
+      <args> x[0][15] d[0][15] </args>
+      <args> x[1][0] d[1][0] </args>
+      <args> x[1][1] d[1][1] </args>
+      <args> x[1][2] d[1][2] </args>
+      <args> x[1][3] d[1][3] </args>
+      <args> x[1][4] d[1][4] </args>
+      <args> x[1][5] d[1][5] </args>
+      <args> x[1][6] d[1][6] </args>
+      <args> x[1][7] d[1][7] </args>
+      <args> x[1][8] d[1][8] </args>
+      <args> x[1][9] d[1][9] </args>
+      <args> x[1][10] d[1][10] </args>
+      <args> x[1][11] d[1][11] </args>
+      <args> x[1][12] d[1][12] </args>
+      <args> x[1][13] d[1][13] </args>
+      <args> x[1][14] d[1][14] </args>
+      <args> x[1][15] d[1][15] </args>
+      <args> x[2][0] d[2][0] </args>
+      <args> x[2][1] d[2][1] </args>
+      <args> x[2][2] d[2][2] </args>
+      <args> x[2][3] d[2][3] </args>
+      <args> x[2][4] d[2][4] </args>
+      <args> x[2][5] d[2][5] </args>
+      <args> x[2][6] d[2][6] </args>
+      <args> x[2][7] d[2][7] </args>
+      <args> x[2][8] d[2][8] </args>
+      <args> x[2][9] d[2][9] </args>
+      <args> x[2][10] d[2][10] </args>
+      <args> x[2][11] d[2][11] </args>
+      <args> x[2][12] d[2][12] </args>
+      <args> x[2][13] d[2][13] </args>
+      <args> x[2][14] d[2][14] </args>
+      <args> x[2][15] d[2][15] </args>
+      <args> x[3][0] d[3][0] </args>
+      <args> x[3][1] d[3][1] </args>
+      <args> x[3][2] d[3][2] </args>
+      <args> x[3][3] d[3][3] </args>
+      <args> x[3][4] d[3][4] </args>
+      <args> x[3][5] d[3][5] </args>
+      <args> x[3][6] d[3][6] </args>
+      <args> x[3][7] d[3][7] </args>
+      <args> x[3][8] d[3][8] </args>
+      <args> x[3][9] d[3][9] </args>
+      <args> x[3][10] d[3][10] </args>
+      <args> x[3][11] d[3][11] </args>
+      <args> x[3][12] d[3][12] </args>
+      <args> x[3][13] d[3][13] </args>
+      <args> x[3][14] d[3][14] </args>
+      <args> x[3][15] d[3][15] </args>
+      <args> x[4][0] d[4][0] </args>
+      <args> x[4][1] d[4][1] </args>
+      <args> x[4][2] d[4][2] </args>
+      <args> x[4][3] d[4][3] </args>
+      <args> x[4][4] d[4][4] </args>
+      <args> x[4][5] d[4][5] </args>
+      <args> x[4][6] d[4][6] </args>
+      <args> x[4][7] d[4][7] </args>
+      <args> x[4][8] d[4][8] </args>
+      <args> x[4][9] d[4][9] </args>
+      <args> x[4][10] d[4][10] </args>
+      <args> x[4][11] d[4][11] </args>
+      <args> x[4][12] d[4][12] </args>
+      <args> x[4][13] d[4][13] </args>
+      <args> x[4][14] d[4][14] </args>
+      <args> x[4][15] d[4][15] </args>
+      <args> x[5][0] d[5][0] </args>
+      <args> x[5][1] d[5][1] </args>
+      <args> x[5][2] d[5][2] </args>
+      <args> x[5][3] d[5][3] </args>
+      <args> x[5][4] d[5][4] </args>
+      <args> x[5][5] d[5][5] </args>
+      <args> x[5][6] d[5][6] </args>
+      <args> x[5][7] d[5][7] </args>
+      <args> x[5][8] d[5][8] </args>
+      <args> x[5][9] d[5][9] </args>
+      <args> x[5][10] d[5][10] </args>
+      <args> x[5][11] d[5][11] </args>
+      <args> x[5][12] d[5][12] </args>
+      <args> x[5][13] d[5][13] </args>
+      <args> x[5][14] d[5][14] </args>
+      <args> x[5][15] d[5][15] </args>
+      <args> x[6][0] d[6][0] </args>
+      <args> x[6][1] d[6][1] </args>
+      <args> x[6][2] d[6][2] </args>
+      <args> x[6][3] d[6][3] </args>
+      <args> x[6][4] d[6][4] </args>
+      <args> x[6][5] d[6][5] </args>
+      <args> x[6][6] d[6][6] </args>
+      <args> x[6][7] d[6][7] </args>
+      <args> x[6][8] d[6][8] </args>
+      <args> x[6][9] d[6][9] </args>
+      <args> x[6][10] d[6][10] </args>
+      <args> x[6][11] d[6][11] </args>
+      <args> x[6][12] d[6][12] </args>
+      <args> x[6][13] d[6][13] </args>
+      <args> x[6][14] d[6][14] </args>
+      <args> x[6][15] d[6][15] </args>
+      <args> x[7][0] d[7][0] </args>
+      <args> x[7][1] d[7][1] </args>
+      <args> x[7][2] d[7][2] </args>
+      <args> x[7][3] d[7][3] </args>
+      <args> x[7][4] d[7][4] </args>
+      <args> x[7][5] d[7][5] </args>
+      <args> x[7][6] d[7][6] </args>
+      <args> x[7][7] d[7][7] </args>
+      <args> x[7][8] d[7][8] </args>
+      <args> x[7][9] d[7][9] </args>
+      <args> x[7][10] d[7][10] </args>
+      <args> x[7][11] d[7][11] </args>
+      <args> x[7][12] d[7][12] </args>
+      <args> x[7][13] d[7][13] </args>
+      <args> x[7][14] d[7][14] </args>
+      <args> x[7][15] d[7][15] </args>
+      <args> x[8][0] d[8][0] </args>
+      <args> x[8][1] d[8][1] </args>
+      <args> x[8][2] d[8][2] </args>
+      <args> x[8][3] d[8][3] </args>
+      <args> x[8][4] d[8][4] </args>
+      <args> x[8][5] d[8][5] </args>
+      <args> x[8][6] d[8][6] </args>
+      <args> x[8][7] d[8][7] </args>
+      <args> x[8][8] d[8][8] </args>
+      <args> x[8][9] d[8][9] </args>
+      <args> x[8][10] d[8][10] </args>
+      <args> x[8][11] d[8][11] </args>
+      <args> x[8][12] d[8][12] </args>
+      <args> x[8][13] d[8][13] </args>
+      <args> x[8][14] d[8][14] </args>
+      <args> x[8][15] d[8][15] </args>
+      <args> x[9][0] d[9][0] </args>
+      <args> x[9][1] d[9][1] </args>
+      <args> x[9][2] d[9][2] </args>
+      <args> x[9][3] d[9][3] </args>
+      <args> x[9][4] d[9][4] </args>
+      <args> x[9][5] d[9][5] </args>
+      <args> x[9][6] d[9][6] </args>
+      <args> x[9][7] d[9][7] </args>
+      <args> x[9][8] d[9][8] </args>
+      <args> x[9][9] d[9][9] </args>
+      <args> x[9][10] d[9][10] </args>
+      <args> x[9][11] d[9][11] </args>
+      <args> x[9][12] d[9][12] </args>
+      <args> x[9][13] d[9][13] </args>
+      <args> x[9][14] d[9][14] </args>
+      <args> x[9][15] d[9][15] </args>
+      <args> x[10][0] d[10][0] </args>
+      <args> x[10][1] d[10][1] </args>
+      <args> x[10][2] d[10][2] </args>
+      <args> x[10][3] d[10][3] </args>
+      <args> x[10][4] d[10][4] </args>
+      <args> x[10][5] d[10][5] </args>
+      <args> x[10][6] d[10][6] </args>
+      <args> x[10][7] d[10][7] </args>
+      <args> x[10][8] d[10][8] </args>
+      <args> x[10][9] d[10][9] </args>
+      <args> x[10][10] d[10][10] </args>
+      <args> x[10][11] d[10][11] </args>
+      <args> x[10][12] d[10][12] </args>
+      <args> x[10][13] d[10][13] </args>
+      <args> x[10][14] d[10][14] </args>
+      <args> x[10][15] d[10][15] </args>
+      <args> x[11][0] d[11][0] </args>
+      <args> x[11][1] d[11][1] </args>
+      <args> x[11][2] d[11][2] </args>
+      <args> x[11][3] d[11][3] </args>
+      <args> x[11][4] d[11][4] </args>
+      <args> x[11][5] d[11][5] </args>
+      <args> x[11][6] d[11][6] </args>
+      <args> x[11][7] d[11][7] </args>
+      <args> x[11][8] d[11][8] </args>
+      <args> x[11][9] d[11][9] </args>
+      <args> x[11][10] d[11][10] </args>
+      <args> x[11][11] d[11][11] </args>
+      <args> x[11][12] d[11][12] </args>
+      <args> x[11][13] d[11][13] </args>
+      <args> x[11][14] d[11][14] </args>
+      <args> x[11][15] d[11][15] </args>
+      <args> x[12][0] d[12][0] </args>
+      <args> x[12][1] d[12][1] </args>
+      <args> x[12][2] d[12][2] </args>
+      <args> x[12][3] d[12][3] </args>
+      <args> x[12][4] d[12][4] </args>
+      <args> x[12][5] d[12][5] </args>
+      <args> x[12][6] d[12][6] </args>
+      <args> x[12][7] d[12][7] </args>
+      <args> x[12][8] d[12][8] </args>
+      <args> x[12][9] d[12][9] </args>
+      <args> x[12][10] d[12][10] </args>
+      <args> x[12][11] d[12][11] </args>
+      <args> x[12][12] d[12][12] </args>
+      <args> x[12][13] d[12][13] </args>
+      <args> x[12][14] d[12][14] </args>
+      <args> x[12][15] d[12][15] </args>
+      <args> x[13][0] d[13][0] </args>
+      <args> x[13][1] d[13][1] </args>
+      <args> x[13][2] d[13][2] </args>
+      <args> x[13][3] d[13][3] </args>
+      <args> x[13][4] d[13][4] </args>
+      <args> x[13][5] d[13][5] </args>
+      <args> x[13][6] d[13][6] </args>
+      <args> x[13][7] d[13][7] </args>
+      <args> x[13][8] d[13][8] </args>
+      <args> x[13][9] d[13][9] </args>
+      <args> x[13][10] d[13][10] </args>
+      <args> x[13][11] d[13][11] </args>
+      <args> x[13][12] d[13][12] </args>
+      <args> x[13][13] d[13][13] </args>
+      <args> x[13][14] d[13][14] </args>
+      <args> x[13][15] d[13][15] </args>
+      <args> x[14][0] d[14][0] </args>
+      <args> x[14][1] d[14][1] </args>
+      <args> x[14][2] d[14][2] </args>
+      <args> x[14][3] d[14][3] </args>
+      <args> x[14][4] d[14][4] </args>
+      <args> x[14][5] d[14][5] </args>
+      <args> x[14][6] d[14][6] </args>
+      <args> x[14][7] d[14][7] </args>
+      <args> x[14][8] d[14][8] </args>
+      <args> x[14][9] d[14][9] </args>
+      <args> x[14][10] d[14][10] </args>
+      <args> x[14][11] d[14][11] </args>
+      <args> x[14][12] d[14][12] </args>
+      <args> x[14][13] d[14][13] </args>
+      <args> x[14][14] d[14][14] </args>
+      <args> x[14][15] d[14][15] </args>
+      <args> x[15][0] d[15][0] </args>
+      <args> x[15][1] d[15][1] </args>
+      <args> x[15][2] d[15][2] </args>
+      <args> x[15][3] d[15][3] </args>
+      <args> x[15][4] d[15][4] </args>
+      <args> x[15][5] d[15][5] </args>
+      <args> x[15][6] d[15][6] </args>
+      <args> x[15][7] d[15][7] </args>
+      <args> x[15][8] d[15][8] </args>
+      <args> x[15][9] d[15][9] </args>
+      <args> x[15][10] d[15][10] </args>
+      <args> x[15][11] d[15][11] </args>
+      <args> x[15][12] d[15][12] </args>
+      <args> x[15][13] d[15][13] </args>
+      <args> x[15][14] d[15][14] </args>
+      <args> x[15][15] d[15][15] </args>
+    </group>
+    <group note="nodes with at least two neighbors cannot be roots (be at distance 0)">
+      <intension> or(le(%0,1),ne(%1,0)) </intension>
+      <args> x[0][0] d[0][0] </args>
+      <args> x[0][1] d[0][1] </args>
+      <args> x[0][2] d[0][2] </args>
+      <args> x[0][3] d[0][3] </args>
+      <args> x[0][4] d[0][4] </args>
+      <args> x[0][5] d[0][5] </args>
+      <args> x[0][6] d[0][6] </args>
+      <args> x[0][7] d[0][7] </args>
+      <args> x[0][8] d[0][8] </args>
+      <args> x[0][9] d[0][9] </args>
+      <args> x[0][10] d[0][10] </args>
+      <args> x[0][11] d[0][11] </args>
+      <args> x[0][12] d[0][12] </args>
+      <args> x[0][13] d[0][13] </args>
+      <args> x[0][14] d[0][14] </args>
+      <args> x[0][15] d[0][15] </args>
+      <args> x[1][0] d[1][0] </args>
+      <args> x[1][1] d[1][1] </args>
+      <args> x[1][2] d[1][2] </args>
+      <args> x[1][3] d[1][3] </args>
+      <args> x[1][4] d[1][4] </args>
+      <args> x[1][5] d[1][5] </args>
+      <args> x[1][6] d[1][6] </args>
+      <args> x[1][7] d[1][7] </args>
+      <args> x[1][8] d[1][8] </args>
+      <args> x[1][9] d[1][9] </args>
+      <args> x[1][10] d[1][10] </args>
+      <args> x[1][11] d[1][11] </args>
+      <args> x[1][12] d[1][12] </args>
+      <args> x[1][13] d[1][13] </args>
+      <args> x[1][14] d[1][14] </args>
+      <args> x[1][15] d[1][15] </args>
+      <args> x[2][0] d[2][0] </args>
+      <args> x[2][1] d[2][1] </args>
+      <args> x[2][2] d[2][2] </args>
+      <args> x[2][3] d[2][3] </args>
+      <args> x[2][4] d[2][4] </args>
+      <args> x[2][5] d[2][5] </args>
+      <args> x[2][6] d[2][6] </args>
+      <args> x[2][7] d[2][7] </args>
+      <args> x[2][8] d[2][8] </args>
+      <args> x[2][9] d[2][9] </args>
+      <args> x[2][10] d[2][10] </args>
+      <args> x[2][11] d[2][11] </args>
+      <args> x[2][12] d[2][12] </args>
+      <args> x[2][13] d[2][13] </args>
+      <args> x[2][14] d[2][14] </args>
+      <args> x[2][15] d[2][15] </args>
+      <args> x[3][0] d[3][0] </args>
+      <args> x[3][1] d[3][1] </args>
+      <args> x[3][2] d[3][2] </args>
+      <args> x[3][3] d[3][3] </args>
+      <args> x[3][4] d[3][4] </args>
+      <args> x[3][5] d[3][5] </args>
+      <args> x[3][6] d[3][6] </args>
+      <args> x[3][7] d[3][7] </args>
+      <args> x[3][8] d[3][8] </args>
+      <args> x[3][9] d[3][9] </args>
+      <args> x[3][10] d[3][10] </args>
+      <args> x[3][11] d[3][11] </args>
+      <args> x[3][12] d[3][12] </args>
+      <args> x[3][13] d[3][13] </args>
+      <args> x[3][14] d[3][14] </args>
+      <args> x[3][15] d[3][15] </args>
+      <args> x[4][0] d[4][0] </args>
+      <args> x[4][1] d[4][1] </args>
+      <args> x[4][2] d[4][2] </args>
+      <args> x[4][3] d[4][3] </args>
+      <args> x[4][4] d[4][4] </args>
+      <args> x[4][5] d[4][5] </args>
+      <args> x[4][6] d[4][6] </args>
+      <args> x[4][7] d[4][7] </args>
+      <args> x[4][8] d[4][8] </args>
+      <args> x[4][9] d[4][9] </args>
+      <args> x[4][10] d[4][10] </args>
+      <args> x[4][11] d[4][11] </args>
+      <args> x[4][12] d[4][12] </args>
+      <args> x[4][13] d[4][13] </args>
+      <args> x[4][14] d[4][14] </args>
+      <args> x[4][15] d[4][15] </args>
+      <args> x[5][0] d[5][0] </args>
+      <args> x[5][1] d[5][1] </args>
+      <args> x[5][2] d[5][2] </args>
+      <args> x[5][3] d[5][3] </args>
+      <args> x[5][4] d[5][4] </args>
+      <args> x[5][5] d[5][5] </args>
+      <args> x[5][6] d[5][6] </args>
+      <args> x[5][7] d[5][7] </args>
+      <args> x[5][8] d[5][8] </args>
+      <args> x[5][9] d[5][9] </args>
+      <args> x[5][10] d[5][10] </args>
+      <args> x[5][11] d[5][11] </args>
+      <args> x[5][12] d[5][12] </args>
+      <args> x[5][13] d[5][13] </args>
+      <args> x[5][14] d[5][14] </args>
+      <args> x[5][15] d[5][15] </args>
+      <args> x[6][0] d[6][0] </args>
+      <args> x[6][1] d[6][1] </args>
+      <args> x[6][2] d[6][2] </args>
+      <args> x[6][3] d[6][3] </args>
+      <args> x[6][4] d[6][4] </args>
+      <args> x[6][5] d[6][5] </args>
+      <args> x[6][6] d[6][6] </args>
+      <args> x[6][7] d[6][7] </args>
+      <args> x[6][8] d[6][8] </args>
+      <args> x[6][9] d[6][9] </args>
+      <args> x[6][10] d[6][10] </args>
+      <args> x[6][11] d[6][11] </args>
+      <args> x[6][12] d[6][12] </args>
+      <args> x[6][13] d[6][13] </args>
+      <args> x[6][14] d[6][14] </args>
+      <args> x[6][15] d[6][15] </args>
+      <args> x[7][0] d[7][0] </args>
+      <args> x[7][1] d[7][1] </args>
+      <args> x[7][2] d[7][2] </args>
+      <args> x[7][3] d[7][3] </args>
+      <args> x[7][4] d[7][4] </args>
+      <args> x[7][5] d[7][5] </args>
+      <args> x[7][6] d[7][6] </args>
+      <args> x[7][7] d[7][7] </args>
+      <args> x[7][8] d[7][8] </args>
+      <args> x[7][9] d[7][9] </args>
+      <args> x[7][10] d[7][10] </args>
+      <args> x[7][11] d[7][11] </args>
+      <args> x[7][12] d[7][12] </args>
+      <args> x[7][13] d[7][13] </args>
+      <args> x[7][14] d[7][14] </args>
+      <args> x[7][15] d[7][15] </args>
+      <args> x[8][0] d[8][0] </args>
+      <args> x[8][1] d[8][1] </args>
+      <args> x[8][2] d[8][2] </args>
+      <args> x[8][3] d[8][3] </args>
+      <args> x[8][4] d[8][4] </args>
+      <args> x[8][5] d[8][5] </args>
+      <args> x[8][6] d[8][6] </args>
+      <args> x[8][7] d[8][7] </args>
+      <args> x[8][8] d[8][8] </args>
+      <args> x[8][9] d[8][9] </args>
+      <args> x[8][10] d[8][10] </args>
+      <args> x[8][11] d[8][11] </args>
+      <args> x[8][12] d[8][12] </args>
+      <args> x[8][13] d[8][13] </args>
+      <args> x[8][14] d[8][14] </args>
+      <args> x[8][15] d[8][15] </args>
+      <args> x[9][0] d[9][0] </args>
+      <args> x[9][1] d[9][1] </args>
+      <args> x[9][2] d[9][2] </args>
+      <args> x[9][3] d[9][3] </args>
+      <args> x[9][4] d[9][4] </args>
+      <args> x[9][5] d[9][5] </args>
+      <args> x[9][6] d[9][6] </args>
+      <args> x[9][7] d[9][7] </args>
+      <args> x[9][8] d[9][8] </args>
+      <args> x[9][9] d[9][9] </args>
+      <args> x[9][10] d[9][10] </args>
+      <args> x[9][11] d[9][11] </args>
+      <args> x[9][12] d[9][12] </args>
+      <args> x[9][13] d[9][13] </args>
+      <args> x[9][14] d[9][14] </args>
+      <args> x[9][15] d[9][15] </args>
+      <args> x[10][0] d[10][0] </args>
+      <args> x[10][1] d[10][1] </args>
+      <args> x[10][2] d[10][2] </args>
+      <args> x[10][3] d[10][3] </args>
+      <args> x[10][4] d[10][4] </args>
+      <args> x[10][5] d[10][5] </args>
+      <args> x[10][6] d[10][6] </args>
+      <args> x[10][7] d[10][7] </args>
+      <args> x[10][8] d[10][8] </args>
+      <args> x[10][9] d[10][9] </args>
+      <args> x[10][10] d[10][10] </args>
+      <args> x[10][11] d[10][11] </args>
+      <args> x[10][12] d[10][12] </args>
+      <args> x[10][13] d[10][13] </args>
+      <args> x[10][14] d[10][14] </args>
+      <args> x[10][15] d[10][15] </args>
+      <args> x[11][0] d[11][0] </args>
+      <args> x[11][1] d[11][1] </args>
+      <args> x[11][2] d[11][2] </args>
+      <args> x[11][3] d[11][3] </args>
+      <args> x[11][4] d[11][4] </args>
+      <args> x[11][5] d[11][5] </args>
+      <args> x[11][6] d[11][6] </args>
+      <args> x[11][7] d[11][7] </args>
+      <args> x[11][8] d[11][8] </args>
+      <args> x[11][9] d[11][9] </args>
+      <args> x[11][10] d[11][10] </args>
+      <args> x[11][11] d[11][11] </args>
+      <args> x[11][12] d[11][12] </args>
+      <args> x[11][13] d[11][13] </args>
+      <args> x[11][14] d[11][14] </args>
+      <args> x[11][15] d[11][15] </args>
+      <args> x[12][0] d[12][0] </args>
+      <args> x[12][1] d[12][1] </args>
+      <args> x[12][2] d[12][2] </args>
+      <args> x[12][3] d[12][3] </args>
+      <args> x[12][4] d[12][4] </args>
+      <args> x[12][5] d[12][5] </args>
+      <args> x[12][6] d[12][6] </args>
+      <args> x[12][7] d[12][7] </args>
+      <args> x[12][8] d[12][8] </args>
+      <args> x[12][9] d[12][9] </args>
+      <args> x[12][10] d[12][10] </args>
+      <args> x[12][11] d[12][11] </args>
+      <args> x[12][12] d[12][12] </args>
+      <args> x[12][13] d[12][13] </args>
+      <args> x[12][14] d[12][14] </args>
+      <args> x[12][15] d[12][15] </args>
+      <args> x[13][0] d[13][0] </args>
+      <args> x[13][1] d[13][1] </args>
+      <args> x[13][2] d[13][2] </args>
+      <args> x[13][3] d[13][3] </args>
+      <args> x[13][4] d[13][4] </args>
+      <args> x[13][5] d[13][5] </args>
+      <args> x[13][6] d[13][6] </args>
+      <args> x[13][7] d[13][7] </args>
+      <args> x[13][8] d[13][8] </args>
+      <args> x[13][9] d[13][9] </args>
+      <args> x[13][10] d[13][10] </args>
+      <args> x[13][11] d[13][11] </args>
+      <args> x[13][12] d[13][12] </args>
+      <args> x[13][13] d[13][13] </args>
+      <args> x[13][14] d[13][14] </args>
+      <args> x[13][15] d[13][15] </args>
+      <args> x[14][0] d[14][0] </args>
+      <args> x[14][1] d[14][1] </args>
+      <args> x[14][2] d[14][2] </args>
+      <args> x[14][3] d[14][3] </args>
+      <args> x[14][4] d[14][4] </args>
+      <args> x[14][5] d[14][5] </args>
+      <args> x[14][6] d[14][6] </args>
+      <args> x[14][7] d[14][7] </args>
+      <args> x[14][8] d[14][8] </args>
+      <args> x[14][9] d[14][9] </args>
+      <args> x[14][10] d[14][10] </args>
+      <args> x[14][11] d[14][11] </args>
+      <args> x[14][12] d[14][12] </args>
+      <args> x[14][13] d[14][13] </args>
+      <args> x[14][14] d[14][14] </args>
+      <args> x[14][15] d[14][15] </args>
+      <args> x[15][0] d[15][0] </args>
+      <args> x[15][1] d[15][1] </args>
+      <args> x[15][2] d[15][2] </args>
+      <args> x[15][3] d[15][3] </args>
+      <args> x[15][4] d[15][4] </args>
+      <args> x[15][5] d[15][5] </args>
+      <args> x[15][6] d[15][6] </args>
+      <args> x[15][7] d[15][7] </args>
+      <args> x[15][8] d[15][8] </args>
+      <args> x[15][9] d[15][9] </args>
+      <args> x[15][10] d[15][10] </args>
+      <args> x[15][11] d[15][11] </args>
+      <args> x[15][12] d[15][12] </args>
+      <args> x[15][13] d[15][13] </args>
+      <args> x[15][14] d[15][14] </args>
+      <args> x[15][15] d[15][15] </args>
+    </group>
+    <group note="nodes with at least two neighbors have exactly one parent (a node with the same distance minus 1)">
+      <intension> or(le(%0,1),eq(%1,1)) </intension>
+      <args> x[0][0] aux_gb[0] </args>
+      <args> x[0][1] aux_gb[1] </args>
+      <args> x[0][2] aux_gb[2] </args>
+      <args> x[0][3] aux_gb[3] </args>
+      <args> x[0][4] aux_gb[4] </args>
+      <args> x[0][5] aux_gb[5] </args>
+      <args> x[0][6] aux_gb[6] </args>
+      <args> x[0][7] aux_gb[7] </args>
+      <args> x[0][8] aux_gb[8] </args>
+      <args> x[0][9] aux_gb[9] </args>
+      <args> x[0][10] aux_gb[10] </args>
+      <args> x[0][11] aux_gb[11] </args>
+      <args> x[0][12] aux_gb[12] </args>
+      <args> x[0][13] aux_gb[13] </args>
+      <args> x[0][14] aux_gb[14] </args>
+      <args> x[0][15] aux_gb[15] </args>
+      <args> x[1][0] aux_gb[16] </args>
+      <args> x[1][1] aux_gb[17] </args>
+      <args> x[1][2] aux_gb[18] </args>
+      <args> x[1][3] aux_gb[19] </args>
+      <args> x[1][4] aux_gb[20] </args>
+      <args> x[1][5] aux_gb[21] </args>
+      <args> x[1][6] aux_gb[22] </args>
+      <args> x[1][7] aux_gb[23] </args>
+      <args> x[1][8] aux_gb[24] </args>
+      <args> x[1][9] aux_gb[25] </args>
+      <args> x[1][10] aux_gb[26] </args>
+      <args> x[1][11] aux_gb[27] </args>
+      <args> x[1][12] aux_gb[28] </args>
+      <args> x[1][13] aux_gb[29] </args>
+      <args> x[1][14] aux_gb[30] </args>
+      <args> x[1][15] aux_gb[31] </args>
+      <args> x[2][0] aux_gb[32] </args>
+      <args> x[2][1] aux_gb[33] </args>
+      <args> x[2][2] aux_gb[34] </args>
+      <args> x[2][3] aux_gb[35] </args>
+      <args> x[2][4] aux_gb[36] </args>
+      <args> x[2][5] aux_gb[37] </args>
+      <args> x[2][6] aux_gb[38] </args>
+      <args> x[2][7] aux_gb[39] </args>
+      <args> x[2][8] aux_gb[40] </args>
+      <args> x[2][9] aux_gb[41] </args>
+      <args> x[2][10] aux_gb[42] </args>
+      <args> x[2][11] aux_gb[43] </args>
+      <args> x[2][12] aux_gb[44] </args>
+      <args> x[2][13] aux_gb[45] </args>
+      <args> x[2][14] aux_gb[46] </args>
+      <args> x[2][15] aux_gb[47] </args>
+      <args> x[3][0] aux_gb[48] </args>
+      <args> x[3][1] aux_gb[49] </args>
+      <args> x[3][2] aux_gb[50] </args>
+      <args> x[3][3] aux_gb[51] </args>
+      <args> x[3][4] aux_gb[52] </args>
+      <args> x[3][5] aux_gb[53] </args>
+      <args> x[3][6] aux_gb[54] </args>
+      <args> x[3][7] aux_gb[55] </args>
+      <args> x[3][8] aux_gb[56] </args>
+      <args> x[3][9] aux_gb[57] </args>
+      <args> x[3][10] aux_gb[58] </args>
+      <args> x[3][11] aux_gb[59] </args>
+      <args> x[3][12] aux_gb[60] </args>
+      <args> x[3][13] aux_gb[61] </args>
+      <args> x[3][14] aux_gb[62] </args>
+      <args> x[3][15] aux_gb[63] </args>
+      <args> x[4][0] aux_gb[64] </args>
+      <args> x[4][1] aux_gb[65] </args>
+      <args> x[4][2] aux_gb[66] </args>
+      <args> x[4][3] aux_gb[67] </args>
+      <args> x[4][4] aux_gb[68] </args>
+      <args> x[4][5] aux_gb[69] </args>
+      <args> x[4][6] aux_gb[70] </args>
+      <args> x[4][7] aux_gb[71] </args>
+      <args> x[4][8] aux_gb[72] </args>
+      <args> x[4][9] aux_gb[73] </args>
+      <args> x[4][10] aux_gb[74] </args>
+      <args> x[4][11] aux_gb[75] </args>
+      <args> x[4][12] aux_gb[76] </args>
+      <args> x[4][13] aux_gb[77] </args>
+      <args> x[4][14] aux_gb[78] </args>
+      <args> x[4][15] aux_gb[79] </args>
+      <args> x[5][0] aux_gb[80] </args>
+      <args> x[5][1] aux_gb[81] </args>
+      <args> x[5][2] aux_gb[82] </args>
+      <args> x[5][3] aux_gb[83] </args>
+      <args> x[5][4] aux_gb[84] </args>
+      <args> x[5][5] aux_gb[85] </args>
+      <args> x[5][6] aux_gb[86] </args>
+      <args> x[5][7] aux_gb[87] </args>
+      <args> x[5][8] aux_gb[88] </args>
+      <args> x[5][9] aux_gb[89] </args>
+      <args> x[5][10] aux_gb[90] </args>
+      <args> x[5][11] aux_gb[91] </args>
+      <args> x[5][12] aux_gb[92] </args>
+      <args> x[5][13] aux_gb[93] </args>
+      <args> x[5][14] aux_gb[94] </args>
+      <args> x[5][15] aux_gb[95] </args>
+      <args> x[6][0] aux_gb[96] </args>
+      <args> x[6][1] aux_gb[97] </args>
+      <args> x[6][2] aux_gb[98] </args>
+      <args> x[6][3] aux_gb[99] </args>
+      <args> x[6][4] aux_gb[100] </args>
+      <args> x[6][5] aux_gb[101] </args>
+      <args> x[6][6] aux_gb[102] </args>
+      <args> x[6][7] aux_gb[103] </args>
+      <args> x[6][8] aux_gb[104] </args>
+      <args> x[6][9] aux_gb[105] </args>
+      <args> x[6][10] aux_gb[106] </args>
+      <args> x[6][11] aux_gb[107] </args>
+      <args> x[6][12] aux_gb[108] </args>
+      <args> x[6][13] aux_gb[109] </args>
+      <args> x[6][14] aux_gb[110] </args>
+      <args> x[6][15] aux_gb[111] </args>
+      <args> x[7][0] aux_gb[112] </args>
+      <args> x[7][1] aux_gb[113] </args>
+      <args> x[7][2] aux_gb[114] </args>
+      <args> x[7][3] aux_gb[115] </args>
+      <args> x[7][4] aux_gb[116] </args>
+      <args> x[7][5] aux_gb[117] </args>
+      <args> x[7][6] aux_gb[118] </args>
+      <args> x[7][7] aux_gb[119] </args>
+      <args> x[7][8] aux_gb[120] </args>
+      <args> x[7][9] aux_gb[121] </args>
+      <args> x[7][10] aux_gb[122] </args>
+      <args> x[7][11] aux_gb[123] </args>
+      <args> x[7][12] aux_gb[124] </args>
+      <args> x[7][13] aux_gb[125] </args>
+      <args> x[7][14] aux_gb[126] </args>
+      <args> x[7][15] aux_gb[127] </args>
+      <args> x[8][0] aux_gb[128] </args>
+      <args> x[8][1] aux_gb[129] </args>
+      <args> x[8][2] aux_gb[130] </args>
+      <args> x[8][3] aux_gb[131] </args>
+      <args> x[8][4] aux_gb[132] </args>
+      <args> x[8][5] aux_gb[133] </args>
+      <args> x[8][6] aux_gb[134] </args>
+      <args> x[8][7] aux_gb[135] </args>
+      <args> x[8][8] aux_gb[136] </args>
+      <args> x[8][9] aux_gb[137] </args>
+      <args> x[8][10] aux_gb[138] </args>
+      <args> x[8][11] aux_gb[139] </args>
+      <args> x[8][12] aux_gb[140] </args>
+      <args> x[8][13] aux_gb[141] </args>
+      <args> x[8][14] aux_gb[142] </args>
+      <args> x[8][15] aux_gb[143] </args>
+      <args> x[9][0] aux_gb[144] </args>
+      <args> x[9][1] aux_gb[145] </args>
+      <args> x[9][2] aux_gb[146] </args>
+      <args> x[9][3] aux_gb[147] </args>
+      <args> x[9][4] aux_gb[148] </args>
+      <args> x[9][5] aux_gb[149] </args>
+      <args> x[9][6] aux_gb[150] </args>
+      <args> x[9][7] aux_gb[151] </args>
+      <args> x[9][8] aux_gb[152] </args>
+      <args> x[9][9] aux_gb[153] </args>
+      <args> x[9][10] aux_gb[154] </args>
+      <args> x[9][11] aux_gb[155] </args>
+      <args> x[9][12] aux_gb[156] </args>
+      <args> x[9][13] aux_gb[157] </args>
+      <args> x[9][14] aux_gb[158] </args>
+      <args> x[9][15] aux_gb[159] </args>
+      <args> x[10][0] aux_gb[160] </args>
+      <args> x[10][1] aux_gb[161] </args>
+      <args> x[10][2] aux_gb[162] </args>
+      <args> x[10][3] aux_gb[163] </args>
+      <args> x[10][4] aux_gb[164] </args>
+      <args> x[10][5] aux_gb[165] </args>
+      <args> x[10][6] aux_gb[166] </args>
+      <args> x[10][7] aux_gb[167] </args>
+      <args> x[10][8] aux_gb[168] </args>
+      <args> x[10][9] aux_gb[169] </args>
+      <args> x[10][10] aux_gb[170] </args>
+      <args> x[10][11] aux_gb[171] </args>
+      <args> x[10][12] aux_gb[172] </args>
+      <args> x[10][13] aux_gb[173] </args>
+      <args> x[10][14] aux_gb[174] </args>
+      <args> x[10][15] aux_gb[175] </args>
+      <args> x[11][0] aux_gb[176] </args>
+      <args> x[11][1] aux_gb[177] </args>
+      <args> x[11][2] aux_gb[178] </args>
+      <args> x[11][3] aux_gb[179] </args>
+      <args> x[11][4] aux_gb[180] </args>
+      <args> x[11][5] aux_gb[181] </args>
+      <args> x[11][6] aux_gb[182] </args>
+      <args> x[11][7] aux_gb[183] </args>
+      <args> x[11][8] aux_gb[184] </args>
+      <args> x[11][9] aux_gb[185] </args>
+      <args> x[11][10] aux_gb[186] </args>
+      <args> x[11][11] aux_gb[187] </args>
+      <args> x[11][12] aux_gb[188] </args>
+      <args> x[11][13] aux_gb[189] </args>
+      <args> x[11][14] aux_gb[190] </args>
+      <args> x[11][15] aux_gb[191] </args>
+      <args> x[12][0] aux_gb[192] </args>
+      <args> x[12][1] aux_gb[193] </args>
+      <args> x[12][2] aux_gb[194] </args>
+      <args> x[12][3] aux_gb[195] </args>
+      <args> x[12][4] aux_gb[196] </args>
+      <args> x[12][5] aux_gb[197] </args>
+      <args> x[12][6] aux_gb[198] </args>
+      <args> x[12][7] aux_gb[199] </args>
+      <args> x[12][8] aux_gb[200] </args>
+      <args> x[12][9] aux_gb[201] </args>
+      <args> x[12][10] aux_gb[202] </args>
+      <args> x[12][11] aux_gb[203] </args>
+      <args> x[12][12] aux_gb[204] </args>
+      <args> x[12][13] aux_gb[205] </args>
+      <args> x[12][14] aux_gb[206] </args>
+      <args> x[12][15] aux_gb[207] </args>
+      <args> x[13][0] aux_gb[208] </args>
+      <args> x[13][1] aux_gb[209] </args>
+      <args> x[13][2] aux_gb[210] </args>
+      <args> x[13][3] aux_gb[211] </args>
+      <args> x[13][4] aux_gb[212] </args>
+      <args> x[13][5] aux_gb[213] </args>
+      <args> x[13][6] aux_gb[214] </args>
+      <args> x[13][7] aux_gb[215] </args>
+      <args> x[13][8] aux_gb[216] </args>
+      <args> x[13][9] aux_gb[217] </args>
+      <args> x[13][10] aux_gb[218] </args>
+      <args> x[13][11] aux_gb[219] </args>
+      <args> x[13][12] aux_gb[220] </args>
+      <args> x[13][13] aux_gb[221] </args>
+      <args> x[13][14] aux_gb[222] </args>
+      <args> x[13][15] aux_gb[223] </args>
+      <args> x[14][0] aux_gb[224] </args>
+      <args> x[14][1] aux_gb[225] </args>
+      <args> x[14][2] aux_gb[226] </args>
+      <args> x[14][3] aux_gb[227] </args>
+      <args> x[14][4] aux_gb[228] </args>
+      <args> x[14][5] aux_gb[229] </args>
+      <args> x[14][6] aux_gb[230] </args>
+      <args> x[14][7] aux_gb[231] </args>
+      <args> x[14][8] aux_gb[232] </args>
+      <args> x[14][9] aux_gb[233] </args>
+      <args> x[14][10] aux_gb[234] </args>
+      <args> x[14][11] aux_gb[235] </args>
+      <args> x[14][12] aux_gb[236] </args>
+      <args> x[14][13] aux_gb[237] </args>
+      <args> x[14][14] aux_gb[238] </args>
+      <args> x[14][15] aux_gb[239] </args>
+      <args> x[15][0] aux_gb[240] </args>
+      <args> x[15][1] aux_gb[241] </args>
+      <args> x[15][2] aux_gb[242] </args>
+      <args> x[15][3] aux_gb[243] </args>
+      <args> x[15][4] aux_gb[244] </args>
+      <args> x[15][5] aux_gb[245] </args>
+      <args> x[15][6] aux_gb[246] </args>
+      <args> x[15][7] aux_gb[247] </args>
+      <args> x[15][8] aux_gb[248] </args>
+      <args> x[15][9] aux_gb[249] </args>
+      <args> x[15][10] aux_gb[250] </args>
+      <args> x[15][11] aux_gb[251] </args>
+      <args> x[15][12] aux_gb[252] </args>
+      <args> x[15][13] aux_gb[253] </args>
+      <args> x[15][14] aux_gb[254] </args>
+      <args> x[15][15] aux_gb[255] </args>
+    </group>
+    <group note="the distance between any two neighbors is always 1">
+      <intension> or(ne(%0,%1),eq(dist(%2,%3),1)) </intension>
+      <args> e[0][0] 0 d[0][0] d[1][1] </args>
+      <args> e[0][0] 1 d[0][1] d[1][0] </args>
+      <args> e[0][1] 0 d[0][1] d[1][2] </args>
+      <args> e[0][1] 1 d[0][2] d[1][1] </args>
+      <args> e[0][2] 0 d[0][2] d[1][3] </args>
+      <args> e[0][2] 1 d[0][3] d[1][2] </args>
+      <args> e[0][3] 0 d[0][3] d[1][4] </args>
+      <args> e[0][3] 1 d[0][4] d[1][3] </args>
+      <args> e[0][4] 0 d[0][4] d[1][5] </args>
+      <args> e[0][4] 1 d[0][5] d[1][4] </args>
+      <args> e[0][5] 0 d[0][5] d[1][6] </args>
+      <args> e[0][5] 1 d[0][6] d[1][5] </args>
+      <args> e[0][6] 0 d[0][6] d[1][7] </args>
+      <args> e[0][6] 1 d[0][7] d[1][6] </args>
+      <args> e[0][7] 0 d[0][7] d[1][8] </args>
+      <args> e[0][7] 1 d[0][8] d[1][7] </args>
+      <args> e[0][8] 0 d[0][8] d[1][9] </args>
+      <args> e[0][8] 1 d[0][9] d[1][8] </args>
+      <args> e[0][9] 0 d[0][9] d[1][10] </args>
+      <args> e[0][9] 1 d[0][10] d[1][9] </args>
+      <args> e[0][10] 0 d[0][10] d[1][11] </args>
+      <args> e[0][10] 1 d[0][11] d[1][10] </args>
+      <args> e[0][11] 0 d[0][11] d[1][12] </args>
+      <args> e[0][11] 1 d[0][12] d[1][11] </args>
+      <args> e[0][12] 0 d[0][12] d[1][13] </args>
+      <args> e[0][12] 1 d[0][13] d[1][12] </args>
+      <args> e[0][13] 0 d[0][13] d[1][14] </args>
+      <args> e[0][13] 1 d[0][14] d[1][13] </args>
+      <args> e[0][14] 0 d[0][14] d[1][15] </args>
+      <args> e[0][14] 1 d[0][15] d[1][14] </args>
+      <args> e[0][0] 1 d[1][0] d[0][1] </args>
+      <args> e[1][0] 0 d[1][0] d[2][1] </args>
+      <args> e[0][0] 0 d[1][1] d[0][0] </args>
+      <args> e[0][1] 1 d[1][1] d[0][2] </args>
+      <args> e[1][0] 1 d[1][1] d[2][0] </args>
+      <args> e[1][1] 0 d[1][1] d[2][2] </args>
+      <args> e[0][1] 0 d[1][2] d[0][1] </args>
+      <args> e[0][2] 1 d[1][2] d[0][3] </args>
+      <args> e[1][1] 1 d[1][2] d[2][1] </args>
+      <args> e[1][2] 0 d[1][2] d[2][3] </args>
+      <args> e[0][2] 0 d[1][3] d[0][2] </args>
+      <args> e[0][3] 1 d[1][3] d[0][4] </args>
+      <args> e[1][2] 1 d[1][3] d[2][2] </args>
+      <args> e[1][3] 0 d[1][3] d[2][4] </args>
+      <args> e[0][3] 0 d[1][4] d[0][3] </args>
+      <args> e[0][4] 1 d[1][4] d[0][5] </args>
+      <args> e[1][3] 1 d[1][4] d[2][3] </args>
+      <args> e[1][4] 0 d[1][4] d[2][5] </args>
+      <args> e[0][4] 0 d[1][5] d[0][4] </args>
+      <args> e[0][5] 1 d[1][5] d[0][6] </args>
+      <args> e[1][4] 1 d[1][5] d[2][4] </args>
+      <args> e[1][5] 0 d[1][5] d[2][6] </args>
+      <args> e[0][5] 0 d[1][6] d[0][5] </args>
+      <args> e[0][6] 1 d[1][6] d[0][7] </args>
+      <args> e[1][5] 1 d[1][6] d[2][5] </args>
+      <args> e[1][6] 0 d[1][6] d[2][7] </args>
+      <args> e[0][6] 0 d[1][7] d[0][6] </args>
+      <args> e[0][7] 1 d[1][7] d[0][8] </args>
+      <args> e[1][6] 1 d[1][7] d[2][6] </args>
+      <args> e[1][7] 0 d[1][7] d[2][8] </args>
+      <args> e[0][7] 0 d[1][8] d[0][7] </args>
+      <args> e[0][8] 1 d[1][8] d[0][9] </args>
+      <args> e[1][7] 1 d[1][8] d[2][7] </args>
+      <args> e[1][8] 0 d[1][8] d[2][9] </args>
+      <args> e[0][8] 0 d[1][9] d[0][8] </args>
+      <args> e[0][9] 1 d[1][9] d[0][10] </args>
+      <args> e[1][8] 1 d[1][9] d[2][8] </args>
+      <args> e[1][9] 0 d[1][9] d[2][10] </args>
+      <args> e[0][9] 0 d[1][10] d[0][9] </args>
+      <args> e[0][10] 1 d[1][10] d[0][11] </args>
+      <args> e[1][9] 1 d[1][10] d[2][9] </args>
+      <args> e[1][10] 0 d[1][10] d[2][11] </args>
+      <args> e[0][10] 0 d[1][11] d[0][10] </args>
+      <args> e[0][11] 1 d[1][11] d[0][12] </args>
+      <args> e[1][10] 1 d[1][11] d[2][10] </args>
+      <args> e[1][11] 0 d[1][11] d[2][12] </args>
+      <args> e[0][11] 0 d[1][12] d[0][11] </args>
+      <args> e[0][12] 1 d[1][12] d[0][13] </args>
+      <args> e[1][11] 1 d[1][12] d[2][11] </args>
+      <args> e[1][12] 0 d[1][12] d[2][13] </args>
+      <args> e[0][12] 0 d[1][13] d[0][12] </args>
+      <args> e[0][13] 1 d[1][13] d[0][14] </args>
+      <args> e[1][12] 1 d[1][13] d[2][12] </args>
+      <args> e[1][13] 0 d[1][13] d[2][14] </args>
+      <args> e[0][13] 0 d[1][14] d[0][13] </args>
+      <args> e[0][14] 1 d[1][14] d[0][15] </args>
+      <args> e[1][13] 1 d[1][14] d[2][13] </args>
+      <args> e[1][14] 0 d[1][14] d[2][15] </args>
+      <args> e[0][14] 0 d[1][15] d[0][14] </args>
+      <args> e[1][14] 1 d[1][15] d[2][14] </args>
+      <args> e[1][0] 1 d[2][0] d[1][1] </args>
+      <args> e[2][0] 0 d[2][0] d[3][1] </args>
+      <args> e[1][0] 0 d[2][1] d[1][0] </args>
+      <args> e[1][1] 1 d[2][1] d[1][2] </args>
+      <args> e[2][0] 1 d[2][1] d[3][0] </args>
+      <args> e[2][1] 0 d[2][1] d[3][2] </args>
+      <args> e[1][1] 0 d[2][2] d[1][1] </args>
+      <args> e[1][2] 1 d[2][2] d[1][3] </args>
+      <args> e[2][1] 1 d[2][2] d[3][1] </args>
+      <args> e[2][2] 0 d[2][2] d[3][3] </args>
+      <args> e[1][2] 0 d[2][3] d[1][2] </args>
+      <args> e[1][3] 1 d[2][3] d[1][4] </args>
+      <args> e[2][2] 1 d[2][3] d[3][2] </args>
+      <args> e[2][3] 0 d[2][3] d[3][4] </args>
+      <args> e[1][3] 0 d[2][4] d[1][3] </args>
+      <args> e[1][4] 1 d[2][4] d[1][5] </args>
+      <args> e[2][3] 1 d[2][4] d[3][3] </args>
+      <args> e[2][4] 0 d[2][4] d[3][5] </args>
+      <args> e[1][4] 0 d[2][5] d[1][4] </args>
+      <args> e[1][5] 1 d[2][5] d[1][6] </args>
+      <args> e[2][4] 1 d[2][5] d[3][4] </args>
+      <args> e[2][5] 0 d[2][5] d[3][6] </args>
+      <args> e[1][5] 0 d[2][6] d[1][5] </args>
+      <args> e[1][6] 1 d[2][6] d[1][7] </args>
+      <args> e[2][5] 1 d[2][6] d[3][5] </args>
+      <args> e[2][6] 0 d[2][6] d[3][7] </args>
+      <args> e[1][6] 0 d[2][7] d[1][6] </args>
+      <args> e[1][7] 1 d[2][7] d[1][8] </args>
+      <args> e[2][6] 1 d[2][7] d[3][6] </args>
+      <args> e[2][7] 0 d[2][7] d[3][8] </args>
+      <args> e[1][7] 0 d[2][8] d[1][7] </args>
+      <args> e[1][8] 1 d[2][8] d[1][9] </args>
+      <args> e[2][7] 1 d[2][8] d[3][7] </args>
+      <args> e[2][8] 0 d[2][8] d[3][9] </args>
+      <args> e[1][8] 0 d[2][9] d[1][8] </args>
+      <args> e[1][9] 1 d[2][9] d[1][10] </args>
+      <args> e[2][8] 1 d[2][9] d[3][8] </args>
+      <args> e[2][9] 0 d[2][9] d[3][10] </args>
+      <args> e[1][9] 0 d[2][10] d[1][9] </args>
+      <args> e[1][10] 1 d[2][10] d[1][11] </args>
+      <args> e[2][9] 1 d[2][10] d[3][9] </args>
+      <args> e[2][10] 0 d[2][10] d[3][11] </args>
+      <args> e[1][10] 0 d[2][11] d[1][10] </args>
+      <args> e[1][11] 1 d[2][11] d[1][12] </args>
+      <args> e[2][10] 1 d[2][11] d[3][10] </args>
+      <args> e[2][11] 0 d[2][11] d[3][12] </args>
+      <args> e[1][11] 0 d[2][12] d[1][11] </args>
+      <args> e[1][12] 1 d[2][12] d[1][13] </args>
+      <args> e[2][11] 1 d[2][12] d[3][11] </args>
+      <args> e[2][12] 0 d[2][12] d[3][13] </args>
+      <args> e[1][12] 0 d[2][13] d[1][12] </args>
+      <args> e[1][13] 1 d[2][13] d[1][14] </args>
+      <args> e[2][12] 1 d[2][13] d[3][12] </args>
+      <args> e[2][13] 0 d[2][13] d[3][14] </args>
+      <args> e[1][13] 0 d[2][14] d[1][13] </args>
+      <args> e[1][14] 1 d[2][14] d[1][15] </args>
+      <args> e[2][13] 1 d[2][14] d[3][13] </args>
+      <args> e[2][14] 0 d[2][14] d[3][15] </args>
+      <args> e[1][14] 0 d[2][15] d[1][14] </args>
+      <args> e[2][14] 1 d[2][15] d[3][14] </args>
+      <args> e[2][0] 1 d[3][0] d[2][1] </args>
+      <args> e[3][0] 0 d[3][0] d[4][1] </args>
+      <args> e[2][0] 0 d[3][1] d[2][0] </args>
+      <args> e[2][1] 1 d[3][1] d[2][2] </args>
+      <args> e[3][0] 1 d[3][1] d[4][0] </args>
+      <args> e[3][1] 0 d[3][1] d[4][2] </args>
+      <args> e[2][1] 0 d[3][2] d[2][1] </args>
+      <args> e[2][2] 1 d[3][2] d[2][3] </args>
+      <args> e[3][1] 1 d[3][2] d[4][1] </args>
+      <args> e[3][2] 0 d[3][2] d[4][3] </args>
+      <args> e[2][2] 0 d[3][3] d[2][2] </args>
+      <args> e[2][3] 1 d[3][3] d[2][4] </args>
+      <args> e[3][2] 1 d[3][3] d[4][2] </args>
+      <args> e[3][3] 0 d[3][3] d[4][4] </args>
+      <args> e[2][3] 0 d[3][4] d[2][3] </args>
+      <args> e[2][4] 1 d[3][4] d[2][5] </args>
+      <args> e[3][3] 1 d[3][4] d[4][3] </args>
+      <args> e[3][4] 0 d[3][4] d[4][5] </args>
+      <args> e[2][4] 0 d[3][5] d[2][4] </args>
+      <args> e[2][5] 1 d[3][5] d[2][6] </args>
+      <args> e[3][4] 1 d[3][5] d[4][4] </args>
+      <args> e[3][5] 0 d[3][5] d[4][6] </args>
+      <args> e[2][5] 0 d[3][6] d[2][5] </args>
+      <args> e[2][6] 1 d[3][6] d[2][7] </args>
+      <args> e[3][5] 1 d[3][6] d[4][5] </args>
+      <args> e[3][6] 0 d[3][6] d[4][7] </args>
+      <args> e[2][6] 0 d[3][7] d[2][6] </args>
+      <args> e[2][7] 1 d[3][7] d[2][8] </args>
+      <args> e[3][6] 1 d[3][7] d[4][6] </args>
+      <args> e[3][7] 0 d[3][7] d[4][8] </args>
+      <args> e[2][7] 0 d[3][8] d[2][7] </args>
+      <args> e[2][8] 1 d[3][8] d[2][9] </args>
+      <args> e[3][7] 1 d[3][8] d[4][7] </args>
+      <args> e[3][8] 0 d[3][8] d[4][9] </args>
+      <args> e[2][8] 0 d[3][9] d[2][8] </args>
+      <args> e[2][9] 1 d[3][9] d[2][10] </args>
+      <args> e[3][8] 1 d[3][9] d[4][8] </args>
+      <args> e[3][9] 0 d[3][9] d[4][10] </args>
+      <args> e[2][9] 0 d[3][10] d[2][9] </args>
+      <args> e[2][10] 1 d[3][10] d[2][11] </args>
+      <args> e[3][9] 1 d[3][10] d[4][9] </args>
+      <args> e[3][10] 0 d[3][10] d[4][11] </args>
+      <args> e[2][10] 0 d[3][11] d[2][10] </args>
+      <args> e[2][11] 1 d[3][11] d[2][12] </args>
+      <args> e[3][10] 1 d[3][11] d[4][10] </args>
+      <args> e[3][11] 0 d[3][11] d[4][12] </args>
+      <args> e[2][11] 0 d[3][12] d[2][11] </args>
+      <args> e[2][12] 1 d[3][12] d[2][13] </args>
+      <args> e[3][11] 1 d[3][12] d[4][11] </args>
+      <args> e[3][12] 0 d[3][12] d[4][13] </args>
+      <args> e[2][12] 0 d[3][13] d[2][12] </args>
+      <args> e[2][13] 1 d[3][13] d[2][14] </args>
+      <args> e[3][12] 1 d[3][13] d[4][12] </args>
+      <args> e[3][13] 0 d[3][13] d[4][14] </args>
+      <args> e[2][13] 0 d[3][14] d[2][13] </args>
+      <args> e[2][14] 1 d[3][14] d[2][15] </args>
+      <args> e[3][13] 1 d[3][14] d[4][13] </args>
+      <args> e[3][14] 0 d[3][14] d[4][15] </args>
+      <args> e[2][14] 0 d[3][15] d[2][14] </args>
+      <args> e[3][14] 1 d[3][15] d[4][14] </args>
+      <args> e[3][0] 1 d[4][0] d[3][1] </args>
+      <args> e[4][0] 0 d[4][0] d[5][1] </args>
+      <args> e[3][0] 0 d[4][1] d[3][0] </args>
+      <args> e[3][1] 1 d[4][1] d[3][2] </args>
+      <args> e[4][0] 1 d[4][1] d[5][0] </args>
+      <args> e[4][1] 0 d[4][1] d[5][2] </args>
+      <args> e[3][1] 0 d[4][2] d[3][1] </args>
+      <args> e[3][2] 1 d[4][2] d[3][3] </args>
+      <args> e[4][1] 1 d[4][2] d[5][1] </args>
+      <args> e[4][2] 0 d[4][2] d[5][3] </args>
+      <args> e[3][2] 0 d[4][3] d[3][2] </args>
+      <args> e[3][3] 1 d[4][3] d[3][4] </args>
+      <args> e[4][2] 1 d[4][3] d[5][2] </args>
+      <args> e[4][3] 0 d[4][3] d[5][4] </args>
+      <args> e[3][3] 0 d[4][4] d[3][3] </args>
+      <args> e[3][4] 1 d[4][4] d[3][5] </args>
+      <args> e[4][3] 1 d[4][4] d[5][3] </args>
+      <args> e[4][4] 0 d[4][4] d[5][5] </args>
+      <args> e[3][4] 0 d[4][5] d[3][4] </args>
+      <args> e[3][5] 1 d[4][5] d[3][6] </args>
+      <args> e[4][4] 1 d[4][5] d[5][4] </args>
+      <args> e[4][5] 0 d[4][5] d[5][6] </args>
+      <args> e[3][5] 0 d[4][6] d[3][5] </args>
+      <args> e[3][6] 1 d[4][6] d[3][7] </args>
+      <args> e[4][5] 1 d[4][6] d[5][5] </args>
+      <args> e[4][6] 0 d[4][6] d[5][7] </args>
+      <args> e[3][6] 0 d[4][7] d[3][6] </args>
+      <args> e[3][7] 1 d[4][7] d[3][8] </args>
+      <args> e[4][6] 1 d[4][7] d[5][6] </args>
+      <args> e[4][7] 0 d[4][7] d[5][8] </args>
+      <args> e[3][7] 0 d[4][8] d[3][7] </args>
+      <args> e[3][8] 1 d[4][8] d[3][9] </args>
+      <args> e[4][7] 1 d[4][8] d[5][7] </args>
+      <args> e[4][8] 0 d[4][8] d[5][9] </args>
+      <args> e[3][8] 0 d[4][9] d[3][8] </args>
+      <args> e[3][9] 1 d[4][9] d[3][10] </args>
+      <args> e[4][8] 1 d[4][9] d[5][8] </args>
+      <args> e[4][9] 0 d[4][9] d[5][10] </args>
+      <args> e[3][9] 0 d[4][10] d[3][9] </args>
+      <args> e[3][10] 1 d[4][10] d[3][11] </args>
+      <args> e[4][9] 1 d[4][10] d[5][9] </args>
+      <args> e[4][10] 0 d[4][10] d[5][11] </args>
+      <args> e[3][10] 0 d[4][11] d[3][10] </args>
+      <args> e[3][11] 1 d[4][11] d[3][12] </args>
+      <args> e[4][10] 1 d[4][11] d[5][10] </args>
+      <args> e[4][11] 0 d[4][11] d[5][12] </args>
+      <args> e[3][11] 0 d[4][12] d[3][11] </args>
+      <args> e[3][12] 1 d[4][12] d[3][13] </args>
+      <args> e[4][11] 1 d[4][12] d[5][11] </args>
+      <args> e[4][12] 0 d[4][12] d[5][13] </args>
+      <args> e[3][12] 0 d[4][13] d[3][12] </args>
+      <args> e[3][13] 1 d[4][13] d[3][14] </args>
+      <args> e[4][12] 1 d[4][13] d[5][12] </args>
+      <args> e[4][13] 0 d[4][13] d[5][14] </args>
+      <args> e[3][13] 0 d[4][14] d[3][13] </args>
+      <args> e[3][14] 1 d[4][14] d[3][15] </args>
+      <args> e[4][13] 1 d[4][14] d[5][13] </args>
+      <args> e[4][14] 0 d[4][14] d[5][15] </args>
+      <args> e[3][14] 0 d[4][15] d[3][14] </args>
+      <args> e[4][14] 1 d[4][15] d[5][14] </args>
+      <args> e[4][0] 1 d[5][0] d[4][1] </args>
+      <args> e[5][0] 0 d[5][0] d[6][1] </args>
+      <args> e[4][0] 0 d[5][1] d[4][0] </args>
+      <args> e[4][1] 1 d[5][1] d[4][2] </args>
+      <args> e[5][0] 1 d[5][1] d[6][0] </args>
+      <args> e[5][1] 0 d[5][1] d[6][2] </args>
+      <args> e[4][1] 0 d[5][2] d[4][1] </args>
+      <args> e[4][2] 1 d[5][2] d[4][3] </args>
+      <args> e[5][1] 1 d[5][2] d[6][1] </args>
+      <args> e[5][2] 0 d[5][2] d[6][3] </args>
+      <args> e[4][2] 0 d[5][3] d[4][2] </args>
+      <args> e[4][3] 1 d[5][3] d[4][4] </args>
+      <args> e[5][2] 1 d[5][3] d[6][2] </args>
+      <args> e[5][3] 0 d[5][3] d[6][4] </args>
+      <args> e[4][3] 0 d[5][4] d[4][3] </args>
+      <args> e[4][4] 1 d[5][4] d[4][5] </args>
+      <args> e[5][3] 1 d[5][4] d[6][3] </args>
+      <args> e[5][4] 0 d[5][4] d[6][5] </args>
+      <args> e[4][4] 0 d[5][5] d[4][4] </args>
+      <args> e[4][5] 1 d[5][5] d[4][6] </args>
+      <args> e[5][4] 1 d[5][5] d[6][4] </args>
+      <args> e[5][5] 0 d[5][5] d[6][6] </args>
+      <args> e[4][5] 0 d[5][6] d[4][5] </args>
+      <args> e[4][6] 1 d[5][6] d[4][7] </args>
+      <args> e[5][5] 1 d[5][6] d[6][5] </args>
+      <args> e[5][6] 0 d[5][6] d[6][7] </args>
+      <args> e[4][6] 0 d[5][7] d[4][6] </args>
+      <args> e[4][7] 1 d[5][7] d[4][8] </args>
+      <args> e[5][6] 1 d[5][7] d[6][6] </args>
+      <args> e[5][7] 0 d[5][7] d[6][8] </args>
+      <args> e[4][7] 0 d[5][8] d[4][7] </args>
+      <args> e[4][8] 1 d[5][8] d[4][9] </args>
+      <args> e[5][7] 1 d[5][8] d[6][7] </args>
+      <args> e[5][8] 0 d[5][8] d[6][9] </args>
+      <args> e[4][8] 0 d[5][9] d[4][8] </args>
+      <args> e[4][9] 1 d[5][9] d[4][10] </args>
+      <args> e[5][8] 1 d[5][9] d[6][8] </args>
+      <args> e[5][9] 0 d[5][9] d[6][10] </args>
+      <args> e[4][9] 0 d[5][10] d[4][9] </args>
+      <args> e[4][10] 1 d[5][10] d[4][11] </args>
+      <args> e[5][9] 1 d[5][10] d[6][9] </args>
+      <args> e[5][10] 0 d[5][10] d[6][11] </args>
+      <args> e[4][10] 0 d[5][11] d[4][10] </args>
+      <args> e[4][11] 1 d[5][11] d[4][12] </args>
+      <args> e[5][10] 1 d[5][11] d[6][10] </args>
+      <args> e[5][11] 0 d[5][11] d[6][12] </args>
+      <args> e[4][11] 0 d[5][12] d[4][11] </args>
+      <args> e[4][12] 1 d[5][12] d[4][13] </args>
+      <args> e[5][11] 1 d[5][12] d[6][11] </args>
+      <args> e[5][12] 0 d[5][12] d[6][13] </args>
+      <args> e[4][12] 0 d[5][13] d[4][12] </args>
+      <args> e[4][13] 1 d[5][13] d[4][14] </args>
+      <args> e[5][12] 1 d[5][13] d[6][12] </args>
+      <args> e[5][13] 0 d[5][13] d[6][14] </args>
+      <args> e[4][13] 0 d[5][14] d[4][13] </args>
+      <args> e[4][14] 1 d[5][14] d[4][15] </args>
+      <args> e[5][13] 1 d[5][14] d[6][13] </args>
+      <args> e[5][14] 0 d[5][14] d[6][15] </args>
+      <args> e[4][14] 0 d[5][15] d[4][14] </args>
+      <args> e[5][14] 1 d[5][15] d[6][14] </args>
+      <args> e[5][0] 1 d[6][0] d[5][1] </args>
+      <args> e[6][0] 0 d[6][0] d[7][1] </args>
+      <args> e[5][0] 0 d[6][1] d[5][0] </args>
+      <args> e[5][1] 1 d[6][1] d[5][2] </args>
+      <args> e[6][0] 1 d[6][1] d[7][0] </args>
+      <args> e[6][1] 0 d[6][1] d[7][2] </args>
+      <args> e[5][1] 0 d[6][2] d[5][1] </args>
+      <args> e[5][2] 1 d[6][2] d[5][3] </args>
+      <args> e[6][1] 1 d[6][2] d[7][1] </args>
+      <args> e[6][2] 0 d[6][2] d[7][3] </args>
+      <args> e[5][2] 0 d[6][3] d[5][2] </args>
+      <args> e[5][3] 1 d[6][3] d[5][4] </args>
+      <args> e[6][2] 1 d[6][3] d[7][2] </args>
+      <args> e[6][3] 0 d[6][3] d[7][4] </args>
+      <args> e[5][3] 0 d[6][4] d[5][3] </args>
+      <args> e[5][4] 1 d[6][4] d[5][5] </args>
+      <args> e[6][3] 1 d[6][4] d[7][3] </args>
+      <args> e[6][4] 0 d[6][4] d[7][5] </args>
+      <args> e[5][4] 0 d[6][5] d[5][4] </args>
+      <args> e[5][5] 1 d[6][5] d[5][6] </args>
+      <args> e[6][4] 1 d[6][5] d[7][4] </args>
+      <args> e[6][5] 0 d[6][5] d[7][6] </args>
+      <args> e[5][5] 0 d[6][6] d[5][5] </args>
+      <args> e[5][6] 1 d[6][6] d[5][7] </args>
+      <args> e[6][5] 1 d[6][6] d[7][5] </args>
+      <args> e[6][6] 0 d[6][6] d[7][7] </args>
+      <args> e[5][6] 0 d[6][7] d[5][6] </args>
+      <args> e[5][7] 1 d[6][7] d[5][8] </args>
+      <args> e[6][6] 1 d[6][7] d[7][6] </args>
+      <args> e[6][7] 0 d[6][7] d[7][8] </args>
+      <args> e[5][7] 0 d[6][8] d[5][7] </args>
+      <args> e[5][8] 1 d[6][8] d[5][9] </args>
+      <args> e[6][7] 1 d[6][8] d[7][7] </args>
+      <args> e[6][8] 0 d[6][8] d[7][9] </args>
+      <args> e[5][8] 0 d[6][9] d[5][8] </args>
+      <args> e[5][9] 1 d[6][9] d[5][10] </args>
+      <args> e[6][8] 1 d[6][9] d[7][8] </args>
+      <args> e[6][9] 0 d[6][9] d[7][10] </args>
+      <args> e[5][9] 0 d[6][10] d[5][9] </args>
+      <args> e[5][10] 1 d[6][10] d[5][11] </args>
+      <args> e[6][9] 1 d[6][10] d[7][9] </args>
+      <args> e[6][10] 0 d[6][10] d[7][11] </args>
+      <args> e[5][10] 0 d[6][11] d[5][10] </args>
+      <args> e[5][11] 1 d[6][11] d[5][12] </args>
+      <args> e[6][10] 1 d[6][11] d[7][10] </args>
+      <args> e[6][11] 0 d[6][11] d[7][12] </args>
+      <args> e[5][11] 0 d[6][12] d[5][11] </args>
+      <args> e[5][12] 1 d[6][12] d[5][13] </args>
+      <args> e[6][11] 1 d[6][12] d[7][11] </args>
+      <args> e[6][12] 0 d[6][12] d[7][13] </args>
+      <args> e[5][12] 0 d[6][13] d[5][12] </args>
+      <args> e[5][13] 1 d[6][13] d[5][14] </args>
+      <args> e[6][12] 1 d[6][13] d[7][12] </args>
+      <args> e[6][13] 0 d[6][13] d[7][14] </args>
+      <args> e[5][13] 0 d[6][14] d[5][13] </args>
+      <args> e[5][14] 1 d[6][14] d[5][15] </args>
+      <args> e[6][13] 1 d[6][14] d[7][13] </args>
+      <args> e[6][14] 0 d[6][14] d[7][15] </args>
+      <args> e[5][14] 0 d[6][15] d[5][14] </args>
+      <args> e[6][14] 1 d[6][15] d[7][14] </args>
+      <args> e[6][0] 1 d[7][0] d[6][1] </args>
+      <args> e[7][0] 0 d[7][0] d[8][1] </args>
+      <args> e[6][0] 0 d[7][1] d[6][0] </args>
+      <args> e[6][1] 1 d[7][1] d[6][2] </args>
+      <args> e[7][0] 1 d[7][1] d[8][0] </args>
+      <args> e[7][1] 0 d[7][1] d[8][2] </args>
+      <args> e[6][1] 0 d[7][2] d[6][1] </args>
+      <args> e[6][2] 1 d[7][2] d[6][3] </args>
+      <args> e[7][1] 1 d[7][2] d[8][1] </args>
+      <args> e[7][2] 0 d[7][2] d[8][3] </args>
+      <args> e[6][2] 0 d[7][3] d[6][2] </args>
+      <args> e[6][3] 1 d[7][3] d[6][4] </args>
+      <args> e[7][2] 1 d[7][3] d[8][2] </args>
+      <args> e[7][3] 0 d[7][3] d[8][4] </args>
+      <args> e[6][3] 0 d[7][4] d[6][3] </args>
+      <args> e[6][4] 1 d[7][4] d[6][5] </args>
+      <args> e[7][3] 1 d[7][4] d[8][3] </args>
+      <args> e[7][4] 0 d[7][4] d[8][5] </args>
+      <args> e[6][4] 0 d[7][5] d[6][4] </args>
+      <args> e[6][5] 1 d[7][5] d[6][6] </args>
+      <args> e[7][4] 1 d[7][5] d[8][4] </args>
+      <args> e[7][5] 0 d[7][5] d[8][6] </args>
+      <args> e[6][5] 0 d[7][6] d[6][5] </args>
+      <args> e[6][6] 1 d[7][6] d[6][7] </args>
+      <args> e[7][5] 1 d[7][6] d[8][5] </args>
+      <args> e[7][6] 0 d[7][6] d[8][7] </args>
+      <args> e[6][6] 0 d[7][7] d[6][6] </args>
+      <args> e[6][7] 1 d[7][7] d[6][8] </args>
+      <args> e[7][6] 1 d[7][7] d[8][6] </args>
+      <args> e[7][7] 0 d[7][7] d[8][8] </args>
+      <args> e[6][7] 0 d[7][8] d[6][7] </args>
+      <args> e[6][8] 1 d[7][8] d[6][9] </args>
+      <args> e[7][7] 1 d[7][8] d[8][7] </args>
+      <args> e[7][8] 0 d[7][8] d[8][9] </args>
+      <args> e[6][8] 0 d[7][9] d[6][8] </args>
+      <args> e[6][9] 1 d[7][9] d[6][10] </args>
+      <args> e[7][8] 1 d[7][9] d[8][8] </args>
+      <args> e[7][9] 0 d[7][9] d[8][10] </args>
+      <args> e[6][9] 0 d[7][10] d[6][9] </args>
+      <args> e[6][10] 1 d[7][10] d[6][11] </args>
+      <args> e[7][9] 1 d[7][10] d[8][9] </args>
+      <args> e[7][10] 0 d[7][10] d[8][11] </args>
+      <args> e[6][10] 0 d[7][11] d[6][10] </args>
+      <args> e[6][11] 1 d[7][11] d[6][12] </args>
+      <args> e[7][10] 1 d[7][11] d[8][10] </args>
+      <args> e[7][11] 0 d[7][11] d[8][12] </args>
+      <args> e[6][11] 0 d[7][12] d[6][11] </args>
+      <args> e[6][12] 1 d[7][12] d[6][13] </args>
+      <args> e[7][11] 1 d[7][12] d[8][11] </args>
+      <args> e[7][12] 0 d[7][12] d[8][13] </args>
+      <args> e[6][12] 0 d[7][13] d[6][12] </args>
+      <args> e[6][13] 1 d[7][13] d[6][14] </args>
+      <args> e[7][12] 1 d[7][13] d[8][12] </args>
+      <args> e[7][13] 0 d[7][13] d[8][14] </args>
+      <args> e[6][13] 0 d[7][14] d[6][13] </args>
+      <args> e[6][14] 1 d[7][14] d[6][15] </args>
+      <args> e[7][13] 1 d[7][14] d[8][13] </args>
+      <args> e[7][14] 0 d[7][14] d[8][15] </args>
+      <args> e[6][14] 0 d[7][15] d[6][14] </args>
+      <args> e[7][14] 1 d[7][15] d[8][14] </args>
+      <args> e[7][0] 1 d[8][0] d[7][1] </args>
+      <args> e[8][0] 0 d[8][0] d[9][1] </args>
+      <args> e[7][0] 0 d[8][1] d[7][0] </args>
+      <args> e[7][1] 1 d[8][1] d[7][2] </args>
+      <args> e[8][0] 1 d[8][1] d[9][0] </args>
+      <args> e[8][1] 0 d[8][1] d[9][2] </args>
+      <args> e[7][1] 0 d[8][2] d[7][1] </args>
+      <args> e[7][2] 1 d[8][2] d[7][3] </args>
+      <args> e[8][1] 1 d[8][2] d[9][1] </args>
+      <args> e[8][2] 0 d[8][2] d[9][3] </args>
+      <args> e[7][2] 0 d[8][3] d[7][2] </args>
+      <args> e[7][3] 1 d[8][3] d[7][4] </args>
+      <args> e[8][2] 1 d[8][3] d[9][2] </args>
+      <args> e[8][3] 0 d[8][3] d[9][4] </args>
+      <args> e[7][3] 0 d[8][4] d[7][3] </args>
+      <args> e[7][4] 1 d[8][4] d[7][5] </args>
+      <args> e[8][3] 1 d[8][4] d[9][3] </args>
+      <args> e[8][4] 0 d[8][4] d[9][5] </args>
+      <args> e[7][4] 0 d[8][5] d[7][4] </args>
+      <args> e[7][5] 1 d[8][5] d[7][6] </args>
+      <args> e[8][4] 1 d[8][5] d[9][4] </args>
+      <args> e[8][5] 0 d[8][5] d[9][6] </args>
+      <args> e[7][5] 0 d[8][6] d[7][5] </args>
+      <args> e[7][6] 1 d[8][6] d[7][7] </args>
+      <args> e[8][5] 1 d[8][6] d[9][5] </args>
+      <args> e[8][6] 0 d[8][6] d[9][7] </args>
+      <args> e[7][6] 0 d[8][7] d[7][6] </args>
+      <args> e[7][7] 1 d[8][7] d[7][8] </args>
+      <args> e[8][6] 1 d[8][7] d[9][6] </args>
+      <args> e[8][7] 0 d[8][7] d[9][8] </args>
+      <args> e[7][7] 0 d[8][8] d[7][7] </args>
+      <args> e[7][8] 1 d[8][8] d[7][9] </args>
+      <args> e[8][7] 1 d[8][8] d[9][7] </args>
+      <args> e[8][8] 0 d[8][8] d[9][9] </args>
+      <args> e[7][8] 0 d[8][9] d[7][8] </args>
+      <args> e[7][9] 1 d[8][9] d[7][10] </args>
+      <args> e[8][8] 1 d[8][9] d[9][8] </args>
+      <args> e[8][9] 0 d[8][9] d[9][10] </args>
+      <args> e[7][9] 0 d[8][10] d[7][9] </args>
+      <args> e[7][10] 1 d[8][10] d[7][11] </args>
+      <args> e[8][9] 1 d[8][10] d[9][9] </args>
+      <args> e[8][10] 0 d[8][10] d[9][11] </args>
+      <args> e[7][10] 0 d[8][11] d[7][10] </args>
+      <args> e[7][11] 1 d[8][11] d[7][12] </args>
+      <args> e[8][10] 1 d[8][11] d[9][10] </args>
+      <args> e[8][11] 0 d[8][11] d[9][12] </args>
+      <args> e[7][11] 0 d[8][12] d[7][11] </args>
+      <args> e[7][12] 1 d[8][12] d[7][13] </args>
+      <args> e[8][11] 1 d[8][12] d[9][11] </args>
+      <args> e[8][12] 0 d[8][12] d[9][13] </args>
+      <args> e[7][12] 0 d[8][13] d[7][12] </args>
+      <args> e[7][13] 1 d[8][13] d[7][14] </args>
+      <args> e[8][12] 1 d[8][13] d[9][12] </args>
+      <args> e[8][13] 0 d[8][13] d[9][14] </args>
+      <args> e[7][13] 0 d[8][14] d[7][13] </args>
+      <args> e[7][14] 1 d[8][14] d[7][15] </args>
+      <args> e[8][13] 1 d[8][14] d[9][13] </args>
+      <args> e[8][14] 0 d[8][14] d[9][15] </args>
+      <args> e[7][14] 0 d[8][15] d[7][14] </args>
+      <args> e[8][14] 1 d[8][15] d[9][14] </args>
+      <args> e[8][0] 1 d[9][0] d[8][1] </args>
+      <args> e[9][0] 0 d[9][0] d[10][1] </args>
+      <args> e[8][0] 0 d[9][1] d[8][0] </args>
+      <args> e[8][1] 1 d[9][1] d[8][2] </args>
+      <args> e[9][0] 1 d[9][1] d[10][0] </args>
+      <args> e[9][1] 0 d[9][1] d[10][2] </args>
+      <args> e[8][1] 0 d[9][2] d[8][1] </args>
+      <args> e[8][2] 1 d[9][2] d[8][3] </args>
+      <args> e[9][1] 1 d[9][2] d[10][1] </args>
+      <args> e[9][2] 0 d[9][2] d[10][3] </args>
+      <args> e[8][2] 0 d[9][3] d[8][2] </args>
+      <args> e[8][3] 1 d[9][3] d[8][4] </args>
+      <args> e[9][2] 1 d[9][3] d[10][2] </args>
+      <args> e[9][3] 0 d[9][3] d[10][4] </args>
+      <args> e[8][3] 0 d[9][4] d[8][3] </args>
+      <args> e[8][4] 1 d[9][4] d[8][5] </args>
+      <args> e[9][3] 1 d[9][4] d[10][3] </args>
+      <args> e[9][4] 0 d[9][4] d[10][5] </args>
+      <args> e[8][4] 0 d[9][5] d[8][4] </args>
+      <args> e[8][5] 1 d[9][5] d[8][6] </args>
+      <args> e[9][4] 1 d[9][5] d[10][4] </args>
+      <args> e[9][5] 0 d[9][5] d[10][6] </args>
+      <args> e[8][5] 0 d[9][6] d[8][5] </args>
+      <args> e[8][6] 1 d[9][6] d[8][7] </args>
+      <args> e[9][5] 1 d[9][6] d[10][5] </args>
+      <args> e[9][6] 0 d[9][6] d[10][7] </args>
+      <args> e[8][6] 0 d[9][7] d[8][6] </args>
+      <args> e[8][7] 1 d[9][7] d[8][8] </args>
+      <args> e[9][6] 1 d[9][7] d[10][6] </args>
+      <args> e[9][7] 0 d[9][7] d[10][8] </args>
+      <args> e[8][7] 0 d[9][8] d[8][7] </args>
+      <args> e[8][8] 1 d[9][8] d[8][9] </args>
+      <args> e[9][7] 1 d[9][8] d[10][7] </args>
+      <args> e[9][8] 0 d[9][8] d[10][9] </args>
+      <args> e[8][8] 0 d[9][9] d[8][8] </args>
+      <args> e[8][9] 1 d[9][9] d[8][10] </args>
+      <args> e[9][8] 1 d[9][9] d[10][8] </args>
+      <args> e[9][9] 0 d[9][9] d[10][10] </args>
+      <args> e[8][9] 0 d[9][10] d[8][9] </args>
+      <args> e[8][10] 1 d[9][10] d[8][11] </args>
+      <args> e[9][9] 1 d[9][10] d[10][9] </args>
+      <args> e[9][10] 0 d[9][10] d[10][11] </args>
+      <args> e[8][10] 0 d[9][11] d[8][10] </args>
+      <args> e[8][11] 1 d[9][11] d[8][12] </args>
+      <args> e[9][10] 1 d[9][11] d[10][10] </args>
+      <args> e[9][11] 0 d[9][11] d[10][12] </args>
+      <args> e[8][11] 0 d[9][12] d[8][11] </args>
+      <args> e[8][12] 1 d[9][12] d[8][13] </args>
+      <args> e[9][11] 1 d[9][12] d[10][11] </args>
+      <args> e[9][12] 0 d[9][12] d[10][13] </args>
+      <args> e[8][12] 0 d[9][13] d[8][12] </args>
+      <args> e[8][13] 1 d[9][13] d[8][14] </args>
+      <args> e[9][12] 1 d[9][13] d[10][12] </args>
+      <args> e[9][13] 0 d[9][13] d[10][14] </args>
+      <args> e[8][13] 0 d[9][14] d[8][13] </args>
+      <args> e[8][14] 1 d[9][14] d[8][15] </args>
+      <args> e[9][13] 1 d[9][14] d[10][13] </args>
+      <args> e[9][14] 0 d[9][14] d[10][15] </args>
+      <args> e[8][14] 0 d[9][15] d[8][14] </args>
+      <args> e[9][14] 1 d[9][15] d[10][14] </args>
+      <args> e[9][0] 1 d[10][0] d[9][1] </args>
+      <args> e[10][0] 0 d[10][0] d[11][1] </args>
+      <args> e[9][0] 0 d[10][1] d[9][0] </args>
+      <args> e[9][1] 1 d[10][1] d[9][2] </args>
+      <args> e[10][0] 1 d[10][1] d[11][0] </args>
+      <args> e[10][1] 0 d[10][1] d[11][2] </args>
+      <args> e[9][1] 0 d[10][2] d[9][1] </args>
+      <args> e[9][2] 1 d[10][2] d[9][3] </args>
+      <args> e[10][1] 1 d[10][2] d[11][1] </args>
+      <args> e[10][2] 0 d[10][2] d[11][3] </args>
+      <args> e[9][2] 0 d[10][3] d[9][2] </args>
+      <args> e[9][3] 1 d[10][3] d[9][4] </args>
+      <args> e[10][2] 1 d[10][3] d[11][2] </args>
+      <args> e[10][3] 0 d[10][3] d[11][4] </args>
+      <args> e[9][3] 0 d[10][4] d[9][3] </args>
+      <args> e[9][4] 1 d[10][4] d[9][5] </args>
+      <args> e[10][3] 1 d[10][4] d[11][3] </args>
+      <args> e[10][4] 0 d[10][4] d[11][5] </args>
+      <args> e[9][4] 0 d[10][5] d[9][4] </args>
+      <args> e[9][5] 1 d[10][5] d[9][6] </args>
+      <args> e[10][4] 1 d[10][5] d[11][4] </args>
+      <args> e[10][5] 0 d[10][5] d[11][6] </args>
+      <args> e[9][5] 0 d[10][6] d[9][5] </args>
+      <args> e[9][6] 1 d[10][6] d[9][7] </args>
+      <args> e[10][5] 1 d[10][6] d[11][5] </args>
+      <args> e[10][6] 0 d[10][6] d[11][7] </args>
+      <args> e[9][6] 0 d[10][7] d[9][6] </args>
+      <args> e[9][7] 1 d[10][7] d[9][8] </args>
+      <args> e[10][6] 1 d[10][7] d[11][6] </args>
+      <args> e[10][7] 0 d[10][7] d[11][8] </args>
+      <args> e[9][7] 0 d[10][8] d[9][7] </args>
+      <args> e[9][8] 1 d[10][8] d[9][9] </args>
+      <args> e[10][7] 1 d[10][8] d[11][7] </args>
+      <args> e[10][8] 0 d[10][8] d[11][9] </args>
+      <args> e[9][8] 0 d[10][9] d[9][8] </args>
+      <args> e[9][9] 1 d[10][9] d[9][10] </args>
+      <args> e[10][8] 1 d[10][9] d[11][8] </args>
+      <args> e[10][9] 0 d[10][9] d[11][10] </args>
+      <args> e[9][9] 0 d[10][10] d[9][9] </args>
+      <args> e[9][10] 1 d[10][10] d[9][11] </args>
+      <args> e[10][9] 1 d[10][10] d[11][9] </args>
+      <args> e[10][10] 0 d[10][10] d[11][11] </args>
+      <args> e[9][10] 0 d[10][11] d[9][10] </args>
+      <args> e[9][11] 1 d[10][11] d[9][12] </args>
+      <args> e[10][10] 1 d[10][11] d[11][10] </args>
+      <args> e[10][11] 0 d[10][11] d[11][12] </args>
+      <args> e[9][11] 0 d[10][12] d[9][11] </args>
+      <args> e[9][12] 1 d[10][12] d[9][13] </args>
+      <args> e[10][11] 1 d[10][12] d[11][11] </args>
+      <args> e[10][12] 0 d[10][12] d[11][13] </args>
+      <args> e[9][12] 0 d[10][13] d[9][12] </args>
+      <args> e[9][13] 1 d[10][13] d[9][14] </args>
+      <args> e[10][12] 1 d[10][13] d[11][12] </args>
+      <args> e[10][13] 0 d[10][13] d[11][14] </args>
+      <args> e[9][13] 0 d[10][14] d[9][13] </args>
+      <args> e[9][14] 1 d[10][14] d[9][15] </args>
+      <args> e[10][13] 1 d[10][14] d[11][13] </args>
+      <args> e[10][14] 0 d[10][14] d[11][15] </args>
+      <args> e[9][14] 0 d[10][15] d[9][14] </args>
+      <args> e[10][14] 1 d[10][15] d[11][14] </args>
+      <args> e[10][0] 1 d[11][0] d[10][1] </args>
+      <args> e[11][0] 0 d[11][0] d[12][1] </args>
+      <args> e[10][0] 0 d[11][1] d[10][0] </args>
+      <args> e[10][1] 1 d[11][1] d[10][2] </args>
+      <args> e[11][0] 1 d[11][1] d[12][0] </args>
+      <args> e[11][1] 0 d[11][1] d[12][2] </args>
+      <args> e[10][1] 0 d[11][2] d[10][1] </args>
+      <args> e[10][2] 1 d[11][2] d[10][3] </args>
+      <args> e[11][1] 1 d[11][2] d[12][1] </args>
+      <args> e[11][2] 0 d[11][2] d[12][3] </args>
+      <args> e[10][2] 0 d[11][3] d[10][2] </args>
+      <args> e[10][3] 1 d[11][3] d[10][4] </args>
+      <args> e[11][2] 1 d[11][3] d[12][2] </args>
+      <args> e[11][3] 0 d[11][3] d[12][4] </args>
+      <args> e[10][3] 0 d[11][4] d[10][3] </args>
+      <args> e[10][4] 1 d[11][4] d[10][5] </args>
+      <args> e[11][3] 1 d[11][4] d[12][3] </args>
+      <args> e[11][4] 0 d[11][4] d[12][5] </args>
+      <args> e[10][4] 0 d[11][5] d[10][4] </args>
+      <args> e[10][5] 1 d[11][5] d[10][6] </args>
+      <args> e[11][4] 1 d[11][5] d[12][4] </args>
+      <args> e[11][5] 0 d[11][5] d[12][6] </args>
+      <args> e[10][5] 0 d[11][6] d[10][5] </args>
+      <args> e[10][6] 1 d[11][6] d[10][7] </args>
+      <args> e[11][5] 1 d[11][6] d[12][5] </args>
+      <args> e[11][6] 0 d[11][6] d[12][7] </args>
+      <args> e[10][6] 0 d[11][7] d[10][6] </args>
+      <args> e[10][7] 1 d[11][7] d[10][8] </args>
+      <args> e[11][6] 1 d[11][7] d[12][6] </args>
+      <args> e[11][7] 0 d[11][7] d[12][8] </args>
+      <args> e[10][7] 0 d[11][8] d[10][7] </args>
+      <args> e[10][8] 1 d[11][8] d[10][9] </args>
+      <args> e[11][7] 1 d[11][8] d[12][7] </args>
+      <args> e[11][8] 0 d[11][8] d[12][9] </args>
+      <args> e[10][8] 0 d[11][9] d[10][8] </args>
+      <args> e[10][9] 1 d[11][9] d[10][10] </args>
+      <args> e[11][8] 1 d[11][9] d[12][8] </args>
+      <args> e[11][9] 0 d[11][9] d[12][10] </args>
+      <args> e[10][9] 0 d[11][10] d[10][9] </args>
+      <args> e[10][10] 1 d[11][10] d[10][11] </args>
+      <args> e[11][9] 1 d[11][10] d[12][9] </args>
+      <args> e[11][10] 0 d[11][10] d[12][11] </args>
+      <args> e[10][10] 0 d[11][11] d[10][10] </args>
+      <args> e[10][11] 1 d[11][11] d[10][12] </args>
+      <args> e[11][10] 1 d[11][11] d[12][10] </args>
+      <args> e[11][11] 0 d[11][11] d[12][12] </args>
+      <args> e[10][11] 0 d[11][12] d[10][11] </args>
+      <args> e[10][12] 1 d[11][12] d[10][13] </args>
+      <args> e[11][11] 1 d[11][12] d[12][11] </args>
+      <args> e[11][12] 0 d[11][12] d[12][13] </args>
+      <args> e[10][12] 0 d[11][13] d[10][12] </args>
+      <args> e[10][13] 1 d[11][13] d[10][14] </args>
+      <args> e[11][12] 1 d[11][13] d[12][12] </args>
+      <args> e[11][13] 0 d[11][13] d[12][14] </args>
+      <args> e[10][13] 0 d[11][14] d[10][13] </args>
+      <args> e[10][14] 1 d[11][14] d[10][15] </args>
+      <args> e[11][13] 1 d[11][14] d[12][13] </args>
+      <args> e[11][14] 0 d[11][14] d[12][15] </args>
+      <args> e[10][14] 0 d[11][15] d[10][14] </args>
+      <args> e[11][14] 1 d[11][15] d[12][14] </args>
+      <args> e[11][0] 1 d[12][0] d[11][1] </args>
+      <args> e[12][0] 0 d[12][0] d[13][1] </args>
+      <args> e[11][0] 0 d[12][1] d[11][0] </args>
+      <args> e[11][1] 1 d[12][1] d[11][2] </args>
+      <args> e[12][0] 1 d[12][1] d[13][0] </args>
+      <args> e[12][1] 0 d[12][1] d[13][2] </args>
+      <args> e[11][1] 0 d[12][2] d[11][1] </args>
+      <args> e[11][2] 1 d[12][2] d[11][3] </args>
+      <args> e[12][1] 1 d[12][2] d[13][1] </args>
+      <args> e[12][2] 0 d[12][2] d[13][3] </args>
+      <args> e[11][2] 0 d[12][3] d[11][2] </args>
+      <args> e[11][3] 1 d[12][3] d[11][4] </args>
+      <args> e[12][2] 1 d[12][3] d[13][2] </args>
+      <args> e[12][3] 0 d[12][3] d[13][4] </args>
+      <args> e[11][3] 0 d[12][4] d[11][3] </args>
+      <args> e[11][4] 1 d[12][4] d[11][5] </args>
+      <args> e[12][3] 1 d[12][4] d[13][3] </args>
+      <args> e[12][4] 0 d[12][4] d[13][5] </args>
+      <args> e[11][4] 0 d[12][5] d[11][4] </args>
+      <args> e[11][5] 1 d[12][5] d[11][6] </args>
+      <args> e[12][4] 1 d[12][5] d[13][4] </args>
+      <args> e[12][5] 0 d[12][5] d[13][6] </args>
+      <args> e[11][5] 0 d[12][6] d[11][5] </args>
+      <args> e[11][6] 1 d[12][6] d[11][7] </args>
+      <args> e[12][5] 1 d[12][6] d[13][5] </args>
+      <args> e[12][6] 0 d[12][6] d[13][7] </args>
+      <args> e[11][6] 0 d[12][7] d[11][6] </args>
+      <args> e[11][7] 1 d[12][7] d[11][8] </args>
+      <args> e[12][6] 1 d[12][7] d[13][6] </args>
+      <args> e[12][7] 0 d[12][7] d[13][8] </args>
+      <args> e[11][7] 0 d[12][8] d[11][7] </args>
+      <args> e[11][8] 1 d[12][8] d[11][9] </args>
+      <args> e[12][7] 1 d[12][8] d[13][7] </args>
+      <args> e[12][8] 0 d[12][8] d[13][9] </args>
+      <args> e[11][8] 0 d[12][9] d[11][8] </args>
+      <args> e[11][9] 1 d[12][9] d[11][10] </args>
+      <args> e[12][8] 1 d[12][9] d[13][8] </args>
+      <args> e[12][9] 0 d[12][9] d[13][10] </args>
+      <args> e[11][9] 0 d[12][10] d[11][9] </args>
+      <args> e[11][10] 1 d[12][10] d[11][11] </args>
+      <args> e[12][9] 1 d[12][10] d[13][9] </args>
+      <args> e[12][10] 0 d[12][10] d[13][11] </args>
+      <args> e[11][10] 0 d[12][11] d[11][10] </args>
+      <args> e[11][11] 1 d[12][11] d[11][12] </args>
+      <args> e[12][10] 1 d[12][11] d[13][10] </args>
+      <args> e[12][11] 0 d[12][11] d[13][12] </args>
+      <args> e[11][11] 0 d[12][12] d[11][11] </args>
+      <args> e[11][12] 1 d[12][12] d[11][13] </args>
+      <args> e[12][11] 1 d[12][12] d[13][11] </args>
+      <args> e[12][12] 0 d[12][12] d[13][13] </args>
+      <args> e[11][12] 0 d[12][13] d[11][12] </args>
+      <args> e[11][13] 1 d[12][13] d[11][14] </args>
+      <args> e[12][12] 1 d[12][13] d[13][12] </args>
+      <args> e[12][13] 0 d[12][13] d[13][14] </args>
+      <args> e[11][13] 0 d[12][14] d[11][13] </args>
+      <args> e[11][14] 1 d[12][14] d[11][15] </args>
+      <args> e[12][13] 1 d[12][14] d[13][13] </args>
+      <args> e[12][14] 0 d[12][14] d[13][15] </args>
+      <args> e[11][14] 0 d[12][15] d[11][14] </args>
+      <args> e[12][14] 1 d[12][15] d[13][14] </args>
+      <args> e[12][0] 1 d[13][0] d[12][1] </args>
+      <args> e[13][0] 0 d[13][0] d[14][1] </args>
+      <args> e[12][0] 0 d[13][1] d[12][0] </args>
+      <args> e[12][1] 1 d[13][1] d[12][2] </args>
+      <args> e[13][0] 1 d[13][1] d[14][0] </args>
+      <args> e[13][1] 0 d[13][1] d[14][2] </args>
+      <args> e[12][1] 0 d[13][2] d[12][1] </args>
+      <args> e[12][2] 1 d[13][2] d[12][3] </args>
+      <args> e[13][1] 1 d[13][2] d[14][1] </args>
+      <args> e[13][2] 0 d[13][2] d[14][3] </args>
+      <args> e[12][2] 0 d[13][3] d[12][2] </args>
+      <args> e[12][3] 1 d[13][3] d[12][4] </args>
+      <args> e[13][2] 1 d[13][3] d[14][2] </args>
+      <args> e[13][3] 0 d[13][3] d[14][4] </args>
+      <args> e[12][3] 0 d[13][4] d[12][3] </args>
+      <args> e[12][4] 1 d[13][4] d[12][5] </args>
+      <args> e[13][3] 1 d[13][4] d[14][3] </args>
+      <args> e[13][4] 0 d[13][4] d[14][5] </args>
+      <args> e[12][4] 0 d[13][5] d[12][4] </args>
+      <args> e[12][5] 1 d[13][5] d[12][6] </args>
+      <args> e[13][4] 1 d[13][5] d[14][4] </args>
+      <args> e[13][5] 0 d[13][5] d[14][6] </args>
+      <args> e[12][5] 0 d[13][6] d[12][5] </args>
+      <args> e[12][6] 1 d[13][6] d[12][7] </args>
+      <args> e[13][5] 1 d[13][6] d[14][5] </args>
+      <args> e[13][6] 0 d[13][6] d[14][7] </args>
+      <args> e[12][6] 0 d[13][7] d[12][6] </args>
+      <args> e[12][7] 1 d[13][7] d[12][8] </args>
+      <args> e[13][6] 1 d[13][7] d[14][6] </args>
+      <args> e[13][7] 0 d[13][7] d[14][8] </args>
+      <args> e[12][7] 0 d[13][8] d[12][7] </args>
+      <args> e[12][8] 1 d[13][8] d[12][9] </args>
+      <args> e[13][7] 1 d[13][8] d[14][7] </args>
+      <args> e[13][8] 0 d[13][8] d[14][9] </args>
+      <args> e[12][8] 0 d[13][9] d[12][8] </args>
+      <args> e[12][9] 1 d[13][9] d[12][10] </args>
+      <args> e[13][8] 1 d[13][9] d[14][8] </args>
+      <args> e[13][9] 0 d[13][9] d[14][10] </args>
+      <args> e[12][9] 0 d[13][10] d[12][9] </args>
+      <args> e[12][10] 1 d[13][10] d[12][11] </args>
+      <args> e[13][9] 1 d[13][10] d[14][9] </args>
+      <args> e[13][10] 0 d[13][10] d[14][11] </args>
+      <args> e[12][10] 0 d[13][11] d[12][10] </args>
+      <args> e[12][11] 1 d[13][11] d[12][12] </args>
+      <args> e[13][10] 1 d[13][11] d[14][10] </args>
+      <args> e[13][11] 0 d[13][11] d[14][12] </args>
+      <args> e[12][11] 0 d[13][12] d[12][11] </args>
+      <args> e[12][12] 1 d[13][12] d[12][13] </args>
+      <args> e[13][11] 1 d[13][12] d[14][11] </args>
+      <args> e[13][12] 0 d[13][12] d[14][13] </args>
+      <args> e[12][12] 0 d[13][13] d[12][12] </args>
+      <args> e[12][13] 1 d[13][13] d[12][14] </args>
+      <args> e[13][12] 1 d[13][13] d[14][12] </args>
+      <args> e[13][13] 0 d[13][13] d[14][14] </args>
+      <args> e[12][13] 0 d[13][14] d[12][13] </args>
+      <args> e[12][14] 1 d[13][14] d[12][15] </args>
+      <args> e[13][13] 1 d[13][14] d[14][13] </args>
+      <args> e[13][14] 0 d[13][14] d[14][15] </args>
+      <args> e[12][14] 0 d[13][15] d[12][14] </args>
+      <args> e[13][14] 1 d[13][15] d[14][14] </args>
+      <args> e[13][0] 1 d[14][0] d[13][1] </args>
+      <args> e[14][0] 0 d[14][0] d[15][1] </args>
+      <args> e[13][0] 0 d[14][1] d[13][0] </args>
+      <args> e[13][1] 1 d[14][1] d[13][2] </args>
+      <args> e[14][0] 1 d[14][1] d[15][0] </args>
+      <args> e[14][1] 0 d[14][1] d[15][2] </args>
+      <args> e[13][1] 0 d[14][2] d[13][1] </args>
+      <args> e[13][2] 1 d[14][2] d[13][3] </args>
+      <args> e[14][1] 1 d[14][2] d[15][1] </args>
+      <args> e[14][2] 0 d[14][2] d[15][3] </args>
+      <args> e[13][2] 0 d[14][3] d[13][2] </args>
+      <args> e[13][3] 1 d[14][3] d[13][4] </args>
+      <args> e[14][2] 1 d[14][3] d[15][2] </args>
+      <args> e[14][3] 0 d[14][3] d[15][4] </args>
+      <args> e[13][3] 0 d[14][4] d[13][3] </args>
+      <args> e[13][4] 1 d[14][4] d[13][5] </args>
+      <args> e[14][3] 1 d[14][4] d[15][3] </args>
+      <args> e[14][4] 0 d[14][4] d[15][5] </args>
+      <args> e[13][4] 0 d[14][5] d[13][4] </args>
+      <args> e[13][5] 1 d[14][5] d[13][6] </args>
+      <args> e[14][4] 1 d[14][5] d[15][4] </args>
+      <args> e[14][5] 0 d[14][5] d[15][6] </args>
+      <args> e[13][5] 0 d[14][6] d[13][5] </args>
+      <args> e[13][6] 1 d[14][6] d[13][7] </args>
+      <args> e[14][5] 1 d[14][6] d[15][5] </args>
+      <args> e[14][6] 0 d[14][6] d[15][7] </args>
+      <args> e[13][6] 0 d[14][7] d[13][6] </args>
+      <args> e[13][7] 1 d[14][7] d[13][8] </args>
+      <args> e[14][6] 1 d[14][7] d[15][6] </args>
+      <args> e[14][7] 0 d[14][7] d[15][8] </args>
+      <args> e[13][7] 0 d[14][8] d[13][7] </args>
+      <args> e[13][8] 1 d[14][8] d[13][9] </args>
+      <args> e[14][7] 1 d[14][8] d[15][7] </args>
+      <args> e[14][8] 0 d[14][8] d[15][9] </args>
+      <args> e[13][8] 0 d[14][9] d[13][8] </args>
+      <args> e[13][9] 1 d[14][9] d[13][10] </args>
+      <args> e[14][8] 1 d[14][9] d[15][8] </args>
+      <args> e[14][9] 0 d[14][9] d[15][10] </args>
+      <args> e[13][9] 0 d[14][10] d[13][9] </args>
+      <args> e[13][10] 1 d[14][10] d[13][11] </args>
+      <args> e[14][9] 1 d[14][10] d[15][9] </args>
+      <args> e[14][10] 0 d[14][10] d[15][11] </args>
+      <args> e[13][10] 0 d[14][11] d[13][10] </args>
+      <args> e[13][11] 1 d[14][11] d[13][12] </args>
+      <args> e[14][10] 1 d[14][11] d[15][10] </args>
+      <args> e[14][11] 0 d[14][11] d[15][12] </args>
+      <args> e[13][11] 0 d[14][12] d[13][11] </args>
+      <args> e[13][12] 1 d[14][12] d[13][13] </args>
+      <args> e[14][11] 1 d[14][12] d[15][11] </args>
+      <args> e[14][12] 0 d[14][12] d[15][13] </args>
+      <args> e[13][12] 0 d[14][13] d[13][12] </args>
+      <args> e[13][13] 1 d[14][13] d[13][14] </args>
+      <args> e[14][12] 1 d[14][13] d[15][12] </args>
+      <args> e[14][13] 0 d[14][13] d[15][14] </args>
+      <args> e[13][13] 0 d[14][14] d[13][13] </args>
+      <args> e[13][14] 1 d[14][14] d[13][15] </args>
+      <args> e[14][13] 1 d[14][14] d[15][13] </args>
+      <args> e[14][14] 0 d[14][14] d[15][15] </args>
+      <args> e[13][14] 0 d[14][15] d[13][14] </args>
+      <args> e[14][14] 1 d[14][15] d[15][14] </args>
+      <args> e[14][0] 1 d[15][0] d[14][1] </args>
+      <args> e[14][0] 0 d[15][1] d[14][0] </args>
+      <args> e[14][1] 1 d[15][1] d[14][2] </args>
+      <args> e[14][1] 0 d[15][2] d[14][1] </args>
+      <args> e[14][2] 1 d[15][2] d[14][3] </args>
+      <args> e[14][2] 0 d[15][3] d[14][2] </args>
+      <args> e[14][3] 1 d[15][3] d[14][4] </args>
+      <args> e[14][3] 0 d[15][4] d[14][3] </args>
+      <args> e[14][4] 1 d[15][4] d[14][5] </args>
+      <args> e[14][4] 0 d[15][5] d[14][4] </args>
+      <args> e[14][5] 1 d[15][5] d[14][6] </args>
+      <args> e[14][5] 0 d[15][6] d[14][5] </args>
+      <args> e[14][6] 1 d[15][6] d[14][7] </args>
+      <args> e[14][6] 0 d[15][7] d[14][6] </args>
+      <args> e[14][7] 1 d[15][7] d[14][8] </args>
+      <args> e[14][7] 0 d[15][8] d[14][7] </args>
+      <args> e[14][8] 1 d[15][8] d[14][9] </args>
+      <args> e[14][8] 0 d[15][9] d[14][8] </args>
+      <args> e[14][9] 1 d[15][9] d[14][10] </args>
+      <args> e[14][9] 0 d[15][10] d[14][9] </args>
+      <args> e[14][10] 1 d[15][10] d[14][11] </args>
+      <args> e[14][10] 0 d[15][11] d[14][10] </args>
+      <args> e[14][11] 1 d[15][11] d[14][12] </args>
+      <args> e[14][11] 0 d[15][12] d[14][11] </args>
+      <args> e[14][12] 1 d[15][12] d[14][13] </args>
+      <args> e[14][12] 0 d[15][13] d[14][12] </args>
+      <args> e[14][13] 1 d[15][13] d[14][14] </args>
+      <args> e[14][13] 0 d[15][14] d[14][13] </args>
+      <args> e[14][14] 1 d[15][14] d[14][15] </args>
+      <args> e[14][14] 0 d[15][15] d[14][14] </args>
+    </group>
+    <group>
+      <count>
+        <list> %... </list>
+        <values> 1 </values>
+        <condition> (eq,%0) </condition>
+      </count>
+      <args> aux_gb[0] and(eq(e[0][0],0),eq(d[0][0],add(d[1][1],1))) </args>
+      <args> aux_gb[1] and(eq(e[0][0],1),eq(d[0][1],add(d[1][0],1))) and(eq(e[0][1],0),eq(d[0][1],add(d[1][2],1))) </args>
+      <args> aux_gb[2] and(eq(e[0][1],1),eq(d[0][2],add(d[1][1],1))) and(eq(e[0][2],0),eq(d[0][2],add(d[1][3],1))) </args>
+      <args> aux_gb[3] and(eq(e[0][2],1),eq(d[0][3],add(d[1][2],1))) and(eq(e[0][3],0),eq(d[0][3],add(d[1][4],1))) </args>
+      <args> aux_gb[4] and(eq(e[0][3],1),eq(d[0][4],add(d[1][3],1))) and(eq(e[0][4],0),eq(d[0][4],add(d[1][5],1))) </args>
+      <args> aux_gb[5] and(eq(e[0][4],1),eq(d[0][5],add(d[1][4],1))) and(eq(e[0][5],0),eq(d[0][5],add(d[1][6],1))) </args>
+      <args> aux_gb[6] and(eq(e[0][5],1),eq(d[0][6],add(d[1][5],1))) and(eq(e[0][6],0),eq(d[0][6],add(d[1][7],1))) </args>
+      <args> aux_gb[7] and(eq(e[0][6],1),eq(d[0][7],add(d[1][6],1))) and(eq(e[0][7],0),eq(d[0][7],add(d[1][8],1))) </args>
+      <args> aux_gb[8] and(eq(e[0][7],1),eq(d[0][8],add(d[1][7],1))) and(eq(e[0][8],0),eq(d[0][8],add(d[1][9],1))) </args>
+      <args> aux_gb[9] and(eq(e[0][8],1),eq(d[0][9],add(d[1][8],1))) and(eq(e[0][9],0),eq(d[0][9],add(d[1][10],1))) </args>
+      <args> aux_gb[10] and(eq(e[0][9],1),eq(d[0][10],add(d[1][9],1))) and(eq(e[0][10],0),eq(d[0][10],add(d[1][11],1))) </args>
+      <args> aux_gb[11] and(eq(e[0][10],1),eq(d[0][11],add(d[1][10],1))) and(eq(e[0][11],0),eq(d[0][11],add(d[1][12],1))) </args>
+      <args> aux_gb[12] and(eq(e[0][11],1),eq(d[0][12],add(d[1][11],1))) and(eq(e[0][12],0),eq(d[0][12],add(d[1][13],1))) </args>
+      <args> aux_gb[13] and(eq(e[0][12],1),eq(d[0][13],add(d[1][12],1))) and(eq(e[0][13],0),eq(d[0][13],add(d[1][14],1))) </args>
+      <args> aux_gb[14] and(eq(e[0][13],1),eq(d[0][14],add(d[1][13],1))) and(eq(e[0][14],0),eq(d[0][14],add(d[1][15],1))) </args>
+      <args> aux_gb[15] and(eq(e[0][14],1),eq(d[0][15],add(d[1][14],1))) </args>
+      <args> aux_gb[16] and(eq(e[0][0],1),eq(d[1][0],add(d[0][1],1))) and(eq(e[1][0],0),eq(d[1][0],add(d[2][1],1))) </args>
+      <args> aux_gb[17] and(eq(e[0][0],0),eq(d[1][1],add(d[0][0],1))) and(eq(e[0][1],1),eq(d[1][1],add(d[0][2],1))) and(eq(e[1][0],1),eq(d[1][1],add(d[2][0],1))) and(eq(e[1][1],0),eq(d[1][1],add(d[2][2],1))) </args>
+      <args> aux_gb[18] and(eq(e[0][1],0),eq(d[1][2],add(d[0][1],1))) and(eq(e[0][2],1),eq(d[1][2],add(d[0][3],1))) and(eq(e[1][1],1),eq(d[1][2],add(d[2][1],1))) and(eq(e[1][2],0),eq(d[1][2],add(d[2][3],1))) </args>
+      <args> aux_gb[19] and(eq(e[0][2],0),eq(d[1][3],add(d[0][2],1))) and(eq(e[0][3],1),eq(d[1][3],add(d[0][4],1))) and(eq(e[1][2],1),eq(d[1][3],add(d[2][2],1))) and(eq(e[1][3],0),eq(d[1][3],add(d[2][4],1))) </args>
+      <args> aux_gb[20] and(eq(e[0][3],0),eq(d[1][4],add(d[0][3],1))) and(eq(e[0][4],1),eq(d[1][4],add(d[0][5],1))) and(eq(e[1][3],1),eq(d[1][4],add(d[2][3],1))) and(eq(e[1][4],0),eq(d[1][4],add(d[2][5],1))) </args>
+      <args> aux_gb[21] and(eq(e[0][4],0),eq(d[1][5],add(d[0][4],1))) and(eq(e[0][5],1),eq(d[1][5],add(d[0][6],1))) and(eq(e[1][4],1),eq(d[1][5],add(d[2][4],1))) and(eq(e[1][5],0),eq(d[1][5],add(d[2][6],1))) </args>
+      <args> aux_gb[22] and(eq(e[0][5],0),eq(d[1][6],add(d[0][5],1))) and(eq(e[0][6],1),eq(d[1][6],add(d[0][7],1))) and(eq(e[1][5],1),eq(d[1][6],add(d[2][5],1))) and(eq(e[1][6],0),eq(d[1][6],add(d[2][7],1))) </args>
+      <args> aux_gb[23] and(eq(e[0][6],0),eq(d[1][7],add(d[0][6],1))) and(eq(e[0][7],1),eq(d[1][7],add(d[0][8],1))) and(eq(e[1][6],1),eq(d[1][7],add(d[2][6],1))) and(eq(e[1][7],0),eq(d[1][7],add(d[2][8],1))) </args>
+      <args> aux_gb[24] and(eq(e[0][7],0),eq(d[1][8],add(d[0][7],1))) and(eq(e[0][8],1),eq(d[1][8],add(d[0][9],1))) and(eq(e[1][7],1),eq(d[1][8],add(d[2][7],1))) and(eq(e[1][8],0),eq(d[1][8],add(d[2][9],1))) </args>
+      <args> aux_gb[25] and(eq(e[0][8],0),eq(d[1][9],add(d[0][8],1))) and(eq(e[0][9],1),eq(d[1][9],add(d[0][10],1))) and(eq(e[1][8],1),eq(d[1][9],add(d[2][8],1))) and(eq(e[1][9],0),eq(d[1][9],add(d[2][10],1))) </args>
+      <args> aux_gb[26] and(eq(e[0][9],0),eq(d[1][10],add(d[0][9],1))) and(eq(e[0][10],1),eq(d[1][10],add(d[0][11],1))) and(eq(e[1][9],1),eq(d[1][10],add(d[2][9],1))) and(eq(e[1][10],0),eq(d[1][10],add(d[2][11],1))) </args>
+      <args> aux_gb[27] and(eq(e[0][10],0),eq(d[1][11],add(d[0][10],1))) and(eq(e[0][11],1),eq(d[1][11],add(d[0][12],1))) and(eq(e[1][10],1),eq(d[1][11],add(d[2][10],1))) and(eq(e[1][11],0),eq(d[1][11],add(d[2][12],1))) </args>
+      <args> aux_gb[28] and(eq(e[0][11],0),eq(d[1][12],add(d[0][11],1))) and(eq(e[0][12],1),eq(d[1][12],add(d[0][13],1))) and(eq(e[1][11],1),eq(d[1][12],add(d[2][11],1))) and(eq(e[1][12],0),eq(d[1][12],add(d[2][13],1))) </args>
+      <args> aux_gb[29] and(eq(e[0][12],0),eq(d[1][13],add(d[0][12],1))) and(eq(e[0][13],1),eq(d[1][13],add(d[0][14],1))) and(eq(e[1][12],1),eq(d[1][13],add(d[2][12],1))) and(eq(e[1][13],0),eq(d[1][13],add(d[2][14],1))) </args>
+      <args> aux_gb[30] and(eq(e[0][13],0),eq(d[1][14],add(d[0][13],1))) and(eq(e[0][14],1),eq(d[1][14],add(d[0][15],1))) and(eq(e[1][13],1),eq(d[1][14],add(d[2][13],1))) and(eq(e[1][14],0),eq(d[1][14],add(d[2][15],1))) </args>
+      <args> aux_gb[31] and(eq(e[0][14],0),eq(d[1][15],add(d[0][14],1))) and(eq(e[1][14],1),eq(d[1][15],add(d[2][14],1))) </args>
+      <args> aux_gb[32] and(eq(e[1][0],1),eq(d[2][0],add(d[1][1],1))) and(eq(e[2][0],0),eq(d[2][0],add(d[3][1],1))) </args>
+      <args> aux_gb[33] and(eq(e[1][0],0),eq(d[2][1],add(d[1][0],1))) and(eq(e[1][1],1),eq(d[2][1],add(d[1][2],1))) and(eq(e[2][0],1),eq(d[2][1],add(d[3][0],1))) and(eq(e[2][1],0),eq(d[2][1],add(d[3][2],1))) </args>
+      <args> aux_gb[34] and(eq(e[1][1],0),eq(d[2][2],add(d[1][1],1))) and(eq(e[1][2],1),eq(d[2][2],add(d[1][3],1))) and(eq(e[2][1],1),eq(d[2][2],add(d[3][1],1))) and(eq(e[2][2],0),eq(d[2][2],add(d[3][3],1))) </args>
+      <args> aux_gb[35] and(eq(e[1][2],0),eq(d[2][3],add(d[1][2],1))) and(eq(e[1][3],1),eq(d[2][3],add(d[1][4],1))) and(eq(e[2][2],1),eq(d[2][3],add(d[3][2],1))) and(eq(e[2][3],0),eq(d[2][3],add(d[3][4],1))) </args>
+      <args> aux_gb[36] and(eq(e[1][3],0),eq(d[2][4],add(d[1][3],1))) and(eq(e[1][4],1),eq(d[2][4],add(d[1][5],1))) and(eq(e[2][3],1),eq(d[2][4],add(d[3][3],1))) and(eq(e[2][4],0),eq(d[2][4],add(d[3][5],1))) </args>
+      <args> aux_gb[37] and(eq(e[1][4],0),eq(d[2][5],add(d[1][4],1))) and(eq(e[1][5],1),eq(d[2][5],add(d[1][6],1))) and(eq(e[2][4],1),eq(d[2][5],add(d[3][4],1))) and(eq(e[2][5],0),eq(d[2][5],add(d[3][6],1))) </args>
+      <args> aux_gb[38] and(eq(e[1][5],0),eq(d[2][6],add(d[1][5],1))) and(eq(e[1][6],1),eq(d[2][6],add(d[1][7],1))) and(eq(e[2][5],1),eq(d[2][6],add(d[3][5],1))) and(eq(e[2][6],0),eq(d[2][6],add(d[3][7],1))) </args>
+      <args> aux_gb[39] and(eq(e[1][6],0),eq(d[2][7],add(d[1][6],1))) and(eq(e[1][7],1),eq(d[2][7],add(d[1][8],1))) and(eq(e[2][6],1),eq(d[2][7],add(d[3][6],1))) and(eq(e[2][7],0),eq(d[2][7],add(d[3][8],1))) </args>
+      <args> aux_gb[40] and(eq(e[1][7],0),eq(d[2][8],add(d[1][7],1))) and(eq(e[1][8],1),eq(d[2][8],add(d[1][9],1))) and(eq(e[2][7],1),eq(d[2][8],add(d[3][7],1))) and(eq(e[2][8],0),eq(d[2][8],add(d[3][9],1))) </args>
+      <args> aux_gb[41] and(eq(e[1][8],0),eq(d[2][9],add(d[1][8],1))) and(eq(e[1][9],1),eq(d[2][9],add(d[1][10],1))) and(eq(e[2][8],1),eq(d[2][9],add(d[3][8],1))) and(eq(e[2][9],0),eq(d[2][9],add(d[3][10],1))) </args>
+      <args> aux_gb[42] and(eq(e[1][9],0),eq(d[2][10],add(d[1][9],1))) and(eq(e[1][10],1),eq(d[2][10],add(d[1][11],1))) and(eq(e[2][9],1),eq(d[2][10],add(d[3][9],1))) and(eq(e[2][10],0),eq(d[2][10],add(d[3][11],1))) </args>
+      <args> aux_gb[43] and(eq(e[1][10],0),eq(d[2][11],add(d[1][10],1))) and(eq(e[1][11],1),eq(d[2][11],add(d[1][12],1))) and(eq(e[2][10],1),eq(d[2][11],add(d[3][10],1))) and(eq(e[2][11],0),eq(d[2][11],add(d[3][12],1))) </args>
+      <args> aux_gb[44] and(eq(e[1][11],0),eq(d[2][12],add(d[1][11],1))) and(eq(e[1][12],1),eq(d[2][12],add(d[1][13],1))) and(eq(e[2][11],1),eq(d[2][12],add(d[3][11],1))) and(eq(e[2][12],0),eq(d[2][12],add(d[3][13],1))) </args>
+      <args> aux_gb[45] and(eq(e[1][12],0),eq(d[2][13],add(d[1][12],1))) and(eq(e[1][13],1),eq(d[2][13],add(d[1][14],1))) and(eq(e[2][12],1),eq(d[2][13],add(d[3][12],1))) and(eq(e[2][13],0),eq(d[2][13],add(d[3][14],1))) </args>
+      <args> aux_gb[46] and(eq(e[1][13],0),eq(d[2][14],add(d[1][13],1))) and(eq(e[1][14],1),eq(d[2][14],add(d[1][15],1))) and(eq(e[2][13],1),eq(d[2][14],add(d[3][13],1))) and(eq(e[2][14],0),eq(d[2][14],add(d[3][15],1))) </args>
+      <args> aux_gb[47] and(eq(e[1][14],0),eq(d[2][15],add(d[1][14],1))) and(eq(e[2][14],1),eq(d[2][15],add(d[3][14],1))) </args>
+      <args> aux_gb[48] and(eq(e[2][0],1),eq(d[3][0],add(d[2][1],1))) and(eq(e[3][0],0),eq(d[3][0],add(d[4][1],1))) </args>
+      <args> aux_gb[49] and(eq(e[2][0],0),eq(d[3][1],add(d[2][0],1))) and(eq(e[2][1],1),eq(d[3][1],add(d[2][2],1))) and(eq(e[3][0],1),eq(d[3][1],add(d[4][0],1))) and(eq(e[3][1],0),eq(d[3][1],add(d[4][2],1))) </args>
+      <args> aux_gb[50] and(eq(e[2][1],0),eq(d[3][2],add(d[2][1],1))) and(eq(e[2][2],1),eq(d[3][2],add(d[2][3],1))) and(eq(e[3][1],1),eq(d[3][2],add(d[4][1],1))) and(eq(e[3][2],0),eq(d[3][2],add(d[4][3],1))) </args>
+      <args> aux_gb[51] and(eq(e[2][2],0),eq(d[3][3],add(d[2][2],1))) and(eq(e[2][3],1),eq(d[3][3],add(d[2][4],1))) and(eq(e[3][2],1),eq(d[3][3],add(d[4][2],1))) and(eq(e[3][3],0),eq(d[3][3],add(d[4][4],1))) </args>
+      <args> aux_gb[52] and(eq(e[2][3],0),eq(d[3][4],add(d[2][3],1))) and(eq(e[2][4],1),eq(d[3][4],add(d[2][5],1))) and(eq(e[3][3],1),eq(d[3][4],add(d[4][3],1))) and(eq(e[3][4],0),eq(d[3][4],add(d[4][5],1))) </args>
+      <args> aux_gb[53] and(eq(e[2][4],0),eq(d[3][5],add(d[2][4],1))) and(eq(e[2][5],1),eq(d[3][5],add(d[2][6],1))) and(eq(e[3][4],1),eq(d[3][5],add(d[4][4],1))) and(eq(e[3][5],0),eq(d[3][5],add(d[4][6],1))) </args>
+      <args> aux_gb[54] and(eq(e[2][5],0),eq(d[3][6],add(d[2][5],1))) and(eq(e[2][6],1),eq(d[3][6],add(d[2][7],1))) and(eq(e[3][5],1),eq(d[3][6],add(d[4][5],1))) and(eq(e[3][6],0),eq(d[3][6],add(d[4][7],1))) </args>
+      <args> aux_gb[55] and(eq(e[2][6],0),eq(d[3][7],add(d[2][6],1))) and(eq(e[2][7],1),eq(d[3][7],add(d[2][8],1))) and(eq(e[3][6],1),eq(d[3][7],add(d[4][6],1))) and(eq(e[3][7],0),eq(d[3][7],add(d[4][8],1))) </args>
+      <args> aux_gb[56] and(eq(e[2][7],0),eq(d[3][8],add(d[2][7],1))) and(eq(e[2][8],1),eq(d[3][8],add(d[2][9],1))) and(eq(e[3][7],1),eq(d[3][8],add(d[4][7],1))) and(eq(e[3][8],0),eq(d[3][8],add(d[4][9],1))) </args>
+      <args> aux_gb[57] and(eq(e[2][8],0),eq(d[3][9],add(d[2][8],1))) and(eq(e[2][9],1),eq(d[3][9],add(d[2][10],1))) and(eq(e[3][8],1),eq(d[3][9],add(d[4][8],1))) and(eq(e[3][9],0),eq(d[3][9],add(d[4][10],1))) </args>
+      <args> aux_gb[58] and(eq(e[2][9],0),eq(d[3][10],add(d[2][9],1))) and(eq(e[2][10],1),eq(d[3][10],add(d[2][11],1))) and(eq(e[3][9],1),eq(d[3][10],add(d[4][9],1))) and(eq(e[3][10],0),eq(d[3][10],add(d[4][11],1))) </args>
+      <args> aux_gb[59] and(eq(e[2][10],0),eq(d[3][11],add(d[2][10],1))) and(eq(e[2][11],1),eq(d[3][11],add(d[2][12],1))) and(eq(e[3][10],1),eq(d[3][11],add(d[4][10],1))) and(eq(e[3][11],0),eq(d[3][11],add(d[4][12],1))) </args>
+      <args> aux_gb[60] and(eq(e[2][11],0),eq(d[3][12],add(d[2][11],1))) and(eq(e[2][12],1),eq(d[3][12],add(d[2][13],1))) and(eq(e[3][11],1),eq(d[3][12],add(d[4][11],1))) and(eq(e[3][12],0),eq(d[3][12],add(d[4][13],1))) </args>
+      <args> aux_gb[61] and(eq(e[2][12],0),eq(d[3][13],add(d[2][12],1))) and(eq(e[2][13],1),eq(d[3][13],add(d[2][14],1))) and(eq(e[3][12],1),eq(d[3][13],add(d[4][12],1))) and(eq(e[3][13],0),eq(d[3][13],add(d[4][14],1))) </args>
+      <args> aux_gb[62] and(eq(e[2][13],0),eq(d[3][14],add(d[2][13],1))) and(eq(e[2][14],1),eq(d[3][14],add(d[2][15],1))) and(eq(e[3][13],1),eq(d[3][14],add(d[4][13],1))) and(eq(e[3][14],0),eq(d[3][14],add(d[4][15],1))) </args>
+      <args> aux_gb[63] and(eq(e[2][14],0),eq(d[3][15],add(d[2][14],1))) and(eq(e[3][14],1),eq(d[3][15],add(d[4][14],1))) </args>
+      <args> aux_gb[64] and(eq(e[3][0],1),eq(d[4][0],add(d[3][1],1))) and(eq(e[4][0],0),eq(d[4][0],add(d[5][1],1))) </args>
+      <args> aux_gb[65] and(eq(e[3][0],0),eq(d[4][1],add(d[3][0],1))) and(eq(e[3][1],1),eq(d[4][1],add(d[3][2],1))) and(eq(e[4][0],1),eq(d[4][1],add(d[5][0],1))) and(eq(e[4][1],0),eq(d[4][1],add(d[5][2],1))) </args>
+      <args> aux_gb[66] and(eq(e[3][1],0),eq(d[4][2],add(d[3][1],1))) and(eq(e[3][2],1),eq(d[4][2],add(d[3][3],1))) and(eq(e[4][1],1),eq(d[4][2],add(d[5][1],1))) and(eq(e[4][2],0),eq(d[4][2],add(d[5][3],1))) </args>
+      <args> aux_gb[67] and(eq(e[3][2],0),eq(d[4][3],add(d[3][2],1))) and(eq(e[3][3],1),eq(d[4][3],add(d[3][4],1))) and(eq(e[4][2],1),eq(d[4][3],add(d[5][2],1))) and(eq(e[4][3],0),eq(d[4][3],add(d[5][4],1))) </args>
+      <args> aux_gb[68] and(eq(e[3][3],0),eq(d[4][4],add(d[3][3],1))) and(eq(e[3][4],1),eq(d[4][4],add(d[3][5],1))) and(eq(e[4][3],1),eq(d[4][4],add(d[5][3],1))) and(eq(e[4][4],0),eq(d[4][4],add(d[5][5],1))) </args>
+      <args> aux_gb[69] and(eq(e[3][4],0),eq(d[4][5],add(d[3][4],1))) and(eq(e[3][5],1),eq(d[4][5],add(d[3][6],1))) and(eq(e[4][4],1),eq(d[4][5],add(d[5][4],1))) and(eq(e[4][5],0),eq(d[4][5],add(d[5][6],1))) </args>
+      <args> aux_gb[70] and(eq(e[3][5],0),eq(d[4][6],add(d[3][5],1))) and(eq(e[3][6],1),eq(d[4][6],add(d[3][7],1))) and(eq(e[4][5],1),eq(d[4][6],add(d[5][5],1))) and(eq(e[4][6],0),eq(d[4][6],add(d[5][7],1))) </args>
+      <args> aux_gb[71] and(eq(e[3][6],0),eq(d[4][7],add(d[3][6],1))) and(eq(e[3][7],1),eq(d[4][7],add(d[3][8],1))) and(eq(e[4][6],1),eq(d[4][7],add(d[5][6],1))) and(eq(e[4][7],0),eq(d[4][7],add(d[5][8],1))) </args>
+      <args> aux_gb[72] and(eq(e[3][7],0),eq(d[4][8],add(d[3][7],1))) and(eq(e[3][8],1),eq(d[4][8],add(d[3][9],1))) and(eq(e[4][7],1),eq(d[4][8],add(d[5][7],1))) and(eq(e[4][8],0),eq(d[4][8],add(d[5][9],1))) </args>
+      <args> aux_gb[73] and(eq(e[3][8],0),eq(d[4][9],add(d[3][8],1))) and(eq(e[3][9],1),eq(d[4][9],add(d[3][10],1))) and(eq(e[4][8],1),eq(d[4][9],add(d[5][8],1))) and(eq(e[4][9],0),eq(d[4][9],add(d[5][10],1))) </args>
+      <args> aux_gb[74] and(eq(e[3][9],0),eq(d[4][10],add(d[3][9],1))) and(eq(e[3][10],1),eq(d[4][10],add(d[3][11],1))) and(eq(e[4][9],1),eq(d[4][10],add(d[5][9],1))) and(eq(e[4][10],0),eq(d[4][10],add(d[5][11],1))) </args>
+      <args> aux_gb[75] and(eq(e[3][10],0),eq(d[4][11],add(d[3][10],1))) and(eq(e[3][11],1),eq(d[4][11],add(d[3][12],1))) and(eq(e[4][10],1),eq(d[4][11],add(d[5][10],1))) and(eq(e[4][11],0),eq(d[4][11],add(d[5][12],1))) </args>
+      <args> aux_gb[76] and(eq(e[3][11],0),eq(d[4][12],add(d[3][11],1))) and(eq(e[3][12],1),eq(d[4][12],add(d[3][13],1))) and(eq(e[4][11],1),eq(d[4][12],add(d[5][11],1))) and(eq(e[4][12],0),eq(d[4][12],add(d[5][13],1))) </args>
+      <args> aux_gb[77] and(eq(e[3][12],0),eq(d[4][13],add(d[3][12],1))) and(eq(e[3][13],1),eq(d[4][13],add(d[3][14],1))) and(eq(e[4][12],1),eq(d[4][13],add(d[5][12],1))) and(eq(e[4][13],0),eq(d[4][13],add(d[5][14],1))) </args>
+      <args> aux_gb[78] and(eq(e[3][13],0),eq(d[4][14],add(d[3][13],1))) and(eq(e[3][14],1),eq(d[4][14],add(d[3][15],1))) and(eq(e[4][13],1),eq(d[4][14],add(d[5][13],1))) and(eq(e[4][14],0),eq(d[4][14],add(d[5][15],1))) </args>
+      <args> aux_gb[79] and(eq(e[3][14],0),eq(d[4][15],add(d[3][14],1))) and(eq(e[4][14],1),eq(d[4][15],add(d[5][14],1))) </args>
+      <args> aux_gb[80] and(eq(e[4][0],1),eq(d[5][0],add(d[4][1],1))) and(eq(e[5][0],0),eq(d[5][0],add(d[6][1],1))) </args>
+      <args> aux_gb[81] and(eq(e[4][0],0),eq(d[5][1],add(d[4][0],1))) and(eq(e[4][1],1),eq(d[5][1],add(d[4][2],1))) and(eq(e[5][0],1),eq(d[5][1],add(d[6][0],1))) and(eq(e[5][1],0),eq(d[5][1],add(d[6][2],1))) </args>
+      <args> aux_gb[82] and(eq(e[4][1],0),eq(d[5][2],add(d[4][1],1))) and(eq(e[4][2],1),eq(d[5][2],add(d[4][3],1))) and(eq(e[5][1],1),eq(d[5][2],add(d[6][1],1))) and(eq(e[5][2],0),eq(d[5][2],add(d[6][3],1))) </args>
+      <args> aux_gb[83] and(eq(e[4][2],0),eq(d[5][3],add(d[4][2],1))) and(eq(e[4][3],1),eq(d[5][3],add(d[4][4],1))) and(eq(e[5][2],1),eq(d[5][3],add(d[6][2],1))) and(eq(e[5][3],0),eq(d[5][3],add(d[6][4],1))) </args>
+      <args> aux_gb[84] and(eq(e[4][3],0),eq(d[5][4],add(d[4][3],1))) and(eq(e[4][4],1),eq(d[5][4],add(d[4][5],1))) and(eq(e[5][3],1),eq(d[5][4],add(d[6][3],1))) and(eq(e[5][4],0),eq(d[5][4],add(d[6][5],1))) </args>
+      <args> aux_gb[85] and(eq(e[4][4],0),eq(d[5][5],add(d[4][4],1))) and(eq(e[4][5],1),eq(d[5][5],add(d[4][6],1))) and(eq(e[5][4],1),eq(d[5][5],add(d[6][4],1))) and(eq(e[5][5],0),eq(d[5][5],add(d[6][6],1))) </args>
+      <args> aux_gb[86] and(eq(e[4][5],0),eq(d[5][6],add(d[4][5],1))) and(eq(e[4][6],1),eq(d[5][6],add(d[4][7],1))) and(eq(e[5][5],1),eq(d[5][6],add(d[6][5],1))) and(eq(e[5][6],0),eq(d[5][6],add(d[6][7],1))) </args>
+      <args> aux_gb[87] and(eq(e[4][6],0),eq(d[5][7],add(d[4][6],1))) and(eq(e[4][7],1),eq(d[5][7],add(d[4][8],1))) and(eq(e[5][6],1),eq(d[5][7],add(d[6][6],1))) and(eq(e[5][7],0),eq(d[5][7],add(d[6][8],1))) </args>
+      <args> aux_gb[88] and(eq(e[4][7],0),eq(d[5][8],add(d[4][7],1))) and(eq(e[4][8],1),eq(d[5][8],add(d[4][9],1))) and(eq(e[5][7],1),eq(d[5][8],add(d[6][7],1))) and(eq(e[5][8],0),eq(d[5][8],add(d[6][9],1))) </args>
+      <args> aux_gb[89] and(eq(e[4][8],0),eq(d[5][9],add(d[4][8],1))) and(eq(e[4][9],1),eq(d[5][9],add(d[4][10],1))) and(eq(e[5][8],1),eq(d[5][9],add(d[6][8],1))) and(eq(e[5][9],0),eq(d[5][9],add(d[6][10],1))) </args>
+      <args> aux_gb[90] and(eq(e[4][9],0),eq(d[5][10],add(d[4][9],1))) and(eq(e[4][10],1),eq(d[5][10],add(d[4][11],1))) and(eq(e[5][9],1),eq(d[5][10],add(d[6][9],1))) and(eq(e[5][10],0),eq(d[5][10],add(d[6][11],1))) </args>
+      <args> aux_gb[91] and(eq(e[4][10],0),eq(d[5][11],add(d[4][10],1))) and(eq(e[4][11],1),eq(d[5][11],add(d[4][12],1))) and(eq(e[5][10],1),eq(d[5][11],add(d[6][10],1))) and(eq(e[5][11],0),eq(d[5][11],add(d[6][12],1))) </args>
+      <args> aux_gb[92] and(eq(e[4][11],0),eq(d[5][12],add(d[4][11],1))) and(eq(e[4][12],1),eq(d[5][12],add(d[4][13],1))) and(eq(e[5][11],1),eq(d[5][12],add(d[6][11],1))) and(eq(e[5][12],0),eq(d[5][12],add(d[6][13],1))) </args>
+      <args> aux_gb[93] and(eq(e[4][12],0),eq(d[5][13],add(d[4][12],1))) and(eq(e[4][13],1),eq(d[5][13],add(d[4][14],1))) and(eq(e[5][12],1),eq(d[5][13],add(d[6][12],1))) and(eq(e[5][13],0),eq(d[5][13],add(d[6][14],1))) </args>
+      <args> aux_gb[94] and(eq(e[4][13],0),eq(d[5][14],add(d[4][13],1))) and(eq(e[4][14],1),eq(d[5][14],add(d[4][15],1))) and(eq(e[5][13],1),eq(d[5][14],add(d[6][13],1))) and(eq(e[5][14],0),eq(d[5][14],add(d[6][15],1))) </args>
+      <args> aux_gb[95] and(eq(e[4][14],0),eq(d[5][15],add(d[4][14],1))) and(eq(e[5][14],1),eq(d[5][15],add(d[6][14],1))) </args>
+      <args> aux_gb[96] and(eq(e[5][0],1),eq(d[6][0],add(d[5][1],1))) and(eq(e[6][0],0),eq(d[6][0],add(d[7][1],1))) </args>
+      <args> aux_gb[97] and(eq(e[5][0],0),eq(d[6][1],add(d[5][0],1))) and(eq(e[5][1],1),eq(d[6][1],add(d[5][2],1))) and(eq(e[6][0],1),eq(d[6][1],add(d[7][0],1))) and(eq(e[6][1],0),eq(d[6][1],add(d[7][2],1))) </args>
+      <args> aux_gb[98] and(eq(e[5][1],0),eq(d[6][2],add(d[5][1],1))) and(eq(e[5][2],1),eq(d[6][2],add(d[5][3],1))) and(eq(e[6][1],1),eq(d[6][2],add(d[7][1],1))) and(eq(e[6][2],0),eq(d[6][2],add(d[7][3],1))) </args>
+      <args> aux_gb[99] and(eq(e[5][2],0),eq(d[6][3],add(d[5][2],1))) and(eq(e[5][3],1),eq(d[6][3],add(d[5][4],1))) and(eq(e[6][2],1),eq(d[6][3],add(d[7][2],1))) and(eq(e[6][3],0),eq(d[6][3],add(d[7][4],1))) </args>
+      <args> aux_gb[100] and(eq(e[5][3],0),eq(d[6][4],add(d[5][3],1))) and(eq(e[5][4],1),eq(d[6][4],add(d[5][5],1))) and(eq(e[6][3],1),eq(d[6][4],add(d[7][3],1))) and(eq(e[6][4],0),eq(d[6][4],add(d[7][5],1))) </args>
+      <args> aux_gb[101] and(eq(e[5][4],0),eq(d[6][5],add(d[5][4],1))) and(eq(e[5][5],1),eq(d[6][5],add(d[5][6],1))) and(eq(e[6][4],1),eq(d[6][5],add(d[7][4],1))) and(eq(e[6][5],0),eq(d[6][5],add(d[7][6],1))) </args>
+      <args> aux_gb[102] and(eq(e[5][5],0),eq(d[6][6],add(d[5][5],1))) and(eq(e[5][6],1),eq(d[6][6],add(d[5][7],1))) and(eq(e[6][5],1),eq(d[6][6],add(d[7][5],1))) and(eq(e[6][6],0),eq(d[6][6],add(d[7][7],1))) </args>
+      <args> aux_gb[103] and(eq(e[5][6],0),eq(d[6][7],add(d[5][6],1))) and(eq(e[5][7],1),eq(d[6][7],add(d[5][8],1))) and(eq(e[6][6],1),eq(d[6][7],add(d[7][6],1))) and(eq(e[6][7],0),eq(d[6][7],add(d[7][8],1))) </args>
+      <args> aux_gb[104] and(eq(e[5][7],0),eq(d[6][8],add(d[5][7],1))) and(eq(e[5][8],1),eq(d[6][8],add(d[5][9],1))) and(eq(e[6][7],1),eq(d[6][8],add(d[7][7],1))) and(eq(e[6][8],0),eq(d[6][8],add(d[7][9],1))) </args>
+      <args> aux_gb[105] and(eq(e[5][8],0),eq(d[6][9],add(d[5][8],1))) and(eq(e[5][9],1),eq(d[6][9],add(d[5][10],1))) and(eq(e[6][8],1),eq(d[6][9],add(d[7][8],1))) and(eq(e[6][9],0),eq(d[6][9],add(d[7][10],1))) </args>
+      <args> aux_gb[106] and(eq(e[5][9],0),eq(d[6][10],add(d[5][9],1))) and(eq(e[5][10],1),eq(d[6][10],add(d[5][11],1))) and(eq(e[6][9],1),eq(d[6][10],add(d[7][9],1))) and(eq(e[6][10],0),eq(d[6][10],add(d[7][11],1))) </args>
+      <args> aux_gb[107] and(eq(e[5][10],0),eq(d[6][11],add(d[5][10],1))) and(eq(e[5][11],1),eq(d[6][11],add(d[5][12],1))) and(eq(e[6][10],1),eq(d[6][11],add(d[7][10],1))) and(eq(e[6][11],0),eq(d[6][11],add(d[7][12],1))) </args>
+      <args> aux_gb[108] and(eq(e[5][11],0),eq(d[6][12],add(d[5][11],1))) and(eq(e[5][12],1),eq(d[6][12],add(d[5][13],1))) and(eq(e[6][11],1),eq(d[6][12],add(d[7][11],1))) and(eq(e[6][12],0),eq(d[6][12],add(d[7][13],1))) </args>
+      <args> aux_gb[109] and(eq(e[5][12],0),eq(d[6][13],add(d[5][12],1))) and(eq(e[5][13],1),eq(d[6][13],add(d[5][14],1))) and(eq(e[6][12],1),eq(d[6][13],add(d[7][12],1))) and(eq(e[6][13],0),eq(d[6][13],add(d[7][14],1))) </args>
+      <args> aux_gb[110] and(eq(e[5][13],0),eq(d[6][14],add(d[5][13],1))) and(eq(e[5][14],1),eq(d[6][14],add(d[5][15],1))) and(eq(e[6][13],1),eq(d[6][14],add(d[7][13],1))) and(eq(e[6][14],0),eq(d[6][14],add(d[7][15],1))) </args>
+      <args> aux_gb[111] and(eq(e[5][14],0),eq(d[6][15],add(d[5][14],1))) and(eq(e[6][14],1),eq(d[6][15],add(d[7][14],1))) </args>
+      <args> aux_gb[112] and(eq(e[6][0],1),eq(d[7][0],add(d[6][1],1))) and(eq(e[7][0],0),eq(d[7][0],add(d[8][1],1))) </args>
+      <args> aux_gb[113] and(eq(e[6][0],0),eq(d[7][1],add(d[6][0],1))) and(eq(e[6][1],1),eq(d[7][1],add(d[6][2],1))) and(eq(e[7][0],1),eq(d[7][1],add(d[8][0],1))) and(eq(e[7][1],0),eq(d[7][1],add(d[8][2],1))) </args>
+      <args> aux_gb[114] and(eq(e[6][1],0),eq(d[7][2],add(d[6][1],1))) and(eq(e[6][2],1),eq(d[7][2],add(d[6][3],1))) and(eq(e[7][1],1),eq(d[7][2],add(d[8][1],1))) and(eq(e[7][2],0),eq(d[7][2],add(d[8][3],1))) </args>
+      <args> aux_gb[115] and(eq(e[6][2],0),eq(d[7][3],add(d[6][2],1))) and(eq(e[6][3],1),eq(d[7][3],add(d[6][4],1))) and(eq(e[7][2],1),eq(d[7][3],add(d[8][2],1))) and(eq(e[7][3],0),eq(d[7][3],add(d[8][4],1))) </args>
+      <args> aux_gb[116] and(eq(e[6][3],0),eq(d[7][4],add(d[6][3],1))) and(eq(e[6][4],1),eq(d[7][4],add(d[6][5],1))) and(eq(e[7][3],1),eq(d[7][4],add(d[8][3],1))) and(eq(e[7][4],0),eq(d[7][4],add(d[8][5],1))) </args>
+      <args> aux_gb[117] and(eq(e[6][4],0),eq(d[7][5],add(d[6][4],1))) and(eq(e[6][5],1),eq(d[7][5],add(d[6][6],1))) and(eq(e[7][4],1),eq(d[7][5],add(d[8][4],1))) and(eq(e[7][5],0),eq(d[7][5],add(d[8][6],1))) </args>
+      <args> aux_gb[118] and(eq(e[6][5],0),eq(d[7][6],add(d[6][5],1))) and(eq(e[6][6],1),eq(d[7][6],add(d[6][7],1))) and(eq(e[7][5],1),eq(d[7][6],add(d[8][5],1))) and(eq(e[7][6],0),eq(d[7][6],add(d[8][7],1))) </args>
+      <args> aux_gb[119] and(eq(e[6][6],0),eq(d[7][7],add(d[6][6],1))) and(eq(e[6][7],1),eq(d[7][7],add(d[6][8],1))) and(eq(e[7][6],1),eq(d[7][7],add(d[8][6],1))) and(eq(e[7][7],0),eq(d[7][7],add(d[8][8],1))) </args>
+      <args> aux_gb[120] and(eq(e[6][7],0),eq(d[7][8],add(d[6][7],1))) and(eq(e[6][8],1),eq(d[7][8],add(d[6][9],1))) and(eq(e[7][7],1),eq(d[7][8],add(d[8][7],1))) and(eq(e[7][8],0),eq(d[7][8],add(d[8][9],1))) </args>
+      <args> aux_gb[121] and(eq(e[6][8],0),eq(d[7][9],add(d[6][8],1))) and(eq(e[6][9],1),eq(d[7][9],add(d[6][10],1))) and(eq(e[7][8],1),eq(d[7][9],add(d[8][8],1))) and(eq(e[7][9],0),eq(d[7][9],add(d[8][10],1))) </args>
+      <args> aux_gb[122] and(eq(e[6][9],0),eq(d[7][10],add(d[6][9],1))) and(eq(e[6][10],1),eq(d[7][10],add(d[6][11],1))) and(eq(e[7][9],1),eq(d[7][10],add(d[8][9],1))) and(eq(e[7][10],0),eq(d[7][10],add(d[8][11],1))) </args>
+      <args> aux_gb[123] and(eq(e[6][10],0),eq(d[7][11],add(d[6][10],1))) and(eq(e[6][11],1),eq(d[7][11],add(d[6][12],1))) and(eq(e[7][10],1),eq(d[7][11],add(d[8][10],1))) and(eq(e[7][11],0),eq(d[7][11],add(d[8][12],1))) </args>
+      <args> aux_gb[124] and(eq(e[6][11],0),eq(d[7][12],add(d[6][11],1))) and(eq(e[6][12],1),eq(d[7][12],add(d[6][13],1))) and(eq(e[7][11],1),eq(d[7][12],add(d[8][11],1))) and(eq(e[7][12],0),eq(d[7][12],add(d[8][13],1))) </args>
+      <args> aux_gb[125] and(eq(e[6][12],0),eq(d[7][13],add(d[6][12],1))) and(eq(e[6][13],1),eq(d[7][13],add(d[6][14],1))) and(eq(e[7][12],1),eq(d[7][13],add(d[8][12],1))) and(eq(e[7][13],0),eq(d[7][13],add(d[8][14],1))) </args>
+      <args> aux_gb[126] and(eq(e[6][13],0),eq(d[7][14],add(d[6][13],1))) and(eq(e[6][14],1),eq(d[7][14],add(d[6][15],1))) and(eq(e[7][13],1),eq(d[7][14],add(d[8][13],1))) and(eq(e[7][14],0),eq(d[7][14],add(d[8][15],1))) </args>
+      <args> aux_gb[127] and(eq(e[6][14],0),eq(d[7][15],add(d[6][14],1))) and(eq(e[7][14],1),eq(d[7][15],add(d[8][14],1))) </args>
+      <args> aux_gb[128] and(eq(e[7][0],1),eq(d[8][0],add(d[7][1],1))) and(eq(e[8][0],0),eq(d[8][0],add(d[9][1],1))) </args>
+      <args> aux_gb[129] and(eq(e[7][0],0),eq(d[8][1],add(d[7][0],1))) and(eq(e[7][1],1),eq(d[8][1],add(d[7][2],1))) and(eq(e[8][0],1),eq(d[8][1],add(d[9][0],1))) and(eq(e[8][1],0),eq(d[8][1],add(d[9][2],1))) </args>
+      <args> aux_gb[130] and(eq(e[7][1],0),eq(d[8][2],add(d[7][1],1))) and(eq(e[7][2],1),eq(d[8][2],add(d[7][3],1))) and(eq(e[8][1],1),eq(d[8][2],add(d[9][1],1))) and(eq(e[8][2],0),eq(d[8][2],add(d[9][3],1))) </args>
+      <args> aux_gb[131] and(eq(e[7][2],0),eq(d[8][3],add(d[7][2],1))) and(eq(e[7][3],1),eq(d[8][3],add(d[7][4],1))) and(eq(e[8][2],1),eq(d[8][3],add(d[9][2],1))) and(eq(e[8][3],0),eq(d[8][3],add(d[9][4],1))) </args>
+      <args> aux_gb[132] and(eq(e[7][3],0),eq(d[8][4],add(d[7][3],1))) and(eq(e[7][4],1),eq(d[8][4],add(d[7][5],1))) and(eq(e[8][3],1),eq(d[8][4],add(d[9][3],1))) and(eq(e[8][4],0),eq(d[8][4],add(d[9][5],1))) </args>
+      <args> aux_gb[133] and(eq(e[7][4],0),eq(d[8][5],add(d[7][4],1))) and(eq(e[7][5],1),eq(d[8][5],add(d[7][6],1))) and(eq(e[8][4],1),eq(d[8][5],add(d[9][4],1))) and(eq(e[8][5],0),eq(d[8][5],add(d[9][6],1))) </args>
+      <args> aux_gb[134] and(eq(e[7][5],0),eq(d[8][6],add(d[7][5],1))) and(eq(e[7][6],1),eq(d[8][6],add(d[7][7],1))) and(eq(e[8][5],1),eq(d[8][6],add(d[9][5],1))) and(eq(e[8][6],0),eq(d[8][6],add(d[9][7],1))) </args>
+      <args> aux_gb[135] and(eq(e[7][6],0),eq(d[8][7],add(d[7][6],1))) and(eq(e[7][7],1),eq(d[8][7],add(d[7][8],1))) and(eq(e[8][6],1),eq(d[8][7],add(d[9][6],1))) and(eq(e[8][7],0),eq(d[8][7],add(d[9][8],1))) </args>
+      <args> aux_gb[136] and(eq(e[7][7],0),eq(d[8][8],add(d[7][7],1))) and(eq(e[7][8],1),eq(d[8][8],add(d[7][9],1))) and(eq(e[8][7],1),eq(d[8][8],add(d[9][7],1))) and(eq(e[8][8],0),eq(d[8][8],add(d[9][9],1))) </args>
+      <args> aux_gb[137] and(eq(e[7][8],0),eq(d[8][9],add(d[7][8],1))) and(eq(e[7][9],1),eq(d[8][9],add(d[7][10],1))) and(eq(e[8][8],1),eq(d[8][9],add(d[9][8],1))) and(eq(e[8][9],0),eq(d[8][9],add(d[9][10],1))) </args>
+      <args> aux_gb[138] and(eq(e[7][9],0),eq(d[8][10],add(d[7][9],1))) and(eq(e[7][10],1),eq(d[8][10],add(d[7][11],1))) and(eq(e[8][9],1),eq(d[8][10],add(d[9][9],1))) and(eq(e[8][10],0),eq(d[8][10],add(d[9][11],1))) </args>
+      <args> aux_gb[139] and(eq(e[7][10],0),eq(d[8][11],add(d[7][10],1))) and(eq(e[7][11],1),eq(d[8][11],add(d[7][12],1))) and(eq(e[8][10],1),eq(d[8][11],add(d[9][10],1))) and(eq(e[8][11],0),eq(d[8][11],add(d[9][12],1))) </args>
+      <args> aux_gb[140] and(eq(e[7][11],0),eq(d[8][12],add(d[7][11],1))) and(eq(e[7][12],1),eq(d[8][12],add(d[7][13],1))) and(eq(e[8][11],1),eq(d[8][12],add(d[9][11],1))) and(eq(e[8][12],0),eq(d[8][12],add(d[9][13],1))) </args>
+      <args> aux_gb[141] and(eq(e[7][12],0),eq(d[8][13],add(d[7][12],1))) and(eq(e[7][13],1),eq(d[8][13],add(d[7][14],1))) and(eq(e[8][12],1),eq(d[8][13],add(d[9][12],1))) and(eq(e[8][13],0),eq(d[8][13],add(d[9][14],1))) </args>
+      <args> aux_gb[142] and(eq(e[7][13],0),eq(d[8][14],add(d[7][13],1))) and(eq(e[7][14],1),eq(d[8][14],add(d[7][15],1))) and(eq(e[8][13],1),eq(d[8][14],add(d[9][13],1))) and(eq(e[8][14],0),eq(d[8][14],add(d[9][15],1))) </args>
+      <args> aux_gb[143] and(eq(e[7][14],0),eq(d[8][15],add(d[7][14],1))) and(eq(e[8][14],1),eq(d[8][15],add(d[9][14],1))) </args>
+      <args> aux_gb[144] and(eq(e[8][0],1),eq(d[9][0],add(d[8][1],1))) and(eq(e[9][0],0),eq(d[9][0],add(d[10][1],1))) </args>
+      <args> aux_gb[145] and(eq(e[8][0],0),eq(d[9][1],add(d[8][0],1))) and(eq(e[8][1],1),eq(d[9][1],add(d[8][2],1))) and(eq(e[9][0],1),eq(d[9][1],add(d[10][0],1))) and(eq(e[9][1],0),eq(d[9][1],add(d[10][2],1))) </args>
+      <args> aux_gb[146] and(eq(e[8][1],0),eq(d[9][2],add(d[8][1],1))) and(eq(e[8][2],1),eq(d[9][2],add(d[8][3],1))) and(eq(e[9][1],1),eq(d[9][2],add(d[10][1],1))) and(eq(e[9][2],0),eq(d[9][2],add(d[10][3],1))) </args>
+      <args> aux_gb[147] and(eq(e[8][2],0),eq(d[9][3],add(d[8][2],1))) and(eq(e[8][3],1),eq(d[9][3],add(d[8][4],1))) and(eq(e[9][2],1),eq(d[9][3],add(d[10][2],1))) and(eq(e[9][3],0),eq(d[9][3],add(d[10][4],1))) </args>
+      <args> aux_gb[148] and(eq(e[8][3],0),eq(d[9][4],add(d[8][3],1))) and(eq(e[8][4],1),eq(d[9][4],add(d[8][5],1))) and(eq(e[9][3],1),eq(d[9][4],add(d[10][3],1))) and(eq(e[9][4],0),eq(d[9][4],add(d[10][5],1))) </args>
+      <args> aux_gb[149] and(eq(e[8][4],0),eq(d[9][5],add(d[8][4],1))) and(eq(e[8][5],1),eq(d[9][5],add(d[8][6],1))) and(eq(e[9][4],1),eq(d[9][5],add(d[10][4],1))) and(eq(e[9][5],0),eq(d[9][5],add(d[10][6],1))) </args>
+      <args> aux_gb[150] and(eq(e[8][5],0),eq(d[9][6],add(d[8][5],1))) and(eq(e[8][6],1),eq(d[9][6],add(d[8][7],1))) and(eq(e[9][5],1),eq(d[9][6],add(d[10][5],1))) and(eq(e[9][6],0),eq(d[9][6],add(d[10][7],1))) </args>
+      <args> aux_gb[151] and(eq(e[8][6],0),eq(d[9][7],add(d[8][6],1))) and(eq(e[8][7],1),eq(d[9][7],add(d[8][8],1))) and(eq(e[9][6],1),eq(d[9][7],add(d[10][6],1))) and(eq(e[9][7],0),eq(d[9][7],add(d[10][8],1))) </args>
+      <args> aux_gb[152] and(eq(e[8][7],0),eq(d[9][8],add(d[8][7],1))) and(eq(e[8][8],1),eq(d[9][8],add(d[8][9],1))) and(eq(e[9][7],1),eq(d[9][8],add(d[10][7],1))) and(eq(e[9][8],0),eq(d[9][8],add(d[10][9],1))) </args>
+      <args> aux_gb[153] and(eq(e[8][8],0),eq(d[9][9],add(d[8][8],1))) and(eq(e[8][9],1),eq(d[9][9],add(d[8][10],1))) and(eq(e[9][8],1),eq(d[9][9],add(d[10][8],1))) and(eq(e[9][9],0),eq(d[9][9],add(d[10][10],1))) </args>
+      <args> aux_gb[154] and(eq(e[8][9],0),eq(d[9][10],add(d[8][9],1))) and(eq(e[8][10],1),eq(d[9][10],add(d[8][11],1))) and(eq(e[9][9],1),eq(d[9][10],add(d[10][9],1))) and(eq(e[9][10],0),eq(d[9][10],add(d[10][11],1))) </args>
+      <args> aux_gb[155] and(eq(e[8][10],0),eq(d[9][11],add(d[8][10],1))) and(eq(e[8][11],1),eq(d[9][11],add(d[8][12],1))) and(eq(e[9][10],1),eq(d[9][11],add(d[10][10],1))) and(eq(e[9][11],0),eq(d[9][11],add(d[10][12],1))) </args>
+      <args> aux_gb[156] and(eq(e[8][11],0),eq(d[9][12],add(d[8][11],1))) and(eq(e[8][12],1),eq(d[9][12],add(d[8][13],1))) and(eq(e[9][11],1),eq(d[9][12],add(d[10][11],1))) and(eq(e[9][12],0),eq(d[9][12],add(d[10][13],1))) </args>
+      <args> aux_gb[157] and(eq(e[8][12],0),eq(d[9][13],add(d[8][12],1))) and(eq(e[8][13],1),eq(d[9][13],add(d[8][14],1))) and(eq(e[9][12],1),eq(d[9][13],add(d[10][12],1))) and(eq(e[9][13],0),eq(d[9][13],add(d[10][14],1))) </args>
+      <args> aux_gb[158] and(eq(e[8][13],0),eq(d[9][14],add(d[8][13],1))) and(eq(e[8][14],1),eq(d[9][14],add(d[8][15],1))) and(eq(e[9][13],1),eq(d[9][14],add(d[10][13],1))) and(eq(e[9][14],0),eq(d[9][14],add(d[10][15],1))) </args>
+      <args> aux_gb[159] and(eq(e[8][14],0),eq(d[9][15],add(d[8][14],1))) and(eq(e[9][14],1),eq(d[9][15],add(d[10][14],1))) </args>
+      <args> aux_gb[160] and(eq(e[9][0],1),eq(d[10][0],add(d[9][1],1))) and(eq(e[10][0],0),eq(d[10][0],add(d[11][1],1))) </args>
+      <args> aux_gb[161] and(eq(e[9][0],0),eq(d[10][1],add(d[9][0],1))) and(eq(e[9][1],1),eq(d[10][1],add(d[9][2],1))) and(eq(e[10][0],1),eq(d[10][1],add(d[11][0],1))) and(eq(e[10][1],0),eq(d[10][1],add(d[11][2],1))) </args>
+      <args> aux_gb[162] and(eq(e[9][1],0),eq(d[10][2],add(d[9][1],1))) and(eq(e[9][2],1),eq(d[10][2],add(d[9][3],1))) and(eq(e[10][1],1),eq(d[10][2],add(d[11][1],1))) and(eq(e[10][2],0),eq(d[10][2],add(d[11][3],1))) </args>
+      <args> aux_gb[163] and(eq(e[9][2],0),eq(d[10][3],add(d[9][2],1))) and(eq(e[9][3],1),eq(d[10][3],add(d[9][4],1))) and(eq(e[10][2],1),eq(d[10][3],add(d[11][2],1))) and(eq(e[10][3],0),eq(d[10][3],add(d[11][4],1))) </args>
+      <args> aux_gb[164] and(eq(e[9][3],0),eq(d[10][4],add(d[9][3],1))) and(eq(e[9][4],1),eq(d[10][4],add(d[9][5],1))) and(eq(e[10][3],1),eq(d[10][4],add(d[11][3],1))) and(eq(e[10][4],0),eq(d[10][4],add(d[11][5],1))) </args>
+      <args> aux_gb[165] and(eq(e[9][4],0),eq(d[10][5],add(d[9][4],1))) and(eq(e[9][5],1),eq(d[10][5],add(d[9][6],1))) and(eq(e[10][4],1),eq(d[10][5],add(d[11][4],1))) and(eq(e[10][5],0),eq(d[10][5],add(d[11][6],1))) </args>
+      <args> aux_gb[166] and(eq(e[9][5],0),eq(d[10][6],add(d[9][5],1))) and(eq(e[9][6],1),eq(d[10][6],add(d[9][7],1))) and(eq(e[10][5],1),eq(d[10][6],add(d[11][5],1))) and(eq(e[10][6],0),eq(d[10][6],add(d[11][7],1))) </args>
+      <args> aux_gb[167] and(eq(e[9][6],0),eq(d[10][7],add(d[9][6],1))) and(eq(e[9][7],1),eq(d[10][7],add(d[9][8],1))) and(eq(e[10][6],1),eq(d[10][7],add(d[11][6],1))) and(eq(e[10][7],0),eq(d[10][7],add(d[11][8],1))) </args>
+      <args> aux_gb[168] and(eq(e[9][7],0),eq(d[10][8],add(d[9][7],1))) and(eq(e[9][8],1),eq(d[10][8],add(d[9][9],1))) and(eq(e[10][7],1),eq(d[10][8],add(d[11][7],1))) and(eq(e[10][8],0),eq(d[10][8],add(d[11][9],1))) </args>
+      <args> aux_gb[169] and(eq(e[9][8],0),eq(d[10][9],add(d[9][8],1))) and(eq(e[9][9],1),eq(d[10][9],add(d[9][10],1))) and(eq(e[10][8],1),eq(d[10][9],add(d[11][8],1))) and(eq(e[10][9],0),eq(d[10][9],add(d[11][10],1))) </args>
+      <args> aux_gb[170] and(eq(e[9][9],0),eq(d[10][10],add(d[9][9],1))) and(eq(e[9][10],1),eq(d[10][10],add(d[9][11],1))) and(eq(e[10][9],1),eq(d[10][10],add(d[11][9],1))) and(eq(e[10][10],0),eq(d[10][10],add(d[11][11],1))) </args>
+      <args> aux_gb[171] and(eq(e[9][10],0),eq(d[10][11],add(d[9][10],1))) and(eq(e[9][11],1),eq(d[10][11],add(d[9][12],1))) and(eq(e[10][10],1),eq(d[10][11],add(d[11][10],1))) and(eq(e[10][11],0),eq(d[10][11],add(d[11][12],1))) </args>
+      <args> aux_gb[172] and(eq(e[9][11],0),eq(d[10][12],add(d[9][11],1))) and(eq(e[9][12],1),eq(d[10][12],add(d[9][13],1))) and(eq(e[10][11],1),eq(d[10][12],add(d[11][11],1))) and(eq(e[10][12],0),eq(d[10][12],add(d[11][13],1))) </args>
+      <args> aux_gb[173] and(eq(e[9][12],0),eq(d[10][13],add(d[9][12],1))) and(eq(e[9][13],1),eq(d[10][13],add(d[9][14],1))) and(eq(e[10][12],1),eq(d[10][13],add(d[11][12],1))) and(eq(e[10][13],0),eq(d[10][13],add(d[11][14],1))) </args>
+      <args> aux_gb[174] and(eq(e[9][13],0),eq(d[10][14],add(d[9][13],1))) and(eq(e[9][14],1),eq(d[10][14],add(d[9][15],1))) and(eq(e[10][13],1),eq(d[10][14],add(d[11][13],1))) and(eq(e[10][14],0),eq(d[10][14],add(d[11][15],1))) </args>
+      <args> aux_gb[175] and(eq(e[9][14],0),eq(d[10][15],add(d[9][14],1))) and(eq(e[10][14],1),eq(d[10][15],add(d[11][14],1))) </args>
+      <args> aux_gb[176] and(eq(e[10][0],1),eq(d[11][0],add(d[10][1],1))) and(eq(e[11][0],0),eq(d[11][0],add(d[12][1],1))) </args>
+      <args> aux_gb[177] and(eq(e[10][0],0),eq(d[11][1],add(d[10][0],1))) and(eq(e[10][1],1),eq(d[11][1],add(d[10][2],1))) and(eq(e[11][0],1),eq(d[11][1],add(d[12][0],1))) and(eq(e[11][1],0),eq(d[11][1],add(d[12][2],1))) </args>
+      <args> aux_gb[178] and(eq(e[10][1],0),eq(d[11][2],add(d[10][1],1))) and(eq(e[10][2],1),eq(d[11][2],add(d[10][3],1))) and(eq(e[11][1],1),eq(d[11][2],add(d[12][1],1))) and(eq(e[11][2],0),eq(d[11][2],add(d[12][3],1))) </args>
+      <args> aux_gb[179] and(eq(e[10][2],0),eq(d[11][3],add(d[10][2],1))) and(eq(e[10][3],1),eq(d[11][3],add(d[10][4],1))) and(eq(e[11][2],1),eq(d[11][3],add(d[12][2],1))) and(eq(e[11][3],0),eq(d[11][3],add(d[12][4],1))) </args>
+      <args> aux_gb[180] and(eq(e[10][3],0),eq(d[11][4],add(d[10][3],1))) and(eq(e[10][4],1),eq(d[11][4],add(d[10][5],1))) and(eq(e[11][3],1),eq(d[11][4],add(d[12][3],1))) and(eq(e[11][4],0),eq(d[11][4],add(d[12][5],1))) </args>
+      <args> aux_gb[181] and(eq(e[10][4],0),eq(d[11][5],add(d[10][4],1))) and(eq(e[10][5],1),eq(d[11][5],add(d[10][6],1))) and(eq(e[11][4],1),eq(d[11][5],add(d[12][4],1))) and(eq(e[11][5],0),eq(d[11][5],add(d[12][6],1))) </args>
+      <args> aux_gb[182] and(eq(e[10][5],0),eq(d[11][6],add(d[10][5],1))) and(eq(e[10][6],1),eq(d[11][6],add(d[10][7],1))) and(eq(e[11][5],1),eq(d[11][6],add(d[12][5],1))) and(eq(e[11][6],0),eq(d[11][6],add(d[12][7],1))) </args>
+      <args> aux_gb[183] and(eq(e[10][6],0),eq(d[11][7],add(d[10][6],1))) and(eq(e[10][7],1),eq(d[11][7],add(d[10][8],1))) and(eq(e[11][6],1),eq(d[11][7],add(d[12][6],1))) and(eq(e[11][7],0),eq(d[11][7],add(d[12][8],1))) </args>
+      <args> aux_gb[184] and(eq(e[10][7],0),eq(d[11][8],add(d[10][7],1))) and(eq(e[10][8],1),eq(d[11][8],add(d[10][9],1))) and(eq(e[11][7],1),eq(d[11][8],add(d[12][7],1))) and(eq(e[11][8],0),eq(d[11][8],add(d[12][9],1))) </args>
+      <args> aux_gb[185] and(eq(e[10][8],0),eq(d[11][9],add(d[10][8],1))) and(eq(e[10][9],1),eq(d[11][9],add(d[10][10],1))) and(eq(e[11][8],1),eq(d[11][9],add(d[12][8],1))) and(eq(e[11][9],0),eq(d[11][9],add(d[12][10],1))) </args>
+      <args> aux_gb[186] and(eq(e[10][9],0),eq(d[11][10],add(d[10][9],1))) and(eq(e[10][10],1),eq(d[11][10],add(d[10][11],1))) and(eq(e[11][9],1),eq(d[11][10],add(d[12][9],1))) and(eq(e[11][10],0),eq(d[11][10],add(d[12][11],1))) </args>
+      <args> aux_gb[187] and(eq(e[10][10],0),eq(d[11][11],add(d[10][10],1))) and(eq(e[10][11],1),eq(d[11][11],add(d[10][12],1))) and(eq(e[11][10],1),eq(d[11][11],add(d[12][10],1))) and(eq(e[11][11],0),eq(d[11][11],add(d[12][12],1))) </args>
+      <args> aux_gb[188] and(eq(e[10][11],0),eq(d[11][12],add(d[10][11],1))) and(eq(e[10][12],1),eq(d[11][12],add(d[10][13],1))) and(eq(e[11][11],1),eq(d[11][12],add(d[12][11],1))) and(eq(e[11][12],0),eq(d[11][12],add(d[12][13],1))) </args>
+      <args> aux_gb[189] and(eq(e[10][12],0),eq(d[11][13],add(d[10][12],1))) and(eq(e[10][13],1),eq(d[11][13],add(d[10][14],1))) and(eq(e[11][12],1),eq(d[11][13],add(d[12][12],1))) and(eq(e[11][13],0),eq(d[11][13],add(d[12][14],1))) </args>
+      <args> aux_gb[190] and(eq(e[10][13],0),eq(d[11][14],add(d[10][13],1))) and(eq(e[10][14],1),eq(d[11][14],add(d[10][15],1))) and(eq(e[11][13],1),eq(d[11][14],add(d[12][13],1))) and(eq(e[11][14],0),eq(d[11][14],add(d[12][15],1))) </args>
+      <args> aux_gb[191] and(eq(e[10][14],0),eq(d[11][15],add(d[10][14],1))) and(eq(e[11][14],1),eq(d[11][15],add(d[12][14],1))) </args>
+      <args> aux_gb[192] and(eq(e[11][0],1),eq(d[12][0],add(d[11][1],1))) and(eq(e[12][0],0),eq(d[12][0],add(d[13][1],1))) </args>
+      <args> aux_gb[193] and(eq(e[11][0],0),eq(d[12][1],add(d[11][0],1))) and(eq(e[11][1],1),eq(d[12][1],add(d[11][2],1))) and(eq(e[12][0],1),eq(d[12][1],add(d[13][0],1))) and(eq(e[12][1],0),eq(d[12][1],add(d[13][2],1))) </args>
+      <args> aux_gb[194] and(eq(e[11][1],0),eq(d[12][2],add(d[11][1],1))) and(eq(e[11][2],1),eq(d[12][2],add(d[11][3],1))) and(eq(e[12][1],1),eq(d[12][2],add(d[13][1],1))) and(eq(e[12][2],0),eq(d[12][2],add(d[13][3],1))) </args>
+      <args> aux_gb[195] and(eq(e[11][2],0),eq(d[12][3],add(d[11][2],1))) and(eq(e[11][3],1),eq(d[12][3],add(d[11][4],1))) and(eq(e[12][2],1),eq(d[12][3],add(d[13][2],1))) and(eq(e[12][3],0),eq(d[12][3],add(d[13][4],1))) </args>
+      <args> aux_gb[196] and(eq(e[11][3],0),eq(d[12][4],add(d[11][3],1))) and(eq(e[11][4],1),eq(d[12][4],add(d[11][5],1))) and(eq(e[12][3],1),eq(d[12][4],add(d[13][3],1))) and(eq(e[12][4],0),eq(d[12][4],add(d[13][5],1))) </args>
+      <args> aux_gb[197] and(eq(e[11][4],0),eq(d[12][5],add(d[11][4],1))) and(eq(e[11][5],1),eq(d[12][5],add(d[11][6],1))) and(eq(e[12][4],1),eq(d[12][5],add(d[13][4],1))) and(eq(e[12][5],0),eq(d[12][5],add(d[13][6],1))) </args>
+      <args> aux_gb[198] and(eq(e[11][5],0),eq(d[12][6],add(d[11][5],1))) and(eq(e[11][6],1),eq(d[12][6],add(d[11][7],1))) and(eq(e[12][5],1),eq(d[12][6],add(d[13][5],1))) and(eq(e[12][6],0),eq(d[12][6],add(d[13][7],1))) </args>
+      <args> aux_gb[199] and(eq(e[11][6],0),eq(d[12][7],add(d[11][6],1))) and(eq(e[11][7],1),eq(d[12][7],add(d[11][8],1))) and(eq(e[12][6],1),eq(d[12][7],add(d[13][6],1))) and(eq(e[12][7],0),eq(d[12][7],add(d[13][8],1))) </args>
+      <args> aux_gb[200] and(eq(e[11][7],0),eq(d[12][8],add(d[11][7],1))) and(eq(e[11][8],1),eq(d[12][8],add(d[11][9],1))) and(eq(e[12][7],1),eq(d[12][8],add(d[13][7],1))) and(eq(e[12][8],0),eq(d[12][8],add(d[13][9],1))) </args>
+      <args> aux_gb[201] and(eq(e[11][8],0),eq(d[12][9],add(d[11][8],1))) and(eq(e[11][9],1),eq(d[12][9],add(d[11][10],1))) and(eq(e[12][8],1),eq(d[12][9],add(d[13][8],1))) and(eq(e[12][9],0),eq(d[12][9],add(d[13][10],1))) </args>
+      <args> aux_gb[202] and(eq(e[11][9],0),eq(d[12][10],add(d[11][9],1))) and(eq(e[11][10],1),eq(d[12][10],add(d[11][11],1))) and(eq(e[12][9],1),eq(d[12][10],add(d[13][9],1))) and(eq(e[12][10],0),eq(d[12][10],add(d[13][11],1))) </args>
+      <args> aux_gb[203] and(eq(e[11][10],0),eq(d[12][11],add(d[11][10],1))) and(eq(e[11][11],1),eq(d[12][11],add(d[11][12],1))) and(eq(e[12][10],1),eq(d[12][11],add(d[13][10],1))) and(eq(e[12][11],0),eq(d[12][11],add(d[13][12],1))) </args>
+      <args> aux_gb[204] and(eq(e[11][11],0),eq(d[12][12],add(d[11][11],1))) and(eq(e[11][12],1),eq(d[12][12],add(d[11][13],1))) and(eq(e[12][11],1),eq(d[12][12],add(d[13][11],1))) and(eq(e[12][12],0),eq(d[12][12],add(d[13][13],1))) </args>
+      <args> aux_gb[205] and(eq(e[11][12],0),eq(d[12][13],add(d[11][12],1))) and(eq(e[11][13],1),eq(d[12][13],add(d[11][14],1))) and(eq(e[12][12],1),eq(d[12][13],add(d[13][12],1))) and(eq(e[12][13],0),eq(d[12][13],add(d[13][14],1))) </args>
+      <args> aux_gb[206] and(eq(e[11][13],0),eq(d[12][14],add(d[11][13],1))) and(eq(e[11][14],1),eq(d[12][14],add(d[11][15],1))) and(eq(e[12][13],1),eq(d[12][14],add(d[13][13],1))) and(eq(e[12][14],0),eq(d[12][14],add(d[13][15],1))) </args>
+      <args> aux_gb[207] and(eq(e[11][14],0),eq(d[12][15],add(d[11][14],1))) and(eq(e[12][14],1),eq(d[12][15],add(d[13][14],1))) </args>
+      <args> aux_gb[208] and(eq(e[12][0],1),eq(d[13][0],add(d[12][1],1))) and(eq(e[13][0],0),eq(d[13][0],add(d[14][1],1))) </args>
+      <args> aux_gb[209] and(eq(e[12][0],0),eq(d[13][1],add(d[12][0],1))) and(eq(e[12][1],1),eq(d[13][1],add(d[12][2],1))) and(eq(e[13][0],1),eq(d[13][1],add(d[14][0],1))) and(eq(e[13][1],0),eq(d[13][1],add(d[14][2],1))) </args>
+      <args> aux_gb[210] and(eq(e[12][1],0),eq(d[13][2],add(d[12][1],1))) and(eq(e[12][2],1),eq(d[13][2],add(d[12][3],1))) and(eq(e[13][1],1),eq(d[13][2],add(d[14][1],1))) and(eq(e[13][2],0),eq(d[13][2],add(d[14][3],1))) </args>
+      <args> aux_gb[211] and(eq(e[12][2],0),eq(d[13][3],add(d[12][2],1))) and(eq(e[12][3],1),eq(d[13][3],add(d[12][4],1))) and(eq(e[13][2],1),eq(d[13][3],add(d[14][2],1))) and(eq(e[13][3],0),eq(d[13][3],add(d[14][4],1))) </args>
+      <args> aux_gb[212] and(eq(e[12][3],0),eq(d[13][4],add(d[12][3],1))) and(eq(e[12][4],1),eq(d[13][4],add(d[12][5],1))) and(eq(e[13][3],1),eq(d[13][4],add(d[14][3],1))) and(eq(e[13][4],0),eq(d[13][4],add(d[14][5],1))) </args>
+      <args> aux_gb[213] and(eq(e[12][4],0),eq(d[13][5],add(d[12][4],1))) and(eq(e[12][5],1),eq(d[13][5],add(d[12][6],1))) and(eq(e[13][4],1),eq(d[13][5],add(d[14][4],1))) and(eq(e[13][5],0),eq(d[13][5],add(d[14][6],1))) </args>
+      <args> aux_gb[214] and(eq(e[12][5],0),eq(d[13][6],add(d[12][5],1))) and(eq(e[12][6],1),eq(d[13][6],add(d[12][7],1))) and(eq(e[13][5],1),eq(d[13][6],add(d[14][5],1))) and(eq(e[13][6],0),eq(d[13][6],add(d[14][7],1))) </args>
+      <args> aux_gb[215] and(eq(e[12][6],0),eq(d[13][7],add(d[12][6],1))) and(eq(e[12][7],1),eq(d[13][7],add(d[12][8],1))) and(eq(e[13][6],1),eq(d[13][7],add(d[14][6],1))) and(eq(e[13][7],0),eq(d[13][7],add(d[14][8],1))) </args>
+      <args> aux_gb[216] and(eq(e[12][7],0),eq(d[13][8],add(d[12][7],1))) and(eq(e[12][8],1),eq(d[13][8],add(d[12][9],1))) and(eq(e[13][7],1),eq(d[13][8],add(d[14][7],1))) and(eq(e[13][8],0),eq(d[13][8],add(d[14][9],1))) </args>
+      <args> aux_gb[217] and(eq(e[12][8],0),eq(d[13][9],add(d[12][8],1))) and(eq(e[12][9],1),eq(d[13][9],add(d[12][10],1))) and(eq(e[13][8],1),eq(d[13][9],add(d[14][8],1))) and(eq(e[13][9],0),eq(d[13][9],add(d[14][10],1))) </args>
+      <args> aux_gb[218] and(eq(e[12][9],0),eq(d[13][10],add(d[12][9],1))) and(eq(e[12][10],1),eq(d[13][10],add(d[12][11],1))) and(eq(e[13][9],1),eq(d[13][10],add(d[14][9],1))) and(eq(e[13][10],0),eq(d[13][10],add(d[14][11],1))) </args>
+      <args> aux_gb[219] and(eq(e[12][10],0),eq(d[13][11],add(d[12][10],1))) and(eq(e[12][11],1),eq(d[13][11],add(d[12][12],1))) and(eq(e[13][10],1),eq(d[13][11],add(d[14][10],1))) and(eq(e[13][11],0),eq(d[13][11],add(d[14][12],1))) </args>
+      <args> aux_gb[220] and(eq(e[12][11],0),eq(d[13][12],add(d[12][11],1))) and(eq(e[12][12],1),eq(d[13][12],add(d[12][13],1))) and(eq(e[13][11],1),eq(d[13][12],add(d[14][11],1))) and(eq(e[13][12],0),eq(d[13][12],add(d[14][13],1))) </args>
+      <args> aux_gb[221] and(eq(e[12][12],0),eq(d[13][13],add(d[12][12],1))) and(eq(e[12][13],1),eq(d[13][13],add(d[12][14],1))) and(eq(e[13][12],1),eq(d[13][13],add(d[14][12],1))) and(eq(e[13][13],0),eq(d[13][13],add(d[14][14],1))) </args>
+      <args> aux_gb[222] and(eq(e[12][13],0),eq(d[13][14],add(d[12][13],1))) and(eq(e[12][14],1),eq(d[13][14],add(d[12][15],1))) and(eq(e[13][13],1),eq(d[13][14],add(d[14][13],1))) and(eq(e[13][14],0),eq(d[13][14],add(d[14][15],1))) </args>
+      <args> aux_gb[223] and(eq(e[12][14],0),eq(d[13][15],add(d[12][14],1))) and(eq(e[13][14],1),eq(d[13][15],add(d[14][14],1))) </args>
+      <args> aux_gb[224] and(eq(e[13][0],1),eq(d[14][0],add(d[13][1],1))) and(eq(e[14][0],0),eq(d[14][0],add(d[15][1],1))) </args>
+      <args> aux_gb[225] and(eq(e[13][0],0),eq(d[14][1],add(d[13][0],1))) and(eq(e[13][1],1),eq(d[14][1],add(d[13][2],1))) and(eq(e[14][0],1),eq(d[14][1],add(d[15][0],1))) and(eq(e[14][1],0),eq(d[14][1],add(d[15][2],1))) </args>
+      <args> aux_gb[226] and(eq(e[13][1],0),eq(d[14][2],add(d[13][1],1))) and(eq(e[13][2],1),eq(d[14][2],add(d[13][3],1))) and(eq(e[14][1],1),eq(d[14][2],add(d[15][1],1))) and(eq(e[14][2],0),eq(d[14][2],add(d[15][3],1))) </args>
+      <args> aux_gb[227] and(eq(e[13][2],0),eq(d[14][3],add(d[13][2],1))) and(eq(e[13][3],1),eq(d[14][3],add(d[13][4],1))) and(eq(e[14][2],1),eq(d[14][3],add(d[15][2],1))) and(eq(e[14][3],0),eq(d[14][3],add(d[15][4],1))) </args>
+      <args> aux_gb[228] and(eq(e[13][3],0),eq(d[14][4],add(d[13][3],1))) and(eq(e[13][4],1),eq(d[14][4],add(d[13][5],1))) and(eq(e[14][3],1),eq(d[14][4],add(d[15][3],1))) and(eq(e[14][4],0),eq(d[14][4],add(d[15][5],1))) </args>
+      <args> aux_gb[229] and(eq(e[13][4],0),eq(d[14][5],add(d[13][4],1))) and(eq(e[13][5],1),eq(d[14][5],add(d[13][6],1))) and(eq(e[14][4],1),eq(d[14][5],add(d[15][4],1))) and(eq(e[14][5],0),eq(d[14][5],add(d[15][6],1))) </args>
+      <args> aux_gb[230] and(eq(e[13][5],0),eq(d[14][6],add(d[13][5],1))) and(eq(e[13][6],1),eq(d[14][6],add(d[13][7],1))) and(eq(e[14][5],1),eq(d[14][6],add(d[15][5],1))) and(eq(e[14][6],0),eq(d[14][6],add(d[15][7],1))) </args>
+      <args> aux_gb[231] and(eq(e[13][6],0),eq(d[14][7],add(d[13][6],1))) and(eq(e[13][7],1),eq(d[14][7],add(d[13][8],1))) and(eq(e[14][6],1),eq(d[14][7],add(d[15][6],1))) and(eq(e[14][7],0),eq(d[14][7],add(d[15][8],1))) </args>
+      <args> aux_gb[232] and(eq(e[13][7],0),eq(d[14][8],add(d[13][7],1))) and(eq(e[13][8],1),eq(d[14][8],add(d[13][9],1))) and(eq(e[14][7],1),eq(d[14][8],add(d[15][7],1))) and(eq(e[14][8],0),eq(d[14][8],add(d[15][9],1))) </args>
+      <args> aux_gb[233] and(eq(e[13][8],0),eq(d[14][9],add(d[13][8],1))) and(eq(e[13][9],1),eq(d[14][9],add(d[13][10],1))) and(eq(e[14][8],1),eq(d[14][9],add(d[15][8],1))) and(eq(e[14][9],0),eq(d[14][9],add(d[15][10],1))) </args>
+      <args> aux_gb[234] and(eq(e[13][9],0),eq(d[14][10],add(d[13][9],1))) and(eq(e[13][10],1),eq(d[14][10],add(d[13][11],1))) and(eq(e[14][9],1),eq(d[14][10],add(d[15][9],1))) and(eq(e[14][10],0),eq(d[14][10],add(d[15][11],1))) </args>
+      <args> aux_gb[235] and(eq(e[13][10],0),eq(d[14][11],add(d[13][10],1))) and(eq(e[13][11],1),eq(d[14][11],add(d[13][12],1))) and(eq(e[14][10],1),eq(d[14][11],add(d[15][10],1))) and(eq(e[14][11],0),eq(d[14][11],add(d[15][12],1))) </args>
+      <args> aux_gb[236] and(eq(e[13][11],0),eq(d[14][12],add(d[13][11],1))) and(eq(e[13][12],1),eq(d[14][12],add(d[13][13],1))) and(eq(e[14][11],1),eq(d[14][12],add(d[15][11],1))) and(eq(e[14][12],0),eq(d[14][12],add(d[15][13],1))) </args>
+      <args> aux_gb[237] and(eq(e[13][12],0),eq(d[14][13],add(d[13][12],1))) and(eq(e[13][13],1),eq(d[14][13],add(d[13][14],1))) and(eq(e[14][12],1),eq(d[14][13],add(d[15][12],1))) and(eq(e[14][13],0),eq(d[14][13],add(d[15][14],1))) </args>
+      <args> aux_gb[238] and(eq(e[13][13],0),eq(d[14][14],add(d[13][13],1))) and(eq(e[13][14],1),eq(d[14][14],add(d[13][15],1))) and(eq(e[14][13],1),eq(d[14][14],add(d[15][13],1))) and(eq(e[14][14],0),eq(d[14][14],add(d[15][15],1))) </args>
+      <args> aux_gb[239] and(eq(e[13][14],0),eq(d[14][15],add(d[13][14],1))) and(eq(e[14][14],1),eq(d[14][15],add(d[15][14],1))) </args>
+      <args> aux_gb[240] and(eq(e[14][0],1),eq(d[15][0],add(d[14][1],1))) </args>
+      <args> aux_gb[241] and(eq(e[14][0],0),eq(d[15][1],add(d[14][0],1))) and(eq(e[14][1],1),eq(d[15][1],add(d[14][2],1))) </args>
+      <args> aux_gb[242] and(eq(e[14][1],0),eq(d[15][2],add(d[14][1],1))) and(eq(e[14][2],1),eq(d[15][2],add(d[14][3],1))) </args>
+      <args> aux_gb[243] and(eq(e[14][2],0),eq(d[15][3],add(d[14][2],1))) and(eq(e[14][3],1),eq(d[15][3],add(d[14][4],1))) </args>
+      <args> aux_gb[244] and(eq(e[14][3],0),eq(d[15][4],add(d[14][3],1))) and(eq(e[14][4],1),eq(d[15][4],add(d[14][5],1))) </args>
+      <args> aux_gb[245] and(eq(e[14][4],0),eq(d[15][5],add(d[14][4],1))) and(eq(e[14][5],1),eq(d[15][5],add(d[14][6],1))) </args>
+      <args> aux_gb[246] and(eq(e[14][5],0),eq(d[15][6],add(d[14][5],1))) and(eq(e[14][6],1),eq(d[15][6],add(d[14][7],1))) </args>
+      <args> aux_gb[247] and(eq(e[14][6],0),eq(d[15][7],add(d[14][6],1))) and(eq(e[14][7],1),eq(d[15][7],add(d[14][8],1))) </args>
+      <args> aux_gb[248] and(eq(e[14][7],0),eq(d[15][8],add(d[14][7],1))) and(eq(e[14][8],1),eq(d[15][8],add(d[14][9],1))) </args>
+      <args> aux_gb[249] and(eq(e[14][8],0),eq(d[15][9],add(d[14][8],1))) and(eq(e[14][9],1),eq(d[15][9],add(d[14][10],1))) </args>
+      <args> aux_gb[250] and(eq(e[14][9],0),eq(d[15][10],add(d[14][9],1))) and(eq(e[14][10],1),eq(d[15][10],add(d[14][11],1))) </args>
+      <args> aux_gb[251] and(eq(e[14][10],0),eq(d[15][11],add(d[14][10],1))) and(eq(e[14][11],1),eq(d[15][11],add(d[14][12],1))) </args>
+      <args> aux_gb[252] and(eq(e[14][11],0),eq(d[15][12],add(d[14][11],1))) and(eq(e[14][12],1),eq(d[15][12],add(d[14][13],1))) </args>
+      <args> aux_gb[253] and(eq(e[14][12],0),eq(d[15][13],add(d[14][12],1))) and(eq(e[14][13],1),eq(d[15][13],add(d[14][14],1))) </args>
+      <args> aux_gb[254] and(eq(e[14][13],0),eq(d[15][14],add(d[14][13],1))) and(eq(e[14][14],1),eq(d[15][14],add(d[14][15],1))) </args>
+      <args> aux_gb[255] and(eq(e[14][14],0),eq(d[15][15],add(d[14][14],1))) </args>
+    </group>
+  </constraints>
+</instance>
