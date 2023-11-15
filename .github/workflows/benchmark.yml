@@ -35,7 +35,7 @@ jobs:
           pip install pysdd
       - name: Benchmark with pytest
         run: |
-          python -m pytest benchmarks/ --benchmark-min-rounds=1 --benchmark-disable-gc --benchmark-verbose --benchmark-json output.json
+          python -m pytest benchmarks/ --benchmark-min-rounds=3 --benchmark-disable-gc --benchmark-verbose --benchmark-json output.json
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1

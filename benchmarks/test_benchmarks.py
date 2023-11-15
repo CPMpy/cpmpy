@@ -1,3 +1,4 @@
+import random
 import pytest
 import cpmpy as cp
 import os
@@ -15,6 +16,7 @@ if 'y' in cwd[-2:]:
 else:
     xmlmodels.extend(glob.glob(join('instances', 'sat', "*.xml")))
     xmlmodels.extend(glob.glob(join('instances', 'unsat', "*.xml")))
+random.shuffle(xmlmodels)
 
 #for subdividing the models (use 'instances' directory for xmlmodels above)
 """for xmlmodel in xmlmodels:
