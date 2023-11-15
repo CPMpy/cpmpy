@@ -37,11 +37,17 @@ else:
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)"""
 
 
+
 @pytest.mark.parametrize('xmlmodel', xmlmodels, ids=str)
 def test_solve_ortools(xmlmodel, benchmark):
     model = XCSPParser(xmlmodel)
     s = cp.SolverLookup.get('ortools',model)
     result = benchmark(s.solve,num_search_workers=6,time_limit=1800)
+    if 'unsat' in xmlmodel:
+        assert not result #should be unsat
+    else:
+        assert result #should be sat
+
 
 
 @pytest.mark.parametrize('xmlmodel', xmlmodels, ids=str)
