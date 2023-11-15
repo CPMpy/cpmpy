@@ -1,8 +1,12 @@
 import copy
 import unittest
+
+import pytest
+
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError
+from cpmpy.solvers import CPM_minizinc
 
 
 class TestGlobal(unittest.TestCase):
@@ -367,6 +371,36 @@ class TestGlobal(unittest.TestCase):
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         self.assertTrue(m.solve())
+
+    def test_cumulative_decomposition_capacity(self):
+        import numpy as np
+
+        # before merging #435 there was an issue with capacity constraint
+        start = cp.intvar(0, 10, 4, "start")
+        duration = [1, 2, 2, 1]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = 10 # tasks cannot be scheduled
+        capacity = np.int64(5) # bug only happened with numpy ints
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertFalse(cp.Model(cons).solve()) # this worked fine
+        # also test decomposition
+        self.assertFalse(cp.Model(cons.decompose()).solve()) # capacity was not taken into account and this failed
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_single_demand(self):
+        start = cp.intvar(0, 10, name="start")
+        dur = 5
+        end = cp.intvar(0, 10, name="end")
+        demand = 2
+        capacity = 10
+
+        m = cp.Model()
+        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
 
     def test_cumulative_no_np(self):
         start = cp.intvar(0, 10, 4, "start")
