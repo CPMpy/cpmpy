@@ -1,6 +1,16 @@
 name: Github Benchmarks
 
-on: [push] # Can also put pull_request here, but then we dont run it when directly pushing to master
+on:
+  push:
+    branches:
+      - master
+      - benchmarks_wv
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
 
 jobs:
   build:
