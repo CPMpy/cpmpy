@@ -15,7 +15,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
                   "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative",'xor'},
                   "exact": {},
                   }
 

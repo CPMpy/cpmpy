@@ -163,9 +163,15 @@ def get_bounds(expr):
     returns appropriately rounded integers
     """
 
+    # import here to avoid circular import
     from cpmpy.expressions.core import Expression
+    from cpmpy.expressions.variables import cpm_array
+
     if isinstance(expr, Expression):
         return expr.get_bounds()
+    elif is_any_list(expr):
+        lbs, ubs = zip(*[get_bounds(e) for e in expr])
+        return list(lbs), list(ubs) # return list as NDVarArray is covered above
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
