@@ -39,6 +39,7 @@ else:
 
 
 @pytest.mark.parametrize('xmlmodel', xmlmodels, ids=str)
+@pytest.mark.ortools_solve
 def test_solve_ortools(xmlmodel, benchmark):
     model = XCSPParser(xmlmodel)
     s = cp.SolverLookup.get('ortools',model)
@@ -51,6 +52,7 @@ def test_solve_ortools(xmlmodel, benchmark):
 
 
 @pytest.mark.parametrize('xmlmodel', xmlmodels, ids=str)
+@pytest.mark.transform_ortools
 def test_transform_ortools(xmlmodel, benchmark):
     model = XCSPParser(xmlmodel)
     s = benchmark(cp.SolverLookup.get,'ortools',model)
