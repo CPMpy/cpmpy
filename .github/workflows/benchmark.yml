@@ -1,4 +1,4 @@
-                           name: Github Benchmarks
+name: Github Benchmarks
 
 on: [push] # Can also put pull_request here, but then we dont run it when directly pushing to master
 
