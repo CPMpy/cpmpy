@@ -597,6 +597,12 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Circuit,(a,b))
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
 
+    def test_multicicruit(self):
+        c1 = cp.Circuit(cp.intvar(0,4, shape=5))
+        c2 = cp.Circuit(cp.intvar(0,2, shape=3))
+        self.assertTrue(cp.Model(c1 & c2).solve())
+
+
     def test_inverse(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
