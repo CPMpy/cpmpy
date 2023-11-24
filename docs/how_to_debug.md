@@ -115,6 +115,31 @@ With this smaller set of constraints, repeat the visual inspection steps above.
 
 (Note that for an UNSAT problem there can be many MUSes, the `examples/advanced/` folder has the MARCO algorithm that can enumerate all MSS/MUSes.)
 
+### Correcting an UNSAT program
+
+As many MUSes (=conflicts) may exist in the problem, resolving one of them does not necessarily make the model satisfiable.
+
+In order to find which constraints are to be corrected, you can use the `tools.mcs` tool which computes a 'Minimal Correction Subset' (MCS).
+By removing these contraints (or altering them), the model will become satisfiable.
+
+Note that a Minimal Correction Subset is the complement of a Maximal Satisfiable Subset (MSS).
+MSSes can be calculated optimally using a Max-CSP (resp. Max-SAT) formuation.
+By weighting each of the constraints, you can define some preferences on which constraints should be satisfied over others.
+
+```python
+from cpmpy.tools import mcs, mss
+
+x = boolvar(shape=3, name="x")
+model = Model(
+    x[0],
+    x[0] | x[1],
+    x[2].implies(x[1]),
+    ~x[0],
+    )
+
+sat_cons = mss(model.constraints) # x[0] or x[1], x[2] -> x[1], ~x[0]
+cons_to_remove = (mcs(model.constraints)) # x[0]
+```
 
 ## Debugging a satisfiable model, that does not contain an expected solution
 
