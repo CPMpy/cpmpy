@@ -10,7 +10,7 @@ import cpmpy as cp
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
-
+from cpmpy.tools.utils import make_assump_model
 
 def mus(soft, hard=[], solver="ortools"):
     """
