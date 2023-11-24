@@ -58,38 +58,35 @@ def mus(soft, hard=[], solver="ortools"):
     return [dmap[avar] for avar in mus]
 
 
-def mus_naive(soft, hard=[], solver="ortools"):
+# Maximum Satisfiable Subset
+# assumes the solver supports 'maximize', if not... revert to a 'grow'
+def mss(soft, hard=[], weights=[1], solver="ortools"):
     """
-        A naive pure CP deletion-based MUS algorithm
-
-        Will repeatedly solve the problem from scratch with one less constraint
-        For anything but tiny sets of constraints, this will be terribly slow.
-
-        Best to only use for testing on solvers that do not support assumptions.
-        For others, use `mus()`
-
-        :param: soft: soft constraints, list of expressions
-        :param: hard: hard constraints, optional, list of expressions
-        :param: solver: name of a solver, see SolverLookup.solvernames()
+        Compute Maximal Satisfiable Subset of unsatisfiable model.
+        Constraints can be weighted using the `weights` parameter.
+        Computes a subset of constraints which maximizes the sum of all weights on constraints
     """
-    # ensure toplevel list
-    soft = toplevel_list(soft, merge_and=False)
+    # make assumption (indicator) variables and soft-constrained model
+    (m, soft, assump) = make_assump_model(soft, hard=hard)
+    dmap = dict(zip(assump, soft))
+    s = cp.SolverLookup.get(solver, m)
 
-    m = cp.Model(hard + soft)
-    assert not m.solve(solver=solver), "MUS: model must be UNSAT"
+    # maximize nr of indicator vars
+    s.maximize(sum(weights * assump))
+    s.solve()
 
-    mus = []
-    # order so that constraints with many variables are tried and removed first
-    core = sorted(soft, key=lambda c: -len(get_variables(c)))
-    for i in range(len(core)):
-        subcore = mus + core[i + 1:]  # check if all but 'i' makes core SAT
+    return [dmap[avar] for avar in soft if avar.value()]
 
-        if cp.Model(hard + subcore).solve(solver=solver):
-            # removing it makes it SAT, must keep for UNSAT
-            mus.append(core[i])
-        # else: still UNSAT so don't need this candidate
 
-    return mus
+# Minimum Correction Subset
+# (delete these to make your problem SAT)
+# assumes the solver supports 'maximize', if not... revert to a 'grow'
+def mcs(soft, hard=[], solver="ortools"):
+    # ensure toplevel list, already here for complement
+    soft2 = toplevel_list(soft, merge_and=False)
+
+    mymss = mss(soft2, hard, solver=solver)
+    return list(set(soft2) - set(mymss))
 
 
 def quickxplain(soft, hard=[], solver="ortools"):
@@ -140,6 +137,40 @@ def quickxplain(soft, hard=[], solver="ortools"):
     core = do_recursion(list(assump)[:max_idx+1], [], [])
     return [dmap[a] for a in core]
 
+
+## Naive, non-assumption based versions of MUS-algos above
+def mus_naive(soft, hard=[], solver="ortools"):
+    """
+        A naive pure CP deletion-based MUS algorithm
+
+        Will repeatedly solve the problem from scratch with one less constraint
+        For anything but tiny sets of constraints, this will be terribly slow.
+
+        Best to only use for testing on solvers that do not support assumptions.
+        For others, use `mus()`
+
+        :param: soft: soft constraints, list of expressions
+        :param: hard: hard constraints, optional, list of expressions
+        :param: solver: name of a solver, see SolverLookup.solvernames()
+    """
+    # ensure toplevel list
+    soft = toplevel_list(soft, merge_and=False)
+
+    m = cp.Model(hard + soft)
+    assert not m.solve(solver=solver), "MUS: model must be UNSAT"
+
+    mus = []
+    # order so that constraints with many variables are tried and removed first
+    core = sorted(soft, key=lambda c: -len(get_variables(c)))
+    for i in range(len(core)):
+        subcore = mus + core[i + 1:]  # check if all but 'i' makes core SAT
+
+        if cp.Model(hard + subcore).solve(solver=solver):
+            # removing it makes it SAT, must keep for UNSAT
+            mus.append(core[i])
+        # else: still UNSAT so don't need this candidate
+
+    return mus
 
 def quickxplain_naive(soft, hard=[], solver="ortools"):
     """
