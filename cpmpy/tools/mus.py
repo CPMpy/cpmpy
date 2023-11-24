@@ -7,6 +7,7 @@ https://github.com/pysathq/pysat/blob/master/examples/musx.py
 """
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.utils import is_any_list
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
@@ -60,7 +61,7 @@ def mus(soft, hard=[], solver="ortools"):
 
 # Maximum Satisfiable Subset
 # assumes the solver supports 'maximize', if not... revert to a 'grow'
-def mss(soft, hard=[], weights=[1], solver="ortools"):
+def mss(soft, hard=[], weights=1, solver="ortools"):
     """
         Compute Maximal Satisfiable Subset of unsatisfiable model.
         Constraints can be weighted using the `weights` parameter.
@@ -68,14 +69,15 @@ def mss(soft, hard=[], weights=[1], solver="ortools"):
     """
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
-    dmap = dict(zip(assump, soft))
     s = cp.SolverLookup.get(solver, m)
 
-    # maximize nr of indicator vars
-    s.maximize(sum(weights * assump))
-    s.solve()
+    # maximize weight of indicator vars
+    if is_any_list(weights):
+        assert len(weights) == len(assump)
+    s.maximize(cp.sum(weights * assump))
+    assert s.solve()
 
-    return [dmap[avar] for avar in soft if avar.value()]
+    return [c for avar, c in zip(assump, soft) if avar.value()]
 
 
 # Minimum Correction Subset
