@@ -31,33 +31,31 @@ def mus(soft, hard=[], solver="ortools"):
         :param: solver: name of a solver, see SolverLookup.solvernames()
             "z3" and "gurobi" are incremental, "ortools" restarts the solver
     """
-    # ensure toplevel list
-    soft = toplevel_list(soft, merge_and=False)
+    # make assumption (indicator) variables and soft-constrained model
+    (m, soft, assump) = make_assump_model(soft, hard=hard)
+    s = cp.SolverLookup.get(solver, m)
+
+    # create dictionary from assump to soft
+    dmap = dict(zip(assump, soft))
+
+    # setting all assump vars to true should be UNSAT
+    assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
+    core = s.get_core()  # start from solver's UNSAT core
 
     # order so that constraints with many variables are tried and removed first
-    candidates = sorted(soft, key=lambda c: -len(get_variables(c)))
+    core = sorted(core, key=lambda c: -len(get_variables(dmap[c])))
 
-    assump = cp.boolvar(shape=len(soft), name="assump")
-    if len(soft) == 1:
-        assump = NDVarArray(shape=1, dtype=object, buffer=np.array([assump]))
-
-    m = cp.Model(hard + [assump.implies(candidates)])  # each assumption variable implies a candidate
-    s = cp.SolverLookup.get(solver, m)
-    assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
-
+    # deletion-based MUS
     mus = []
-    core = sorted(s.get_core())  # start from solver's UNSAT core
     for i in range(len(core)):
-        subassump = mus + core[i + 1:]  # check if all but 'i' makes constraints SAT
+        subassump = mus + core[i + 1:]  # all but the 'i'th constraint
 
         if s.solve(assumptions=subassump):
-            # removing it makes it SAT, must keep for UNSAT
+            # removing 'i' makes the problem SAT, must keep for UNSAT
             mus.append(core[i])
-        # else: still UNSAT so don't need this candidate
+        # else: still UNSAT so don't need this candidate, not in mus
 
-    # create dictionary from assump to candidate
-    dmap = dict(zip(assump, candidates))
-    return [dmap[assump] for assump in mus]
+    return [dmap[avar] for avar in mus]
 
 
 def mus_naive(soft, hard=[], solver="ortools"):
@@ -109,22 +107,16 @@ def quickxplain(soft, hard=[], solver="ortools"):
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
     """
 
-    soft = toplevel_list(soft, merge_and=False)
+    model, soft, assump = make_assump_model(soft, hard)
+    s = cp.SolverLookup.get(solver, model)
 
-    assump = cp.boolvar(shape=len(soft), name="assump")
-    if len(soft) == 1:
-        assump = NDVarArray(shape=1, dtype=object, buffer=np.array([assump]))
-
-    m = cp.SolverLookup.get(solver, cp.Model(hard))
-    m += assump.implies(soft)
-
-    assert m.solve(assumptions=assump) is False, "The model should be UNSAT!"
+    assert s.solve(assumptions=assump) is False, "The model should be UNSAT!"
     dmap = dict(zip(assump, soft))
 
     # the recursive call
     def do_recursion(soft, hard, delta):
 
-        if len(delta) != 0 and m.solve(assumptions=hard) is False:
+        if len(delta) != 0 and s.solve(assumptions=hard) is False:
             # conflict is in hard constraints, no need to recurse
             return []
 
@@ -142,7 +134,7 @@ def quickxplain(soft, hard=[], solver="ortools"):
         return delta1 + delta2
 
     # optimization: find max index of solver core
-    solver_core = set(m.get_core())
+    solver_core = frozenset(s.get_core())
     max_idx = max(i for i,a in enumerate(assump) if a in solver_core)
 
     core = do_recursion(list(assump)[:max_idx+1], [], [])
