@@ -51,7 +51,10 @@ class CPM_int2bool_direct(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: str, name of a subsolver (required!)
         """
-        assert(subsolver is not None), "CPM_Meta_int2bool: you must supply the name of a CPMpy solver"
+        #assert(subsolver is not None), "CPM_Meta_int2bool: you must supply the name of a CPMpy solver"
+        if subsolver is None:
+            print("Warning: CPM_int2bool_direct: no subsolver provided, using 'pysat'")
+            subsolver = "pysat"
 
         from .utils import SolverLookup
         # init the subsolver with an empty model
