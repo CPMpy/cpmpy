@@ -569,14 +569,14 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
-            self += [s + d == e for s,d,e in zip(start,dur,end)]
-            if len(start) == 1:
-                assert len(start) == 1
-                format_str = "cumulative([{}],[{}],[{}],{})"
-            else:
-                format_str = "cumulative({},{},{},{})"
 
-            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
+            durstr = self._convert_expression([s + d == e for s,d,e in zip(start, dur, end)])
+            if len(start) == 1:
+                format_str = durstr +" /\\ cumulative([{}],[{}],[{}],{})"
+            else:
+                format_str = durstr +" ++ [cumulative({},{},{},{})]"
+
+            return "forall("+format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])+")"
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args
