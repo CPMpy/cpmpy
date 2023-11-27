@@ -22,6 +22,8 @@ jobs:
           pip install z3-solver
           pip install exact
           pip install pysdd
+          snap install minizinc
+          pip install minizinc
       - name: Test with pytest
         run: |
           python -m pytest tests/
