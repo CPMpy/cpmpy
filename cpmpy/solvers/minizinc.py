@@ -574,9 +574,9 @@ class CPM_minizinc(SolverInterface):
             if len(start) == 1:
                 format_str = durstr +" /\\ cumulative([{}],[{}],[{}],{})"
             else:
-                format_str = durstr +" ++ [cumulative({},{},{},{})]"
+                format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
-            return "forall("+format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])+")"
+            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args
