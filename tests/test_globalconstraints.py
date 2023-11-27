@@ -401,6 +401,24 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(m.solve(solver="ortools"))
         self.assertTrue(m.solve(solver="minizinc"))
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_nested(self):
+        start = cp.intvar(0, 10, name="start", shape=3)
+        dur = [5,5,5]
+        end = cp.intvar(0, 10, name="end", shape=3)
+        demand = [5,5,9]
+        capacity = 10
+        bv = cp.boolvar()
+
+        cons = cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        m = cp.Model(bv.implies(cons), start + dur != end)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
+
 
     def test_cumulative_no_np(self):
         start = cp.intvar(0, 10, 4, "start")
@@ -666,7 +684,7 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve())
+        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve(solver="minizinc:com.google.ortools.sat"))
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[a,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],x,False)
