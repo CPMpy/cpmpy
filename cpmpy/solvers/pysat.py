@@ -458,11 +458,11 @@ class CPM_pysat(SolverInterface):
             weights = left.args[0]
             lits = self.solver_vars(left.args[1])
 
-        if cpm_expr.name == "<" or (cpm_expr.name == "!=" and bound >= len(lits)):
+        if cpm_expr.name == "<":  # edge case? or (cpm_expr.name == "!=" and bound >= sum(max(0,weights))):
             return PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
         elif cpm_expr.name == "<=":
             return PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool).clauses
-        elif cpm_expr.name == ">" or (cpm_expr.name == "!=" and bound <= 0):
+        elif cpm_expr.name == ">":  # edge case? or (cpm_expr.name == "!=" and bound <= sum(min(0,weights))):
             return PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
         elif cpm_expr.name == ">=":
             return PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool).clauses
@@ -470,6 +470,7 @@ class CPM_pysat(SolverInterface):
             return PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
 
         elif cpm_expr.name == "!=":
+            # XXX This case already covered by linearize (which uses just 1 literal is_atleast=-is_atmost)
             # BUG with pblib solved in Pysat dev 0.1.7.dev12
             ## add implication literals for (strict) atleast/atmost, one must be true
             is_atleast = self.solver_var(boolvar())
