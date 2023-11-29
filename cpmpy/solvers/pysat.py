@@ -35,11 +35,13 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_int, flatlist
+from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
+from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_implies, only_bv_reifies
+from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
 
 
 class CPM_pysat(SolverInterface):
@@ -239,9 +241,16 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
-        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        # the next two only needed if the model contains cardinality/pseudo-boolean constraints
+        #?cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        #?cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+
         cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
+        # the next only needed if the model contains cardinality/pseudo-boolean constraints
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}))  # the core of the MIP-linearization
+
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
