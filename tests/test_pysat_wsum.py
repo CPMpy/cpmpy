@@ -52,6 +52,23 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         for expression in expressions:
             Model(expression).solve("pysat")
 
+    def test_encode_pb_oob(self):
+        # test out of bounds (meaningless) thresholds
+        expressions = [
+            sum(self.bv*[2,2,2]) <= 10,  # true
+            sum(self.bv*[2,2,2]) <= 6,   # true
+            sum(self.bv*[2,2,2]) >= 10,  # false
+            sum(self.bv*[2,2,2]) >= 6,   # undecided
+            sum(self.bv*[2,-2,2]) <= 10,  # true
+            sum(self.bv*[2,-2,2]) <= 4,   # true
+            sum(self.bv*[2,-2,2]) >= 10,  # false
+            sum(self.bv*[2,-2,2]) >= 4,   # undecided
+        ]
+
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            Model(expression).solve("pysat")
+
 if __name__ == '__main__':
     unittest.main()
 
