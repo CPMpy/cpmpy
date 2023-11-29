@@ -21,6 +21,7 @@ jobs:
           pip install python-sat
           pip install z3-solver
           pip install exact
+          pip install pysdd
       - name: Test with pytest
         run: |
           python -m pytest tests/

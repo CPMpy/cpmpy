@@ -116,6 +116,7 @@ from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
 from .globalfunctions import * # XXX make this file backwards compatible
 
+
 # Base class GlobalConstraint
 class GlobalConstraint(Expression):
     """
@@ -142,20 +143,22 @@ class GlobalConstraint(Expression):
             Defining constraints (totally) define new auxiliary variables needed for the decomposition,
             they can always be enforced top-level.
         """
-        raise NotImplementedError("Decomposition for",self,"not available")
+        raise NotImplementedError("Decomposition for", self, "not available")
 
     def get_bounds(self):
         """
         Returns the bounds of a Boolean global constraint.
         Numerical global constraints should reimplement this.
         """
-        return (0,1)
+        return 0, 1
 
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
+
+
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
@@ -169,6 +172,7 @@ class AllDifferent(GlobalConstraint):
 
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
+
 
 class AllDifferentExcept0(GlobalConstraint):
     """
@@ -189,6 +193,8 @@ class AllDifferentExcept0(GlobalConstraint):
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
+
+
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
@@ -208,6 +214,8 @@ class AllEqual(GlobalConstraint):
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
+
+
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
@@ -240,14 +248,13 @@ class Circuit(GlobalConstraint):
 
         return constraining, defining
 
-
     def value(self):
         pathlen = 0
         idx = 0
         visited = set()
         arr = [argval(a) for a in self.args]
-        while(idx not in visited):
-            if idx == None:
+        while idx not in visited:
+            if idx is None:
                 return False
             if not (0 <= idx < len(arr)):
                 break
@@ -284,6 +291,7 @@ class Inverse(GlobalConstraint):
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
+
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
@@ -301,9 +309,9 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
-
-# syntax of the form 'if b then x == 9 else x == 0' is not supported
-# a little helper:
+# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
+# same semantic as CPLEX IfThenElse constraint
+# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
@@ -312,7 +320,6 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        condition_val = argval(condition)
         if argval(condition):
             return argval(if_true)
         else:
@@ -327,7 +334,7 @@ class IfThenElse(GlobalConstraint):
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
-      
+
 class InDomain(GlobalConstraint):
     """
         The "InDomain" constraint, defining non-interval domains for an expression
@@ -387,16 +394,11 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        # there are multiple decompositions possible
-        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
-        # since Xor is logical constraint, the default is a logic decomposition
-        a0, a1 = self.args[:2]
-        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
-
-        # for more than 2 variables, we cascade (decomposed) xors
-        for arg in self.args[2:]:
-            cons = (cons | arg) & (~cons | ~arg)
-        return [cons], []
+        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
+        decomp = [sum(self.args[:2]) == 1]
+        if len(self.args) > 2:
+            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+        return decomp, []
 
     def value(self):
         return sum(argval(a) for a in self.args) % 2 == 1
@@ -415,30 +417,26 @@ class Cumulative(GlobalConstraint):
     """
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
-        start = flatlist(start)
         assert is_any_list(duration), "duration should be a list"
-        duration = flatlist(duration)
-        for d in duration:
-            if get_bounds(d)[0]<0:
-                raise TypeError("durations should be non-negative")
         assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
         end = flatlist(end)
-        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
 
         if is_any_list(demand):
             demand = flatlist(demand)
-            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
-            for d in demand:
-                if is_boolexpr(d):
-                    raise TypeError("demands must be non-boolean: {}".format(d))
-        else:
-            if is_boolexpr(demand):
-                raise TypeError("demand must be non-boolean: {}".format(demand))
-        flatargs = flatlist([start, duration, end, demand, capacity])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
 
-        super(Cumulative, self).__init__("cumulative",[start, duration, end, demand, capacity])
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
     def decompose(self):
         """
@@ -466,7 +464,8 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
                 else:
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
-            cons += [capacity >= demand_at_t]
+
+            cons += [demand_at_t <= capacity]
 
         return cons, []
 
@@ -478,7 +477,7 @@ class Cumulative(GlobalConstraint):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, cap = argvals
+        start, dur, end, demand, capacity = argvals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -486,7 +485,7 @@ class Cumulative(GlobalConstraint):
         # demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         for t in range(lb, ub+1):
-            if cap < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
         return True

@@ -158,18 +158,9 @@ def flatten_constraint(expr):
                     # there could be nested implications
                     newlist.extend(flatten_constraint(Operator('or', newargs)))
                     continue
-                else:
-                    # check if disjunction contains conjunctions, and if so split out
-                    newexprs = None
-                    for i,a in enumerate(expr.args):
-                        if isinstance(a, Operator) and a.name == 'and':
-                            # can avoid aux var creation by splitting over the and
-                            newexprs = [Operator("or", expr.args[:i]+[e]+expr.args[i+1:]) for e in a.args]
-                            break
-                    if newexprs is not None:
-                        newlist.extend(flatten_constraint(newexprs))
-                        continue
-
+                # conjunctions in disjunctions could be split out by applying distributivity,
+                # but this would explode the number of constraints in favour of having less auxiliary variables.
+                # Testing has proven that this is not worth it.
             elif expr.name == '->':
                 # some rewrite rules that avoid creating auxiliary variables
                 # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
@@ -251,21 +242,11 @@ def flatten_constraint(expr):
 
             # ensure rhs is var
             (rvar, rcons) = get_or_make_var(rexpr)
-
             # Reification (double implication): Boolexpr == Var
+            # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
-                if is_num(rexpr):
-                    # shortcut, full original one is normalizable BoolExpr
-                    # such as And(v1,v2,v3) == 0
-                    # TODO: should be normalized away in earlier transform
-                    (con, flatcons) = normalized_boolexpr(expr)
-                    newlist.append(con)
-                    newlist.extend(flatcons)
-                    continue
-                else:
-                    (lhs, lcons) = normalized_boolexpr(lexpr)
+                (lhs, lcons) = normalized_boolexpr(lexpr)
             else:
-                # other cases: LHS is numexpr
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
             newlist.append(Comparison(exprname, lhs, rvar))
@@ -427,15 +408,6 @@ def normalized_boolexpr(expr):
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
-                if is_num(rexpr):
-                    # BoolExpr == 0|False
-                    assert (not rexpr), f"should be false: {rexpr}" # 'true' is preprocessed away
-                    if exprname == '==':
-                        nnexpr = recurse_negation(lexpr)
-                        return normalized_boolexpr(nnexpr)
-                    else: # !=, should only be possible in dubble negation
-                        return normalized_boolexpr(lexpr)
-
                 # this is a reified constraint, so lhs must be var too to be in normal form
                 (lhs, lcons) = get_or_make_var(lexpr)
                 if expr.name == '!=' and rvar.is_bool():

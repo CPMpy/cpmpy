@@ -391,9 +391,8 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
+        return decompose_in_tree(cpm_cons, supported)
 
-        return simplify_boolean(cpm_cons)
 
     def __add__(self, cpm_expr):
         """
@@ -571,7 +570,13 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
             self += [s + d == e for s,d,e in zip(start,dur,end)]
-            return "cumulative({},{},{},{})".format(args_str[0], args_str[1], args_str[3], args_str[4])
+            if len(start) == 1:
+                assert len(start) == 1
+                format_str = "cumulative([{}],[{}],[{}],{})"
+            else:
+                format_str = "cumulative({},{},{},{})"
+
+            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args

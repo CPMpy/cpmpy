@@ -53,7 +53,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 
 def BoolVar(shape=1, name=None):
@@ -366,7 +366,7 @@ class NegBoolView(_BoolVarImpl):
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest
-class NDVarArray(Expression, np.ndarray):
+class NDVarArray(np.ndarray, Expression):
     """
     N-dimensional numpy array of variables.
 
@@ -593,6 +593,11 @@ class NDVarArray(Expression, np.ndarray):
 
         # return the NDVarArray that contains the all() constraints
         return out
+
+
+    def get_bounds(self):
+        lbs, ubs = zip(*[get_bounds(e) for e in self])
+        return cpm_array(lbs), cpm_array(ubs)
 
     # VECTORIZED master function (delegate)
     def _vectorized(self, other, attr):

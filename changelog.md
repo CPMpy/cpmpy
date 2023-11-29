@@ -1,5 +1,33 @@
 # Change log
 
+## 0.9.17
+Some new solvers supported at tier 3, update to our transformations and bugfixes.
+
+### Solver tier updates:
+* Choco and SCIP our now available as tier 3 solvers in separate pull requests.
+
+### New transformations:
+* Canonical comparison, puts comparisons in a canonical normal form.
+* only_bv_reifies: the bool var is sent to the left part and the boolexpr to the right part in reifications. (split out of only_bv_implies)
+* Only_implies: renamed what's left from only_bv_implies, that being removing all '==' double reifications.
+
+### What else is new?
+* Allow description for a constraint
+* Updated linearize transformation
+* small improvements to our docs
+* solution hints in Exact
+* New, more efficient Xor decomposition
+* added QuickXplain to our tools.
+* Did some performance tests and optimized our flatten_constraint transformation by not applying distributivity of disjunctions over conjunctions.
+
+### Bugfixes:
+* mark Inverse as supported in OR-tools
+* removed unnecessary use of simplify bool in minizinc and z3
+* fix possible overflow in bound computations
+* Solution hinting fix, when giving N-D variables and values
+* Solution hinting remove python 3.9 exclusive code
+* Bugfixes in MUS-tool
+* 
 ## 0.9.16
 One of our most substantial releases so far, with special focus on extending and improving the
 transformations for all allowed input and all solvers.
