@@ -272,16 +272,19 @@ class CPM_pysat(SolverInterface):
         elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
             a0,a1 = cpm_expr.args
 
-            # BoolVar() -> BoolVar()
             if isinstance(a1, _BoolVarImpl):
+                # BoolVar() -> BoolVar()
                 args = [~a0, a1]
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Operator) and a1.name == 'or':
+                # BoolVar() -> or(...)
                 args = [~a0]+a1.args
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif hasattr(a1, 'decompose'):  # implied global constraint
+                # TODO @wout I think we decompose in transformation now?
                 self += a0.implies(cpm_expr.decompose())
-            elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
+            elif isinstance(a1, Comparison) and a1.args[0].name == "sum":
+                # implied sum comparison (a0->sum(bvs)<>val)
                 # convert sum to clauses
                 sum_clauses = self._pysat_cardinality(a1)
                 # implication of conjunction is conjunction of individual implications
@@ -290,6 +293,7 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.append_formula(clauses)
 
             elif isinstance(a1, Comparison) and (a1.args[0].name == "wsum" or a1.args[0].name == "mul"):  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
+                # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
                 # convert wsum to clauses
                 wsum_clauses = self._pysat_pseudoboolean(a1)
                 # implication of conjunction is conjunction of individual implications
@@ -300,11 +304,19 @@ class CPM_pysat(SolverInterface):
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
         elif isinstance(cpm_expr, Comparison):
-            # only handle cardinality encodings (for now)
-            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
-                # convert to clauses and post
-                clauses = self._pysat_cardinality(cpm_expr)
-                self.pysat_solver.append_formula(clauses)
+            # comparisons between Booleans will have been transformed out
+            # check if comparison of cardinality/pseudo-boolean constraint
+            if isinstance(cpm_expr.args[0], Operator):
+                if cpm_expr.args[0].name == "sum":
+                    # convert to clauses and post
+                    clauses = self._pysat_cardinality(cpm_expr)
+                    self.pysat_solver.append_formula(clauses)
+                elif (cpm_expr.args[0].name == "wsum" or cpm_expr.args[0].name == "mul"):
+                    # convert to clauses and post
+                    clauses = self._pysat_pseudoboolean(cpm_expr)
+                    self.pysat_solver.append_formula(clauses)
+                else:
+                    raise NotImplementedError(f"Operator constraint {cpm_expr} not supported by CPM_pysat")
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 

@@ -4,7 +4,7 @@ from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.to_cnf import to_cnf
 
-class TestEncodeLinearConstraint(unittest.TestCase):
+class TestEncodePseudoBooleanConstraint(unittest.TestCase):
     def setUp(self):
         self.bv = boolvar(shape=3)
 
