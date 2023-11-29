@@ -94,6 +94,19 @@ class TestCardinality(unittest.TestCase):
 
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
+    def test_pysat_linear_other(self):
+        expressions = [
+            self.bvs[0] + self.bvs[1] + self.bvs[2] > 0,
+            # now with var/expr on RHS
+            self.bvs[0] + self.bvs[1] > self.bvs[2],
+            self.bvs[0] > self.bvs[1] + self.bvs[2],
+            self.bvs[0] > (self.bvs[1] | self.bvs[2]),
+        ]
+
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            cp.Model(expression).solve("pysat")
+
     def test_pysat_different(self):
         
         differrent = cp.Model(
