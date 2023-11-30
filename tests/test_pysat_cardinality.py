@@ -126,7 +126,7 @@ class TestCardinality(unittest.TestCase):
 
             ## check all types of linear constraints are handled
             for expression in expressions:
-                Model(expression).solve("pysat")
+                cp.Model(expression).solve("pysat")
 
     def test_pysat_different(self):
         
