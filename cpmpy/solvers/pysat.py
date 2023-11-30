@@ -249,7 +249,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
         # the next only needed if the model contains cardinality/pseudo-boolean constraints
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or", "bv"}))  # the core of the MIP-linearization
 
         return cpm_cons
 
@@ -410,32 +410,32 @@ class CPM_pysat(SolverInterface):
         lits = self.solver_vars(cpm_compsum.args[0].args)
         bound = cpm_compsum.args[1]
 
-        if cpm_compsum.name == "<":
-            return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
-        elif cpm_compsum.name == "<=":
+        # if cpm_compsum.name == "<":
+        #     return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+        if cpm_compsum.name == "<=":
             return CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
         elif cpm_compsum.name == ">=":
             return CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-        elif cpm_compsum.name == ">":
-            return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+        # elif cpm_compsum.name == ">":
+        #     return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
         elif cpm_compsum.name == "==":
             return CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-        elif cpm_compsum.name == "!=":
-            # special cases with bounding 'hardcoded' for clarity
-            if bound <= 0:
-                return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
-            elif bound >= len(lits):
-                return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
-            else:
-                ## add implication literals for (strict) atleast/atmost, one must be true
-                is_atleast = self.solver_var(boolvar())
-                is_atmost = self.solver_var(boolvar())
-                clauses = [[is_atleast, is_atmost]]
-                clauses += [atl + [-is_atleast] for atl in
-                            CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
-                clauses += [atm + [-is_atmost] for atm in
-                            CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
-                return clauses
+        # elif cpm_compsum.name == "!=":
+        #     # special cases with bounding 'hardcoded' for clarity
+        #     if bound <= 0:
+        #         return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+        #     elif bound >= len(lits):
+        #         return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+        #     else:
+        #         ## add implication literals for (strict) atleast/atmost, one must be true
+        #         is_atleast = self.solver_var(boolvar())
+        #         is_atmost = self.solver_var(boolvar())
+        #         clauses = [[is_atleast, is_atmost]]
+        #         clauses += [atl + [-is_atleast] for atl in
+        #                     CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
+        #         clauses += [atm + [-is_atmost] for atm in
+        #                     CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
+        #         return clauses
 
         raise NotImplementedError(f"Non-operator constraint {cpm_compsum} not supported by CPM_pysat")
 
@@ -458,28 +458,28 @@ class CPM_pysat(SolverInterface):
             weights = left.args[0]
             lits = self.solver_vars(left.args[1])
 
-        if cpm_expr.name == "<":  # edge case? or (cpm_expr.name == "!=" and bound >= sum(max(0,weights))):
-            return PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
-        elif cpm_expr.name == "<=":
+        # if cpm_expr.name == "<":  # edge case? or (cpm_expr.name == "!=" and bound >= sum(max(0,weights))):
+        #     return PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses
+        if cpm_expr.name == "<=":
             return PBEnc.leq(lits=lits, weights=weights, bound=bound,vpool=self.pysat_vpool).clauses
-        elif cpm_expr.name == ">":  # edge case? or (cpm_expr.name == "!=" and bound <= sum(min(0,weights))):
-            return PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
+        # elif cpm_expr.name == ">":  # edge case? or (cpm_expr.name == "!=" and bound <= sum(min(0,weights))):
+        #     return PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses
         elif cpm_expr.name == ">=":
             return PBEnc.geq(lits=lits, weights=weights, bound=bound ,vpool=self.pysat_vpool).clauses
         elif cpm_expr.name == "==":
             return PBEnc.equals(lits=lits, weights=weights, bound=bound, vpool=self.pysat_vpool)
 
-        elif cpm_expr.name == "!=":
-            # XXX This case already covered by linearize (which uses just 1 literal is_atleast=-is_atmost)
-            # BUG with pblib solved in Pysat dev 0.1.7.dev12
-            ## add implication literals for (strict) atleast/atmost, one must be true
-            is_atleast = self.solver_var(boolvar())
-            is_atmost = self.solver_var(boolvar())
-            clauses = [[is_atleast, is_atmost]]
-            clauses += [atl + [-is_atleast] for atl in
-                        PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses]
-            clauses += [atm + [-is_atmost] for atm in
-                        PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses]
-            return clauses
+        # elif cpm_expr.name == "!=":
+        #     # XXX This case already covered by linearize (which uses just 1 literal is_atleast=-is_atmost)
+        #     # BUG with pblib solved in Pysat dev 0.1.7.dev12
+        #     ## add implication literals for (strict) atleast/atmost, one must be true
+        #     is_atleast = self.solver_var(boolvar())
+        #     is_atmost = self.solver_var(boolvar())
+        #     clauses = [[is_atleast, is_atmost]]
+        #     clauses += [atl + [-is_atleast] for atl in
+        #                 PBEnc.geq(lits=lits, weights=weights, bound=bound+1, vpool=self.pysat_vpool).clauses]
+        #     clauses += [atm + [-is_atmost] for atm in
+        #                 PBEnc.leq(lits=lits, weights=weights, bound=bound-1, vpool=self.pysat_vpool).clauses]
+        #     return clauses
 
         raise NotImplementedError(f"Comparison: {cpm_expr} not supported by CPM_pysat")
