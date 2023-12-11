@@ -417,28 +417,24 @@ class Cumulative(GlobalConstraint):
     """
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
-        start = flatlist(start)
         assert is_any_list(duration), "duration should be a list"
-        duration = flatlist(duration)
-        for d in duration:
-            if get_bounds(d)[0]<0:
-                raise TypeError("durations should be non-negative")
         assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
         end = flatlist(end)
-        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
 
         if is_any_list(demand):
             demand = flatlist(demand)
-            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
-            for d in demand:
-                if is_boolexpr(d):
-                    raise TypeError("demands must be non-boolean: {}".format(d))
-        else:
-            if is_boolexpr(demand):
-                raise TypeError("demand must be non-boolean: {}".format(demand))
-        flatargs = flatlist([start, duration, end, demand, capacity])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
@@ -468,7 +464,8 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
                 else:
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
-            cons += [capacity >= demand_at_t]
+
+            cons += [demand_at_t <= capacity]
 
         return cons, []
 

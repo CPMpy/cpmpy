@@ -570,7 +570,7 @@ class Operator(Expression):
             bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'sum':
-            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            lbs, ubs = get_bounds(self.args)
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
