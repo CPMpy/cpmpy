@@ -2,7 +2,8 @@ import unittest
 from unittest import TestCase
 
 import cpmpy as cp
-from cpmpy.tools.mus import mus, mus_naive, quickxplain, quickxplain_naive, mss, mcs
+from cpmpy.tools import mss_opt
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, mss, mcs
 
 
 class MusTests(TestCase):
@@ -128,7 +129,7 @@ class MSSTests(unittest.TestCase):
         ]
 
         self.assertLess(len(mss(cons)), len(cons))
-        self.assertIn(cons[4], set(mss(cons, weights=[1,1,1,1,5]))) # weighted version
+        self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
 
 
 class MCSTests(unittest.TestCase):
