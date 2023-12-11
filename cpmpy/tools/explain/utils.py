@@ -1,7 +1,6 @@
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 
-
 def make_assump_model(soft, hard=[], name=None):
     """
         Construct implied version of all soft constraints
