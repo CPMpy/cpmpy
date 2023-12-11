@@ -562,6 +562,35 @@ gs.solve()
  
 _Technical note_: OR-Tools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
 
+### Assumption-based solving
+SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
+Assumption variables are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
+By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
+Many explanation-generation algorithms (see `cpmpy.tools.explain`) make use of this feature to speed up the solving.
+
+```pythonupdate tests
+import cpmpy as cp
+
+x = cp.intvar(1,5, shape=5, name="x")
+
+c1 = cp.AllDifferent(x)
+c2 = x[0] == cp.min(x)
+c3 = x[-1] == 1 # this one makes it UNSAT
+
+cp.Model([c1,c2,c3]).solve() # Will be UNSAT
+
+s = cp.SolverLookup.get("exact") # OR-tools, PySAT and Exact support solving under assumptions
+assump = cp.boolvar(shape=3, name="assump")
+s += assump.implies([c1,c2,c3])
+
+# Underlying solver state will be kept inbetween solve-calls
+s.solve(assumptions=assump[0,1]) # Will be SAT
+s.solve(assumptions=assump[0,1,2]) # Will be UNSAT
+s.solve(assumptions=assump[1,2]) # Will be SAT
+```
+
+
+
 ## Using solver-specific CPMpy features
 
 We sometimes add solver-specific functions to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
