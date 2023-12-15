@@ -23,14 +23,11 @@ import time
 
 import numpy as np
 
-from cpmpy.exceptions import NotSupportedError
-
-import cpmpy
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -97,7 +94,7 @@ class CPM_choco(SolverInterface):
         self.has_obj = False
         self.obj = None
         self.maximize_obj = None
-
+        self.helper_var = None
         # for solving with assumption variables, TO-CHECK
 
         # initialise everything else and post the constraints/objective
@@ -115,6 +112,7 @@ class CPM_choco(SolverInterface):
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
+
         start = time.time()
 
         if time_limit is not None:
@@ -259,7 +257,7 @@ class CPM_choco(SolverInterface):
         """
 
         # make objective function non-nested
-        obj_var = cpmpy.intvar(*expr.get_bounds())
+        obj_var = intvar(*expr.get_bounds())
         self += obj_var == expr
 
         self.has_obj = True
@@ -309,17 +307,16 @@ class CPM_choco(SolverInterface):
     def to_var(self, val):
         from pychoco.variables.intvar import IntVar
         if is_int(val):
+            # Choco accepts only int32, not int64
             if val < -2147483646 or val > 2147483646:
                 raise ChocoBoundsException(
                     "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
-            var = self.chc_model.intvar(val, val)  # convert to "variable"
+            return self.chc_model.intvar(val, val)  # convert to "variable"
         elif isinstance(val, _NumVarImpl):
-            var = self.solver_var(val)  # use variable
+            return self.solver_var(val)  # use variable
         elif isinstance(val, IntVar):
-            var = val
-        else:
-            var = None
-        return var
+            return val
+        return None
 
     def to_vars(self, vals):
         if is_any_list(vals):
@@ -392,7 +389,6 @@ class CPM_choco(SolverInterface):
         :type cpm_expr: Expression
 
         """
-        from pychoco.variables.intvar import IntVar
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         if isinstance(cpm_expr, Operator):
@@ -414,8 +410,10 @@ class CPM_choco(SolverInterface):
                     # bv -> boolexpr
                     # the `reify_rewrite()` transformation ensures that only reifiable rhs remain here
                     if subexpr.name == 'not':
-                        bv = self._get_constraint(subexpr.args[0]).reify()
-                        return self.chc_model.or_([~lhs, ~bv])
+                        assert isinstance(subexpr, _BoolVarImpl)
+                        # TODO need to check it in tests
+                        #bv = self._get_constraint(subexpr.args[0]).reify()
+                        return self.chc_model.or_([~lhs, ~subexpr])
                     else:
                         bv = self._get_constraint(cpm_expr.args[1]).reify()
                         return self.chc_model.or_([~lhs, bv])
@@ -425,7 +423,6 @@ class CPM_choco(SolverInterface):
 
         # Comparisons: both numeric and boolean ones
         # numexpr `comp` bvar|const
-        # Choco accepts only int32, not int64
         elif isinstance(cpm_expr, Comparison):
             for i in range(len(cpm_expr.args)):
                 if isinstance(cpm_expr.args[i], np.integer):
@@ -573,8 +570,6 @@ class CPM_choco(SolverInterface):
                 # Everything given to cumulative in Choco needs to be a variable.
                 start, end, cap = self.to_vars((start, end, cap))
                 # Convert demands to variables
-                if not is_any_list(demand):  # Create list for demand per task
-                    demand = [demand] * len(start)
                 demand = self.to_vars(demand)  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
@@ -605,7 +600,8 @@ class CPM_choco(SolverInterface):
             if cpm_expr.args[0] is True:
                 return None
             else:
-                self.helper_var = self.chc_model.intvar(0, 0)
+                if self.helper_var is not None:
+                    self.helper_var = self.chc_model.intvar(0, 0)
                 return self.chc_model.arithm(self.helper_var, "<", 0)
 
         # a direct constraint, pass to solver
