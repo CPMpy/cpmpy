@@ -247,7 +247,7 @@ class Element(GlobalFunction):
             raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
         lb, ub = get_bounds(idx)
         if lb < 0 or ub >= len(arr):
-            raise TypeError('index should never exceed the array bounds. if you have a usecase for this, please report it on GitHub')
+            raise TypeError('index should never exceed the array bounds. if you have a usecase for this, please report it on GitHub. See issue #439')
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
