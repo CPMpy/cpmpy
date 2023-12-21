@@ -32,12 +32,12 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
@@ -49,7 +49,6 @@ class CPM_ortools(SolverInterface):
 
     See detailed installation instructions at:
     https://developers.google.com/optimization/install
-    and if you are on Apple M1: https://cpmpy.readthedocs.io/en/latest/installation_M1.html
 
     Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
@@ -119,7 +118,7 @@ class CPM_ortools(SolverInterface):
 
             You can use any of these parameters as keyword argument to `solve()` and they will
             be forwarded to the solver. Examples include:
-                - num_search_workers=8          number of parallel workers (default: 1)
+                - num_search_workers=8          number of parallel workers (default: 8)
                 - log_search_progress=True      to log the search process to stdout (default: False)
                 - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
                 - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
@@ -334,7 +333,8 @@ class CPM_ortools(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_implies(cpm_cons) # everything that can create
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)  # everything that can create
                                              # reified expr must go before this
         return cpm_cons
 
@@ -408,7 +408,7 @@ class CPM_ortools(SolverInterface):
                 raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
 
-        # Comparisons: only numeric ones as the `only_bv_implies()` transformation
+        # Comparisons: only numeric ones as the `only_implies()` transformation
         # has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
@@ -466,8 +466,6 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
-                if is_num(demand):
-                    demand = [demand] * len(start)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "circuit":
@@ -476,7 +474,7 @@ class CPM_ortools(SolverInterface):
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)
-                arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+                arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
@@ -520,6 +518,10 @@ class CPM_ortools(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         self.ort_model.ClearHints() # because add just appends
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         for (cpm_var, val) in zip(cpm_vars, vals):
             self.ort_model.AddHint(self.solver_var(cpm_var), val)
 
@@ -558,7 +560,7 @@ class CPM_ortools(SolverInterface):
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'minimize_core' : [False, True],
+            'core_minimization_level' : [0,1,2], # new in OR-tools>=v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -575,7 +577,7 @@ class CPM_ortools(SolverInterface):
             'search_branching': 0,
             'boolean_encoding_level': 1,
             'linearization_level': 1,
-            'minimize_core': True,
+            'core_minimization_level': 2,# new in OR-tools>=v9.8
             'cp_model_probing_level': 2,
             'cp_model_presolve': True,
             'clause_cleanup_ordering': 0,

@@ -32,10 +32,10 @@ To make clear how well supported and tested these solvers are, we work with a ti
     - "z3" the SMT solver and theorem prover
     - "gurobi" the MIP solver
     - "PySDD" a Boolean knowledge compiler
+    - "exact" the Exact integer linear programming solver
 
 * Tier 3 solvers: they are work in progress and live in a pull request
     - "gcs" the Glasgow Constraint Solver
-    - "exact" the Exact pseudo-boolean solver
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 

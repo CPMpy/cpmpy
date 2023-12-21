@@ -5,7 +5,7 @@ from cpmpy.exceptions import NotSupportedError
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
-from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
+from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
 class TestTransfReif(unittest.TestCase):
@@ -13,9 +13,9 @@ class TestTransfReif(unittest.TestCase):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-    def test_only_bv_implies(self):
+    def test_only_implies(self):
         a,b,c = [boolvar(name=n) for n in "abc"]
-        
+
         cases = [((a).implies(b), "[(a) -> (b)]"),
                  ((~a).implies(b), "[(~a) -> (b)]"),
                  ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
@@ -30,7 +30,7 @@ class TestTransfReif(unittest.TestCase):
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
+            self.assertEqual( str(only_implies(only_bv_reifies((expr,)))), strexpr )
             self.assertTrue(Model(expr).solve())
 
     def test_reif_element(self):
