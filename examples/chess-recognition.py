@@ -82,7 +82,7 @@ occupancy_in_board = np.array([[False, False, False, False, False, False, True, 
                                [True, False, False, False, True, False, False, False]])
 
 # Variable to represent the whole board
-board = intvar(0, 12, (8, 8), "board")
+board = intvar(0, 11, (8, 8), "board")
 
 # take the log of the NN output values
 logprobs = np.log(piece_probabilities)
