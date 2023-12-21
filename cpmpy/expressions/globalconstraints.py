@@ -227,7 +227,15 @@ class Circuit(GlobalConstraint):
         lb = min(lbs)
         ub = max(ubs)
         if lb < 0 or ub >= len(flatargs):
-            raise TypeError("Circuit global constraint is only defined if all bounds are between 0 and the length of the array.")
+            for arg in flatargs:
+                lb, ub = get_bounds(arg)
+                if lb < 0 or ub >= len(flatargs):
+                    argument = arg
+                    break
+            raise IncompleteFunctionError(f"elements in the array cannot have bounds outside [0,{len(flatargs)-1}]"
+                                          f", since they are used to index the array of length {len(flatargs)}, "
+                                          f"bounds of {argument} are not tight enough ([{lb},{ub}])"
+                                          f" \n see https://github.com/CPMpy/cpmpy/issues/439 for more information")
 
         super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
@@ -288,7 +296,15 @@ class Inverse(GlobalConstraint):
         lb = min(lbs)
         ub = max(ubs)
         if lb < 0 or ub >= len(fwd):
-            raise TypeError("All arguments must be within array bounds for Inverse to have meaning over the whole domain!")
+            for arg in flatargs:
+                lb, ub = get_bounds(arg)
+                if lb < 0 or ub >= len(flatargs):
+                    argument = arg
+                    break
+            raise IncompleteFunctionError(f"elements in the arrays cannot have bounds outside [0,{len(fwd)-1}]"
+                                          f", since they are used to index the given arrays of length {len(fwd)}, "
+                                          f"bounds of {argument} are not tight enough ([{lb},{ub}])"
+                                          f" \n see https://github.com/CPMpy/cpmpy/issues/439 for more information")
 
         super().__init__("inverse", [fwd, rev])
 
