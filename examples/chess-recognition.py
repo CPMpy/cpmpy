@@ -82,7 +82,9 @@ occupancy_in_board = np.array([[False, False, False, False, False, False, True, 
                                [True, False, False, False, True, False, False, False]])
 
 # Variable to represent the whole board
-board = intvar(0, 11, (8, 8), "board")
+board = intvar(0, 12, (8, 8), "board")
+#variable to represent the board, excluding empty spaces, needed for strict indexing
+pieces = intvar(0,11, (8, 8), 'pieces')
 
 # take the log of the NN output values
 logprobs = np.log(piece_probabilities)
@@ -178,8 +180,11 @@ model = Model(
 # Constraints for the empty squares
 model += board[occupancy_in_board == False] == E
 
+#the pieces are where the board is occupied
+model += (board[occupancy_in_board] == pieces[occupancy_in_board])
 # Maximize the probabilities of the pieces to get the most likely board
-obj = sum(lp[v] for lp, v in zip(lprobs, board[occupancy_in_board]))
+
+obj = sum(lp[v] for lp, v in zip(lprobs, pieces[occupancy_in_board]))
 
 model.minimize(obj)
 
