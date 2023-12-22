@@ -552,8 +552,9 @@ s.solve()
 print(s.ort_solver.NumBranches())
 ```
 
-Other solvers, like Minizinc do not have the distinction between model and solver objects, like ortools ort_model and ort_solver.
-We can just access the solver statistics from the mzn_result object like this:
+Other solvers, like Minizinc might have other native objects stored.
+You can see which solver native objects are initialized for each solver in [the API documentation](api/solvers.html) of the solver.
+We can access the solver statistics from the mzn_result object like this:
 
 ```python
 import cpmpy as cp
