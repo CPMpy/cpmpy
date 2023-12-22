@@ -72,6 +72,3 @@ Are you a solver developer? We are keen to integrate solvers that have a python 
    api/model
    api/solvers
    api/transformations
-
-.. |br| raw:: html
-   <br />
