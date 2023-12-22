@@ -41,8 +41,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
-    """
-    test if this changes, or is it using headers from main?
+    """Interface to the python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
@@ -52,7 +51,7 @@ class CPM_ortools(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
-    |  ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+    ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
     The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
