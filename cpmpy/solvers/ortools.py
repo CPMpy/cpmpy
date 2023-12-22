@@ -50,6 +50,7 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/install
 
     Creates the following attributes (see parent constructor for more):
+
         -ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
         -ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
