@@ -269,8 +269,10 @@ def canonical_comparison(lst_of_expr):
             elif isinstance(lhs, Comparison):
                 lhs = canonical_comparison(lhs)[0]
                 newlist.append(lhs.implies(rhs))
+            else:
+                newlist.append(cpm_expr)
 
-        if isinstance(cpm_expr, Comparison):
+        elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
