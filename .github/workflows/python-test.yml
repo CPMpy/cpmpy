@@ -19,6 +19,7 @@ jobs:
           pip install flake8 pytest requests pandas
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install python-sat
+          pip install pycryptosat
           pip install z3-solver
           pip install exact
           pip install pysdd
