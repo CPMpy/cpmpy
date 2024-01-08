@@ -400,9 +400,12 @@ class CPM_choco(SolverInterface):
             #     cond, subexpr = cpm_expr.args
             #     if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
             #         return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
+            #     elif isinstance(cond, _BoolVarImpl):
+            #         return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
+            #     elif isinstance(subexpr, _BoolVarImpl):
+            #         return self._get_constraint(cond).implies(self.solver_var(subexpr))
             #     else:
-            #         return self.chc_model.if_then(self._get_constraint(cond),
-            #                                       self._get_constraint(subexpr))
+            #         ValueError(f"Unexpected implication: {cpm_expr}")
 
             elif cpm_expr.name == '->':
                 cond, subexpr = cpm_expr.args
