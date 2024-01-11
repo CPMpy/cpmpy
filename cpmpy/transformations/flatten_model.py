@@ -241,7 +241,7 @@ def flatten_constraint(expr):
                 continue
 
             # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr)
+            (rvar, rcons) = get_or_make_var(rexpr,boolean=True)
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
@@ -302,13 +302,15 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr):
+def get_or_make_var(expr,boolean=False):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
-    if __is_flat_var(expr):
+    if expr.is_bool():
+        boolean = True
+    if __is_flat_var(expr) and boolean == expr.is_bool():
         return (expr, [])
 
     if is_any_list(expr):
@@ -331,6 +333,9 @@ def get_or_make_var(expr):
 
         lb, ub = flatexpr.get_bounds()
         ivar = _IntVarImpl(lb, ub)
+        if boolean:
+            bvar = _BoolVarImpl()
+            return (bvar,[flatexpr == bvar] + flatcons)
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):
