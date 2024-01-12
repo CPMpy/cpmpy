@@ -354,7 +354,7 @@ def get_or_make_boolvar(expr):
     """
     isbool = is_boolexpr(expr)
     if __is_flat_var(expr):
-        if isbool:
+        if isbool or is_num(expr):
             return (expr, [])
         else:
             bv = _BoolVarImpl()
