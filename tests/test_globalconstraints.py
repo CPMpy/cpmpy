@@ -5,7 +5,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
-from cpmpy.exceptions import TypeError
+from cpmpy.exceptions import TypeError, NotSupportedError
 from cpmpy.solvers import CPM_minizinc
 
 
@@ -100,6 +100,15 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.AllDifferentExcept0(iv).value())
         self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
 
+    def test_alldifferent_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.AllDifferent([iv])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_circuit(self):
         """
@@ -125,6 +134,7 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
+
 
     def test_not_circuit(self):
         x = cp.intvar(lb=0, ub=2, shape=3)
@@ -185,6 +195,17 @@ class TestGlobal(unittest.TestCase):
         # constraint can be used as value
         self.assertTrue(inv.value())
 
+    def test_inverse_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Inverse([iv], [0])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+
     def test_InDomain(self):
         iv = cp.intvar(-8, 8)
         iv_arr = cp.intvar(-8, 8, shape=5)
@@ -214,6 +235,17 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
 
+    def test_indomain_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.InDomain(iv, [2])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
@@ -242,6 +274,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_table_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Table([iv], [[0]])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]
@@ -253,6 +296,17 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '4')
 
+    def test_minimum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.min([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_maximum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Maximum(iv) + 9 <= 8]
@@ -263,6 +317,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(max(iv.value())), '4')
+
+    def test_maximum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.max([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_abs(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -298,7 +363,7 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3))
-        a,b = cp.intvar(0, 3, shape=2)
+        a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
         self.assertTrue(model.solve())
@@ -310,6 +375,18 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(arr[a.value(), b.value()], 1)
+
+    def test_element_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        idx = cp.intvar(0,0)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Element([iv],idx) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_xor(self):
         bv = cp.boolvar(5)
@@ -498,6 +575,17 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
         self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
+    def test_gcc_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.GlobalCardinalityCount([iv], [3],[1])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_count(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([iv[0] == 0, iv[1] != 1, iv[2] != 2, cp.Count(iv, 0) == 3]).solve())
@@ -515,6 +603,16 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
 
+    def test_count_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Count([iv], 1) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
