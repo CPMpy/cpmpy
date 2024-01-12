@@ -332,7 +332,7 @@ def get_or_make_var(expr,boolean=False):
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
-        lb, ub = flatexpr.get_bounds()
+        lb, ub = get_bounds(flatexpr)
         ivar = _IntVarImpl(lb, ub)
         if boolean:
             bvar = _BoolVarImpl()
