@@ -308,9 +308,10 @@ def get_or_make_var(expr,boolean=False):
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
-    if is_boolexpr(expr):
+    isbool = is_boolexpr(expr)
+    if isbool:
         boolean = True
-    if __is_flat_var(expr) and boolean == expr.is_bool():
+    if __is_flat_var(expr) and boolean == isbool:
         return (expr, [])
 
     if is_any_list(expr):
