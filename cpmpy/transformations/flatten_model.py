@@ -240,13 +240,16 @@ def flatten_constraint(expr):
                     newlist.append(Comparison(exprname, lexpr, rexpr))
                 continue
 
-            # ensure rhs is a boolvar
-            (rvar, rcons) = get_or_make_boolvar(rexpr)
+
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
+                # ensure rhs is a boolvar
+                (rvar, rcons) = get_or_make_boolvar(rexpr)
                 (lhs, lcons) = normalized_boolexpr(lexpr)
             else:
+                # ensure rhs is a var
+                (rvar, rcons) = get_or_make_var(rexpr)
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
             newlist.append(Comparison(exprname, lhs, rvar))
