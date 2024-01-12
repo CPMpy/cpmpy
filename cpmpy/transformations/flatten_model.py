@@ -317,7 +317,7 @@ def get_or_make_var(expr,boolean=False):
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
 
-    if expr.is_bool():
+    if isbool:
         # normalize expr into a boolexpr LHS, reify LHS == bvar
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
