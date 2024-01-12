@@ -430,17 +430,12 @@ class CPM_minizinc(SolverInterface):
             function that returns strings
         """
         if is_any_list(expr):
-            if len(expr) == 1:
-                # unary special case, don't put in list
-                # continue with later code
-                expr = expr[0]
+            if isinstance(expr, np.ndarray):
+                # must flatten
+                expr_str = [self._convert_expression(e) for e in expr.flat]
             else:
-                if isinstance(expr, np.ndarray):
-                    # must flatten
-                    expr_str = [self._convert_expression(e) for e in expr.flat]
-                else:
-                    expr_str = [self._convert_expression(e) for e in expr]
-                return "[{}]".format(",".join(expr_str))
+                expr_str = [self._convert_expression(e) for e in expr]
+            return "[{}]".format(",".join(expr_str))
 
         if isinstance(expr,(bool,np.bool_)):
             expr = BoolVal(expr)
@@ -571,10 +566,7 @@ class CPM_minizinc(SolverInterface):
             start, dur, end, _, _ = expr.args
 
             durstr = self._convert_expression([s + d == e for s,d,e in zip(start, dur, end)])
-            if len(start) == 1:
-                format_str = durstr +" /\\ cumulative([{}],[{}],[{}],{})"
-            else:
-                format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
+            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
