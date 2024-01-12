@@ -240,8 +240,8 @@ def flatten_constraint(expr):
                     newlist.append(Comparison(exprname, lexpr, rexpr))
                 continue
 
-            # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr,boolean=True)
+            # ensure rhs is a boolvar
+            (rvar, rcons) = get_or_make_boolvar(rexpr)
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
@@ -302,17 +302,63 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr,boolean=False):
+def get_or_make_var(expr):
+    """
+        Must return a variable, and list of flat normal constraints
+        Determines whether this is a Boolean or Integer variable and returns
+        the equivalent of: (var, normalize(expr) == var)
+    """
+    if __is_flat_var(expr):
+        return (expr, [])
+
+    if is_any_list(expr):
+        raise Exception(f"Expected single variable, not a list for: {expr}")
+
+    if expr.is_bool():
+        # normalize expr into a boolexpr LHS, reify LHS == bvar
+        (flatexpr, flatcons) = normalized_boolexpr(expr)
+
+        if isinstance(flatexpr,_BoolVarImpl):
+            #avoids unnecessary bv == bv or bv == ~bv assignments
+            return flatexpr,flatcons
+        bvar = _BoolVarImpl()
+        return (bvar, [flatexpr == bvar]+flatcons)
+
+    else:
+        # normalize expr into a numexpr LHS,
+        # then compute bounds and return (newintvar, LHS == newintvar)
+        (flatexpr, flatcons) = normalized_numexpr(expr)
+
+        lb, ub = flatexpr.get_bounds()
+        ivar = _IntVarImpl(lb, ub)
+        return (ivar, [flatexpr == ivar]+flatcons)
+
+def get_or_make_var_or_list(expr):
+    """ Like get_or_make_var() but also accepts and recursively transforms lists
+        Used to convert arguments of globals
+    """
+    if __is_flat_var_or_list(expr):
+        return (expr,[])
+    elif is_any_list(expr):
+        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr])
+        return (flatvars, [c for con in flatcons for c in con])
+    else:
+        return get_or_make_var(expr)
+
+
+def get_or_make_boolvar(expr):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
     isbool = is_boolexpr(expr)
-    if isbool:
-        boolean = True
-    if __is_flat_var(expr) and boolean == isbool:
-        return (expr, [])
+    if __is_flat_var(expr):
+        if isbool:
+            return (expr, [])
+        else:
+            bv = _BoolVarImpl()
+            return (bv, [bv == expr])
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
@@ -329,28 +375,10 @@ def get_or_make_var(expr,boolean=False):
 
     else:
         # normalize expr into a numexpr LHS,
-        # then compute bounds and return (newintvar, LHS == newintvar)
+        # then compute bounds and return (new bool var, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr)
-
-        lb, ub = get_bounds(flatexpr)
-        ivar = _IntVarImpl(lb, ub)
-        if boolean:
-            bvar = _BoolVarImpl()
-            return (bvar,[flatexpr == bvar] + flatcons)
-        return (ivar, [flatexpr == ivar]+flatcons)
-
-def get_or_make_var_or_list(expr):
-    """ Like get_or_make_var() but also accepts and recursively transforms lists
-        Used to convert arguments of globals
-    """
-    if __is_flat_var_or_list(expr):
-        return (expr,[])
-    elif is_any_list(expr):
-        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr])
-        return (flatvars, [c for con in flatcons for c in con])
-    else:
-        return get_or_make_var(expr)
-
+        bvar = _BoolVarImpl()
+        return (bvar,[flatexpr == bvar] + flatcons)
 
 def normalized_boolexpr(expr):
     """
