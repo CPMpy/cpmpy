@@ -816,3 +816,14 @@ class TestTypeChecks(unittest.TestCase):
 
         self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
         self.assertRaises(TypeError, cp.Count, [x,y],[x,False])
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
