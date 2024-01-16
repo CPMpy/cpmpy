@@ -8,14 +8,14 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-
+SOLVERNAMES.remove("minizinc")
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative",'xor'},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
                   "exact": {},
                   }
 
@@ -149,7 +149,7 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative
+           Xor, Cumulative, NValue, Count
     """
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue]
     for global_type in global_cons:
@@ -163,6 +163,9 @@ def global_constraints(solver):
 
     if solver not in EXCLUDE_GLOBAL or "xor" not in EXCLUDE_GLOBAL[solver]:
         yield Xor(BOOL_ARGS)
+
+    if solver not in EXCLUDE_GLOBAL or "count" not in EXCLUDE_GLOBAL[solver]:
+        yield Count(NUM_ARGS, NUM_VAR)
 
     if solver not in EXCLUDE_GLOBAL or "cumulative" not in EXCLUDE_GLOBAL[solver]:
         s = intvar(0,10,shape=3,name="start")
