@@ -489,18 +489,6 @@ class CPM_minizinc(SolverInterface):
             return "{}({},{},{})".format(name, x, y, c)
 
         args_str = [self._convert_expression(e) for e in expr.args]
-
-        if isinstance(expr, Comparison) and expr.args[0].name == "nvalue":
-            name = expr.name
-            lhs, rhs = expr.args
-            if expr.name != "==": # not the traditional nvalue constraint, rewrite with newvar
-                newn = intvar(0, len(lhs.args))
-                return self._convert_expression([eval_comparison(expr.name, newn, rhs), lhs == newn])
-
-            n = self._convert_expression(rhs) # number of values
-            x = self._convert_expression(lhs.args)
-            return "{}({},{})".format(name, x,n)
-
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             # wrap args that are a subexpression in ()
