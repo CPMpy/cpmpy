@@ -327,7 +327,7 @@ class NValue(GlobalFunction):
     def __init__(self, arr):
         if not is_any_list(arr):
             raise ValueError("NValue takes an array and a value as input")
-        super().__init__("NValue", arr)
+        super().__init__("nvalue", arr)
 
     def decompose_comparison(self, cmp_op, cpm_rhs):
         """
