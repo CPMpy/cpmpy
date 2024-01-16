@@ -614,6 +614,29 @@ class TestGlobal(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
+
+    def test_nvalue(self):
+
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0,10)
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve())
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        self.assertTrue(cp.Model(cp.NValue(iv) != cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve())
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValue(iv) <= 2)
+        def check_true():
+            self.assertTrue(cons.value())
+        cp.Model(cons).solveAll(display=check_true)
+
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
