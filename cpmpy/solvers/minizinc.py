@@ -34,9 +34,9 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -389,7 +389,7 @@ class CPM_minizinc(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
@@ -489,6 +489,17 @@ class CPM_minizinc(SolverInterface):
             return "{}({},{},{})".format(name, x, y, c)
 
         args_str = [self._convert_expression(e) for e in expr.args]
+
+        if isinstance(expr, Comparison) and expr.args[0].name == "nvalue":
+            name = expr.name
+            lhs, rhs = expr.args
+            if expr.name != "==": # not the traditional nvalue constraint, rewrite with newvar
+                newn = intvar(0, len(lhs.args))
+                return self._convert_expression([eval_comparison(expr.name, newn, rhs), lhs == newn])
+
+            n = self._convert_expression(rhs) # number of values
+            x = self._convert_expression(lhs.args)
+            return "{}({},{})".format(name, x,n)
 
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
