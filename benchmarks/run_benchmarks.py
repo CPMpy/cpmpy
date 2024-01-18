@@ -8,6 +8,10 @@ from cpmpy.tools.read_xcsp import XCSPParser
 
 #give this a meaningful name, so we know what branch was tested after the results are safed.
 branch = 'main'
+#set solver to test (suported: ortools)
+solver = 'ortools'
+#set true to only time transformations, and not call the solver
+transonly = False
 
 alltimes = {}
 xmlmodels = []
@@ -101,7 +105,7 @@ df = pd.concat([df, total], ignore_index=False)
 
 now= str(datetime.datetime.now()).replace(':','.')
 if 'y' in cwd[-2:]:
-    filename = ((join("benchmarks", "results", branch + now + '.csv')))
+    filename = ((join("benchmarks", "results", branch + '_' + solver + '_' +  now + '.csv')))
 else:
-    filename = ((join("results", branch + now + '.csv')))
+    filename = ((join("results", branch + '_' + solver + '_' + now + '.csv')))
 df.to_csv(filename)
