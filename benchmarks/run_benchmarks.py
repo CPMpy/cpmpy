@@ -57,17 +57,21 @@ for xmlmodel in xmlmodels:
         global result
         result = s.solve(num_search_workers=1,time_limit=1800)
 
-    t_solve = timeit.timeit(stmt=solv, number=1)
+    if not transonly:
+        t_solve = timeit.timeit(stmt=solv, number=1)
+    else:
+        t_solve = 0
     timings = s.timings
     timings['solve'] = t_solve
     alltimes[xmlmodel] = timings
-    if 'unsat' in xmlmodel:
-        assert not result #should be unsat
-    else:
-        assert result #should be sat
+    if not transonly:
+        if 'unsat' in xmlmodel:
+            assert not result #should be unsat
+        else:
+            assert result #should be sat
 
-    if result is None:
-        assert False
+        if result is None:
+            assert False
 
 import pandas as pd
 # Maak een lege DataFrame aan

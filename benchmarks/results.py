@@ -6,10 +6,10 @@ import glob
 import matplotlib.pyplot as plt
 
 #threshold to get notified of instances that became faster or slower
-slowthreshold = 0.01
-fastthreshold = 0.01
+slowthreshold = 0.2
+fastthreshold = 0.2
 #filename of reference instance, should be in results folder!
-refname = 'maincopy.csv'
+refname = 'main_ortools_2024-01-18 16.56.13.929690.csv'
 
 results = []
 cwd = os.getcwd()
@@ -40,9 +40,8 @@ for r in results:
     dft.name = r[8:-26]
     dfs_list.append(dft)
     percentagedif = ((refinstance - df)/refinstance)
-    dfthreshold = percentagedif[percentagedif > fastthreshold].dropna(how='all')
-    dfslowthreshold = percentagedif[percentagedif < -slowthreshold].dropna(how='all')
-    #dfthreshold = percentagedif[(percentagedif < -slowthreshold) or (percentagedif > fastthreshold)]
+    dfthreshold = percentagedif[percentagedif >= fastthreshold].dropna(how='all')
+    dfslowthreshold = percentagedif[percentagedif <= -slowthreshold].dropna(how='all')
     print('\n')
     print('results for ' + r)
     pd.set_option('display.max_rows', None)
@@ -64,4 +63,4 @@ for r in results:
 
 totals = pandas.concat(dfs_list, axis=1)
 totals.plot(kind='bar')
-#plt.show()
+plt.show()
