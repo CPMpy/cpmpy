@@ -508,7 +508,7 @@ class CPM_ortools(SolverInterface):
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)
-                arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+                arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
@@ -594,7 +594,7 @@ class CPM_ortools(SolverInterface):
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'minimize_core' : [False, True],
+            'core_minimization_level' : [0,1,2], # new in OR-tools>=v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -611,7 +611,7 @@ class CPM_ortools(SolverInterface):
             'search_branching': 0,
             'boolean_encoding_level': 1,
             'linearization_level': 1,
-            'minimize_core': True,
+            'core_minimization_level': 2,# new in OR-tools>=v9.8
             'cp_model_probing_level': 2,
             'cp_model_presolve': True,
             'clause_cleanup_ordering': 0,

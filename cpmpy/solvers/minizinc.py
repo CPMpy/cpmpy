@@ -391,7 +391,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
-        return decompose_in_tree(cpm_cons, supported)
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
 
     def __add__(self, cpm_expr):
@@ -430,17 +430,12 @@ class CPM_minizinc(SolverInterface):
             function that returns strings
         """
         if is_any_list(expr):
-            if len(expr) == 1:
-                # unary special case, don't put in list
-                # continue with later code
-                expr = expr[0]
+            if isinstance(expr, np.ndarray):
+                # must flatten
+                expr_str = [self._convert_expression(e) for e in expr.flat]
             else:
-                if isinstance(expr, np.ndarray):
-                    # must flatten
-                    expr_str = [self._convert_expression(e) for e in expr.flat]
-                else:
-                    expr_str = [self._convert_expression(e) for e in expr]
-                return "[{}]".format(",".join(expr_str))
+                expr_str = [self._convert_expression(e) for e in expr]
+            return "[{}]".format(",".join(expr_str))
 
         if isinstance(expr,(bool,np.bool_)):
             expr = BoolVal(expr)
@@ -569,12 +564,9 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
-            self += [s + d == e for s,d,e in zip(start,dur,end)]
-            if len(start) == 1:
-                assert len(start) == 1
-                format_str = "cumulative([{}],[{}],[{}],{})"
-            else:
-                format_str = "cumulative({},{},{},{})"
+
+            durstr = self._convert_expression([s + d == e for s,d,e in zip(start, dur, end)])
+            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
