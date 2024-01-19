@@ -127,6 +127,18 @@ def argval(a):
         raise e
 
 
+def vectorized_check(arr, condition):
+    '''
+    check the condition for every element in arr
+    arr should be flat
+    Returns the first object that meets the condition, or None otherwise
+    '''
+    for a in arr:
+        if condition(a):
+            return a
+    return None
+
+
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator

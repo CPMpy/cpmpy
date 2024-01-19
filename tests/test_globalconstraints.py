@@ -728,6 +728,17 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Inverse,[a,b],[x,y])
         self.assertRaises(TypeError,cp.Inverse,[a,b],[b,False])
 
+    def test_inDomain(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model(cp.InDomain(x, [x, y, x])).solve())
+        self.assertRaises(TypeError, cp.InDomain, [x, y, x], [x, y, x])
+        self.assertRaises(TypeError, cp.InDomain, a, [x, y])
+        self.assertRaises(TypeError, cp.InDomain, x, [a, b])
+        self.assertRaises(TypeError, cp.InDomain, x, [y, False])
+
     def test_ITE(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
