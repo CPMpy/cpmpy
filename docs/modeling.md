@@ -595,7 +595,7 @@ Assumption variables are usefull for incremental solving when you want to activa
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
 Many explanation-generation algorithms (see `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
-```pythonupdate tests
+pythonupdate tests
 import cpmpy as cp
 
 x = cp.intvar(1,5, shape=5, name="x")
@@ -614,7 +614,7 @@ s += assump.implies([c1,c2,c3])
 s.solve(assumptions=assump[0,1]) # Will be SAT
 s.solve(assumptions=assump[0,1,2]) # Will be UNSAT
 s.solve(assumptions=assump[1,2]) # Will be SAT
-```
+
 
 
 
