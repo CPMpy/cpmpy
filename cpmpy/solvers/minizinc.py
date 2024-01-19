@@ -391,7 +391,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", 'nvalue'})
 
 
     def __add__(self, cpm_expr):
