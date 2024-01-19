@@ -41,7 +41,8 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
-    """Interface to the python 'ortools' CP-SAT API
+    """
+    Interface to the python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
