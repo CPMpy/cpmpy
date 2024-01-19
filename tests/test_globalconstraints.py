@@ -643,7 +643,7 @@ class TestGlobal(unittest.TestCase):
         iv = cp.intvar(-8, 8, shape=3)
         cnt = cp.intvar(0, 10)
 
-        ''' self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve('minizinc'))
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve('minizinc'))
         self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve('minizinc'))
         self.assertGreater(len(set(iv.value())), cnt.value())
 
@@ -651,7 +651,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve('minizinc'))
         self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve('minizinc'))
         self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve('minizinc'))
-        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve('minizinc'))'''
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve('minizinc'))
 
         # test nested
         bv = cp.boolvar()
