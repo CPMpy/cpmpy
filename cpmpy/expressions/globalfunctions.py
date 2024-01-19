@@ -57,6 +57,7 @@
         Maximum
         Element
         Count
+        NValue
         Abs
 
 """
@@ -316,3 +317,49 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         return 0, len(arr)
+
+class NValue(GlobalFunction):
+
+    """
+    The NValue constraint counts the number of distinct values in a given set of variables.
+    """
+
+    def __init__(self, arr):
+        if not is_any_list(arr):
+            raise ValueError("NValue takes an array as input")
+        super().__init__("nvalue", arr)
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        """
+        NValue(arr) can only be decomposed if it's part of a comparison
+
+        Based on "simple decomposition" from:
+            Bessiere, Christian, et al. "Decomposition of the NValue constraint."
+            International Conference on Principles and Practice of Constraint Programming.
+            Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+        """
+        from .python_builtins import sum, any
+
+        lbs, ubs = get_bounds(self.args)
+        lb, ub = min(lbs), max(ubs)
+
+        constraints = []
+
+        # introduce boolvar for each possible value
+        bvars = boolvar(shape=(ub+1-lb))
+
+        args = cpm_array(self.args)
+        # bvar is true if the value is taken by any variable
+        for bv, val in zip(bvars, range(lb, ub+1)):
+            constraints += [any(args == val) == bv]
+
+        return [eval_comparison(cmp_op, sum(bvars), cpm_rhs)], constraints
+
+    def value(self):
+        return len(set(argval(a) for a in self.args))
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        return 1, len(self.args)
