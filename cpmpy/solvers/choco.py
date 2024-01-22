@@ -340,7 +340,7 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse"}
+                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
         supported_reified = supported # choco supports reification of any constraint
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -558,6 +558,11 @@ class CPM_choco(SolverInterface):
                         raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
                     return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
                                               chcrhs)
+                elif lhs.name == "nvalue":
+                    chcrhs = self.to_var(rhs)
+                    if chcrhs is None:
+                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
+                    return self.chc_model.n_values(self.solver_vars(lhs.args), chcrhs)
             raise NotImplementedError(
                 "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
