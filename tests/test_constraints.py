@@ -14,8 +14,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative",'xor'},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
                   "exact": {},
                   }
 
@@ -99,6 +99,8 @@ def comp_constraints(solver):
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
                 for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                    if comp_name == "<" and get_bounds(glob_expr)[0] >= get_bounds(rhs)[1]:
+                        continue
                     yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
@@ -147,9 +149,9 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative
+           Xor, Cumulative, NValue, Count
     """
-    global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
+    global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue]
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
         if solver not in EXCLUDE_GLOBAL or cons.name not in EXCLUDE_GLOBAL[solver]:
@@ -161,6 +163,9 @@ def global_constraints(solver):
 
     if solver not in EXCLUDE_GLOBAL or "xor" not in EXCLUDE_GLOBAL[solver]:
         yield Xor(BOOL_ARGS)
+
+    if solver not in EXCLUDE_GLOBAL or "count" not in EXCLUDE_GLOBAL[solver]:
+        yield Count(NUM_ARGS, NUM_VAR)
 
     if solver not in EXCLUDE_GLOBAL or "cumulative" not in EXCLUDE_GLOBAL[solver]:
         s = intvar(0,10,shape=3,name="start")

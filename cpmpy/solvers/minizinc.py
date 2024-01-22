@@ -34,9 +34,9 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -389,9 +389,9 @@ class CPM_minizinc(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
-        return decompose_in_tree(cpm_cons, supported)
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
 
     def __add__(self, cpm_expr):
@@ -430,17 +430,12 @@ class CPM_minizinc(SolverInterface):
             function that returns strings
         """
         if is_any_list(expr):
-            if len(expr) == 1:
-                # unary special case, don't put in list
-                # continue with later code
-                expr = expr[0]
+            if isinstance(expr, np.ndarray):
+                # must flatten
+                expr_str = [self._convert_expression(e) for e in expr.flat]
             else:
-                if isinstance(expr, np.ndarray):
-                    # must flatten
-                    expr_str = [self._convert_expression(e) for e in expr.flat]
-                else:
-                    expr_str = [self._convert_expression(e) for e in expr]
-                return "[{}]".format(",".join(expr_str))
+                expr_str = [self._convert_expression(e) for e in expr]
+            return "[{}]".format(",".join(expr_str))
 
         if isinstance(expr,(bool,np.bool_)):
             expr = BoolVal(expr)
@@ -494,7 +489,6 @@ class CPM_minizinc(SolverInterface):
             return "{}({},{},{})".format(name, x, y, c)
 
         args_str = [self._convert_expression(e) for e in expr.args]
-
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             # wrap args that are a subexpression in ()
@@ -569,12 +563,9 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
-            self += [s + d == e for s,d,e in zip(start,dur,end)]
-            if len(start) == 1:
-                assert len(start) == 1
-                format_str = "cumulative([{}],[{}],[{}],{})"
-            else:
-                format_str = "cumulative({},{},{},{})"
+
+            durstr = self._convert_expression([s + d == e for s,d,e in zip(start, dur, end)])
+            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
