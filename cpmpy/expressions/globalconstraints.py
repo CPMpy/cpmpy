@@ -170,6 +170,20 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
+    def decompose_negation(self):
+        """decomposition only valid in strictly negative contexts"""
+        from .python_builtins import any
+        lb, ub = min(arg.lb for arg in self.args), max(arg.ub for arg in self.args)
+        # Linear decomposition of alldifferent using bipartite matching
+        sigma = boolvar(shape=(len(self.args), 1 + ub - lb))
+
+        defining = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
+        constraints = any([sum(col) > 1 for col in sigma.T])  # Each value is assigned to at most 1 variable
+
+        for arg, row in zip(self.args, sigma):
+            defining += [sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0]
+        return constraints, defining
+
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
