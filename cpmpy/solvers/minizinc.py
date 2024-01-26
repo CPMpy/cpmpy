@@ -185,8 +185,7 @@ class CPM_minizinc(SolverInterface):
         # call the solver, with parameters
         import minizinc.error
         try:
-            mzn_result = mzn_inst.solve(**mzn_kwargs)
-            self.mzn_result = mzn_result
+            self.mzn_result = mzn_inst.solve(**mzn_kwargs)
         except minizinc.error.MiniZincError as e:
             if sys.platform == "win32" or sys.platform == "cygwin": #path error can occur in windows
                 path = os.environ.get("path")
@@ -198,7 +197,7 @@ class CPM_minizinc(SolverInterface):
             else:
                 raise e
         # new status, translate runtime
-        self.cpm_status = self._post_solve(mzn_result)
+        self.cpm_status = self._post_solve(self.mzn_result)
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -206,7 +205,7 @@ class CPM_minizinc(SolverInterface):
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
         if has_sol: #mzn_result.status.has_solution():
-            mznsol = mzn_result.solution
+            mznsol = self.mzn_result.solution
             if is_any_list(mznsol):
                 print("Warning: multiple solutions found, only returning last one")
                 mznsol = mznsol[-1]
@@ -220,7 +219,7 @@ class CPM_minizinc(SolverInterface):
                     print("Warning, no value for ", sol_var)
 
             # translate objective, for optimisation problems only (otherwise None)
-            self.objective_value_ = mzn_result.objective
+            self.objective_value_ = self.mzn_result.objective
         
         return has_sol
 
