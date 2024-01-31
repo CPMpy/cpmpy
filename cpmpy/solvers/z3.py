@@ -24,6 +24,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
@@ -248,7 +249,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+        supported = {"alldifferent", "xor", "ite", "div"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
@@ -342,8 +343,6 @@ class CPM_z3(SolverInterface):
                     return lhs - rhs
                 elif cpm_con.name == "mul":
                     return lhs * rhs
-                elif cpm_con.name == "div":
-                    return lhs / rhs
                 elif cpm_con.name == "pow":
                     return lhs ** rhs
                 elif cpm_con.name == "mod":
@@ -385,6 +384,9 @@ class CPM_z3(SolverInterface):
             # post the comparison
             return eval_comparison(cpm_con.name, lhs, rhs)
 
+        elif isinstance(cpm_con, GlobalFunction):
+            if cpm_con.name == "div":
+                return self._z3_expr(cpm_con.args[0]) / self._z3_expr(cpm_con.args[1])
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
             # TODO:
@@ -401,7 +403,6 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'ite':
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
-
             raise ValueError(f"Global constraint {cpm_con} should be decomposed already, please report on github.")
 
         # a direct constraint, make with z3 (will be posted to it by calling function)
