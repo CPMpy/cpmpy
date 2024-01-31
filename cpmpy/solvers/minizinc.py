@@ -389,7 +389,7 @@ class CPM_minizinc(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "div", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
@@ -583,6 +583,9 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
+
+        elif expr.name == 'div':
+            return "({}) div ({})".format(args_str[0],args_str[1])
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple

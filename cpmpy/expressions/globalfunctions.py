@@ -318,6 +318,43 @@ class Count(GlobalFunction):
         arr, val = self.args
         return 0, len(arr)
 
+class Division(GlobalFunction):
+    """
+    The Division (numerical) global fuction represents the floordivision of its 2 arguments.
+    """
+
+    def __init__(self,a,b):
+        if is_any_list(a) or is_any_list(b):
+            raise TypeError("division does not take lists as input, not: {} and {}".format(a,b))
+        super().__init__("div", [a,b])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Can only be decomposed if it's part of a comparison
+        """
+        #TODO: make decomposition for z3 and gurobi? Also in some cases possible for linear solvers
+        return None
+
+    def value(self):
+        a, b = self.args
+        a, b = argval(a), argval(b)
+        try:
+            return a // b
+        except ZeroDivisionError:
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        if lb2 <= 0 <= ub2:
+            #TODO: allow this
+            raise ZeroDivisionError("division by domain containing 0 is not supported")
+        bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+        lowerbound, upperbound = min(bounds), max(bounds)
+
 class NValue(GlobalFunction):
 
     """

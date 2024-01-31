@@ -28,7 +28,6 @@
     - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
     - x - y         Operator("sum", [x,-y])
     - x * y         Operator("mul", [x,y])
-    - x / y         Operator("div", [x,y])
     - x % y         Operator("mod", [x,y])
     - x ** y        Operator("pow", [x,y])
 
@@ -70,7 +69,6 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
-
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
@@ -311,12 +309,15 @@ class Expression(object):
         return self.__rfloordiv__(other)
 
     def __floordiv__(self, other):
+        #avoid circular import
+        from .globalfunctions import Division
         if is_num(other) and other == 1:
             return self
-        return Operator("div", [self, other])
+        return Division(self,other)
 
     def __rfloordiv__(self, other):
-        return Operator("div", [other, self])
+        from .globalfunctions import Division
+        return Division(other,self)
 
     def __mod__(self, other):
         return Operator("mod", [self, other])
@@ -428,12 +429,11 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
-        'div': (2, False),
         'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -542,12 +542,6 @@ class Operator(Expression):
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "div":
-            try:
-                return arg_vals[0] // arg_vals[1]
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
-
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
@@ -586,13 +580,6 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
-        elif self.name == 'div':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
-            lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
