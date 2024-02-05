@@ -53,8 +53,8 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation.html
 
     Creates the following attributes (see parent constructor for more):
-    pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
+        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
     The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
