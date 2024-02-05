@@ -318,9 +318,112 @@ class Count(GlobalFunction):
         arr, val = self.args
         return 0, len(arr)
 
+class FloorDivision(GlobalFunction):
+    """
+    The Division (numerical) global function represents the floordivision of its 2 arguments.
+    """
+
+    def __init__(self,a,b):
+        if is_any_list(a) or is_any_list(b):
+            raise TypeError("division does not take lists as input, not: {} and {}".format(a,b))
+        super().__init__("fdiv", [a,b])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Can only be decomposed if it's part of a comparison
+        """
+        #TODO: make decomposition for z3 and gurobi? Also in some cases possible for linear solvers
+        a, b = self.args
+        flipmap = {'==': '==', '!=': '!=', '<': '>', '>': '<', '<=': '>=', '>=': '<='}
+        #if division is total, b is either strictly negative or strictly positive!
+        lb, ub = get_bounds(b)
+        if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+            raise IncompleteFunctionError(f"Can't divide by a domain containing 0, safen the expression first")
+
+        r = intvar(0, max(abs(lb) - 1, abs(ub) - 1))  # remainder is always positive for floordivision.
+        if ub < 0:
+            return [eval_comparison(flipmap[cmp_op], a, b * cmp_rhs + r)], [r < Abs(b)]
+        else:
+            return [eval_comparison(cmp_op, a, b * cmp_rhs + r)], [r < Abs(b)]
+
+    def value(self):
+        a, b = self.args
+        a, b = argval(a), argval(b)
+        try:
+            return a // b
+        except ZeroDivisionError:
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        if lb2 <= 0 <= ub2:
+            #TODO: allow this
+            raise ZeroDivisionError("division by domain containing 0 is not supported")
+        bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+        return min(bounds), max(bounds)
+
+
 class Division(GlobalFunction):
     """
-    The Division (numerical) global fuction represents the floordivision of its 2 arguments.
+    The Division (numerical) global function represents the integer division of its 2 arguments.
+    By this we mean that the result of div(a,b) = c iff c = int(a/b). (Round towards zero).
+    This is the default used by most solvers.
+    """
+
+    def __init__(self,a,b):
+        if is_any_list(a) or is_any_list(b):
+            raise TypeError("division does not take lists as input, not: {} and {}".format(a,b))
+        super().__init__("div", [a,b])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+        Can only be decomposed if it's part of a comparison
+        """
+        #TODO: make decomposition for z3 and gurobi? Also in some cases possible for linear solvers
+        a, b = self.args
+        flipmap = {'==': '==', '!=': '!=', '<': '>', '>': '<', '<=': '>=', '>=': '<='}
+        #if division is total, b is either strictly negative or strictly positivel
+        lb, ub = get_bounds(b)
+        lba, uba = get_bounds(a)
+        if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+            raise IncompleteFunctionError(f"Can't divide by a domain containing 0, safen the expression first")
+        # remainder can be negative, if a is negative.. (for integer division)
+        r = intvar(-max(abs(lb) - 1, abs(ub) - 1), max(abs(lb) - 1, abs(ub) - 1))
+        if ub < 0:
+            return [eval_comparison(flipmap[cmp_op], a, b * cmp_rhs + r)], [(a < 0) == (r < 0), Abs(r) < Abs(b)]
+        else:
+            return [eval_comparison(cmp_op, a, b * cmp_rhs + r)], [(a < 0) == (r < 0), Abs(r) < Abs(b)]
+
+    def value(self):
+        a, b = self.args
+        a, b = argval(a), argval(b)
+        try:
+            return a // b
+        except ZeroDivisionError:
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        if lb2 <= 0 <= ub2:
+            #TODO: allow this
+            raise ZeroDivisionError("division by domain containing 0 is not supported")
+        bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
+        return min(bounds), max(bounds)
+
+
+
+class StrictDivision(GlobalFunction):
+    """
+    The Division (numerical) global function represents the strict integer division of its 2 arguments.
+    By this we mean that the remainder of a/b has to be 0 for this expression to have a value. (no rounding allowed)
     """
 
     def __init__(self,a,b):
@@ -342,18 +445,21 @@ class Division(GlobalFunction):
             raise IncompleteFunctionError(f"Can't divide by a domain containing 0, safen the expression first")
         if ub < 0:
             r = intvar(0,max(abs(lba),abs(uba) - 1))
-            return [eval_comparison(flipmap[cmp_op], a, b * cmp_rhs + r)], [(a<0).implies(r<Abs(a)), (a>0).implies(r<a)]
+            return [eval_comparison(flipmap[cmp_op], a, b * cmp_rhs)], []
         else:
             r = intvar(0, max(abs(lba), abs(uba) - 1))
-            return [eval_comparison(cmp_op,a,b * cmp_rhs + r)], [(a < 0).implies(r<Abs(a)), (a > 0).implies(r < a)]
+            return [eval_comparison(cmp_op,a,b * cmp_rhs)], []
 
     def value(self):
         a, b = self.args
         a, b = argval(a), argval(b)
-        try:
-            return a // b
-        except ZeroDivisionError:
-            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+        if (a/b) == (a//b):
+            try:
+                return a // b
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+        else:
+            raise IncompleteFunctionError("Strict division is undefined, {} is not divisible by {}".format(a,b))
 
     def get_bounds(self):
         """
@@ -364,8 +470,9 @@ class Division(GlobalFunction):
         if lb2 <= 0 <= ub2:
             #TODO: allow this
             raise ZeroDivisionError("division by domain containing 0 is not supported")
-        bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
-        lowerbound, upperbound = min(bounds), max(bounds)
+        bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)] # smallest bounds, round towards 0.
+        return min(bounds), max(bounds)
+
 
 class NValue(GlobalFunction):
 

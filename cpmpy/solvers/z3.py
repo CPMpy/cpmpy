@@ -249,7 +249,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "xor", "ite", "div"}  # z3 accepts these reified too
+        supported = {"alldifferent", "xor", "ite", "fdiv"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
