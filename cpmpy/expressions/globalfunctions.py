@@ -333,7 +333,19 @@ class Division(GlobalFunction):
         Can only be decomposed if it's part of a comparison
         """
         #TODO: make decomposition for z3 and gurobi? Also in some cases possible for linear solvers
-        return None
+        a, b = self.args
+        flipmap = {'==': '==', '!=': '!=', '<': '>', '>': '<', '<=': '>=', '>=': '<='}
+        #if division is total, b is either strictly negative or strictly positivel
+        lb, ub = get_bounds(b)
+        lba, uba = get_bounds(a)
+        if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+            raise IncompleteFunctionError(f"Can't divide by a domain containing 0, safen the expression first")
+        if ub < 0:
+            r = intvar(0,max(abs(lba),abs(uba) - 1))
+            return [eval_comparison(flipmap[cmp_op], a, b * cmp_rhs + r)], [(a<0).implies(r<Abs(a)), (a>0).implies(r<a)]
+        else:
+            r = intvar(0, max(abs(lba), abs(uba) - 1))
+            return [eval_comparison(cmp_op,a,b * cmp_rhs + r)], [(a < 0).implies(r<Abs(a)), (a > 0).implies(r < a)]
 
     def value(self):
         a, b = self.args
