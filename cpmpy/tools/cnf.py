@@ -7,7 +7,6 @@ from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 
-def write_cnf(model):
 """
 This file implements helper functions for exporting CPMpy models from and to .cnf format.
 """
