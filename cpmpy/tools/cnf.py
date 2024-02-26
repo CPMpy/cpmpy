@@ -28,7 +28,7 @@ def write_cnf(model, fname=None):
     vars = get_variables(constraints)
     mapping = {v : i+1 for i, v in enumerate(vars)}
 
-    out = f"p {len(vars)} {len(constraints)}\n"
+    out = f"p cnf {len(vars)} {len(constraints)}\n"
     for cons in constraints:
 
         if isinstance(cons, _BoolVarImpl):
@@ -103,9 +103,9 @@ def read_cnf(fname, sep=None):
             clause = []
             for i, var_idx in enumerate(map(int, str_idxes)):
                 if var_idx > 0: # boolvar
-                    clause.append(bvs[i-1])
+                    clause.append(bvs[var_idx-1])
                 elif var_idx < 0: # neg boolvar
-                    clause.append(bvs[(-i)-1])
+                    clause.append(~bvs[(-var_idx)-1])
                 elif var_idx == 0: # end of clause
                     assert i == len(str_idxes)-1, f"Can only have '0' at end of a clause, but got 0 at index {i} in clause {str_idxes}"
             m += cp.any(clause)
