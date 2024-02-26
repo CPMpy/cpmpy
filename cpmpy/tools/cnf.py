@@ -8,6 +8,20 @@ from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 
 def write_cnf(model):
+"""
+This file implements helper functions for exporting CPMpy models from and to .cnf format.
+"""
+
+
+def write_cnf(model, fname=None):
+    """
+        Writes CPMpy model to .cnf format
+        Uses the "to_cnf" transformation from CPMpy
+
+        # TODO: implement pseudoboolean constraints in to_cnf
+        :param model: a CPMpy model
+        :fname: optional, file name to write the cnf output to
+    """
 
     constraints = toplevel_list(model.constraints)
     constraints = to_cnf(constraints)
@@ -53,10 +67,19 @@ def write_cnf(model):
 
         out += " ".join(ints + ["0"]) + "\n"
 
+    if fname is not None:
+        with open(fname, "w") as f:
+            f.write(out)
+
     return out
 
 
 def read_cnf(fname, sep=None):
+    """
+        Read a CPMpy model from a .cnf formatted file
+        :param: fname: the name of the .cnf
+        :param: sep: optional, separator used in the .cnf file, will try to infer if None
+    """
 
     m = cp.Model()
 
