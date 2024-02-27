@@ -11,7 +11,7 @@ def make_assump_model(soft, hard=[], name=None):
     soft2 = toplevel_list(soft, merge_and=False)
 
     # make assumption variables
-    assump = cp.boolvar(shape=(len(soft),), name=name)
+    assump = cp.boolvar(shape=(len(soft2),), name=name)
 
     # hard + implied soft constraints
     model = cp.Model(hard + [assump.implies(soft2)])  # each assumption variable implies a candidate
