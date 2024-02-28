@@ -91,17 +91,24 @@ def read_cnf(fname, sep=None):
             elif " " in line: sep =" "
             else: raise ValueError(f"Unknown separator, got line {line}")
 
-        p, fmt, n_vars, n_constraints = line.split(sep)
-        assert fmt == "cnf", f"The header of a cnf file should be formatted as 'p cnf n_vars, n_clauses, but got {line}"
-        n_vars, n_constraints = int(n_vars), int(n_constraints)
+        assert line[0] == "p", f"The header of a cnf file should be formatted as 'p cnf ..., but got {line}"
+        if sep is None:
+            sep = line[1]
+        p, fmt, *_ = line.split(sep)
 
-        bvs = cp.boolvar(shape=n_vars)
+        bvs = []
 
-        for _ in range(n_constraints):
-            str_idxes = f.readline().strip().split(sep)
+        while 1:
+            line = f.readline()
+            if line is None or len(line) <= 0:
+                break
 
+            str_idxes = line.strip().split(sep)
             clause = []
             for i, var_idx in enumerate(map(int, str_idxes)):
+                if abs(var_idx) >= len(bvs): # var does not exist yet, create
+                    bvs += [cp.boolvar() for _ in range(abs(var_idx)- len(bvs))]
+
                 if var_idx > 0: # boolvar
                     clause.append(bvs[var_idx-1])
                 elif var_idx < 0: # neg boolvar
