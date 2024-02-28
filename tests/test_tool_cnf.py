@@ -15,12 +15,11 @@ class CNFTool(unittest.TestCase):
         ~b | ~c,
         ~a
         """
-        cnf_txt = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        cnf_txt = "p cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
         with open(tmp_file.name, "w") as f:
             f.write(cnf_txt)
 
         model = read_cnf(tmp_file.name)
-
         vars = sorted(get_variables_model(model), key=str)
 
         sols = set()
