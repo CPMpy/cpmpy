@@ -36,7 +36,7 @@ from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, reel_to_int
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
 
@@ -331,6 +331,8 @@ class CPM_ortools(SolverInterface):
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = reel_to_int(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)

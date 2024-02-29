@@ -40,6 +40,69 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+def reel_to_int(lst_of_expr):
+    '''
+    run toplevel list first
+    removes reel constants from linear expressions by multiplying both sides with an integer.
+    '''
+    newlist = []
+    for expr in lst_of_expr:
+        if isinstance(expr, Comparison):
+            lhs, rhs = expr.args
+            if lhs.name == 'wsum':
+                coeffs, vars = lhs.args
+                factor = 1
+                for c in coeffs:
+                    if isinstance(c, float):
+                        for i in range(1, 100):
+                            r = i * c
+                            if r == int(r):
+                                factor = i * factor
+                                break
+                newcoeffs = []
+                for c in coeffs:
+                    newcoeffs.append(int(c*factor))
+                lhs.args[0] = newcoeffs
+                expr.args = lhs, (factor * rhs)
+
+            if rhs.name == 'wsum':
+                coeffs, vars = rhs.args
+                factor = 1
+                for c in coeffs:
+                    if isinstance(c, float):
+                        for i in range(1, 100):
+                            r = i * c
+                            if r == int(r):
+                                factor = i * factor
+                                break
+                newcoeffs = []
+                for c in coeffs:
+                    newcoeffs.append(int(c * factor))
+                rhs.args[0] = newcoeffs
+                expr.args = (factor * lhs), rhs
+        newlist.append(expr)
+    return newlist
+
+
+def left_extract_reel_from_mul(expr):
+    reel = None
+    if isinstance(expr, Expression):
+        if expr.name == 'mul':
+            lhs, rhs = expr.args
+            if isinstance(lhs, float):
+                #lhs is the float
+                return lhs, rhs
+            elif isinstance(lhs, Expression) and lhs.name == 'mul':
+                #nested multiplications
+                real, lhsexpr = left_extract_reel_from_mul(lhs)
+                return real, lhsexpr * rhs
+
+        elif expr.name == 'wsum':
+            return
+    else:
+        assert False, 'must be an expression'
+
+
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
