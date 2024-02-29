@@ -26,13 +26,17 @@ import numpy as np
 import math
 from collections.abc import Iterable # for _flatten
 from itertools import chain, combinations
+
+
+
 from cpmpy.exceptions import IncompleteFunctionError
 
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal))
 
 
 def is_int(arg):
