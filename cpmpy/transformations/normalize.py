@@ -65,6 +65,15 @@ def reel_to_int(lst_of_expr):
                 lhs.args[0] = newcoeffs
                 expr.args = lhs, (factor * rhs)
 
+            elif isinstance(lhs,Expression) and lhs.name == 'mul':
+                c, e = left_extract_reel_from_mul(lhs)
+                if c is not None:
+                    for i in range(1, 100):
+                        r = i * c
+                        if r == int(r):
+                            break
+                    expr.args = int(r) * e, i * rhs
+
             if isinstance(rhs, Expression) and rhs.name == 'wsum':
                 coeffs, vars = rhs.args
                 factor = 1
@@ -80,6 +89,15 @@ def reel_to_int(lst_of_expr):
                     newcoeffs.append(int(c * factor))
                 rhs.args[0] = newcoeffs
                 expr.args = (factor * lhs), rhs
+
+            elif isinstance(rhs,Expression) and rhs.name == 'mul':
+                c, e = left_extract_reel_from_mul(rhs)
+                if c is not None:
+                    for i in range(1, 100):
+                        r = i * c
+                        if r == int(r):
+                            break
+                    expr.args = i * lhs, int(r) * e
         newlist.append(expr)
     return newlist
 
@@ -98,9 +116,10 @@ def left_extract_reel_from_mul(expr):
                 return real, lhsexpr * rhs
 
         elif expr.name == 'wsum':
-            return
+            return None, None
     else:
         assert False, 'must be an expression'
+    return None, None
 
 
 def simplify_boolean(lst_of_expr, num_context=False):
