@@ -8,18 +8,24 @@ from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 
 """
-This file implements helper functions for exporting CPMpy models from and to .cnf format.
+This file implements helper functions for exporting CPMpy models from and to DIMACS format.
+DIMACS is a textual format to represent CNF problems.
+The header of the file should be formatted as `p cnf <n_vars> <n_constraints>
+If the number of variables and constraints are not given, it is inferred by the parser.
+
+Each remaining line of the file is formatted as a list of integers.
+An integer represents a Boolean variable and a negative Boolean variable is represented using a `-` sign.
 """
 
 
-def write_cnf(model, fname=None):
+def write_dimacs(model, fname=None):
     """
-        Writes CPMpy model to .cnf format
+        Writes CPMpy model to DIMACS format
         Uses the "to_cnf" transformation from CPMpy
 
         # TODO: implement pseudoboolean constraints in to_cnf
         :param model: a CPMpy model
-        :fname: optional, file name to write the cnf output to
+        :fname: optional, file name to write the DIMACS output to
     """
 
     constraints = toplevel_list(model.constraints)
@@ -73,11 +79,12 @@ def write_cnf(model, fname=None):
     return out
 
 
-def read_cnf(fname, sep=None):
+def read_dimacs(fname, sep=None):
     """
-        Read a CPMpy model from a .cnf formatted file
-        :param: fname: the name of the .cnf
-        :param: sep: optional, separator used in the .cnf file, will try to infer if None
+        Read a CPMpy model from a DIMACS formatted file
+        If the header is omitted in the file, the number of variables and constraints are inferred.
+        :param: fname: the name of the DIMACS file
+        :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
 
     m = cp.Model()
@@ -91,7 +98,7 @@ def read_cnf(fname, sep=None):
             elif " " in line: sep =" "
             else: raise ValueError(f"Unknown separator, got line {line}")
 
-        assert line[0] == "p", f"The header of a cnf file should be formatted as 'p cnf ..., but got {line}"
+        assert line[0] == "p", f"The header of a DIMACS file should be formatted as 'p cnf ..., but got {line}"
         if sep is None:
             sep = line[1]
         p, fmt, *_ = line.split(sep)

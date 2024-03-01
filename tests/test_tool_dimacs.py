@@ -2,7 +2,7 @@ import unittest
 import tempfile
 
 import cpmpy as cp
-from cpmpy.tools.cnf import read_cnf, write_cnf
+from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 class CNFTool(unittest.TestCase):
 
@@ -19,7 +19,7 @@ class CNFTool(unittest.TestCase):
         with open(tmp_file.name, "w") as f:
             f.write(cnf_txt)
 
-        model = read_cnf(tmp_file.name)
+        model = read_dimacs(tmp_file.name)
         vars = sorted(get_variables_model(model), key=str)
 
         sols = set()
@@ -37,7 +37,7 @@ class CNFTool(unittest.TestCase):
         m += b.implies(~c)
         m += a <= 0
 
-        cnf_txt = write_cnf(m)
+        cnf_txt = write_dimacs(m)
         gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
 
         self.assertEqual(cnf_txt, gt_cnf)
