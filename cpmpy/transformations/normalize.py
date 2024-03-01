@@ -49,7 +49,7 @@ def reel_to_int(lst_of_expr):
     for expr in lst_of_expr:
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
-            if lhs.name == 'wsum':
+            if isinstance(lhs,Expression) and lhs.name == 'wsum':
                 coeffs, vars = lhs.args
                 factor = 1
                 for c in coeffs:
@@ -65,7 +65,7 @@ def reel_to_int(lst_of_expr):
                 lhs.args[0] = newcoeffs
                 expr.args = lhs, (factor * rhs)
 
-            if rhs.name == 'wsum':
+            if isinstance(rhs, Expression) and rhs.name == 'wsum':
                 coeffs, vars = rhs.args
                 factor = 1
                 for c in coeffs:
