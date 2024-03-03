@@ -6,9 +6,11 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 class CNFTool(unittest.TestCase):
 
-    def test_read_cnf(self):
 
-        tmp_file = tempfile.NamedTemporaryFile()
+    def setUp(self) -> None:
+        self.tmpfile = tempfile.NamedTemporaryFile()
+
+    def test_read_cnf(self):
 
         """
         a | b | c,
@@ -16,10 +18,10 @@ class CNFTool(unittest.TestCase):
         ~a
         """
         cnf_txt = "p cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
-        with open(tmp_file.name, "w") as f:
+        with open(self.tmpfile.name, "w") as f:
             f.write(cnf_txt)
 
-        model = read_dimacs(tmp_file.name)
+        model = read_dimacs(self.tmpfile.name)
         vars = sorted(get_variables_model(model), key=str)
 
         sols = set()
@@ -27,6 +29,21 @@ class CNFTool(unittest.TestCase):
 
         self.assertEqual(model.solveAll(display=addsol), 2)
         self.assertSetEqual(sols, {(False, False, True), (False, True, False)})
+
+
+    def test_badly_formatted(self):
+
+        cases = [
+            "p cnf 2 1\n1\n2\n0", "p cnf 2 1\n\n1 2 0"
+        ]
+
+        for cnf_txt in cases:
+            with open(self.tmpfile.name, "w") as f:
+                f.write(cnf_txt)
+
+            m = read_dimacs(self.tmpfile.name)
+            self.assertEqual(len(m.constraints), 1)
+            self.assertEqual(m.solveAll(), 3)
 
     def test_write_cnf(self):
 
