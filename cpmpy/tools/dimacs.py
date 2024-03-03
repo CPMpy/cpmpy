@@ -91,38 +91,39 @@ def read_dimacs(fname, sep=None):
 
     with open(fname, "r") as f:
 
-        line = f.readline().strip()
+        lines = f.readlines()
+        for i, line in enumerate(lines): # DIMACS allows for comments, skip comment lines
+            if line.startswith("p cnf"):
+                break
+            else:
+                assert line.startswith("c"), f"Expected comment on line {i}, but got {line}"
 
-        if sep is None:
-            if "\t" in line: sep = "\t"
-            elif " " in line: sep =" "
-            else: raise ValueError(f"Unknown separator, got line {line}")
-
-        assert line[0] == "p", f"The header of a DIMACS file should be formatted as 'p cnf ..., but got {line}"
-        if sep is None:
-            sep = line[1]
-        p, fmt, *_ = line.split(sep)
+        cnf = "\n".join(lines[i+1:]) # part of file containing clauses
 
         bvs = []
 
-        while 1:
-            line = f.readline()
-            if line is None or len(line) <= 0:
-                break
+        negate = False
+        clause = []
+        for char in cnf:
+            if char == "0": # end of clause, add to model and reset
+                print(f"End of clause: {clause}, adding to model")
+                m += cp.any(clause)
+                clause = []
 
-            str_idxes = line.strip().split(sep)
-            clause = []
-            for i, var_idx in enumerate(map(int, str_idxes)):
-                if abs(var_idx) >= len(bvs): # var does not exist yet, create
-                    bvs += [cp.boolvar() for _ in range(abs(var_idx)- len(bvs))]
+            elif char.isnumeric():  # found Boolvar
+                var_idx = int(char)
+                if abs(var_idx) >= len(bvs):  # var does not exist yet, create
+                    bvs += [cp.boolvar() for _ in range(abs(var_idx) - len(bvs))]
+                bv = bvs[var_idx-1]
 
-                if var_idx > 0: # boolvar
-                    clause.append(bvs[var_idx-1])
-                elif var_idx < 0: # neg boolvar
-                    clause.append(~bvs[(-var_idx)-1])
-                elif var_idx == 0: # end of clause
-                    assert i == len(str_idxes)-1, f"Can only have '0' at end of a clause, but got 0 at index {i} in clause {str_idxes}"
-            m += cp.any(clause)
+                clause.append(bv if negate is False else ~bv)
+                negate = False # reset negation
+
+            elif char == "-": # negation of next Boolvar
+                negate = True
+
+            else: # whitespace, newline...
+                pass
 
     return m
 
