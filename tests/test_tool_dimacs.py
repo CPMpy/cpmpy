@@ -34,7 +34,7 @@ class CNFTool(unittest.TestCase):
     def test_badly_formatted(self):
 
         cases = [
-            "p cnf 2 1\n1\n2\n0", "p cnf 2 1\n\n1 2 0"
+            "p cnf 2 1\n1 \n2 \n0", "p cnf 2 1\n \n1 2 0"
         ]
 
         for cnf_txt in cases:
@@ -44,6 +44,17 @@ class CNFTool(unittest.TestCase):
             m = read_dimacs(self.tmpfile.name)
             self.assertEqual(len(m.constraints), 1)
             self.assertEqual(m.solveAll(), 3)
+
+    def test_read_bigint(self):
+
+        cnf_txt = "p cnf \n-2 -300 0\n300 2 1 0\n-1 0\n"
+        with open(self.tmpfile.name, "w") as f:
+            f.write(cnf_txt)
+
+        model = read_dimacs(self.tmpfile.name)
+        vars = sorted(get_variables_model(model), key=str)
+
+        self.assertEqual(model.solveAll(), 2)
 
     def test_write_cnf(self):
 
