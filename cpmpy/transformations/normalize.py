@@ -47,6 +47,8 @@ def reel_to_int(lst_of_expr):
     '''
     newlist = []
     for expr in lst_of_expr:
+        if isinstance(expr, Operator):
+            expr.args = reel_to_int(expr.args)
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
             if isinstance(lhs,Expression) and lhs.name == 'wsum':
