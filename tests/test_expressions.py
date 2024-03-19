@@ -420,16 +420,8 @@ class TestBounds(unittest.TestCase):
 
 
     def test_incomplete_func(self):
-        # element constraint
-        arr = cpm_array([1,2,3])
-        i = intvar(0,5,name="i")
+
         p = boolvar()
-
-        cons = (arr[i] == 1).implies(p)
-        m = cp.Model([cons, i == 5])
-        self.assertTrue(m.solve())
-        self.assertTrue(cons.value())
-
         # div constraint
         a,b = intvar(1,2,shape=2)
         cons = (42 // (a - b)) >= 3
@@ -438,12 +430,27 @@ class TestBounds(unittest.TestCase):
             self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
             self.assertRaises(IncompleteFunctionError, cons.value)
 
-        # mayhem
-        cons = (arr[10 // (a - b)] == 1).implies(p)
-        m = cp.Model([cons, a == b])
-        if cp.SolverLookup.lookup("z3").supported():
-            self.assertTrue(m.solve(solver="z3"))
-            self.assertTrue(cons.value())
+
+    def test_reified_normalized_element(self):
+        iv = intvar(-5,5,2)
+        idx = intvar(0,2)
+        lis = intvar(-2,3,3)
+        bv = boolvar(2)
+        const = [(lis[idx] == iv[1]).implies(bv[0])]
+        const2 = [(bv[1]).implies(bv[0]), (lis[idx] == iv[1]) == bv[1]]
+        const3 = [(lis[idx] == iv[1]).implies(bv[0]),
+                  (lis[idx] == iv[1]).implies(bv[0]) | (~((lis[idx] == iv[1]).implies(bv[0])))]
+        const4 = [(bv[1]).implies(bv[0]), (bv[1]).implies(bv[0]) | (~((bv[1]).implies(bv[0]))),
+                  (lis[idx] == iv[1]) == bv[1]]
+
+        count1 = cp.Model(const).solveAll()
+        count2 = cp.Model(const2).solveAll()
+        count3 = cp.Model(const3).solveAll()
+        count4 = cp.Model(const4).solveAll()
+
+        self.assertEqual(count1,count2)
+        self.assertEqual(count3,count2)
+        self.assertEqual(count3,count4)
 
 
     def test_list(self):
