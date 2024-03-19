@@ -1,11 +1,13 @@
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
 from cpmpy.expressions.core import Operator, Comparison
 
 from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
+
+import re
 
 """
 This file implements helper functions for exporting CPMpy models from and to DIMACS format.
@@ -40,25 +42,8 @@ def write_dimacs(model, fname=None):
         if isinstance(cons, _BoolVarImpl):
             cons = Operator("or", [cons])
 
-        if isinstance(cons, Operator) and cons.name == "->":
-            # implied constraint
-            cond, subexpr = cons.args
-            assert isinstance(cond, _BoolVarImpl)
-
-            # implied boolean variable, convert to unit clause
-            if isinstance(subexpr, _BoolVarImpl):
-                subexpr = Operator("or", [subexpr])
-
-            # implied clause, convert to clause
-            if isinstance(subexpr, Operator) and subexpr.name == "or":
-                cons = Operator("or", [~cond]+subexpr.args)
-            else:
-                raise ValueError(f"Unknown format for CNF-constraint: {cons}")
-
-        if isinstance(cons, Comparison):
-            raise NotImplementedError(f"Pseudo-boolean constraints not (yet) supported!")
-
-        assert isinstance(cons, Operator) and cons.name == "or", f"Should get a clause here, but got {cons}"
+        if not (isinstance(cons, Operator) and cons.name == "or"):
+            raise NotImplementedError(f"Unsupported constraint {cons}")
 
         # write clause to cnf format
         ints = []
@@ -79,10 +64,10 @@ def write_dimacs(model, fname=None):
     return out
 
 
-def read_dimacs(fname, sep=None):
+def read_dimacs(fname):
     """
         Read a CPMpy model from a DIMACS formatted file
-        If the header is omitted in the file, the number of variables and constraints are inferred.
+        If the number of variables and constraints is not present in the header, they are inferred.
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
@@ -101,29 +86,22 @@ def read_dimacs(fname, sep=None):
         cnf = "\n".join(lines[i+1:]) # part of file containing clauses
 
         bvs = []
+        txt_clauses = re.split(r"\n* \n*0", cnf) # clauses end with ` 0` but can have arbitrary newlines
 
-        negate = False
-        clause = []
-        for char in cnf:
-            if char == "0": # end of clause, add to model and reset
-                print(f"End of clause: {clause}, adding to model")
-                m += cp.any(clause)
-                clause = []
+        for txt_ints in txt_clauses:
+            if txt_ints is None or len(txt_ints.strip()) == 0:
+                continue # empty clause or weird format
 
-            elif char.isnumeric():  # found Boolvar
-                var_idx = int(char)
-                if abs(var_idx) >= len(bvs):  # var does not exist yet, create
-                    bvs += [cp.boolvar() for _ in range(abs(var_idx) - len(bvs))]
-                bv = bvs[var_idx-1]
+            clause = []
+            ints = [int(idx.strip()) for idx in txt_ints.split(" ") if len(idx.strip())]
 
-                clause.append(bv if negate is False else ~bv)
-                negate = False # reset negation
+            for i in ints:
+                if abs(i) >= len(bvs):  # var does not exist yet, create
+                    bvs += [cp.boolvar() for _ in range(abs(i) - len(bvs))]
+                bv = bvs[abs(i) - 1]
+                clause.append(bv if i > 0 else ~bv)
 
-            elif char == "-": # negation of next Boolvar
-                negate = True
-
-            else: # whitespace, newline...
-                pass
+            m += cp.any(clause)
 
     return m
 
