@@ -342,7 +342,7 @@ class CPM_choco(SolverInterface):
         # transform and post the constraints
         for con in self.transform(cpm_expr):
             c = self._get_constraint(con)
-            if c is not None:
+            if c is not None: # Reification constraints are not posted
                 c.post()
 
         return self
