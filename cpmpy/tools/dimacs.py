@@ -1,6 +1,6 @@
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
 from cpmpy.expressions.core import Operator, Comparison
 
 from cpmpy.transformations.normalize import toplevel_list
