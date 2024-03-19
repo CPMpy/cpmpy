@@ -130,15 +130,15 @@ class CPM_choco(SolverInterface):
 
         # translate exit status
         if sol is not None:
-            if self.has_objective() and (time_limit is None or self.cpm_status.runtime < time_limit):
+            if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else:
+            else: # solved, but optimality not proven
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif (sol is None) and time_limit is not None and self.cpm_status.runtime >= time_limit:
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else:
+        elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-            # can happen when timeout is reached...
+        else:
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
+
 
         # True/False depending on self.chc_status
         has_sol = sol is not None
