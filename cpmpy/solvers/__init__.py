@@ -18,6 +18,7 @@
         pysdd
         z3
         exact
+        scip
         utils
 
     ===============
@@ -33,6 +34,7 @@
         CPM_pysdd
         CPM_z3
         CPM_exact
+        CPM_scip
 
     =================
     List of functions
@@ -51,3 +53,4 @@ from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
+from .scip import CPM_scip
