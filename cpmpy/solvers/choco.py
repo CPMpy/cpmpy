@@ -88,12 +88,10 @@ class CPM_choco(SolverInterface):
 
         # initialise the native solver objects
         self.chc_model = chc.Model()
-        self.chc_solver = chc.Model().get_solver()
 
         # for the objective
-        self.has_obj = False
         self.obj = None
-        self.maximize_obj = None
+        self.minimize_obj = None
         self.helper_var = None
         # for solving with assumption variables, TO-CHECK
 
@@ -119,8 +117,9 @@ class CPM_choco(SolverInterface):
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
-            sol = self.chc_solver.find_optimal_solution(maximize=self.maximize_obj,
-                                                                    objective=self.solver_var(self.obj))
+            sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
+                                                        objective=self.solver_var(self.obj),
+                                                        **kwargs)
         else:
             sol = self.chc_solver.find_solution()
         end = time.time()
@@ -180,9 +179,10 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
-            sols = self.chc_solver.find_all_optimal_solutions(maximize=self.maximize_obj,
-                                                                         solution_limit=solution_limit,
-                                                                         objective=self.solver_var(self.obj))
+            sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
+                                                              solution_limit=solution_limit,
+                                                              objective=self.solver_var(self.obj),
+                                                              **kwargs)
         else:
             sols = self.chc_solver.find_all_solutions(solution_limit=solution_limit)
         end = time.time()
@@ -257,33 +257,15 @@ class CPM_choco(SolverInterface):
         """
 
         # make objective function non-nested
-        obj_var = intvar(*expr.get_bounds())
+        obj_var = intvar(*get_bounds(expr))
         self += obj_var == expr
 
         self.has_obj = True
         self.obj = obj_var
-        self.maximize_obj = not minimize  # Choco has as default to maximize
+        self.minimize_obj = minimize  # Choco has as default to maximize
 
     def has_objective(self):
-        return self.has_obj
-
-    def _make_numexpr(self, cpm_expr):
-        """
-            Turns a numeric CPMpy 'flat' expression into a solver-specific
-            numeric expression
-
-            Used especially to post an expression as objective function
-
-            Accepted by Choco:
-            - Decision variable: Var
-            - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
-                      wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
-        """
-
-        lhs, rhs = cpm_expr.args
-        op = cpm_expr.name
-        if op == "==": op = "="  # choco uses "=" for equality
-        if not isinstance(rhs,Expression): rhs = int(rhs)
+        return self.obj is not None
 
         # decision variables, check in varmap
         if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
