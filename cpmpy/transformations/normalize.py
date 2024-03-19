@@ -51,6 +51,29 @@ def reel_to_int(lst_of_expr):
             expr.args = reel_to_int(expr.args)
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
+
+            # Function to find a multiplier for floats to convert them to int
+            def find_factor(value):
+                for i in range(1, 101):
+                    if round((i * value), 2).is_integer():
+                        return i
+                return 1
+
+            # Handle lhs if it's a float directly
+            if isinstance(lhs, float):
+                factor = find_factor(lhs)
+                lhs = int(lhs * factor)
+                rhs *= factor
+
+            # Handle rhs if it's a float directly
+            if isinstance(rhs, float):
+                factor = find_factor(rhs)
+                rhs = int(rhs * factor)
+                lhs *= factor
+
+            # Set the modified arguments back to the expression
+            expr.args = (lhs, rhs)
+
             if isinstance(lhs,Expression) and lhs.name == 'wsum':
                 coeffs, vars = lhs.args
                 factor = 1
