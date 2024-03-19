@@ -596,6 +596,8 @@ class CPM_choco(SolverInterface):
                 start, dur, end, demand, cap = cpm_expr.args
                 # Everything given to cumulative in Choco needs to be a variable.
                 start, end, cap = self.to_vars((start, end, cap))
+                # Duration can be var or int
+                dur = self.solver_vars(dur)
                 # Convert demands to variables
                 demand = self.to_vars(demand)  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
