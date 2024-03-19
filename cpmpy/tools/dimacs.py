@@ -42,25 +42,8 @@ def write_dimacs(model, fname=None):
         if isinstance(cons, _BoolVarImpl):
             cons = Operator("or", [cons])
 
-        if isinstance(cons, Operator) and cons.name == "->":
-            # implied constraint
-            cond, subexpr = cons.args
-            assert isinstance(cond, _BoolVarImpl)
-
-            # implied boolean variable, convert to unit clause
-            if isinstance(subexpr, _BoolVarImpl):
-                subexpr = Operator("or", [subexpr])
-
-            # implied clause, convert to clause
-            if isinstance(subexpr, Operator) and subexpr.name == "or":
-                cons = Operator("or", [~cond]+subexpr.args)
-            else:
-                raise ValueError(f"Unknown format for CNF-constraint: {cons}")
-
-        if isinstance(cons, Comparison):
-            raise NotImplementedError(f"Pseudo-boolean constraints not (yet) supported!")
-
-        assert isinstance(cons, Operator) and cons.name == "or", f"Should get a clause here, but got {cons}"
+        if not (isinstance(cons, Operator) and cons.name == "or"):
+            raise NotImplementedError(f"Unsupported constraint {cons}")
 
         # write clause to cnf format
         ints = []
