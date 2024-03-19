@@ -195,9 +195,9 @@ class CPM_z3(SolverInterface):
             # we assume al variables are user variables (because nested expressions)
             self.user_vars.add(cpm_var)
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = z3.Bool(str(cpm_var))
+                revar = z3.Bool(str(cpm_var) + str(cpm_var.id))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = z3.Int(str(cpm_var))
+                revar = z3.Int(str(cpm_var) + str(cpm_var.id))
                 # set bounds
                 self.z3_solver.add(revar >= cpm_var.lb)
                 self.z3_solver.add(revar <= cpm_var.ub)
