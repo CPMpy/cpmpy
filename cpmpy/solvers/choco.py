@@ -311,7 +311,7 @@ class CPM_choco(SolverInterface):
             if val < -2147483646 or val > 2147483646:
                 raise ChocoBoundsException(
                     "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
-            return self.chc_model.intvar(val, val)  # convert to "variable"
+            return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
         elif isinstance(val, _NumVarImpl):
             return self.solver_var(val)  # use variable
         elif isinstance(val, IntVar):
