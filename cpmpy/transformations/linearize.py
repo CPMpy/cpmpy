@@ -67,16 +67,19 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
         # boolvar
         if isinstance(cpm_expr, _BoolVarImpl):
-            newlist.append(sum([cpm_expr]) >= 1)
+            if "bv" in supported:
+                newlist.append(cpm_expr)
+            else:
+                newlist.append(sum([cpm_expr]) >= 1)
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
-            if cpm_expr.name == "and":
+            if cpm_expr.name == "and" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
-            elif cpm_expr.name == "or":
+            elif cpm_expr.name == "or" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= 1)
 
             # xor
@@ -100,6 +103,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified)
+
+            else: # supported operator
+                newlist.append(cpm_expr)
 
 
         # comparisons

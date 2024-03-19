@@ -94,6 +94,40 @@ class TestCardinality(unittest.TestCase):
 
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
+    def test_pysat_linear_other(self):
+        expressions = [
+            self.bvs[0] + self.bvs[1] + self.bvs[2] > 0,
+            # now with var/expr on RHS
+            self.bvs[0] + self.bvs[1] > self.bvs[2],
+            self.bvs[0] > self.bvs[1] + self.bvs[2],
+            self.bvs[0] > (self.bvs[1] | self.bvs[2]),
+        ]
+
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            cp.Model(expression).solve("pysat")
+
+    def test_pysat_oob(self):
+
+        def test_encode_pb_oob(self):
+            self.assertTrue(len(self.bv) == 3)
+            # test out of bounds (meaningless) thresholds
+            expressions = [
+                sum(self.bv) <= 5,  # true
+                sum(self.bv) <= 3,  # true
+                sum(self.bv) <= -2,  # false
+                sum(self.bv) <= 0,  # undecided
+
+                sum(self.bv) >= -2,  # true
+                sum(self.bv) >= 0,  # true
+                sum(self.bv) >= 5,  # false
+                sum(self.bv) >= 3,  # undecided
+            ]
+
+            ## check all types of linear constraints are handled
+            for expression in expressions:
+                cp.Model(expression).solve("pysat")
+
     def test_pysat_different(self):
         
         differrent = cp.Model(
