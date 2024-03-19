@@ -79,48 +79,47 @@ def reel_to_int(lst_of_expr):
                 factor = 1
                 for c in coeffs:
                     if isinstance(c, float):
-                        for i in range(1, 100):
-                            r = i * c
-                            if r == int(r):
-                                factor = i * factor
-                                break
+                        factor *= find_factor(c)
                 newcoeffs = []
                 for c in coeffs:
                     newcoeffs.append(int(c*factor))
                 lhs.args[0] = newcoeffs
-                expr.args = lhs, (factor * rhs)
-
+                if isinstance(rhs, Expression) and rhs.name == 'wsum':
+                    coeffs, vars = rhs.args
+                    newcoeffs2 = [coeff * factor for coeff in coeffs]
+                    rhs.args[0] = newcoeffs2
+                    expr.args = lhs, rhs
+                elif isinstance(rhs,Expression) and rhs.name == 'mul':
+                    rhs.args[0] = factor * rhs.args[0]
+                else:
+                    expr.args = lhs, (factor * rhs)
             elif isinstance(lhs,Expression) and lhs.name == 'mul':
                 c, e = left_extract_reel_from_mul(lhs)
                 if c is not None:
-                    for i in range(1, 100):
+                    for i in range(1, 101):
                         r = i * c
-                        if r == int(r):
+                        if r.is_integer():
                             break
                     expr.args = int(r) * e, i * rhs
 
+            lhs, rhs = expr.args
             if isinstance(rhs, Expression) and rhs.name == 'wsum':
                 coeffs, vars = rhs.args
                 factor = 1
                 for c in coeffs:
                     if isinstance(c, float):
-                        for i in range(1, 100):
-                            r = i * c
-                            if r == int(r):
-                                factor = i * factor
-                                break
+                        factor *= find_factor(c)
                 newcoeffs = []
                 for c in coeffs:
                     newcoeffs.append(int(c * factor))
                 rhs.args[0] = newcoeffs
                 expr.args = (factor * lhs), rhs
-
             elif isinstance(rhs,Expression) and rhs.name == 'mul':
                 c, e = left_extract_reel_from_mul(rhs)
                 if c is not None:
-                    for i in range(1, 100):
+                    for i in range(1, 101):
                         r = i * c
-                        if r == int(r):
+                        if r.is_integer():
                             break
                     expr.args = i * lhs, int(r) * e
         newlist.append(expr)
