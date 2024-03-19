@@ -17,6 +17,7 @@ EXCLUDE_GLOBAL = {"ortools": {},
                   "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
                   "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
                   "exact": {},
+                  "choco": {"inverse"} #  bug 1099 on Choco github
                   }
 
 # Exclude certain operators for solvers.
