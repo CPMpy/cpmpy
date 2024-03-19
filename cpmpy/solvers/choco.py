@@ -217,6 +217,8 @@ class CPM_choco(SolverInterface):
             or returns from cache if previously created
         """
         if is_num(cpm_var):  # shortcut, eases posting constraints
+            if not is_int(cpm_var):
+                raise ValueError(f"Choco only accepts integer constants, got {cpm_var} of type {type(cpm_var)}")
             if cpm_var < -2147483646 or cpm_var > 2147483646:
                 raise ChocoBoundsException(
                     "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
