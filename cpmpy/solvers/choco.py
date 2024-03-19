@@ -262,33 +262,14 @@ class CPM_choco(SolverInterface):
         obj_var = intvar(*get_bounds(expr))
         self += obj_var == expr
 
-        self.has_obj = True
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
 
     def has_objective(self):
         return self.obj is not None
 
-        # decision variables, check in varmap
-        if isinstance(lhs, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
-            return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
 
-        # sum or weighted sum
-        if isinstance(lhs, Operator):
-            if lhs.name == 'sum':
-                return self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
-            elif lhs.name == "sub":
-                a, b = self.solver_vars(lhs.args)
-                return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
-            elif lhs.name == 'wsum':
-                wgt, x = lhs.args
-                w = np.array(wgt).tolist()
-                x = self.solver_vars(lhs.args[1])
-                return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
-
-        raise NotImplementedError("Choco: Not a known supported numexpr {}".format(cpm_expr))
-
-    def to_var(self, val):
+    def _to_var(self, val):
         from pychoco.variables.intvar import IntVar
         if is_int(val):
             # Choco accepts only int32, not int64
@@ -298,14 +279,17 @@ class CPM_choco(SolverInterface):
             return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
         elif isinstance(val, _NumVarImpl):
             return self.solver_var(val)  # use variable
-        elif isinstance(val, IntVar):
-            return val
-        return None
+        else:
+            raise ValueError(f"Cannot convert {val} of type {type(val)} to Choco variable, expected int or NumVarImpl")
 
-    def to_vars(self, vals):
+        # elif isinstance(val, IntVar):
+        #     return val
+        # return None
+
+    def _to_vars(self, vals):
         if is_any_list(vals):
-            return [self.to_vars(v) for v in vals]
-        return self.to_var(vals)
+            return [self._to_vars(v) for v in vals]
+        return self._to_var(vals)
 
     def transform(self, cpm_expr):
         """
