@@ -149,7 +149,7 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative, NValue, Count
+           Xor, Cumulative, NValue, Count, Inverse
     """
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue]
     for global_type in global_cons:
@@ -174,6 +174,9 @@ def global_constraints(solver):
         demand = [4,5,7]
         cap = 10
         yield Cumulative(s, dur, e, demand, cap)
+
+    if solver not in EXCLUDE_GLOBAL or "inverse" not in EXCLUDE_GLOBAL[solver]:
+        yield Inverse(NUM_ARGS, [0,1,2])
 
 
 def reify_imply_exprs(solver):
