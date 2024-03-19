@@ -36,7 +36,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.reification import only_bv_reifies, reify_rewrite
-from ..exceptions import ChocoBoundsException, ChocoTypeException
+from ..exceptions import ChocoBoundsException, ChocoTypeException, NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -397,10 +397,8 @@ class CPM_choco(SolverInterface):
         # Comparisons: both numeric and boolean ones
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
-            for i in range(len(cpm_expr.args)):
-                if isinstance(cpm_expr.args[i], np.integer):
-                    cpm_expr.args[i] = int(cpm_expr.args[i])
             lhs, rhs = cpm_expr.args
+            op = cpm_expr.name if cpm_expr.name != "==" else "="
 
             if is_boolexpr(lhs) and is_boolexpr(rhs): #boolean equality -- Reification
                 # # prepared for if pychoco releases reify_with addition
@@ -425,167 +423,105 @@ class CPM_choco(SolverInterface):
                     raise ValueError(f"Unexpected reification {cpm_expr}")
                 return self.chc_model.all_equal([chc_var, bv])
 
-            elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (
-                    lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
-                # a BoundedLinearExpression LHS, special case, like in objective
-                chc_numexpr = self._make_numexpr(cpm_expr)
-                return chc_numexpr
-            elif cpm_expr.name == '==':
-                chcrhs = self.solver_var(rhs)
-                # NumExpr == IV, supported by Choco (thanks to `only_numexpr_equality()` transformation)
-                if lhs.name == 'min':
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    chclhs = self.to_vars(lhs.args)
-                    if any(c is None for c in chclhs):
-                            raise ChocoTypeException(
-                                f"Choco does not accept {lhs} in lhs of expression {lhs.name}")
-                    return self.chc_model.min(chcrhs, chclhs)
-                elif lhs.name == 'max':
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    chclhs = self.to_vars(lhs.args)
-                    if any(c is None for c in chclhs):
-                            raise ChocoTypeException(
-                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
-                    return self.chc_model.max(chcrhs, chclhs)
-                elif lhs.name == 'abs':
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    chclhs = self.to_vars(lhs.args)
-                    if any(c is None for c in chclhs):
-                            raise ChocoTypeException(
-                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
-                    return self.chc_model.absolute(chcrhs, self.solver_var(lhs.args[0]))
-                elif lhs.name == 'count':
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(
-                            f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    arr, val = lhs.args
-                    chcarr = self.to_vars(arr)
-                    if any(c is None for c in chcarr):
-                            raise ChocoTypeException(
-                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
-                    return self.chc_model.count(self.solver_var(val), chcarr, chcrhs)
-                elif lhs.name == 'mul':
-                    return self.chc_model.times(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
-                                                chcrhs)
-                elif lhs.name == 'div':
-                    # Choco needs dividend to be a variable
-                    dividend = self.to_var(lhs.args[0])
-                    if dividend is None:
-                        raise ChocoTypeException(f"Choco does not accept {lhs.args[0]} with type {type(lhs.args[0])} in expression {lhs.name}")
-                    # Choco needs divisor to be a variable
-                    divisor = self.to_var(lhs.args[1])
-                    if divisor is None:
-                        raise ChocoTypeException(f"Choco does not accept {lhs.args[1]} with type {type(lhs.args[1])} in lhs of expression {lhs.name}")
-                    # Choco needs result to be a variable
-                    result = self.to_var(rhs)
-                    if result is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.div(dividend, divisor, result)
-                elif lhs.name == 'element':
-                    arr, idx = lhs.args
-                    chcarr = self.to_vars(arr)
-                    if any(c is None for c in chcarr):
-                        raise ChocoTypeException(
-                                f"Choco does not accept {lhs} with type {type(lhs)} as an element in lhs of expression {lhs.name}")
-                    index = self.to_var(idx)
-                    if index is None:
-                        raise ChocoTypeException(f"Choco does not accept {idx} with type {type(idx)} in expression {lhs.name}")
-                    result = self.to_var(rhs)
-                    if result is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
+            elif isinstance(lhs, _NumVarImpl):
+                return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
+            elif isinstance(lhs, Operator) and lhs.name in {'sum','wsum','sub'}:
+                if lhs.name == 'sum':
+                    return self.chc_model.sum(self.solver_vars(lhs.args), op, self.solver_var(rhs))
+                elif lhs.name == "sub":
+                    a, b = self.solver_vars(lhs.args)
+                    return self.chc_model.arithm(a, "-", b, op, self.solver_var(rhs))
+                elif lhs.name == 'wsum':
+                    wgt, x = lhs.args
+                    w = np.array(wgt).tolist()
+                    x = self.solver_vars(lhs.args[1])
+                    return self.chc_model.scalar(x, w, op, self.solver_var(rhs))
 
-                    return self.chc_model.element(result, chcarr,
-                                                  index)
-                elif lhs.name == 'mod':
-                    # Choco needs dividend to be a variable
-                    dividend = self.to_var(lhs.args[0])
-                    if dividend is None:
-                        raise ChocoTypeException(
-                            f"Choco does not accept {lhs.args[0]} with type {type(lhs.args[0])} in lhs of expression {lhs.name}")
-                    # Choco needs divisor to be a variable
-                    divisor = self.to_var(lhs.args[1])
-                    if divisor is None:
-                        raise ChocoTypeException(
-                            f"Choco does not accept {lhs.args[1]} with type {type(lhs.args[1])} in lhs of expression {lhs.name}")
-                    # Choco needs result to be a variable
-                    result = self.to_var(rhs)
-                    if result is None:
-                        raise ChocoTypeException(
-                            f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.mod(dividend, divisor, result)
-                elif lhs.name == 'pow':
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.pow(self.solver_vars(lhs.args[0]), self.solver_vars(lhs.args[1]),
-                                              chcrhs)
-                elif lhs.name == "nvalue":
-                    chcrhs = self.to_var(rhs)
-                    if chcrhs is None:
-                        raise ChocoTypeException(f"Choco does not accept {rhs} with type {type(rhs)} as rhs of expression {lhs.name}")
-                    return self.chc_model.n_values(self.solver_vars(lhs.args), chcrhs)
-            raise NotImplementedError(
-                "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
+            elif cpm_expr.name == '==':
+
+                chc_rhs = self._to_var(rhs) # result is always var
+                all_vars = {"min", "max", "abs", "div", "mod", "element", "nvalue"}
+                if lhs.name in all_vars:
+
+                    chc_args = self._to_vars(lhs.args)
+
+                    if lhs.name == 'min': # min(vars) = var
+                        return self.chc_model.min(chc_rhs, chc_args)
+                    elif lhs.name == 'max': # max(vars) = var
+                        return self.chc_model.max(chc_rhs, chc_args)
+                    elif lhs.name == 'abs': # abs(var) = var
+                        assert len(chc_args) == 1, f"Expected one argument of abs constraint, but got {chc_args}"
+                        return self.chc_model.absolute(chc_rhs, chc_args[0])
+                    elif lhs.name == "div": # var / var = var
+                        dividend, divisor = chc_args
+                        return self.chc_model.div(dividend, divisor, chc_rhs)
+                    elif lhs.name == 'mod': # var % var = var
+                        dividend, divisor = chc_args
+                        return self.chc_model.mod(dividend, divisor, chc_rhs)
+                    elif lhs.name == "element": # varsvar[var] = var
+                        # TODO: actually, Choco also supports ints[var] = var, but no mix of var and int in array
+                        arr, idx = chc_args
+                        return self.chc_model.element(chc_rhs, arr, idx)
+                    elif lhs.name == "nvalue": # nvalue(vars) = var
+                        # TODO: should look into leaving nvalue <= arg so can post atmost_nvalues here
+                        return self.chc_model.n_values(chc_args, chc_rhs)
+
+                elif lhs.name == 'count': # count(vars, var/int) = var
+                    arr, val = lhs.args
+                    return self.chc_model.count(self.solver_var(val), self._to_vars(arr), chc_rhs)
+                elif lhs.name == 'mul': # var * var/int = var/int
+                    a,b = self.solver_vars(lhs.args)
+                    if isinstance(a, int):
+                        a,b = b,a # int arg should always be second
+                    return self.chc_model.times(a,b, self.solver_var(rhs))
+                elif lhs.name == 'pow': # var ^ int = var
+                    chc_rhs = self._to_var(rhs)
+                    return self.chc_model.pow(*self.solver_vars(lhs.args),chc_rhs)
+
+                raise NotImplementedError(
+                    "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
         # base (Boolean) global constraints
         elif isinstance(cpm_expr, GlobalConstraint):
 
+            # many globals require all variables as arguments
+            chc_args = self._to_vars(cpm_expr.args)
             if cpm_expr.name == 'alldifferent':
-                vars = self.to_vars(cpm_expr.args)
-                if any(c is None for c in vars):
-                    raise ChocoTypeException(f"Choco cannot accept alldifferent with: {vars}")
-                return self.chc_model.all_different(vars)
+                return self.chc_model.all_different(chc_args)
             elif cpm_expr.name == 'alldifferent_except0':
-                vars = self.to_vars(cpm_expr.args)
-                if any(c is None for c in vars):
-                    raise ChocoTypeException(f"Choco cannot accept alldifferent_except0 with: {vars}")
-                return self.chc_model.all_different_except_0(vars)
+                return self.chc_model.all_different_except_0(chc_args)
             elif cpm_expr.name == 'allequal':
-                vars = self.to_vars(cpm_expr.args)
-                if any(c is None for c in vars):
-                    raise ChocoTypeException(f"Choco cannot accept allequal with: {vars}")
-                return self.chc_model.all_equal(vars)
+                return self.chc_model.all_equal(chc_args)
+            elif cpm_expr.name == "circuit":
+                return self.chc_model.circuit(chc_args)
+            elif cpm_expr.name == "inverse":
+                if min(get_bounds(cpm_expr.args[0])[0]) <= 0 or min(get_bounds(cpm_expr.args[1])[0]) <= 0:
+                    raise NotSupportedError("Issue in the Choco solver (github #1090) prevents posting inverse constraint with negative bounds for any variable, decomposing the constraint")
+                return self.chc_model.inverse_channeling(*chc_args)
+
+            # but not all
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table)
             elif cpm_expr.name == 'InDomain':
-                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
-                # Everything given to cumulative in Choco needs to be a variable.
-                start, end, cap = self.to_vars((start, end, cap))
-                # Duration can be var or int
+                # start, end, demand and cap should be var
+                start, end, demand, cap = self._to_vars([start, end, demand, cap])
+                # duration can be var or int
                 dur = self.solver_vars(dur)
-                # Convert demands to variables
-                demand = self.to_vars(demand)  # Create variables for demand
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
-            elif cpm_expr.name == "circuit":
-                return self.chc_model.circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "gcc":
-                vars, vals, occ = self.solver_vars(cpm_expr.args)
-                occ = self.to_vars(occ)
-                if any(o is None for o in occ):
-                    raise ChocoTypeException(f"Choco cannot accept gcc including the following in the occurrences: {occ}")
-                return self.chc_model.global_cardinality(vars, vals, occ)
-            elif cpm_expr.name == 'inverse':
-                assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
-                fwd, rev = self.solver_vars(cpm_expr.args)
-                return self.chc_model.inverse_channeling(fwd, rev)
+                vars, vals, occ = cpm_expr.args
+                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ))
             else:
-                raise NotImplementedError(
-                    f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
+                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
