@@ -42,25 +42,8 @@ def write_dimacs(model, fname=None):
         if isinstance(cons, _BoolVarImpl):
             cons = Operator("or", [cons])
 
-        if isinstance(cons, Operator) and cons.name == "->":
-            # implied constraint
-            cond, subexpr = cons.args
-            assert isinstance(cond, _BoolVarImpl)
-
-            # implied boolean variable, convert to unit clause
-            if isinstance(subexpr, _BoolVarImpl):
-                subexpr = Operator("or", [subexpr])
-
-            # implied clause, convert to clause
-            if isinstance(subexpr, Operator) and subexpr.name == "or":
-                cons = Operator("or", [~cond]+subexpr.args)
-            else:
-                raise ValueError(f"Unknown format for CNF-constraint: {cons}")
-
-        if isinstance(cons, Comparison):
-            raise NotImplementedError(f"Pseudo-boolean constraints not (yet) supported!")
-
-        assert isinstance(cons, Operator) and cons.name == "or", f"Should get a clause here, but got {cons}"
+        if not (isinstance(cons, Operator) and cons.name == "or"):
+            raise NotImplementedError(f"Unsupported constraint {cons}")
 
         # write clause to cnf format
         ints = []
@@ -81,10 +64,10 @@ def write_dimacs(model, fname=None):
     return out
 
 
-def read_dimacs(fname, sep=None):
+def read_dimacs(fname):
     """
         Read a CPMpy model from a DIMACS formatted file
-        If the header is omitted in the file, the number of variables and constraints are inferred.
+        If the number of variables and constraints is not present in the header, they are inferred.
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
