@@ -64,10 +64,10 @@ def write_dimacs(model, fname=None):
     return out
 
 
-def read_dimacs(fname, sep=None):
+def read_dimacs(fname):
     """
         Read a CPMpy model from a DIMACS formatted file
-        If the header is omitted in the file, the number of variables and constraints are inferred.
+        If the number of variables and constraints is not present in the header, they are inferred.
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
