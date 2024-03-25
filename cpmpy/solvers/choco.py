@@ -160,7 +160,7 @@ class CPM_choco(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -386,7 +386,7 @@ class CPM_choco(SolverInterface):
                     bv = self._get_constraint(cond).reify()
                     chc_var = self.solver_var(subexpr)
                 else:
-                    raise ValueError(f"Unexpected reification {cpm_expr}")
+                    raise ValueError(f"Unexpected implication {cpm_expr}")
 
                 return self.chc_model.or_([~bv, chc_var])
 
@@ -496,8 +496,6 @@ class CPM_choco(SolverInterface):
                 elif cpm_expr.name == "circuit":
                     return self.chc_model.circuit(chc_args)
                 elif cpm_expr.name == "inverse":
-                    if min(get_bounds(cpm_expr.args[0])[0]) <= 0 or min(get_bounds(cpm_expr.args[1])[0]) <= 0:
-                        raise NotSupportedError("Issue in the Choco solver (github #1090) prevents posting inverse constraint with negative bounds for any variable, decomposing the constraint")
                     return self.chc_model.inverse_channeling(*chc_args)
 
             # but not all
@@ -534,7 +532,7 @@ class CPM_choco(SolverInterface):
             if cpm_expr.args[0] is True:
                 return None
             else:
-                if self.helper_var is not None:
+                if self.helper_var is None:
                     self.helper_var = self.chc_model.intvar(0, 0)
                 return self.chc_model.arithm(self.helper_var, "<", 0)
 
