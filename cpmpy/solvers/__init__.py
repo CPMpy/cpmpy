@@ -12,6 +12,7 @@
         :nosignatures:
 
         ortools
+        minizinc
         pysat
         gurobi
         pysdd
@@ -27,6 +28,7 @@
         :nosignatures:
 
         CPM_ortools
+        CPM_minizinc
         CPM_pysat
         CPM_gurobi
         CPM_pysdd

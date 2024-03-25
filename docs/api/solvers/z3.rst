@@ -1,0 +1,7 @@
+CPMpy z3 interface (:mod:`cpmpy.solvers.z3`)
+=====================================================
+
+.. automodule:: cpmpy.solvers.z3
+    :members:
+    :undoc-members:
+    :inherited-members:

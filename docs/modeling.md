@@ -538,8 +538,35 @@ s.solve(cp_model_probing_level = 2,
 
 See [the API documentation of the solvers](api/solvers.html) for information and links on the parameters supported. See our documentation page on [solver parameters](solver_parameters.html) if you want to tune your hyperparameters automatically. 
 
+## Accessing the underlying solver object
 
+After solving, we can access the underlying solver object to retrieve some information about the solve.
+For example in ortools we can find the number of search branches like this, expanding our previous example.
+```python
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3) 
+s = cp.SolverLookup.get("ortools")
+# we are operating on the ortools interface here
+s += (cp.sum(x) <= 5)
+s.solve()
+print(s.ort_solver.NumBranches())
+```
 
+Other solvers, like Minizinc might have other native objects stored.
+You can see which solver native objects are initialized for each solver in [the API documentation](api/solvers.html) of the solver.
+We can access the solver statistics from the mzn_result object like this:
+
+```python
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3) 
+s = cp.SolverLookup.get("minizinc")
+# we are operating on the minizinc interface here
+s += (cp.sum(x) <= 5)
+s.solve()
+print(s.mzn_result.statistics)
+print(s.mzn_result.statistics['nodes']) #if we are only interested in the nb of search nodes
+
+```
 ## Incremental solving
 It is important to realize that a CPMpy solver interface is _eager_. That means that when a CPMpy constraint is added to a solver object, CPMpy _immediately_ translates it and posts the constraints to the underlying solver. That is why the debugging trick of posting it one-by-one works.
 
@@ -568,7 +595,7 @@ Assumption variables are usefull for incremental solving when you want to activa
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
 Many explanation-generation algorithms (see `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
-```pythonupdate tests
+```python
 import cpmpy as cp
 
 x = cp.intvar(1,5, shape=5, name="x")
