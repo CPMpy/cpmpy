@@ -42,9 +42,9 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
     Creates the following attributes (see parent constructor for more):
-    pysdd_vtree: a pysdd.sdd.Vtree
-    pysdd_manager: a pysdd.sdd.SddManager
-    pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
+        - pysdd_vtree: a pysdd.sdd.Vtree
+        - pysdd_manager: a pysdd.sdd.SddManager
+        - pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
 
     The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
     """

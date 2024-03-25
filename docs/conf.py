@@ -20,11 +20,11 @@ import cpmpy
 # -- Project information -----------------------------------------------------
 
 project = 'CPMpy'
-copyright = '2021, Tias Guns'
+copyright = '2024, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.5'
+release = '0.9.19'
 
 # variables to be accessed from html
 html_context = {

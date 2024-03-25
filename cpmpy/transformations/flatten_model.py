@@ -245,7 +245,12 @@ def flatten_constraint(expr):
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
-                (lhs, lcons) = normalized_boolexpr(lexpr)
+                if rvar.is_bool():
+                    # this is a reification
+                    (lhs, lcons) = normalized_boolexpr(lexpr)
+                else:
+                    # integer comparison
+                    (lhs, lcons) = get_or_make_var(lexpr)
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
@@ -330,7 +335,7 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        ivar = _IntVarImpl(lb, ub)
+        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
         return (ivar, [flatexpr == ivar]+flatcons)
 
 def get_or_make_var_or_list(expr):

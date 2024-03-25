@@ -51,8 +51,8 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/install
 
     Creates the following attributes (see parent constructor for more):
-    ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
-    ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+        - ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
+        - ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
     The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
@@ -555,12 +555,12 @@ class CPM_ortools(SolverInterface):
             List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
         """
         return {
-            'use_branching_in_lp': [False, True],
+            # 'use_branching_in_lp': [False, True], # removed in OR-tools >= v9.9
             'optimize_with_core' : [False, True],
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'core_minimization_level' : [0,1,2], # new in OR-tools>=v9.8
+            'core_minimization_level' : [0,1,2], # new in OR-tools>= v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -572,7 +572,7 @@ class CPM_ortools(SolverInterface):
     @classmethod
     def default_params(cls):
         return {
-            'use_branching_in_lp': False,
+            # 'use_branching_in_lp': False, # removed in OR-tools >= v9.9
             'optimize_with_core': False,
             'search_branching': 0,
             'boolean_encoding_level': 1,
