@@ -76,7 +76,15 @@ class CPM_minizinc(SolverInterface):
         # try to import the package
         try:
             import minizinc
-            return True
+            from minizinc import default_driver
+            version_tuple = (2, 8, 0) # minimum required version
+            if default_driver.parsed_version >= (2, 8, 3):
+                return True
+            else:
+                version = str(version_tuple[0])
+                for x in version_tuple[1:]:
+                    version = version + "." + str(x)
+                raise NotSupportedError("Your Minizinc compiler is outdated, please upgrade to a version >= " + version)
         except ImportError as e:
             return False
 
