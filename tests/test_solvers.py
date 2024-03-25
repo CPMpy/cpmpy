@@ -541,10 +541,7 @@ class TestSolvers(unittest.TestCase):
         ])
         m += sum(bv) == len(bv)
         s = cp.SolverLookup.get("choco", m)
-        s.solve()
 
-        print(bv.value())
-        print(iv.value())
         self.assertFalse(s.solve())
 
         m = cp.Model(~(iv[0] != iv[1]))
