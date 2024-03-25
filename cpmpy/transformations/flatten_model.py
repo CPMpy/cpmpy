@@ -324,10 +324,10 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
         if isinstance(flatexpr,_BoolVarImpl):
-            #avoids unnecessary bv == bv or bv == ~bv assignments
+            # avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
         bvar = _BoolVarImpl()
-        return (bvar, [flatexpr == bvar]+flatcons)
+        return bvar, [flatexpr == bvar] + flatcons
 
     else:
         # normalize expr into a numexpr LHS,
@@ -335,8 +335,12 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        ivar = _IntVarImpl(math.floor(lb), math.ceil(ub))
-        return (ivar, [flatexpr == ivar]+flatcons)
+        if not(isinstance(lb,int) and isinstance(ub,int)):
+            warnings.warn("CPMPy only uses integer variables, non-integer expression detected that will be reified "
+                          "into an intvar with rounded bounds. \n Your constraints will stay the same.", UserWarning)
+            lb, ub = math.floor(lb), math.ceil(ub)
+        ivar = _IntVarImpl(lb, ub)
+        return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
