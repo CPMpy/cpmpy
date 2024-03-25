@@ -485,19 +485,20 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            chc_args = self._to_vars(cpm_expr.args)
-            if cpm_expr.name == 'alldifferent':
-                return self.chc_model.all_different(chc_args)
-            elif cpm_expr.name == 'alldifferent_except0':
-                return self.chc_model.all_different_except_0(chc_args)
-            elif cpm_expr.name == 'allequal':
-                return self.chc_model.all_equal(chc_args)
-            elif cpm_expr.name == "circuit":
-                return self.chc_model.circuit(chc_args)
-            elif cpm_expr.name == "inverse":
-                if min(get_bounds(cpm_expr.args[0])[0]) <= 0 or min(get_bounds(cpm_expr.args[1])[0]) <= 0:
-                    raise NotSupportedError("Issue in the Choco solver (github #1090) prevents posting inverse constraint with negative bounds for any variable, decomposing the constraint")
-                return self.chc_model.inverse_channeling(*chc_args)
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse"}:
+                chc_args = self._to_vars(cpm_expr.args)
+                if cpm_expr.name == 'alldifferent':
+                    return self.chc_model.all_different(chc_args)
+                elif cpm_expr.name == 'alldifferent_except0':
+                    return self.chc_model.all_different_except_0(chc_args)
+                elif cpm_expr.name == 'allequal':
+                    return self.chc_model.all_equal(chc_args)
+                elif cpm_expr.name == "circuit":
+                    return self.chc_model.circuit(chc_args)
+                elif cpm_expr.name == "inverse":
+                    if min(get_bounds(cpm_expr.args[0])[0]) <= 0 or min(get_bounds(cpm_expr.args[1])[0]) <= 0:
+                        raise NotSupportedError("Issue in the Choco solver (github #1090) prevents posting inverse constraint with negative bounds for any variable, decomposing the constraint")
+                    return self.chc_model.inverse_channeling(*chc_args)
 
             # but not all
             elif cpm_expr.name == 'table':
