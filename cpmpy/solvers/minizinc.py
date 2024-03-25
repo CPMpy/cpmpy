@@ -77,7 +77,7 @@ class CPM_minizinc(SolverInterface):
         try:
             import minizinc
             from minizinc import default_driver
-            version_tuple = (2, 8, 0) # minimum required version
+            version_tuple = (2, 8, 2) # minimum required version
             if default_driver.parsed_version >= version_tuple:
                 return True
             else:
