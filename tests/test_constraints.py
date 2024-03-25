@@ -8,16 +8,17 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES.remove("minizinc")
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative", "invese"},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative", "inverse"},
                   "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor', "inverse"},
                   "exact": {},
-                  "choco": {"inverse"} #  bug 1099 on Choco github
+                  "choco": {}
                   }
 
 # Exclude certain operators for solvers.

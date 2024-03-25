@@ -378,17 +378,17 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == '->':
                 cond, subexpr = cpm_expr.args
                 if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl): # bv -> bv
-                    bv, chc_var = self.solver_vars([cond, subexpr])
+                    chc_cond, chc_subexpr = self.solver_vars([cond, subexpr])
                 elif isinstance(cond, _BoolVarImpl): # bv -> expr
-                    bv = self._get_constraint(subexpr).reify()
-                    chc_var = self.solver_var(cond)
+                    chc_cond = self.solver_var(cond)
+                    chc_subexpr = self._get_constraint(subexpr).reify()
                 elif isinstance(subexpr, _BoolVarImpl): # expr -> bv
-                    bv = self._get_constraint(cond).reify()
-                    chc_var = self.solver_var(subexpr)
+                    chc_cond = self._get_constraint(cond).reify()
+                    chc_subexpr = self.solver_var(subexpr)
                 else:
                     raise ValueError(f"Unexpected implication {cpm_expr}")
 
-                return self.chc_model.or_([~bv, chc_var])
+                return self.chc_model.or_([self.chc_model.bool_not_view(chc_cond), chc_subexpr])
 
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
