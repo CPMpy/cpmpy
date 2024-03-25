@@ -23,6 +23,7 @@ jobs:
           pip install z3-solver
           pip install exact
           pip install pysdd
+          pip install pychoco
           sudo snap install minizinc --classic
           pip install minizinc
       - name: Test with pytest
