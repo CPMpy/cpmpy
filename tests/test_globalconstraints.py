@@ -830,7 +830,7 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve(solver="minizinc:com.google.ortools.sat"))
+        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve())
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[a,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],x,False)
