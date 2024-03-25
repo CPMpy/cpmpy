@@ -177,7 +177,7 @@ def global_constraints(solver):
         yield Cumulative(s, dur, e, demand, cap)
 
     if solver not in EXCLUDE_GLOBAL or "inverse" not in EXCLUDE_GLOBAL[solver]:
-        yield Inverse(NUM_ARGS, [0,1,2])
+        yield Inverse(NUM_ARGS, [1,2,0])
 
 
 def reify_imply_exprs(solver):
