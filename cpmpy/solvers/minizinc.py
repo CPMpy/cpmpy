@@ -71,22 +71,31 @@ class CPM_minizinc(SolverInterface):
     The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
+    required_version = (2, 8, 2)
     @staticmethod
     def supported():
+        return CPM_minizinc.installed() and not CPM_minizinc.outdated(CPM_minizinc.required_version)
+
+    @staticmethod
+    def installed():
         # try to import the package
         try:
             import minizinc
-            from minizinc import default_driver
-            version_tuple = (2, 8, 2) # minimum required version
-            if default_driver.parsed_version >= version_tuple:
-                return True
-            else:
-                version = str(version_tuple[0])
-                for x in version_tuple[1:]:
-                    version = version + "." + str(x)
-                raise NotSupportedError("Your Minizinc compiler is outdated, please upgrade to a version >= " + version)
+            return True
         except ImportError as e:
             return False
+
+    @staticmethod
+    def outdated(version_tuple : tuple):
+        from minizinc import default_driver
+        if default_driver.parsed_version >= version_tuple:
+            return False
+        else:
+            #outdated
+            return True
+
+
+
 
     @staticmethod
     def solvernames():
@@ -124,8 +133,14 @@ class CPM_minizinc(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
                           has to be one of solvernames()
         """
-        if not self.supported():
+
+        if not self.installed():
             raise Exception("CPM_minizinc: Install the python package 'minizinc'")
+        elif self.outdated(self.required_version):
+            version = str(self.required_version[0])
+            for x in self.required_version[1:]:
+                version = version + "." + str(x)
+            raise ImportError("Your Minizinc compiler is outdated, please upgrade to a version >= " + version)
 
         import minizinc
 
