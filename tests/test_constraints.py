@@ -14,8 +14,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative", "invese"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor', "inverse"},
                   "exact": {},
                   "choco": {"inverse"} #  bug 1099 on Choco github
                   }
