@@ -34,8 +34,13 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_int
-from ..transformations.to_cnf import to_cnf
+from ..expressions.utils import is_int, flatlist
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import flatten_constraint
+from ..transformations.normalize import toplevel_list
+from ..transformations.reification import only_implies, only_bv_reifies
+
 
 class CPM_pysat(SolverInterface):
     """
@@ -48,8 +53,8 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation.html
 
     Creates the following attributes (see parent constructor for more):
-    pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
+        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
     The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
@@ -209,7 +214,6 @@ class CPM_pysat(SolverInterface):
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
 
-    # `__add__()` from the superclass first calls `transform()` then `_post_constraint()`, just implement the latter
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -224,79 +228,71 @@ class CPM_pysat(SolverInterface):
 
         :return: list of Expression
         """
-        # we accept more than clauses,
-        # would be better to call the transfs that to_cnf calls instead (see other pull request)
-        return to_cnf(cpm_expr)
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons)
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)
+        return cpm_cons
 
-    def _post_constraint(self, cpm_expr):
-        """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+    def __add__(self, cpm_expr_orig):
+      """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
-        """
+      """
+      # add new user vars to the set
+      get_variables(cpm_expr_orig, collect=self.user_vars)
+
+      # transform and post the constraints
+      for cpm_expr in self.transform(cpm_expr_orig):
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
+        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
+            a0,a1 = cpm_expr.args
+
+            # BoolVar() -> BoolVar()
+            if isinstance(a1, _BoolVarImpl):
+                args = [~a0, a1]
+                self.pysat_solver.add_clause(self.solver_vars(args))
+            elif isinstance(a1, Operator) and a1.name == 'or':
+                args = [~a0]+a1.args
+                self.pysat_solver.add_clause(self.solver_vars(args))
+            elif hasattr(a1, 'decompose'):  # implied global constraint
+                self += a0.implies(cpm_expr.decompose())
+            elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
+                # convert sum to clauses
+                sum_clauses = self._pysat_cardinality(a1)
+                # implication of conjunction is conjunction of individual implications
+                nimplvar = [self.solver_var(~a0)]
+                clauses = [nimplvar+c for c in sum_clauses]
+                self.pysat_solver.append_formula(clauses)
+
         elif isinstance(cpm_expr, Comparison):
             # only handle cardinality encodings (for now)
-            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum" and all(
-                    isinstance(v, _BoolVarImpl) for v in cpm_expr.args[0].args):
-                from pysat.card import CardEnc
-
-                lits = self.solver_vars(cpm_expr.args[0].args)
-                bound = cpm_expr.args[1]
-                if not is_int(bound):
-                    raise NotImplementedError(f"PySAT sum: rhs `{bound}` type {type(bound)} not supported")
-
-                clauses = []
-                if cpm_expr.name == "<":
-                    clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "<=":
-                    clauses += CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">=":
-                    clauses += CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == ">":
-                    clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "==":
-                    clauses += CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
-                elif cpm_expr.name == "!=":
-                    # special cases with bounding 'hardcoded' for clarity
-                    if bound <= 0:
-                        clauses += CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses
-                    elif bound >= len(lits):
-                        clauses += CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses
-                    else:
-                        ## add implication literal to atleast/atmost
-                        is_atleast = self.solver_var(boolvar())
-                        clauses += [atl + [-is_atleast] for atl in
-                                    CardEnc.atleast(lits=lits, bound=bound + 1, vpool=self.pysat_vpool).clauses]
-
-                        is_atmost = self.solver_var(boolvar())
-                        clauses += [atm + [-is_atmost] for atm in
-                                    CardEnc.atmost(lits=lits, bound=bound - 1, vpool=self.pysat_vpool).clauses]
-
-                        ## add is_atleast or is_atmost
-                        clauses.append([is_atleast, is_atmost])
-                else:
-                    raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
-
-                # post the clauses
+            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
+                # convert to clauses and post
+                clauses = self._pysat_cardinality(cpm_expr)
                 self.pysat_solver.append_formula(clauses)
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
-        elif hasattr(cpm_expr, 'decompose'):  # cpm_expr.name == 'xor':
-            # for all global constraints:
-            for con in self.transform(cpm_expr.decompose()):
-                self._post_constraint(con)
-
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                return self.pysat_solver.add_clause([])
+                self.pysat_solver.add_clause([])
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -304,11 +300,12 @@ class CPM_pysat(SolverInterface):
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
-            return cpm_expr.callSolver(self, self.pysat_solver)
+            cpm_expr.callSolver(self, self.pysat_solver)
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
 
+      return self
 
     def solution_hint(self, cpm_vars, vals):
         """
@@ -319,6 +316,11 @@ class CPM_pysat(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
             lit = self.solver_var(cpm_var)
@@ -347,3 +349,50 @@ class CPM_pysat(SolverInterface):
         assum_idx = frozenset(self.pysat_solver.get_core()) # to speed up lookup
 
         return [v for v in self.assumption_vars if self.solver_var(v) in assum_idx]
+
+
+    def _pysat_cardinality(self, cpm_compsum):
+        """ convert CPMpy comparison of sum into PySAT list of clauses """
+        # we assume transformations are applied such that the below is true
+        if not isinstance(cpm_compsum, Comparison):
+            raise NotSupportedError(f"PySAT card: input constraint must be Comparison -- {cpm_compsum}")
+        if not is_int(cpm_compsum.args[1]):
+            raise NotSupportedError(f"PySAT card: sum must have constant at rhs not {cpm_compsum.args[1]} -- {cpm_compsum}")
+        if not cpm_compsum.args[0].name == "sum":
+            raise NotSupportedError(f"PySAT card: input constraint must be sum, got {cpm_compsum.args[0].name} -- {cpm_compsum}")
+        if not (all(isinstance(v, _BoolVarImpl) for v in cpm_compsum.args[0].args)):
+            raise NotSupportedError(f"PySAT card: sum must be over Boolvars only -- {cpm_compsum.args[0]}")
+
+        from pysat.card import CardEnc
+
+        lits = self.solver_vars(cpm_compsum.args[0].args)
+        bound = cpm_compsum.args[1]
+
+        if cpm_compsum.name == "<":
+            return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+        elif cpm_compsum.name == "<=":
+            return CardEnc.atmost(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+        elif cpm_compsum.name == ">=":
+            return CardEnc.atleast(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+        elif cpm_compsum.name == ">":
+            return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+        elif cpm_compsum.name == "==":
+            return CardEnc.equals(lits=lits, bound=bound, vpool=self.pysat_vpool).clauses
+        elif cpm_compsum.name == "!=":
+            # special cases with bounding 'hardcoded' for clarity
+            if bound <= 0:
+                return CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses
+            elif bound >= len(lits):
+                return CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses
+            else:
+                ## add implication literals for (strict) atleast/atmost, one must be true
+                is_atleast = self.solver_var(boolvar())
+                is_atmost = self.solver_var(boolvar())
+                clauses = [[is_atleast, is_atmost]]
+                clauses += [atl + [-is_atleast] for atl in
+                            CardEnc.atleast(lits=lits, bound=bound+1, vpool=self.pysat_vpool).clauses]
+                clauses += [atm + [-is_atmost] for atm in
+                            CardEnc.atmost(lits=lits, bound=bound-1, vpool=self.pysat_vpool).clauses]
+                return clauses
+
+        raise NotImplementedError(f"Non-operator constraint {cpm_compsum} not supported by CPM_pysat")

@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
 from cpmpy import *
-from cpmpy.transformations.decompose_global import decompose_global
+from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.flatten_model import flatten_constraint
-from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
+from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
 class TestTransfReif(unittest.TestCase):
@@ -12,9 +12,9 @@ class TestTransfReif(unittest.TestCase):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-    def test_only_bv_implies(self):
+    def test_only_implies(self):
         a,b,c = [boolvar(name=n) for n in "abc"]
-        
+
         cases = [((a).implies(b), "[(a) -> (b)]"),
                  ((~a).implies(b), "[(~a) -> (b)]"),
                  ((a).implies(b|c), "[(a) -> ((b) or (c))]"),
@@ -29,7 +29,7 @@ class TestTransfReif(unittest.TestCase):
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_bv_implies((expr,))), strexpr )
+            self.assertEqual( str(only_implies(only_bv_reifies((expr,)))), strexpr )
             self.assertTrue(Model(expr).solve())
 
     def test_reif_element(self):
@@ -82,7 +82,7 @@ class TestTransfReif(unittest.TestCase):
         arr = cpm_array([0,1,2])
 
         f = lambda expr : str(reify_rewrite(flatten_constraint(expr)))
-        fd = lambda expr : str(reify_rewrite(decompose_global(flatten_constraint(expr))))
+        fd = lambda expr : str(reify_rewrite(flatten_constraint(decompose_in_tree(expr))))
 
 
         # various reify_rewrite cases:
@@ -91,9 +91,8 @@ class TestTransfReif(unittest.TestCase):
         self.assertEqual(f(rv.implies(any(bvs))), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]")
         self.assertEqual(f((bvs[0].implies(bvs[1])).implies(rv)), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]")
         self.assertRaises(ValueError, lambda : f(rv == AllDifferent(ivs)))
-        self.assertEqual(fd(rv.implies(AllDifferent(ivs))), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]")
-        self.assertEqual(f(rv == (arr[intvar(-1, 3)] != 1)), "[(and([BV0, BV1, BV2])) == (rv), (IV0 != 1) == (BV0), (IV0 >= 0) == (BV1), (IV0 < 3) == (BV2)]")
-        self.assertEqual(f(rv == (arr[intvar(0, 2)] != 1)), "[([0 1 2][IV1]) == (IV2), (IV2 != 1) == (rv)]")
-        self.assertEqual(f(rv == (max(ivs) > 5)), "[(max(ivs[0],ivs[1],ivs[2])) == (IV3), (IV3 > 5) == (rv)]")
-        self.assertEqual(f(rv.implies(min(ivs) != 0)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (rv) -> (IV4 != 0)]")
-        self.assertEqual(f((min(ivs) != 0).implies(rv)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV5), (IV5 != 0) -> (rv)]")
+        self.assertEqual(fd([rv.implies(AllDifferent(ivs))]), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]")
+        self.assertEqual(f(rv == (arr[intvar(0, 2)] != 1)), "[([0 1 2][IV0]) == (IV1), (IV1 != 1) == (rv)]")
+        self.assertEqual(f(rv == (max(ivs) > 5)), "[(max(ivs[0],ivs[1],ivs[2])) == (IV2), (IV2 > 5) == (rv)]")
+        self.assertEqual(f(rv.implies(min(ivs) != 0)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV3), (rv) -> (IV3 != 0)]")
+        self.assertEqual(f((min(ivs) != 0).implies(rv)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 != 0) -> (rv)]")

@@ -1,8 +1,13 @@
 import copy
 import unittest
+
+import pytest
+
 import cpmpy as cp
-from cpmpy.expressions.globalconstraints import GlobalConstraint
-from cpmpy.exceptions import TypeError
+from cpmpy.expressions.globalfunctions import GlobalFunction
+from cpmpy.exceptions import TypeError, NotSupportedError
+from cpmpy.solvers import CPM_minizinc
+
 
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
@@ -85,12 +90,25 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv), iv == [0,0,1]]).solve())
         self.assertTrue(cp.AllDifferentExcept0(iv).value())
 
+        #test with mixed types
+        bv = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv[0], bv)]).solve())
+
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
         self.assertFalse(cp.AllDifferentExcept0(iv).value())
         self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
 
+    def test_alldifferent_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.AllDifferent([iv])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_circuit(self):
         """
@@ -117,22 +135,40 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
+
     def test_not_circuit(self):
-        x = cp.intvar(0, 5, 6)
-        constraints = [~cp.Circuit(x), x == [1,2,3,4,5,0]]
-        model = cp.Model(constraints)
+        x = cp.intvar(lb=0, ub=2, shape=3)
+        circuit = cp.Circuit(x)
+
+        model = cp.Model([~circuit, x == [1,2,0]])
         self.assertFalse(model.solve())
 
-        constraints = [~cp.Circuit(x)]
-        model = cp.Model(constraints)
+        model = cp.Model([~circuit])
         self.assertTrue(model.solve())
-        self.assertFalse(cp.Circuit(x).value())
+        self.assertFalse(circuit.value())
 
-        nbNotModels = model.solveAll(display=lambda: self.assertFalse(cp.Circuit(x).value()))
-        nbModels = cp.Model(cp.Circuit(x)).solveAll(display=lambda: self.assertTrue(cp.Circuit(x).value()))
+        self.assertFalse(cp.Model([circuit, ~circuit]).solve())
+
+        circuit_sols = set()
+        not_circuit_sols = set()
+
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+
         total = cp.Model(x == x).solveAll()
 
-        self.assertEqual(str(total), str(nbModels + nbNotModels))
+        for sol in circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertTrue(circuit.value())
+
+        for sol in not_circuit_sols:
+            for var,val in zip(x, sol):
+                var._value = val
+            self.assertFalse(circuit.value())
+
+        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+
 
     def test_inverse(self):
         # Arrays
@@ -159,6 +195,56 @@ class TestGlobal(unittest.TestCase):
         # constraint can be used as value
         self.assertTrue(inv.value())
 
+    def test_inverse_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Inverse([iv], [0])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+
+    def test_InDomain(self):
+        iv = cp.intvar(-8, 8)
+        iv_arr = cp.intvar(-8, 8, shape=5)
+        cons = [cp.InDomain(iv, iv_arr)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(iv.value(), iv_arr.value())
+        vals = [1, 5, 8, -4]
+        cons = [cp.InDomain(iv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(iv.value(), vals)
+        cons = [cp.InDomain(iv, [])]
+        model = cp.Model(cons)
+        self.assertFalse(model.solve())
+        cons = [cp.InDomain(iv, [1])]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertEqual(iv.value(),1)
+        cons = cp.InDomain(min(iv_arr), vals)
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        iv2 = cp.intvar(-8, 8)
+        vals = [1, 5, 8, -4, iv2]
+        cons = [cp.InDomain(iv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(iv.value(), vals)
+
+    def test_indomain_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.InDomain(iv, [2])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_table(self):
         iv = cp.intvar(-8,8,3)
@@ -188,6 +274,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_table_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Table([iv], [[0]])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]
@@ -198,6 +295,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '4')
+
+    def test_minimum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.min([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_maximum(self):
         iv = cp.intvar(-8, 8, 3)
@@ -210,14 +318,75 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertNotEqual(str(max(iv.value())), '4')
 
-    def test_element(self):
-        iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
-        constraints = [cp.Element(iv,idx) == 8]
+    def test_maximum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.max([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+    def test_abs(self):
+        from cpmpy.transformations.decompose_global import decompose_in_tree
+        iv = cp.intvar(-8, 8)
+        constraints = [cp.Abs(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Abs(iv - 4) + 1 > 12]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
-        self.assertTrue(iv.value()[idx.value()] == 8)
-        self.assertTrue(cp.Element(iv,idx).value() == 8)
+        self.assertTrue(cp.Model(decompose_in_tree(constraints)).solve()) #test with decomposition
+
+        model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(abs(iv.value())), '4')
+
+    def test_element(self):
+        # test 1-D
+        iv = cp.intvar(-8, 8, 3)
+        idx = cp.intvar(-8, 8)
+        # test directly the constraint
+        cons = cp.Element(iv,idx) == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test through __get_item__
+        cons = iv[idx] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[idx.value()], 8)
+        # test 2-D
+        iv = cp.intvar(-8, 8, shape=(3, 3))
+        a,b = cp.intvar(0, 2, shape=2)
+        cons = iv[a,b] == 8
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(iv.value()[a.value(), b.value()], 8)
+        arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
+        cons = arr[a,b] == 1
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertTrue(cons.value())
+        self.assertEqual(arr[a.value(), b.value()], 1)
+
+    def test_element_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        idx = cp.intvar(0,0)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Element([iv],idx) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_xor(self):
         bv = cp.boolvar(5)
@@ -230,21 +399,23 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Xor(bv).value())
         nbNotModels = cp.Model(~cp.Xor(bv)).solveAll(display=lambda: self.assertFalse(cp.Xor(bv).value()))
         nbModels = cp.Model(cp.Xor(bv)).solveAll(display=lambda: self.assertTrue(cp.Xor(bv).value()))
+        nbDecompModels = cp.Model(cp.Xor(bv).decompose()).solveAll(display=lambda: self.assertTrue(cp.Xor(bv).value()))
+        self.assertEqual(nbDecompModels,nbModels)
         total = cp.Model(bv == bv).solveAll()
         self.assertEqual(str(total), str(nbModels + nbNotModels))
 
     def test_minimax_python(self):
         from cpmpy import min,max
         iv = cp.intvar(1,9, 10)
-        self.assertIsInstance(min(iv), GlobalConstraint) 
-        self.assertIsInstance(max(iv), GlobalConstraint) 
+        self.assertIsInstance(min(iv), GlobalFunction)
+        self.assertIsInstance(max(iv), GlobalFunction)
 
     def test_minimax_cpm(self):
         iv = cp.intvar(1,9, 10)
         mi = cp.min(iv)
         ma = cp.max(iv)
-        self.assertIsInstance(mi, GlobalConstraint) 
-        self.assertIsInstance(ma, GlobalConstraint)
+        self.assertIsInstance(mi, GlobalFunction)
+        self.assertIsInstance(ma, GlobalFunction)
         
         def solve_return(model):
             model.solve()
@@ -278,11 +449,72 @@ class TestGlobal(unittest.TestCase):
         m += cp.Cumulative(start, duration, end, demand, capacity)
         self.assertTrue(m.solve())
 
+    def test_cumulative_decomposition_capacity(self):
+        import numpy as np
+
+        # before merging #435 there was an issue with capacity constraint
+        start = cp.intvar(0, 10, 4, "start")
+        duration = [1, 2, 2, 1]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = 10 # tasks cannot be scheduled
+        capacity = np.int64(5) # bug only happened with numpy ints
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertFalse(cp.Model(cons).solve()) # this worked fine
+        # also test decomposition
+        self.assertFalse(cp.Model(cons.decompose()).solve()) # capacity was not taken into account and this failed
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_single_demand(self):
+        start = cp.intvar(0, 10, name="start")
+        dur = 5
+        end = cp.intvar(0, 10, name="end")
+        demand = 2
+        capacity = 10
+
+        m = cp.Model()
+        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_nested(self):
+        start = cp.intvar(0, 10, name="start", shape=3)
+        dur = [5,5,5]
+        end = cp.intvar(0, 10, name="end", shape=3)
+        demand = [5,5,9]
+        capacity = 10
+        bv = cp.boolvar()
+
+        cons = cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        m = cp.Model(bv.implies(cons), start + dur != end)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
+
+
     def test_cumulative_no_np(self):
         start = cp.intvar(0, 10, 4, "start")
         duration = (1, 2, 2, 1) # smt weird such as a tuple
         end = [cp.intvar(0,20, name=f"end[{i}]") for i in range(4)] # force smt weird
         demand = 1
+        capacity = 1
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        # also test decomposition
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+
+    def test_cumulative_no_np2(self):
+        start = cp.intvar(0, 10, 4, "start")
+        duration = (1, 2, 2, 1) # smt weird such as a tuple
+        end = [cp.intvar(0,20, name=f"end[{i}]") for i in range(4)] # force smt weird
+        demand = [1,1,1,1]
         capacity = 1
         cons = cp.Cumulative(start, duration, end, demand, capacity)
         self.assertTrue(cp.Model(cons).solve())
@@ -310,37 +542,49 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(constraints).solve())
 
     def test_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc), iv == [5,5,4]]).solve())
-        self.assertEqual( str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, gcc).decompose(), iv == [5, 5, 4]]).solve())
-        self.assertEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertTrue(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1]], gcc).value())
-
-    def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
-
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=3)
-        gcc = cp.intvar(0, 10, shape=iv[0].ub + 1)
-        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4]]).solve())
-        self.assertNotEqual(str(gcc.value()), '[0 0 0 0 1 2 0 0 0]')
-        self.assertFalse(cp.GlobalCardinalityCount(iv, gcc).value())
+        iv = cp.intvar(-8, 8, shape=5)
+        val = cp.intvar(-3, 3, shape=3)
+        occ = cp.intvar(0, len(iv), shape=3)
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        val = [1, 4, 5]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val))))
+        occ = [2, 3, 0]
+        self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve())
+        self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
+        self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
+        self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
-        self.assertFalse(cp.Model([~cp.GlobalCardinalityCount(iv, gcc), iv == [5, 5, 4],
-                                   gcc == [0, 0, 0, 0, 1, 2, 0, 0, 0]]).solve())
+    def test_gcc_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.GlobalCardinalityCount([iv], [3],[1])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_count(self):
         iv = cp.intvar(-8, 8, shape=3)
@@ -359,6 +603,64 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
 
+    def test_count_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Count([iv], 1) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+    def test_nvalue(self):
+
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0,10)
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve())
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        self.assertTrue(cp.Model(cp.NValue(iv) != cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve())
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValue(iv) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+        cp.Model(cons).solveAll(display=check_true)
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_nvalue_minizinc(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0, 10)
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve('minizinc'))
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        self.assertTrue(cp.Model(cp.NValue(iv) != cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve('minizinc'))
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValue(iv) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+
+        cp.Model(cons).solveAll(solver='minizinc')
 
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
@@ -383,6 +685,15 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr<lb).solve())
         self.assertFalse(cp.Model(expr>ub).solve())
+
+    def test_bounds_abs(self):
+        x = cp.intvar(-8, 5)
+        y = cp.intvar(-7, -2)
+        z = cp.intvar(1, 9)
+        for var,test_lb,test_ub in [(x,0,8),(y,2,7),(z,1,9)]:
+            lb, ub = cp.Abs(var).get_bounds()
+            self.assertEqual(test_lb,lb)
+            self.assertEqual(test_ub,ub)
 
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
@@ -450,6 +761,12 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Circuit,(a,b))
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
 
+    def test_multicicruit(self):
+        c1 = cp.Circuit(cp.intvar(0,4, shape=5))
+        c2 = cp.Circuit(cp.intvar(0,2, shape=3))
+        self.assertTrue(cp.Model(c1 & c2).solve())
+
+
     def test_inverse(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -513,7 +830,7 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve())
+        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve(solver="minizinc:com.google.ortools.sat"))
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[a,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],1,x)
         self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],x,False)
@@ -523,14 +840,19 @@ class TestTypeChecks(unittest.TestCase):
         z = cp.intvar(-8, 8)
         q = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
+        h = cp.intvar(-7, 7)
+        v = cp.intvar(-7, 7)
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y],[z,q])]).solve())
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[x,False])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y,q],[z,x])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y],[z,b])
-        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a],[a,b])
+        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y], [z,q], [h,v])]).solve())
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [x,False], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [z,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a], [a,b], [h,v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [h, v], [z, b])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [True, v])
+        self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [v, a])
+
 
     def test_count(self):
         x = cp.intvar(0, 1)
@@ -542,3 +864,14 @@ class TestTypeChecks(unittest.TestCase):
 
         self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
         self.assertRaises(TypeError, cp.Count, [x,y],[x,False])
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])

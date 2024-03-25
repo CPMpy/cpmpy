@@ -15,6 +15,7 @@
     Searching and time-out start at the default configuration for a solver (if available in the solver class)
 """
 import time
+from random import shuffle
 
 import numpy as np
 
@@ -54,10 +55,10 @@ class ParameterTuner:
         solver = SolverLookup.get(self.solvername, self.model)
         solver.solve(**self.best_params)
 
-        best_runtime = solver.status().runtime
-        self.base_runtime = best_runtime
+        self.base_runtime = solver.status().runtime
+        self.best_runtime = self.base_runtime
 
-        # Add default's runtime as first entry in configs
+        # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         combos_np = self._params_to_np(combos)
 
@@ -80,15 +81,15 @@ class ParameterTuner:
             # Convert numpy array back to dictionary
             params_dict = self._np_to_params(params_np)
             # set fixed params
-            params_dict |= fix_params
-            timeout = best_runtime
+            params_dict.update(fix_params)
+            timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
                 timeout = min(timeout, time_limit - (time.time() - start_time))
             # run solver
             solver.solve(**params_dict, time_limit=timeout)
-            if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < best_runtime:
-                best_runtime = solver.status().runtime
+            if solver.status().exitstatus == ExitStatus.OPTIMAL and  solver.status().runtime < self.best_runtime:
+                self.best_runtime = solver.status().runtime
                 # update surrogate
                 self._best_config = params_np
 
@@ -97,16 +98,15 @@ class ParameterTuner:
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
-        self.best_params |= fix_params
-        self.best_runtime = best_runtime
+        self.best_params.update(fix_params)
         return self.best_params
 
     def _get_score(self, combos):
         """
-            Return score for every parameter config in combos
+            Return the hamming distance for each remaining configuration to the current best config.
+            Lower score means better configuration, so exploit the current best configuration by only allowing small changes.
         """
-        mtrx = np.tile(self._best_config, len(combos)).reshape(combos.shape)
-        return np.count_nonzero(combos != mtrx, axis=1)
+        return np.count_nonzero(combos != self._best_config, axis=1)
 
     def _params_to_np(self,combos):
         arr = [[params[key] for key in self._param_order] for params in combos]
@@ -114,4 +114,58 @@ class ParameterTuner:
 
     def _np_to_params(self,arr):
         return {key: val for key, val in zip(self._param_order, arr)}
+
+
+
+class GridSearchTuner(ParameterTuner):
+
+    def __init__(self, solvername, model, all_params=None, defaults=None):
+        super().__init__(solvername, model, all_params, defaults)
+
+    def tune(self, time_limit=None, max_tries=None, fix_params={}):
+        """
+            :param: time_limit: Time budget to run tuner in seconds. Solver will be interrupted when time budget is exceeded
+            :param: max_tries: Maximum number of configurations to test
+            :param: fix_params: Non-default parameters to run solvers with.
+        """
+        if time_limit is not None:
+            start_time = time.time()
+
+        # Init solver
+        solver = SolverLookup.get(self.solvername, self.model)
+        solver.solve(**self.best_params)
+
+
+        self.base_runtime = solver.status().runtime
+        self.best_runtime = self.base_runtime
+
+        # Get all possible hyperparameter configurations
+        combos = list(param_combinations(self.all_params))
+        shuffle(combos) # test in random order
+
+        if max_tries is not None:
+            combos = combos[:max_tries]
+
+        for params_dict in combos:
+            # Make new solver
+            solver = SolverLookup.get(self.solvername, self.model)
+            # set fixed params
+            params_dict.update(fix_params)
+            timeout = self.best_runtime
+            # set timeout depending on time budget
+            if time_limit is not None:
+                timeout = min(timeout, time_limit - (time.time() - start_time))
+            # run solver
+            solver.solve(**params_dict, time_limit=timeout)
+            if solver.status().exitstatus == ExitStatus.OPTIMAL and solver.status().runtime < self.best_runtime:
+                self.best_runtime = solver.status().runtime
+                # update surrogate
+                self.best_params = params_dict
+
+            if time_limit is not None and (time.time() - start_time) >= time_limit:
+                break
+
+        return self.best_params
+
+
 

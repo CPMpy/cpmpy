@@ -1,22 +1,23 @@
-from cpmpy import Model, SolverLookup
+from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
+from cpmpy.expressions.globalfunctions import *
 
 import pytest
-
 
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-SOLVERNAMES = ["ortools"]
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {"circuit"},
-                  "gurobi": {"circuit"},
+EXCLUDE_GLOBAL = {"ortools": {},
+                  "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
+                  "exact": {},
+                  "choco": {}
                   }
 
 # Exclude certain operators for solvers.
@@ -24,18 +25,18 @@ EXCLUDE_GLOBAL = {"ortools": {"circuit"},
 EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "exact": {"mod","pow","div","mul"},
                      }
 
 # Some solvers only support a subset of operators in imply-constraints
 # This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {"element"},
-                "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
-                "z3": {"min", "max", "abs"}, # TODO this will become emtpy after resolving issue #105
-                "pysat": {"xor"}, # xors: temporarily avoid till #209 is fixed
-                "pysdd": {"xor"},
+EXCLUDE_IMPL = {"ortools": {},
+                "minizinc": {},
+                "z3": {},
+                "pysat": {},
+                "pysdd": {},
+                "exact": {"mod","pow","div","mul"},
                 }
-
-
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
@@ -71,7 +72,7 @@ def numexprs(solver):
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,2]
         elif name == "mod":
-            operator_args = [NUM_ARGS[0],POS_VAR]
+            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
@@ -92,21 +93,27 @@ def comp_constraints(solver):
     """
     for comp_name in Comparison.allowed:
         for numexpr in numexprs(solver):
-            for rhs in [NUM_VAR, 1]:
+            for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
                 yield Comparison(comp_name, numexpr, rhs)
 
     for comp_name in Comparison.allowed:
         for glob_expr in global_constraints(solver):
             if not glob_expr.is_bool():
-                for rhs in [NUM_VAR, 1]:
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                    if comp_name == "<" and get_bounds(glob_expr)[0] >= get_bounds(rhs)[1]:
+                        continue
                     yield Comparison(comp_name, glob_expr, rhs)
 
     if solver == "z3":
         for comp_name in Comparison.allowed:
             for boolexpr in bool_exprs(solver):
-                for rhs in [NUM_VAR, 1]:
-                    if comp_name == '>' and rhs == 1:
-                        rhs = 0 # >1 is unsat for boolean expressions, so change it to 0
+                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
+                    if comp_name == '>':
+                        # >1 is unsat for boolean expressions, so change it to 0
+                        if isinstance(rhs, int) and rhs == 1:
+                            rhs = 0
+                        if isinstance(rhs, BoolVal) and rhs.args[0] == True:
+                            rhs = BoolVal(False)
                     yield Comparison(comp_name, boolexpr, rhs)
 
 
@@ -143,9 +150,9 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative
+           Xor, Cumulative, NValue, Count
     """
-    global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
+    global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue]
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
         if solver not in EXCLUDE_GLOBAL or cons.name not in EXCLUDE_GLOBAL[solver]:
@@ -157,6 +164,9 @@ def global_constraints(solver):
 
     if solver not in EXCLUDE_GLOBAL or "xor" not in EXCLUDE_GLOBAL[solver]:
         yield Xor(BOOL_ARGS)
+
+    if solver not in EXCLUDE_GLOBAL or "count" not in EXCLUDE_GLOBAL[solver]:
+        yield Count(NUM_ARGS, NUM_VAR)
 
     if solver not in EXCLUDE_GLOBAL or "cumulative" not in EXCLUDE_GLOBAL[solver]:
         s = intvar(0,10,shape=3,name="start")

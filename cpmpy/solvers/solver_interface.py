@@ -168,31 +168,6 @@ class SolverInterface(object):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
 
-    # most solvers can inherit this function as is, just implement `transform()` and `__post_constraint()` below
-    def __add__(self, cpm_expr):
-        """
-            Eagerly add a constraint to the underlying solver.
-
-            Any CPMpy expression given is immediately transformed (throught `transform()`)
-            and then posted to the solver (through `_post_constraint()`).
-
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about. All other variables are auxiliary variables created by transformations.
-
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
-
-        :return: self
-        """
-        # add new user vars to the set
-        get_variables(cpm_expr, collect=self.user_vars)
-
-        # transform and post the constraints
-        for con in self.transform(cpm_expr):
-            self._post_constraint(con)
-
-        return self
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -207,21 +182,34 @@ class SolverInterface(object):
 
         :return: list of Expression
         """
-        return list(cpm_expr)  # overwrite this function and call the transformations you need
+        return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def _post_constraint(self, cpm_expr):
+    def __add__(self, cpm_expr):
         """
-            Post a supported CPMpy constraint directly to the underlying solver's API
+            Eagerly add a constraint to the underlying solver.
 
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
 
-            Solvers can raise 'NotImplementedError' for any constraint not supported after transformation
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-        :param cpm_expr: list of CPMpy expressions
-        :type cpm_expr: list of Expression
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
         """
-        raise NotImplementedError("solver _post_constraint(): abstract function, overwrite")
+        # add new user vars to the set
+        get_variables(cpm_expr, collect=self.user_vars)
+
+        # transform and post the constraints
+        for con in self.transform(cpm_expr):
+            raise NotImplementedError("solver __add__(): abstract function, overwrite")
+
+        return self
 
 
     # OPTIONAL functions
@@ -266,7 +254,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
 
         return solution_count
 
@@ -279,7 +267,7 @@ class SolverInterface(object):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        raise NotImplementedError("Solver does not support solution hinting")
+        raise NotSupportedError("Solver does not support solution hinting")
 
     def get_core(self):
         """
@@ -291,7 +279,7 @@ class SolverInterface(object):
         (a literal is either a `_BoolVarImpl` or a `NegBoolView` in case of its negation, e.g. x or ~x)
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
-        raise NotImplementedError("Solver does not support unsat core extraction")
+        raise NotSupportedError("Solver does not support unsat core extraction")
 
 
     # shared helper functions

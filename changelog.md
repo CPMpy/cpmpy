@@ -1,5 +1,78 @@
 # Change log
 
+## 0.9.17
+Some new solvers supported at tier 3, update to our transformations and bugfixes.
+
+### Solver tier updates:
+* Choco and SCIP our now available as tier 3 solvers in separate pull requests.
+
+### New transformations:
+* Canonical comparison, puts comparisons in a canonical normal form.
+* only_bv_reifies: the bool var is sent to the left part and the boolexpr to the right part in reifications. (split out of only_bv_implies)
+* Only_implies: renamed what's left from only_bv_implies, that being removing all '==' double reifications.
+
+### What else is new?
+* Allow description for a constraint
+* Updated linearize transformation
+* small improvements to our docs
+* solution hints in Exact
+* New, more efficient Xor decomposition
+* added QuickXplain to our tools.
+* Did some performance tests and optimized our flatten_constraint transformation by not applying distributivity of disjunctions over conjunctions.
+
+### Bugfixes:
+* mark Inverse as supported in OR-tools
+* removed unnecessary use of simplify bool in minizinc and z3
+* fix possible overflow in bound computations
+* Solution hinting fix, when giving N-D variables and values
+* Solution hinting remove python 3.9 exclusive code
+* Bugfixes in MUS-tool
+* 
+## 0.9.16
+One of our most substantial releases so far, with special focus on extending and improving the
+transformations for all allowed input and all solvers.
+
+### Solver tier updates:
+* MiniZinc and Z3 are now Tier1 solvers (passes all internal tests, passes our bigtest suit, will be fuzztested in the near future)
+* new solver: Exact in Tier2 (passes all internal tests, might fail on edge cases in bigtest)
+  Currently Exact is not supported on Windows
+
+### Revamped documentation
+* simpler readme on github, with badges
+* simpler index file on readthedocs
+* consolidated scattered documentation into one prominent 'modeling.html' file on readthedocs
+
+### Global constraints
+* Global functions (Minimum, Maximum, Element, Count, Abs) now separated from Global constraints in the class diagram
+* New global constraint: InDomain, to specify non-interval domains.
+* Abs is now a global
+* Multi-dimensional element constraint supported
+
+### New transformations:
+* decompose_in_tree. Unsupported globals now get decomposed at tree-level.
+* simplify_boolean, that simplifies boolean (and equivalent-to-Boolean) expressions.
+* push_down_negation. Pushes down the not-operator so that it only occurs at the leaves of the expression tree
+
+### What else is new?
+* Warning messages for common beginner mistakes.
+* type-checks in operator constructor and in global constraints/functions.
+* our NDVarArray now support NumPy-like method 'prod', and supports the axis argument for min, max, sum, prod, any and all
+* Updated tuner tool: added a (random) grid search tuner
+* pysat: accept reified cardinality constraints
+* z3: handle mixed integer/boolean expressions
+* Add explicit requirements for jupyter notebooks examples
+* Add n-queens 1000 example.
+* solver interfaces: make `__add__()` directly call transform, simpler and more explicit (#312)
+
+### Bugfixes:
+* Allow numpy booleans in boolvals
+* negating boolval fix
+* check for bv == iv in normalized boolexpr and only_bv_implies
+* Inverse decomposition with non vararrays
+* Minizinc integer bounds fix
+* Minizinc False literal now gets correctly translated.
+
+
 ## 0.9.15
 Re-release of 0.9.14 due to github action pip-release screw-up
 
