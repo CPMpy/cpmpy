@@ -17,6 +17,12 @@ class MinizincNameException(CPMpyException):
 class MinizincBoundsException(CPMpyException):
     pass
 
+class ChocoTypeException(CPMpyException):
+    pass
+
+class ChocoBoundsException(CPMpyException):
+    pass
+
 class NotSupportedError(CPMpyException):
     pass
 

@@ -51,8 +51,8 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/install
 
     Creates the following attributes (see parent constructor for more):
-    ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
-    ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+        - ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
+        - ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
     The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
@@ -118,7 +118,7 @@ class CPM_ortools(SolverInterface):
 
             You can use any of these parameters as keyword argument to `solve()` and they will
             be forwarded to the solver. Examples include:
-                - num_search_workers=8          number of parallel workers (default: 1)
+                - num_search_workers=8          number of parallel workers (default: 8)
                 - log_search_progress=True      to log the search process to stdout (default: False)
                 - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
                 - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
@@ -466,8 +466,6 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
-                if is_num(demand):
-                    demand = [demand] * len(start)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "circuit":
@@ -476,7 +474,7 @@ class CPM_ortools(SolverInterface):
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)
-                arcvars = boolvar(shape=(N,N), name="circuit_arcs")
+                arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
@@ -557,12 +555,12 @@ class CPM_ortools(SolverInterface):
             List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
         """
         return {
-            'use_branching_in_lp': [False, True],
+            # 'use_branching_in_lp': [False, True], # removed in OR-tools >= v9.9
             'optimize_with_core' : [False, True],
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'minimize_core' : [False, True],
+            'core_minimization_level' : [0,1,2], # new in OR-tools>= v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -574,12 +572,12 @@ class CPM_ortools(SolverInterface):
     @classmethod
     def default_params(cls):
         return {
-            'use_branching_in_lp': False,
+            # 'use_branching_in_lp': False, # removed in OR-tools >= v9.9
             'optimize_with_core': False,
             'search_branching': 0,
             'boolean_encoding_level': 1,
             'linearization_level': 1,
-            'minimize_core': True,
+            'core_minimization_level': 2,# new in OR-tools>=v9.8
             'cp_model_probing_level': 2,
             'cp_model_presolve': True,
             'clause_cleanup_ordering': 0,

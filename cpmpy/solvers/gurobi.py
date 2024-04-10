@@ -56,7 +56,7 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-    - grb_model: object, TEMPLATE's model object
+        - grb_model: object, TEMPLATE's model object
 
     The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """

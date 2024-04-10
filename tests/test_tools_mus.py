@@ -2,7 +2,9 @@ import unittest
 from unittest import TestCase
 
 import cpmpy as cp
-from cpmpy.tools.mus import mus, mus_naive, quickxplain, quickxplain_naive
+from cpmpy.tools import mss_opt
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, mss, mcs
+
 
 class MusTests(TestCase):
 
@@ -110,6 +112,41 @@ class QuickXplainTests(MusTests):
         self.assertSetEqual(set(subset), {a, b, c})
         subset2 = self.naive_func([d, c, b, a], hard)
         self.assertSetEqual(set(subset2), {b, d})
+
+
+class MSSTests(unittest.TestCase):
+
+    def test_circular(self):
+        x = cp.intvar(0, 3, shape=4, name="x")
+        # circular "bigger then", UNSAT
+        cons = [
+            x[0] > x[1],
+            x[1] > x[2],
+            x[2] > x[0],
+
+            x[3] > x[0],
+            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
+        ]
+
+        self.assertLess(len(mss(cons)), len(cons))
+        self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
+
+
+class MCSTests(unittest.TestCase):
+
+    def test_circular(self):
+        x = cp.intvar(0, 3, shape=4, name="x")
+        # circular "bigger then", UNSAT
+        cons = [
+            x[0] > x[1],
+            x[1] > x[2],
+            x[2] > x[0],
+
+            x[3] > x[0],
+            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
+        ]
+        self.assertEqual(len(mcs(cons)), 1)
+
 
 
 if __name__ == '__main__':

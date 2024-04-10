@@ -24,15 +24,16 @@ Internal utilities for expression handling.
 
 import numpy as np
 import math
-from collections.abc import Iterable # for _flatten
-from itertools import chain, combinations
+from collections.abc import Iterable  # for flatten
+from itertools import combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal))
 
 
 def is_int(arg):
@@ -163,9 +164,15 @@ def get_bounds(expr):
     returns appropriately rounded integers
     """
 
+    # import here to avoid circular import
     from cpmpy.expressions.core import Expression
+    from cpmpy.expressions.variables import cpm_array
+
     if isinstance(expr, Expression):
         return expr.get_bounds()
+    elif is_any_list(expr):
+        lbs, ubs = zip(*[get_bounds(e) for e in expr])
+        return list(lbs), list(ubs) # return list as NDVarArray is covered above
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):

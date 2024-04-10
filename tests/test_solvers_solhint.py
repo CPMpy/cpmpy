@@ -10,7 +10,7 @@ class TestSolutionHinting(unittest.TestCase):
     def test_hints(self):
 
         a,b = cp.boolvar(shape=2)
-        model = cp.Model(a ^ b)
+        model = cp.Model(a | b)
 
         for n, solver_class in cp.SolverLookup.base_solvers():
             if not solver_class.supported():
@@ -29,7 +29,7 @@ class TestSolutionHinting(unittest.TestCase):
                 self.assertEqual(a.value(), False)
                 self.assertEqual(b.value(), True)
 
-                slv.solution_hint([a,b], [True,True])
+                slv.solution_hint([a,b], [False,False])
                 self.assertTrue(slv.solve(**args)) # should also work with an UNSAT hint
 
                 slv.solution_hint([a,[b]], [[[False]], True]) # check nested lists

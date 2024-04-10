@@ -51,12 +51,12 @@ class CPM_exact(SolverInterface):
     See https://pypi.org/project/exact for more information.
 
     Creates the following attributes (see parent constructor for more):
-    - xct_solver: the Exact instance used in solve() and solveAll()
-    - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+        - xct_solver: the Exact instance used in solve() and solveAll()
+        - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
     to recover which expressions were in the core
-    - solver_is_initialized: whether xct_solver is initialized
-    - self.objective_given: whether an objective function is given to xct_solver
-    - self.objective_minimize: the direction of the optimization (if false then maximize)
+        - solver_is_initialized: whether xct_solver is initialized
+        - self.objective_given: whether an objective function is given to xct_solver
+        - self.objective_minimize: the direction of the optimization (if false then maximize)
     as Exact can only minimize
     """
 

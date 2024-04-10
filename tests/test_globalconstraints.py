@@ -1,8 +1,12 @@
 import copy
 import unittest
+
+import pytest
+
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
-from cpmpy.exceptions import TypeError
+from cpmpy.exceptions import TypeError, NotSupportedError
+from cpmpy.solvers import CPM_minizinc
 
 
 class TestGlobal(unittest.TestCase):
@@ -96,6 +100,15 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.AllDifferentExcept0(iv).value())
         self.assertFalse(cp.Model([~cp.AllDifferentExcept0(iv), iv == [0, 0, 1]]).solve())
 
+    def test_alldifferent_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.AllDifferent([iv])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_circuit(self):
         """
@@ -121,6 +134,7 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
+
 
     def test_not_circuit(self):
         x = cp.intvar(lb=0, ub=2, shape=3)
@@ -181,6 +195,17 @@ class TestGlobal(unittest.TestCase):
         # constraint can be used as value
         self.assertTrue(inv.value())
 
+    def test_inverse_onearg(self):
+        iv = cp.intvar(0,10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Inverse([iv], [0])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+
     def test_InDomain(self):
         iv = cp.intvar(-8, 8)
         iv_arr = cp.intvar(-8, 8, shape=5)
@@ -210,6 +235,17 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
 
+    def test_indomain_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.InDomain(iv, [2])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
@@ -238,6 +274,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_table_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Table([iv], [[0]])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]
@@ -249,6 +296,17 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '4')
 
+    def test_minimum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.min([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_maximum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Maximum(iv) + 9 <= 8]
@@ -259,6 +317,17 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(max(iv.value())), '4')
+
+    def test_maximum_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.max([iv]) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_abs(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -294,7 +363,7 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3))
-        a,b = cp.intvar(0, 3, shape=2)
+        a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
         self.assertTrue(model.solve())
@@ -306,6 +375,18 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(arr[a.value(), b.value()], 1)
+
+    def test_element_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        idx = cp.intvar(0,0)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Element([iv],idx) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
 
     def test_xor(self):
         bv = cp.boolvar(5)
@@ -367,6 +448,54 @@ class TestGlobal(unittest.TestCase):
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         self.assertTrue(m.solve())
+
+    def test_cumulative_decomposition_capacity(self):
+        import numpy as np
+
+        # before merging #435 there was an issue with capacity constraint
+        start = cp.intvar(0, 10, 4, "start")
+        duration = [1, 2, 2, 1]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = 10 # tasks cannot be scheduled
+        capacity = np.int64(5) # bug only happened with numpy ints
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertFalse(cp.Model(cons).solve()) # this worked fine
+        # also test decomposition
+        self.assertFalse(cp.Model(cons.decompose()).solve()) # capacity was not taken into account and this failed
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_single_demand(self):
+        start = cp.intvar(0, 10, name="start")
+        dur = 5
+        end = cp.intvar(0, 10, name="end")
+        demand = 2
+        capacity = 10
+
+        m = cp.Model()
+        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_cumulative_nested(self):
+        start = cp.intvar(0, 10, name="start", shape=3)
+        dur = [5,5,5]
+        end = cp.intvar(0, 10, name="end", shape=3)
+        demand = [5,5,9]
+        capacity = 10
+        bv = cp.boolvar()
+
+        cons = cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        m = cp.Model(bv.implies(cons), start + dur != end)
+
+        self.assertTrue(m.solve(solver="ortools"))
+        self.assertTrue(m.solve(solver="minizinc"))
+
+
 
     def test_cumulative_no_np(self):
         start = cp.intvar(0, 10, 4, "start")
@@ -446,6 +575,17 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
         self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
+    def test_gcc_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.GlobalCardinalityCount([iv], [3],[1])).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
     def test_count(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([iv[0] == 0, iv[1] != 1, iv[2] != 2, cp.Count(iv, 0) == 3]).solve())
@@ -463,6 +603,64 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(cp.Model(cp.Count([iv[0],iv[2],iv[1]], x) > y).solve())
 
+    def test_count_onearg(self):
+
+        iv = cp.intvar(0, 10)
+        for s, cls in cp.SolverLookup.base_solvers():
+            print(s)
+            if cls.supported():
+                try:
+                    self.assertTrue(cp.Model(cp.Count([iv], 1) == 0).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+    def test_nvalue(self):
+
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0,10)
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve())
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        self.assertTrue(cp.Model(cp.NValue(iv) != cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve())
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve())
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValue(iv) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+        cp.Model(cons).solveAll(display=check_true)
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_nvalue_minizinc(self):
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0, 10)
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValue(iv) > 1).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValue(iv) > cnt).solve('minizinc'))
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        self.assertTrue(cp.Model(cp.NValue(iv) != cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) >= cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) <= cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) < cnt).solve('minizinc'))
+        self.assertTrue(cp.Model(cp.NValue(iv) > cnt).solve('minizinc'))
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValue(iv) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+
+        cp.Model(cons).solveAll(solver='minizinc')
 
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
@@ -563,6 +761,12 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError,cp.Circuit,(a,b))
         self.assertRaises(TypeError,cp.Circuit,(x,y,b))
 
+    def test_multicicruit(self):
+        c1 = cp.Circuit(cp.intvar(0,4, shape=5))
+        c2 = cp.Circuit(cp.intvar(0,2, shape=3))
+        self.assertTrue(cp.Model(c1 & c2).solve())
+
+
     def test_inverse(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -660,3 +864,14 @@ class TestTypeChecks(unittest.TestCase):
 
         self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
         self.assertRaises(TypeError, cp.Count, [x,y],[x,False])
+
+    def test_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
