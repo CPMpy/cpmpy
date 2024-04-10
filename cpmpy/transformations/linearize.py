@@ -222,7 +222,7 @@ def only_positive_bv(lst_of_expr):
                 weights, args = lhs.args
                 idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
                 nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-                lhs = Operator("wsum", [nw, na]) # force making wsum, even for arity = 1
+                lhs = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
                 rhs -= sum(weights[i] for i in idxes)
 
             if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
