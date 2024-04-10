@@ -45,6 +45,7 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         # check instance
         instance = tree.getroot()
         self.varpool = dict()
+        self.dompool = dict()
 
         xml_vars = instance.findall("./variables/")
         self.parse_variables(xml_vars)
@@ -63,14 +64,23 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
             else:
                 raise ValueError(f"Unknown variable {xml_el}, todo?")
 
-    def parse_singular_var(self,xml_element):
+    def parse_singular_var(self, xml_element):
         varname = xml_element.attrib['id']
-        description = xml_element.attrib['note']
-        lb, ub = self.parse_text_domain(xml_element.text)
+
+        if 'as' not in xml_element.attrib:
+            lb, ub, dom_vals = self.parse_text_domain(xml_element.text)
+        else:
+            prev_var = xml_element.attrib['as']
+            lb, ub, dom_vals = self.dompool[prev_var]
+
+        self.dompool[varname] = (lb, ub, dom_vals)
         if lb == 0 and ub == 1:
-            self.varpool[varname] = cp.boolvar(name=varname,description=description)
+            self.varpool[varname] = cp.boolvar(name=varname)
         else:
             self.varpool[varname] = cp.intvar(lb, ub, name=varname)
+            if len(dom_vals) > 0:
+                self += cp.InDomain(self.varpool[varname],dom_vals)
+
 
     def parse_n_dimvar(self, xml_element):
 
@@ -83,7 +93,7 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
 
         domains = xml_element.findall('domain')
         if domains == []: #domain is same for all vars
-            lb, ub = self.parse_text_domain(xml_element.text)
+            lb, ub, domains = self.parse_text_domain(xml_element.text)
             if lb == 0 and ub == 1:
                 self.varpool[varname] = cp.boolvar(shape=shape, name=varname)
             else:
@@ -119,7 +129,10 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
                 i, j = str_var.split('..')
                 return [x for x in range(int(i), int(j) + 1)]
             else: #simple var/value
-                return self.varpool.get(str_var, int(str_var))
+                var = self.varpool.get(str_var)
+                if var is None:
+                    return int(str_var)
+                return var
 
         if '(' in str_var: #it's a subexpression used as a var
             return self.parse_intension(str_var)
@@ -156,15 +169,15 @@ class XCSPParser(cp.Model): # not sure if we should subclass Model
         if ".." in txt:
             # integer range
             lb, ub = txt.split("..")
-            return int(lb), int(ub)
+            return int(lb), int(ub), []
         elif txt.strip() == "0 1":
-            return 0, 1
+            return 0, 1, []
         else:
-            try:
-                lb = int(txt.strip())
-            except Exception:
-                raise ValueError("Unknown domain:", txt)
-            return lb, lb #var is actually a val (this is not xcsp core)
+            domain = [int(num) for num in txt.split()]
+            if len(domain) == 1:
+                return domain[0], domain[0]
+            else:
+                return min(domain), max(domain), domain
 
     # parsers for all constraints
     def parse_constraint(self, xml_cons):
