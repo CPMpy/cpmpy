@@ -608,6 +608,12 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
 
+        elif expr.name == "count":
+            vars, val = expr.args
+            vars = self._convert_expression(vars)
+            val = self._convert_expression(val)
+            return "count({},{})".format(vars, val)
+
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):
