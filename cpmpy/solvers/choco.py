@@ -343,7 +343,6 @@ class CPM_choco(SolverInterface):
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
-        # ensure all vars are known to solver
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
