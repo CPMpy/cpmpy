@@ -150,21 +150,30 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
+        sddmodels = [x for x in self.pysdd_root.models()]
+        if len(sddmodels) != self.pysdd_root.model_count:
+            #pysdd doesn't always have correct solution count..
+            projected_sols = set()
+            for sol in sddmodels:
+                projectedsol = []
+                for cpm_var in self.user_vars:
+                    lit = self.solver_var(cpm_var).literal
+                    projectedsol.append(bool(sol[lit]))
+                projected_sols.add(tuple(projectedsol))
+        else:
+            projected_sols = set(sddmodels)
         if display is None:
             # the desired, fast computation
-            return self.pysdd_root.model_count()
+            return len(projected_sols)
+
         else:
             # manually walking over the tree, much slower...
             solution_count = 0
-            for sol in self.pysdd_root.models():
+            for sol in projected_sols:
                 solution_count += 1
                 # fill in variable values
-                for cpm_var in self.user_vars:
-                    lit = self.solver_var(cpm_var).literal
-                    if lit in sol:
-                        cpm_var._value = bool(sol[lit])
-                    else:
-                        raise ValueError(f"Var {cpm_var} is unknown to the PySDD solver, this is unexpected - please report on github...")
+                for i, cpm_var in enumerate(self.user_vars):
+                    cpm_var._value = sol[i]
 
                 # display is not None:
                 if isinstance(display, Expression):

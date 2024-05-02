@@ -686,7 +686,9 @@ class TestSolvers(unittest.TestCase):
                 sols = set()
                 if name == 'gurobi':
                     self.assertEqual(m.solveAll(solver=name,solution_limit=20, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
+                    self.assertEqual(m.solveAll(solver=name,solution_limit=20), 8) #test number of solutions is valid, no display
                 else:
                     self.assertEqual(m.solveAll(solver=name, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
+                    self.assertEqual(m.solveAll(solver=name), 8) #test number of solutions is valid, no display
                 #test unique sols, should be same number
                 self.assertEqual(len(sols),8)
