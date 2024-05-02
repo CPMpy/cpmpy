@@ -682,3 +682,18 @@ class TestSolvers(unittest.TestCase):
                 self.assertTrue(m.solve(solver=name))
                 for v in bvs:
                     self.assertIsNotNone(v.value())
+
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_count_mzn(self):
+        # bug #461
+        from cpmpy.expressions.core import Operator
+
+        iv = cp.intvar(0,10, shape=3)
+        x = cp.intvar(0,1)
+        y = cp.intvar(0,1)
+        wsum = Operator("wsum", [[1,2,3],[x,y,cp.Count(iv,3)]])
+
+        m = cp.Model([x + y == 2, wsum == 9])
+        self.assertTrue(m.solve(solver="minizinc"))
