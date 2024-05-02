@@ -83,9 +83,9 @@ class CPM_gurobi(SolverInterface):
         Arguments:
         - cpm_model: a CPMpy Model()
         """
-        # if not self.supported():
-        #     raise Exception(
-        #         "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+        if not self.supported():
+            raise Exception(
+                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
