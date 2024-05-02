@@ -669,3 +669,16 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("gurobi", model)
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
+
+
+    def test_vars_not_removed(self):
+        bvs = cp.boolvar(shape=3)
+        m = cp.Model([cp.any(bvs) <= 2])
+        for name, cls in cp.SolverLookup.base_solvers():
+            print(f"Testing with {name}")
+            if cls.supported():
+                # reset value for vars
+                bvs.clear()
+                self.assertTrue(m.solve(solver=name))
+                for v in bvs:
+                    self.assertIsNotNone(v.value())
