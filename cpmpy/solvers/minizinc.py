@@ -496,7 +496,7 @@ class CPM_minizinc(SolverInterface):
 
         if expr.name == "alldifferent_except0":
             args_str = [self._convert_expression(e) for e in expr.args]
-            return "alldifferent_except_0({})".format(args_str)
+            return "alldifferent_except_0([{}])".format(",".join(args_str))
 
         # count: we need the lhs and rhs together
         if isinstance(expr, Comparison) and expr.args[0].name == 'count':
