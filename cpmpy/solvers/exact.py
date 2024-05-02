@@ -226,6 +226,9 @@ class CPM_exact(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if self.objective_given:
             raise NotSupportedError("Exact does not support finding all optimal solutions.")
 

@@ -198,7 +198,7 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    cpm_var._value = None  # probably got optimized away by our transformations
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
 
             # translate objective
             if self.has_objective():
