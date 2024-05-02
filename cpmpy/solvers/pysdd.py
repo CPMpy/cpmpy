@@ -121,7 +121,7 @@ class CPM_pysdd(SolverInterface):
                 if lit in sol:
                     cpm_var._value = bool(sol[lit])
                 else:
-                    cpm_var._value = None  # not specified...
+                    raise ValueError(f"Var {cpm_var} is unknown to the PySDD solver, this is unexpected - please report on github...")
 
         return has_sol
 
@@ -139,6 +139,9 @@ class CPM_pysdd(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
@@ -161,7 +164,7 @@ class CPM_pysdd(SolverInterface):
                     if lit in sol:
                         cpm_var._value = bool(sol[lit])
                     else:
-                        cpm_var._value = None
+                        raise ValueError(f"Var {cpm_var} is unknown to the PySDD solver, this is unexpected - please report on github...")
 
                 # display is not None:
                 if isinstance(display, Expression):
