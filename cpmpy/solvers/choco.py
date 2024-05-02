@@ -175,6 +175,9 @@ class CPM_choco(SolverInterface):
             Returns: number of solutions found
         """
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
 
