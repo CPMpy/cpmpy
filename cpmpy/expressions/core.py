@@ -400,7 +400,11 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [argval(a) for a in self.args]
+        try:
+            arg_vals = [argval(a) for a in self.args]
+        except IncompleteFunctionError:
+            return False
+
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
         elif self.name == "!=": return arg_vals[0] != arg_vals[1]
@@ -526,11 +530,16 @@ class Operator(Expression):
         return "{}({})".format(self.name, self.args)
 
     def value(self):
+
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
             arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
         else:
-            arg_vals = [argval(arg) for arg in self.args]
+            try:
+                arg_vals = [argval(arg) for arg in self.args]
+            except IncompleteFunctionError as e:
+                if self.is_bool(): return False
+                raise e
 
 
         if any(a is None for a in arg_vals): return None

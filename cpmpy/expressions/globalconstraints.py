@@ -171,7 +171,11 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == len(self.args)
+        try:
+            values = [argval(a) for a  in self.args]
+            return len(set(values)) == len(self.args)
+        except IncompleteFunctionError:
+            return False
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -186,9 +190,11 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        vals = [a.value() for a in self.args if a.value() != 0]
-        return len(set(vals)) == len(vals)
-
+        try:
+            vals = [a.value() for a in self.args if a.value() != 0]
+            return len(set(vals)) == len(vals)
+        except IncompleteFunctionError:
+            return False
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -208,8 +214,11 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == 1
-
+        try:
+            values = [argval(a) for a in self.args]
+            return len(set(values)) == 1
+        except IncompleteFunctionError:
+            return False
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -252,7 +261,11 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        arr = [argval(a) for a in self.args]
+        try:
+            arr = [argval(a) for a in self.args]
+        except IncompleteFunctionError:
+            return False
+
         while idx not in visited:
             if idx is None:
                 return False
@@ -287,9 +300,16 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        fwd = [argval(a) for a in self.args[0]]
-        rev = [argval(a) for a in self.args[1]]
-        return all(rev[x] == i for i, x in enumerate(fwd))
+        try:
+            fwd = [argval(a) for a in self.args[0]]
+            rev = [argval(a) for a in self.args[1]]
+        except IncompleteFunctionError:
+            return False
+        # args are fine, now evaluate actual inverse cons
+        try:
+            return all(rev[x] == i for i, x in enumerate(fwd))
+        except IndexError: # partiality of Element constraint
+            raise IncompleteFunctionError
 
 
 class Table(GlobalConstraint):
@@ -308,8 +328,12 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
-        return arrval in tab
+        try:
+            arrval = [argval(a) for a in arr]
+            return arrval in tab
+        except IncompleteFunctionError:
+            return False
+
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
@@ -323,10 +347,13 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        if argval(condition):
-            return argval(if_true)
-        else:
-            return argval(if_false)
+        try:
+            if argval(condition):
+                return argval(if_true)
+            else:
+                return argval(if_false)
+        except IncompleteFunctionError:
+            return False
 
     def decompose(self):
         condition, if_true, if_false = self.args
@@ -374,7 +401,10 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        return argval(self.args[0]) in argval(self.args[1])
+        try:
+            return argval(self.args[0]) in argval(self.args[1])
+        except IncompleteFunctionError:
+            return False
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -404,7 +434,10 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        return sum(argval(a) for a in self.args) % 2 == 1
+        try:
+            return sum(argval(a) for a in self.args) % 2 == 1
+        except IncompleteFunctionError:
+            return False
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -473,8 +506,11 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
-                   else argval(arg) for arg in self.args]
+        try:
+            argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+                       else argval(arg) for arg in self.args]
+        except IncompleteFunctionError:
+            return False
 
         if any(a is None for a in argvals):
             return None
