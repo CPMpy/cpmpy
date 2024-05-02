@@ -155,6 +155,9 @@ class CPM_exact(SolverInterface):
         """
         from exact import Exact as xct
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if not self.solver_is_initialized:
             assert not self.objective_given
             # NOTE: initialization of exact is also how it fixes the objective function.

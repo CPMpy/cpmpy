@@ -112,6 +112,9 @@ class CPM_z3(SolverInterface):
         """
         import z3
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))

@@ -201,6 +201,10 @@ class CPM_minizinc(SolverInterface):
 
             Does not store the minizinc.Instance() or minizinc.Result()
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         # make mzn_inst
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         

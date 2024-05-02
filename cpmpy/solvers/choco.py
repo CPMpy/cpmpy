@@ -107,6 +107,8 @@ class CPM_choco(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
@@ -338,6 +340,7 @@ class CPM_choco(SolverInterface):
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
+        # ensure all vars are known to solver
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):

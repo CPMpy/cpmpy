@@ -94,6 +94,10 @@ class CPM_pysdd(SolverInterface):
                 - building it is the (computationally) hard part
                 - checking for a solution is trivial after that
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
