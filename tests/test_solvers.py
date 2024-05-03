@@ -671,6 +671,7 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
 
+save_all_uservars
     def test_vars_not_removed(self):
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
@@ -692,3 +693,19 @@ class TestSolvers(unittest.TestCase):
                     self.assertEqual(m.solveAll(solver=name), 8) #test number of solutions is valid, no display
                 #test unique sols, should be same number
                 self.assertEqual(len(sols),8)
+
+                
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_count_mzn(self):
+        # bug #461
+        from cpmpy.expressions.core import Operator
+
+        iv = cp.intvar(0,10, shape=3)
+        x = cp.intvar(0,1)
+        y = cp.intvar(0,1)
+        wsum = Operator("wsum", [[1,2,3],[x,y,cp.Count(iv,3)]])
+
+        m = cp.Model([x + y == 2, wsum == 9])
+        self.assertTrue(m.solve(solver="minizinc"))
+

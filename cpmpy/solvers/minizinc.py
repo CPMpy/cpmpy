@@ -500,21 +500,7 @@ class CPM_minizinc(SolverInterface):
 
         if expr.name == "alldifferent_except0":
             args_str = [self._convert_expression(e) for e in expr.args]
-            return "alldifferent_except_0({})".format(args_str)
-
-        # count: we need the lhs and rhs together
-        if isinstance(expr, Comparison) and expr.args[0].name == 'count':
-            name = expr.name
-            lhs, rhs = expr.args
-            c = self._convert_expression(rhs)  # count
-            x = [self._convert_expression(countable) for countable in lhs.args[0]]  # array
-            y = self._convert_expression(lhs.args[1])  # value to count in array
-            functionmap = {'==': 'count_eq', '!=': 'count_neq',
-                        '<=': 'count_geq', '>=': 'count_leq',
-                        '>': 'count_lt', '<': 'count_gt'}
-            if name in functionmap:
-                name = functionmap[name]
-            return "{}({},{},{})".format(name, x, y, c)
+            return "alldifferent_except_0([{}])".format(",".join(args_str))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
@@ -611,6 +597,12 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
+
+        elif expr.name == "count":
+            vars, val = expr.args
+            vars = self._convert_expression(vars)
+            val = self._convert_expression(val)
+            return "count({},{})".format(vars, val)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
