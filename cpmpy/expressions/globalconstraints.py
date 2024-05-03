@@ -102,6 +102,7 @@
         Circuit
         Inverse
         Table
+        SmartTable
         Xor
         Cumulative
         GlobalCardinalityCount
@@ -311,6 +312,27 @@ class Table(GlobalConstraint):
         arrval = [argval(a) for a in arr]
         return arrval in tab
 
+
+class SmartTable(GlobalConstraint):
+    """The values of the variables in 'array' correspond to a row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("smarttable", [array, table])
+
+    def decompose(self):
+        from .python_builtins import any, all
+        arr, tab = self.args
+        raise NotImplementedError('not yet implemented')
+        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        raise NotImplementedError('not yet implemented')
+        return arrval in tab
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
