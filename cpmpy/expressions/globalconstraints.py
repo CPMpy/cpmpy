@@ -517,6 +517,46 @@ class GlobalCardinalityCount(GlobalConstraint):
         return all(decomposed).value()
 
 
+class Increasing(GlobalConstraint):
+    """
+        The "Increasing" constraint, the expressions will have increasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("increasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Increasing constraint
+            2) empty list of defining constraints
+        """
+        return [var1 <= var2 for var1, var2 in all_pairs(self.args)], []
+
+    def value(self):
+        from .python_builtins import all
+        return all(var1.value() <= var2.value() for var1, var2 in all_pairs(self.args))
+
+class Decreasing(GlobalConstraint):
+    """
+        The "Decreasing" constraint, the expressions will have decreasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("decreasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Decreasing constraint
+            2) empty list of defining constraints
+        """
+        return [var1 >= var2 for var1, var2 in all_pairs(self.args)], []
+
+    def value(self):
+        from .python_builtins import all
+        return all(var1.value() >= var2.value() for var1, var2 in all_pairs(self.args))
+
 class DirectConstraint(Expression):
     """
         A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
