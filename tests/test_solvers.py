@@ -671,7 +671,6 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
 
-save_all_uservars
     def test_vars_not_removed(self):
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
