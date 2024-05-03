@@ -137,6 +137,10 @@ class CPM_pysat(SolverInterface):
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
@@ -185,9 +189,8 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = True
                 elif -lit in sol:
                     cpm_var._value = False
-                else:
-                    # not specified...
-                    cpm_var._value = None
+                else: # not specified, dummy val
+                    cpm_var._value = True
 
         return has_sol
 

@@ -107,6 +107,8 @@ class CPM_choco(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # call the solver, with parameters
         self.chc_solver = self.chc_model.get_solver()
@@ -172,6 +174,9 @@ class CPM_choco(SolverInterface):
 
             Returns: number of solutions found
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")

@@ -115,6 +115,9 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
 

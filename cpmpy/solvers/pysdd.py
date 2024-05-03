@@ -94,6 +94,10 @@ class CPM_pysdd(SolverInterface):
                 - building it is the (computationally) hard part
                 - checking for a solution is trivial after that
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
@@ -117,7 +121,7 @@ class CPM_pysdd(SolverInterface):
                 if lit in sol:
                     cpm_var._value = bool(sol[lit])
                 else:
-                    cpm_var._value = None  # not specified...
+                    raise ValueError(f"Var {cpm_var} is unknown to the PySDD solver, this is unexpected - please report on github...")
 
         return has_sol
 
@@ -135,6 +139,9 @@ class CPM_pysdd(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
@@ -143,21 +150,30 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             return 0
 
+        sddmodels = [x for x in self.pysdd_root.models()]
+        if len(sddmodels) != self.pysdd_root.model_count:
+            #pysdd doesn't always have correct solution count..
+            projected_sols = set()
+            for sol in sddmodels:
+                projectedsol = []
+                for cpm_var in self.user_vars:
+                    lit = self.solver_var(cpm_var).literal
+                    projectedsol.append(bool(sol[lit]))
+                projected_sols.add(tuple(projectedsol))
+        else:
+            projected_sols = set(sddmodels)
         if display is None:
             # the desired, fast computation
-            return self.pysdd_root.model_count()
+            return len(projected_sols)
+
         else:
             # manually walking over the tree, much slower...
             solution_count = 0
-            for sol in self.pysdd_root.models():
+            for sol in projected_sols:
                 solution_count += 1
                 # fill in variable values
-                for cpm_var in self.user_vars:
-                    lit = self.solver_var(cpm_var).literal
-                    if lit in sol:
-                        cpm_var._value = bool(sol[lit])
-                    else:
-                        cpm_var._value = None
+                for i, cpm_var in enumerate(self.user_vars):
+                    cpm_var._value = sol[i]
 
                 # display is not None:
                 if isinstance(display, Expression):
