@@ -14,8 +14,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing"},
                   "exact": {},
                   "choco": {}
                   }
@@ -152,7 +152,7 @@ def global_constraints(solver):
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
            Xor, Cumulative, NValue, Count
     """
-    global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue]
+    global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue, Increasing, Decreasing]
     for global_type in global_cons:
         cons = global_type(NUM_ARGS)
         if solver not in EXCLUDE_GLOBAL or cons.name not in EXCLUDE_GLOBAL[solver]:
