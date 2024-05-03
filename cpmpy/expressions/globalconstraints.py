@@ -537,6 +537,7 @@ class Increasing(GlobalConstraint):
         from .python_builtins import all
         return all(var1.value() <= var2.value() for var1, var2 in all_pairs(self.args))
 
+
 class Decreasing(GlobalConstraint):
     """
         The "Decreasing" constraint, the expressions will have decreasing (not strictly) values
@@ -556,6 +557,49 @@ class Decreasing(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         return all(var1.value() >= var2.value() for var1, var2 in all_pairs(self.args))
+
+
+class IncreasingStrict(GlobalConstraint):
+    """
+        The "IncreasingStrict" constraint, the expressions will have increasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("increasing_strict", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the IncreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        return [var1 < var2 for var1, var2 in all_pairs(self.args)], []
+
+    def value(self):
+        from .python_builtins import all
+        return all(var1.value() < var2.value() for var1, var2 in all_pairs(self.args))
+
+
+class DecreasingStrict(GlobalConstraint):
+    """
+        The "DecreasingStrict" constraint, the expressions will have decreasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("decreasing_strict", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the DecreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        return [var1 > var2 for var1, var2 in all_pairs(self.args)], []
+
+    def value(self):
+        from .python_builtins import all
+        return all(var1.value() > var2.value() for var1, var2 in all_pairs(self.args))
+
 
 class DirectConstraint(Expression):
     """
