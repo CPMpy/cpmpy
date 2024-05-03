@@ -223,6 +223,20 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
+        lbs, ubs = zip(*[get_bounds(arg) for arg in flatargs])
+        lb = min(lbs)
+        ub = max(ubs)
+        if lb < 0 or ub >= len(flatargs):
+            for arg in flatargs:
+                lb, ub = get_bounds(arg)
+                if lb < 0 or ub >= len(flatargs):
+                    argument = arg
+                    break
+            raise IncompleteFunctionError(f"elements in the array cannot have bounds outside [0,{len(flatargs)-1}]"
+                                          f", since they are used to index the array of length {len(flatargs)}, "
+                                          f"bounds of {argument} are not tight enough ([{lb},{ub}])"
+                                          f" \n see https://github.com/CPMpy/cpmpy/issues/439 for more information")
+
         super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
@@ -278,6 +292,20 @@ class Inverse(GlobalConstraint):
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         assert len(fwd) == len(rev)
+        lbs, ubs = zip(*[get_bounds(arg) for arg in flatargs])
+        lb = min(lbs)
+        ub = max(ubs)
+        if lb < 0 or ub >= len(fwd):
+            for arg in flatargs:
+                lb, ub = get_bounds(arg)
+                if lb < 0 or ub >= len(flatargs):
+                    argument = arg
+                    break
+            raise IncompleteFunctionError(f"elements in the arrays cannot have bounds outside [0,{len(fwd)-1}]"
+                                          f", since they are used to index the given arrays of length {len(fwd)}, "
+                                          f"bounds of {argument} are not tight enough ([{lb},{ub}])"
+                                          f" \n see https://github.com/CPMpy/cpmpy/issues/439 for more information")
+
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):

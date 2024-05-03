@@ -246,6 +246,10 @@ class Element(GlobalFunction):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if is_any_list(idx):
             raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
+        lb, ub = get_bounds(idx)
+        if lb < 0 or ub >= len(arr):
+            raise IncompleteFunctionError('index should never exceed the array bounds. if you have a usecase for this, please report it on GitHub.'
+                            f" \n see https://github.com/CPMpy/cpmpy/issues/439 for more information")
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
@@ -274,8 +278,7 @@ class Element(GlobalFunction):
         from .python_builtins import any
 
         arr, idx = self.args
-        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)], []
+        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))], []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
