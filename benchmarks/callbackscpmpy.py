@@ -12,6 +12,8 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
+from cpmpy.expressions.utils import is_any_list, get_bounds
+
 
 class CallbacksCPMPy(Callbacks):
 
@@ -21,15 +23,23 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_variables = dict()
 
     def var_integer_range(self, x: Variable, min_value: int, max_value: int):
-        newvar = cp.intvar(min_value, max_value, name=x.id)
+        if min_value == 0 and max_value == 1:
+            #boolvar
+            newvar = cp.boolvar(name=x.id)
+        else:
+            newvar = cp.intvar(min_value, max_value, name=x.id)
         self.cpm_variables[x] = newvar
 
     def var_integer(self, x: Variable, values: list[int]):
         mini = min(values)
         maxi = max(values)
-        newvar = cp.intvar(mini, maxi, name=x.id)
-        nbvals = maxi - mini + 1
+        if mini == 0 and maxi == 1:
+            #boolvar
+            newvar = cp.boolvar(name=x.id)
+        else:
+            newvar = cp.intvar(mini, maxi, name=x.id)
         self.cpm_variables[x] = newvar
+        nbvals = maxi - mini + 1
         if nbvals < len(values):
             # only do this if there are holes in the domain
             self.cpm_model += cp.InDomain(newvar, values)
@@ -181,9 +191,19 @@ class CallbacksCPMPy(Callbacks):
             if isinstance(x,_Star):
                 return '*'
             return x
-        cpm_vars = self.vars_from_node(scope)
-        exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
-        self.cpm_model += cp.SmartTable(cpm_vars, exttuples)
+        if 'starred' in flags:
+            cpm_vars = self.vars_from_node(scope)
+            exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
+            if positive:
+                self.cpm_model += cp.SmartTable(cpm_vars, exttuples)
+            else:
+                self.cpm_model += ~cp.SmartTable(cpm_vars, exttuples)
+        else:
+            cpm_vars = self.vars_from_node(scope)
+            if positive:
+                self.cpm_model += cp.Table(cpm_vars, tuples)
+            else:
+                self.cpm_model += ~cp.Table(cpm_vars, tuples)
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
@@ -200,6 +220,8 @@ class CallbacksCPMPy(Callbacks):
         if excepting is None:
             cpm_exprs = self.exprs_from_node(scope)
             return cp.AllDifferent(cpm_exprs)
+        elif excepting == [0]:
+            return cp.AllDifferentExcept0(self.exprs_from_node(scope))
         else:
             self._unimplemented(scope, excepting)
 
@@ -211,7 +233,7 @@ class CallbacksCPMPy(Callbacks):
         #self._unimplemented(matrix, excepting)
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
-        self._unimplemented(scope, excepting)
+        self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
         #raise NotImplementedError('Increasing global not in cpmpy')
@@ -358,10 +380,24 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(origins, lengths, zero_ignored)
 
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
-        self._unimplemented(xs, ys, lx, ly, zero_ignored)
+        #self._unimplemented(xs, ys, lx, ly, zero_ignored)
+        pass
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable], heights: list[int] | list[Variable], condition: Condition):
-        self._unimplemented(origins, lengths, heights, condition)
+        #self._unimplemented(origins, lengths, heights, condition)
+        cpm_start = self.get_cpm_exprs(origins)
+        cpm_durations = self.get_cpm_exprs(lengths)
+        cpm_demands = self.get_cpm_exprs(heights)
+        if condition.operator.name == 'LE':
+            lbs, ubs = get_bounds(cp.cpm_array(cpm_start) + cpm_durations)
+            lb = min(lbs)
+            ub = max(ubs)
+            cpm_ends = cp.intvar(lb, ub, len(cpm_start))
+            for i in range(len(cpm_start)):
+                self.cpm_model += cpm_start[i] + cpm_ends[i] == cpm_ends[i]
+            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, capacity=self.get_cpm_var(condition.operator.value))
+
+
 
     def ctr_binpacking(self, lst: list[Variable], sizes: list[int], condition: Condition):
         self._unimplemented(lst, sizes, condition)
@@ -400,16 +436,74 @@ class CallbacksCPMPy(Callbacks):
     # # # # # # # # # #
 
     def obj_minimize(self, term: Variable | Node):
-        self._unimplemented(term)
+        if isinstance(term, Node):
+            term = term.cnt
+        self.cpm_model.minimize(self.get_cpm_var(term))
 
     def obj_maximize(self, term: Variable | Node):
-        self._unimplemented(term)
+        self.cpm_model.maximize(self.get_cpm_exprs(term)[0])
 
     def obj_minimize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
-        self._unimplemented(obj_type, terms, coefficients)
+        if obj_type == TypeObj.SUM:
+            if coefficients is None:
+                self.cpm_model.minimize(cp.sum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.minimize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.PRODUCT:
+            if coefficients is None:
+                self.cpm_model.minimize(reduce((lambda x, y: x*y),self.get_cpm_exprs(terms)))
+            else:
+                self._unimplemented(obj_type, terms, coefficients)
+        elif obj_type == TypeObj.EXPRESSION:
+            self._unimplemented(obj_type, terms, coefficients)
+        elif obj_type == TypeObj.MAXIMUM:
+            if coefficients is None:
+                self.cpm_model.minimize(cp.Maximum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.minimize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.MINIMUM:
+            if coefficients is None:
+                self.cpm_model.minimize(cp.Minimum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.minimize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.NVALUES:
+            if coefficients is None:
+                self.cpm_model.minimize(cp.NValue(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.minimize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        else:
+            self._unimplemented(obj_type, terms, coefficients)
 
     def obj_maximize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
-        self._unimplemented(obj_type, terms, coefficients)
+        if obj_type == TypeObj.SUM:
+            if coefficients is None:
+                self.cpm_model.maximize(cp.sum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.maximize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.PRODUCT:
+            if coefficients is None:
+                self.cpm_model.maximize(reduce((lambda x, y: x * y), self.get_cpm_exprs(terms)))
+            else:
+                self._unimplemented(obj_type, terms, coefficients)
+        elif obj_type == TypeObj.EXPRESSION:
+            self._unimplemented(obj_type, terms, coefficients)
+        elif obj_type == TypeObj.MAXIMUM:
+            if coefficients is None:
+                self.cpm_model.maximize(cp.Maximum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.maximize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.MINIMUM:
+            if coefficients is None:
+                self.cpm_model.maximize(cp.Minimum(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.maximize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        elif obj_type == TypeObj.NVALUES:
+            if coefficients is None:
+                self.cpm_model.maximize(cp.NValue(self.get_cpm_exprs(terms)))
+            else:
+                self.cpm_model.maximize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        else:
+            self._unimplemented(obj_type, terms, coefficients)
 
     def vars_from_node(self, scope):
         cpm_vars = []
@@ -442,3 +536,14 @@ class CallbacksCPMPy(Callbacks):
             return [self.get_cpm_var(x) for x in list]
         else:
             return self.exprs_from_node(list)
+
+    def end_instance(self):
+        pass
+
+    def load_annotation(self, annotation):
+        pass
+    def load_annotations(self, annotations):
+        print('load_annotations_')
+
+    def load_objectives(self, objectives):
+        print('load_objectives_')

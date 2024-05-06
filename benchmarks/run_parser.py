@@ -6,10 +6,9 @@ from callbackscpmpy import CallbacksCPMPy
 
 import glob
 from os.path import join
-problems = glob.glob(join("CSP", '*.xml'))
-problems += glob.glob(join("..", "MiniCOP", '*.xml'))
+problems = glob.glob(join("CSP", 'bugs', '*.xml'))
 print(problems)
-count = 160
+count = 10
 ecount = 0
 print(problems[count])
 for xml in problems[count:]:

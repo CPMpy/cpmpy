@@ -325,14 +325,22 @@ class SmartTable(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any, all
         arr, tab = self.args
-        raise NotImplementedError('not yet implemented')
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [any(all(ai == ri for ai, ri in zip(arr, row) if ri != '*') for row in tab)], []
 
     def value(self):
         arr, tab = self.args
         arrval = [argval(a) for a in arr]
-        raise NotImplementedError('not yet implemented')
-        return arrval in tab
+        for tup in tab:
+            thistup = True
+            for aval, tval in zip(arrval, tup):
+                if tval != '*':
+                    if aval != tval:
+                        thistup = False
+            if thistup:
+                #found tuple that matches
+                return True
+        #didn't find tuple that matches
+        return False
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
