@@ -181,10 +181,16 @@ class CallbacksCPMPy(Callbacks):
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
         if positive:
             #unary table constraint is just an inDomain
-            self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
+            if len(values) == 1:
+                self.cpm_model += self.get_cpm_var(x) == values[0]
+            else:
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
         else:
             # negative, so not in domain
-            self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values)
+            if len(values) == 1:
+                self.cpm_model += self.get_cpm_var(x) != values[0]
+            else:
+                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values)
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
@@ -229,8 +235,13 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lists, excepting)
 
     def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
-        pass
-        #self._unimplemented(matrix, excepting)
+        if excepting is None:
+            cpm_exprs = self.exprs_from_node(matrix)
+            return cp.AllDifferent(cpm_exprs)
+        elif excepting == [0]:
+            return cp.AllDifferentExcept0(self.exprs_from_node(matrix))
+        else:
+            self._unimplemented(excepting)
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
@@ -304,16 +315,24 @@ class CallbacksCPMPy(Callbacks):
         #self._unimplemented(lst, values, k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
-        pass
-        #self._unimplemented(lst, excepting, condition)
-
+        arity, op = self.funcmap[condition.operator.name.lower()]
+        cpm_rhs = self.cpm_variables[condition.right_operand()]
+        if excepting is None:
+            if arity == 2: #should always be a comparison
+                self.cpm_model += op(cp.NValue(self.get_cpm_exprs(lst)), cpm_rhs)
+            else:
+                assert False, "condition should be a comparision"
+        else:
+            self._unimplemented()
     def ctr_not_all_qual(self, lst: list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
         self.cpm_model += ~cp.AllEqual(cpm_vars)
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable], occurs: list[int] | list[Variable] | list[range], closed: bool):
-        pass
-        #self._unimplemented(lst, values, occurs, closed)
+        if closed == False:
+            self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst), self.get_cpm_exprs(values), self.get_cpm_exprs(occurs))
+        else:
+            self._unimplemented()
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
         cpm_vars = self.get_cpm_vars(lst)
