@@ -102,6 +102,7 @@
         Circuit
         Inverse
         Table
+        SmartTable
         Xor
         Cumulative
         GlobalCardinalityCount
@@ -312,6 +313,35 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
+class SmartTable(GlobalConstraint):
+    """The values of the variables in 'array' correspond to a row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("smarttable", [array, table])
+
+    def decompose(self):
+        from .python_builtins import any, all
+        arr, tab = self.args
+        return [any(all(ai == ri for ai, ri in zip(arr, row) if ri != '*') for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        for tup in tab:
+            thistup = True
+            for aval, tval in zip(arrval, tup):
+                if tval != '*':
+                    if aval != tval:
+                        thistup = False
+            if thistup:
+                #found tuple that matches
+                return True
+        #didn't find tuple that matches
+        return False
+
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
@@ -344,8 +374,8 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
-        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
-            "The expressions in the InDomain constraint should not be boolean"
+        #assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
+         #   "The expressions in the InDomain constraint should not be boolean"
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
