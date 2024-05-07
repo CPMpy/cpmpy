@@ -15,14 +15,18 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
-# Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {},
-                  "gurobi": {},
-                  "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
-                  "exact": {},
-                  "choco": {}
+NUM_GLOBAL = {
+    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    # also global functions
+    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue",
+}
+
+# Solvers not supporting arithmetic constraints
+SAT_SOLVERS = {"pysat", "pysdd"}
+
+EXCLUDE_GLOBAL = {"minizinc": {"circuit"},
+                  "pysat": NUM_GLOBAL,
+                  "pysdd": NUM_GLOBAL | {"Xor"},
                   }
 
 # Exclude certain operators for solvers.
@@ -32,16 +36,6 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {"mod","pow","div","mul"},
                      }
-
-# Some solvers only support a subset of operators in imply-constraints
-# This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {},
-                "minizinc": {},
-                "z3": {},
-                "pysat": {},
-                "pysdd": {},
-                "exact": {"mod","pow","div","mul"},
-                }
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
@@ -91,6 +85,8 @@ def numexprs(solver):
     # also global functions
     classes = inspect.getmembers(cpmpy.expressions.globalfunctions, inspect.isclass)
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
+
     for name, cls in classes:
         if name == "Abs":
             expr = cls(NUM_ARGS[0])
@@ -124,6 +120,8 @@ def comp_constraints(solver):
             # numeric vs bool/num var/val (incl global func)
             lb, ub = get_bounds(numexpr)
             for rhs in [NUM_VAR, BOOL_VAR, BoolVal(True), 1]:
+                if solver in SAT_SOLVERS and not is_num(rhs):
+                    continue
                 if comp_name == ">" and ub <= get_bounds(rhs)[1]:
                     continue
                 if comp_name == "<" and lb >= get_bounds(rhs)[0]:
@@ -168,13 +166,14 @@ def global_constraints(solver):
     """
     classes = inspect.getmembers(cpmpy.expressions.globalconstraints, inspect.isclass)
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
 
         if name == "Xor":
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
-            expr = cls(NUM_ARGS, NUM_ARGS)
+            expr = cls(NUM_ARGS, [1,2,0])
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "IfThenElse":
@@ -207,20 +206,15 @@ def reify_imply_exprs(solver):
                    Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
     """
     for bool_expr in bool_exprs(solver):
-        if solver not in EXCLUDE_IMPL or  \
-                bool_expr.name not in EXCLUDE_IMPL[solver]:
-            yield bool_expr.implies(BOOL_VAR)
-            yield BOOL_VAR.implies(bool_expr)
-            yield bool_expr == BOOL_VAR
+        yield bool_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(bool_expr)
+        yield bool_expr == BOOL_VAR
 
     for comp_expr in comp_constraints(solver):
         lhs, rhs = comp_expr.args
-        if solver not in EXCLUDE_IMPL or \
-                (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL[solver]) and \
-                (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL[solver]):
-            yield comp_expr.implies(BOOL_VAR)
-            yield BOOL_VAR.implies(comp_expr)
-            yield comp_expr == BOOL_VAR
+        yield comp_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(comp_expr)
+        yield comp_expr == BOOL_VAR
 
 
 def verify(cons):
