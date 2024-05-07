@@ -189,7 +189,7 @@ def global_constraints(solver):
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
         elif name == "GlobalCardinalityCount":
-            vals = intvar(0,3, shape=3)
+            vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
             expr = cls(NUM_ARGS, vals, cnts)
         else: # default constructor, list of numvars
