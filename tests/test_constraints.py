@@ -16,13 +16,13 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 
 # Exclude some global constraints for solvers
 # Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {},
-                  "gurobi": {},
-                  "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor'},
-                  "exact": {},
-                  "choco": {}
+EXCLUDE_GLOBAL = {"ortools": {'inverse'},
+                  "gurobi": {'inverse'},
+                  "minizinc": {"circuit", 'inverse'},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative", 'inverse'},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative",'xor', 'inverse'},
+                  "exact": {'inverse'},
+                  "choco": {'inverse'}
                   }
 
 # Exclude certain operators for solvers.
