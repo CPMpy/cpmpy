@@ -64,10 +64,10 @@
 import copy
 import warnings  # for deprecation warning
 import numpy as np
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
+from ..exceptions import CPMpyException, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, argval, argvals, eval_comparison, is_any_list, is_boolexpr, get_bounds
 
 
 class GlobalFunction(Expression):
@@ -116,11 +116,12 @@ class Minimum(GlobalFunction):
         super().__init__("min", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
+        vals = argvals(self.args)
+        if any(val is None for val in vals):
             return None
         else:
-            return min(argvals)
+            return min(vals)  # will always return nan if any argument is nan.
+            # This is in line with how solvers handle undefinedness in Min and Max.
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -157,11 +158,11 @@ class Maximum(GlobalFunction):
         super().__init__("max", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
+        vals = argvals(self.args)
+        if any(val is None for val in vals):
             return None
         else:
-            return max(argvals)
+            return max(vals)
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -257,8 +258,8 @@ class Element(GlobalFunction):
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
                 return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
-        return None # default
+            return np.nan
+        return None  # default
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -271,8 +272,6 @@ class Element(GlobalFunction):
                    they should be enforced toplevel.
 
         """
-        from .python_builtins import any
-
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)], []
@@ -356,7 +355,7 @@ class NValue(GlobalFunction):
         return [eval_comparison(cmp_op, sum(bvars), cpm_rhs)], constraints
 
     def value(self):
-        return len(set(argval(a) for a in self.args))
+        return len(set(argval(a) for a in self.args if not np.isnan(argval(a))))
 
     def get_bounds(self):
         """
