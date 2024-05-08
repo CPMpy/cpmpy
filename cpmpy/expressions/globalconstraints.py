@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## globalconstraints.py
 ##
@@ -108,13 +108,14 @@
 
 """
 import copy
-import warnings # for deprecation warning
+import warnings  # for deprecation warning
 import numpy as np
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
+from ..exceptions import CPMpyException, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
-from .globalfunctions import * # XXX make this file backwards compatible
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, \
+    is_true_cst, argvals
+from .globalfunctions import *  # XXX make this file backwards compatible
 
 
 # Base class GlobalConstraint
@@ -155,13 +156,15 @@ class GlobalConstraint(Expression):
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
-    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
-    return AllDifferent(*args) # unfold list as individual arguments
+    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
+    return AllDifferent(*args)  # unfold list as individual arguments
 
 
 class AllDifferent(GlobalConstraint):
     """All arguments have a different (distinct) value
     """
+
     def __init__(self, *args):
         super().__init__("alldifferent", flatlist(args))
 
@@ -171,17 +174,18 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        try:
-            values = [argval(a) for a  in self.args]
-            return len(set(values)) == len(self.args)
-        except IncompleteFunctionError:
+        values = argvals(self.args)
+        if any([np.isnan(x) for x in values]):
             return False
+        else:
+            return len(set(values)) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
     """
     All nonzero arguments have a distinct value
     """
+
     def __init__(self, *args):
         super().__init__("alldifferent_except0", flatlist(args))
 
@@ -190,20 +194,23 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        try:
-            vals = [a.value() for a in self.args if a.value() != 0]
-            return len(set(vals)) == len(vals)
-        except IncompleteFunctionError:
+        vals = [a.value() for a in self.args if a.value() != 0]
+        if any([np.isnan(x) for x in vals]):
             return False
+        else:
+            return len(set(vals)) == len(vals)
+
 
 def allequal(args):
-    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
-    return AllEqual(*args) # unfold list as individual arguments
+    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
+    return AllEqual(*args)  # unfold list as individual arguments
 
 
 class AllEqual(GlobalConstraint):
     """All arguments have the same value
     """
+
     def __init__(self, *args):
         super().__init__("allequal", flatlist(args))
 
@@ -214,20 +221,22 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        try:
-            values = [argval(a) for a in self.args]
-            return len(set(values)) == 1
-        except IncompleteFunctionError:
+        values = argvals(self.args)
+        if any([np.isnan(x) for x in values]):
             return False
+        return len(set(values)) == 1
+
 
 def circuit(args):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
-    return Circuit(*args) # unfold list as individual arguments
+    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
+    return Circuit(*args)  # unfold list as individual arguments
 
 
 class Circuit(GlobalConstraint):
     """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
     """
+
     def __init__(self, *args):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
@@ -246,14 +255,15 @@ class Circuit(GlobalConstraint):
         """
         succ = cpm_array(self.args)
         n = len(succ)
-        order = intvar(0,n-1, shape=n)
+        order = intvar(0, n - 1, shape=n)
         constraining = []
-        constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)] # different orders
-        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
+        constraining += [AllDifferent(succ)]  # different successors
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
 
         defining = [order[0] == succ[0]]
-        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+        defining += [order[i] == succ[order[i - 1]] for i in
+                     range(1, n)]  # first one is successor of '0', ith one is successor of i-1
 
         return constraining, defining
 
@@ -261,11 +271,7 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        try:
-            arr = [argval(a) for a in self.args]
-        except IncompleteFunctionError:
-            return False
-
+        arr = argvals(self.args)
         while idx not in visited:
             if idx is None:
                 return False
@@ -274,7 +280,6 @@ class Circuit(GlobalConstraint):
             visited.add(idx)
             pathlen += 1
             idx = arr[idx]
-
         return pathlen == len(self.args) and idx == 0
 
 
@@ -286,8 +291,9 @@ class Inverse(GlobalConstraint):
            fwd[i] == x  <==>  rev[x] == i
 
     """
+
     def __init__(self, fwd, rev):
-        flatargs = flatlist([fwd,rev])
+        flatargs = flatlist([fwd, rev])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         assert len(fwd) == len(rev)
@@ -300,21 +306,19 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        try:
-            fwd = [argval(a) for a in self.args[0]]
-            rev = [argval(a) for a in self.args[1]]
-        except IncompleteFunctionError:
-            return False
+        fwd = argvals(self.args[0])
+        rev = argvals(self.args[1])
         # args are fine, now evaluate actual inverse cons
         try:
             return all(rev[x] == i for i, x in enumerate(fwd))
-        except IndexError: # partiality of Element constraint
-            raise IncompleteFunctionError
+        except IndexError:  # if index is out of range then it's definitely not Inverse.
+            return False
 
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
+
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -328,12 +332,8 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        try:
-            arrval = [argval(a) for a in arr]
-            return arrval in tab
-        except IncompleteFunctionError:
-            return False
-
+        arrval = [argval(a) for a in arr if not np.isnan(argval(a))]
+        return arrval in tab
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
@@ -347,13 +347,10 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        try:
-            if argval(condition):
-                return argval(if_true)
-            else:
-                return argval(if_false)
-        except IncompleteFunctionError:
-            return False
+        if is_true_cst((argval(condition))):
+            return argval(if_true)
+        else:
+            return argval(if_false)
 
     def decompose(self):
         condition, if_true, if_false = self.args
@@ -364,15 +361,14 @@ class IfThenElse(GlobalConstraint):
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
-
 class InDomain(GlobalConstraint):
     """
         The "InDomain" constraint, defining non-interval domains for an expression
     """
 
     def __init__(self, expr, arr):
-        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
-            "The expressions in the InDomain constraint should not be boolean"
+        # assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
+        #    "The expressions in the InDomain constraint should not be boolean"
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
@@ -387,8 +383,8 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
 
         defining = []
-        #if expr is not a var
-        if not isinstance(expr,_IntVarImpl):
+        # if expr is not a var
+        if not isinstance(expr, _IntVarImpl):
             aux = intvar(lb, ub)
             defining.append(aux == expr)
             expr = aux
@@ -399,12 +395,9 @@ class InDomain(GlobalConstraint):
         else:
             return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
 
-
     def value(self):
-        try:
-            return argval(self.args[0]) in argval(self.args[1])
-        except IncompleteFunctionError:
-            return False
+        val = argval(self.args[0])
+        return val in argval(self.args[1]) and not np.isnan(val)
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -430,14 +423,11 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
-            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+            decomp = Xor([decomp, self.args[2:]]).decompose()[0]
         return decomp, []
 
     def value(self):
-        try:
-            return sum(argval(a) for a in self.args) % 2 == 1
-        except IncompleteFunctionError:
-            return False
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -451,6 +441,7 @@ class Cumulative(GlobalConstraint):
         Ensures no overlap between tasks and never exceeding the capacity of the resource
         Supports both varying demand across tasks or equal demand for all jobs
     """
+
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
         assert is_any_list(duration), "duration should be a list"
@@ -469,7 +460,7 @@ class Cumulative(GlobalConstraint):
         if is_any_list(demand):
             demand = flatlist(demand)
             assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
-        else: # constant demand
+        else:  # constant demand
             demand = [demand] * n_jobs
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
@@ -493,7 +484,7 @@ class Cumulative(GlobalConstraint):
 
         # demand doesn't exceed capacity
         lb, ub = min(s.lb for s in start), max(s.ub for s in end)
-        for t in range(lb,ub+1):
+        for t in range(lb, ub + 1):
             demand_at_t = 0
             for job in range(len(start)):
                 if is_num(demand):
@@ -506,24 +497,21 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        try:
-            argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
-                       else argval(arg) for arg in self.args]
-        except IncompleteFunctionError:
-            return False
+        vals = [np.array(argvals(arg)) if is_any_list(arg)
+                else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
 
         # demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        for t in range(lb, ub+1):
+        for t in range(lb, ub + 1):
             if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
@@ -540,7 +528,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
-        super().__init__("gcc", [vars,vals,occ])
+        super().__init__("gcc", [vars, vals, occ])
 
     def decompose(self):
         from .globalfunctions import Count
@@ -566,6 +554,7 @@ class DirectConstraint(Expression):
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
         then use `directvar()` instead, or access the solver object from the solver interface directly.
     """
+
     def __init__(self, name, arguments, novar=None):
         """
             name: name of the solver function that you wish to call
@@ -603,4 +592,3 @@ class DirectConstraint(Expression):
                 solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
         # len(native_args) should match nr of arguments of `native_function`
         return solver_function(*solver_args)
-
