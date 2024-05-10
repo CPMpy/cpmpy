@@ -662,6 +662,7 @@ class TestGlobal(unittest.TestCase):
 
 
         self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > 1).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, 10) > 1).solve())
         self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 1) == 0).solve())
         self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > cnt).solve())
         self.assertGreater(len(set(iv.value())), cnt.value())

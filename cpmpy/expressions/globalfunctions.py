@@ -400,7 +400,7 @@ class NValueExcept(GlobalFunction):
         # introduce boolvar for each possible value
         bvars = boolvar(shape=(ub + 1 - lb))
         idx_of_n = n - lb
-        if idx_of_n >= 0:
+        if 0 <= idx_of_n < len(bvars):
             count_of_vals = sum(bvars[:idx_of_n]) + sum(bvars[idx_of_n+1:])
         else:
             count_of_vals = sum(bvars)
