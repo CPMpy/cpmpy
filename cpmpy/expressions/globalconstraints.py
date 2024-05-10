@@ -312,6 +312,89 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 
+class MDD(GlobalConstraint):
+    """The values of the variables in 'array' correspond to a path in the mdd formed by the transition in 'transitions'
+    """
+
+    def __init__(self, array, transitions):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of an MDD constraint should only contain variables/expressions")
+        super().__init__("mdd", [array, transitions])
+        self.root_node = "r"
+        self.sink_node = "t"
+        self.mapping = {}
+        for s, v, e in transitions:
+            self.mapping[(s, v)] = e
+
+    def transition_to_layer_representation(self):
+        arr, transitions = self.args
+        nodes_by_level = [[self.root_node]]
+        transitions_by_level = []
+        tran = transitions
+        for i in range(len(arr)):
+            nodes_by_level.append([])
+            transitions_by_level.append([])
+            remaining_tran = []
+            for ns, v, ne in tran:
+                if ns in nodes_by_level[i]:
+                    if ne not in nodes_by_level[i + 1]:
+                        nodes_by_level[i + 1].append(ne)
+                    transitions_by_level[i].append((ns, v, ne))
+                else:
+                    remaining_tran.append((ns, v, ne))
+            tran = remaining_tran
+        return nodes_by_level, transitions_by_level
+
+    # auxillary method to transform into layered representation (gather all the node by node-layers)
+    def normalize_layer_representation(self, nodes_by_level, transitions_by_level):
+        nb_nodes_by_level = [len(x) for x in nodes_by_level]
+        m = {}
+        for lvl in nodes_by_level:
+            for i in range(len(lvl)):
+                m[lvl[i]] = i
+        transitions_by_level_normalized = [[[m[n_in], v, m[n_out]] for n_in, v, n_out in lvl] for lvl in
+                                           transitions_by_level]
+        return nb_nodes_by_level, transitions_by_level_normalized
+
+    def decompose(self):
+        # Table decomposition (not by decomposition of the mdd into one big table, but by having transition table for
+        # each state and auxiliary variables for the nodes. Similar to decomposition of regular into table,
+        # but with one table for each layer
+        arr, _ = self.args
+        nbl, tbl = self.transition_to_layer_representation()
+        nb_nodes_by_level, transitions_by_level_normalized = self.normalize_layer_representation(nbl, tbl)
+        if len(transitions_by_level_normalized) > 2:
+            aux = [intvar(0, ub - 1) for ub in nb_nodes_by_level[1:-1]]
+            tab_first = [x[1:] for x in transitions_by_level_normalized[0]]  # optimization for first level (one node)
+            tab_last = [x[:-1] for x in transitions_by_level_normalized[-1]]  # optimization for last level (one node)
+            return [Table([arr[0], aux[0]], tab_first)] \
+                   + [Table([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
+                      range(1, len(arr) - 1)] + [Table([aux[-1], arr[-1]],
+                                                       tab_last)], []
+            # TODO do not work well in False -> decomposition (too many solutions as it give as solution the cardinal
+            #  product between the actual solution and domains of aux variables)
+
+        elif len(transitions_by_level_normalized) == 2:
+            tab = [[x[1], y[1]] for x in transitions_by_level_normalized[0] for y in transitions_by_level_normalized[1]
+                   if x[2] == y[0]]
+            return [Table(arr, tab)], []
+
+        elif len(transitions_by_level_normalized) == 1:
+            return [InDomain(arr[0], [x[1] for x in transitions_by_level_normalized[0]])], []
+
+    def value(self):
+        arr, transitions = self.args
+        arrval = [argval(a) for a in arr]
+        curr_node = self.root_node
+        for v in arrval:
+            if (curr_node, v) in self.mapping:
+                curr_node = self.mapping[curr_node]
+            else:
+                return False
+        return curr_node == self.sink_node
+
+
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
