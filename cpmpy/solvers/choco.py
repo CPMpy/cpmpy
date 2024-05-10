@@ -313,8 +313,14 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
-        supported_reified = supported # choco supports reification of any constraint
+                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "decreasing","strictly_increasing","strictly_decreasing"}
+
+        # choco supports reification of any constraint, but has a bug in increasing and decreasing
+        supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
+                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
+        # for when choco new release comes, fixing the bug on increasing and decreasing
+        #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -490,7 +496,7 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -502,6 +508,14 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.circuit(chc_args)
                 elif cpm_expr.name == "inverse":
                     return self.chc_model.inverse_channeling(*chc_args)
+                elif cpm_expr.name == "increasing":
+                    return self.chc_model.increasing(chc_args,0)
+                elif cpm_expr.name == "decreasing":
+                    return self.chc_model.decreasing(chc_args,0)
+                elif cpm_expr.name == "strictly_increasing":
+                    return self.chc_model.increasing(chc_args,1)
+                elif cpm_expr.name == "strictly_decreasing":
+                    return self.chc_model.decreasing(chc_args,1)
 
             # but not all
             elif cpm_expr.name == 'table':
