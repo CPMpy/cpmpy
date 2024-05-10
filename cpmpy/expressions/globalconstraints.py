@@ -171,7 +171,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == len(self.args)
+        return len(set(argval(a) for a in self.args)) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -186,7 +186,26 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        vals = [a.value() for a in self.args if a.value() != 0]
+        vals = [argval(a) for a in self.args if argval(a) != 0]
+        return len(set(vals)) == len(vals)
+
+
+class AllDifferentExceptN(GlobalConstraint):
+    """
+    All arguments except those equal to n have a distinct value.
+    """
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        super().__init__("alldifferent_except_n", [flatarr, n])
+
+    def decompose(self):
+        if self.args[1] == 0:
+            return [AllDifferentExcept0(self.args[0])], []
+        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
+        return [(var1 == var2).implies(var1 == self.args[1]) for var1, var2 in all_pairs(self.args[0])], []
+
+    def value(self):
+        vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
         return len(set(vals)) == len(vals)
 
 
@@ -208,7 +227,24 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == 1
+        return len(set(argval(a) for a in self.args)) == 1
+
+
+class AllEqualExceptN(GlobalConstraint):
+    """
+    All arguments except those equal to n have a distinct value.
+    """
+
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        super().__init__("allequal_except_n", [flatarr, n])
+
+    def decompose(self):
+        return [((var1 == self.args[1]) | (var1 == var2) | (var2 == self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+
+    def value(self):
+        vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
+        return len(set(vals)) == 1 or len(set(vals)) == 0
 
 
 def circuit(args):
