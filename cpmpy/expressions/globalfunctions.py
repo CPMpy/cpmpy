@@ -57,6 +57,7 @@
         Maximum
         Element
         Count
+        Among
         NValue
         Abs
 
@@ -317,6 +318,34 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         return 0, len(arr)
+
+
+
+class Among(GlobalFunction):
+    """
+        The Among (numerical) global constraint represents the number of variable that take values among the values in arr
+    """
+
+    def __init__(self,arr,vals):
+        if not is_any_list(arr) or not is_any_list(vals):
+            raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        super().__init__("among", [arr,vals])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            Among(arr, vals) can only be decomposed if it's part of a comparison'
+        """
+        from .python_builtins import sum, any
+        arr, values = self.args
+        count_for_each_val = [Count(arr, val) for val in values]
+        return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
+
+    def value(self):
+        argvals = np.array([argval(a) for a in self.args[0]])
+        return len([a for a in argvals if a in set(self.args[1])])
+
+    def get_bounds(self):
+        return 0, len(self.args[0])
 
 class NValue(GlobalFunction):
 
