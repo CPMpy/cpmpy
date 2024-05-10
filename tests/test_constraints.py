@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", "Among",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue",
 }
@@ -96,6 +96,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS[0])
         elif name == "Count":
             expr = cls(NUM_ARGS, NUM_VAR)
+        elif name == "Among":
+            expr = cls(NUM_ARGS, [1,2])
         elif name == "Element":
             expr = cls(NUM_ARGS, POS_VAR)
         else:
