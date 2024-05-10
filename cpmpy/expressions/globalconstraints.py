@@ -104,7 +104,14 @@
         Table
         Xor
         Cumulative
+        IfThenElse
         GlobalCardinalityCount
+        DirectConstraint
+        InDomain
+        Increasing
+        Decreasing
+        IncreasingStrict
+        DecreasingStrict
 
 """
 import copy
