@@ -316,7 +316,7 @@ class Inverse(GlobalConstraint):
         try:
             return all(rev[x] == i for i, x in enumerate(fwd))
         except IndexError: # partiality of Element constraint
-            raise IncompleteFunctionError
+            return False
 
 
 class Table(GlobalConstraint):
