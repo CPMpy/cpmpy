@@ -633,13 +633,13 @@ class LexLess(GlobalConstraint):
         defining = bvar == ((X <= Y) &
                           ((X < Y) | bvar[1:]))
         constraining = [bvar[0]]
-        #constraining += [bvar[-1] == 0] #for strict case
+        #defining += [bvar[-1] == 0] #for strict case
         return constraining, defining
 
     def value(self):
         from .python_builtins import any, all
         X, Y = self.args
-        return argval((X[0] < Y[0]) | any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))))
+        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))))
 
 
 class DirectConstraint(Expression):
