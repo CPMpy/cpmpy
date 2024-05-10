@@ -541,16 +541,20 @@ class GlobalCardinalityCount(GlobalConstraint):
     must be equal to occ[i].
     """
 
-    def __init__(self, vars, vals, occ):
+    def __init__(self, vars, vals, occ, closed=False):
         flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         super().__init__("gcc", [vars,vals,occ])
+        self.closed = closed
 
     def decompose(self):
         from .globalfunctions import Count
         vars, vals, occ = self.args
-        return [Count(vars, i) == v for i, v in zip(vals, occ)], []
+        constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+        if self.closed:
+            constraints += [InDomain(v, vals) for v in vars]
+        return constraints, []
 
     def value(self):
         from .python_builtins import all
