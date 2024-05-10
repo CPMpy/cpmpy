@@ -121,7 +121,8 @@ class CPM_pysdd(SolverInterface):
                 if lit in sol:
                     cpm_var._value = bool(sol[lit])
                 else:
-                    cpm_var._value = None  # not specified...
+                    cpm_var._value = cpm_var.get_bounds()[0] # dummy value - TODO: ensure Pysdd assigns an actual value
+                    # cpm_var._value = None  # not specified...
 
         return has_sol
 
