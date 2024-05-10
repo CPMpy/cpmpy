@@ -770,6 +770,50 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
         #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
 
+    def test_increasing(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.Increasing(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.Increasing(a,b)]).solve())
+        self.assertTrue(cp.Model([cp.Increasing(x,y,b)]).solve())
+        z = cp.intvar(2,5)
+        self.assertFalse(cp.Model([cp.Increasing(z,b)]).solve())
+
+    def test_decreasing(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.Decreasing(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.Decreasing(a,b)]).solve())
+        self.assertFalse(cp.Model([cp.Decreasing(x,y,b)]).solve())
+        z = cp.intvar(2,5)
+        self.assertTrue(cp.Model([cp.Decreasing(z,b)]).solve())
+
+    def test_increasing_strict(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.IncreasingStrict(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.IncreasingStrict(a,b)]).solve())
+        self.assertTrue(cp.Model([cp.IncreasingStrict(x,y,b)]).solve())
+        z = cp.intvar(1,5)
+        self.assertFalse(cp.Model([cp.IncreasingStrict(z,b)]).solve())
+
+    def test_decreasing_strict(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, 0)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.DecreasingStrict(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.DecreasingStrict(a,b)]).solve())
+        self.assertFalse(cp.Model([cp.DecreasingStrict(x,y,b)]).solve())
+        z = cp.intvar(1,5)
+        self.assertTrue(cp.Model([cp.DecreasingStrict(z,b)]).solve())
+
     def test_circuit(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)

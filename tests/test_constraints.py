@@ -14,8 +14,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","increasing_strict","decreasing_strict"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","increasing_strict","decreasing_strict"},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","strictly_increasing","strictly_decreasing"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","strictly_increasing","strictly_decreasing"},
                   "exact": {},
                   "choco": {}
                   }
