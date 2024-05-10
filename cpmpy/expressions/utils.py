@@ -118,13 +118,14 @@ def all_pairs(args):
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
+        
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    return a.value() if hasattr(a, "value") else a
-
-
-def argvals(arr):
-    return [argval(a) for a in arr]
+    try:
+        return a.value() if hasattr(a, "value") else a
+    except IncompleteFunctionError as e:
+        if a.is_bool(): return False
+        raise e
 
 
 def eval_comparison(str_op, lhs, rhs):
