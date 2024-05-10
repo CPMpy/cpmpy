@@ -531,11 +531,13 @@ class Increasing(GlobalConstraint):
             1) the decomposition of the Increasing constraint
             2) empty list of defining constraints
         """
-        return [var1 <= var2 for var1, var2 in all_pairs(self.args)], []
+        args = self.args
+        return [(args[i] <= args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
-        return all(var1.value() <= var2.value() for var1, var2 in all_pairs(self.args))
+        args = self.args
+        return all((args[i] <= args[i+1]) for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -552,11 +554,13 @@ class Decreasing(GlobalConstraint):
             1) the decomposition of the Decreasing constraint
             2) empty list of defining constraints
         """
-        return [var1 >= var2 for var1, var2 in all_pairs(self.args)], []
+        args = self.args
+        return [(args[i] >= args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
-        return all(var1.value() >= var2.value() for var1, var2 in all_pairs(self.args))
+        args = self.args
+        return all((args[i] >= args[i+1]) for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -573,11 +577,13 @@ class IncreasingStrict(GlobalConstraint):
             1) the decomposition of the IncreasingStrict constraint
             2) empty list of defining constraints
         """
-        return [var1 < var2 for var1, var2 in all_pairs(self.args)], []
+        args = self.args
+        return [(args[i] < args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
-        return all(var1.value() < var2.value() for var1, var2 in all_pairs(self.args))
+        args = self.args
+        return all((args[i] < args[i+1]) for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -594,11 +600,13 @@ class DecreasingStrict(GlobalConstraint):
             1) the decomposition of the DecreasingStrict constraint
             2) empty list of defining constraints
         """
-        return [var1 > var2 for var1, var2 in all_pairs(self.args)], []
+        args = self.args
+        return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
-        return all(var1.value() > var2.value() for var1, var2 in all_pairs(self.args))
+        args = self.args
+        return all((args[i] > args[i+1]) for i in range(len(args)-1))
 
 
 class DirectConstraint(Expression):
