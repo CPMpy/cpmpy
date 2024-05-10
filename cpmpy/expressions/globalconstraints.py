@@ -394,6 +394,47 @@ class MDD(GlobalConstraint):
                 return False
         return curr_node == self.sink_node
 
+class Regular(GlobalConstraint):
+    """The values of the variables in 'array' correspond to a path in the automaton formed by the transition in 'transitions'.
+    The path starts in 'start' and ends in one of the ending states ('ends')
+    """
+    def __init__(self, array, transitions, start, ends):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a regular constraint should only contain variables/expressions")
+        super().__init__("regular", [array, transitions, start, ends])
+        self.mapping = {}
+        for s, v, e in transitions:
+            self.mapping[(s, v)] = e
+
+    def decompose(self):
+        arr, transitions, start, ends = self.args
+        # Table decomposition with aux variables for the states
+        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))
+        m = {}
+        for i in range(len(nodes)):
+            m[nodes[i]] = i
+        normalized_transitions = [[m[n_in], v, m[n_out]] for n_in, v, n_out in transitions]
+        aux = intvar(0, len(nodes)-1, shape=len(arr))
+        start_id = m[start]
+        tab_first = [t[1:] for t in normalized_transitions if t[0] == start_id] # optimization for first (one node)
+        normalized_ends = [m[e] for e in ends]
+        return [InDomain(aux[-1], normalized_ends), Table([arr[0], aux[0]], tab_first)] + \
+               [Table([aux[i - 1], arr[i], aux[i]], normalized_transitions) for i in range(1, len(arr))], []
+        # TODO same issue (and probably will work with the same solution) as MDD constraint. Create symmetric solutions
+        #  due to auxiliary vars
+
+    def value(self):
+        arr, transitions, start, ends = self.args
+        arrval = [argval(a) for a in arr]
+        curr_node = start
+        for v in arrval:
+            if (curr_node, v) in self.mapping:
+                curr_node = self.mapping[curr_node]
+            else:
+                return False
+        return curr_node in ends
+
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
