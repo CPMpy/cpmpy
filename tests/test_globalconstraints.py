@@ -863,7 +863,7 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y], [z,q], [h,v])]).solve())
+        # type checks
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [x,False], [h,v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [z,b], [h,v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a], [a,b], [h,v])
@@ -871,6 +871,12 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [True, v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [v, a])
 
+        iv = cp.intvar(0,10, shape=3)
+        for name, cls in cp.SolverLookup.base_solvers():
+            if name in ("pysat", "pysdd"): continue
+            self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
+            # test closed version
+            self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
 
     def test_count(self):
         x = cp.intvar(0, 1)
