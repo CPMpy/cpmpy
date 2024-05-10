@@ -314,6 +314,8 @@ class Table(GlobalConstraint):
 
 class ShortTable(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
+    tuples in 'table' may contain the wildcard character '*' to indicate there are no restrictions for the corresponding
+    variable.
     """
     def __init__(self, array, table):
         array = flatlist(array)
