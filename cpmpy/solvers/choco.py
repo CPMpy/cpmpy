@@ -313,6 +313,8 @@ class CPM_choco(SolverInterface):
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
                              "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
+        # for when choco new release comes, fixing the bug on increasing and decreasing
+        #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
