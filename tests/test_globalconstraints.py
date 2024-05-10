@@ -883,6 +883,21 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
         self.assertRaises(TypeError, cp.Count, [x,y],[x,False])
 
+    def test_among(self):
+
+        iv = cp.intvar(0,10, shape=3, name="x")
+
+        for name, cls in cp.SolverLookup.base_solvers():
+            print(f"Testing {name}")
+            try:
+                self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
+                self.assertTrue(all(x.value() in [1,2] for x in iv))
+                self.assertTrue(cp.Model([cp.Among(iv, [1,100]) > 2]).solve(solver=name))
+                self.assertTrue(all(x.value() == 1 for x in iv))
+            except NotSupportedError:
+                continue
+
+
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
