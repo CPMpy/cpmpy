@@ -532,12 +532,12 @@ class Increasing(GlobalConstraint):
             2) empty list of defining constraints
         """
         args = self.args
-        return [(args[i] <= args[i+1]) for i in range(len(args)-1)], []
+        return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i] <= args[i+1]) for i in range(len(args)-1))
+        return all(args[i].value() <= args[i+1].value() for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -555,12 +555,12 @@ class Decreasing(GlobalConstraint):
             2) empty list of defining constraints
         """
         args = self.args
-        return [(args[i] >= args[i+1]) for i in range(len(args)-1)], []
+        return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i] >= args[i+1]) for i in range(len(args)-1))
+        return all(args[i].value() >= args[i+1].value() for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -578,12 +578,12 @@ class IncreasingStrict(GlobalConstraint):
             2) empty list of defining constraints
         """
         args = self.args
-        return [(args[i] < args[i+1]) for i in range(len(args)-1)], []
+        return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i] < args[i+1]) for i in range(len(args)-1))
+        return all((args[i].value() < args[i+1].value()) for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -606,7 +606,7 @@ class DecreasingStrict(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i] > args[i+1]) for i in range(len(args)-1))
+        return all((args[i].value() > args[i+1].value()) for i in range(len(args)-1))
 
 
 class DirectConstraint(Expression):
