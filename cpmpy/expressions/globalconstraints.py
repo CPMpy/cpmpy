@@ -98,6 +98,7 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentLists
         AllEqual
         Circuit
         Inverse
@@ -196,6 +197,21 @@ class AllDifferentExcept0(GlobalConstraint):
         vals = [a.value() for a in self.args if a.value() != 0]
         return len(set(vals)) == len(vals)
 
+
+class AllDifferentLists(GlobalConstraint):
+    def __init__(self, lists):
+        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
+
+    def decompose(self):
+        """Returns the decomposition
+        """
+        from .python_builtins import any
+        return [any([var1 != var2 for (var1, var2) in zip(vars1, vars2)]) for vars1, vars2 in all_pairs(self.args)], []
+
+    def value(self):
+        x = set([tuple([argval(a) for a in arr]) for arr in self.args])
+        y = [tuple([argval(a) for a in arr]) for arr in self.args]
+        return len(set([tuple([argval(a) for a in arr]) for arr in self.args])) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
