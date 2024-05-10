@@ -24,9 +24,12 @@ NUM_GLOBAL = {
 # Solvers not supporting arithmetic constraints
 SAT_SOLVERS = {"pysat", "pysdd"}
 
-EXCLUDE_GLOBAL = {"minizinc": {"circuit"},
-                  "pysat": NUM_GLOBAL,
+EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
+                  "z3": {"Inverse"},
+                  "choco": {"Inverse"},
+                  "ortools":{"Inverse"},
+                  "exact": {"Inverse"},
                   }
 
 # Exclude certain operators for solvers.
@@ -173,7 +176,7 @@ def global_constraints(solver):
         if name == "Xor":
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
-            expr = cls(NUM_ARGS, [1,2,0])
+            expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "IfThenElse":
