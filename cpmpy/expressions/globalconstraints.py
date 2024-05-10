@@ -104,7 +104,14 @@
         Table
         Xor
         Cumulative
+        IfThenElse
         GlobalCardinalityCount
+        DirectConstraint
+        InDomain
+        Increasing
+        Decreasing
+        IncreasingStrict
+        DecreasingStrict
 
 """
 import copy
@@ -371,8 +378,6 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
-        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
-            "The expressions in the InDomain constraint should not be boolean"
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
@@ -551,6 +556,98 @@ class GlobalCardinalityCount(GlobalConstraint):
         from .python_builtins import all
         decomposed, _ = self.decompose()
         return all(decomposed).value()
+
+
+class Increasing(GlobalConstraint):
+    """
+        The "Increasing" constraint, the expressions will have increasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("increasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Increasing constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] <= args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        from .python_builtins import all
+        args = self.args
+        return all(args[i].value() <= args[i+1].value() for i in range(len(args)-1))
+
+
+class Decreasing(GlobalConstraint):
+    """
+        The "Decreasing" constraint, the expressions will have decreasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("decreasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Decreasing constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] >= args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        from .python_builtins import all
+        args = self.args
+        return all(args[i].value() >= args[i+1].value() for i in range(len(args)-1))
+
+
+class IncreasingStrict(GlobalConstraint):
+    """
+        The "IncreasingStrict" constraint, the expressions will have increasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("increasing_strict", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the IncreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] < args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        from .python_builtins import all
+        args = self.args
+        return all((args[i].value() < args[i+1].value()) for i in range(len(args)-1))
+
+
+class DecreasingStrict(GlobalConstraint):
+    """
+        The "DecreasingStrict" constraint, the expressions will have decreasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("decreasing_strict", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the DecreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
+
+    def value(self):
+        from .python_builtins import all
+        args = self.args
+        return all((args[i].value() > args[i+1].value()) for i in range(len(args)-1))
 
 
 class DirectConstraint(Expression):

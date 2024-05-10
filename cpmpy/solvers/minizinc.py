@@ -242,7 +242,7 @@ class CPM_minizinc(SolverInterface):
                 if hasattr(mznsol, sol_var):
                     cpm_var._value = getattr(mznsol, sol_var)
                 else:
-                    print("Warning, no value for ", sol_var)
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # translate objective, for optimisation problems only (otherwise None)
             self.objective_value_ = self.mzn_result.objective
