@@ -234,6 +234,24 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
+        vals = [1, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
+        vals = [iv2, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
+        vals = [bv & bv, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
 
     def test_indomain_onearg(self):
 
