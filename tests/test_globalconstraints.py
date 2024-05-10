@@ -285,6 +285,31 @@ class TestGlobal(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
+    def test_mdd(self):
+        x = cp.intvar(0, 2, shape=3)
+        transition = [
+            ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"),
+            ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+            ("n4", 0, "t"), ("n5", 0, "t")]
+
+        constraints = [cp.MDD(x, transition)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        solutions = [[0, 2, 0], [1, 2, 0], [2, 0, 0]]
+
+        for i in range(4):
+            for j in range(4):
+                for k in range(4):
+                    candidate = [i, j, k]
+                    constraints = [cp.MDD(x, transition), x == candidate]
+                    model = cp.Model(constraints)
+                    if candidate in solutions:
+                        self.assertTrue(model.solve())
+                    else:
+                        self.assertFalse(model.solve())
+
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]
