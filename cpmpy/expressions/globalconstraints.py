@@ -542,7 +542,7 @@ class Increasing(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all(args[i].value() <= args[i+1].value() for i in range(len(args)-1))
+        return argval(all(args[i] <= args[i+1] for i in range(len(args)-1)))
 
 
 class Decreasing(GlobalConstraint):
@@ -565,7 +565,7 @@ class Decreasing(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all(args[i].value() >= args[i+1].value() for i in range(len(args)-1))
+        return argval(all(args[i] >= args[i+1] for i in range(len(args)-1)))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -588,7 +588,7 @@ class IncreasingStrict(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i].value() < args[i+1].value()) for i in range(len(args)-1))
+        return argval(all(args[i] < args[i+1] for i in range(len(args)-1)))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -611,7 +611,35 @@ class DecreasingStrict(GlobalConstraint):
     def value(self):
         from .python_builtins import all
         args = self.args
-        return all((args[i].value() > args[i+1].value()) for i in range(len(args)-1))
+        return argval(all(args[i] > args[i+1] for i in range(len(args)-1)))
+
+
+class LexLess(GlobalConstraint):
+    """ Given lists X,Y, enforcinG that X is lexicographically less than Y.
+    Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_less", [X, Y])
+
+    def decompose(self):
+        X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
+        length = len(X)
+
+        bvar = boolvar(shape=(length + 1))
+        defining = bvar == ((X <= Y) &
+                          ((X < Y) | bvar[1:]))
+        constraining = [bvar[0]]
+        constraining += [bvar[-1] == 0] #for strict case
+        return constraining, defining
+
+    def value(self):
+        from .python_builtins import any
+        X, Y = self.args
+        return argval((X[0] < Y[0]) | any((X[i] < Y[i]) & (X[i-1] <= Y[i-1]) for i in range(1, len(X))))
 
 
 class DirectConstraint(Expression):
