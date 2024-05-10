@@ -133,6 +133,8 @@ class CPM_ortools(SolverInterface):
 
         """
         from ortools.sat.python import cp_model as ort
+        # ensure all user vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # set time limit?
         if time_limit is not None:
@@ -196,7 +198,7 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    cpm_var._value = None  # probably got optimized away by our transformations
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
 
             # translate objective
             if self.has_objective():

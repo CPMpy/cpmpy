@@ -201,6 +201,10 @@ class CPM_minizinc(SolverInterface):
 
             Does not store the minizinc.Instance() or minizinc.Result()
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         # make mzn_inst
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         
@@ -238,7 +242,7 @@ class CPM_minizinc(SolverInterface):
                 if hasattr(mznsol, sol_var):
                     cpm_var._value = getattr(mznsol, sol_var)
                 else:
-                    print("Warning, no value for ", sol_var)
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # translate objective, for optimisation problems only (otherwise None)
             self.objective_value_ = self.mzn_result.objective

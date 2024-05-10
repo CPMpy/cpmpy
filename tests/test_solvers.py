@@ -671,6 +671,29 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
 
+    def test_vars_not_removed(self):
+        bvs = cp.boolvar(shape=3)
+        m = cp.Model([cp.any(bvs) <= 2])
+        for name, cls in cp.SolverLookup.base_solvers():
+            print(f"Testing with {name}")
+            if cls.supported():
+                # reset value for vars
+                bvs.clear()
+                self.assertTrue(m.solve(solver=name))
+                for v in bvs:
+                    self.assertIsNotNone(v.value())
+                #test solve_all
+                sols = set()
+                if name == 'gurobi':
+                    self.assertEqual(m.solveAll(solver=name,solution_limit=20, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
+                    self.assertEqual(m.solveAll(solver=name,solution_limit=20), 8) #test number of solutions is valid, no display
+                else:
+                    self.assertEqual(m.solveAll(solver=name, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
+                    self.assertEqual(m.solveAll(solver=name), 8) #test number of solutions is valid, no display
+                #test unique sols, should be same number
+                self.assertEqual(len(sols),8)
+
+                
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
     def test_count_mzn(self):
@@ -684,3 +707,4 @@ class TestSolvers(unittest.TestCase):
 
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
+
