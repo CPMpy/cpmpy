@@ -436,7 +436,7 @@ class TestBounds(unittest.TestCase):
         m = cp.Model([p.implies(cons), a == b])
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
-            self.assertRaises(IncompleteFunctionError, cons.value)
+            self.assertFalse(cons.value())
 
         # mayhem
         cons = (arr[10 // (a - b)] == 1).implies(p)
