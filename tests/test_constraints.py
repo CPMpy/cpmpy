@@ -13,9 +13,9 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 # Can be used when .value() method is not implemented/contains bugs
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
-                  "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","strictly_increasing","strictly_decreasing"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","strictly_increasing","strictly_decreasing"},
+                  "minizinc": {"circuit", "subcircuit"},
+                  "pysat": {"circuit", "subcircuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","strictly_increasing","strictly_decreasing"},
+                  "pysdd": {"circuit", "subcircuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","strictly_increasing","strictly_decreasing"},
                   "exact": {},
                   "choco": {}
                   }

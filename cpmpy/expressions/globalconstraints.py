@@ -100,6 +100,7 @@
         AllDifferentExcept0
         AllEqual
         Circuit
+        SubCircuit
         Inverse
         Table
         Xor
@@ -271,6 +272,105 @@ class Circuit(GlobalConstraint):
 
         return pathlen == len(self.args) and idx == 0
 
+
+class SubCircuit(GlobalConstraint):
+    """
+        The sequence of variables form a subcircuits, where x[i] = j means that j is the successor of i.
+        Contrary to Circuit, there is no requirement on all nodes needing to be part of the circuit.
+        Nodes which aren't part of the subcircuit, should self loop i.e. x[i] = i.
+        The size of the subcircuit should be strictly greater than 1, so not all stops can selfloop.
+        When a startIndex is provided, it will be treated as the start of the subcircuit and will be garuanteed
+        to be inside the subcircuit.
+    """
+
+    def __init__(self, *args, startIndex:int=None):
+        flatargs = flatlist(args)
+        # Ensure all args are integer successor values
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("SubCircuit global constraint only takes arithmetic arguments: {}".format(flatargs))
+        # Ensure startIndex is an integer
+        if not isinstance(startIndex, int) and startIndex is not None:
+            raise TypeError("SubCircuit global constraint's startIndex argument must be an integer: {}".format(startIndex))
+        super().__init__("subcircuit", flatargs)
+        self.startIndex = startIndex
+        # Ensure there are at least two stops to create a circuit with
+        if len(flatargs) < 2:
+            raise CPMpyException('SubCircuit constraint must be given a minimum of 2 variables')
+
+    def decompose(self):
+        """
+            Decomposition for SubCircuit
+
+            A mix of the above circuit implementation, with elements from the Minizinc implementation for the support of optional visits:
+            https://github.com/MiniZinc/minizinc-old/blob/master/lib/minizinc/std/subcircuit.mzn
+        """
+
+        from .python_builtins import all as cpm_all
+        
+        startIndex = self.startIndex
+        succ = cpm_array(self.args) # Successor variables
+        n = len(succ)
+        order = intvar(0, n-1, shape=n) # Order variables of the stops within the subcircuit (if part of it, otherwise a remaining value in the domain to satisfy AllDiff).
+        instantiated = boolvar(shape=n) # Whether a stop is part of the subcircuit.
+        endIndex = intvar(0, n-1) # Index of the last stop in the subcircuit, before looping back to the startIndex.
+         # If a startIndex is not supplied, create an additional auxilary variable
+        if startIndex is None: startIndex = intvar(0, n-1)
+
+        constraining = []
+        constraining += [AllDifferent(succ)] # All stops should have a unique successor.
+        constraining += [AllDifferent(order)] # All stops should have a unique order.
+        constraining += list( instantiated.implies(succ < len(succ)) ) # Successor values should remain within domain.
+
+        defining = []
+        defining += [order[startIndex] == 0] # The ordering starts at the startIndex stop.   
+        defining += [cpm_all(((instantiated[i] == True), (i != endIndex))).implies(order[succ[i]] == (order[i] + 1)) for i in range(0,n)] # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as order.
+        defining += [(instantiated[i] == (order[endIndex] >= order[i])) for i in range(0, n-1)] # A stop is either part of the subcircuit or has an order value larger than the length of the subcircuit (the order of the last element endIndex).
+        defining += [instantiated[startIndex] == True, instantiated[endIndex] == True] # Both the start and end stops should be part of the circuit.
+        defining += [startIndex != endIndex] # The end stop cannot be the start stop, thus the subcircuit length should be longer than 1.
+        defining += [succ[endIndex] == startIndex] # Definition of the last stop.
+        defining += list( instantiated == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
+           
+        return constraining, defining
+    
+    def value(self):
+
+        succ = [argval(a) for a in self.args]
+        n = len(succ)
+
+        # Find startIndex
+        # - get user input
+        startIndex = self.startIndex
+        # - if user didn't provide a start index, look for one
+        if startIndex is None:
+            for i,s in enumerate(succ):
+                if i != s:
+                    # first non self-loop found is taken as start
+                    startIndex = i
+                    break
+            # No valid start found, thus no subcircuit
+            if startIndex is None:
+                return False
+
+        # Collect subcircuit
+        visited = set([self.startIndex])
+        idx = succ[self.startIndex]
+        while idx != startIndex:
+            # Something is wrong, certain variables didn't get values
+            if idx is None: return False
+            # Check bounds on successor value
+            if not (0 <= idx < n): return False
+            # Collect
+            visited.add(idx)
+            idx = succ[idx]
+
+        # Check subcircuit
+        for i in range(n):
+            # A stop is either visited or self-loops
+            if not ( (i in visited) or (succ[i] == i) ):
+                return False
+
+        # Check that subcircuit has length of at least 1.
+        return succ[startIndex] != startIndex
 
 class Inverse(GlobalConstraint):
     """

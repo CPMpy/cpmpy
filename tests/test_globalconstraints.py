@@ -169,6 +169,70 @@ class TestGlobal(unittest.TestCase):
 
         self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
 
+    def test_subcircuit(self):
+
+        def model_and_solve(n, not_included, startIndex=None, negative=False, decompose=False):
+            x = cp.intvar(0, n-1, n)
+            c = []
+            if not negative:
+                # SubCircuit constraint
+                if (not decompose):
+                    c += [cp.SubCircuit(x, startIndex=startIndex)]
+                else:
+                    constraining, defining = cp.SubCircuit(x, startIndex=startIndex).decompose()
+                    c += constraining
+                    c += defining
+                # Side constraints based on test case restrictions
+                c += [x[i] == i for i in not_included]
+                c += [x[i] != i for i in range(n) if i not in not_included]
+            else:
+                c += [~cp.SubCircuit(x, startIndex=startIndex)]
+                # no decompose in the negative case
+                # c += ~cp.all(list(cp.SubCircuit(x, startIndex=startIndex).decompose()))
+
+            model = cp.Model(c)
+            sat = model.solve()
+            if sat:
+                return sat, x.value()
+            return sat, None
+        
+        def included(x):
+            return [xi for i, xi in enumerate(x) if xi != i]
+
+        def assert_positive(n, not_included, startIndex, decompose):
+            sat, x = model_and_solve(n, not_included, startIndex, negative=False, decompose=decompose)
+            self.assertTrue(sat)
+            self.assertEqual(len(included(x)), (n - len(not_included)))
+            self.assertTrue(cp.SubCircuit(x))
+            for i in not_included:
+                assert(i not in included(x))
+            if startIndex is not None:
+                assert(startIndex in included(x))
+
+        def assert_negative(n, not_included, startIndex, decompose):
+            sat, x = model_and_solve(n, not_included, startIndex, negative=True, decompose=decompose)
+            self.assertTrue(sat)
+
+        # Positive cases
+        # - global constraint
+        assert_positive(6, [], None, False)
+        assert_positive(6, [1], None, False)
+        assert_positive(6, [], 0, False)
+        # - decomposed
+        assert_positive(6, [], None, True)
+        assert_positive(6, [1], None, True)
+        assert_positive(6, [], 0, True)
+
+        # Negative cases
+        # - global constraint
+        assert_negative(6, [0, 1, 2, 3, 4, 5], None, False)
+        assert_negative(6, [0, 1, 2, 3, 4], None, False)
+        assert_negative(6, [0], 0, False)
+        # - decomposed
+        assert_negative(6, [0, 1, 2, 3, 4, 5], None, True)
+        assert_negative(6, [0, 1, 2, 3, 4], None, True)
+        assert_negative(6, [0], 0, True)
+        
 
     def test_inverse(self):
         # Arrays
