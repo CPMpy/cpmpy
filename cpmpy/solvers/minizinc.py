@@ -37,6 +37,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
+from ..expressions.python_builtins import any as cpm_any
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -430,10 +431,9 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing",
+                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
-
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit"})
 
     def __add__(self, cpm_expr):
         """
@@ -584,10 +584,20 @@ class CPM_minizinc(SolverInterface):
             return txt
 
         # rest: global constraints
-        elif expr.name.endswith('circuit'):  # circuit, subcircuit
+        elif expr.name == 'circuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
+        elif expr.name == 'subcircuit': 
+            # minizinc is offset 1, which can be problematic here...
+            args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            # Enforce that startIndex, if provided, should be inside the subcircuit
+            if expr.startIndex is not None:
+                self += [expr.args[expr.startIndex] != expr.startIndex]
+            else:
+                # Do not allow the subcircuit to be empty
+                self += [cpm_any([expr.args[i] != i for i in range(len(expr.args))])]
+        
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
 

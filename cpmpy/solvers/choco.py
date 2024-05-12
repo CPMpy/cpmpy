@@ -313,7 +313,7 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
 
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
@@ -496,7 +496,8 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "subcircuit", 
+                                 "inverse", "increasing", "decreasing", "strictly_increasing", "strictly_decreasing"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -535,6 +536,15 @@ class CPM_choco(SolverInterface):
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "subcircuit":
+                # Successor variables
+                succ = self.solver_vars(cpm_expr.args)
+                # Start index must be in subcircuit and thus cannot selfloop
+                if cpm_expr.startIndex is not None:
+                    self += [(cpm_expr.args[cpm_expr.startIndex] != cpm_expr.startIndex)]
+                # Add an unused variable for the subcircuit length, assume that subcircuit should consist of at least 2 nodes.
+                subcircuit_length = self.chc_model.intvar(2, len(succ))  
+                return self.chc_model.sub_circuit(succ, 0, subcircuit_length)
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
                 return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ))
