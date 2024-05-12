@@ -74,16 +74,26 @@ class CPM_minizinc(SolverInterface):
     required_version = (2, 8, 2)
     @staticmethod
     def supported():
-        return CPM_minizinc.installed() and not CPM_minizinc.outdated()
+        return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
     def installed():
         # try to import the package
         try:
+            # check if MiniZinc Python is installed
             import minizinc
             return True
         except ImportError as e:
             return False
+        
+    @staticmethod
+    def executable_installed():
+        # check if MiniZinc executable is installed
+        from minizinc import default_driver
+        if default_driver is None:
+            warnings.warn("MiniZinc Python is installed, but the MiniZinc executable is missing in path.")
+            return False
+        return True
 
     @staticmethod
     def outdated():
@@ -135,6 +145,8 @@ class CPM_minizinc(SolverInterface):
         """
         if not self.installed():
             raise Exception("CPM_minizinc: Install the python package 'minizinc'")
+        if not self.executable_installed():
+            raise Exception("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
         elif self.outdated():
             version = str(self.required_version[0])
             for x in self.required_version[1:]:
