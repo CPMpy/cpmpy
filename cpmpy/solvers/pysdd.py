@@ -26,7 +26,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_bool
+from ..expressions.utils import is_any_list, is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -178,9 +178,9 @@ class CPM_pysdd(SolverInterface):
 
                 # display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
             return solution_count

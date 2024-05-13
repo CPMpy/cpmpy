@@ -144,6 +144,15 @@ class Expression(object):
     def value(self):
         return None # default
 
+    def safe_value(self):
+        try:
+            return self.value()
+        except IncompleteFunctionError as e:
+            if self.is_bool():
+                return False
+            else:
+                raise e
+
     def get_bounds(self):
         if self.is_bool():
             return 0, 1 #default for boolean expressions

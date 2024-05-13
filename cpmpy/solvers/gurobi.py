@@ -28,6 +28,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -461,9 +462,9 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

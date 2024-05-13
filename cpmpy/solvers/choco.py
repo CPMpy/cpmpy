@@ -29,7 +29,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -208,9 +208,9 @@ class CPM_choco(SolverInterface):
                         cpm_var._value = value
                 # print the desired display
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

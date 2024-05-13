@@ -121,11 +121,11 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    try:
-        return a.value() if hasattr(a, "value") else a
-    except IncompleteFunctionError as e:
-        if a.is_bool(): return False
-        raise e
+    return a.safe_value() if hasattr(a, "safe_value") else a
+
+
+def argvals(arr):
+    return [argval(a) for a in arr]
 
 
 def eval_comparison(str_op, lhs, rhs):
