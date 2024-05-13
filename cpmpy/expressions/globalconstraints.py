@@ -178,8 +178,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        values = argvals(self.args)
-        return len(set(values)) == len(self.args)
+        return len(set(argvals(self.args))) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -194,8 +193,7 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        vals = [argval(a) for a in self.args if argval(a) != 0]
-        return len(set(vals)) == len(vals)
+        return len(set([argval(a) for a in self.args if argval(a) != 0])) == len(vals)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -215,8 +213,7 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        values = argvals(self.args)
-        return len(set(values)) == 1
+        return len(set(argvals(self.args))) == 1
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
