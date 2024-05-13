@@ -311,6 +311,7 @@ class SubCircuit(GlobalConstraint):
         """
 
         from .python_builtins import all as cpm_all
+        from .python_builtins import min as cpm_min
         
         start_index = self.start_index
         succ = cpm_array(self.args) # Successor variables
@@ -343,6 +344,31 @@ class SubCircuit(GlobalConstraint):
         defining += [start_index != end_index] # The end stop cannot be the start stop, thus the subcircuit length should be longer than 1.
         defining += [succ[end_index] == start_index] # Definition of the last stop.
         defining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
+           
+        # Symmetry breaking
+        if self.start_index is None:
+            # When no start index is given, the model will create one as a decision variable.
+            # if it can freely take the value of any on the stops inside the circuit, degenerate solutions
+            # will be created, resulting in a much higher solution count when doing solveAll()
+            # Thus some symmetry breaking is needed, assuming that the start_index will take the smallest index.
+
+            # Part of the formulation from the following is used:
+            # https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
+
+            # Auxiliary variable which will hold the indices of the subcircuit in a looping fashion.
+            # If we have 6 stops [0, .., 5] and the subcircuit is [0, 2, 1], then s = [0, 2, 1, 0, 2, 1]
+            # Thus s is a way to collect all the indices of stops which get visited.
+            s = intvar(0, n-1, shape=n)
+            defining += [s[0] == start_index]
+            defining += [s[i+1] == succ[s[i]] for i in range(n-1)]
+
+            # The free start_index could be any of the values of s, resulting in degenerate solutions.
+            # By enforcing start_index to take the smallest value, symmetry breaking is ensured.
+            defining += [start_index == cpm_min(s)]
+
+
+
+
         return constraining, defining
     
     def value(self):
