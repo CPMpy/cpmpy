@@ -494,9 +494,8 @@ class CPM_choco(SolverInterface):
 
         # base (Boolean) global constraints
         elif isinstance(cpm_expr, GlobalConstraint):
-
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "subcircuit", 
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", 
                                  "inverse", "increasing", "decreasing", "strictly_increasing", "strictly_decreasing"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
