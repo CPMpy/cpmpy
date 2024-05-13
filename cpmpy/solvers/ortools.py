@@ -492,9 +492,10 @@ class CPM_ortools(SolverInterface):
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
                 # posting arcs on diagonal (i==j) allows for subcircuits
-                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == cpm_expr.startIndex))] # The start index cannot self loop and thus must be part of the subcircuit.
+                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == cpm_expr.start_index))] # The start index cannot self loop and thus must be part of the subcircuit.
                 # If no startIndex is given, garuantee that subcircuit has at least length 2
-                if cpm_expr.startIndex is None:
+                #   can post it here, since ORTools does not support reified subcircuit in the first place
+                if cpm_expr.start_index is None:
                     self += [cpm_any(cpm_array(x) != np.arange(N))]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':

@@ -540,10 +540,10 @@ class CPM_choco(SolverInterface):
                 # Successor variables
                 succ = self.solver_vars(cpm_expr.args)
                 # Start index must be in subcircuit and thus cannot selfloop
-                if cpm_expr.startIndex is not None:
-                    self += [(cpm_expr.args[cpm_expr.startIndex] != cpm_expr.startIndex)]
+                if cpm_expr.start_index is not None:
+                    self += [(cpm_expr.args[cpm_expr.start_index] != cpm_expr.start_index)]
                 # Add an unused variable for the subcircuit length, assume that subcircuit should consist of at least 2 nodes.
-                subcircuit_length = self.chc_model.intvar(2, len(succ))  
+                subcircuit_length = self.solver_var(intvar(2, len(succ)))
                 return self.chc_model.sub_circuit(succ, 0, subcircuit_length)
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args

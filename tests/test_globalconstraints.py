@@ -171,24 +171,24 @@ class TestGlobal(unittest.TestCase):
 
     def test_subcircuit(self):
 
-        def model_and_solve(n, not_included, startIndex=None, negative=False, decompose=False):
+        def model_and_solve(n, not_included, start_index=None, negative=False, decompose=False):
             x = cp.intvar(0, n-1, n)
             c = []
             if not negative:
                 # SubCircuit constraint
                 if (not decompose):
-                    c += [cp.SubCircuit(x, startIndex=startIndex)]
+                    c += [cp.SubCircuit(x, start_index=start_index)]
                 else:
-                    constraining, defining = cp.SubCircuit(x, startIndex=startIndex).decompose()
+                    constraining, defining = cp.SubCircuit(x, start_index=start_index).decompose()
                     c += constraining
                     c += defining
                 # Side constraints based on test case restrictions
                 c += [x[i] == i for i in not_included]
                 c += [x[i] != i for i in range(n) if i not in not_included]
             else:
-                c += [~cp.SubCircuit(x, startIndex=startIndex)]
+                c += [~cp.SubCircuit(x, start_index=start_index)]
                 # no decompose in the negative case
-                # c += ~cp.all(list(cp.SubCircuit(x, startIndex=startIndex).decompose()))
+                # c += ~cp.all(list(cp.SubCircuit(x, start_index=start_index).decompose()))
 
             model = cp.Model(c)
             sat = model.solve()
@@ -199,18 +199,18 @@ class TestGlobal(unittest.TestCase):
         def included(x):
             return [xi for i, xi in enumerate(x) if xi != i]
 
-        def assert_positive(n, not_included, startIndex, decompose):
-            sat, x = model_and_solve(n, not_included, startIndex, negative=False, decompose=decompose)
+        def assert_positive(n, not_included, start_index, decompose):
+            sat, x = model_and_solve(n, not_included, start_index, negative=False, decompose=decompose)
             self.assertTrue(sat)
             self.assertEqual(len(included(x)), (n - len(not_included)))
             self.assertTrue(cp.SubCircuit(x))
             for i in not_included:
                 assert(i not in included(x))
-            if startIndex is not None:
-                assert(startIndex in included(x))
+            if start_index is not None:
+                assert(start_index in included(x))
 
-        def assert_negative(n, not_included, startIndex, decompose):
-            sat, x = model_and_solve(n, not_included, startIndex, negative=True, decompose=decompose)
+        def assert_negative(n, not_included, start_index, decompose):
+            sat, x = model_and_solve(n, not_included, start_index, negative=True, decompose=decompose)
             self.assertTrue(sat)
 
         # Positive cases
