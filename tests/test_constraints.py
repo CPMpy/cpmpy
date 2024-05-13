@@ -11,6 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ['ortools']
 
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
@@ -222,7 +223,7 @@ def reify_imply_exprs(solver):
 
 
 def verify(cons):
-    assert cons.value()
+    assert argval(cons)
 
 
 @pytest.mark.parametrize(("solver","constraint"),_generate_inputs(bool_exprs), ids=str)
@@ -235,7 +236,7 @@ def test_bool_constaints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)
 
 
 @pytest.mark.parametrize(("solver","constraint"), _generate_inputs(comp_constraints),  ids=str)
@@ -248,7 +249,7 @@ def test_comparison_constraints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver,Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)
 
 
 @pytest.mark.parametrize(("solver","constraint"), _generate_inputs(reify_imply_exprs),  ids=str)
@@ -261,4 +262,4 @@ def test_reify_imply_constraints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)

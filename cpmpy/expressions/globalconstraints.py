@@ -193,7 +193,8 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set([argval(a) for a in self.args if argval(a) != 0])) == len(vals)
+        vals = [argval(a) for a in self.args if argval(a) != 0]
+        return len(set(vals)) == len(vals)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -481,14 +482,14 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        argvals = [np.array(argvals(arg)) if is_any_list(arg)
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in arg_vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
