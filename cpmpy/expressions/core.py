@@ -557,7 +557,8 @@ class Operator(Expression):
             try:
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use .safe_value() if you want to use relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)
