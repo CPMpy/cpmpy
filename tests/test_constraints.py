@@ -223,6 +223,7 @@ def reify_imply_exprs(solver):
 
 def verify(cons):
     assert argval(cons)
+    assert cons.value()
 
 
 @pytest.mark.parametrize(("solver","constraint"),_generate_inputs(bool_exprs), ids=str)
@@ -236,6 +237,7 @@ def test_bool_constaints(solver, constraint):
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
+        assert constraint.value()
 
 
 @pytest.mark.parametrize(("solver","constraint"), _generate_inputs(comp_constraints),  ids=str)
@@ -249,6 +251,7 @@ def test_comparison_constraints(solver, constraint):
     else:
         assert SolverLookup.get(solver,Model(constraint)).solve()
         assert argval(constraint)
+        assert constraint.value()
 
 
 @pytest.mark.parametrize(("solver","constraint"), _generate_inputs(reify_imply_exprs),  ids=str)
@@ -262,3 +265,4 @@ def test_reify_imply_constraints(solver, constraint):
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
+        assert constraint.value()
