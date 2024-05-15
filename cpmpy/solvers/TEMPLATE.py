@@ -10,6 +10,13 @@
     as CPMpy should also work without this solver installed.
     To ensure that, include it inside supported() and other functions that need it...
 """
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
+from ..expressions.utils import is_num, is_any_list
+from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
 
@@ -30,12 +37,6 @@ from ..transformations.normalize import toplevel_list
 
         CPM_template
 """
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
-from ..expressions.utils import is_num, is_any_list
-from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
 
 class CPM_template(SolverInterface):
     """
@@ -74,10 +75,12 @@ class CPM_template(SolverInterface):
 
         import TEMPLATEpy
 
-        assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
+        assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        self.tpl_model = TEMPLATEpy.Model("cpmpy")
+        # we commonly use 3-letter abbrivations to refer to native objects:
+        #    OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
+        self.TPL_solver = TEMPLATEpy.Solver("cpmpy") 
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
@@ -93,7 +96,7 @@ class CPM_template(SolverInterface):
 
             Arguments that correspond to solver parameters:
             <Please document key solver arguments that the user might wish to change
-             for example: log_output=True, var_ordering=3, num_cores=8, ...>
+             for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...>
             <Add link to documentation of all solver parameters>
         """
 
@@ -101,14 +104,15 @@ class CPM_template(SolverInterface):
         self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
-            raise NotImplementedError("TEMPLATE: TODO, implement time_limit")
-
+            self.TPL_solver.set_timelimit_seconds(time_limit)
+            
         # call the solver, with parameters
-        my_status = self.TEMPLATE_solver.solve(**kwargs)
+        my_status = self.TPL_solver.solve(**kwargs)
+        # if the status object contains more information than true/false, save as self.TPL_status instead
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TEMPLATE_solver.time()
+        self.cpm_status.runtime = self.TPL_solver.time()
 
         # translate exit status
         if my_status is True:
@@ -130,13 +134,12 @@ class CPM_template(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
-                cpm_var._value = None # if not in solution
-                #cpm_var._value = self.TEMPLATEpy.value(sol_var)
+                cpm_var._value = self.TPL_solver.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
             # translate objective, for optimisation problems only
             if self.has_objective():
-                self.objective_value_ = self.TEMPLATE_solver.ObjectiveValue()
+                self.objective_value_ = self.TPL_solver.ObjectiveValue()
 
         return has_sol
 
@@ -199,7 +202,7 @@ class CPM_template(SolverInterface):
             Turns a numeric CPMpy 'flat' expression into a solver-specific
             numeric expression
 
-            Used especially to post an expression as objective function
+            Used especially to post an expression as objective function and eases constraint posting
         """
         if is_num(cpm_expr):
             return cpm_expr
@@ -247,8 +250,8 @@ class CPM_template(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons, supported={"AllDifferent"})
         cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
-        #cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        #cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         # ...
         return cpm_cons
 
@@ -279,16 +282,21 @@ class CPM_template(SolverInterface):
 
             if isinstance(cpm_con, _BoolVarImpl):
                 # base case, just var or ~var
-                self.TEMPLATE_solver.add_clause([ self.solver_var(cpm_con) ])
+                self.TPL_solver.add_clause([ self.solver_var(cpm_con) ])
             elif cpm_con.name == 'or':
-                self.TEMPLATE_solver.add_clause(self.solver_vars(cpm_con.args))
-            elif hasattr(cpm_expr, 'decompose'):
-                # global constraint not known, try posting generic decomposition
-                # side-step `__add__()` as the decomposition can contain non-user (auxiliary) variables
-                for con in self.transform(cpm_expr.decompose()):
-                    self._post_constraint(con)
-
-            raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+                self.TPL_solver.add_clause(self.solver_vars(cpm_con.args))
+            elif isinstance(cpm_con, Comparison):
+                lhs, rhs = cpm_con.args
+                TPL_lhs = self._make_numexpr(lhs)
+                if cpm_con.name == "==":
+                    self.TPL_solver.add_eq(lhs, self.solver_var(rhs))
+                elif cpm_con.name == "<=":
+                    self.TPL_solver.add_leq(lhs, self.solver_var(rhs))
+                #elif ...
+            elif cpm_con.name == "alldifferent":
+                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_con.args))
+            else:
+                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
 
         return self
 
@@ -314,7 +322,7 @@ class CPM_template(SolverInterface):
 
         # check if objective function
         if self.has_objective():
-            raise Exception("TEMPLATE does not support finding all optimal solutions")
+            raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
 
         # A. Example code if solver supports callbacks
         if is_any_list(display):
@@ -323,12 +331,12 @@ class CPM_template(SolverInterface):
             callback = display
 
         self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
-        return self.TEMPLATE_solver.SolutionCount()
+        return self.TPL_solver.SolutionCount()
 
         # B. Example code if solver does not support callbacks
         self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
         solution_count = 0
-        for solution in self.TEMPLATE_solver.GetSolutions():
+        for solution in self.TPL_solver.GetAllSolutions():
             solution_count += 1
             # Translate solution to variables
             for cpm_var in self.user_vars:
