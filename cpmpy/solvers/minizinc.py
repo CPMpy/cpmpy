@@ -418,7 +418,7 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc"}
+                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "lex_lesseq"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
 
@@ -501,6 +501,11 @@ class CPM_minizinc(SolverInterface):
         if expr.name == "alldifferent_except0":
             args_str = [self._convert_expression(e) for e in expr.args]
             return "alldifferent_except_0([{}])".format(",".join(args_str))
+
+        if expr.name == "lex_lesseq":
+            X = [self._convert_expression(e) for e in expr.args[0]]
+            Y = [self._convert_expression(e) for e in expr.args[1]]
+            return "lex_lesseq({}, {})".format(X, Y)
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element

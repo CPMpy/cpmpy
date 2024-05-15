@@ -614,7 +614,7 @@ class DecreasingStrict(GlobalConstraint):
         return argval(all(args[i] > args[i+1] for i in range(len(args)-1)))
 
 
-class LexLess(GlobalConstraint):
+class LexLessEq(GlobalConstraint):
     """ Given lists X,Y, enforcing that X is lexicographically less than Y.
     Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
     """
@@ -623,7 +623,7 @@ class LexLess(GlobalConstraint):
         Y = flatlist(list2)
         if len(X) != len(Y):
             raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
-        super().__init__("lex_less", [X, Y])
+        super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):
         X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
