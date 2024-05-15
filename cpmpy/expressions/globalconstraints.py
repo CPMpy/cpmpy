@@ -629,11 +629,14 @@ class LexLess(GlobalConstraint):
         X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
         length = len(X)
 
+        constraining = []
         bvar = boolvar(shape=(length + 1))
-        defining = bvar == ((X <= Y) &
-                          ((X < Y) | bvar[1:]))
-        constraining = [bvar[0]]
-        #defining += [bvar[-1] == 0] #for strict case
+        from cpmpy.transformations.normalize import toplevel_list
+        defining = toplevel_list(bvar == ((X <= Y) &
+                          ((X < Y) | bvar[1:])))
+        defining.append(bvar[-1] == (X[-1] <= Y[-1])) #for strict case use <
+        constraining.append(bvar[0])
+
         return constraining, defining
 
     def value(self):
