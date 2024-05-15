@@ -144,14 +144,6 @@ class Expression(object):
     def value(self):
         return None # default
 
-    def safe_value(self):
-        try:
-            return self.value()
-        except IncompleteFunctionError as e:
-            if self.is_bool():
-                return False
-            else:
-                raise e
 
     def get_bounds(self):
         if self.is_bool():
@@ -558,7 +550,7 @@ class Operator(Expression):
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use .safe_value() if you want to use relational semantics.")
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)

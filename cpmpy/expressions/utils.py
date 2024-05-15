@@ -121,7 +121,15 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    return a.safe_value() if hasattr(a, "safe_value") else a
+    if hasattr(a, "value"):
+        try:
+            return a.value()
+        except IncompleteFunctionError as e:
+            if a.is_bool():
+                return False
+            else:
+                raise e
+    return a
 
 
 def argvals(arr):
