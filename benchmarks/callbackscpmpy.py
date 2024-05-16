@@ -21,6 +21,8 @@ class CallbacksCPMPy(Callbacks):
         super().__init__()
         self.cpm_model = cp.Model()
         self.cpm_variables = dict()
+        self.print_general_methods = False
+        self.print_specific_methods = False
 
     def var_integer_range(self, x: Variable, min_value: int, max_value: int):
         if min_value == 0 and max_value == 1:
