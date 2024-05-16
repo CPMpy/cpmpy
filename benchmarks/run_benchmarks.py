@@ -73,6 +73,7 @@ def time_limiter(seconds):
 
 print(xmlmodels)
 for xmlmodel in xmlmodels:
+    print(xmlmodel)
     model = None
     def parse():
         parser = ParserXCSP3(xmlmodel)
