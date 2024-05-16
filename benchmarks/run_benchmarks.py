@@ -6,6 +6,7 @@ import datetime
 import glob
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from callbackscpmpy import CallbacksCPMPy
+from cpmpy.exceptions import TransformationNotImplementedError
 
 # give this a meaningful name, so we know what branch was tested after the results are safed.
 branch = 'main'
@@ -75,7 +76,11 @@ for xmlmodel in xmlmodels:
 
     def solve_exact():
         global result
-        result = s.solve(time_limit=time_limit)
+        try:
+            result = s.solve(time_limit=time_limit)
+        except TransformationNotImplementedError as e:
+            result = None
+
 
     if not transonly:
         print('solving')
