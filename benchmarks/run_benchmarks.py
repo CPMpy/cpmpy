@@ -13,7 +13,7 @@ branch = 'main'
 # set solver to test (suported: ortools)
 solver = 'ortools'
 # solver timeout in seconds
-time_limit = 20
+time_limit = 60
 # set true to only time transformations, and not call the solver
 transonly = False
 
@@ -52,7 +52,7 @@ for xmlmodel in xmlmodels:
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)
 '''
 print(xmlmodels)
-for xmlmodel in xmlmodels[:2]:
+for xmlmodel in xmlmodels:
     model = None
     def parse():
         parser = ParserXCSP3(xmlmodel)
