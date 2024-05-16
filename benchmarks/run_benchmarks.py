@@ -10,7 +10,7 @@ from callbackscpmpy import CallbacksCPMPy
 # give this a meaningful name, so we know what branch was tested after the results are safed.
 branch = 'main'
 # set solver to test (suported: ortools)
-solver = 'ortools'
+solver = 'exact'
 # solver timeout in seconds
 time_limit = 60
 # set true to only time transformations, and not call the solver
@@ -51,7 +51,7 @@ for xmlmodel in xmlmodels:
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)
 '''
 print(xmlmodels)
-for xmlmodel in xmlmodels:
+for xmlmodel in xmlmodels[:10]:
     model = None
     def parse():
         parser = ParserXCSP3(xmlmodel)
