@@ -292,6 +292,34 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_shorttable(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]]).value())
+        self.assertFalse(cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 3]]).value())
+
+        constraints = [cp.ShortTable(iv, [[10, 8, '*'], ['*', 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.ShortTable(iv, [[10, 8, '*'], [5, 9, '*']])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
     def test_table_onearg(self):
 
         iv = cp.intvar(0, 10)
