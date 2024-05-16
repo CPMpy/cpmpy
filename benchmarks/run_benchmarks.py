@@ -51,6 +51,9 @@ for xmlmodel in xmlmodels:
         name = os.path.basename(xmlmodel)
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)
 '''
+class Fakesolver():
+    def __init__(self):
+        self.timings = dict()
 print(xmlmodels)
 for xmlmodel in xmlmodels:
     model = None
@@ -69,17 +72,17 @@ for xmlmodel in xmlmodels:
 
     result = None
     t_parse = timeit.timeit(stmt=parse, number=1)
-    s = cp.SolverLookup.get(solver, model)
+    try:
+        s = cp.SolverLookup.get(solver, model)
+    except TransformationNotImplementedError as e:
+        s = Fakesolver()
     def solve_ortools():
         global result
-        result = s.solve(num_search_workers=1,time_limit=time_limit)
+        result = s.solve(num_search_workers=1, time_limit=time_limit)
 
     def solve_exact():
         global result
-        try:
-            result = s.solve(time_limit=time_limit)
-        except TransformationNotImplementedError as e:
-            result = None
+        result = s.solve(time_limit=time_limit)
 
 
     if not transonly:
@@ -87,7 +90,10 @@ for xmlmodel in xmlmodels:
         if solver == 'ortools':
             t_solve = timeit.timeit(stmt=solve_ortools, number=1)
         else:
-            t_solve = timeit.timeit(stmt=solve_exact, number=1)
+            try:
+                t_solve = timeit.timeit(stmt=solve_exact, number=1)
+            except Exception:
+                t_solve = 0
     else:
         t_solve = 0
     timings = s.timings
