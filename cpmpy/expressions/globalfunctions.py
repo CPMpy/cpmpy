@@ -363,3 +363,59 @@ class NValue(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 1, len(self.args)
+
+
+class NValueExcept(GlobalFunction):
+
+    """
+        The NValueExceptN constraint counts the number of distinct values,
+            not including value N, if any argument is assigned to it.
+    """
+
+    def __init__(self, arr, n):
+        if not is_any_list(arr):
+            raise ValueError("NValueExcept takes an array as input")
+        if not is_num(n):
+            raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
+        super().__init__("nvalue_except",[arr, n])
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        """
+        NValue(arr) can only be decomposed if it's part of a comparison
+
+        Based on "simple decomposition" from:
+            Bessiere, Christian, et al. "Decomposition of the NValue constraint."
+            International Conference on Principles and Practice of Constraint Programming.
+            Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+        """
+        from .python_builtins import sum, any
+
+        arr, n = self.args
+        arr = cpm_array(arr)
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+
+        constraints = []
+
+        # introduce boolvar for each possible value
+        bvars = boolvar(shape=(ub + 1 - lb))
+        idx_of_n = n - lb
+        if 0 <= idx_of_n < len(bvars):
+            count_of_vals = sum(bvars[:idx_of_n]) + sum(bvars[idx_of_n+1:])
+        else:
+            count_of_vals = sum(bvars)
+
+        # bvar is true if the value is taken by any variable
+        for bv, val in zip(bvars, range(lb, ub + 1)):
+            constraints += [any(arr == val) == bv]
+
+        return [eval_comparison(cmp_op, count_of_vals, cpm_rhs)], constraints
+
+    def value(self):
+        return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        return 0, len(self.args)
