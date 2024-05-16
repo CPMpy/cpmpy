@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 slowthreshold = 0.2
 fastthreshold = 0.2
 #filename of reference instance, should be in results folder!
-refname = 'main_ortools_2024-01-18 16.56.13.929690.csv'
+refname = 'main_ortools_2024-05-16 13.55.25.615425.csv'
 
 results = []
 cwd = os.getcwd()
@@ -21,8 +21,10 @@ else:
     refname = join('results', refname)
 
 last = pd.read_csv(results[-1], index_col=0)
+print(last)
 refinstance = pd.read_csv(refname, index_col=0)
-sorted_df = last.loc['total'].sort_values()
+print(refinstance)
+#sorted_df = last.loc['total'].sort_values()
 
 #for the last file, plot totals in a pie chart and a bar chart
 '''sorted_df.plot(kind='pie', y='total', autopct='%1.0f%%')
