@@ -91,9 +91,16 @@ for xmlmodel in xmlmodels:
     result = None
     t_parse = timeit.timeit(stmt=parse, number=1)
     try:
-        s = cp.SolverLookup.get(solver, model)
+        with time_limiter(time_limit + 1000):
+            s = cp.SolverLookup.get(solver, model)
     except TransformationNotImplementedError as e:
         s = Fakesolver()
+    except TimeoutException as e:
+        print('hard timeout in transformations..')
+        s = Fakesolver()
+        for opt in ['parse', 'decompose', 'flatten', 'reify', 'only_numexpr', 'only_bv', 'only_implies', 'linearize',
+                    'only_pos_bv', 'get_vars', 'post_cons', 'solve']:
+            s.timings[opt] = time_limit + 10
     def solve_ortools():
         global result
         result = s.solve(num_search_workers=1, time_limit=time_limit)
