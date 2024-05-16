@@ -1,0 +1,51 @@
+name: Github Benchmarks
+
+on:
+  push:
+    branches:
+      - master
+      - benchmarks_wv
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest requests pandas
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest-benchmark
+          pip install python-sat
+          pip install z3-solver
+          pip install exact
+          pip install pysdd
+      - name: Benchmark with pytest
+        run: |
+          python -m pytest benchmarks/ --benchmark-min-rounds=3 --benchmark-disable-gc --benchmark-verbose --benchmark-json output.json
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Python Benchmark with pytest-benchmark
+          tool: 'pytest'
+          output-file-path: output.json
+          # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          # Show alert with commit comment on detecting possible performance regression
+          alert-threshold: '200%'
+          fail-on-alert: true

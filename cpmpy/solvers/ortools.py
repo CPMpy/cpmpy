@@ -96,6 +96,9 @@ class CPM_ortools(SolverInterface):
         # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
 
+        #for saving timing results
+        self.timings = None
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
 
@@ -329,16 +332,36 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
+        import timeit
+        global cpm_cons
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # everything that can create
-                                             # reified expr must go before this
-        return cpm_cons
+        def decompose():
+            global cpm_cons
+            cpm_cons = decompose_in_tree(cpm_cons, supported)
+        def flatten():
+            global cpm_cons
+            cpm_cons = flatten_constraint(cpm_cons)
+        def reify():
+            global cpm_cons
+            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))
+        def only_num():
+            global cpm_cons
+            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))
+        def only_bv():
+            global cpm_cons
+            cpm_cons = only_bv_reifies(cpm_cons)
+        def only_impl():
+            global cpm_cons
+            cpm_cons = only_implies(cpm_cons)
+
+        t_decomp = timeit.timeit(stmt=decompose,number=1)
+        t_flatten = timeit.timeit(stmt=flatten,number=1)
+        t_reify = timeit.timeit(stmt=reify,number=1)
+        t_only_num = timeit.timeit(stmt=only_num,number=1)
+        t_only_bv = timeit.timeit(stmt=only_bv,number=1)
+        t_only_impl = timeit.timeit(stmt=only_impl,number=1)
+        return cpm_cons, t_decomp, t_flatten, t_reify, t_only_num, t_only_bv, t_only_impl
 
     def __add__(self, cpm_expr):
         """
@@ -358,12 +381,23 @@ class CPM_ortools(SolverInterface):
 
         :return: self
         """
-        # add new user vars to the set
-        get_variables(cpm_expr, collect=self.user_vars)
 
-        # transform and post the constraints
-        for con in self.transform(cpm_expr):
-            self._post_constraint(con)
+        import timeit
+        # add new user vars to the set
+        def get_vars():
+            get_variables(cpm_expr, collect=self.user_vars)
+        #get_variables(cpm_expr, collect=self.user_vars)
+        t_getvars = timeit.timeit(stmt=get_vars, number=1)
+
+        cons, t_decomp, t_flatten, t_reify, t_only_num, t_only_bv, t_only_impl = self.transform(cpm_expr)
+
+        def post_cons():
+            for con in cons:
+                self._post_constraint(con)
+
+        t_post = timeit.timeit(stmt=post_cons, number=1)
+
+        self.timings = {'decompose' : t_decomp, 'flatten' : t_flatten, 'reify' : t_reify, 'only_numexpr' : t_only_num, 'only_bv' : t_only_bv, 'only_implies' : t_only_impl, 'get_vars' : t_getvars, 'post_cons' : t_post}
 
         return self
 
