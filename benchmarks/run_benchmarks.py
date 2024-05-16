@@ -92,7 +92,8 @@ for xmlmodel in xmlmodels:
         else:
             try:
                 t_solve = timeit.timeit(stmt=solve_exact, number=1)
-            except Exception:
+            except Exception as e:
+                print(e)
                 t_solve = 0
     else:
         t_solve = 0
