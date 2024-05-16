@@ -6,6 +6,8 @@
     The functions are ordered in a way that could be convenient to 
     start from the top and continue in that order
 
+    After you are done filling in the template, remove all comments starting with [GUIDELINE]
+
     WARNING: do not include the python package at the top of the file,
     as CPMpy should also work without this solver installed.
     To ensure that, include it inside supported() and other functions that need it...
@@ -13,12 +15,14 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.flatten_model import flatten_constraint
+from ..transformations.comparison import only_numexpr_equality
+from ..transformations.reification import reify_rewrite, only_bv_reifies
 
 """
     Interface to TEMPLATE's API
@@ -78,11 +82,13 @@ class CPM_template(SolverInterface):
         assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        # we commonly use 3-letter abbrivations to refer to native objects:
-        #    OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
+        # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
+        #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.TPL_solver = TEMPLATEpy.Solver("cpmpy") 
 
         # initialise everything else and post the constraints/objective
+        # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
+        #           internally, constructor relies on __add__ which uses solver native objects
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
@@ -105,16 +111,21 @@ class CPM_template(SolverInterface):
 
         if time_limit is not None:
             self.TPL_solver.set_timelimit_seconds(time_limit)
-            
+
+        # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
+        #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
+        #       then translate assumptions here assumptions are a list of (negated) Boolean variables
+
         # call the solver, with parameters
         my_status = self.TPL_solver.solve(**kwargs)
-        # if the status object contains more information than true/false, save as self.TPL_status instead
+        # [GUIDELINE] consider saving status as self.TPL_status such that CPMpy users can access the status object.
+        #       This is mainly useful when more elaborate information about the solve-call is saved into the status
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.TPL_solver.time()
+        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
 
-        # translate exit status
+        # translate solver exit status to CPMpy exit status
         if my_status is True:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
@@ -152,6 +163,9 @@ class CPM_template(SolverInterface):
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
+        # [GUIDELINE] some solver interefaces explitely create variables on the solver.
+        #       then use self.TPL_solver.NewBoolVar(...) instead of TEMPLATEpy.NewBoolVar(...)
+
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
@@ -171,7 +185,7 @@ class CPM_template(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    # if TEMPLATE does not support objective functions, you can delete objective()/_make_numexpr()
+    # [GUIDELINE] if TEMPLATE does not support objective functions, you can delete objective()
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -189,21 +203,30 @@ class CPM_template(SolverInterface):
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
+        # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
+        #         _make_numexpr may be removed and an objective can be posted as:
+        #           self.TPL_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
+
         if minimize:
-            TEMPLATEpy.Minimize(obj)
+            self.TPL_solver.Minimize(obj)
         else:
-            TEMPLATEpy.Maximize(obj)
+            self.TPL_solver.Maximize(obj)
 
     def has_objective(self):
-        return TEMPLATEpy.hasObjective()
+        return self.TPL_solver.hasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
-            Turns a numeric CPMpy 'flat' expression into a solver-specific
-            numeric expression
+            Turns a numeric CPMpy 'flat' expression into a solver-specific numeric expression
 
             Used especially to post an expression as objective function and eases constraint posting
         """
+
+        # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
+        #       in that case, this function may be removed and a case-by-case analysis of the numerical expression
+        #           used in the constraint at hand is required in __add__
+        #       For an example of such solver interface, check out solvers/choco.py or solvers/exact.py
+
         if is_num(cpm_expr):
             return cpm_expr
 
@@ -211,22 +234,18 @@ class CPM_template(SolverInterface):
         if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
             return self.solver_var(cpm_expr)
 
-        # if the solver only supports a decision variable as argument to its minimize/maximize then
-        # well, smth generic like
-        #(obj_var, obj_cons) = get_or_make_var(cpm_expr)
-        #self += obj_cons
-        #return self.solver_var(obj_var)
-
-        # else if the solver support e.g. a linear expression as objective, built it here
-        # something like
-        #if isinstance(cpm_expr, Operator):
-        #    if cpm_expr.name == 'sum':
-        #        return sum(self.solver_vars(cpm_expr.args)) # if TEMPLATEpy supports this
-        #    elif cpm_expr.name == 'wsum':
-        #        w = cpm_expr.args[0]
-        #        x = self.solver_vars(cpm_expr.args[1])
-        #        return sum(wi*xi for wi,xi in zip(w,x)) # if TEMPLATEpy supports this
-
+        # any solver-native numerical expression
+        if isinstance(cpm_expr, Operator):
+           if cpm_expr.name == 'sum':
+               return self.TPL_solver.sum(self.solver_vars(cpm_expr.args))
+           elif cpm_expr.name == 'wsum':
+               weights, vars = cpm_expr.args
+               return self.TPL_solver.weighted_sum(weights, self.solver_vars(vars))
+           # [GUIDELINE] or more fancy ones such as max
+           #        be aware this is not the Maximum CONSTRAINT, but rather the Maximum NUMERICAL EXPRESSION
+           elif cpm_expr.name == "max":
+               return self.TPL_solver.maximum_of_vars(self.solver_vars(cpm_expr.args))
+           # ...
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
@@ -248,9 +267,10 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"AllDifferent"})
-        cpm_cons = flatten_constraint(cpm_expr)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent"})
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         # ...
         return cpm_cons
@@ -280,23 +300,71 @@ class CPM_template(SolverInterface):
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
 
-            if isinstance(cpm_con, _BoolVarImpl):
+            if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
-                self.TPL_solver.add_clause([ self.solver_var(cpm_con) ])
-            elif cpm_con.name == 'or':
-                self.TPL_solver.add_clause(self.solver_vars(cpm_con.args))
-            elif isinstance(cpm_con, Comparison):
-                lhs, rhs = cpm_con.args
-                TPL_lhs = self._make_numexpr(lhs)
-                if cpm_con.name == "==":
-                    self.TPL_solver.add_eq(lhs, self.solver_var(rhs))
-                elif cpm_con.name == "<=":
-                    self.TPL_solver.add_leq(lhs, self.solver_var(rhs))
-                #elif ...
-            elif cpm_con.name == "alldifferent":
-                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_con.args))
+                self.TPL_solver.add_clause([ self.solver_var(cpm_expr) ])
+
+            elif isinstance(cpm_expr, Operator):
+                if cpm_expr.name == "or":
+                    self.TPL_solver.add_clause(self.solver_vars(cpm_expr.args))
+                elif cpm_expr.name == "->": # half-reification
+                    bv, subexpr = cpm_expr.args
+                    if isinstance(subexpr, Comparison):
+                        lhs, rhs = subexpr.args
+                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+                            TPL_lhs = self._make_numexpr(lhs)
+                            self.TPL_solver.add_half_reified_comparison(self.solver_var(bv),
+                                                                        TPL_lhs, subexpr.name, self.solver_var(rhs))
+                        else:
+                            raise NotImplementedError("TEMPLATE: no support for half-reified comparison:", subexpr)
+                    else:
+                        raise NotImplementedError("TEMPLATE: no support for half-reified constraint:", subexpr)
+
+            elif isinstance(cpm_expr, Comparison):
+                lhs, rhs = cpm_expr.args
+
+                # [GUIDELINE] == is used for both double reification and numerical comparisons
+                #       need case by case analysis here. Note that if your solver does not support full-reification,
+                #       you can rely on the transformation only_implies to convert all reifications to half-reification
+                #       for more information, please reach out on github!
+                if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
+                    bv, subexpr = lhs, rhs
+                    assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
+
+                    if isinstance(subexpr, Comparison):
+                        lhs, rhs = subexpr.args
+                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+                            TPL_lhs = self._make_numexpr(lhs)
+                            self.TPL_solver.add_reified_comparison(self.solver_var(bv),
+                                                                   TPL_lhs, subexpr.name, self.solver_var(rhs))
+                        else:
+                            raise NotImplementedError("TEMPLATE: no support for reified comparison:", subexpr)
+                    else:
+                        raise NotImplementedError("TEMPLATE: no support for reified constraint:", subexpr)
+
+                # otherwise, numerical comparisons
+                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+                    TPL_lhs = self._make_numexpr(lhs)
+                    self.TPL_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
+                # global functions
+                elif cpm_expr.name == "==":
+                    TPL_rhs = self.solver_var(rhs)
+                    if lhs.name == "max":
+                        self.TPL_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
+                    elif lhs.name == "element":
+                        TPL_arr, TPL_idx = self.solver_vars(lhs.args)
+                        self.TPL_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
+                    # elif...
+                    else:
+                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", cpm_expr)
+                else:
+                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", cpm_expr)
+
+            # global constraints
+            elif cpm_expr.name == "alldifferent":
+                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
             else:
-                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_con)
+                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
 
         return self
 
