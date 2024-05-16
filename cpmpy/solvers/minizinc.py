@@ -591,12 +591,6 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == 'subcircuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
-            # Enforce that start_index, if provided, should be inside the subcircuit
-            if expr.start_index is not None:
-                self += [expr.args[expr.start_index] != expr.start_index]
-            else:
-                # Do not allow the subcircuit to be empty
-                self += [cpm_any([expr.args[i] != i for i in range(len(expr.args))])]
         
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args

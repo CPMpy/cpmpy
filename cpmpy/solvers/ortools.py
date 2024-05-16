@@ -331,7 +331,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -492,11 +492,17 @@ class CPM_ortools(SolverInterface):
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
                 # posting arcs on diagonal (i==j) allows for subcircuits
+                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars)] # Allows for empty subcircuits
+                return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == "subcircuitwithstart":
+                x = cpm_expr.args
+                N = len(x)
+                arcvars = boolvar(shape=(N,N))
+                # post channeling constraints from int to bool
+                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                # post the global constraint
+                # posting arcs on diagonal (i==j) allows for subcircuits
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == cpm_expr.start_index))] # The start index cannot self loop and thus must be part of the subcircuit.
-                # If no startIndex is given, garuantee that subcircuit has at least length 2
-                #   can post it here, since ORTools does not support reified subcircuit in the first place
-                if cpm_expr.start_index is None:
-                    self += [cpm_any(cpm_array(x) != np.arange(N))]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"

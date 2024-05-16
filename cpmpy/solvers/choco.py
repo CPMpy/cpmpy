@@ -316,10 +316,10 @@ class CPM_choco(SolverInterface):
                      "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
 
-        # choco supports reification of any constraint, but has a bug in increasing and decreasing
+        # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
                              "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
-        # for when choco new release comes, fixing the bug on increasing and decreasing
+        # for when choco new release comes, fixing the bug on increasing, decreasing and subcircuit
         #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -538,11 +538,8 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "subcircuit":
                 # Successor variables
                 succ = self.solver_vars(cpm_expr.args)
-                # Start index must be in subcircuit and thus cannot selfloop
-                if cpm_expr.start_index is not None:
-                    self += [(cpm_expr.args[cpm_expr.start_index] != cpm_expr.start_index)]
-                # Add an unused variable for the subcircuit length, assume that subcircuit should consist of at least 2 nodes.
-                subcircuit_length = self.solver_var(intvar(2, len(succ)))
+                # Add an unused variable for the subcircuit length.
+                subcircuit_length = self.solver_var(intvar(0, len(succ)))
                 return self.chc_model.sub_circuit(succ, 0, subcircuit_length)
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
