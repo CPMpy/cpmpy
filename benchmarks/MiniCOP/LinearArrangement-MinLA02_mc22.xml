@@ -1,0 +1,86 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] denotes the position (in the line) of the ith node" size="[49]"> 0..48 </array>
+    <array id="d" note="d[i][j] denotes the distance in the line between the ith and jth nodes (if they are adjacent in the graph)" size="[49][49]"> 1..48 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="putting nodes at different positions"> x[] </allDifferent>
+    <group note="computing distances">
+      <intension> eq(%0,dist(%1,%2)) </intension>
+      <args> d[0][1] x[0] x[1] </args>
+      <args> d[1][2] x[1] x[2] </args>
+      <args> d[1][3] x[1] x[3] </args>
+      <args> d[2][29] x[2] x[29] </args>
+      <args> d[2][36] x[2] x[36] </args>
+      <args> d[4][27] x[4] x[27] </args>
+      <args> d[4][31] x[4] x[31] </args>
+      <args> d[5][14] x[5] x[14] </args>
+      <args> d[5][32] x[5] x[32] </args>
+      <args> d[6][16] x[6] x[16] </args>
+      <args> d[6][19] x[6] x[19] </args>
+      <args> d[6][33] x[6] x[33] </args>
+      <args> d[7][16] x[7] x[16] </args>
+      <args> d[7][36] x[7] x[36] </args>
+      <args> d[8][13] x[8] x[13] </args>
+      <args> d[9][13] x[9] x[13] </args>
+      <args> d[10][13] x[10] x[13] </args>
+      <args> d[11][14] x[11] x[14] </args>
+      <args> d[12][15] x[12] x[15] </args>
+      <args> d[13][14] x[13] x[14] </args>
+      <args> d[13][40] x[13] x[40] </args>
+      <args> d[14][15] x[14] x[15] </args>
+      <args> d[14][35] x[14] x[35] </args>
+      <args> d[15][21] x[15] x[21] </args>
+      <args> d[17][18] x[17] x[18] </args>
+      <args> d[17][29] x[17] x[29] </args>
+      <args> d[17][36] x[17] x[36] </args>
+      <args> d[18][20] x[18] x[20] </args>
+      <args> d[19][27] x[19] x[27] </args>
+      <args> d[19][30] x[19] x[30] </args>
+      <args> d[20][44] x[20] x[44] </args>
+      <args> d[21][22] x[21] x[22] </args>
+      <args> d[21][37] x[21] x[37] </args>
+      <args> d[21][44] x[21] x[44] </args>
+      <args> d[22][23] x[22] x[23] </args>
+      <args> d[22][24] x[22] x[24] </args>
+      <args> d[22][25] x[22] x[25] </args>
+      <args> d[22][37] x[22] x[37] </args>
+      <args> d[22][48] x[22] x[48] </args>
+      <args> d[26][27] x[26] x[27] </args>
+      <args> d[26][28] x[26] x[28] </args>
+      <args> d[27][31] x[27] x[31] </args>
+      <args> d[27][34] x[27] x[34] </args>
+      <args> d[31][32] x[31] x[32] </args>
+      <args> d[31][33] x[31] x[33] </args>
+      <args> d[31][36] x[31] x[36] </args>
+      <args> d[32][41] x[32] x[41] </args>
+      <args> d[34][35] x[34] x[35] </args>
+      <args> d[36][37] x[36] x[37] </args>
+      <args> d[38][39] x[38] x[39] </args>
+      <args> d[38][48] x[38] x[48] </args>
+      <args> d[40][41] x[40] x[41] </args>
+      <args> d[40][42] x[40] x[42] </args>
+      <args> d[41][43] x[41] x[43] </args>
+      <args> d[44][45] x[44] x[45] </args>
+      <args> d[44][48] x[44] x[48] </args>
+      <args> d[45][46] x[45] x[46] </args>
+      <args> d[45][47] x[45] x[47] </args>
+      <args> d[45][48] x[45] x[48] </args>
+    </group>
+    <group class="redundant-constraints" note="triangle constraints: distance(i,j) &lt;= distance(i,k) + distance(k,j)">
+      <intension> le(%0,add(%1,%2)) </intension>
+      <args> d[4][27] d[4][31] d[27][31] </args>
+      <args> d[4][31] d[4][27] d[27][31] </args>
+      <args> d[21][22] d[21..22][37] </args>
+      <args> d[21][37] d[21][22] d[22][37] </args>
+      <args> d[22][37] d[21][22] d[21][37] </args>
+      <args> d[27][31] d[4][27] d[4][31] </args>
+      <args> d[44][45] d[44..45][48] </args>
+      <args> d[44][48] d[44][45] d[45][48] </args>
+      <args> d[45][48] d[44][45] d[44][48] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize note="minimizing the sum of distances between adjacent nodes" type="sum"> d[0][1] d[1][2..3] d[2][29] d[2][36] d[4][27] d[4][31] d[5][14] d[5][32] d[6][16] d[6][19] d[6][33] d[7][16] d[7][36] d[8..10][13] d[11][14] d[12][15] d[13][14] d[13][40] d[14][15] d[14][35] d[15][21] d[17][18] d[17][29] d[17][36] d[18][20] d[19][27] d[19][30] d[20][44] d[21][22] d[21][37] d[21][44] d[22][23..25] d[22][37] d[22][48] d[26][27..28] d[27][31] d[27][34] d[31][32..33] d[31][36] d[32][41] d[34][35] d[36][37] d[38][39] d[38][48] d[40][41..42] d[41][43] d[44][45] d[44][48] d[45][46..48] </minimize>
+  </objectives>
+</instance>

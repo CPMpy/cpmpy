@@ -1,0 +1,224 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[15]"> -1 1 </array>
+    <array id="y" size="[14][14]"> -1 1 </array>
+    <array id="c" size="[14]">
+      <domain for="c[0]"> -14..14 </domain>
+      <domain for="c[1]"> -13..13 </domain>
+      <domain for="c[2]"> -12..12 </domain>
+      <domain for="c[3]"> -11..11 </domain>
+      <domain for="c[4]"> -10..10 </domain>
+      <domain for="c[5]"> -9..9 </domain>
+      <domain for="c[6]"> -8..8 </domain>
+      <domain for="c[7]"> -7..7 </domain>
+      <domain for="c[8]"> -6..6 </domain>
+      <domain for="c[9]"> -5..5 </domain>
+      <domain for="c[10]"> -4..4 </domain>
+      <domain for="c[11]"> -3..3 </domain>
+      <domain for="c[12]"> -2..2 </domain>
+      <domain for="c[13]"> -1..1 </domain>
+    </array>
+    <array id="s" size="[14]">
+      <domain for="s[0]"> 0 1 4 9 16 25 36 49 64 81 100 121 144 169 196 </domain>
+      <domain for="s[1]"> 0 1 4 9 16 25 36 49 64 81 100 121 144 169 </domain>
+      <domain for="s[2]"> 0 1 4 9 16 25 36 49 64 81 100 121 144 </domain>
+      <domain for="s[3]"> 0 1 4 9 16 25 36 49 64 81 100 121 </domain>
+      <domain for="s[4]"> 0 1 4 9 16 25 36 49 64 81 100 </domain>
+      <domain for="s[5]"> 0 1 4 9 16 25 36 49 64 81 </domain>
+      <domain for="s[6]"> 0 1 4 9 16 25 36 49 64 </domain>
+      <domain for="s[7]"> 0 1 4 9 16 25 36 49 </domain>
+      <domain for="s[8]"> 0 1 4 9 16 25 36 </domain>
+      <domain for="s[9]"> 0 1 4 9 16 25 </domain>
+      <domain for="s[10]"> 0 1 4 9 16 </domain>
+      <domain for="s[11]"> 0 1 4 9 </domain>
+      <domain for="s[12]"> 0 1 4 </domain>
+      <domain for="s[13]"> 0 1 </domain>
+    </array>
+  </variables>
+  <constraints>
+    <group>
+      <intension> eq(%0,mul(%1,%2)) </intension>
+      <args> y[0][0] x[0] x[1] </args>
+      <args> y[0][1] x[1] x[2] </args>
+      <args> y[0][2] x[2] x[3] </args>
+      <args> y[0][3] x[3] x[4] </args>
+      <args> y[0][4] x[4] x[5] </args>
+      <args> y[0][5] x[5] x[6] </args>
+      <args> y[0][6] x[6] x[7] </args>
+      <args> y[0][7] x[7] x[8] </args>
+      <args> y[0][8] x[8] x[9] </args>
+      <args> y[0][9] x[9] x[10] </args>
+      <args> y[0][10] x[10] x[11] </args>
+      <args> y[0][11] x[11] x[12] </args>
+      <args> y[0][12] x[12] x[13] </args>
+      <args> y[0][13] x[13] x[14] </args>
+      <args> y[1][0] x[0] x[2] </args>
+      <args> y[1][1] x[1] x[3] </args>
+      <args> y[1][2] x[2] x[4] </args>
+      <args> y[1][3] x[3] x[5] </args>
+      <args> y[1][4] x[4] x[6] </args>
+      <args> y[1][5] x[5] x[7] </args>
+      <args> y[1][6] x[6] x[8] </args>
+      <args> y[1][7] x[7] x[9] </args>
+      <args> y[1][8] x[8] x[10] </args>
+      <args> y[1][9] x[9] x[11] </args>
+      <args> y[1][10] x[10] x[12] </args>
+      <args> y[1][11] x[11] x[13] </args>
+      <args> y[1][12] x[12] x[14] </args>
+      <args> y[2][0] x[0] x[3] </args>
+      <args> y[2][1] x[1] x[4] </args>
+      <args> y[2][2] x[2] x[5] </args>
+      <args> y[2][3] x[3] x[6] </args>
+      <args> y[2][4] x[4] x[7] </args>
+      <args> y[2][5] x[5] x[8] </args>
+      <args> y[2][6] x[6] x[9] </args>
+      <args> y[2][7] x[7] x[10] </args>
+      <args> y[2][8] x[8] x[11] </args>
+      <args> y[2][9] x[9] x[12] </args>
+      <args> y[2][10] x[10] x[13] </args>
+      <args> y[2][11] x[11] x[14] </args>
+      <args> y[3][0] x[0] x[4] </args>
+      <args> y[3][1] x[1] x[5] </args>
+      <args> y[3][2] x[2] x[6] </args>
+      <args> y[3][3] x[3] x[7] </args>
+      <args> y[3][4] x[4] x[8] </args>
+      <args> y[3][5] x[5] x[9] </args>
+      <args> y[3][6] x[6] x[10] </args>
+      <args> y[3][7] x[7] x[11] </args>
+      <args> y[3][8] x[8] x[12] </args>
+      <args> y[3][9] x[9] x[13] </args>
+      <args> y[3][10] x[10] x[14] </args>
+      <args> y[4][0] x[0] x[5] </args>
+      <args> y[4][1] x[1] x[6] </args>
+      <args> y[4][2] x[2] x[7] </args>
+      <args> y[4][3] x[3] x[8] </args>
+      <args> y[4][4] x[4] x[9] </args>
+      <args> y[4][5] x[5] x[10] </args>
+      <args> y[4][6] x[6] x[11] </args>
+      <args> y[4][7] x[7] x[12] </args>
+      <args> y[4][8] x[8] x[13] </args>
+      <args> y[4][9] x[9] x[14] </args>
+      <args> y[5][0] x[0] x[6] </args>
+      <args> y[5][1] x[1] x[7] </args>
+      <args> y[5][2] x[2] x[8] </args>
+      <args> y[5][3] x[3] x[9] </args>
+      <args> y[5][4] x[4] x[10] </args>
+      <args> y[5][5] x[5] x[11] </args>
+      <args> y[5][6] x[6] x[12] </args>
+      <args> y[5][7] x[7] x[13] </args>
+      <args> y[5][8] x[8] x[14] </args>
+      <args> y[6][0] x[0] x[7] </args>
+      <args> y[6][1] x[1] x[8] </args>
+      <args> y[6][2] x[2] x[9] </args>
+      <args> y[6][3] x[3] x[10] </args>
+      <args> y[6][4] x[4] x[11] </args>
+      <args> y[6][5] x[5] x[12] </args>
+      <args> y[6][6] x[6] x[13] </args>
+      <args> y[6][7] x[7] x[14] </args>
+      <args> y[7][0] x[0] x[8] </args>
+      <args> y[7][1] x[1] x[9] </args>
+      <args> y[7][2] x[2] x[10] </args>
+      <args> y[7][3] x[3] x[11] </args>
+      <args> y[7][4] x[4] x[12] </args>
+      <args> y[7][5] x[5] x[13] </args>
+      <args> y[7][6] x[6] x[14] </args>
+      <args> y[8][0] x[0] x[9] </args>
+      <args> y[8][1] x[1] x[10] </args>
+      <args> y[8][2] x[2] x[11] </args>
+      <args> y[8][3] x[3] x[12] </args>
+      <args> y[8][4] x[4] x[13] </args>
+      <args> y[8][5] x[5] x[14] </args>
+      <args> y[9][0] x[0] x[10] </args>
+      <args> y[9][1] x[1] x[11] </args>
+      <args> y[9][2] x[2] x[12] </args>
+      <args> y[9][3] x[3] x[13] </args>
+      <args> y[9][4] x[4] x[14] </args>
+      <args> y[10][0] x[0] x[11] </args>
+      <args> y[10][1] x[1] x[12] </args>
+      <args> y[10][2] x[2] x[13] </args>
+      <args> y[10][3] x[3] x[14] </args>
+      <args> y[11][0] x[0] x[12] </args>
+      <args> y[11][1] x[1] x[13] </args>
+      <args> y[11][2] x[2] x[14] </args>
+      <args> y[12][0] x[0] x[13] </args>
+      <args> y[12][1] x[1] x[14] </args>
+      <args> y[13][0] x[0] x[14] </args>
+    </group>
+    <sum>
+      <list> y[0][] </list>
+      <condition> (eq,c[0]) </condition>
+    </sum>
+    <sum>
+      <list> y[1][0..12] </list>
+      <condition> (eq,c[1]) </condition>
+    </sum>
+    <sum>
+      <list> y[2][0..11] </list>
+      <condition> (eq,c[2]) </condition>
+    </sum>
+    <sum>
+      <list> y[3][0..10] </list>
+      <condition> (eq,c[3]) </condition>
+    </sum>
+    <sum>
+      <list> y[4][0..9] </list>
+      <condition> (eq,c[4]) </condition>
+    </sum>
+    <sum>
+      <list> y[5][0..8] </list>
+      <condition> (eq,c[5]) </condition>
+    </sum>
+    <sum>
+      <list> y[6][0..7] </list>
+      <condition> (eq,c[6]) </condition>
+    </sum>
+    <sum>
+      <list> y[7][0..6] </list>
+      <condition> (eq,c[7]) </condition>
+    </sum>
+    <sum>
+      <list> y[8][0..5] </list>
+      <condition> (eq,c[8]) </condition>
+    </sum>
+    <sum>
+      <list> y[9][0..4] </list>
+      <condition> (eq,c[9]) </condition>
+    </sum>
+    <sum>
+      <list> y[10][0..3] </list>
+      <condition> (eq,c[10]) </condition>
+    </sum>
+    <sum>
+      <list> y[11][0..2] </list>
+      <condition> (eq,c[11]) </condition>
+    </sum>
+    <sum>
+      <list> y[12][0] y[12][1] </list>
+      <condition> (eq,c[12]) </condition>
+    </sum>
+    <sum>
+      <list> y[13][0] </list>
+      <condition> (eq,c[13]) </condition>
+    </sum>
+    <group>
+      <intension> eq(%0,mul(%1,%2)) </intension>
+      <args> s[0] c[0] c[0] </args>
+      <args> s[1] c[1] c[1] </args>
+      <args> s[2] c[2] c[2] </args>
+      <args> s[3] c[3] c[3] </args>
+      <args> s[4] c[4] c[4] </args>
+      <args> s[5] c[5] c[5] </args>
+      <args> s[6] c[6] c[6] </args>
+      <args> s[7] c[7] c[7] </args>
+      <args> s[8] c[8] c[8] </args>
+      <args> s[9] c[9] c[9] </args>
+      <args> s[10] c[10] c[10] </args>
+      <args> s[11] c[11] c[11] </args>
+      <args> s[12] c[12] c[12] </args>
+      <args> s[13] c[13] c[13] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize type="sum"> s[] </minimize>
+  </objectives>
+</instance>

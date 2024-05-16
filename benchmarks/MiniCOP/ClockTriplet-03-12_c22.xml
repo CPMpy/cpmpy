@@ -1,0 +1,34 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] is the ith number in the circle" size="[12]"> 1..12 </array>
+    <var id="z" note="z is the minimal value such that any (circular) subsequence of x  of size r is less than or equal to z"> 0..33 </var>
+  </variables>
+  <constraints>
+    <allDifferent note="a permutation is required"> x[] </allDifferent>
+    <group note="any subsequence of size r must be less than or equal to z">
+      <sum>
+        <list> %0 %1 %2 </list>
+        <condition> (le,z) </condition>
+      </sum>
+      <args> x[0..2] </args>
+      <args> x[1..3] </args>
+      <args> x[2..4] </args>
+      <args> x[3..5] </args>
+      <args> x[4..6] </args>
+      <args> x[5..7] </args>
+      <args> x[6..8] </args>
+      <args> x[7..9] </args>
+      <args> x[8..10] </args>
+      <args> x[9..11] </args>
+      <args> x[10..11] x[0] </args>
+      <args> x[11] x[0..1] </args>
+    </group>
+    <block class="symmetry-breaking">
+      <intension> eq(x[0],1) </intension>
+      <intension> lt(x[1],x[11]) </intension>
+    </block>
+  </constraints>
+  <objectives>
+    <minimize> z </minimize>
+  </objectives>
+</instance>

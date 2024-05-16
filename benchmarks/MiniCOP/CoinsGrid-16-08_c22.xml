@@ -1,0 +1,57 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i][j] is 1 if a coin is placed at row i and column j" size="[16][16]"> 0 1 </array>
+  </variables>
+  <constraints>
+    <group>
+      <sum>
+        <list> %... </list>
+        <condition> (eq,8) </condition>
+      </sum>
+      <args> x[0][] </args>
+      <args> x[1][] </args>
+      <args> x[2][] </args>
+      <args> x[3][] </args>
+      <args> x[4][] </args>
+      <args> x[5][] </args>
+      <args> x[6][] </args>
+      <args> x[7][] </args>
+      <args> x[8][] </args>
+      <args> x[9][] </args>
+      <args> x[10][] </args>
+      <args> x[11][] </args>
+      <args> x[12][] </args>
+      <args> x[13][] </args>
+      <args> x[14][] </args>
+      <args> x[15][] </args>
+    </group>
+    <group>
+      <sum>
+        <list> %... </list>
+        <condition> (eq,8) </condition>
+      </sum>
+      <args> x[][0] </args>
+      <args> x[][1] </args>
+      <args> x[][2] </args>
+      <args> x[][3] </args>
+      <args> x[][4] </args>
+      <args> x[][5] </args>
+      <args> x[][6] </args>
+      <args> x[][7] </args>
+      <args> x[][8] </args>
+      <args> x[][9] </args>
+      <args> x[][10] </args>
+      <args> x[][11] </args>
+      <args> x[][12] </args>
+      <args> x[][13] </args>
+      <args> x[][14] </args>
+      <args> x[][15] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize type="sum">
+      <list> x[][] </list>
+      <coeffs> 0 1 4 9 16 25 36 49 64 81 100 121 144 169 196 225 1 0 1 4 9 16 25 36 49 64 81 100 121 144 169 196 4 1 0 1 4 9 16 25 36 49 64 81 100 121 144 169 9 4 1 0 1 4 9 16 25 36 49 64 81 100 121 144 16 9 4 1 0 1 4 9 16 25 36 49 64 81 100 121 25 16 9 4 1 0 1 4 9 16 25 36 49 64 81 100 36 25 16 9 4 1 0 1 4 9 16 25 36 49 64 81 49 36 25 16 9 4 1 0 1 4 9 16 25 36 49 64 64 49 36 25 16 9 4 1 0 1 4 9 16 25 36 49 81 64 49 36 25 16 9 4 1 0 1 4 9 16 25 36 100 81 64 49 36 25 16 9 4 1 0 1 4 9 16 25 121 100 81 64 49 36 25 16 9 4 1 0 1 4 9 16 144 121 100 81 64 49 36 25 16 9 4 1 0 1 4 9 169 144 121 100 81 64 49 36 25 16 9 4 1 0 1 4 196 169 144 121 100 81 64 49 36 25 16 9 4 1 0 1 225 196 169 144 121 100 81 64 49 36 25 16 9 4 1 0 </coeffs>
+    </minimize>
+  </objectives>
+</instance>

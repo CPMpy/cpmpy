@@ -1,0 +1,73 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i] is the ith value of the first set" size="[10]"> 1..20 </array>
+    <array id="y" note="y[i] is the ith value of the second set" size="[10]"> 1..20 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[20]"> 1..400 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[] y[] </allDifferent>
+    <group class="power1">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,105) </condition>
+      </sum>
+      <args> x[] </args>
+      <args> y[] </args>
+    </group>
+    <group class="power2">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,1435) </condition>
+      </sum>
+      <args> aux_gb[0..9] </args>
+      <args> aux_gb[10..19] </args>
+    </group>
+    <block class="symmetry-breaking">
+      <intension> eq(x[0],1) </intension>
+      <group>
+        <intension> lt(%0,%1) </intension>
+        <args> x[0] x[1] </args>
+        <args> x[1] x[2] </args>
+        <args> x[2] x[3] </args>
+        <args> x[3] x[4] </args>
+        <args> x[4] x[5] </args>
+        <args> x[5] x[6] </args>
+        <args> x[6] x[7] </args>
+        <args> x[7] x[8] </args>
+        <args> x[8] x[9] </args>
+        <args> y[0] y[1] </args>
+        <args> y[1] y[2] </args>
+        <args> y[2] y[3] </args>
+        <args> y[3] y[4] </args>
+        <args> y[4] y[5] </args>
+        <args> y[5] y[6] </args>
+        <args> y[6] y[7] </args>
+        <args> y[7] y[8] </args>
+        <args> y[8] y[9] </args>
+      </group>
+    </block>
+    <group>
+      <intension> eq(mul(%0,%0),%1) </intension>
+      <args> x[0] aux_gb[0] </args>
+      <args> x[1] aux_gb[1] </args>
+      <args> x[2] aux_gb[2] </args>
+      <args> x[3] aux_gb[3] </args>
+      <args> x[4] aux_gb[4] </args>
+      <args> x[5] aux_gb[5] </args>
+      <args> x[6] aux_gb[6] </args>
+      <args> x[7] aux_gb[7] </args>
+      <args> x[8] aux_gb[8] </args>
+      <args> x[9] aux_gb[9] </args>
+      <args> y[0] aux_gb[10] </args>
+      <args> y[1] aux_gb[11] </args>
+      <args> y[2] aux_gb[12] </args>
+      <args> y[3] aux_gb[13] </args>
+      <args> y[4] aux_gb[14] </args>
+      <args> y[5] aux_gb[15] </args>
+      <args> y[6] aux_gb[16] </args>
+      <args> y[7] aux_gb[17] </args>
+      <args> y[8] aux_gb[18] </args>
+      <args> y[9] aux_gb[19] </args>
+    </group>
+  </constraints>
+</instance>

@@ -1,0 +1,56 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x represents the hexagon; on row x[i], only the first n - |n/2 - i| cells are useful (here, n = 7)." size="[7][7]"> 17..53 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[][0] x[][1] x[][2] x[][3] x[1..2][4] x[2][5] x[3][4..6] x[4][4..5] x[5][4] </allDifferent>
+    <group class="rows" note="All rows sum to the magic value">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,185) </condition>
+      </sum>
+      <args> x[0][0..3] </args>
+      <args> x[1][0..4] </args>
+      <args> x[2][0..5] </args>
+      <args> x[3][] </args>
+      <args> x[4][0..5] </args>
+      <args> x[5][0..4] </args>
+      <args> x[6][0..3] </args>
+    </group>
+    <group class="rightDiagonals" note="All right-sloping diagonals sum to the magic value">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,185) </condition>
+      </sum>
+      <args> x[3..6][0] </args>
+      <args> x[2][0] x[3..6][1] </args>
+      <args> x[1][0] x[2][1] x[3..6][2] </args>
+      <args> x[0][0] x[1][1] x[2][2] x[3..6][3] </args>
+      <args> x[0][1] x[1][2] x[2][3] x[3..5][4] </args>
+      <args> x[0][2] x[1][3] x[2][4] x[3..4][5] </args>
+      <args> x[0][3] x[1][4] x[2][5] x[3][6] </args>
+    </group>
+    <group class="leftDiagonals" note="All left-sloping diagonals sum to the magic value">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,185) </condition>
+      </sum>
+      <args> x[0..3][0] </args>
+      <args> x[0..3][1] x[4][0] </args>
+      <args> x[0..3][2] x[4][1] x[5][0] </args>
+      <args> x[0..3][3] x[4][2] x[5][1] x[6][0] </args>
+      <args> x[1..3][4] x[4][3] x[5][2] x[6][1] </args>
+      <args> x[2..3][5] x[4][4] x[5][3] x[6][2] </args>
+      <args> x[3][6] x[4][5] x[5][4] x[6][3] </args>
+    </group>
+    <group class="symmetryBreaking">
+      <intension> lt(%0,%1) </intension>
+      <args> x[0][0] x[0][3] </args>
+      <args> x[0][0] x[3][6] </args>
+      <args> x[0][0] x[6][3] </args>
+      <args> x[0][0] x[6][0] </args>
+      <args> x[0][0] x[3][0] </args>
+      <args> x[0][3] x[3][0] </args>
+    </group>
+  </constraints>
+</instance>

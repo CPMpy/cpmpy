@@ -1,0 +1,1314 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] denotes the position (in the line) of the ith node" size="[96]"> 0..95 </array>
+    <array id="d" note="d[i][j] denotes the distance in the line between the ith and jth nodes (if they are adjacent in the graph)" size="[96][96]"> 1..95 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="putting nodes at different positions"> x[] </allDifferent>
+    <group note="computing distances">
+      <intension> eq(%0,dist(%1,%2)) </intension>
+      <args> d[0][1] x[0] x[1] </args>
+      <args> d[0][15] x[0] x[15] </args>
+      <args> d[0][16] x[0] x[16] </args>
+      <args> d[0][17] x[0] x[17] </args>
+      <args> d[0][31] x[0] x[31] </args>
+      <args> d[1][2] x[1] x[2] </args>
+      <args> d[1][16] x[1] x[16] </args>
+      <args> d[1][17] x[1] x[17] </args>
+      <args> d[1][18] x[1] x[18] </args>
+      <args> d[2][3] x[2] x[3] </args>
+      <args> d[2][17] x[2] x[17] </args>
+      <args> d[2][18] x[2] x[18] </args>
+      <args> d[2][19] x[2] x[19] </args>
+      <args> d[3][4] x[3] x[4] </args>
+      <args> d[3][18] x[3] x[18] </args>
+      <args> d[3][19] x[3] x[19] </args>
+      <args> d[3][20] x[3] x[20] </args>
+      <args> d[4][5] x[4] x[5] </args>
+      <args> d[4][19] x[4] x[19] </args>
+      <args> d[4][20] x[4] x[20] </args>
+      <args> d[4][21] x[4] x[21] </args>
+      <args> d[5][6] x[5] x[6] </args>
+      <args> d[5][20] x[5] x[20] </args>
+      <args> d[5][21] x[5] x[21] </args>
+      <args> d[5][22] x[5] x[22] </args>
+      <args> d[6][7] x[6] x[7] </args>
+      <args> d[6][21] x[6] x[21] </args>
+      <args> d[6][22] x[6] x[22] </args>
+      <args> d[6][23] x[6] x[23] </args>
+      <args> d[7][8] x[7] x[8] </args>
+      <args> d[7][22] x[7] x[22] </args>
+      <args> d[7][23] x[7] x[23] </args>
+      <args> d[7][24] x[7] x[24] </args>
+      <args> d[8][9] x[8] x[9] </args>
+      <args> d[8][23] x[8] x[23] </args>
+      <args> d[8][24] x[8] x[24] </args>
+      <args> d[8][25] x[8] x[25] </args>
+      <args> d[9][10] x[9] x[10] </args>
+      <args> d[9][24] x[9] x[24] </args>
+      <args> d[9][25] x[9] x[25] </args>
+      <args> d[9][26] x[9] x[26] </args>
+      <args> d[10][11] x[10] x[11] </args>
+      <args> d[10][25] x[10] x[25] </args>
+      <args> d[10][26] x[10] x[26] </args>
+      <args> d[10][27] x[10] x[27] </args>
+      <args> d[11][12] x[11] x[12] </args>
+      <args> d[11][26] x[11] x[26] </args>
+      <args> d[11][27] x[11] x[27] </args>
+      <args> d[11][28] x[11] x[28] </args>
+      <args> d[12][13] x[12] x[13] </args>
+      <args> d[12][27] x[12] x[27] </args>
+      <args> d[12][28] x[12] x[28] </args>
+      <args> d[12][29] x[12] x[29] </args>
+      <args> d[13][14] x[13] x[14] </args>
+      <args> d[13][28] x[13] x[28] </args>
+      <args> d[13][29] x[13] x[29] </args>
+      <args> d[13][30] x[13] x[30] </args>
+      <args> d[14][15] x[14] x[15] </args>
+      <args> d[14][29] x[14] x[29] </args>
+      <args> d[14][30] x[14] x[30] </args>
+      <args> d[14][31] x[14] x[31] </args>
+      <args> d[15][16] x[15] x[16] </args>
+      <args> d[15][30] x[15] x[30] </args>
+      <args> d[15][31] x[15] x[31] </args>
+      <args> d[16][17] x[16] x[17] </args>
+      <args> d[16][31] x[16] x[31] </args>
+      <args> d[16][32] x[16] x[32] </args>
+      <args> d[16][33] x[16] x[33] </args>
+      <args> d[16][47] x[16] x[47] </args>
+      <args> d[17][18] x[17] x[18] </args>
+      <args> d[17][32] x[17] x[32] </args>
+      <args> d[17][33] x[17] x[33] </args>
+      <args> d[17][34] x[17] x[34] </args>
+      <args> d[18][19] x[18] x[19] </args>
+      <args> d[18][33] x[18] x[33] </args>
+      <args> d[18][34] x[18] x[34] </args>
+      <args> d[18][35] x[18] x[35] </args>
+      <args> d[19][20] x[19] x[20] </args>
+      <args> d[19][34] x[19] x[34] </args>
+      <args> d[19][35] x[19] x[35] </args>
+      <args> d[19][36] x[19] x[36] </args>
+      <args> d[20][21] x[20] x[21] </args>
+      <args> d[20][35] x[20] x[35] </args>
+      <args> d[20][36] x[20] x[36] </args>
+      <args> d[20][37] x[20] x[37] </args>
+      <args> d[21][22] x[21] x[22] </args>
+      <args> d[21][36] x[21] x[36] </args>
+      <args> d[21][37] x[21] x[37] </args>
+      <args> d[21][38] x[21] x[38] </args>
+      <args> d[22][23] x[22] x[23] </args>
+      <args> d[22][37] x[22] x[37] </args>
+      <args> d[22][38] x[22] x[38] </args>
+      <args> d[22][39] x[22] x[39] </args>
+      <args> d[23][24] x[23] x[24] </args>
+      <args> d[23][38] x[23] x[38] </args>
+      <args> d[23][39] x[23] x[39] </args>
+      <args> d[23][40] x[23] x[40] </args>
+      <args> d[24][25] x[24] x[25] </args>
+      <args> d[24][39] x[24] x[39] </args>
+      <args> d[24][40] x[24] x[40] </args>
+      <args> d[24][41] x[24] x[41] </args>
+      <args> d[25][26] x[25] x[26] </args>
+      <args> d[25][40] x[25] x[40] </args>
+      <args> d[25][41] x[25] x[41] </args>
+      <args> d[25][42] x[25] x[42] </args>
+      <args> d[26][27] x[26] x[27] </args>
+      <args> d[26][41] x[26] x[41] </args>
+      <args> d[26][42] x[26] x[42] </args>
+      <args> d[26][43] x[26] x[43] </args>
+      <args> d[27][28] x[27] x[28] </args>
+      <args> d[27][42] x[27] x[42] </args>
+      <args> d[27][43] x[27] x[43] </args>
+      <args> d[27][44] x[27] x[44] </args>
+      <args> d[28][29] x[28] x[29] </args>
+      <args> d[28][43] x[28] x[43] </args>
+      <args> d[28][44] x[28] x[44] </args>
+      <args> d[28][45] x[28] x[45] </args>
+      <args> d[29][30] x[29] x[30] </args>
+      <args> d[29][44] x[29] x[44] </args>
+      <args> d[29][45] x[29] x[45] </args>
+      <args> d[29][46] x[29] x[46] </args>
+      <args> d[30][31] x[30] x[31] </args>
+      <args> d[30][45] x[30] x[45] </args>
+      <args> d[30][46] x[30] x[46] </args>
+      <args> d[30][47] x[30] x[47] </args>
+      <args> d[31][32] x[31] x[32] </args>
+      <args> d[31][46] x[31] x[46] </args>
+      <args> d[31][47] x[31] x[47] </args>
+      <args> d[32][33] x[32] x[33] </args>
+      <args> d[32][47] x[32] x[47] </args>
+      <args> d[32][48] x[32] x[48] </args>
+      <args> d[32][49] x[32] x[49] </args>
+      <args> d[32][63] x[32] x[63] </args>
+      <args> d[33][34] x[33] x[34] </args>
+      <args> d[33][48] x[33] x[48] </args>
+      <args> d[33][49] x[33] x[49] </args>
+      <args> d[33][50] x[33] x[50] </args>
+      <args> d[34][35] x[34] x[35] </args>
+      <args> d[34][49] x[34] x[49] </args>
+      <args> d[34][50] x[34] x[50] </args>
+      <args> d[34][51] x[34] x[51] </args>
+      <args> d[35][36] x[35] x[36] </args>
+      <args> d[35][50] x[35] x[50] </args>
+      <args> d[35][51] x[35] x[51] </args>
+      <args> d[35][52] x[35] x[52] </args>
+      <args> d[36][37] x[36] x[37] </args>
+      <args> d[36][51] x[36] x[51] </args>
+      <args> d[36][52] x[36] x[52] </args>
+      <args> d[36][53] x[36] x[53] </args>
+      <args> d[37][38] x[37] x[38] </args>
+      <args> d[37][52] x[37] x[52] </args>
+      <args> d[37][53] x[37] x[53] </args>
+      <args> d[37][54] x[37] x[54] </args>
+      <args> d[38][39] x[38] x[39] </args>
+      <args> d[38][53] x[38] x[53] </args>
+      <args> d[38][54] x[38] x[54] </args>
+      <args> d[38][55] x[38] x[55] </args>
+      <args> d[39][40] x[39] x[40] </args>
+      <args> d[39][54] x[39] x[54] </args>
+      <args> d[39][55] x[39] x[55] </args>
+      <args> d[39][56] x[39] x[56] </args>
+      <args> d[40][41] x[40] x[41] </args>
+      <args> d[40][55] x[40] x[55] </args>
+      <args> d[40][56] x[40] x[56] </args>
+      <args> d[40][57] x[40] x[57] </args>
+      <args> d[41][42] x[41] x[42] </args>
+      <args> d[41][56] x[41] x[56] </args>
+      <args> d[41][57] x[41] x[57] </args>
+      <args> d[41][58] x[41] x[58] </args>
+      <args> d[42][43] x[42] x[43] </args>
+      <args> d[42][57] x[42] x[57] </args>
+      <args> d[42][58] x[42] x[58] </args>
+      <args> d[42][59] x[42] x[59] </args>
+      <args> d[43][44] x[43] x[44] </args>
+      <args> d[43][58] x[43] x[58] </args>
+      <args> d[43][59] x[43] x[59] </args>
+      <args> d[43][60] x[43] x[60] </args>
+      <args> d[44][45] x[44] x[45] </args>
+      <args> d[44][59] x[44] x[59] </args>
+      <args> d[44][60] x[44] x[60] </args>
+      <args> d[44][61] x[44] x[61] </args>
+      <args> d[45][46] x[45] x[46] </args>
+      <args> d[45][60] x[45] x[60] </args>
+      <args> d[45][61] x[45] x[61] </args>
+      <args> d[45][62] x[45] x[62] </args>
+      <args> d[46][47] x[46] x[47] </args>
+      <args> d[46][61] x[46] x[61] </args>
+      <args> d[46][62] x[46] x[62] </args>
+      <args> d[46][63] x[46] x[63] </args>
+      <args> d[47][48] x[47] x[48] </args>
+      <args> d[47][62] x[47] x[62] </args>
+      <args> d[47][63] x[47] x[63] </args>
+      <args> d[48][49] x[48] x[49] </args>
+      <args> d[48][63] x[48] x[63] </args>
+      <args> d[48][64] x[48] x[64] </args>
+      <args> d[48][65] x[48] x[65] </args>
+      <args> d[48][79] x[48] x[79] </args>
+      <args> d[49][50] x[49] x[50] </args>
+      <args> d[49][64] x[49] x[64] </args>
+      <args> d[49][65] x[49] x[65] </args>
+      <args> d[49][66] x[49] x[66] </args>
+      <args> d[50][51] x[50] x[51] </args>
+      <args> d[50][65] x[50] x[65] </args>
+      <args> d[50][66] x[50] x[66] </args>
+      <args> d[50][67] x[50] x[67] </args>
+      <args> d[51][52] x[51] x[52] </args>
+      <args> d[51][66] x[51] x[66] </args>
+      <args> d[51][67] x[51] x[67] </args>
+      <args> d[51][68] x[51] x[68] </args>
+      <args> d[52][53] x[52] x[53] </args>
+      <args> d[52][67] x[52] x[67] </args>
+      <args> d[52][68] x[52] x[68] </args>
+      <args> d[52][69] x[52] x[69] </args>
+      <args> d[53][54] x[53] x[54] </args>
+      <args> d[53][68] x[53] x[68] </args>
+      <args> d[53][69] x[53] x[69] </args>
+      <args> d[53][70] x[53] x[70] </args>
+      <args> d[54][55] x[54] x[55] </args>
+      <args> d[54][69] x[54] x[69] </args>
+      <args> d[54][70] x[54] x[70] </args>
+      <args> d[54][71] x[54] x[71] </args>
+      <args> d[55][56] x[55] x[56] </args>
+      <args> d[55][70] x[55] x[70] </args>
+      <args> d[55][71] x[55] x[71] </args>
+      <args> d[55][72] x[55] x[72] </args>
+      <args> d[56][57] x[56] x[57] </args>
+      <args> d[56][71] x[56] x[71] </args>
+      <args> d[56][72] x[56] x[72] </args>
+      <args> d[56][73] x[56] x[73] </args>
+      <args> d[57][58] x[57] x[58] </args>
+      <args> d[57][72] x[57] x[72] </args>
+      <args> d[57][73] x[57] x[73] </args>
+      <args> d[57][74] x[57] x[74] </args>
+      <args> d[58][59] x[58] x[59] </args>
+      <args> d[58][73] x[58] x[73] </args>
+      <args> d[58][74] x[58] x[74] </args>
+      <args> d[58][75] x[58] x[75] </args>
+      <args> d[59][60] x[59] x[60] </args>
+      <args> d[59][74] x[59] x[74] </args>
+      <args> d[59][75] x[59] x[75] </args>
+      <args> d[59][76] x[59] x[76] </args>
+      <args> d[60][61] x[60] x[61] </args>
+      <args> d[60][75] x[60] x[75] </args>
+      <args> d[60][76] x[60] x[76] </args>
+      <args> d[60][77] x[60] x[77] </args>
+      <args> d[61][62] x[61] x[62] </args>
+      <args> d[61][76] x[61] x[76] </args>
+      <args> d[61][77] x[61] x[77] </args>
+      <args> d[61][78] x[61] x[78] </args>
+      <args> d[62][63] x[62] x[63] </args>
+      <args> d[62][77] x[62] x[77] </args>
+      <args> d[62][78] x[62] x[78] </args>
+      <args> d[62][79] x[62] x[79] </args>
+      <args> d[63][64] x[63] x[64] </args>
+      <args> d[63][78] x[63] x[78] </args>
+      <args> d[63][79] x[63] x[79] </args>
+      <args> d[64][65] x[64] x[65] </args>
+      <args> d[64][79] x[64] x[79] </args>
+      <args> d[64][80] x[64] x[80] </args>
+      <args> d[64][81] x[64] x[81] </args>
+      <args> d[64][95] x[64] x[95] </args>
+      <args> d[65][66] x[65] x[66] </args>
+      <args> d[65][80] x[65] x[80] </args>
+      <args> d[65][81] x[65] x[81] </args>
+      <args> d[65][82] x[65] x[82] </args>
+      <args> d[66][67] x[66] x[67] </args>
+      <args> d[66][81] x[66] x[81] </args>
+      <args> d[66][82] x[66] x[82] </args>
+      <args> d[66][83] x[66] x[83] </args>
+      <args> d[67][68] x[67] x[68] </args>
+      <args> d[67][82] x[67] x[82] </args>
+      <args> d[67][83] x[67] x[83] </args>
+      <args> d[67][84] x[67] x[84] </args>
+      <args> d[68][69] x[68] x[69] </args>
+      <args> d[68][83] x[68] x[83] </args>
+      <args> d[68][84] x[68] x[84] </args>
+      <args> d[68][85] x[68] x[85] </args>
+      <args> d[69][70] x[69] x[70] </args>
+      <args> d[69][84] x[69] x[84] </args>
+      <args> d[69][85] x[69] x[85] </args>
+      <args> d[69][86] x[69] x[86] </args>
+      <args> d[70][71] x[70] x[71] </args>
+      <args> d[70][85] x[70] x[85] </args>
+      <args> d[70][86] x[70] x[86] </args>
+      <args> d[70][87] x[70] x[87] </args>
+      <args> d[71][72] x[71] x[72] </args>
+      <args> d[71][86] x[71] x[86] </args>
+      <args> d[71][87] x[71] x[87] </args>
+      <args> d[71][88] x[71] x[88] </args>
+      <args> d[72][73] x[72] x[73] </args>
+      <args> d[72][87] x[72] x[87] </args>
+      <args> d[72][88] x[72] x[88] </args>
+      <args> d[72][89] x[72] x[89] </args>
+      <args> d[73][74] x[73] x[74] </args>
+      <args> d[73][88] x[73] x[88] </args>
+      <args> d[73][89] x[73] x[89] </args>
+      <args> d[73][90] x[73] x[90] </args>
+      <args> d[74][75] x[74] x[75] </args>
+      <args> d[74][89] x[74] x[89] </args>
+      <args> d[74][90] x[74] x[90] </args>
+      <args> d[74][91] x[74] x[91] </args>
+      <args> d[75][76] x[75] x[76] </args>
+      <args> d[75][90] x[75] x[90] </args>
+      <args> d[75][91] x[75] x[91] </args>
+      <args> d[75][92] x[75] x[92] </args>
+      <args> d[76][77] x[76] x[77] </args>
+      <args> d[76][91] x[76] x[91] </args>
+      <args> d[76][92] x[76] x[92] </args>
+      <args> d[76][93] x[76] x[93] </args>
+      <args> d[77][78] x[77] x[78] </args>
+      <args> d[77][92] x[77] x[92] </args>
+      <args> d[77][93] x[77] x[93] </args>
+      <args> d[77][94] x[77] x[94] </args>
+      <args> d[78][79] x[78] x[79] </args>
+      <args> d[78][93] x[78] x[93] </args>
+      <args> d[78][94] x[78] x[94] </args>
+      <args> d[78][95] x[78] x[95] </args>
+      <args> d[79][80] x[79] x[80] </args>
+      <args> d[79][94] x[79] x[94] </args>
+      <args> d[79][95] x[79] x[95] </args>
+      <args> d[80][81] x[80] x[81] </args>
+      <args> d[80][95] x[80] x[95] </args>
+      <args> d[81][82] x[81] x[82] </args>
+      <args> d[82][83] x[82] x[83] </args>
+      <args> d[83][84] x[83] x[84] </args>
+      <args> d[84][85] x[84] x[85] </args>
+      <args> d[85][86] x[85] x[86] </args>
+      <args> d[86][87] x[86] x[87] </args>
+      <args> d[87][88] x[87] x[88] </args>
+      <args> d[88][89] x[88] x[89] </args>
+      <args> d[89][90] x[89] x[90] </args>
+      <args> d[90][91] x[90] x[91] </args>
+      <args> d[91][92] x[91] x[92] </args>
+      <args> d[92][93] x[92] x[93] </args>
+      <args> d[93][94] x[93] x[94] </args>
+      <args> d[94][95] x[94] x[95] </args>
+    </group>
+    <group class="redundant-constraints" note="triangle constraints: distance(i,j) &lt;= distance(i,k) + distance(k,j)">
+      <intension> le(%0,add(%1,%2)) </intension>
+      <args> d[0][1] d[0..1][16] </args>
+      <args> d[0][1] d[0..1][17] </args>
+      <args> d[0][15..16] d[15][16] </args>
+      <args> d[0][15] d[0][31] d[15][31] </args>
+      <args> d[0][16] d[0][1] d[1][16] </args>
+      <args> d[0][16] d[0][15] d[15][16] </args>
+      <args> d[0][16..17] d[16][17] </args>
+      <args> d[0][16] d[0][31] d[16][31] </args>
+      <args> d[0][17] d[0][1] d[1][17] </args>
+      <args> d[0][17] d[0][16] d[16][17] </args>
+      <args> d[0][31] d[0][15] d[15][31] </args>
+      <args> d[0][31] d[0][16] d[16][31] </args>
+      <args> d[1][2] d[1..2][17] </args>
+      <args> d[1][2] d[1..2][18] </args>
+      <args> d[1][16] d[0][1] d[0][16] </args>
+      <args> d[1][16..17] d[16][17] </args>
+      <args> d[1][17] d[0][1] d[0][17] </args>
+      <args> d[1][17] d[1][2] d[2][17] </args>
+      <args> d[1][17] d[1][16] d[16][17] </args>
+      <args> d[1][17..18] d[17][18] </args>
+      <args> d[1][18] d[1][2] d[2][18] </args>
+      <args> d[1][18] d[1][17] d[17][18] </args>
+      <args> d[2][3] d[2..3][18] </args>
+      <args> d[2][3] d[2..3][19] </args>
+      <args> d[2][17] d[1][2] d[1][17] </args>
+      <args> d[2][17..18] d[17][18] </args>
+      <args> d[2][18] d[1][2] d[1][18] </args>
+      <args> d[2][18] d[2][3] d[3][18] </args>
+      <args> d[2][18] d[2][17] d[17][18] </args>
+      <args> d[2][18..19] d[18][19] </args>
+      <args> d[2][19] d[2][3] d[3][19] </args>
+      <args> d[2][19] d[2][18] d[18][19] </args>
+      <args> d[3][4] d[3..4][19] </args>
+      <args> d[3][4] d[3..4][20] </args>
+      <args> d[3][18] d[2][3] d[2][18] </args>
+      <args> d[3][18..19] d[18][19] </args>
+      <args> d[3][19] d[2][3] d[2][19] </args>
+      <args> d[3][19] d[3][4] d[4][19] </args>
+      <args> d[3][19] d[3][18] d[18][19] </args>
+      <args> d[3][19..20] d[19][20] </args>
+      <args> d[3][20] d[3][4] d[4][20] </args>
+      <args> d[3][20] d[3][19] d[19][20] </args>
+      <args> d[4][5] d[4..5][20] </args>
+      <args> d[4][5] d[4..5][21] </args>
+      <args> d[4][19] d[3][4] d[3][19] </args>
+      <args> d[4][19..20] d[19][20] </args>
+      <args> d[4][20] d[3][4] d[3][20] </args>
+      <args> d[4][20] d[4][5] d[5][20] </args>
+      <args> d[4][20] d[4][19] d[19][20] </args>
+      <args> d[4][20..21] d[20][21] </args>
+      <args> d[4][21] d[4][5] d[5][21] </args>
+      <args> d[4][21] d[4][20] d[20][21] </args>
+      <args> d[5][6] d[5..6][21] </args>
+      <args> d[5][6] d[5..6][22] </args>
+      <args> d[5][20] d[4][5] d[4][20] </args>
+      <args> d[5][20..21] d[20][21] </args>
+      <args> d[5][21] d[4][5] d[4][21] </args>
+      <args> d[5][21] d[5][6] d[6][21] </args>
+      <args> d[5][21] d[5][20] d[20][21] </args>
+      <args> d[5][21..22] d[21][22] </args>
+      <args> d[5][22] d[5][6] d[6][22] </args>
+      <args> d[5][22] d[5][21] d[21][22] </args>
+      <args> d[6][7] d[6..7][22] </args>
+      <args> d[6][7] d[6..7][23] </args>
+      <args> d[6][21] d[5][6] d[5][21] </args>
+      <args> d[6][21..22] d[21][22] </args>
+      <args> d[6][22] d[5][6] d[5][22] </args>
+      <args> d[6][22] d[6][7] d[7][22] </args>
+      <args> d[6][22] d[6][21] d[21][22] </args>
+      <args> d[6][22..23] d[22][23] </args>
+      <args> d[6][23] d[6][7] d[7][23] </args>
+      <args> d[6][23] d[6][22] d[22][23] </args>
+      <args> d[7][8] d[7..8][23] </args>
+      <args> d[7][8] d[7..8][24] </args>
+      <args> d[7][22] d[6][7] d[6][22] </args>
+      <args> d[7][22..23] d[22][23] </args>
+      <args> d[7][23] d[6][7] d[6][23] </args>
+      <args> d[7][23] d[7][8] d[8][23] </args>
+      <args> d[7][23] d[7][22] d[22][23] </args>
+      <args> d[7][23..24] d[23][24] </args>
+      <args> d[7][24] d[7][8] d[8][24] </args>
+      <args> d[7][24] d[7][23] d[23][24] </args>
+      <args> d[8][9] d[8..9][24] </args>
+      <args> d[8][9] d[8..9][25] </args>
+      <args> d[8][23] d[7][8] d[7][23] </args>
+      <args> d[8][23..24] d[23][24] </args>
+      <args> d[8][24] d[7][8] d[7][24] </args>
+      <args> d[8][24] d[8][9] d[9][24] </args>
+      <args> d[8][24] d[8][23] d[23][24] </args>
+      <args> d[8][24..25] d[24][25] </args>
+      <args> d[8][25] d[8][9] d[9][25] </args>
+      <args> d[8][25] d[8][24] d[24][25] </args>
+      <args> d[9][10] d[9..10][25] </args>
+      <args> d[9][10] d[9..10][26] </args>
+      <args> d[9][24] d[8][9] d[8][24] </args>
+      <args> d[9][24..25] d[24][25] </args>
+      <args> d[9][25] d[8][9] d[8][25] </args>
+      <args> d[9][25] d[9][10] d[10][25] </args>
+      <args> d[9][25] d[9][24] d[24][25] </args>
+      <args> d[9][25..26] d[25][26] </args>
+      <args> d[9][26] d[9][10] d[10][26] </args>
+      <args> d[9][26] d[9][25] d[25][26] </args>
+      <args> d[10][11] d[10..11][26] </args>
+      <args> d[10][11] d[10..11][27] </args>
+      <args> d[10][25] d[9][10] d[9][25] </args>
+      <args> d[10][25..26] d[25][26] </args>
+      <args> d[10][26] d[9][10] d[9][26] </args>
+      <args> d[10][26] d[10][11] d[11][26] </args>
+      <args> d[10][26] d[10][25] d[25][26] </args>
+      <args> d[10][26..27] d[26][27] </args>
+      <args> d[10][27] d[10][11] d[11][27] </args>
+      <args> d[10][27] d[10][26] d[26][27] </args>
+      <args> d[11][12] d[11..12][27] </args>
+      <args> d[11][12] d[11..12][28] </args>
+      <args> d[11][26] d[10][11] d[10][26] </args>
+      <args> d[11][26..27] d[26][27] </args>
+      <args> d[11][27] d[10][11] d[10][27] </args>
+      <args> d[11][27] d[11][12] d[12][27] </args>
+      <args> d[11][27] d[11][26] d[26][27] </args>
+      <args> d[11][27..28] d[27][28] </args>
+      <args> d[11][28] d[11][12] d[12][28] </args>
+      <args> d[11][28] d[11][27] d[27][28] </args>
+      <args> d[12][13] d[12..13][28] </args>
+      <args> d[12][13] d[12..13][29] </args>
+      <args> d[12][27] d[11][12] d[11][27] </args>
+      <args> d[12][27..28] d[27][28] </args>
+      <args> d[12][28] d[11][12] d[11][28] </args>
+      <args> d[12][28] d[12][13] d[13][28] </args>
+      <args> d[12][28] d[12][27] d[27][28] </args>
+      <args> d[12][28..29] d[28][29] </args>
+      <args> d[12][29] d[12][13] d[13][29] </args>
+      <args> d[12][29] d[12][28] d[28][29] </args>
+      <args> d[13][14] d[13..14][29] </args>
+      <args> d[13][14] d[13..14][30] </args>
+      <args> d[13][28] d[12][13] d[12][28] </args>
+      <args> d[13][28..29] d[28][29] </args>
+      <args> d[13][29] d[12][13] d[12][29] </args>
+      <args> d[13][29] d[13][14] d[14][29] </args>
+      <args> d[13][29] d[13][28] d[28][29] </args>
+      <args> d[13][29..30] d[29][30] </args>
+      <args> d[13][30] d[13][14] d[14][30] </args>
+      <args> d[13][30] d[13][29] d[29][30] </args>
+      <args> d[14][15] d[14..15][30] </args>
+      <args> d[14][15] d[14..15][31] </args>
+      <args> d[14][29] d[13][14] d[13][29] </args>
+      <args> d[14][29..30] d[29][30] </args>
+      <args> d[14][30] d[13][14] d[13][30] </args>
+      <args> d[14][30] d[14][15] d[15][30] </args>
+      <args> d[14][30] d[14][29] d[29][30] </args>
+      <args> d[14][30..31] d[30][31] </args>
+      <args> d[14][31] d[14][15] d[15][31] </args>
+      <args> d[14][31] d[14][30] d[30][31] </args>
+      <args> d[15][16] d[0][15..16] </args>
+      <args> d[15][16] d[15..16][31] </args>
+      <args> d[15][30] d[14][15] d[14][30] </args>
+      <args> d[15][30..31] d[30][31] </args>
+      <args> d[15][31] d[0][15] d[0][31] </args>
+      <args> d[15][31] d[14][15] d[14][31] </args>
+      <args> d[15][31] d[15][16] d[16][31] </args>
+      <args> d[15][31] d[15][30] d[30][31] </args>
+      <args> d[16][17] d[0][16..17] </args>
+      <args> d[16][17] d[1][16..17] </args>
+      <args> d[16][17] d[16..17][32] </args>
+      <args> d[16][17] d[16..17][33] </args>
+      <args> d[16][31] d[0][16] d[0][31] </args>
+      <args> d[16][31] d[15][16] d[15][31] </args>
+      <args> d[16][31..32] d[31][32] </args>
+      <args> d[16][31] d[16][47] d[31][47] </args>
+      <args> d[16][32] d[16][17] d[17][32] </args>
+      <args> d[16][32] d[16][31] d[31][32] </args>
+      <args> d[16][32..33] d[32][33] </args>
+      <args> d[16][32] d[16][47] d[32][47] </args>
+      <args> d[16][33] d[16][17] d[17][33] </args>
+      <args> d[16][33] d[16][32] d[32][33] </args>
+      <args> d[16][47] d[16][31] d[31][47] </args>
+      <args> d[16][47] d[16][32] d[32][47] </args>
+      <args> d[17][18] d[1][17..18] </args>
+      <args> d[17][18] d[2][17..18] </args>
+      <args> d[17][18] d[17..18][33] </args>
+      <args> d[17][18] d[17..18][34] </args>
+      <args> d[17][32] d[16][17] d[16][32] </args>
+      <args> d[17][32..33] d[32][33] </args>
+      <args> d[17][33] d[16][17] d[16][33] </args>
+      <args> d[17][33] d[17][18] d[18][33] </args>
+      <args> d[17][33] d[17][32] d[32][33] </args>
+      <args> d[17][33..34] d[33][34] </args>
+      <args> d[17][34] d[17][18] d[18][34] </args>
+      <args> d[17][34] d[17][33] d[33][34] </args>
+      <args> d[18][19] d[2][18..19] </args>
+      <args> d[18][19] d[3][18..19] </args>
+      <args> d[18][19] d[18..19][34] </args>
+      <args> d[18][19] d[18..19][35] </args>
+      <args> d[18][33] d[17][18] d[17][33] </args>
+      <args> d[18][33..34] d[33][34] </args>
+      <args> d[18][34] d[17][18] d[17][34] </args>
+      <args> d[18][34] d[18][19] d[19][34] </args>
+      <args> d[18][34] d[18][33] d[33][34] </args>
+      <args> d[18][34..35] d[34][35] </args>
+      <args> d[18][35] d[18][19] d[19][35] </args>
+      <args> d[18][35] d[18][34] d[34][35] </args>
+      <args> d[19][20] d[3][19..20] </args>
+      <args> d[19][20] d[4][19..20] </args>
+      <args> d[19][20] d[19..20][35] </args>
+      <args> d[19][20] d[19..20][36] </args>
+      <args> d[19][34] d[18][19] d[18][34] </args>
+      <args> d[19][34..35] d[34][35] </args>
+      <args> d[19][35] d[18][19] d[18][35] </args>
+      <args> d[19][35] d[19][20] d[20][35] </args>
+      <args> d[19][35] d[19][34] d[34][35] </args>
+      <args> d[19][35..36] d[35][36] </args>
+      <args> d[19][36] d[19][20] d[20][36] </args>
+      <args> d[19][36] d[19][35] d[35][36] </args>
+      <args> d[20][21] d[4][20..21] </args>
+      <args> d[20][21] d[5][20..21] </args>
+      <args> d[20][21] d[20..21][36] </args>
+      <args> d[20][21] d[20..21][37] </args>
+      <args> d[20][35] d[19][20] d[19][35] </args>
+      <args> d[20][35..36] d[35][36] </args>
+      <args> d[20][36] d[19][20] d[19][36] </args>
+      <args> d[20][36] d[20][21] d[21][36] </args>
+      <args> d[20][36] d[20][35] d[35][36] </args>
+      <args> d[20][36..37] d[36][37] </args>
+      <args> d[20][37] d[20][21] d[21][37] </args>
+      <args> d[20][37] d[20][36] d[36][37] </args>
+      <args> d[21][22] d[5][21..22] </args>
+      <args> d[21][22] d[6][21..22] </args>
+      <args> d[21][22] d[21..22][37] </args>
+      <args> d[21][22] d[21..22][38] </args>
+      <args> d[21][36] d[20][21] d[20][36] </args>
+      <args> d[21][36..37] d[36][37] </args>
+      <args> d[21][37] d[20][21] d[20][37] </args>
+      <args> d[21][37] d[21][22] d[22][37] </args>
+      <args> d[21][37] d[21][36] d[36][37] </args>
+      <args> d[21][37..38] d[37][38] </args>
+      <args> d[21][38] d[21][22] d[22][38] </args>
+      <args> d[21][38] d[21][37] d[37][38] </args>
+      <args> d[22][23] d[6][22..23] </args>
+      <args> d[22][23] d[7][22..23] </args>
+      <args> d[22][23] d[22..23][38] </args>
+      <args> d[22][23] d[22..23][39] </args>
+      <args> d[22][37] d[21][22] d[21][37] </args>
+      <args> d[22][37..38] d[37][38] </args>
+      <args> d[22][38] d[21][22] d[21][38] </args>
+      <args> d[22][38] d[22][23] d[23][38] </args>
+      <args> d[22][38] d[22][37] d[37][38] </args>
+      <args> d[22][38..39] d[38][39] </args>
+      <args> d[22][39] d[22][23] d[23][39] </args>
+      <args> d[22][39] d[22][38] d[38][39] </args>
+      <args> d[23][24] d[7][23..24] </args>
+      <args> d[23][24] d[8][23..24] </args>
+      <args> d[23][24] d[23..24][39] </args>
+      <args> d[23][24] d[23..24][40] </args>
+      <args> d[23][38] d[22][23] d[22][38] </args>
+      <args> d[23][38..39] d[38][39] </args>
+      <args> d[23][39] d[22][23] d[22][39] </args>
+      <args> d[23][39] d[23][24] d[24][39] </args>
+      <args> d[23][39] d[23][38] d[38][39] </args>
+      <args> d[23][39..40] d[39][40] </args>
+      <args> d[23][40] d[23][24] d[24][40] </args>
+      <args> d[23][40] d[23][39] d[39][40] </args>
+      <args> d[24][25] d[8][24..25] </args>
+      <args> d[24][25] d[9][24..25] </args>
+      <args> d[24][25] d[24..25][40] </args>
+      <args> d[24][25] d[24..25][41] </args>
+      <args> d[24][39] d[23][24] d[23][39] </args>
+      <args> d[24][39..40] d[39][40] </args>
+      <args> d[24][40] d[23][24] d[23][40] </args>
+      <args> d[24][40] d[24][25] d[25][40] </args>
+      <args> d[24][40] d[24][39] d[39][40] </args>
+      <args> d[24][40..41] d[40][41] </args>
+      <args> d[24][41] d[24][25] d[25][41] </args>
+      <args> d[24][41] d[24][40] d[40][41] </args>
+      <args> d[25][26] d[9][25..26] </args>
+      <args> d[25][26] d[10][25..26] </args>
+      <args> d[25][26] d[25..26][41] </args>
+      <args> d[25][26] d[25..26][42] </args>
+      <args> d[25][40] d[24][25] d[24][40] </args>
+      <args> d[25][40..41] d[40][41] </args>
+      <args> d[25][41] d[24][25] d[24][41] </args>
+      <args> d[25][41] d[25][26] d[26][41] </args>
+      <args> d[25][41] d[25][40] d[40][41] </args>
+      <args> d[25][41..42] d[41][42] </args>
+      <args> d[25][42] d[25][26] d[26][42] </args>
+      <args> d[25][42] d[25][41] d[41][42] </args>
+      <args> d[26][27] d[10][26..27] </args>
+      <args> d[26][27] d[11][26..27] </args>
+      <args> d[26][27] d[26..27][42] </args>
+      <args> d[26][27] d[26..27][43] </args>
+      <args> d[26][41] d[25][26] d[25][41] </args>
+      <args> d[26][41..42] d[41][42] </args>
+      <args> d[26][42] d[25][26] d[25][42] </args>
+      <args> d[26][42] d[26][27] d[27][42] </args>
+      <args> d[26][42] d[26][41] d[41][42] </args>
+      <args> d[26][42..43] d[42][43] </args>
+      <args> d[26][43] d[26][27] d[27][43] </args>
+      <args> d[26][43] d[26][42] d[42][43] </args>
+      <args> d[27][28] d[11][27..28] </args>
+      <args> d[27][28] d[12][27..28] </args>
+      <args> d[27][28] d[27..28][43] </args>
+      <args> d[27][28] d[27..28][44] </args>
+      <args> d[27][42] d[26][27] d[26][42] </args>
+      <args> d[27][42..43] d[42][43] </args>
+      <args> d[27][43] d[26][27] d[26][43] </args>
+      <args> d[27][43] d[27][28] d[28][43] </args>
+      <args> d[27][43] d[27][42] d[42][43] </args>
+      <args> d[27][43..44] d[43][44] </args>
+      <args> d[27][44] d[27][28] d[28][44] </args>
+      <args> d[27][44] d[27][43] d[43][44] </args>
+      <args> d[28][29] d[12][28..29] </args>
+      <args> d[28][29] d[13][28..29] </args>
+      <args> d[28][29] d[28..29][44] </args>
+      <args> d[28][29] d[28..29][45] </args>
+      <args> d[28][43] d[27][28] d[27][43] </args>
+      <args> d[28][43..44] d[43][44] </args>
+      <args> d[28][44] d[27][28] d[27][44] </args>
+      <args> d[28][44] d[28][29] d[29][44] </args>
+      <args> d[28][44] d[28][43] d[43][44] </args>
+      <args> d[28][44..45] d[44][45] </args>
+      <args> d[28][45] d[28][29] d[29][45] </args>
+      <args> d[28][45] d[28][44] d[44][45] </args>
+      <args> d[29][30] d[13][29..30] </args>
+      <args> d[29][30] d[14][29..30] </args>
+      <args> d[29][30] d[29..30][45] </args>
+      <args> d[29][30] d[29..30][46] </args>
+      <args> d[29][44] d[28][29] d[28][44] </args>
+      <args> d[29][44..45] d[44][45] </args>
+      <args> d[29][45] d[28][29] d[28][45] </args>
+      <args> d[29][45] d[29][30] d[30][45] </args>
+      <args> d[29][45] d[29][44] d[44][45] </args>
+      <args> d[29][45..46] d[45][46] </args>
+      <args> d[29][46] d[29][30] d[30][46] </args>
+      <args> d[29][46] d[29][45] d[45][46] </args>
+      <args> d[30][31] d[14][30..31] </args>
+      <args> d[30][31] d[15][30..31] </args>
+      <args> d[30][31] d[30..31][46] </args>
+      <args> d[30][31] d[30..31][47] </args>
+      <args> d[30][45] d[29][30] d[29][45] </args>
+      <args> d[30][45..46] d[45][46] </args>
+      <args> d[30][46] d[29][30] d[29][46] </args>
+      <args> d[30][46] d[30][31] d[31][46] </args>
+      <args> d[30][46] d[30][45] d[45][46] </args>
+      <args> d[30][46..47] d[46][47] </args>
+      <args> d[30][47] d[30][31] d[31][47] </args>
+      <args> d[30][47] d[30][46] d[46][47] </args>
+      <args> d[31][32] d[16][31..32] </args>
+      <args> d[31][32] d[31..32][47] </args>
+      <args> d[31][46] d[30][31] d[30][46] </args>
+      <args> d[31][46..47] d[46][47] </args>
+      <args> d[31][47] d[16][31] d[16][47] </args>
+      <args> d[31][47] d[30][31] d[30][47] </args>
+      <args> d[31][47] d[31][32] d[32][47] </args>
+      <args> d[31][47] d[31][46] d[46][47] </args>
+      <args> d[32][33] d[16][32..33] </args>
+      <args> d[32][33] d[17][32..33] </args>
+      <args> d[32][33] d[32..33][48] </args>
+      <args> d[32][33] d[32..33][49] </args>
+      <args> d[32][47] d[16][32] d[16][47] </args>
+      <args> d[32][47] d[31][32] d[31][47] </args>
+      <args> d[32][47..48] d[47][48] </args>
+      <args> d[32][47] d[32][63] d[47][63] </args>
+      <args> d[32][48] d[32][33] d[33][48] </args>
+      <args> d[32][48] d[32][47] d[47][48] </args>
+      <args> d[32][48..49] d[48][49] </args>
+      <args> d[32][48] d[32][63] d[48][63] </args>
+      <args> d[32][49] d[32][33] d[33][49] </args>
+      <args> d[32][49] d[32][48] d[48][49] </args>
+      <args> d[32][63] d[32][47] d[47][63] </args>
+      <args> d[32][63] d[32][48] d[48][63] </args>
+      <args> d[33][34] d[17][33..34] </args>
+      <args> d[33][34] d[18][33..34] </args>
+      <args> d[33][34] d[33..34][49] </args>
+      <args> d[33][34] d[33..34][50] </args>
+      <args> d[33][48] d[32][33] d[32][48] </args>
+      <args> d[33][48..49] d[48][49] </args>
+      <args> d[33][49] d[32][33] d[32][49] </args>
+      <args> d[33][49] d[33][34] d[34][49] </args>
+      <args> d[33][49] d[33][48] d[48][49] </args>
+      <args> d[33][49..50] d[49][50] </args>
+      <args> d[33][50] d[33][34] d[34][50] </args>
+      <args> d[33][50] d[33][49] d[49][50] </args>
+      <args> d[34][35] d[18][34..35] </args>
+      <args> d[34][35] d[19][34..35] </args>
+      <args> d[34][35] d[34..35][50] </args>
+      <args> d[34][35] d[34..35][51] </args>
+      <args> d[34][49] d[33][34] d[33][49] </args>
+      <args> d[34][49..50] d[49][50] </args>
+      <args> d[34][50] d[33][34] d[33][50] </args>
+      <args> d[34][50] d[34][35] d[35][50] </args>
+      <args> d[34][50] d[34][49] d[49][50] </args>
+      <args> d[34][50..51] d[50][51] </args>
+      <args> d[34][51] d[34][35] d[35][51] </args>
+      <args> d[34][51] d[34][50] d[50][51] </args>
+      <args> d[35][36] d[19][35..36] </args>
+      <args> d[35][36] d[20][35..36] </args>
+      <args> d[35][36] d[35..36][51] </args>
+      <args> d[35][36] d[35..36][52] </args>
+      <args> d[35][50] d[34][35] d[34][50] </args>
+      <args> d[35][50..51] d[50][51] </args>
+      <args> d[35][51] d[34][35] d[34][51] </args>
+      <args> d[35][51] d[35][36] d[36][51] </args>
+      <args> d[35][51] d[35][50] d[50][51] </args>
+      <args> d[35][51..52] d[51][52] </args>
+      <args> d[35][52] d[35][36] d[36][52] </args>
+      <args> d[35][52] d[35][51] d[51][52] </args>
+      <args> d[36][37] d[20][36..37] </args>
+      <args> d[36][37] d[21][36..37] </args>
+      <args> d[36][37] d[36..37][52] </args>
+      <args> d[36][37] d[36..37][53] </args>
+      <args> d[36][51] d[35][36] d[35][51] </args>
+      <args> d[36][51..52] d[51][52] </args>
+      <args> d[36][52] d[35][36] d[35][52] </args>
+      <args> d[36][52] d[36][37] d[37][52] </args>
+      <args> d[36][52] d[36][51] d[51][52] </args>
+      <args> d[36][52..53] d[52][53] </args>
+      <args> d[36][53] d[36][37] d[37][53] </args>
+      <args> d[36][53] d[36][52] d[52][53] </args>
+      <args> d[37][38] d[21][37..38] </args>
+      <args> d[37][38] d[22][37..38] </args>
+      <args> d[37][38] d[37..38][53] </args>
+      <args> d[37][38] d[37..38][54] </args>
+      <args> d[37][52] d[36][37] d[36][52] </args>
+      <args> d[37][52..53] d[52][53] </args>
+      <args> d[37][53] d[36][37] d[36][53] </args>
+      <args> d[37][53] d[37][38] d[38][53] </args>
+      <args> d[37][53] d[37][52] d[52][53] </args>
+      <args> d[37][53..54] d[53][54] </args>
+      <args> d[37][54] d[37][38] d[38][54] </args>
+      <args> d[37][54] d[37][53] d[53][54] </args>
+      <args> d[38][39] d[22][38..39] </args>
+      <args> d[38][39] d[23][38..39] </args>
+      <args> d[38][39] d[38..39][54] </args>
+      <args> d[38][39] d[38..39][55] </args>
+      <args> d[38][53] d[37][38] d[37][53] </args>
+      <args> d[38][53..54] d[53][54] </args>
+      <args> d[38][54] d[37][38] d[37][54] </args>
+      <args> d[38][54] d[38][39] d[39][54] </args>
+      <args> d[38][54] d[38][53] d[53][54] </args>
+      <args> d[38][54..55] d[54][55] </args>
+      <args> d[38][55] d[38][39] d[39][55] </args>
+      <args> d[38][55] d[38][54] d[54][55] </args>
+      <args> d[39][40] d[23][39..40] </args>
+      <args> d[39][40] d[24][39..40] </args>
+      <args> d[39][40] d[39..40][55] </args>
+      <args> d[39][40] d[39..40][56] </args>
+      <args> d[39][54] d[38][39] d[38][54] </args>
+      <args> d[39][54..55] d[54][55] </args>
+      <args> d[39][55] d[38][39] d[38][55] </args>
+      <args> d[39][55] d[39][40] d[40][55] </args>
+      <args> d[39][55] d[39][54] d[54][55] </args>
+      <args> d[39][55..56] d[55][56] </args>
+      <args> d[39][56] d[39][40] d[40][56] </args>
+      <args> d[39][56] d[39][55] d[55][56] </args>
+      <args> d[40][41] d[24][40..41] </args>
+      <args> d[40][41] d[25][40..41] </args>
+      <args> d[40][41] d[40..41][56] </args>
+      <args> d[40][41] d[40..41][57] </args>
+      <args> d[40][55] d[39][40] d[39][55] </args>
+      <args> d[40][55..56] d[55][56] </args>
+      <args> d[40][56] d[39][40] d[39][56] </args>
+      <args> d[40][56] d[40][41] d[41][56] </args>
+      <args> d[40][56] d[40][55] d[55][56] </args>
+      <args> d[40][56..57] d[56][57] </args>
+      <args> d[40][57] d[40][41] d[41][57] </args>
+      <args> d[40][57] d[40][56] d[56][57] </args>
+      <args> d[41][42] d[25][41..42] </args>
+      <args> d[41][42] d[26][41..42] </args>
+      <args> d[41][42] d[41..42][57] </args>
+      <args> d[41][42] d[41..42][58] </args>
+      <args> d[41][56] d[40][41] d[40][56] </args>
+      <args> d[41][56..57] d[56][57] </args>
+      <args> d[41][57] d[40][41] d[40][57] </args>
+      <args> d[41][57] d[41][42] d[42][57] </args>
+      <args> d[41][57] d[41][56] d[56][57] </args>
+      <args> d[41][57..58] d[57][58] </args>
+      <args> d[41][58] d[41][42] d[42][58] </args>
+      <args> d[41][58] d[41][57] d[57][58] </args>
+      <args> d[42][43] d[26][42..43] </args>
+      <args> d[42][43] d[27][42..43] </args>
+      <args> d[42][43] d[42..43][58] </args>
+      <args> d[42][43] d[42..43][59] </args>
+      <args> d[42][57] d[41][42] d[41][57] </args>
+      <args> d[42][57..58] d[57][58] </args>
+      <args> d[42][58] d[41][42] d[41][58] </args>
+      <args> d[42][58] d[42][43] d[43][58] </args>
+      <args> d[42][58] d[42][57] d[57][58] </args>
+      <args> d[42][58..59] d[58][59] </args>
+      <args> d[42][59] d[42][43] d[43][59] </args>
+      <args> d[42][59] d[42][58] d[58][59] </args>
+      <args> d[43][44] d[27][43..44] </args>
+      <args> d[43][44] d[28][43..44] </args>
+      <args> d[43][44] d[43..44][59] </args>
+      <args> d[43][44] d[43..44][60] </args>
+      <args> d[43][58] d[42][43] d[42][58] </args>
+      <args> d[43][58..59] d[58][59] </args>
+      <args> d[43][59] d[42][43] d[42][59] </args>
+      <args> d[43][59] d[43][44] d[44][59] </args>
+      <args> d[43][59] d[43][58] d[58][59] </args>
+      <args> d[43][59..60] d[59][60] </args>
+      <args> d[43][60] d[43][44] d[44][60] </args>
+      <args> d[43][60] d[43][59] d[59][60] </args>
+      <args> d[44][45] d[28][44..45] </args>
+      <args> d[44][45] d[29][44..45] </args>
+      <args> d[44][45] d[44..45][60] </args>
+      <args> d[44][45] d[44..45][61] </args>
+      <args> d[44][59] d[43][44] d[43][59] </args>
+      <args> d[44][59..60] d[59][60] </args>
+      <args> d[44][60] d[43][44] d[43][60] </args>
+      <args> d[44][60] d[44][45] d[45][60] </args>
+      <args> d[44][60] d[44][59] d[59][60] </args>
+      <args> d[44][60..61] d[60][61] </args>
+      <args> d[44][61] d[44][45] d[45][61] </args>
+      <args> d[44][61] d[44][60] d[60][61] </args>
+      <args> d[45][46] d[29][45..46] </args>
+      <args> d[45][46] d[30][45..46] </args>
+      <args> d[45][46] d[45..46][61] </args>
+      <args> d[45][46] d[45..46][62] </args>
+      <args> d[45][60] d[44][45] d[44][60] </args>
+      <args> d[45][60..61] d[60][61] </args>
+      <args> d[45][61] d[44][45] d[44][61] </args>
+      <args> d[45][61] d[45][46] d[46][61] </args>
+      <args> d[45][61] d[45][60] d[60][61] </args>
+      <args> d[45][61..62] d[61][62] </args>
+      <args> d[45][62] d[45][46] d[46][62] </args>
+      <args> d[45][62] d[45][61] d[61][62] </args>
+      <args> d[46][47] d[30][46..47] </args>
+      <args> d[46][47] d[31][46..47] </args>
+      <args> d[46][47] d[46..47][62] </args>
+      <args> d[46][47] d[46..47][63] </args>
+      <args> d[46][61] d[45][46] d[45][61] </args>
+      <args> d[46][61..62] d[61][62] </args>
+      <args> d[46][62] d[45][46] d[45][62] </args>
+      <args> d[46][62] d[46][47] d[47][62] </args>
+      <args> d[46][62] d[46][61] d[61][62] </args>
+      <args> d[46][62..63] d[62][63] </args>
+      <args> d[46][63] d[46][47] d[47][63] </args>
+      <args> d[46][63] d[46][62] d[62][63] </args>
+      <args> d[47][48] d[32][47..48] </args>
+      <args> d[47][48] d[47..48][63] </args>
+      <args> d[47][62] d[46][47] d[46][62] </args>
+      <args> d[47][62..63] d[62][63] </args>
+      <args> d[47][63] d[32][47] d[32][63] </args>
+      <args> d[47][63] d[46][47] d[46][63] </args>
+      <args> d[47][63] d[47][48] d[48][63] </args>
+      <args> d[47][63] d[47][62] d[62][63] </args>
+      <args> d[48][49] d[32][48..49] </args>
+      <args> d[48][49] d[33][48..49] </args>
+      <args> d[48][49] d[48..49][64] </args>
+      <args> d[48][49] d[48..49][65] </args>
+      <args> d[48][63] d[32][48] d[32][63] </args>
+      <args> d[48][63] d[47][48] d[47][63] </args>
+      <args> d[48][63..64] d[63][64] </args>
+      <args> d[48][63] d[48][79] d[63][79] </args>
+      <args> d[48][64] d[48][49] d[49][64] </args>
+      <args> d[48][64] d[48][63] d[63][64] </args>
+      <args> d[48][64..65] d[64][65] </args>
+      <args> d[48][64] d[48][79] d[64][79] </args>
+      <args> d[48][65] d[48][49] d[49][65] </args>
+      <args> d[48][65] d[48][64] d[64][65] </args>
+      <args> d[48][79] d[48][63] d[63][79] </args>
+      <args> d[48][79] d[48][64] d[64][79] </args>
+      <args> d[49][50] d[33][49..50] </args>
+      <args> d[49][50] d[34][49..50] </args>
+      <args> d[49][50] d[49..50][65] </args>
+      <args> d[49][50] d[49..50][66] </args>
+      <args> d[49][64] d[48][49] d[48][64] </args>
+      <args> d[49][64..65] d[64][65] </args>
+      <args> d[49][65] d[48][49] d[48][65] </args>
+      <args> d[49][65] d[49][50] d[50][65] </args>
+      <args> d[49][65] d[49][64] d[64][65] </args>
+      <args> d[49][65..66] d[65][66] </args>
+      <args> d[49][66] d[49][50] d[50][66] </args>
+      <args> d[49][66] d[49][65] d[65][66] </args>
+      <args> d[50][51] d[34][50..51] </args>
+      <args> d[50][51] d[35][50..51] </args>
+      <args> d[50][51] d[50..51][66] </args>
+      <args> d[50][51] d[50..51][67] </args>
+      <args> d[50][65] d[49][50] d[49][65] </args>
+      <args> d[50][65..66] d[65][66] </args>
+      <args> d[50][66] d[49][50] d[49][66] </args>
+      <args> d[50][66] d[50][51] d[51][66] </args>
+      <args> d[50][66] d[50][65] d[65][66] </args>
+      <args> d[50][66..67] d[66][67] </args>
+      <args> d[50][67] d[50][51] d[51][67] </args>
+      <args> d[50][67] d[50][66] d[66][67] </args>
+      <args> d[51][52] d[35][51..52] </args>
+      <args> d[51][52] d[36][51..52] </args>
+      <args> d[51][52] d[51..52][67] </args>
+      <args> d[51][52] d[51..52][68] </args>
+      <args> d[51][66] d[50][51] d[50][66] </args>
+      <args> d[51][66..67] d[66][67] </args>
+      <args> d[51][67] d[50][51] d[50][67] </args>
+      <args> d[51][67] d[51][52] d[52][67] </args>
+      <args> d[51][67] d[51][66] d[66][67] </args>
+      <args> d[51][67..68] d[67][68] </args>
+      <args> d[51][68] d[51][52] d[52][68] </args>
+      <args> d[51][68] d[51][67] d[67][68] </args>
+      <args> d[52][53] d[36][52..53] </args>
+      <args> d[52][53] d[37][52..53] </args>
+      <args> d[52][53] d[52..53][68] </args>
+      <args> d[52][53] d[52..53][69] </args>
+      <args> d[52][67] d[51][52] d[51][67] </args>
+      <args> d[52][67..68] d[67][68] </args>
+      <args> d[52][68] d[51][52] d[51][68] </args>
+      <args> d[52][68] d[52][53] d[53][68] </args>
+      <args> d[52][68] d[52][67] d[67][68] </args>
+      <args> d[52][68..69] d[68][69] </args>
+      <args> d[52][69] d[52][53] d[53][69] </args>
+      <args> d[52][69] d[52][68] d[68][69] </args>
+      <args> d[53][54] d[37][53..54] </args>
+      <args> d[53][54] d[38][53..54] </args>
+      <args> d[53][54] d[53..54][69] </args>
+      <args> d[53][54] d[53..54][70] </args>
+      <args> d[53][68] d[52][53] d[52][68] </args>
+      <args> d[53][68..69] d[68][69] </args>
+      <args> d[53][69] d[52][53] d[52][69] </args>
+      <args> d[53][69] d[53][54] d[54][69] </args>
+      <args> d[53][69] d[53][68] d[68][69] </args>
+      <args> d[53][69..70] d[69][70] </args>
+      <args> d[53][70] d[53][54] d[54][70] </args>
+      <args> d[53][70] d[53][69] d[69][70] </args>
+      <args> d[54][55] d[38][54..55] </args>
+      <args> d[54][55] d[39][54..55] </args>
+      <args> d[54][55] d[54..55][70] </args>
+      <args> d[54][55] d[54..55][71] </args>
+      <args> d[54][69] d[53][54] d[53][69] </args>
+      <args> d[54][69..70] d[69][70] </args>
+      <args> d[54][70] d[53][54] d[53][70] </args>
+      <args> d[54][70] d[54][55] d[55][70] </args>
+      <args> d[54][70] d[54][69] d[69][70] </args>
+      <args> d[54][70..71] d[70][71] </args>
+      <args> d[54][71] d[54][55] d[55][71] </args>
+      <args> d[54][71] d[54][70] d[70][71] </args>
+      <args> d[55][56] d[39][55..56] </args>
+      <args> d[55][56] d[40][55..56] </args>
+      <args> d[55][56] d[55..56][71] </args>
+      <args> d[55][56] d[55..56][72] </args>
+      <args> d[55][70] d[54][55] d[54][70] </args>
+      <args> d[55][70..71] d[70][71] </args>
+      <args> d[55][71] d[54][55] d[54][71] </args>
+      <args> d[55][71] d[55][56] d[56][71] </args>
+      <args> d[55][71] d[55][70] d[70][71] </args>
+      <args> d[55][71..72] d[71][72] </args>
+      <args> d[55][72] d[55][56] d[56][72] </args>
+      <args> d[55][72] d[55][71] d[71][72] </args>
+      <args> d[56][57] d[40][56..57] </args>
+      <args> d[56][57] d[41][56..57] </args>
+      <args> d[56][57] d[56..57][72] </args>
+      <args> d[56][57] d[56..57][73] </args>
+      <args> d[56][71] d[55][56] d[55][71] </args>
+      <args> d[56][71..72] d[71][72] </args>
+      <args> d[56][72] d[55][56] d[55][72] </args>
+      <args> d[56][72] d[56][57] d[57][72] </args>
+      <args> d[56][72] d[56][71] d[71][72] </args>
+      <args> d[56][72..73] d[72][73] </args>
+      <args> d[56][73] d[56][57] d[57][73] </args>
+      <args> d[56][73] d[56][72] d[72][73] </args>
+      <args> d[57][58] d[41][57..58] </args>
+      <args> d[57][58] d[42][57..58] </args>
+      <args> d[57][58] d[57..58][73] </args>
+      <args> d[57][58] d[57..58][74] </args>
+      <args> d[57][72] d[56][57] d[56][72] </args>
+      <args> d[57][72..73] d[72][73] </args>
+      <args> d[57][73] d[56][57] d[56][73] </args>
+      <args> d[57][73] d[57][58] d[58][73] </args>
+      <args> d[57][73] d[57][72] d[72][73] </args>
+      <args> d[57][73..74] d[73][74] </args>
+      <args> d[57][74] d[57][58] d[58][74] </args>
+      <args> d[57][74] d[57][73] d[73][74] </args>
+      <args> d[58][59] d[42][58..59] </args>
+      <args> d[58][59] d[43][58..59] </args>
+      <args> d[58][59] d[58..59][74] </args>
+      <args> d[58][59] d[58..59][75] </args>
+      <args> d[58][73] d[57][58] d[57][73] </args>
+      <args> d[58][73..74] d[73][74] </args>
+      <args> d[58][74] d[57][58] d[57][74] </args>
+      <args> d[58][74] d[58][59] d[59][74] </args>
+      <args> d[58][74] d[58][73] d[73][74] </args>
+      <args> d[58][74..75] d[74][75] </args>
+      <args> d[58][75] d[58][59] d[59][75] </args>
+      <args> d[58][75] d[58][74] d[74][75] </args>
+      <args> d[59][60] d[43][59..60] </args>
+      <args> d[59][60] d[44][59..60] </args>
+      <args> d[59][60] d[59..60][75] </args>
+      <args> d[59][60] d[59..60][76] </args>
+      <args> d[59][74] d[58][59] d[58][74] </args>
+      <args> d[59][74..75] d[74][75] </args>
+      <args> d[59][75] d[58][59] d[58][75] </args>
+      <args> d[59][75] d[59][60] d[60][75] </args>
+      <args> d[59][75] d[59][74] d[74][75] </args>
+      <args> d[59][75..76] d[75][76] </args>
+      <args> d[59][76] d[59][60] d[60][76] </args>
+      <args> d[59][76] d[59][75] d[75][76] </args>
+      <args> d[60][61] d[44][60..61] </args>
+      <args> d[60][61] d[45][60..61] </args>
+      <args> d[60][61] d[60..61][76] </args>
+      <args> d[60][61] d[60..61][77] </args>
+      <args> d[60][75] d[59][60] d[59][75] </args>
+      <args> d[60][75..76] d[75][76] </args>
+      <args> d[60][76] d[59][60] d[59][76] </args>
+      <args> d[60][76] d[60][61] d[61][76] </args>
+      <args> d[60][76] d[60][75] d[75][76] </args>
+      <args> d[60][76..77] d[76][77] </args>
+      <args> d[60][77] d[60][61] d[61][77] </args>
+      <args> d[60][77] d[60][76] d[76][77] </args>
+      <args> d[61][62] d[45][61..62] </args>
+      <args> d[61][62] d[46][61..62] </args>
+      <args> d[61][62] d[61..62][77] </args>
+      <args> d[61][62] d[61..62][78] </args>
+      <args> d[61][76] d[60][61] d[60][76] </args>
+      <args> d[61][76..77] d[76][77] </args>
+      <args> d[61][77] d[60][61] d[60][77] </args>
+      <args> d[61][77] d[61][62] d[62][77] </args>
+      <args> d[61][77] d[61][76] d[76][77] </args>
+      <args> d[61][77..78] d[77][78] </args>
+      <args> d[61][78] d[61][62] d[62][78] </args>
+      <args> d[61][78] d[61][77] d[77][78] </args>
+      <args> d[62][63] d[46][62..63] </args>
+      <args> d[62][63] d[47][62..63] </args>
+      <args> d[62][63] d[62..63][78] </args>
+      <args> d[62][63] d[62..63][79] </args>
+      <args> d[62][77] d[61][62] d[61][77] </args>
+      <args> d[62][77..78] d[77][78] </args>
+      <args> d[62][78] d[61][62] d[61][78] </args>
+      <args> d[62][78] d[62][63] d[63][78] </args>
+      <args> d[62][78] d[62][77] d[77][78] </args>
+      <args> d[62][78..79] d[78][79] </args>
+      <args> d[62][79] d[62][63] d[63][79] </args>
+      <args> d[62][79] d[62][78] d[78][79] </args>
+      <args> d[63][64] d[48][63..64] </args>
+      <args> d[63][64] d[63..64][79] </args>
+      <args> d[63][78] d[62][63] d[62][78] </args>
+      <args> d[63][78..79] d[78][79] </args>
+      <args> d[63][79] d[48][63] d[48][79] </args>
+      <args> d[63][79] d[62][63] d[62][79] </args>
+      <args> d[63][79] d[63][64] d[64][79] </args>
+      <args> d[63][79] d[63][78] d[78][79] </args>
+      <args> d[64][65] d[48][64..65] </args>
+      <args> d[64][65] d[49][64..65] </args>
+      <args> d[64][65] d[64..65][80] </args>
+      <args> d[64][65] d[64..65][81] </args>
+      <args> d[64][79] d[48][64] d[48][79] </args>
+      <args> d[64][79] d[63][64] d[63][79] </args>
+      <args> d[64][79..80] d[79][80] </args>
+      <args> d[64][79] d[64][95] d[79][95] </args>
+      <args> d[64][80] d[64][65] d[65][80] </args>
+      <args> d[64][80] d[64][79] d[79][80] </args>
+      <args> d[64][80..81] d[80][81] </args>
+      <args> d[64][80] d[64][95] d[80][95] </args>
+      <args> d[64][81] d[64][65] d[65][81] </args>
+      <args> d[64][81] d[64][80] d[80][81] </args>
+      <args> d[64][95] d[64][79] d[79][95] </args>
+      <args> d[64][95] d[64][80] d[80][95] </args>
+      <args> d[65][66] d[49][65..66] </args>
+      <args> d[65][66] d[50][65..66] </args>
+      <args> d[65][66] d[65..66][81] </args>
+      <args> d[65][66] d[65..66][82] </args>
+      <args> d[65][80] d[64][65] d[64][80] </args>
+      <args> d[65][80..81] d[80][81] </args>
+      <args> d[65][81] d[64][65] d[64][81] </args>
+      <args> d[65][81] d[65][66] d[66][81] </args>
+      <args> d[65][81] d[65][80] d[80][81] </args>
+      <args> d[65][81..82] d[81][82] </args>
+      <args> d[65][82] d[65][66] d[66][82] </args>
+      <args> d[65][82] d[65][81] d[81][82] </args>
+      <args> d[66][67] d[50][66..67] </args>
+      <args> d[66][67] d[51][66..67] </args>
+      <args> d[66][67] d[66..67][82] </args>
+      <args> d[66][67] d[66..67][83] </args>
+      <args> d[66][81] d[65][66] d[65][81] </args>
+      <args> d[66][81..82] d[81][82] </args>
+      <args> d[66][82] d[65][66] d[65][82] </args>
+      <args> d[66][82] d[66][67] d[67][82] </args>
+      <args> d[66][82] d[66][81] d[81][82] </args>
+      <args> d[66][82..83] d[82][83] </args>
+      <args> d[66][83] d[66][67] d[67][83] </args>
+      <args> d[66][83] d[66][82] d[82][83] </args>
+      <args> d[67][68] d[51][67..68] </args>
+      <args> d[67][68] d[52][67..68] </args>
+      <args> d[67][68] d[67..68][83] </args>
+      <args> d[67][68] d[67..68][84] </args>
+      <args> d[67][82] d[66][67] d[66][82] </args>
+      <args> d[67][82..83] d[82][83] </args>
+      <args> d[67][83] d[66][67] d[66][83] </args>
+      <args> d[67][83] d[67][68] d[68][83] </args>
+      <args> d[67][83] d[67][82] d[82][83] </args>
+      <args> d[67][83..84] d[83][84] </args>
+      <args> d[67][84] d[67][68] d[68][84] </args>
+      <args> d[67][84] d[67][83] d[83][84] </args>
+      <args> d[68][69] d[52][68..69] </args>
+      <args> d[68][69] d[53][68..69] </args>
+      <args> d[68][69] d[68..69][84] </args>
+      <args> d[68][69] d[68..69][85] </args>
+      <args> d[68][83] d[67][68] d[67][83] </args>
+      <args> d[68][83..84] d[83][84] </args>
+      <args> d[68][84] d[67][68] d[67][84] </args>
+      <args> d[68][84] d[68][69] d[69][84] </args>
+      <args> d[68][84] d[68][83] d[83][84] </args>
+      <args> d[68][84..85] d[84][85] </args>
+      <args> d[68][85] d[68][69] d[69][85] </args>
+      <args> d[68][85] d[68][84] d[84][85] </args>
+      <args> d[69][70] d[53][69..70] </args>
+      <args> d[69][70] d[54][69..70] </args>
+      <args> d[69][70] d[69..70][85] </args>
+      <args> d[69][70] d[69..70][86] </args>
+      <args> d[69][84] d[68][69] d[68][84] </args>
+      <args> d[69][84..85] d[84][85] </args>
+      <args> d[69][85] d[68][69] d[68][85] </args>
+      <args> d[69][85] d[69][70] d[70][85] </args>
+      <args> d[69][85] d[69][84] d[84][85] </args>
+      <args> d[69][85..86] d[85][86] </args>
+      <args> d[69][86] d[69][70] d[70][86] </args>
+      <args> d[69][86] d[69][85] d[85][86] </args>
+      <args> d[70][71] d[54][70..71] </args>
+      <args> d[70][71] d[55][70..71] </args>
+      <args> d[70][71] d[70..71][86] </args>
+      <args> d[70][71] d[70..71][87] </args>
+      <args> d[70][85] d[69][70] d[69][85] </args>
+      <args> d[70][85..86] d[85][86] </args>
+      <args> d[70][86] d[69][70] d[69][86] </args>
+      <args> d[70][86] d[70][71] d[71][86] </args>
+      <args> d[70][86] d[70][85] d[85][86] </args>
+      <args> d[70][86..87] d[86][87] </args>
+      <args> d[70][87] d[70][71] d[71][87] </args>
+      <args> d[70][87] d[70][86] d[86][87] </args>
+      <args> d[71][72] d[55][71..72] </args>
+      <args> d[71][72] d[56][71..72] </args>
+      <args> d[71][72] d[71..72][87] </args>
+      <args> d[71][72] d[71..72][88] </args>
+      <args> d[71][86] d[70][71] d[70][86] </args>
+      <args> d[71][86..87] d[86][87] </args>
+      <args> d[71][87] d[70][71] d[70][87] </args>
+      <args> d[71][87] d[71][72] d[72][87] </args>
+      <args> d[71][87] d[71][86] d[86][87] </args>
+      <args> d[71][87..88] d[87][88] </args>
+      <args> d[71][88] d[71][72] d[72][88] </args>
+      <args> d[71][88] d[71][87] d[87][88] </args>
+      <args> d[72][73] d[56][72..73] </args>
+      <args> d[72][73] d[57][72..73] </args>
+      <args> d[72][73] d[72..73][88] </args>
+      <args> d[72][73] d[72..73][89] </args>
+      <args> d[72][87] d[71][72] d[71][87] </args>
+      <args> d[72][87..88] d[87][88] </args>
+      <args> d[72][88] d[71][72] d[71][88] </args>
+      <args> d[72][88] d[72][73] d[73][88] </args>
+      <args> d[72][88] d[72][87] d[87][88] </args>
+      <args> d[72][88..89] d[88][89] </args>
+      <args> d[72][89] d[72][73] d[73][89] </args>
+      <args> d[72][89] d[72][88] d[88][89] </args>
+      <args> d[73][74] d[57][73..74] </args>
+      <args> d[73][74] d[58][73..74] </args>
+      <args> d[73][74] d[73..74][89] </args>
+      <args> d[73][74] d[73..74][90] </args>
+      <args> d[73][88] d[72][73] d[72][88] </args>
+      <args> d[73][88..89] d[88][89] </args>
+      <args> d[73][89] d[72][73] d[72][89] </args>
+      <args> d[73][89] d[73][74] d[74][89] </args>
+      <args> d[73][89] d[73][88] d[88][89] </args>
+      <args> d[73][89..90] d[89][90] </args>
+      <args> d[73][90] d[73][74] d[74][90] </args>
+      <args> d[73][90] d[73][89] d[89][90] </args>
+      <args> d[74][75] d[58][74..75] </args>
+      <args> d[74][75] d[59][74..75] </args>
+      <args> d[74][75] d[74..75][90] </args>
+      <args> d[74][75] d[74..75][91] </args>
+      <args> d[74][89] d[73][74] d[73][89] </args>
+      <args> d[74][89..90] d[89][90] </args>
+      <args> d[74][90] d[73][74] d[73][90] </args>
+      <args> d[74][90] d[74][75] d[75][90] </args>
+      <args> d[74][90] d[74][89] d[89][90] </args>
+      <args> d[74][90..91] d[90][91] </args>
+      <args> d[74][91] d[74][75] d[75][91] </args>
+      <args> d[74][91] d[74][90] d[90][91] </args>
+      <args> d[75][76] d[59][75..76] </args>
+      <args> d[75][76] d[60][75..76] </args>
+      <args> d[75][76] d[75..76][91] </args>
+      <args> d[75][76] d[75..76][92] </args>
+      <args> d[75][90] d[74][75] d[74][90] </args>
+      <args> d[75][90..91] d[90][91] </args>
+      <args> d[75][91] d[74][75] d[74][91] </args>
+      <args> d[75][91] d[75][76] d[76][91] </args>
+      <args> d[75][91] d[75][90] d[90][91] </args>
+      <args> d[75][91..92] d[91][92] </args>
+      <args> d[75][92] d[75][76] d[76][92] </args>
+      <args> d[75][92] d[75][91] d[91][92] </args>
+      <args> d[76][77] d[60][76..77] </args>
+      <args> d[76][77] d[61][76..77] </args>
+      <args> d[76][77] d[76..77][92] </args>
+      <args> d[76][77] d[76..77][93] </args>
+      <args> d[76][91] d[75][76] d[75][91] </args>
+      <args> d[76][91..92] d[91][92] </args>
+      <args> d[76][92] d[75][76] d[75][92] </args>
+      <args> d[76][92] d[76][77] d[77][92] </args>
+      <args> d[76][92] d[76][91] d[91][92] </args>
+      <args> d[76][92..93] d[92][93] </args>
+      <args> d[76][93] d[76][77] d[77][93] </args>
+      <args> d[76][93] d[76][92] d[92][93] </args>
+      <args> d[77][78] d[61][77..78] </args>
+      <args> d[77][78] d[62][77..78] </args>
+      <args> d[77][78] d[77..78][93] </args>
+      <args> d[77][78] d[77..78][94] </args>
+      <args> d[77][92] d[76][77] d[76][92] </args>
+      <args> d[77][92..93] d[92][93] </args>
+      <args> d[77][93] d[76][77] d[76][93] </args>
+      <args> d[77][93] d[77][78] d[78][93] </args>
+      <args> d[77][93] d[77][92] d[92][93] </args>
+      <args> d[77][93..94] d[93][94] </args>
+      <args> d[77][94] d[77][78] d[78][94] </args>
+      <args> d[77][94] d[77][93] d[93][94] </args>
+      <args> d[78][79] d[62][78..79] </args>
+      <args> d[78][79] d[63][78..79] </args>
+      <args> d[78][79] d[78..79][94] </args>
+      <args> d[78][79] d[78..79][95] </args>
+      <args> d[78][93] d[77][78] d[77][93] </args>
+      <args> d[78][93..94] d[93][94] </args>
+      <args> d[78][94] d[77][78] d[77][94] </args>
+      <args> d[78][94] d[78][79] d[79][94] </args>
+      <args> d[78][94] d[78][93] d[93][94] </args>
+      <args> d[78][94..95] d[94][95] </args>
+      <args> d[78][95] d[78][79] d[79][95] </args>
+      <args> d[78][95] d[78][94] d[94][95] </args>
+      <args> d[79][80] d[64][79..80] </args>
+      <args> d[79][80] d[79..80][95] </args>
+      <args> d[79][94] d[78][79] d[78][94] </args>
+      <args> d[79][94..95] d[94][95] </args>
+      <args> d[79][95] d[64][79] d[64][95] </args>
+      <args> d[79][95] d[78][79] d[78][95] </args>
+      <args> d[79][95] d[79][80] d[80][95] </args>
+      <args> d[79][95] d[79][94] d[94][95] </args>
+      <args> d[80][81] d[64][80..81] </args>
+      <args> d[80][81] d[65][80..81] </args>
+      <args> d[80][95] d[64][80] d[64][95] </args>
+      <args> d[80][95] d[79][80] d[79][95] </args>
+      <args> d[81][82] d[65][81..82] </args>
+      <args> d[81][82] d[66][81..82] </args>
+      <args> d[82][83] d[66][82..83] </args>
+      <args> d[82][83] d[67][82..83] </args>
+      <args> d[83][84] d[67][83..84] </args>
+      <args> d[83][84] d[68][83..84] </args>
+      <args> d[84][85] d[68][84..85] </args>
+      <args> d[84][85] d[69][84..85] </args>
+      <args> d[85][86] d[69][85..86] </args>
+      <args> d[85][86] d[70][85..86] </args>
+      <args> d[86][87] d[70][86..87] </args>
+      <args> d[86][87] d[71][86..87] </args>
+      <args> d[87][88] d[71][87..88] </args>
+      <args> d[87][88] d[72][87..88] </args>
+      <args> d[88][89] d[72][88..89] </args>
+      <args> d[88][89] d[73][88..89] </args>
+      <args> d[89][90] d[73][89..90] </args>
+      <args> d[89][90] d[74][89..90] </args>
+      <args> d[90][91] d[74][90..91] </args>
+      <args> d[90][91] d[75][90..91] </args>
+      <args> d[91][92] d[75][91..92] </args>
+      <args> d[91][92] d[76][91..92] </args>
+      <args> d[92][93] d[76][92..93] </args>
+      <args> d[92][93] d[77][92..93] </args>
+      <args> d[93][94] d[77][93..94] </args>
+      <args> d[93][94] d[78][93..94] </args>
+      <args> d[94][95] d[78][94..95] </args>
+      <args> d[94][95] d[79][94..95] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize note="minimizing the sum of distances between adjacent nodes" type="sum"> d[0][1] d[0][15..17] d[0][31] d[1][2] d[1][16..18] d[2][3] d[2][17..19] d[3][4] d[3][18..20] d[4][5] d[4][19..21] d[5][6] d[5][20..22] d[6][7] d[6][21..23] d[7][8] d[7][22..24] d[8][9] d[8][23..25] d[9][10] d[9][24..26] d[10][11] d[10][25..27] d[11][12] d[11][26..28] d[12][13] d[12][27..29] d[13][14] d[13][28..30] d[14][15] d[14][29..31] d[15][16] d[15][30..31] d[16][17] d[16][31..33] d[16][47] d[17][18] d[17][32..34] d[18][19] d[18][33..35] d[19][20] d[19][34..36] d[20][21] d[20][35..37] d[21][22] d[21][36..38] d[22][23] d[22][37..39] d[23][24] d[23][38..40] d[24][25] d[24][39..41] d[25][26] d[25][40..42] d[26][27] d[26][41..43] d[27][28] d[27][42..44] d[28][29] d[28][43..45] d[29][30] d[29][44..46] d[30][31] d[30][45..47] d[31][32] d[31][46..47] d[32][33] d[32][47..49] d[32][63] d[33][34] d[33][48..50] d[34][35] d[34][49..51] d[35][36] d[35][50..52] d[36][37] d[36][51..53] d[37][38] d[37][52..54] d[38][39] d[38][53..55] d[39][40] d[39][54..56] d[40][41] d[40][55..57] d[41][42] d[41][56..58] d[42][43] d[42][57..59] d[43][44] d[43][58..60] d[44][45] d[44][59..61] d[45][46] d[45][60..62] d[46][47] d[46][61..63] d[47][48] d[47][62..63] d[48][49] d[48][63..65] d[48][79] d[49][50] d[49][64..66] d[50][51] d[50][65..67] d[51][52] d[51][66..68] d[52][53] d[52][67..69] d[53][54] d[53][68..70] d[54][55] d[54][69..71] d[55][56] d[55][70..72] d[56][57] d[56][71..73] d[57][58] d[57][72..74] d[58][59] d[58][73..75] d[59][60] d[59][74..76] d[60][61] d[60][75..77] d[61][62] d[61][76..78] d[62][63] d[62][77..79] d[63][64] d[63][78..79] d[64][65] d[64][79..81] d[64][95] d[65][66] d[65][80..82] d[66][67] d[66][81..83] d[67][68] d[67][82..84] d[68][69] d[68][83..85] d[69][70] d[69][84..86] d[70][71] d[70][85..87] d[71][72] d[71][86..88] d[72][73] d[72][87..89] d[73][74] d[73][88..90] d[74][75] d[74][89..91] d[75][76] d[75][90..92] d[76][77] d[76][91..93] d[77][78] d[77][92..94] d[78][79] d[78][93..95] d[79][80] d[79][94..95] d[80][81] d[80][95] d[81][82] d[82][83] d[83][84] d[84][85] d[85][86] d[86][87] d[87][88] d[88][89] d[89][90] d[90][91] d[91][92] d[92][93] d[93][94] d[94][95] </minimize>
+  </objectives>
+</instance>

@@ -1,0 +1,126 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" size="[36]"> 0..5 </array>
+  </variables>
+  <constraints>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,0)(0,1)(1,1)(2,2)(3,3)(4,4)(5,5) </conflicts>
+      </extension>
+      <args> x[10] x[13] </args>
+      <args> x[10] x[14] </args>
+      <args> x[10] x[21] </args>
+      <args> x[10] x[31] </args>
+      <args> x[10] x[34] </args>
+      <args> x[0] x[26] </args>
+      <args> x[11] x[26] </args>
+      <args> x[16] x[26] </args>
+      <args> x[25] x[26] </args>
+      <args> x[26] x[28] </args>
+      <args> x[22] x[32] </args>
+      <args> x[29] x[32] </args>
+      <args> x[32] x[33] </args>
+      <args> x[32] x[35] </args>
+      <args> x[32] x[8] </args>
+      <args> x[20] x[4] </args>
+      <args> x[24] x[4] </args>
+      <args> x[27] x[4] </args>
+      <args> x[3] x[4] </args>
+      <args> x[30] x[4] </args>
+      <args> x[12] x[6] </args>
+      <args> x[15] x[6] </args>
+      <args> x[17] x[6] </args>
+      <args> x[18] x[6] </args>
+      <args> x[23] x[6] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,1)(2,2)(3,3)(4,4)(5,5) </conflicts>
+      </extension>
+      <args> x[0] x[11] </args>
+      <args> x[12] x[17] </args>
+      <args> x[13] x[31] </args>
+      <args> x[13] x[34] </args>
+      <args> x[0] x[16] </args>
+      <args> x[11] x[16] </args>
+      <args> x[16] x[28] </args>
+      <args> x[19] x[1] </args>
+      <args> x[19] x[7] </args>
+      <args> x[21] x[31] </args>
+      <args> x[21] x[34] </args>
+      <args> x[22] x[8] </args>
+      <args> x[15] x[23] </args>
+      <args> x[18] x[23] </args>
+      <args> x[20] x[24] </args>
+      <args> x[24] x[27] </args>
+      <args> x[24] x[3] </args>
+      <args> x[24] x[30] </args>
+      <args> x[11] x[25] </args>
+      <args> x[25] x[28] </args>
+      <args> x[20] x[27] </args>
+      <args> x[27] x[30] </args>
+      <args> x[22] x[29] </args>
+      <args> x[29] x[35] </args>
+      <args> x[20] x[3] </args>
+      <args> x[30] x[3] </args>
+      <args> x[22] x[33] </args>
+      <args> x[14] x[34] </args>
+      <args> x[31] x[34] </args>
+      <args> x[33] x[35] </args>
+      <args> x[35] x[8] </args>
+      <args> x[1] x[5] </args>
+      <args> x[5] x[7] </args>
+      <args> x[1] x[9] </args>
+      <args> x[7] x[9] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,1)(2,2)(3,3)(4,4)(5,5) </conflicts>
+      </extension>
+      <args> x[11] x[28] </args>
+      <args> x[12] x[15] </args>
+      <args> x[12] x[18] </args>
+      <args> x[12] x[23] </args>
+      <args> x[13] x[14] </args>
+      <args> x[13] x[21] </args>
+      <args> x[14] x[31] </args>
+      <args> x[15] x[17] </args>
+      <args> x[15] x[18] </args>
+      <args> x[16] x[25] </args>
+      <args> x[17] x[18] </args>
+      <args> x[19] x[2] </args>
+      <args> x[19] x[5] </args>
+      <args> x[19] x[9] </args>
+      <args> x[1] x[2] </args>
+      <args> x[2] x[5] </args>
+      <args> x[2] x[7] </args>
+      <args> x[2] x[9] </args>
+      <args> x[14] x[21] </args>
+      <args> x[17] x[23] </args>
+      <args> x[0] x[25] </args>
+      <args> x[27] x[3] </args>
+      <args> x[0] x[28] </args>
+      <args> x[29] x[33] </args>
+      <args> x[29] x[8] </args>
+      <args> x[20] x[30] </args>
+      <args> x[33] x[8] </args>
+      <args> x[22] x[35] </args>
+      <args> x[1] x[7] </args>
+      <args> x[5] x[9] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <supports> (0,0)(1,1)(2,2)(3,3)(4,4)(5,5) </supports>
+      </extension>
+      <args> x[10] x[19] </args>
+      <args> x[2] x[6] </args>
+      <args> x[4] x[5] </args>
+      <args> x[26] x[7] </args>
+      <args> x[32] x[9] </args>
+    </group>
+  </constraints>
+</instance>

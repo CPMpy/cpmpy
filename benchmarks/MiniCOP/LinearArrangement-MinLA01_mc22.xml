@@ -1,0 +1,70 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] denotes the position (in the line) of the ith node" size="[39]"> 0..38 </array>
+    <array id="d" note="d[i][j] denotes the distance in the line between the ith and jth nodes (if they are adjacent in the graph)" size="[39][39]"> 1..38 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="putting nodes at different positions"> x[] </allDifferent>
+    <group note="computing distances">
+      <intension> eq(%0,dist(%1,%2)) </intension>
+      <args> d[0][1] x[0] x[1] </args>
+      <args> d[0][38] x[0] x[38] </args>
+      <args> d[1][2] x[1] x[2] </args>
+      <args> d[1][24] x[1] x[24] </args>
+      <args> d[1][29] x[1] x[29] </args>
+      <args> d[2][3] x[2] x[3] </args>
+      <args> d[2][17] x[2] x[17] </args>
+      <args> d[3][13] x[3] x[13] </args>
+      <args> d[3][17] x[3] x[17] </args>
+      <args> d[4][5] x[4] x[5] </args>
+      <args> d[4][7] x[4] x[7] </args>
+      <args> d[5][6] x[5] x[6] </args>
+      <args> d[5][10] x[5] x[10] </args>
+      <args> d[5][30] x[5] x[30] </args>
+      <args> d[6][7] x[6] x[7] </args>
+      <args> d[7][8] x[7] x[8] </args>
+      <args> d[8][38] x[8] x[38] </args>
+      <args> d[9][10] x[9] x[10] </args>
+      <args> d[9][12] x[9] x[12] </args>
+      <args> d[9][31] x[9] x[31] </args>
+      <args> d[10][11] x[10] x[11] </args>
+      <args> d[11][12] x[11] x[12] </args>
+      <args> d[12][13] x[12] x[13] </args>
+      <args> d[13][14] x[13] x[14] </args>
+      <args> d[14][15] x[14] x[15] </args>
+      <args> d[15][16] x[15] x[16] </args>
+      <args> d[15][18] x[15] x[18] </args>
+      <args> d[15][20] x[15] x[20] </args>
+      <args> d[15][23] x[15] x[23] </args>
+      <args> d[16][17] x[16] x[17] </args>
+      <args> d[16][26] x[16] x[26] </args>
+      <args> d[18][19] x[18] x[19] </args>
+      <args> d[18][32] x[18] x[32] </args>
+      <args> d[19][33] x[19] x[33] </args>
+      <args> d[20][21] x[20] x[21] </args>
+      <args> d[21][22] x[21] x[22] </args>
+      <args> d[21][34] x[21] x[34] </args>
+      <args> d[22][23] x[22] x[23] </args>
+      <args> d[22][35] x[22] x[35] </args>
+      <args> d[24][25] x[24] x[25] </args>
+      <args> d[24][36] x[24] x[36] </args>
+      <args> d[25][26] x[25] x[26] </args>
+      <args> d[25][27] x[25] x[27] </args>
+      <args> d[25][28] x[25] x[28] </args>
+      <args> d[27][28] x[27] x[28] </args>
+      <args> d[28][37] x[28] x[37] </args>
+    </group>
+    <group class="redundant-constraints" note="triangle constraints: distance(i,j) &lt;= distance(i,k) + distance(k,j)">
+      <intension> le(%0,add(%1,%2)) </intension>
+      <args> d[2][3] d[2..3][17] </args>
+      <args> d[2][17] d[2][3] d[3][17] </args>
+      <args> d[3][17] d[2][3] d[2][17] </args>
+      <args> d[25][27..28] d[27][28] </args>
+      <args> d[25][28] d[25][27] d[27][28] </args>
+      <args> d[27][28] d[25][27..28] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize note="minimizing the sum of distances between adjacent nodes" type="sum"> d[0][1] d[0][38] d[1][2] d[1][24] d[1][29] d[2][3] d[2][17] d[3][13] d[3][17] d[4][5] d[4][7] d[5][6] d[5][10] d[5][30] d[6][7] d[7][8] d[8][38] d[9][10] d[9][12] d[9][31] d[10][11] d[11][12] d[12][13] d[13][14] d[14][15] d[15][16] d[15][18] d[15][20] d[15][23] d[16][17] d[16][26] d[18][19] d[18][32] d[19][33] d[20][21] d[21][22] d[21][34] d[22][23] d[22][35] d[24][25] d[24][36] d[25][26..28] d[27][28] d[28][37] </minimize>
+  </objectives>
+</instance>

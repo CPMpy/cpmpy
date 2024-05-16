@@ -1,0 +1,104 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x is the first Latin square" size="[6][6]"> 0..5 </array>
+    <array id="y" note="y is the second Latin square" size="[6][6]"> 0..5 </array>
+    <array id="z" note="z is the matrix used to control orthogonality" size="[36]"> 0..35 </array>
+  </variables>
+  <constraints>
+    <group note="ensuring that x is a Latin square">
+      <allDifferent> %... </allDifferent>
+      <args> x[0][] </args>
+      <args> x[1][] </args>
+      <args> x[2][] </args>
+      <args> x[3][] </args>
+      <args> x[4][] </args>
+      <args> x[5][] </args>
+      <args> x[][0] </args>
+      <args> x[][1] </args>
+      <args> x[][2] </args>
+      <args> x[][3] </args>
+      <args> x[][4] </args>
+      <args> x[][5] </args>
+    </group>
+    <group note="ensuring that y is a Latin square">
+      <allDifferent> %... </allDifferent>
+      <args> y[0][] </args>
+      <args> y[1][] </args>
+      <args> y[2][] </args>
+      <args> y[3][] </args>
+      <args> y[4][] </args>
+      <args> y[5][] </args>
+      <args> y[][0] </args>
+      <args> y[][1] </args>
+      <args> y[][2] </args>
+      <args> y[][3] </args>
+      <args> y[][4] </args>
+      <args> y[][5] </args>
+    </group>
+    <group class="diagonals" note="ensuring that values on diagonals are different">
+      <allDifferent> %... </allDifferent>
+      <args> x[0][0] x[1][1] x[2][2] x[3][3] x[4][4] x[5][5] </args>
+      <args> x[0][5] x[1][4] x[2][3] x[3][2] x[4][1] x[5][0] </args>
+      <args> y[0][0] y[1][1] y[2][2] y[3][3] y[4][4] y[5][5] </args>
+      <args> y[0][5] y[1][4] y[2][3] y[3][2] y[4][1] y[5][0] </args>
+    </group>
+    <allDifferent note="ensuring orthogonality of x and y through z"> z[] </allDifferent>
+    <group note="computing z from x and y">
+      <extension>
+        <list> %0 %1 %2 </list>
+        <supports> (0,0,0)(0,1,1)(0,2,2)(0,3,3)(0,4,4)(0,5,5)(1,0,6)(1,1,7)(1,2,8)(1,3,9)(1,4,10)(1,5,11)(2,0,12)(2,1,13)(2,2,14)(2,3,15)(2,4,16)(2,5,17)(3,0,18)(3,1,19)(3,2,20)(3,3,21)(3,4,22)(3,5,23)(4,0,24)(4,1,25)(4,2,26)(4,3,27)(4,4,28)(4,5,29)(5,0,30)(5,1,31)(5,2,32)(5,3,33)(5,4,34)(5,5,35) </supports>
+      </extension>
+      <args> x[0][0] y[0][0] z[0] </args>
+      <args> x[0][1] y[0][1] z[1] </args>
+      <args> x[0][2] y[0][2] z[2] </args>
+      <args> x[0][3] y[0][3] z[3] </args>
+      <args> x[0][4] y[0][4] z[4] </args>
+      <args> x[0][5] y[0][5] z[5] </args>
+      <args> x[1][0] y[1][0] z[6] </args>
+      <args> x[1][1] y[1][1] z[7] </args>
+      <args> x[1][2] y[1][2] z[8] </args>
+      <args> x[1][3] y[1][3] z[9] </args>
+      <args> x[1][4] y[1][4] z[10] </args>
+      <args> x[1][5] y[1][5] z[11] </args>
+      <args> x[2][0] y[2][0] z[12] </args>
+      <args> x[2][1] y[2][1] z[13] </args>
+      <args> x[2][2] y[2][2] z[14] </args>
+      <args> x[2][3] y[2][3] z[15] </args>
+      <args> x[2][4] y[2][4] z[16] </args>
+      <args> x[2][5] y[2][5] z[17] </args>
+      <args> x[3][0] y[3][0] z[18] </args>
+      <args> x[3][1] y[3][1] z[19] </args>
+      <args> x[3][2] y[3][2] z[20] </args>
+      <args> x[3][3] y[3][3] z[21] </args>
+      <args> x[3][4] y[3][4] z[22] </args>
+      <args> x[3][5] y[3][5] z[23] </args>
+      <args> x[4][0] y[4][0] z[24] </args>
+      <args> x[4][1] y[4][1] z[25] </args>
+      <args> x[4][2] y[4][2] z[26] </args>
+      <args> x[4][3] y[4][3] z[27] </args>
+      <args> x[4][4] y[4][4] z[28] </args>
+      <args> x[4][5] y[4][5] z[29] </args>
+      <args> x[5][0] y[5][0] z[30] </args>
+      <args> x[5][1] y[5][1] z[31] </args>
+      <args> x[5][2] y[5][2] z[32] </args>
+      <args> x[5][3] y[5][3] z[33] </args>
+      <args> x[5][4] y[5][4] z[34] </args>
+      <args> x[5][5] y[5][5] z[35] </args>
+    </group>
+    <group class="symmetry-breaking">
+      <intension> eq(%0,%1) </intension>
+      <args> x[0][0] 0 </args>
+      <args> x[0][1] 1 </args>
+      <args> x[0][2] 2 </args>
+      <args> x[0][3] 3 </args>
+      <args> x[0][4] 4 </args>
+      <args> x[0][5] 5 </args>
+      <args> y[0][0] 0 </args>
+      <args> y[0][1] 1 </args>
+      <args> y[0][2] 2 </args>
+      <args> y[0][3] 3 </args>
+      <args> y[0][4] 4 </args>
+      <args> y[0][5] 5 </args>
+    </group>
+  </constraints>
+</instance>

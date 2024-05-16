@@ -1,0 +1,58 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" size="[16]"> 0..3 </array>
+  </variables>
+  <constraints>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,1)(2,2)(3,3) </conflicts>
+      </extension>
+      <args> x[0] x[14] </args>
+      <args> x[10] x[12] </args>
+      <args> x[11] x[3] </args>
+      <args> x[11] x[5] </args>
+      <args> x[12] x[15] </args>
+      <args> x[3] x[5] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <supports> (0,0)(1,1)(2,2)(3,3) </supports>
+      </extension>
+      <args> x[0] x[9] </args>
+      <args> x[2] x[4] </args>
+      <args> x[6] x[7] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,1)(2,2)(3,3) </conflicts>
+      </extension>
+      <args> x[1] x[8] </args>
+      <args> x[13] x[1] </args>
+      <args> x[13] x[8] </args>
+      <args> x[10] x[15] </args>
+      <args> x[0] x[4] </args>
+      <args> x[14] x[4] </args>
+      <args> x[0] x[7] </args>
+      <args> x[14] x[7] </args>
+      <args> x[4] x[7] </args>
+    </group>
+    <group>
+      <extension>
+        <list> %0 %1 </list>
+        <conflicts> (0,0)(1,0)(0,1)(1,1)(2,2)(3,3) </conflicts>
+      </extension>
+      <args> x[1] x[2] </args>
+      <args> x[13] x[2] </args>
+      <args> x[2] x[8] </args>
+      <args> x[10] x[6] </args>
+      <args> x[12] x[6] </args>
+      <args> x[15] x[6] </args>
+      <args> x[11] x[9] </args>
+      <args> x[3] x[9] </args>
+      <args> x[5] x[9] </args>
+    </group>
+  </constraints>
+</instance>

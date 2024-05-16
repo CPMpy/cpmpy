@@ -1,0 +1,253 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" note="x[i] is the ith value of the first set" size="[55]"> 1..110 </array>
+    <array id="y" note="y[i] is the ith value of the second set" size="[55]"> 1..110 </array>
+    <array id="aux_gb" note="aux_gb[i] is the ith auxiliary variable having been automatically introduced" size="[110]"> 1..12100 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[] y[] </allDifferent>
+    <group class="power1">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,3052) </condition>
+      </sum>
+      <args> x[] </args>
+      <args> y[] </args>
+    </group>
+    <group class="power2">
+      <sum>
+        <list> %... </list>
+        <condition> (eq,224867) </condition>
+      </sum>
+      <args> aux_gb[0..54] </args>
+      <args> aux_gb[55..109] </args>
+    </group>
+    <block class="symmetry-breaking">
+      <intension> eq(x[0],1) </intension>
+      <group>
+        <intension> lt(%0,%1) </intension>
+        <args> x[0] x[1] </args>
+        <args> x[1] x[2] </args>
+        <args> x[2] x[3] </args>
+        <args> x[3] x[4] </args>
+        <args> x[4] x[5] </args>
+        <args> x[5] x[6] </args>
+        <args> x[6] x[7] </args>
+        <args> x[7] x[8] </args>
+        <args> x[8] x[9] </args>
+        <args> x[9] x[10] </args>
+        <args> x[10] x[11] </args>
+        <args> x[11] x[12] </args>
+        <args> x[12] x[13] </args>
+        <args> x[13] x[14] </args>
+        <args> x[14] x[15] </args>
+        <args> x[15] x[16] </args>
+        <args> x[16] x[17] </args>
+        <args> x[17] x[18] </args>
+        <args> x[18] x[19] </args>
+        <args> x[19] x[20] </args>
+        <args> x[20] x[21] </args>
+        <args> x[21] x[22] </args>
+        <args> x[22] x[23] </args>
+        <args> x[23] x[24] </args>
+        <args> x[24] x[25] </args>
+        <args> x[25] x[26] </args>
+        <args> x[26] x[27] </args>
+        <args> x[27] x[28] </args>
+        <args> x[28] x[29] </args>
+        <args> x[29] x[30] </args>
+        <args> x[30] x[31] </args>
+        <args> x[31] x[32] </args>
+        <args> x[32] x[33] </args>
+        <args> x[33] x[34] </args>
+        <args> x[34] x[35] </args>
+        <args> x[35] x[36] </args>
+        <args> x[36] x[37] </args>
+        <args> x[37] x[38] </args>
+        <args> x[38] x[39] </args>
+        <args> x[39] x[40] </args>
+        <args> x[40] x[41] </args>
+        <args> x[41] x[42] </args>
+        <args> x[42] x[43] </args>
+        <args> x[43] x[44] </args>
+        <args> x[44] x[45] </args>
+        <args> x[45] x[46] </args>
+        <args> x[46] x[47] </args>
+        <args> x[47] x[48] </args>
+        <args> x[48] x[49] </args>
+        <args> x[49] x[50] </args>
+        <args> x[50] x[51] </args>
+        <args> x[51] x[52] </args>
+        <args> x[52] x[53] </args>
+        <args> x[53] x[54] </args>
+        <args> y[0] y[1] </args>
+        <args> y[1] y[2] </args>
+        <args> y[2] y[3] </args>
+        <args> y[3] y[4] </args>
+        <args> y[4] y[5] </args>
+        <args> y[5] y[6] </args>
+        <args> y[6] y[7] </args>
+        <args> y[7] y[8] </args>
+        <args> y[8] y[9] </args>
+        <args> y[9] y[10] </args>
+        <args> y[10] y[11] </args>
+        <args> y[11] y[12] </args>
+        <args> y[12] y[13] </args>
+        <args> y[13] y[14] </args>
+        <args> y[14] y[15] </args>
+        <args> y[15] y[16] </args>
+        <args> y[16] y[17] </args>
+        <args> y[17] y[18] </args>
+        <args> y[18] y[19] </args>
+        <args> y[19] y[20] </args>
+        <args> y[20] y[21] </args>
+        <args> y[21] y[22] </args>
+        <args> y[22] y[23] </args>
+        <args> y[23] y[24] </args>
+        <args> y[24] y[25] </args>
+        <args> y[25] y[26] </args>
+        <args> y[26] y[27] </args>
+        <args> y[27] y[28] </args>
+        <args> y[28] y[29] </args>
+        <args> y[29] y[30] </args>
+        <args> y[30] y[31] </args>
+        <args> y[31] y[32] </args>
+        <args> y[32] y[33] </args>
+        <args> y[33] y[34] </args>
+        <args> y[34] y[35] </args>
+        <args> y[35] y[36] </args>
+        <args> y[36] y[37] </args>
+        <args> y[37] y[38] </args>
+        <args> y[38] y[39] </args>
+        <args> y[39] y[40] </args>
+        <args> y[40] y[41] </args>
+        <args> y[41] y[42] </args>
+        <args> y[42] y[43] </args>
+        <args> y[43] y[44] </args>
+        <args> y[44] y[45] </args>
+        <args> y[45] y[46] </args>
+        <args> y[46] y[47] </args>
+        <args> y[47] y[48] </args>
+        <args> y[48] y[49] </args>
+        <args> y[49] y[50] </args>
+        <args> y[50] y[51] </args>
+        <args> y[51] y[52] </args>
+        <args> y[52] y[53] </args>
+        <args> y[53] y[54] </args>
+      </group>
+    </block>
+    <group>
+      <intension> eq(mul(%0,%0),%1) </intension>
+      <args> x[0] aux_gb[0] </args>
+      <args> x[1] aux_gb[1] </args>
+      <args> x[2] aux_gb[2] </args>
+      <args> x[3] aux_gb[3] </args>
+      <args> x[4] aux_gb[4] </args>
+      <args> x[5] aux_gb[5] </args>
+      <args> x[6] aux_gb[6] </args>
+      <args> x[7] aux_gb[7] </args>
+      <args> x[8] aux_gb[8] </args>
+      <args> x[9] aux_gb[9] </args>
+      <args> x[10] aux_gb[10] </args>
+      <args> x[11] aux_gb[11] </args>
+      <args> x[12] aux_gb[12] </args>
+      <args> x[13] aux_gb[13] </args>
+      <args> x[14] aux_gb[14] </args>
+      <args> x[15] aux_gb[15] </args>
+      <args> x[16] aux_gb[16] </args>
+      <args> x[17] aux_gb[17] </args>
+      <args> x[18] aux_gb[18] </args>
+      <args> x[19] aux_gb[19] </args>
+      <args> x[20] aux_gb[20] </args>
+      <args> x[21] aux_gb[21] </args>
+      <args> x[22] aux_gb[22] </args>
+      <args> x[23] aux_gb[23] </args>
+      <args> x[24] aux_gb[24] </args>
+      <args> x[25] aux_gb[25] </args>
+      <args> x[26] aux_gb[26] </args>
+      <args> x[27] aux_gb[27] </args>
+      <args> x[28] aux_gb[28] </args>
+      <args> x[29] aux_gb[29] </args>
+      <args> x[30] aux_gb[30] </args>
+      <args> x[31] aux_gb[31] </args>
+      <args> x[32] aux_gb[32] </args>
+      <args> x[33] aux_gb[33] </args>
+      <args> x[34] aux_gb[34] </args>
+      <args> x[35] aux_gb[35] </args>
+      <args> x[36] aux_gb[36] </args>
+      <args> x[37] aux_gb[37] </args>
+      <args> x[38] aux_gb[38] </args>
+      <args> x[39] aux_gb[39] </args>
+      <args> x[40] aux_gb[40] </args>
+      <args> x[41] aux_gb[41] </args>
+      <args> x[42] aux_gb[42] </args>
+      <args> x[43] aux_gb[43] </args>
+      <args> x[44] aux_gb[44] </args>
+      <args> x[45] aux_gb[45] </args>
+      <args> x[46] aux_gb[46] </args>
+      <args> x[47] aux_gb[47] </args>
+      <args> x[48] aux_gb[48] </args>
+      <args> x[49] aux_gb[49] </args>
+      <args> x[50] aux_gb[50] </args>
+      <args> x[51] aux_gb[51] </args>
+      <args> x[52] aux_gb[52] </args>
+      <args> x[53] aux_gb[53] </args>
+      <args> x[54] aux_gb[54] </args>
+      <args> y[0] aux_gb[55] </args>
+      <args> y[1] aux_gb[56] </args>
+      <args> y[2] aux_gb[57] </args>
+      <args> y[3] aux_gb[58] </args>
+      <args> y[4] aux_gb[59] </args>
+      <args> y[5] aux_gb[60] </args>
+      <args> y[6] aux_gb[61] </args>
+      <args> y[7] aux_gb[62] </args>
+      <args> y[8] aux_gb[63] </args>
+      <args> y[9] aux_gb[64] </args>
+      <args> y[10] aux_gb[65] </args>
+      <args> y[11] aux_gb[66] </args>
+      <args> y[12] aux_gb[67] </args>
+      <args> y[13] aux_gb[68] </args>
+      <args> y[14] aux_gb[69] </args>
+      <args> y[15] aux_gb[70] </args>
+      <args> y[16] aux_gb[71] </args>
+      <args> y[17] aux_gb[72] </args>
+      <args> y[18] aux_gb[73] </args>
+      <args> y[19] aux_gb[74] </args>
+      <args> y[20] aux_gb[75] </args>
+      <args> y[21] aux_gb[76] </args>
+      <args> y[22] aux_gb[77] </args>
+      <args> y[23] aux_gb[78] </args>
+      <args> y[24] aux_gb[79] </args>
+      <args> y[25] aux_gb[80] </args>
+      <args> y[26] aux_gb[81] </args>
+      <args> y[27] aux_gb[82] </args>
+      <args> y[28] aux_gb[83] </args>
+      <args> y[29] aux_gb[84] </args>
+      <args> y[30] aux_gb[85] </args>
+      <args> y[31] aux_gb[86] </args>
+      <args> y[32] aux_gb[87] </args>
+      <args> y[33] aux_gb[88] </args>
+      <args> y[34] aux_gb[89] </args>
+      <args> y[35] aux_gb[90] </args>
+      <args> y[36] aux_gb[91] </args>
+      <args> y[37] aux_gb[92] </args>
+      <args> y[38] aux_gb[93] </args>
+      <args> y[39] aux_gb[94] </args>
+      <args> y[40] aux_gb[95] </args>
+      <args> y[41] aux_gb[96] </args>
+      <args> y[42] aux_gb[97] </args>
+      <args> y[43] aux_gb[98] </args>
+      <args> y[44] aux_gb[99] </args>
+      <args> y[45] aux_gb[100] </args>
+      <args> y[46] aux_gb[101] </args>
+      <args> y[47] aux_gb[102] </args>
+      <args> y[48] aux_gb[103] </args>
+      <args> y[49] aux_gb[104] </args>
+      <args> y[50] aux_gb[105] </args>
+      <args> y[51] aux_gb[106] </args>
+      <args> y[52] aux_gb[107] </args>
+      <args> y[53] aux_gb[108] </args>
+      <args> y[54] aux_gb[109] </args>
+    </group>
+  </constraints>
+</instance>

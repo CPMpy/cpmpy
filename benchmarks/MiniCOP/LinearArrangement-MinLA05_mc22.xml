@@ -1,0 +1,266 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] denotes the position (in the line) of the ith node" size="[24]"> 0..23 </array>
+    <array id="d" note="d[i][j] denotes the distance in the line between the ith and jth nodes (if they are adjacent in the graph)" size="[24][24]"> 1..23 </array>
+  </variables>
+  <constraints>
+    <allDifferent note="putting nodes at different positions"> x[] </allDifferent>
+    <group note="computing distances">
+      <intension> eq(%0,dist(%1,%2)) </intension>
+      <args> d[0][5] x[0] x[5] </args>
+      <args> d[0][6] x[0] x[6] </args>
+      <args> d[0][12] x[0] x[12] </args>
+      <args> d[0][13] x[0] x[13] </args>
+      <args> d[0][17] x[0] x[17] </args>
+      <args> d[0][18] x[0] x[18] </args>
+      <args> d[0][19] x[0] x[19] </args>
+      <args> d[0][21] x[0] x[21] </args>
+      <args> d[1][8] x[1] x[8] </args>
+      <args> d[1][9] x[1] x[9] </args>
+      <args> d[1][13] x[1] x[13] </args>
+      <args> d[1][14] x[1] x[14] </args>
+      <args> d[1][17] x[1] x[17] </args>
+      <args> d[2][6] x[2] x[6] </args>
+      <args> d[2][11] x[2] x[11] </args>
+      <args> d[2][20] x[2] x[20] </args>
+      <args> d[2][21] x[2] x[21] </args>
+      <args> d[2][22] x[2] x[22] </args>
+      <args> d[3][7] x[3] x[7] </args>
+      <args> d[3][10] x[3] x[10] </args>
+      <args> d[3][15] x[3] x[15] </args>
+      <args> d[3][18] x[3] x[18] </args>
+      <args> d[3][19] x[3] x[19] </args>
+      <args> d[4][7] x[4] x[7] </args>
+      <args> d[4][9] x[4] x[9] </args>
+      <args> d[4][14] x[4] x[14] </args>
+      <args> d[4][15] x[4] x[15] </args>
+      <args> d[4][16] x[4] x[16] </args>
+      <args> d[5][6] x[5] x[6] </args>
+      <args> d[5][12] x[5] x[12] </args>
+      <args> d[5][13] x[5] x[13] </args>
+      <args> d[5][17] x[5] x[17] </args>
+      <args> d[6][11] x[6] x[11] </args>
+      <args> d[6][12] x[6] x[12] </args>
+      <args> d[6][19] x[6] x[19] </args>
+      <args> d[6][21] x[6] x[21] </args>
+      <args> d[6][23] x[6] x[23] </args>
+      <args> d[7][9] x[7] x[9] </args>
+      <args> d[7][14] x[7] x[14] </args>
+      <args> d[7][15] x[7] x[15] </args>
+      <args> d[7][16] x[7] x[16] </args>
+      <args> d[7][17] x[7] x[17] </args>
+      <args> d[7][18] x[7] x[18] </args>
+      <args> d[8][9] x[8] x[9] </args>
+      <args> d[8][14] x[8] x[14] </args>
+      <args> d[9][13] x[9] x[13] </args>
+      <args> d[9][14] x[9] x[14] </args>
+      <args> d[9][17] x[9] x[17] </args>
+      <args> d[9][18] x[9] x[18] </args>
+      <args> d[10][18] x[10] x[18] </args>
+      <args> d[10][19] x[10] x[19] </args>
+      <args> d[10][20] x[10] x[20] </args>
+      <args> d[10][21] x[10] x[21] </args>
+      <args> d[11][12] x[11] x[12] </args>
+      <args> d[11][21] x[11] x[21] </args>
+      <args> d[11][23] x[11] x[23] </args>
+      <args> d[12][23] x[12] x[23] </args>
+      <args> d[13][17] x[13] x[17] </args>
+      <args> d[15][16] x[15] x[16] </args>
+      <args> d[15][18] x[15] x[18] </args>
+      <args> d[17][18] x[17] x[18] </args>
+      <args> d[17][19] x[17] x[19] </args>
+      <args> d[18][19] x[18] x[19] </args>
+      <args> d[19][20] x[19] x[20] </args>
+      <args> d[19][21] x[19] x[21] </args>
+      <args> d[20][21] x[20] x[21] </args>
+      <args> d[20][22] x[20] x[22] </args>
+      <args> d[21][22] x[21] x[22] </args>
+    </group>
+    <group class="redundant-constraints" note="triangle constraints: distance(i,j) &lt;= distance(i,k) + distance(k,j)">
+      <intension> le(%0,add(%1,%2)) </intension>
+      <args> d[0][5..6] d[5][6] </args>
+      <args> d[0][5] d[0][12] d[5][12] </args>
+      <args> d[0][5] d[0][13] d[5][13] </args>
+      <args> d[0][5] d[0][17] d[5][17] </args>
+      <args> d[0][6] d[0][5] d[5][6] </args>
+      <args> d[0][6] d[0][12] d[6][12] </args>
+      <args> d[0][6] d[0][19] d[6][19] </args>
+      <args> d[0][6] d[0][21] d[6][21] </args>
+      <args> d[0][12] d[0][5] d[5][12] </args>
+      <args> d[0][12] d[0][6] d[6][12] </args>
+      <args> d[0][13] d[0][5] d[5][13] </args>
+      <args> d[0][13] d[0][17] d[13][17] </args>
+      <args> d[0][17] d[0][5] d[5][17] </args>
+      <args> d[0][17] d[0][13] d[13][17] </args>
+      <args> d[0][17..18] d[17][18] </args>
+      <args> d[0][17] d[0][19] d[17][19] </args>
+      <args> d[0][18] d[0][17] d[17][18] </args>
+      <args> d[0][18..19] d[18][19] </args>
+      <args> d[0][19] d[0][6] d[6][19] </args>
+      <args> d[0][19] d[0][17] d[17][19] </args>
+      <args> d[0][19] d[0][18] d[18][19] </args>
+      <args> d[0][19] d[0][21] d[19][21] </args>
+      <args> d[0][21] d[0][6] d[6][21] </args>
+      <args> d[0][21] d[0][19] d[19][21] </args>
+      <args> d[1][8..9] d[8][9] </args>
+      <args> d[1][8] d[1][14] d[8][14] </args>
+      <args> d[1][9] d[1][8] d[8][9] </args>
+      <args> d[1][9] d[1][13] d[9][13] </args>
+      <args> d[1][9] d[1][14] d[9][14] </args>
+      <args> d[1][9] d[1][17] d[9][17] </args>
+      <args> d[1][13] d[1][9] d[9][13] </args>
+      <args> d[1][13] d[1][17] d[13][17] </args>
+      <args> d[1][14] d[1][8] d[8][14] </args>
+      <args> d[1][14] d[1][9] d[9][14] </args>
+      <args> d[1][17] d[1][9] d[9][17] </args>
+      <args> d[1][17] d[1][13] d[13][17] </args>
+      <args> d[2][6] d[2][11] d[6][11] </args>
+      <args> d[2][6] d[2][21] d[6][21] </args>
+      <args> d[2][11] d[2][6] d[6][11] </args>
+      <args> d[2][11] d[2][21] d[11][21] </args>
+      <args> d[2][20..21] d[20][21] </args>
+      <args> d[2][20] d[2][22] d[20][22] </args>
+      <args> d[2][21] d[2][6] d[6][21] </args>
+      <args> d[2][21] d[2][11] d[11][21] </args>
+      <args> d[2][21] d[2][20] d[20][21] </args>
+      <args> d[2][21..22] d[21][22] </args>
+      <args> d[2][22] d[2][20] d[20][22] </args>
+      <args> d[2][22] d[2][21] d[21][22] </args>
+      <args> d[3][7] d[3][15] d[7][15] </args>
+      <args> d[3][7] d[3][18] d[7][18] </args>
+      <args> d[3][10] d[3][18] d[10][18] </args>
+      <args> d[3][10] d[3][19] d[10][19] </args>
+      <args> d[3][15] d[3][7] d[7][15] </args>
+      <args> d[3][15] d[3][18] d[15][18] </args>
+      <args> d[3][18] d[3][7] d[7][18] </args>
+      <args> d[3][18] d[3][10] d[10][18] </args>
+      <args> d[3][18] d[3][15] d[15][18] </args>
+      <args> d[3][18..19] d[18][19] </args>
+      <args> d[3][19] d[3][10] d[10][19] </args>
+      <args> d[3][19] d[3][18] d[18][19] </args>
+      <args> d[4][7] d[4][9] d[7][9] </args>
+      <args> d[4][7] d[4][14] d[7][14] </args>
+      <args> d[4][7] d[4][15] d[7][15] </args>
+      <args> d[4][7] d[4][16] d[7][16] </args>
+      <args> d[4][9] d[4][7] d[7][9] </args>
+      <args> d[4][9] d[4][14] d[9][14] </args>
+      <args> d[4][14] d[4][7] d[7][14] </args>
+      <args> d[4][14] d[4][9] d[9][14] </args>
+      <args> d[4][15] d[4][7] d[7][15] </args>
+      <args> d[4][15..16] d[15][16] </args>
+      <args> d[4][16] d[4][7] d[7][16] </args>
+      <args> d[4][16] d[4][15] d[15][16] </args>
+      <args> d[5][6] d[0][5..6] </args>
+      <args> d[5][6] d[5..6][12] </args>
+      <args> d[5][12] d[0][5] d[0][12] </args>
+      <args> d[5][12] d[5][6] d[6][12] </args>
+      <args> d[5][13] d[0][5] d[0][13] </args>
+      <args> d[5][13] d[5][17] d[13][17] </args>
+      <args> d[5][17] d[0][5] d[0][17] </args>
+      <args> d[5][17] d[5][13] d[13][17] </args>
+      <args> d[6][11] d[2][6] d[2][11] </args>
+      <args> d[6][11..12] d[11][12] </args>
+      <args> d[6][11] d[6][21] d[11][21] </args>
+      <args> d[6][11] d[6][23] d[11][23] </args>
+      <args> d[6][12] d[0][6] d[0][12] </args>
+      <args> d[6][12] d[5][6] d[5][12] </args>
+      <args> d[6][12] d[6][11] d[11][12] </args>
+      <args> d[6][12] d[6][23] d[12][23] </args>
+      <args> d[6][19] d[0][6] d[0][19] </args>
+      <args> d[6][19] d[6][21] d[19][21] </args>
+      <args> d[6][21] d[0][6] d[0][21] </args>
+      <args> d[6][21] d[2][6] d[2][21] </args>
+      <args> d[6][21] d[6][11] d[11][21] </args>
+      <args> d[6][21] d[6][19] d[19][21] </args>
+      <args> d[6][23] d[6][11] d[11][23] </args>
+      <args> d[6][23] d[6][12] d[12][23] </args>
+      <args> d[7][9] d[4][7] d[4][9] </args>
+      <args> d[7][9] d[7][14] d[9][14] </args>
+      <args> d[7][9] d[7][17] d[9][17] </args>
+      <args> d[7][9] d[7][18] d[9][18] </args>
+      <args> d[7][14] d[4][7] d[4][14] </args>
+      <args> d[7][14] d[7][9] d[9][14] </args>
+      <args> d[7][15] d[3][7] d[3][15] </args>
+      <args> d[7][15] d[4][7] d[4][15] </args>
+      <args> d[7][15..16] d[15][16] </args>
+      <args> d[7][15] d[7][18] d[15][18] </args>
+      <args> d[7][16] d[4][7] d[4][16] </args>
+      <args> d[7][16] d[7][15] d[15][16] </args>
+      <args> d[7][17] d[7][9] d[9][17] </args>
+      <args> d[7][17..18] d[17][18] </args>
+      <args> d[7][18] d[3][7] d[3][18] </args>
+      <args> d[7][18] d[7][9] d[9][18] </args>
+      <args> d[7][18] d[7][15] d[15][18] </args>
+      <args> d[7][18] d[7][17] d[17][18] </args>
+      <args> d[8][9] d[1][8..9] </args>
+      <args> d[8][9] d[8..9][14] </args>
+      <args> d[8][14] d[1][8] d[1][14] </args>
+      <args> d[8][14] d[8][9] d[9][14] </args>
+      <args> d[9][13] d[1][9] d[1][13] </args>
+      <args> d[9][13] d[9][17] d[13][17] </args>
+      <args> d[9][14] d[1][9] d[1][14] </args>
+      <args> d[9][14] d[4][9] d[4][14] </args>
+      <args> d[9][14] d[7][9] d[7][14] </args>
+      <args> d[9][14] d[8][9] d[8][14] </args>
+      <args> d[9][17] d[1][9] d[1][17] </args>
+      <args> d[9][17] d[7][9] d[7][17] </args>
+      <args> d[9][17] d[9][13] d[13][17] </args>
+      <args> d[9][17..18] d[17][18] </args>
+      <args> d[9][18] d[7][9] d[7][18] </args>
+      <args> d[9][18] d[9][17] d[17][18] </args>
+      <args> d[10][18] d[3][10] d[3][18] </args>
+      <args> d[10][18..19] d[18][19] </args>
+      <args> d[10][19] d[3][10] d[3][19] </args>
+      <args> d[10][19] d[10][18] d[18][19] </args>
+      <args> d[10][19..20] d[19][20] </args>
+      <args> d[10][19] d[10][21] d[19][21] </args>
+      <args> d[10][20] d[10][19] d[19][20] </args>
+      <args> d[10][20..21] d[20][21] </args>
+      <args> d[10][21] d[10][19] d[19][21] </args>
+      <args> d[10][21] d[10][20] d[20][21] </args>
+      <args> d[11][12] d[6][11..12] </args>
+      <args> d[11][12] d[11..12][23] </args>
+      <args> d[11][21] d[2][11] d[2][21] </args>
+      <args> d[11][21] d[6][11] d[6][21] </args>
+      <args> d[11][23] d[6][11] d[6][23] </args>
+      <args> d[11][23] d[11][12] d[12][23] </args>
+      <args> d[12][23] d[6][12] d[6][23] </args>
+      <args> d[12][23] d[11][12] d[11][23] </args>
+      <args> d[13][17] d[0][13] d[0][17] </args>
+      <args> d[13][17] d[1][13] d[1][17] </args>
+      <args> d[13][17] d[5][13] d[5][17] </args>
+      <args> d[13][17] d[9][13] d[9][17] </args>
+      <args> d[15][16] d[4][15..16] </args>
+      <args> d[15][16] d[7][15..16] </args>
+      <args> d[15][18] d[3][15] d[3][18] </args>
+      <args> d[15][18] d[7][15] d[7][18] </args>
+      <args> d[17][18] d[0][17..18] </args>
+      <args> d[17][18] d[7][17..18] </args>
+      <args> d[17][18] d[9][17..18] </args>
+      <args> d[17][18..19] d[18][19] </args>
+      <args> d[17][19] d[0][17] d[0][19] </args>
+      <args> d[17][19] d[17][18] d[18][19] </args>
+      <args> d[18][19] d[0][18..19] </args>
+      <args> d[18][19] d[3][18..19] </args>
+      <args> d[18][19] d[10][18..19] </args>
+      <args> d[18][19] d[17][18..19] </args>
+      <args> d[19][20] d[10][19..20] </args>
+      <args> d[19][20..21] d[20][21] </args>
+      <args> d[19][21] d[0][19] d[0][21] </args>
+      <args> d[19][21] d[6][19] d[6][21] </args>
+      <args> d[19][21] d[10][19] d[10][21] </args>
+      <args> d[19][21] d[19][20] d[20][21] </args>
+      <args> d[20][21] d[2][20..21] </args>
+      <args> d[20][21] d[10][20..21] </args>
+      <args> d[20][21] d[19][20..21] </args>
+      <args> d[20][21..22] d[21][22] </args>
+      <args> d[20][22] d[2][20] d[2][22] </args>
+      <args> d[20][22] d[20][21] d[21][22] </args>
+      <args> d[21][22] d[2][21..22] </args>
+      <args> d[21][22] d[20][21..22] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize note="minimizing the sum of distances between adjacent nodes" type="sum"> d[0][5..6] d[0][12..13] d[0][17..19] d[0][21] d[1][8..9] d[1][13..14] d[1][17] d[2][6] d[2][11] d[2][20..22] d[3][7] d[3][10] d[3][15] d[3][18..19] d[4][7] d[4][9] d[4][14..16] d[5][6] d[5][12..13] d[5][17] d[6][11..12] d[6][19] d[6][21] d[6][23] d[7][9] d[7][14..18] d[8][9] d[8][14] d[9][13..14] d[9][17..18] d[10][18..21] d[11][12] d[11][21] d[11..12][23] d[13][17] d[15][16] d[15][18] d[17][18..19] d[18][19] d[19][20..21] d[20][21..22] d[21][22] </minimize>
+  </objectives>
+</instance>

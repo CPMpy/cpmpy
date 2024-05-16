@@ -1,0 +1,52 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] is the ith number in the circle" size="[30]"> 1..30 </array>
+    <var id="z" note="z is the minimal value such that any (circular) subsequence of x  of size r is less than or equal to z"> 0..345 </var>
+  </variables>
+  <constraints>
+    <allDifferent note="a permutation is required"> x[] </allDifferent>
+    <group note="any subsequence of size r must be less than or equal to z">
+      <sum>
+        <list> %... </list>
+        <condition> (le,z) </condition>
+      </sum>
+      <args> x[0..14] </args>
+      <args> x[1..15] </args>
+      <args> x[2..16] </args>
+      <args> x[3..17] </args>
+      <args> x[4..18] </args>
+      <args> x[5..19] </args>
+      <args> x[6..20] </args>
+      <args> x[7..21] </args>
+      <args> x[8..22] </args>
+      <args> x[9..23] </args>
+      <args> x[10..24] </args>
+      <args> x[11..25] </args>
+      <args> x[12..26] </args>
+      <args> x[13..27] </args>
+      <args> x[14..28] </args>
+      <args> x[15..29] </args>
+      <args> x[16..29] x[0] </args>
+      <args> x[17..29] x[0..1] </args>
+      <args> x[18..29] x[0..2] </args>
+      <args> x[19..29] x[0..3] </args>
+      <args> x[20..29] x[0..4] </args>
+      <args> x[21..29] x[0..5] </args>
+      <args> x[22..29] x[0..6] </args>
+      <args> x[23..29] x[0..7] </args>
+      <args> x[24..29] x[0..8] </args>
+      <args> x[25..29] x[0..9] </args>
+      <args> x[26..29] x[0..10] </args>
+      <args> x[27..29] x[0..11] </args>
+      <args> x[28..29] x[0..12] </args>
+      <args> x[29] x[0..13] </args>
+    </group>
+    <block class="symmetry-breaking">
+      <intension> eq(x[0],1) </intension>
+      <intension> lt(x[1],x[29]) </intension>
+    </block>
+  </constraints>
+  <objectives>
+    <minimize> z </minimize>
+  </objectives>
+</instance>

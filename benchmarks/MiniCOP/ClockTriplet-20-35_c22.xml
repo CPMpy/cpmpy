@@ -1,0 +1,57 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" note="x[i] is the ith number in the circle" size="[35]"> 1..35 </array>
+    <var id="z" note="z is the minimal value such that any (circular) subsequence of x  of size r is less than or equal to z"> 0..510 </var>
+  </variables>
+  <constraints>
+    <allDifferent note="a permutation is required"> x[] </allDifferent>
+    <group note="any subsequence of size r must be less than or equal to z">
+      <sum>
+        <list> %... </list>
+        <condition> (le,z) </condition>
+      </sum>
+      <args> x[0..19] </args>
+      <args> x[1..20] </args>
+      <args> x[2..21] </args>
+      <args> x[3..22] </args>
+      <args> x[4..23] </args>
+      <args> x[5..24] </args>
+      <args> x[6..25] </args>
+      <args> x[7..26] </args>
+      <args> x[8..27] </args>
+      <args> x[9..28] </args>
+      <args> x[10..29] </args>
+      <args> x[11..30] </args>
+      <args> x[12..31] </args>
+      <args> x[13..32] </args>
+      <args> x[14..33] </args>
+      <args> x[15..34] </args>
+      <args> x[16..34] x[0] </args>
+      <args> x[17..34] x[0..1] </args>
+      <args> x[18..34] x[0..2] </args>
+      <args> x[19..34] x[0..3] </args>
+      <args> x[20..34] x[0..4] </args>
+      <args> x[21..34] x[0..5] </args>
+      <args> x[22..34] x[0..6] </args>
+      <args> x[23..34] x[0..7] </args>
+      <args> x[24..34] x[0..8] </args>
+      <args> x[25..34] x[0..9] </args>
+      <args> x[26..34] x[0..10] </args>
+      <args> x[27..34] x[0..11] </args>
+      <args> x[28..34] x[0..12] </args>
+      <args> x[29..34] x[0..13] </args>
+      <args> x[30..34] x[0..14] </args>
+      <args> x[31..34] x[0..15] </args>
+      <args> x[32..34] x[0..16] </args>
+      <args> x[33..34] x[0..17] </args>
+      <args> x[34] x[0..18] </args>
+    </group>
+    <block class="symmetry-breaking">
+      <intension> eq(x[0],1) </intension>
+      <intension> lt(x[1],x[34]) </intension>
+    </block>
+  </constraints>
+  <objectives>
+    <minimize> z </minimize>
+  </objectives>
+</instance>
