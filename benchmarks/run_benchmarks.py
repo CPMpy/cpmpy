@@ -52,7 +52,7 @@ for xmlmodel in xmlmodels:
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)
 '''
 print(xmlmodels)
-for xmlmodel in xmlmodels[:10]:
+for xmlmodel in xmlmodels[:2]:
     model = None
     def parse():
         parser = ParserXCSP3(xmlmodel)
@@ -82,12 +82,16 @@ for xmlmodel in xmlmodels[:10]:
     timings = s.timings
     timings['solve'] = t_solve
     timings['parse'] = t_parse
+    for opt in ['parse', 'decompose', 'flatten', 'reify', 'only_numexpr', 'only_bv', 'only_implies', 'linearize', 'only_pos_bv', 'get_vars', 'post_cons', 'solve']:
+        if opt not in timings:
+            # add unused transformations
+            timings[opt] = 0
     alltimes[xmlmodel] = timings
 
 
 import pandas as pd
 # Maak een lege DataFrame aan
-df = pd.DataFrame(columns=['parse', 'decompose', 'flatten', 'reify', 'only_numexpr', 'only_bv', 'only_implies', 'get_vars', 'post_cons', 'solve'])
+df = pd.DataFrame(columns=['parse', 'decompose', 'flatten', 'reify', 'only_numexpr', 'only_bv', 'only_implies', 'linearize', 'only_pos_bv', 'get_vars', 'post_cons', 'solve'])
 dfs = []
 for instance, values in alltimes.items():
     instance_df = pd.DataFrame({
@@ -98,6 +102,8 @@ for instance, values in alltimes.items():
         'only_numexpr': [values['only_numexpr']],
         'only_bv': [values['only_bv']],
         'only_implies': [values['only_implies']],
+        'linearize': [values['linearize']],
+        'only_pos_bv': [values['only_pos_bv']],
         'get_vars': [values['get_vars']],
         'post_cons': [values['post_cons']],
         'solve': [values['solve']]
@@ -106,13 +112,15 @@ for instance, values in alltimes.items():
 
 df = pd.concat(dfs, ignore_index=False)
 total = pd.DataFrame({
-    'parse': [df['parse']],
+    'parse': [df['parse'].sum()],
     'decompose': [df['decompose'].sum()],
     'flatten': [df['flatten'].sum()],
     'reify': [df['reify'].sum()],
     'only_numexpr': [df['only_numexpr'].sum()],
     'only_bv': [df['only_bv'].sum()],
     'only_implies': [df['only_implies'].sum()],
+    'linearize': [df['linearize'].sum()],
+    'only_pos_bv': [df['only_pos_bv'].sum()],
     'get_vars': [df['get_vars'].sum()],
     'post_cons': [df['post_cons'].sum()],
     'solve': [df['solve'].sum()]
