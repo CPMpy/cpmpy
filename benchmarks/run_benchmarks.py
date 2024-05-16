@@ -11,7 +11,7 @@ from cpmpy.exceptions import TransformationNotImplementedError
 # give this a meaningful name, so we know what branch was tested after the results are safed.
 branch = 'main'
 # set solver to test (suported: ortools)
-solver = 'exact'
+solver = 'ortools'
 # solver timeout in seconds
 time_limit = 60
 # set true to only time transformations, and not call the solver
@@ -72,7 +72,7 @@ def time_limiter(seconds):
         signal.alarm(0)
 
 print(xmlmodels)
-for xmlmodel in xmlmodels[:10]:
+for xmlmodel in xmlmodels:
     print(xmlmodel)
     model = None
     def parse():
