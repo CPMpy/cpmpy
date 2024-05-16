@@ -6,7 +6,6 @@ import datetime
 import glob
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from callbackscpmpy import CallbacksCPMPy
-from cpmpy.tools.read_xcsp import XCSPParser
 
 # give this a meaningful name, so we know what branch was tested after the results are safed.
 branch = 'main'
