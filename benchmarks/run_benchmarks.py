@@ -54,6 +54,23 @@ for xmlmodel in xmlmodels:
 class Fakesolver():
     def __init__(self):
         self.timings = dict()
+
+import signal
+from contextlib import contextmanager
+
+class TimeoutException(Exception): pass
+
+@contextmanager
+def time_limiter(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Timed out!")
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
 print(xmlmodels)
 for xmlmodel in xmlmodels:
     model = None
@@ -84,19 +101,25 @@ for xmlmodel in xmlmodels:
         global result
         result = s.solve(time_limit=time_limit)
 
-
-    if not transonly:
-        print('solving')
-        if solver == 'ortools':
-            t_solve = timeit.timeit(stmt=solve_ortools, number=1)
-        else:
-            try:
-                t_solve = timeit.timeit(stmt=solve_exact, number=1)
-            except Exception as e:
-                print(e)
+    try:
+        with time_limiter(time_limit + 30):
+            if not transonly:
+                print('solving')
+                if solver == 'ortools':
+                    t_solve = timeit.timeit(stmt=solve_ortools, number=1)
+                else:
+                    try:
+                        t_solve = timeit.timeit(stmt=solve_exact, number=1)
+                    except Exception as e:
+                        print(e)
+                        t_solve = 0
+            else:
                 t_solve = 0
-    else:
-        t_solve = 0
+    except TimeoutException as e:
+        print('hard time out..')
+        t_solve = time_limit
+
+    print('solved in ', t_solve, 'seconds')
     timings = s.timings
     timings['solve'] = t_solve
     timings['parse'] = t_parse
