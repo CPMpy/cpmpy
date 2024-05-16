@@ -203,9 +203,9 @@ class CallbacksCPMPy(Callbacks):
             cpm_vars = self.vars_from_node(scope)
             exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
             if positive:
-                self.cpm_model += cp.SmartTable(cpm_vars, exttuples)
+                self.cpm_model += cp.ShortTable(cpm_vars, exttuples)
             else:
-                self.cpm_model += ~cp.SmartTable(cpm_vars, exttuples)
+                self.cpm_model += ~cp.ShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
