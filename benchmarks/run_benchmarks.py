@@ -69,13 +69,20 @@ for xmlmodel in xmlmodels[:10]:
     result = None
     t_parse = timeit.timeit(stmt=parse, number=1)
     s = cp.SolverLookup.get(solver, model)
-    def solv():
+    def solve_ortools():
         global result
         result = s.solve(num_search_workers=1,time_limit=time_limit)
 
+    def solve_exact():
+        global result
+        result = s.solve(time_limit=time_limit)
+
     if not transonly:
         print('solving')
-        t_solve = timeit.timeit(stmt=solv, number=1)
+        if solver == 'ortools':
+            t_solve = timeit.timeit(stmt=solve_ortools, number=1)
+        else:
+            t_solve = timeit.timeit(stmt=solve_exact, number=1)
     else:
         t_solve = 0
     timings = s.timings
