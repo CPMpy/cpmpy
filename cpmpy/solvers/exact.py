@@ -438,14 +438,23 @@ class CPM_exact(SolverInterface):
             global cpm_cons
             cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
 
+        print('decomposing')
         t_decomp = timeit.timeit(stmt=decompose, number=1)
+        print('flattening')
         t_flatten = timeit.timeit(stmt=flatten, number=1)
+        print('reifying')
         t_reify = timeit.timeit(stmt=reify, number=1)
+        print('only_numing')
         t_only_num = timeit.timeit(stmt=only_num, number=1)
+        print('only_bving')
         t_only_bv = timeit.timeit(stmt=only_bv, number=1)
+        print('only_implying')
         t_only_impl = timeit.timeit(stmt=only_impl, number=1)
+        print('linearizing')
         t_linear = timeit.timeit(stmt=linear, number=1)
+        print('only_positiveing')
         t_only_pos = timeit.timeit(stmt=only_pos, number=1)
+        print('transformed')
         return cpm_cons, t_decomp, t_flatten, t_reify, t_only_num, t_only_bv, t_only_impl, t_linear, t_only_pos
         # NOTE: the transformations that are still done specifically for Exact are two-fold:
         # 1) transform '==' and '<=' to '>='

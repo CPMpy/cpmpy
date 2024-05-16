@@ -234,6 +234,24 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(iv.value(), vals)
+        vals = [1, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
+        vals = [iv2, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
+        vals = [bv & bv, 5, 8, -4]
+        bv = cp.boolvar()
+        cons = [cp.InDomain(bv, vals)]
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+        self.assertIn(bv.value(), vals)
 
     def test_indomain_onearg(self):
 
@@ -637,6 +655,34 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
         cp.Model(cons).solveAll(display=check_true)
 
+    def test_nvalue_except(self):
+
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0, 10)
+
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > 1).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, 10) > 1).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 1) == 0).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > cnt).solve())
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        val = 6
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) != cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) >= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) <= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) < cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) > cnt).solve())
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValueExcept(iv, val) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+
+        cp.Model(cons).solveAll(display=check_true)
+
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
     def test_nvalue_minizinc(self):
@@ -751,6 +797,50 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllEqual(x,y,-1)]).solve())
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
         #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
+
+    def test_increasing(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.Increasing(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.Increasing(a,b)]).solve())
+        self.assertTrue(cp.Model([cp.Increasing(x,y,b)]).solve())
+        z = cp.intvar(2,5)
+        self.assertFalse(cp.Model([cp.Increasing(z,b)]).solve())
+
+    def test_decreasing(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.Decreasing(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.Decreasing(a,b)]).solve())
+        self.assertFalse(cp.Model([cp.Decreasing(x,y,b)]).solve())
+        z = cp.intvar(2,5)
+        self.assertTrue(cp.Model([cp.Decreasing(z,b)]).solve())
+
+    def test_increasing_strict(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.IncreasingStrict(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.IncreasingStrict(a,b)]).solve())
+        self.assertTrue(cp.Model([cp.IncreasingStrict(x,y,b)]).solve())
+        z = cp.intvar(1,5)
+        self.assertFalse(cp.Model([cp.IncreasingStrict(z,b)]).solve())
+
+    def test_decreasing_strict(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, 0)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.DecreasingStrict(x,y)]).solve())
+        self.assertTrue(cp.Model([cp.DecreasingStrict(a,b)]).solve())
+        self.assertFalse(cp.Model([cp.DecreasingStrict(x,y,b)]).solve())
+        z = cp.intvar(1,5)
+        self.assertTrue(cp.Model([cp.DecreasingStrict(z,b)]).solve())
 
     def test_circuit(self):
         x = cp.intvar(-8, 8)
