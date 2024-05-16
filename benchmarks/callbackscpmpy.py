@@ -564,7 +564,7 @@ class CallbacksCPMPy(Callbacks):
     def load_annotation(self, annotation):
         pass
     def load_annotations(self, annotations):
-        print('load_annotations_')
+        pass
 
     def load_objectives(self, objectives):
-        print('load_objectives_')
+        pass
