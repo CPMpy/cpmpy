@@ -46,7 +46,7 @@ def needs_simplify(expr):
         for arg in expr.args:
             if isinstance(arg, (bool, BoolVal)):
                 return True  # boolean constants can be simplified away
-            args.add(arg)
+            args.add(is_boolexpr(arg))
         return len(args) > 1  # mixed types should be simplified
     else:
         return False
