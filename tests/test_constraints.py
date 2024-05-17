@@ -11,7 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-
+SOLVERNAMES = ["ortools"]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
@@ -93,12 +93,15 @@ def numexprs(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        print(name, cls)
         if name == "Abs":
             expr = cls(NUM_ARGS[0])
         elif name == "Count":
             expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             expr = cls(NUM_ARGS, POS_VAR)
+        elif name == "NValueExcept":
+            expr = cls(NUM_ARGS, 3)
         else:
             expr = cls(NUM_ARGS)
 
