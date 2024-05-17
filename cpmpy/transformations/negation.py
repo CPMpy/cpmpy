@@ -5,7 +5,8 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, has_nested
+
 
 def push_down_negation(lst_of_expr, toplevel=True):
     """
@@ -21,13 +22,10 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
     newlist = []
     for expr in lst_of_expr:
+
         if is_any_list(expr):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
-
-        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal)):
-            # nothing to do
-            newlist.append(expr)
 
         elif expr.name == "not":
             # the negative case, negate
@@ -37,14 +35,18 @@ def push_down_negation(lst_of_expr, toplevel=True):
                 newlist.extend(toplevel_list(arg_neg))
             else:
                 newlist.append(arg_neg)
+        elif not has_nested(expr):
+            newlist.append(expr)  # no need to do anything
 
         else:
             # an Expression, we remain in the positive case
-            newexpr = copy.copy(expr)
-            # TODO, check that an arg changed? otherwise no copy needed here...
-            newexpr.args = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
-            newlist.append(newexpr)
-
+            newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
+            if str(newargs) != str(expr.args):
+                newexpr = copy.copy(expr)
+                newexpr.args = newargs  # check if 'not' is present in arguments
+                newlist.append(newexpr)
+            else:
+                newlist.append(expr)
     return newlist
 
 def recurse_negation(expr):
