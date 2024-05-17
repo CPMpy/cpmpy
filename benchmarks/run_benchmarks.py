@@ -9,7 +9,7 @@ from callbackscpmpy import CallbacksCPMPy
 from cpmpy.exceptions import TransformationNotImplementedError
 
 # give this a meaningful name, so we know what branch was tested after the results are safed.
-branch = 'has_nested'
+branch = 'has_nested_simple'
 # set solver to test (suported: ortools)
 solver = 'ortools'
 # solver timeout in seconds

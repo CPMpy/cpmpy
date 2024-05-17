@@ -131,6 +131,8 @@ def argval(a):
 def is_leaf(a):
     if hasattr(a, 'is_leaf'):
         return a.is_leaf()
+    if is_any_list(a):
+        return all([is_leaf(x) for x in a])
     else:
         return True
 
