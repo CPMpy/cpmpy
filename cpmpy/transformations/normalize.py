@@ -40,6 +40,18 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+def needs_simplify(expr):
+    if hasattr(expr, 'args'):
+        args = set()
+        for arg in expr.args:
+            if isinstance(arg, (bool, BoolVal)):
+                return True  # boolean constants can be simplified away
+            args.add(arg)
+        return len(args) > 1  # mixed types should be simplified
+    else:
+        return False
+
+
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
@@ -56,7 +68,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
         if isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
 
-        elif not has_nested(expr):
+        elif not has_nested(expr) and not needs_simplify(expr):
             newlist.append(expr)
 
         elif isinstance(expr, Operator):
