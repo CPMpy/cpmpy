@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, has_nested
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, has_nested, is_bool
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -44,7 +44,7 @@ def needs_simplify(expr):
     if hasattr(expr, 'args'):
         args = set()
         for arg in expr.args:
-            if isinstance(arg, (bool, BoolVal)):
+            if is_bool(arg):
                 return True  # boolean constants can be simplified away
             args.add(is_boolexpr(arg))
         return len(args) > 1  # mixed types should be simplified
