@@ -5,7 +5,7 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list, has_nested, is_boolexpr
+from ..expressions.utils import is_any_list, has_nested, is_boolexpr, is_bool
 
 
 def push_down_negation(lst_of_expr, toplevel=True):
@@ -70,6 +70,8 @@ def recurse_negation(expr):
     if isinstance(expr, (_BoolVarImpl,BoolVal)):
         return ~expr
 
+    elif is_bool(expr):
+        return not expr
     elif isinstance(expr, Comparison):
         newexpr = copy.copy(expr)
         if   expr.name == '==': newexpr.name = '!='
