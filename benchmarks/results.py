@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 slowthreshold = 0.2
 fastthreshold = 0.2
 #filename of reference instance, should be in results folder!
-refname = 'main_ortools_2024-05-16 14.17.52.619920.csv'
+refname = 'diamondfree_ortools_2024-05-17 13.49.48.079323.csv'
 
 results = []
 cwd = os.getcwd()
