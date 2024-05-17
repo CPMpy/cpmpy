@@ -578,7 +578,7 @@ class IncreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
-        super().__init__("increasing_strict", flatlist(args))
+        super().__init__("strictly_increasing", flatlist(args))
 
     def decompose(self):
         """
@@ -601,7 +601,7 @@ class DecreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
-        super().__init__("decreasing_strict", flatlist(args))
+        super().__init__("strictly_decreasing", flatlist(args))
 
     def decompose(self):
         """
