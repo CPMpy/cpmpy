@@ -135,9 +135,6 @@ class Expression(object):
     def __hash__(self):
         return hash(self.__repr__())
 
-    def has_nested(self):
-        return not all([is_leaf(x) for x in self.args])
-
     def is_leaf(self):
         return False  # default
 

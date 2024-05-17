@@ -129,7 +129,16 @@ def argval(a):
 
 
 def is_leaf(a):
-    return a.is_leaf() if hasattr(a, 'is_leaf') else True
+    if hasattr(a, 'is_leaf'):
+        return a.is_leaf()
+    if is_any_list(a):
+        return all([is_leaf(x) for x in a])
+    else:
+        return True
+
+
+def has_nested(expr):
+    return not all([is_leaf(x) for x in expr.args])
 
 
 def eval_comparison(str_op, lhs, rhs):
