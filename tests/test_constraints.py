@@ -19,7 +19,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue",
+    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
 }
 
 # Solvers not supporting arithmetic constraints
