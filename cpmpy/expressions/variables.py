@@ -53,7 +53,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, is_leaf
 
 
 def BoolVar(shape=1, name=None):
@@ -245,6 +245,9 @@ class _NumVarImpl(Expression):
         """
         return False
 
+    def is_leaf(self):
+        return True
+
     def value(self):
         """ the value obtained in the last solve call
             (or 'None')
@@ -384,6 +387,9 @@ class NDVarArray(np.ndarray, Expression):
         """ is it a Boolean (return type) Operator?
         """
         return False
+
+    def is_leaf(self):
+        return all([is_leaf(x) for x in self])
 
     def value(self):
         """ the values, for each of the stored variables, obtained in the last solve call

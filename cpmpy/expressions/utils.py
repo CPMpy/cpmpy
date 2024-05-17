@@ -128,6 +128,10 @@ def argval(a):
         raise e
 
 
+def is_leaf(a):
+    return a.is_leaf() if hasattr(a, 'is_leaf') else True
+
+
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator
