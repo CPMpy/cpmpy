@@ -22,10 +22,12 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
     newlist = []
     for expr in lst_of_expr:
-
         if is_any_list(expr):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
+
+        elif not has_nested(expr) and not (hasattr(expr, 'name') and expr.name == 'not'):
+            newlist.append(expr)  # no need to do anything
 
         elif expr.name == "not":
             # the negative case, negate
@@ -35,8 +37,6 @@ def push_down_negation(lst_of_expr, toplevel=True):
                 newlist.extend(toplevel_list(arg_neg))
             else:
                 newlist.append(arg_neg)
-        elif not has_nested(expr):
-            newlist.append(expr)  # no need to do anything
 
         else:
             # an Expression, we remain in the positive case

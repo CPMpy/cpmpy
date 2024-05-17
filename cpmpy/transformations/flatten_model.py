@@ -86,7 +86,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, has_nested
 from .negation import recurse_negation, push_down_negation
 
 
@@ -132,9 +132,8 @@ def flatten_constraint(expr):
     lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
     lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     for expr in lst_of_expr:
-
-        if isinstance(expr, _BoolVarImpl):
-            newlist.append(expr)
+        if not has_nested(expr):
+            newlist.append(expr)  # no need to do anything
 
         elif isinstance(expr, Operator):
             """

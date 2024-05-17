@@ -140,6 +140,8 @@ def is_leaf(a):
 def has_nested(expr):
     if is_leaf(expr):
         return False
+    if is_any_list(expr):
+        return not is_leaf(expr)
     return not all([is_leaf(x) for x in expr.args])
 
 
