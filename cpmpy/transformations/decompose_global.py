@@ -6,7 +6,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
-from ..expressions.utils import is_any_list, eval_comparison
+from ..expressions.utils import is_any_list, eval_comparison, has_nested
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
@@ -37,7 +37,6 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
     newlist = []  # decomposed constraints will go here
     for expr in lst_of_expr:
-
         if is_any_list(expr):
             assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run cpmpy.transformations.normalize.toplevel_list first."
             newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True)
@@ -97,6 +96,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
                     newlist.append(aux)  # replace original expression by aux
 
+        elif not has_nested(expr):
+            newlist.append(expr)
         elif isinstance(expr, Comparison):
             # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
             # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`

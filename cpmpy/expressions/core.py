@@ -72,7 +72,7 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -134,6 +134,9 @@ class Expression(object):
 
     def __hash__(self):
         return hash(self.__repr__())
+
+    def is_leaf(self):
+        return False  # default
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -380,6 +383,9 @@ class BoolVal(Expression):
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
+
+    def is_leaf(self):
+        return True
 
 
 class Comparison(Expression):
