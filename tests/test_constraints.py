@@ -92,7 +92,6 @@ def numexprs(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
-        print(name, cls)
         if name == "Abs":
             expr = cls(NUM_ARGS[0])
         elif name == "Count":
