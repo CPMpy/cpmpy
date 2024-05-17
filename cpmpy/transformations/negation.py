@@ -44,6 +44,8 @@ def push_down_negation(lst_of_expr, toplevel=True):
             if is_boolexpr(lexpr) and is_boolexpr(rexpr):
                 newexpr = (lexpr == recurse_negation(rexpr))
                 newlist.append(newexpr)
+            else:
+                newlist.append(expr)
 
         else:
             # an Expression, we remain in the positive case
