@@ -225,12 +225,6 @@ def flatten_constraint(expr):
                 lexpr, rexpr = rexpr, lexpr
                 rewritten = True
 
-            # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            if exprname == '!=' and lexpr.is_bool() and rexpr.is_bool():
-                exprname = '=='
-                rexpr = ~rexpr
-                rewritten = True
-
             # already flat?
             if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
                 if not rewritten:

@@ -5,7 +5,7 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list, has_nested
+from ..expressions.utils import is_any_list, has_nested, is_boolexpr
 
 
 def push_down_negation(lst_of_expr, toplevel=True):
@@ -26,7 +26,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
 
-        elif not has_nested(expr) and not (hasattr(expr, 'name') and expr.name == 'not'):
+        elif not has_nested(expr) and not (hasattr(expr, 'name') and (expr.name == 'not' or expr.name == '!=')):
             newlist.append(expr)  # no need to do anything
 
         elif expr.name == "not":
@@ -37,6 +37,13 @@ def push_down_negation(lst_of_expr, toplevel=True):
                 newlist.extend(toplevel_list(arg_neg))
             else:
                 newlist.append(arg_neg)
+
+        # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+        elif expr.name == '!=':
+            lexpr, rexpr = expr.args
+            if is_boolexpr(lexpr) and is_boolexpr(rexpr):
+                newexpr = (lexpr == recurse_negation(rexpr))
+                newlist.append(newexpr)
 
         else:
             # an Expression, we remain in the positive case
