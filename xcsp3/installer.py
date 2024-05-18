@@ -58,7 +58,7 @@ def install_xcsp3_instances():
 
 
     target = ".lzma"
-    for root, dir, files in os.walk('./xcsp3/instancesXCSP22/'):
+    for root, dir, files in os.walk(os.path.join(pathlib.Path(__file__).parent.resolve(), "instancesXCSP22")):
         print(f"Extracting {root}")
         for file in tqdm.tqdm(files):
             if target in file:
