@@ -141,3 +141,11 @@ bugs/
 
 # Intellij
 .idea/
+
+# XCSP3
+instances/
+*.tgz
+jar/
+*.jar
+out/
+instancesXCSP22/
