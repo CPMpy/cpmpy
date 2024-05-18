@@ -128,6 +128,23 @@ def argval(a):
         raise e
 
 
+def is_leaf(a):
+    if hasattr(a, 'is_leaf'):
+        return a.is_leaf()
+    if is_any_list(a):
+        return all([is_leaf(x) for x in a])
+    else:
+        return True
+
+
+def has_nested(expr):
+    if is_leaf(expr):
+        return False
+    if hasattr(expr, 'args'):
+        return not all([is_leaf(x) for x in expr.args])
+    return True
+
+
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator

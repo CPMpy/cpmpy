@@ -5,7 +5,8 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, has_nested, is_boolexpr, is_bool
+
 
 def push_down_negation(lst_of_expr, toplevel=True):
     """
@@ -25,9 +26,8 @@ def push_down_negation(lst_of_expr, toplevel=True):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
 
-        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal)):
-            # nothing to do
-            newlist.append(expr)
+        elif not has_nested(expr) and not (hasattr(expr, 'name') and (expr.name == 'not' or expr.name == '!=')):
+            newlist.append(expr)  # no need to do anything
 
         elif expr.name == "not":
             # the negative case, negate
@@ -38,13 +38,24 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(arg_neg)
 
+        # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+        elif expr.name == '!=':
+            lexpr, rexpr = expr.args
+            if is_boolexpr(lexpr) and is_boolexpr(rexpr):
+                newexpr = (lexpr == recurse_negation(rexpr))
+                newlist.append(newexpr)
+            else:
+                newlist.append(expr)
+
         else:
             # an Expression, we remain in the positive case
-            newexpr = copy.copy(expr)
-            # TODO, check that an arg changed? otherwise no copy needed here...
-            newexpr.args = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
-            newlist.append(newexpr)
-
+            newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
+            if str(newargs) != str(expr.args):
+                newexpr = copy.copy(expr)
+                newexpr.args = newargs  # check if 'not' is present in arguments
+                newlist.append(newexpr)
+            else:
+                newlist.append(expr)
     return newlist
 
 def recurse_negation(expr):
@@ -59,6 +70,8 @@ def recurse_negation(expr):
     if isinstance(expr, (_BoolVarImpl,BoolVal)):
         return ~expr
 
+    elif is_bool(expr):
+        return not expr
     elif isinstance(expr, Comparison):
         newexpr = copy.copy(expr)
         if   expr.name == '==': newexpr.name = '!='

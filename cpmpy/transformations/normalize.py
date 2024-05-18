@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, has_nested, is_bool
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -40,6 +40,18 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+def needs_simplify(expr):
+    if hasattr(expr, 'args'):
+        args = set()
+        for arg in expr.args:
+            if is_bool(arg):
+                return True  # boolean constants can be simplified away
+            args.add(is_boolexpr(arg))
+        return len(args) > 1  # mixed types should be simplified
+    else:
+        return False
+
+
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
@@ -49,13 +61,15 @@ def simplify_boolean(lst_of_expr, num_context=False):
     from .negation import recurse_negation # avoid circular import
     newlist = []
     for expr in lst_of_expr:
-
         if isinstance(expr, bool):
             # not sure if this should happen here or at construction time
             expr = BoolVal(expr)
 
         if isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
+
+        elif not has_nested(expr) and not needs_simplify(expr):
+            newlist.append(expr)
 
         elif isinstance(expr, Operator):
             args = simplify_boolean(expr.args, num_context=not expr.is_bool())
