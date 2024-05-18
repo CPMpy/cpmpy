@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 import pathlib
+from dataclasses import dataclass
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
 
@@ -101,16 +102,21 @@ def supported_solver(solver:Optional[str]):
 # ---------------------------------------------------------------------------- #
 #                         Executable & Solver arguments                        #
 # ---------------------------------------------------------------------------- #
+@dataclass
 class Args:
     benchname:str
-    seed:int
-    time_limit:int
-    mem_limit:int
-    cores:int
-    tmpdir:os.PathLike
-    dir:os.PathLike
+    seed:int=None
+    time_limit:int=None
+    mem_limit:int=None
+    cores:int=1
+    tmpdir:os.PathLike=None
+    dir:os.PathLike=None
+    solver:str=DEFAULT_SOLVER
+    time_buffer:int=TIME_BUFFER
+    intermediate:bool=False
 
-    def __init__(self, args):
+    @staticmethod
+    def from_cli(self, args):
         self.args = args
         self.benchname = args.benchname
         self.seed = args.seed
@@ -220,6 +226,10 @@ def main():
     args = Args(parser.parse_args())
     print_comment(str(args))
     
+    run(args)
+
+def run(args: Args):
+
     # --------------------------- Global Configuration --------------------------- #
 
     if args.seed is not None:

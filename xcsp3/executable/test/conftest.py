@@ -96,6 +96,8 @@ def pytest_addoption(parser):
     parser.addoption("--memory_limit", action="store", default=None)
     parser.addoption("--type", action="store", default=None)
     parser.addoption("--intermediate", action="store_true")
+    parser.addoption("--competition", action="store_true")
+
 
 def pytest_generate_tests(metafunc):
     """
@@ -140,3 +142,7 @@ def pytest_generate_tests(metafunc):
     # If intermediate solutions should be shown
     if "intermediate" in metafunc.fixturenames:
         metafunc.parametrize("intermediate", [metafunc.config.getoption("intermediate")])
+
+    # If intermediate solutions should be shown
+    if "competition" in metafunc.fixturenames:
+        metafunc.parametrize("competition", [metafunc.config.getoption("competition")])

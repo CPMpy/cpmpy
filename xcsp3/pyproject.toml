@@ -17,6 +17,9 @@ lxml = "^5.2.2"
 pycsp3 = { path="pycsp3", develop = true }
 ortools = "^9.10.4067"
 pychoco = "^0.1.2"
+pytest-fast-first = "^1.0.5"
+pytest-sugar = "^1.0.0"
+pytest-profiling = "^1.7.0"
 
 [build-system]
 requires = ["poetry-core"]

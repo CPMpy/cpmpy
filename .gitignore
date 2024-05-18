@@ -150,3 +150,6 @@ jar/
 out/
 instancesXCSP22/
 pycsp3/
+xcsp3/prof/
+reportlog.jsonl
+.pytest-runtimes
