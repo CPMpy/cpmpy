@@ -9,7 +9,11 @@ from callbackscpmpy import CallbacksCPMPy
 from cpmpy.exceptions import TransformationNotImplementedError
 
 # give this a meaningful name, so we know what branch was tested after the results are safed.
+<<<<<<< HEAD
 branch = 'quick'
+=======
+branch = 'has_nested_simple'
+>>>>>>> 09e60efcec01cf9f7bc171ed746246c831390d49
 # set solver to test (suported: ortools)
 solver = 'ortools'
 # solver timeout in seconds
@@ -24,8 +28,8 @@ if 'y' in cwd[-2:]:
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCSP', "*.xml")))
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCOP', "*.xml")))
 else:
-    xmlmodels.extend(glob.glob(join('MiniCSP', "*.xml")))
-    xmlmodels.extend(glob.glob(join('MiniCOP', "*.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCSP', "Diamond*.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCOP', "Diamond*.xml")))
 
 #for subdividing the models (use 'instances' directory for xmlmodels)
 '''if 'y' in cwd[-2:]:
@@ -60,7 +64,7 @@ from contextlib import contextmanager
 
 class TimeoutException(Exception): pass
 
-@contextmanager
+'''@contextmanager
 def time_limiter(seconds):
     def signal_handler(signum, frame):
         raise TimeoutException("Timed out!")
@@ -69,7 +73,7 @@ def time_limiter(seconds):
     try:
         yield
     finally:
-        signal.alarm(0)
+        signal.alarm(0)'''
 
 print(xmlmodels)
 for xmlmodel in xmlmodels:
