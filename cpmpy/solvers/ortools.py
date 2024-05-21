@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import has_nested, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -331,8 +331,9 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        _has_nested = [has_nested(e) for e in cpm_cons] 
+        cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
+        cpm_cons = flatten_constraint(cpm_cons, _has_nested=_has_nested)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
