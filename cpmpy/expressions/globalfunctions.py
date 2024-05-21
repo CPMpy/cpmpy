@@ -68,7 +68,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
@@ -344,8 +344,7 @@ class Among(GlobalFunction):
         return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
 
     def value(self):
-        argvals = np.array([argval(a) for a in self.args[0]])
-        return len([a for a in argvals if a in set(self.args[1])])
+        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
 
     def get_bounds(self):
         return 0, len(self.args[0])
