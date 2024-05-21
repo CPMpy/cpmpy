@@ -111,7 +111,7 @@ def flatten_model(orig_model):
             return Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr):
+def flatten_constraint(expr, pdn=True, _has_nested=None):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -130,9 +130,10 @@ def flatten_constraint(expr):
     # e.g. `toplevel_list()` ensures it is a list
     lst_of_expr = toplevel_list(expr)               # ensure it is a list
     lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
-    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
-    for expr in lst_of_expr:
-        if not has_nested(expr):
+    expr_has_nested = _has_nested#[has_nested(e) for e in lst_of_expr] 
+    lst_of_expr = simplify_boolean(lst_of_expr, _has_nested=expr_has_nested)     # simplify boolean expressions, and ensure types are correct
+    for i_expr, expr in enumerate(lst_of_expr):
+        if not expr_has_nested[i_expr]:
             newlist.append(expr)  # no need to do anything
 
         elif isinstance(expr, Operator):
