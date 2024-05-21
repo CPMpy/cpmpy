@@ -11,7 +11,7 @@ from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
 
-def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
+def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False, _has_nested=False):
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
@@ -36,7 +36,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
     flipmap = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
 
     newlist = []  # decomposed constraints will go here
-    for expr in lst_of_expr:
+    for i_expr, expr in enumerate(lst_of_expr):        
         if is_any_list(expr):
             assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run cpmpy.transformations.normalize.toplevel_list first."
             newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True)
@@ -57,7 +57,24 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            # if expr.name == "table":
+            #     a, b = expr.args
+            #     a = np.array(a)
+            #     c = np.array(b)
+
+            #     def f(expr):
+            #         return decompose_in_tree((expr,), supported, supported_reified, _toplevel, nested=True)[0]
+            #     vectorized = np.vectorize(f, otypes=[object])
+            #     expr.args = [a, c]
+
+            # else:
+            if _has_nested is not None:
+                if _has_nested[i_expr]:
+                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            else:
+                if has_nested(expr):
+                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+
 
             is_supported = (expr.name in supported)
             if nested and expr.is_bool():
