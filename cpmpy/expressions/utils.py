@@ -21,31 +21,61 @@ Internal utilities for expression handling.
         argval
         eval_comparison
 """
-
+from __future__ import annotations
+import functools
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
+from functools import singledispatch
 
+
+# @singledispatch
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    from cpmpy import BoolVal
-    return isinstance(arg, (bool, np.bool_, BoolVal))
+    return type(arg) in (np.bool_, bool, "BoolVal") 
+    
+    return isinstance(arg, (np.bool_, bool)) or  type(arg) == "BoolVal"
 
+# @is_bool.register("BoolVal")
+# @is_bool.register(np.bool_)
+# @is_bool.register(bool)
+# def _(arg):
+#     return True
 
+# @singledispatch
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    return type(arg) in (np.bool_, bool, "BoolVal", int, np.integer) 
+    return is_bool(arg)  or isinstance(arg, (int, np.integer))
+
+# @is_int.register(bool)
+# @is_int.register(np.bool_)
+# @is_int.register(int)
+# @is_int.register(np.integer)
+# def _(arg):
+#     return True
 
 
+# @singledispatch
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
+    return type(arg) in (np.bool_, bool, "BoolVal", int, np.integer, float, np.floating) 
     return is_int(arg) or isinstance(arg, (float, np.floating))
+
+# @is_num.register(bool)
+# @is_num.register(np.bool_)
+# @is_num.register(int)
+# @is_num.register(np.integer)
+# @is_num.register(float)
+# @is_num.register(np.floating)
+# def _(arg):
+#     return True
 
 
 def is_false_cst(arg):
@@ -79,17 +109,40 @@ def is_boolexpr(expr):
     #boolean constant
     return is_bool(expr)
 
-
+@singledispatch
 def is_pure_list(arg):
     """ is it a list or tuple?
     """
-    return isinstance(arg, (list, tuple))
+    # return type(arg) in (list, tuple)
+    return False
 
+@is_pure_list.register(list)
+def _(args:list):
+    return True
 
+@is_pure_list.register(tuple)
+def _(args:tuple):
+    return True
+
+# @singledispatch
 def is_any_list(arg):
     """ is it a list or tuple or numpy array?
     """
-    return isinstance(arg, (list, tuple, np.ndarray))
+    # return False
+    return type(arg) in (list, tuple, np.ndarray)
+
+# @is_any_list.register(list)
+# def _(args:list):
+#     return True
+
+# @is_any_list.register(tuple)
+# def _(args:tuple):
+#     return True
+
+# @is_any_list.register(np.ndarray)
+# def _(args:np.ndarray):
+#     return True
+
 
 
 def flatlist(args):
