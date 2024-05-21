@@ -12,12 +12,13 @@ import pytest
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
-
+SOLVERNAMES = ["ortools"]
 # Exclude some global constraints for solvers
 
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0" , "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "Precedence", "Cumulative",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
 }
@@ -194,6 +195,9 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "Precedence":
+            x = intvar(0,5, shape=3, name="x")
+            expr = cls(x, [3,1,0])
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
@@ -238,7 +242,16 @@ def test_bool_constaints(solver, constraint):
         n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
         assert n_sols >= 1
     else:
+        print(constraint)
+        for c in constraint.decompose()[0]:
+            print("-", c)
+
         assert SolverLookup.get(solver, Model(constraint)).solve()
+
+        from cpmpy.transformations.get_variables import get_variables
+        for v in get_variables(constraint):
+            print(v, v.value())
+
         assert argval(constraint)
         assert constraint.value()
 

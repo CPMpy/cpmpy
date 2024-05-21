@@ -708,6 +708,17 @@ class TestGlobal(unittest.TestCase):
 
         cp.Model(cons).solveAll(solver='minizinc')
 
+
+    def test_precedence(self):
+        iv = cp.intvar(0,5, shape=6, name="x")
+
+        cons = cp.Precedence(iv, [0,2,1])
+        for c in cons.decompose()[0]:
+            print(c)
+
+        self.assertTrue(cp.Model([cons, iv == [0,2,2,1,0,1]]).solve())
+        self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
+
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
