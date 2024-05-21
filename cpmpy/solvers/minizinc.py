@@ -586,16 +586,13 @@ class CPM_minizinc(SolverInterface):
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
         elif expr.name == "precedence":
-            args, precedence = expr.args
-            format_str = "value_precede_chain({},{})".format(self._convert_expression(precedence),
-                                                             self._convert_expression(args))
-            return format_str
+            return "value_precede_chain({},{})".format(args_str[1], args_str[0])
 
         elif expr.name == "no_overlap":
             start, dur, end = expr.args
-            durstr = self._convert_expression(s + d == e for s,d,e in zip(start, dur, end))
+            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
             format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
-            return format_str.format(start, dur)
+            return format_str.format(args_str[0], args_str[1])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args
