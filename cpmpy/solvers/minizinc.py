@@ -419,6 +419,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing",
+                     "precedence",
                      "decreasing","strictly_increasing","strictly_decreasing"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
@@ -583,6 +584,12 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
+
+        elif expr.name == "precedence":
+            args, precedence = expr.args
+            format_str = "value_precede_chain({},{})".format(self._convert_expression(precedence),
+                                                             self._convert_expression(args))
+            return format_str
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args

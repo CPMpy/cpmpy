@@ -314,6 +314,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "precedence",
                      "decreasing","strictly_increasing","strictly_decreasing"}
 
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
@@ -536,6 +537,8 @@ class CPM_choco(SolverInterface):
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "precedence":
+                return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
                 return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ))
