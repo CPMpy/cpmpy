@@ -713,9 +713,6 @@ class TestGlobal(unittest.TestCase):
         iv = cp.intvar(0,5, shape=6, name="x")
 
         cons = cp.Precedence(iv, [0,2,1])
-        for c in cons.decompose()[0]:
-            print(c)
-
         self.assertTrue(cp.Model([cons, iv == [0,2,2,1,0,1]]).solve())
         self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
 
