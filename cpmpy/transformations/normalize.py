@@ -40,19 +40,47 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+# def needs_simplify(expr):
+#     if hasattr(expr, 'args'):
+#         args = set()
+#         for arg in expr.args:
+#             if is_bool(arg):
+#                 return True  # boolean constants can be simplified away
+#             args.add(is_boolexpr(arg))
+#         return len(args) > 1  # mixed types should be simplified
+#     else:
+#         return False
+    
 def needs_simplify(expr):
     if hasattr(expr, 'args'):
-        args = set()
+        has_bool_arg_expr = None
+
+        # if any(map(is_bool, expr.args)):
+        #     return True
+        # if is_boolexpr(expr.args[0]):
+        #     if all(map(is_boolexpr, expr.args[1:])):
+        #         return True
+        # else:
+        #     if any(map(is_boolexpr, expr.args[1:])):
+        #         return False
+        #     else:
+        #         return True
+
         for arg in expr.args:
             if is_bool(arg):
                 return True  # boolean constants can be simplified away
-            args.add(is_boolexpr(arg))
-        return len(args) > 1  # mixed types should be simplified
+            
+            bool_arg_expr = is_boolexpr(arg)
+            if bool_arg_expr != has_bool_arg_expr:
+                if has_bool_arg_expr is None:
+                    has_bool_arg_expr = bool_arg_expr
+                else:
+                    return True # mixed types should be simplified
     else:
         return False
 
 
-def simplify_boolean(lst_of_expr, num_context=False):
+def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
