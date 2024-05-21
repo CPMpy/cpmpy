@@ -960,7 +960,8 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3, name="x")
 
         for name, cls in cp.SolverLookup.base_solvers():
-            print(f"Testing {name}")
+            if cls.supported() is False:
+                continue
             try:
                 self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
                 self.assertTrue(all(x.value() in [1,2] for x in iv))
