@@ -23,6 +23,7 @@
 import warnings
 import time
 from enum import Enum
+import numpy as np
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
@@ -164,6 +165,12 @@ class SolverInterface(object):
         """
            Like `solver_var()` but for arbitrary shaped lists/tensors
         """
+
+        if is_any_list(cpm_vars):
+            vectorized_create_object = np.vectorize(self.solver_var, otypes=[object])
+            return vectorized_create_object(cpm_vars)
+        return self.solver_var(cpm_vars)
+
         if is_any_list(cpm_vars):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
