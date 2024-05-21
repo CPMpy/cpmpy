@@ -127,21 +127,56 @@ def argval(a):
         if a.is_bool(): return False
         raise e
 
+def is_leaf_vectorized(a) -> bool: # 0.61 -> 0.57
+    # return all(map(is_leaf_helper, a.flat))
+    vectorized = np.vectorize(is_leaf_helper, otypes=[bool])
+    b = vectorized(a)
+    # return np.all(vectorized(a))
+    c = b[np.argmin(b)] # short-circuits
+    if isinstance(c, bool):
+        return c
+    else:
+        return b.flat[0]
 
-def is_leaf(a):
+
+def is_leaf(a) -> bool:        
     if hasattr(a, 'is_leaf'):
         return a.is_leaf()
     if is_any_list(a):
-        return all([is_leaf(x) for x in a])
+        return all(map(is_leaf, a))
+    else:
+        return True
+    
+def is_leaf_helper(a) -> bool:
+    if hasattr(a, 'is_leaf'):
+        return a.is_leaf()
     else:
         return True
 
 
-def has_nested(expr):
+
+def has_nested(expr) -> bool:
+    if hasattr(expr, 'args'):
+
+        if expr.name == "table":
+            
+            a, b = expr.args
+            # print("a", a)
+            # print("b", b)
+            a = np.array(a)
+            if not is_leaf_vectorized(a):
+                # print("a not leaf")
+                return True
+            c = np.array(b)
+            if not is_leaf_vectorized(c):
+                # print("b not leaf")
+                return True
+            # print("leaf")
+            return False
+            
+        return not all(map(is_leaf, expr.args))
     if is_leaf(expr):
         return False
-    if hasattr(expr, 'args'):
-        return not all([is_leaf(x) for x in expr.args])
     return True
 
 
