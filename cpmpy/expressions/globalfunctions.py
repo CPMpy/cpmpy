@@ -258,7 +258,8 @@ class Element(GlobalFunction):
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
                 return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return None # default
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
