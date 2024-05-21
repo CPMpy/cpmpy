@@ -57,24 +57,13 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
-            # if expr.name == "table":
-            #     a, b = expr.args
-            #     a = np.array(a)
-            #     c = np.array(b)
 
-            #     def f(expr):
-            #         return decompose_in_tree((expr,), supported, supported_reified, _toplevel, nested=True)[0]
-            #     vectorized = np.vectorize(f, otypes=[object])
-            #     expr.args = [a, c]
-
-            # else:
             if _has_nested is not None:
                 if _has_nested[i_expr]:
                     expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
             else:
                 if has_nested(expr):
                     expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
-
 
             is_supported = (expr.name in supported)
             if nested and expr.is_bool():
@@ -113,8 +102,12 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
                     newlist.append(aux)  # replace original expression by aux
 
-        elif not has_nested(expr):
+        elif _has_nested is not None and _has_nested[i_expr]:
             newlist.append(expr)
+
+        elif _has_nested is None and not has_nested(expr):
+            newlist.append(expr)
+
         elif isinstance(expr, Comparison):
             # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
             # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
