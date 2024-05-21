@@ -28,7 +28,10 @@ from solution import solution_xml
 from callbacks import CallbacksCPMPy
 
 # Configuration
-SUPPORTED_SOLVERS = ["choco", "ortools"]
+SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc"]
+SUPPORTED_SUBSOLVERS = {
+    "minizinc": ["gecode", "chuffed", "scip"]
+}
 DEFAULT_SOLVER = "ortools"
 TIME_BUFFER = 1 # seconds
 # TODO : see if good value
@@ -92,12 +95,25 @@ def dir_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-def supported_solver(solver:Optional[str]):
+
+def is_supported_solver(solver:Optional[str]):
     if (solver is not None) and (solver not in SUPPORTED_SOLVERS):
+        return False    
+    else:
+        return True
+    
+def is_supported_subsolver(solver, subsolver:Optional[str]):
+    if (subsolver is not None) and (subsolver not in SUPPORTED_SUBSOLVERS[solver]):
+        return False
+    else:
+        return True
+
+def supported_solver(solver:Optional[str]):
+    if is_supported_solver(solver):
         argparse.ArgumentTypeError(f"solver:{solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}")
     else:
         return solver
-
+    
 
 # ---------------------------------------------------------------------------- #
 #                         Executable & Solver arguments                        #
@@ -112,22 +128,34 @@ class Args:
     tmpdir:os.PathLike=None
     dir:os.PathLike=None
     solver:str=DEFAULT_SOLVER
+    subsolver:str=None
     time_buffer:int=TIME_BUFFER
     intermediate:bool=False
 
+
+    def __post_init__(self):
+        if self.dir is not None:
+            self.dir = dir_path(self.dir)
+        if not is_supported_solver(self.solver):
+            raise(ValueError(f"solver:{self.solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}"))
+        if not is_supported_subsolver(self.solver, self.subsolver):
+            raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
+
     @staticmethod
-    def from_cli(self, args):
-        self.args = args
-        self.benchname = args.benchname
-        self.seed = args.seed
-        self.time_limit = args.time_limit if args.time_limit is not None else args.time_out
-        self.mem_limit = args.mem_limit
-        self.cores = args.cores if args.cores is not None else 1
-        self.tmpdir = args.tmpdir
-        self.dir = args.dir
-        self.solver = args.solver if args.solver is not None else DEFAULT_SOLVER
-        self.time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER
-        self.intermediate = args.intermediate if args.intermediate is not None else False
+    def from_cli(args):
+        return Args(
+            benchname = args.benchname,
+            seed = args.seed,
+            time_limit = args.time_limit if args.time_limit is not None else args.time_out,
+            mem_limit = args.mem_limit,
+            cores = args.cores if args.cores is not None else 1,
+            tmpdir = args.tmpdir,
+            dir = args.dir,
+            solver = args.solver if args.solver is not None else DEFAULT_SOLVER,
+            subsolver = args.subsolver if args.subsolver is not None else None,
+            time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
+            intermediate = args.intermediate if args.intermediate is not None else False,
+        )
 
     def __str__(self):
         return f"Args(benchname='{self.benchname}', seed={self.seed}, time_limit={self.time_limit}[s], mem_limit={self.mem_limit}[MiB], cores={self.cores}, tmpdir='{self.tmpdir}', dir='{self.dir})"
@@ -176,11 +204,18 @@ def ortools_arguments(args: Args):
 def exact_arguments(args: Args):
     return {}
 
+def z3_arguments(args: Args):
+    return {}
+
+def minizinc_arguments(args: Args):
+    return {}
 
 def solver_arguments(args: Args):
     if args.solver == "ortools": return ortools_arguments(args)
     elif args.solver == "exact": return exact_arguments(args)
     elif args.solver == "choco": return choco_arguments(args)
+    elif args.solver == "z3": return z3_arguments(args)
+    elif args.solver == "minizinc": return minizinc_arguments(args)
     else: raise()
 
 # ---------------------------------------------------------------------------- #
@@ -217,13 +252,15 @@ def main():
     parser.add_argument("-d", "--dir", required=False, type=dir_path)
     # The underlying solver which should be used
     parser.add_argument("--solver", required=False, type=supported_solver)
+    # The underlying subsolver which should be used
+    parser.add_argument("--subsolver", required=False, type=str)
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
     parser.add_argument("--time_buffer", required=False, type=int)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments
-    args = Args(parser.parse_args())
+    args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
     run(args)
@@ -239,6 +276,8 @@ def run(args: Args):
         soft = (args.mem_limit - MEMORY_BUFFER_SOFT) * 1024 * 1024 # MiB to bytes
         hard = (args.mem_limit - MEMORY_BUFFER_HARD) * 1024 * 1024 # MiB to bytes
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+
+    sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
     # -------------------------- Configure XCSP3 parser -------------------------- #
 
@@ -267,7 +306,7 @@ def run(args: Args):
 
     # Transfer model to solver
     start = time.time()
-    s = cp.SolverLookup.get(args.solver, model)
+    s = cp.SolverLookup.get(args.solver + ((":" + args.subsolver) if args.subsolver is not None else ""), model)
     transfer_time = time.time() - start
     print_comment(f"took {transfer_time} seconds to transfer model to {args.solver}")
 

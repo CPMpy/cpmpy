@@ -11,7 +11,7 @@ from pathlib import Path
 from .conftest import TEST_OUTPUT_DIR, JAR
 
 
-def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, verbose: bool = True, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False):
+def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = True, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False):
     """
         Prepares the environment, runs the executable and checks the solution with SolutionChecker.
         Pipes all executable outputs to a file and adds additional, usefull data as comments 
@@ -25,7 +25,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
     elif "CSP" in instance_location: instance_type = "CSP"
     
     # Configure files to pipe output to
-    out_dir = os.path.join(os.getcwd(), TEST_OUTPUT_DIR, instance_type, solver)
+    out_dir = os.path.join(os.getcwd(), TEST_OUTPUT_DIR, instance_type, solver + (f"-{subsolver}" if subsolver is not None else ""))
     out_file = os.path.join(out_dir, instance_name + ".txt")
     
     # Make directories if non-existant
@@ -48,7 +48,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
             # https://alexandra-zaharia.github.io/posts/kill-subprocess-and-its-children-on-timeout-python/
             try:
                 # Create command
-                cmd = ["python", os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "main.py"), instance_location, f"--solver={solver}"]
+                cmd = ["python", os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "main.py"), instance_location, f"--solver={solver}", f"--subsolver={subsolver}"]
                 if time_limit is not None: cmd += [f"--time-limit={time_limit}"]
                 if memory_limit is not None: cmd += [f"--mem-limit={memory_limit}"]
                 if intermediate: cmd += [f"--intermediate"]
@@ -64,7 +64,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
 
             except subprocess.TimeoutExpired:
                 # If executable has not returned before timeout, send SIGTERM
-                print(f'Timeout for {solver}:{instance_name} ({time_limit}s) expired', file=sys.stderr)
+                print(f'Timeout for {solver}' + (f':{subsolver}' if subsolver is not None else "") + f':{instance_name} ({time_limit}s) expired', file=sys.stderr)
                 print('Terminating the whole process group...', file=sys.stderr)
                 os.killpg(os.getpgid(p.pid), signal.SIGTERM)
 
@@ -81,6 +81,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                     time_limit=time_limit,
                     mem_limit=memory_limit,
                     solver=solver,
+                    subsolver=subsolver,
                     intermediate=intermediate
                 )
                 main.run(args)
@@ -110,17 +111,21 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
     return test_res_str
 
 # Pytest test function
-def test_instance(pytestconfig, instance, solver, fresh, time_limit, memory_limit, intermediate, verbose: bool = True, test=True, competition=False):
+# @pytest.mark.repeat(10)
+def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, memory_limit, intermediate, verbose: bool = True, test=True, competition=False):
     """
         This is the actual function which gets called by pytest. All inputs are defined in `conftest.py`.
     """
     
     instance_name, instance_location = instance
 
-    if verbose: print(f"Running instance {instance_name} on {solver}")
+    if verbose: print(f"Running instance {instance_name} on {solver}" + (f":{subsolver}" if subsolver is not None else ""))
 
-    test_res_str = run_instance(instance_name, instance_location, solver=solver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition)
+    test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition)
 
     # Assert that the result must be correct
     if test: assert(test_res_str[:2] == "OK")
+
+if __name__ == "__main__":
+    test_instance(None, "prof/test_instance\[instance5-ortools-True-None-None-True\].prof", "ortools", False, None, None, False)
 

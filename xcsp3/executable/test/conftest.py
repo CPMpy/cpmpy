@@ -90,6 +90,7 @@ def pytest_addoption(parser):
         Defines the cli arguments for pytest.
     """
     parser.addoption("--solver", action="store", default=None)
+    parser.addoption("--subsolver", action="store", default=None)
     parser.addoption("--all", action="store_true", help="run all combinations")
     parser.addoption("--fresh", action="store_true", help="reset all stored results")
     parser.addoption("--time_limit", action="store", default=None)
@@ -122,6 +123,14 @@ def pytest_generate_tests(metafunc):
         else:
             solver = SUPPORTED_SOLVERS
         metafunc.parametrize("solver", solver)
+
+    # The subsolver to use
+    if "subsolver" in metafunc.fixturenames:
+        if metafunc.config.getoption("subsolver"):
+            subsolver = [metafunc.config.getoption("subsolver")]
+        else:
+            subsolver = [None]
+        metafunc.parametrize("subsolver", subsolver)
 
     # If the saved solve results should be reset
     if "fresh" in metafunc.fixturenames:
