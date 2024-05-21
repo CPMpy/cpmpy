@@ -349,39 +349,49 @@ class MDD(GlobalConstraint):
     # auxillary method to transform into layered representation (gather all the node by node-layers)
     def normalize_layer_representation(self, nodes_by_level, transitions_by_level):
         nb_nodes_by_level = [len(x) for x in nodes_by_level]
-        m = {}
+        num_mapping = {}
         for lvl in nodes_by_level:
             for i in range(len(lvl)):
-                m[lvl[i]] = i
-        transitions_by_level_normalized = [[[m[n_in], v, m[n_out]] for n_in, v, n_out in lvl] for lvl in
+                num_mapping[lvl[i]] = i
+        transitions_by_level_normalized = [[[num_mapping[n_in], v, num_mapping[n_out]] for n_in, v, n_out in lvl] for
+                                           lvl in
                                            transitions_by_level]
-        return nb_nodes_by_level, transitions_by_level_normalized
+        return nb_nodes_by_level, num_mapping, transitions_by_level_normalized
+
 
     def decompose(self):
         # Table decomposition (not by decomposition of the mdd into one big table, but by having transition table for
         # each state and auxiliary variables for the nodes. Similar to decomposition of regular into table,
         # but with one table for each layer
         arr, _ = self.args
+        lb = [x.lb for x in arr]
+        ub = [x.ub for x in arr]
         nbl, tbl = self.transition_to_layer_representation()
-        nb_nodes_by_level, transitions_by_level_normalized = self.normalize_layer_representation(nbl, tbl)
+        nb_nodes_by_level, num_mapping, transitions_by_level_normalized = self.normalize_layer_representation(nbl, tbl)
         if len(transitions_by_level_normalized) > 2:
-            aux = [intvar(0, ub - 1) for ub in nb_nodes_by_level[1:-1]]
+            # decomposition with multiple transitions table and aux variables for the nodes
+            aux = [intvar(0, nb_nodes) for nb_nodes in nb_nodes_by_level[1:]]
+            for i in range(len(arr)):
+                transition_dummy = [[num_mapping[n], v, nb_nodes_by_level[i+1]] for n in nbl[i] for v in range(lb[i], ub[i] + 1) if
+                            (n, v) not in self.mapping]
+                if i != 0:
+                    transition_dummy += [[nb_nodes_by_level[i], v, nb_nodes_by_level[i+1]] for v in range(lb[i], ub[i] + 1)]
+                transitions_by_level_normalized[i] = transitions_by_level_normalized[i] + transition_dummy
             tab_first = [x[1:] for x in transitions_by_level_normalized[0]]  # optimization for first level (one node)
-            tab_last = [x[:-1] for x in transitions_by_level_normalized[-1]]  # optimization for last level (one node)
-            return [Table([arr[0], aux[0]], tab_first)] \
+            return [aux[-1] == 0], [Table([arr[0], aux[0]], tab_first)] \
                    + [Table([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
-                      range(1, len(arr) - 1)] + [Table([aux[-1], arr[-1]],
-                                                       tab_last)], []
-            # TODO do not work well in False -> decomposition (too many solutions as it give as solution the cardinal
-            #  product between the actual solution and domains of aux variables)
-
+                      range(1, len(arr))]
+            # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-MDD
+            # constraining constraint: end of the path in accepting node
         elif len(transitions_by_level_normalized) == 2:
-            tab = [[x[1], y[1]] for x in transitions_by_level_normalized[0] for y in transitions_by_level_normalized[1]
-                   if x[2] == y[0]]
+            # decomposition by unfolding into a table
+            tab = [[t_a[1], t_b[1]] for t_a in transitions_by_level_normalized[0] for t_b in
+                   transitions_by_level_normalized[1] if t_a[2] == t_b[0]]
             return [Table(arr, tab)], []
 
         elif len(transitions_by_level_normalized) == 1:
-            return [InDomain(arr[0], [x[1] for x in transitions_by_level_normalized[0]])], []
+            # decomposition to inDomain
+            return [InDomain(arr[0], [t[1] for t in transitions_by_level_normalized[0]])], []
 
     def value(self):
         arr, transitions = self.args
@@ -389,7 +399,7 @@ class MDD(GlobalConstraint):
         curr_node = self.root_node
         for v in arrval:
             if (curr_node, v) in self.mapping:
-                curr_node = self.mapping[curr_node]
+                curr_node = self.mapping[curr_node, v]
             else:
                 return False
         return curr_node == self.sink_node
@@ -409,20 +419,26 @@ class Regular(GlobalConstraint):
 
     def decompose(self):
         arr, transitions, start, ends = self.args
+        lb = min([x.lb for x in arr])
+        ub = max([x.ub for x in arr])
         # Table decomposition with aux variables for the states
-        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))
-        m = {}
-        for i in range(len(nodes)):
-            m[nodes[i]] = i
-        normalized_transitions = [[m[n_in], v, m[n_out]] for n_in, v, n_out in transitions]
-        aux = intvar(0, len(nodes)-1, shape=len(arr))
-        start_id = m[start]
-        tab_first = [t[1:] for t in normalized_transitions if t[0] == start_id] # optimization for first (one node)
-        normalized_ends = [m[e] for e in ends]
-        return [InDomain(aux[-1], normalized_ends), Table([arr[0], aux[0]], tab_first)] + \
-               [Table([aux[i - 1], arr[i], aux[i]], normalized_transitions) for i in range(1, len(arr))], []
-        # TODO same issue (and probably will work with the same solution) as MDD constraint. Create symmetric solutions
-        #  due to auxiliary vars
+        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+        num_mapping = dict(zip(nodes, range(len(nodes))))  # map node to integer ids for the nodes
+        num_transitions = [[num_mapping[n_in], v, num_mapping[n_out]] for n_in, v, n_out in
+                           transitions]  # apply mapping to transition
+        id_dummy = len(nodes)  # default node id
+        transition_dummy = [[num_mapping[n], v, id_dummy] for n in nodes for v in range(lb, ub + 1) if
+                            (n, v) not in self.mapping] + [[id_dummy, v, id_dummy] for v in range(lb, ub + 1)]
+        num_transitions = num_transitions + transition_dummy
+        aux_vars = intvar(0, id_dummy, shape=len(arr))
+        id_start = num_mapping[start]
+        tab_first = [t[1:] for t in num_transitions if t[0] == id_start]  # optimization for first (one node)
+        id_ends = [num_mapping[e] for e in ends]
+        return [InDomain(aux_vars[-1], id_ends)], [Table([arr[0], aux_vars[0]], tab_first)] + \
+                                                  [Table([aux_vars[i - 1], arr[i], aux_vars[i]], num_transitions) for i
+                                                   in range(1, len(arr))]
+        # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-Automaton
+        # constraining constraint: end of the path in accepting node
 
     def value(self):
         arr, transitions, start, ends = self.args
@@ -430,7 +446,7 @@ class Regular(GlobalConstraint):
         curr_node = start
         for v in arrval:
             if (curr_node, v) in self.mapping:
-                curr_node = self.mapping[curr_node]
+                curr_node = self.mapping[curr_node, v]
             else:
                 return False
         return curr_node in ends
