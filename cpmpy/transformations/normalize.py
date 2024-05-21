@@ -88,15 +88,22 @@ def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
     """
     from .negation import recurse_negation # avoid circular import
     newlist = []
-    for expr in lst_of_expr:
+    for i_expr, expr in enumerate(lst_of_expr):
         if isinstance(expr, bool):
-            # not sure if this should happen here or at construction time
-            expr = BoolVal(expr)
+            if num_context:
+                newlist.append(1 if expr else 0)
+            else:
+                # not sure if this should happen here or at construction time
+                expr = BoolVal(expr)
+                newlist.append(expr)
 
-        if isinstance(expr, BoolVal):
+        elif isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
 
-        elif not has_nested(expr) and not needs_simplify(expr):
+        elif _has_nested is not None and not _has_nested[i_expr] and not needs_simplify(expr):
+            newlist.append(expr)
+
+        elif _has_nested is None and not has_nested(i_expr) and not needs_simplify(expr):
             newlist.append(expr)
 
         elif isinstance(expr, Operator):
