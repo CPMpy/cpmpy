@@ -686,6 +686,34 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
         cp.Model(cons).solveAll(display=check_true)
 
+    def test_nvalue_except(self):
+
+        iv = cp.intvar(-8, 8, shape=3)
+        cnt = cp.intvar(0, 10)
+
+
+        self.assertFalse(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > 1).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, 10) > 1).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 1) == 0).solve())
+        self.assertTrue(cp.Model(cp.all(iv == 1), cp.NValueExcept(iv, 6) > cnt).solve())
+        self.assertGreater(len(set(iv.value())), cnt.value())
+
+        val = 6
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) != cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) >= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) <= cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) < cnt).solve())
+        self.assertTrue(cp.Model(cp.NValueExcept(iv, val) > cnt).solve())
+
+        # test nested
+        bv = cp.boolvar()
+        cons = bv == (cp.NValueExcept(iv, val) <= 2)
+
+        def check_true():
+            self.assertTrue(cons.value())
+
+        cp.Model(cons).solveAll(display=check_true)
+
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
     def test_nvalue_minizinc(self):

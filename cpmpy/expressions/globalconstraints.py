@@ -120,7 +120,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -178,7 +178,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(argval(a) for a in self.args)) == len(self.args)
+        return len(set(argvals(self.args))) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -193,7 +193,7 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        vals = [argval(a) for a in self.args if argval(a) != 0]
+        vals = [a for a in argvals(self.args) if a != 0]
         return len(set(vals)) == len(vals)
 
 
@@ -215,7 +215,6 @@ class AllDifferentExceptN(GlobalConstraint):
         vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
         return len(set(vals)) == len(vals)
 
-
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -234,8 +233,7 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        return len(set(argval(a) for a in self.args)) == 1
-
+        return len(set(argvals(self.args))) == 1
 
 class AllEqualExceptN(GlobalConstraint):
     """
@@ -295,7 +293,8 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        arr = [argval(a) for a in self.args]
+        arr = argvals(self.args)
+
         while idx not in visited:
             if idx is None:
                 return False
@@ -330,9 +329,13 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        fwd = [argval(a) for a in self.args[0]]
-        rev = [argval(a) for a in self.args[1]]
-        return all(rev[x] == i for i, x in enumerate(fwd))
+        fwd = argvals(self.args[0])
+        rev = argvals(self.args[1])
+        # args are fine, now evaluate actual inverse cons
+        try:
+            return all(rev[x] == i for i, x in enumerate(fwd))
+        except IndexError: # partiality of Element constraint
+            return False
 
 
 class Table(GlobalConstraint):
@@ -351,8 +354,9 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = argvals(arr)
         return arrval in tab
+
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
@@ -415,7 +419,7 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        return argval(self.args[0]) in argval(self.args[1])
+        return argval(self.args[0]) in argvals(self.args[1])
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -445,7 +449,7 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        return sum(argval(a) for a in self.args) % 2 == 1
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -514,14 +518,14 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in arg_vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
