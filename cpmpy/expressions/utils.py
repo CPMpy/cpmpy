@@ -207,27 +207,26 @@ def is_leaf_helper(a) -> bool:
 
 
 
-def has_nested(expr) -> bool:
+def has_nested(expr) -> Union[bool, List[bool]]:
     if hasattr(expr, 'args'):
 
-        if expr.name == "table":
-            
+        if expr.name == "table": # small improvement for table, where args are very structured and ideal for vectorisation
             a, b = expr.args
-            # print("a", a)
-            # print("b", b)
             a = np.array(a)
             if not is_leaf_vectorized(a):
-                # print("a not leaf")
                 return True
             c = np.array(b)
             if not is_leaf_vectorized(c):
-                # print("b not leaf")
                 return True
-            # print("leaf")
             return False
             
-        return not all(map(is_leaf, expr.args))
-    if is_leaf(expr):
+        else: # default to checking all args independently
+            return not all(map(is_leaf, expr.args))
+
+    if is_any_list(expr):
+        return [has_nested(e) for e in expr]
+
+    if is_leaf_helper(expr):
         return False
     return True
 

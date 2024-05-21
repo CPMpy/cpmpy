@@ -25,6 +25,7 @@
 """
 import sys  # for stdout checking
 import numpy as np
+from viztracer import ignore_function
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -331,7 +332,7 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        _has_nested = [has_nested(e) for e in cpm_cons] 
+        _has_nested = has_nested(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
         cpm_cons = flatten_constraint(cpm_cons, _has_nested=_has_nested)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -373,6 +374,7 @@ class CPM_ortools(SolverInterface):
     # we can just add reified support for those and not need `reifiable` or returning the constraint
     # then we can remove _post_constraint and have its code inside the for loop of __add__
     # like for other solvers
+    # @ignore_function
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
             Post a supported CPMpy constraint directly to the underlying solver's API
