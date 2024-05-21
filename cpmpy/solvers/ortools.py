@@ -334,7 +334,7 @@ class CPM_ortools(SolverInterface):
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         _has_nested = has_nested(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
-        cpm_cons = flatten_constraint(cpm_cons, _has_nested=_has_nested)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_cons)#, _has_nested=_has_nested)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)

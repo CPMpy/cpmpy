@@ -103,7 +103,7 @@ def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
         elif _has_nested is not None and not _has_nested[i_expr] and not needs_simplify(expr):
             newlist.append(expr)
 
-        elif _has_nested is None and not has_nested(i_expr) and not needs_simplify(expr):
+        elif _has_nested is None and not has_nested(expr) and not needs_simplify(expr):
             newlist.append(expr)
 
         elif isinstance(expr, Operator):
