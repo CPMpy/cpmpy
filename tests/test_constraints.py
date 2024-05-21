@@ -31,6 +31,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "choco": {"Inverse"},
                   "ortools":{"Inverse"},
                   "exact": {"Inverse"},
+                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
                   }
 
 # Exclude certain operators for solvers.
@@ -228,7 +229,7 @@ def verify(cons):
     assert cons.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"),_generate_inputs(bool_exprs), ids=str)
+@pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
 def test_bool_constaints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
@@ -242,7 +243,7 @@ def test_bool_constaints(solver, constraint):
         assert constraint.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(comp_constraints),  ids=str)
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
 def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
@@ -256,7 +257,7 @@ def test_comparison_constraints(solver, constraint):
         assert constraint.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(reify_imply_exprs),  ids=str)
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
 def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
