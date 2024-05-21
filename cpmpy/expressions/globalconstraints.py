@@ -642,7 +642,7 @@ class LexLessEq(GlobalConstraint):
     def value(self):
         from .python_builtins import any, all
         X, Y = self.args
-        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X))))
+        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X))))
 
 
 class LexLess(GlobalConstraint):
@@ -673,7 +673,7 @@ class LexLess(GlobalConstraint):
     def value(self):
         from .python_builtins import any, all
         X, Y = self.args
-        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))))
+        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))))
 
 
 class DirectConstraint(Expression):

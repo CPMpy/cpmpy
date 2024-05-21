@@ -233,5 +233,5 @@ def test_reify_imply_constraints(solver, constraint):
         Tests boolean expression by posting it to solver and checking the value after solve.
     """
     assert SolverLookup.get(solver, Model(constraint)).solve()
-    assert constraint.value(), f"Constraint {constraint} is not satisfied ({constraint.value()}), arguments: {[c.value() for c in constraint.args[0].args[0].args[0]]}, {[c.value() for c in constraint.args[0].args[0].args[1]]} "
+    assert constraint.value()
 
