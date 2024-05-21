@@ -421,7 +421,7 @@ class CPM_minizinc(SolverInterface):
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing",
                      "precedence",
                      "decreasing","strictly_increasing","strictly_decreasing"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
 
 
     def __add__(self, cpm_expr):
