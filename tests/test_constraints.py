@@ -242,16 +242,7 @@ def test_bool_constaints(solver, constraint):
         n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
         assert n_sols >= 1
     else:
-        print(constraint)
-        for c in constraint.decompose()[0]:
-            print("-", c)
-
         assert SolverLookup.get(solver, Model(constraint)).solve()
-
-        from cpmpy.transformations.get_variables import get_variables
-        for v in get_variables(constraint):
-            print(v, v.value())
-
         assert argval(constraint)
         assert constraint.value()
 
