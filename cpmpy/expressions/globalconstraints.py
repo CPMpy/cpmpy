@@ -543,6 +543,27 @@ class Precedence(GlobalConstraint):
         return True
 
 
+class NoOverlap(GlobalConstraint):
+
+    def __init__(self, start, dur, end):
+        super().__init__("no_overlap", [start, dur, end])
+
+    def decompose(self):
+        start, dur, end = self.args
+        cons = [s + d == e for s,d,e in zip(start, dur, end)]
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+            cons += [(e1 <= s2) | (e2 <= s1)]
+        return cons, []
+    def value(self):
+        start, dur, end = argvals(self.args)
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if s1 + d1 != e1: return False
+            if s2 + d2 != e2: return False
+            if e1 > s2 and e2 > s1:
+                return False
+        return True
+
+
 class GlobalCardinalityCount(GlobalConstraint):
     """
     GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
