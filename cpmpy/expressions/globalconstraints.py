@@ -98,6 +98,7 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentExceptN
         AllEqual
         Circuit
         Inverse
@@ -180,40 +181,29 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
-    """
-    All nonzero arguments have a distinct value
-    """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except0", flatlist(args))
-
-    def decompose(self):
-        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
-        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
-
-    def value(self):
-        vals = [a for a in argvals(self.args) if a != 0]
-        return len(set(vals)) == len(vals)
-
-
 class AllDifferentExceptN(GlobalConstraint):
     """
-    All arguments except those equal to n have a distinct value.
+        All arguments except those equal to n have a distinct value.
     """
     def __init__(self, arr, n):
         flatarr = flatlist(arr)
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        if self.args[1] == 0:
-            return [AllDifferentExcept0(self.args[0])], []
         # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
         return [(var1 == var2).implies(var1 == self.args[1]) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
         return len(set(vals)) == len(vals)
+
+class AllDifferentExcept0(AllDifferentExceptN):
+    """
+        All nonzero arguments have a distinct value
+    """
+    def __init__(self, arr):
+        super().__init__(arr, 0)
+
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
