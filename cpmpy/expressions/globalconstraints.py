@@ -615,14 +615,14 @@ class DecreasingStrict(GlobalConstraint):
 
 
 class LexLessEq(GlobalConstraint):
-    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
     Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
     """
     def __init__(self, list1, list2):
         X = flatlist(list1)
         Y = flatlist(list2)
         if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
         super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):
@@ -643,6 +643,37 @@ class LexLessEq(GlobalConstraint):
         from .python_builtins import any, all
         X, Y = self.args
         return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X))))
+
+
+class LexLess(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_less", [X, Y])
+
+    def decompose(self):
+        X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
+        length = len(X)
+
+        constraining = []
+        bvar = boolvar(shape=(length + 1))
+        from cpmpy.transformations.normalize import toplevel_list
+        defining = toplevel_list(bvar == ((X <= Y) &
+                          ((X < Y) | bvar[1:])))
+        defining.append(bvar[-1] == (X[-1] < Y[-1])) #for strict case use <
+        constraining.append(bvar[0])
+
+        return constraining, defining
+
+    def value(self):
+        from .python_builtins import any, all
+        X, Y = self.args
+        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i-1)) for i in range(len(X))))
 
 
 class DirectConstraint(Expression):

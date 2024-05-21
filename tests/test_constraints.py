@@ -14,8 +14,8 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 EXCLUDE_GLOBAL = {"ortools": {},
                   "gurobi": {},
                   "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","increasing_strict","decreasing_strict","lex_less"},
-                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","increasing_strict","decreasing_strict","lex_less"},
+                  "pysat": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","increasing","decreasing","increasing_strict","decreasing_strict","lex_less","lex_lesseq"},
+                  "pysdd": {"circuit", "element","min","max","count", "nvalue", "allequal","alldifferent","cumulative","xor","increasing","decreasing","increasing_strict","decreasing_strict","lex_less","lex_lesseq"},
                   "exact": {},
                   "choco": {}
                   }
@@ -150,7 +150,7 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLess
+           Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
     global_cons = [AllDifferent, AllEqual, Minimum, Maximum, NValue, Increasing, Decreasing, IncreasingStrict, DecreasingStrict]
     for global_type in global_cons:
@@ -175,6 +175,11 @@ def global_constraints(solver):
         demand = [4,5,7]
         cap = 10
         yield Cumulative(s, dur, e, demand, cap)
+
+    if solver not in EXCLUDE_GLOBAL or "lex_lesseq" not in EXCLUDE_GLOBAL[solver]:
+        X = intvar(0, 10, shape=10)
+        Y = intvar(0, 10, shape=10)
+        yield LexLessEq(X, Y)
 
     if solver not in EXCLUDE_GLOBAL or "lex_less" not in EXCLUDE_GLOBAL[solver]:
         X = intvar(0, 10, shape=10)
@@ -228,4 +233,5 @@ def test_reify_imply_constraints(solver, constraint):
         Tests boolean expression by posting it to solver and checking the value after solve.
     """
     assert SolverLookup.get(solver, Model(constraint)).solve()
-    assert constraint.value()
+    assert constraint.value(), f"Constraint {constraint} is not satisfied ({constraint.value()}), arguments: {[c.value() for c in constraint.args[0].args[0].args[0]]}, {[c.value() for c in constraint.args[0].args[0].args[1]]} "
+; V

@@ -253,6 +253,28 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertIn(bv.value(), vals)
 
+
+    def test_lex_lesseq(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLessEq(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLessEq(X, Y)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("choco"))
+        self.assertTrue(m.solve("minizinc"))
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
     def test_indomain_onearg(self):
 
         iv = cp.intvar(0, 10)
