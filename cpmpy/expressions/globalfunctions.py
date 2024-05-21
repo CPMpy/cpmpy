@@ -330,6 +330,8 @@ class Among(GlobalFunction):
     def __init__(self,arr,vals):
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        if any(isinstance(val, Expression) for val in vals):
+            raise TypeError(f"Among takes a set of values as input, not {vals}")
         super().__init__("among", [arr,vals])
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
