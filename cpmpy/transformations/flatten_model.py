@@ -129,11 +129,13 @@ def flatten_constraint(expr, pdn=True, _has_nested=None):
     # transformation, that calls (preceding) transformations itself
     # e.g. `toplevel_list()` ensures it is a list
     lst_of_expr = toplevel_list(expr)               # ensure it is a list
-    lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
-    expr_has_nested = _has_nested#[has_nested(e) for e in lst_of_expr] 
-    lst_of_expr = simplify_boolean(lst_of_expr, _has_nested=expr_has_nested)     # simplify boolean expressions, and ensure types are correct
+    lst_of_expr = push_down_negation(lst_of_expr, _has_nested=_has_nested)   # push negation into the arguments to simplify expressions
+    # expr_has_nested = _has_nested#[has_nested(e) for e in lst_of_expr] 
+    lst_of_expr = simplify_boolean(lst_of_expr, _has_nested=_has_nested)     # simplify boolean expressions, and ensure types are correct
     for i_expr, expr in enumerate(lst_of_expr):
-        if not expr_has_nested[i_expr]:
+        if _has_nested is not None and not _has_nested[i_expr]:
+            newlist.append(expr)  # no need to do anything
+        elif _has_nested is None and not has_nested(expr):
             newlist.append(expr)  # no need to do anything
 
         elif isinstance(expr, Operator):

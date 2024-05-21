@@ -8,7 +8,7 @@ from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list, has_nested, is_boolexpr, is_bool
 
 
-def push_down_negation(lst_of_expr, toplevel=True):
+def push_down_negation(lst_of_expr, toplevel=True, _has_nested=None):
     """
         Transformation that checks all elements from the list,
         and pushes down any negation it finds with the `recurse_negation()` function.
