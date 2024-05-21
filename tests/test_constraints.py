@@ -16,7 +16,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentExceptN", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
@@ -176,35 +176,39 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
 
         if name == "Xor":
-            expr = cls(BOOL_ARGS)
+            yield cls(BOOL_ARGS)
         elif name == "Inverse":
-            expr = cls(NUM_ARGS, [1,0,2])
+            yield cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
-            expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "IfThenElse":
-            expr = cls(*BOOL_ARGS)
+            yield cls(*BOOL_ARGS)
         elif name == "InDomain":
-            expr = cls(NUM_VAR, [0,1,6])
+            yield cls(NUM_VAR, [0,1,6])
         elif name == "Cumulative":
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            expr = Cumulative(s, dur, e, demand, cap)
+            yield Cumulative(s, dur, e, demand, cap)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
-            expr = cls(NUM_ARGS, vals, cnts)
+            yield cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentExceptN":
+            yield cls(NUM_ARGS, 3)
+            yield cls(NUM_ARGS, NUM_VAR)
+        elif name == "AllEqualExceptN":
+            yield cls(NUM_ARGS, 3)
+            yield cls(NUM_ARGS, NUM_VAR)
         else: # default constructor, list of numvars
-            expr= cls(NUM_ARGS)
+            yield cls(NUM_ARGS)
 
-        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
-            continue
-        else:
-            yield expr
 
 def reify_imply_exprs(solver):
     """
