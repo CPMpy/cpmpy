@@ -23,6 +23,7 @@ Internal utilities for expression handling.
 """
 from __future__ import annotations
 import functools
+from typing import List, Union
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
@@ -81,22 +82,20 @@ def is_num(arg):
 def is_false_cst(arg):
     """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is False or arg is np.False_:
         return True
-    elif isinstance(arg, BoolVal):
-        return not arg.value()
+    elif hasattr(arg, "value"):
+        return arg.value() # Anything other than a BoolVal holding a constant will return None, thus False
     return False
 
 
 def is_true_cst(arg):
     """ is the argument the constant True (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is True or arg is np.True_:
         return True
-    elif isinstance(arg, BoolVal):
-        return arg.value()
+    elif hasattr(arg, "value"):
+        return arg.value() # Anything other than a BoolVal holding a constant will return None, thus False
     return False
 
 
