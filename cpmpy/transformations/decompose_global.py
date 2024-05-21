@@ -135,7 +135,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     if _has_nested[i_expr]:
                         _has_nested_args = has_nested(expr.args)
                         expr = copy.copy(expr)
-                        expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested_args=_has_nested_args)
+                        expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested_args)
                     newlist.append(expr)
 
                 else:
