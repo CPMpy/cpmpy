@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -689,10 +689,10 @@ try:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 
                 if isinstance(self._display, Expression):
-                    print(self._display.value())
+                    print(argval(self._display))
                 elif isinstance(self._display, list):
                     # explicit list of expressions to display
-                    print([v.value() for v in self._display])
+                    print(argvals(self._display))
                 else: # callable
                     self._display()
 
