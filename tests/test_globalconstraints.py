@@ -715,6 +715,7 @@ class TestGlobal(unittest.TestCase):
         cons = cp.Precedence(iv, [0,2,1])
         self.assertTrue(cp.Model([cons, iv == [0,2,2,1,0,1]]).solve())
         self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
+        self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
 
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
