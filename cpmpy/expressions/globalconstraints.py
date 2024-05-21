@@ -201,7 +201,7 @@ class AllDifferentExcept0(AllDifferentExceptN):
     """
         All nonzero arguments have a distinct value
     """
-    def __init__(self, arr):
+    def __init__(self, *arr):
         super().__init__(arr, 0)
 
 
