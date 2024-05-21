@@ -11,7 +11,7 @@ from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
 
-def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False, _has_nested=False):
+def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False, _has_nested=None):
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
@@ -39,7 +39,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
     for i_expr, expr in enumerate(lst_of_expr):        
         if is_any_list(expr):
             assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run cpmpy.transformations.normalize.toplevel_list first."
-            newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True)
+            newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
             if isinstance(expr, NDVarArray):
                 newlist.append(cpm_array(newexpr))
             else:
@@ -51,7 +51,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 expr, base_con = normalized_numexpr(expr)
                 _toplevel.extend(base_con)  # should be added toplevel
             # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
             newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
@@ -60,10 +60,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
             if _has_nested is not None:
                 if _has_nested[i_expr]:
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
             else:
                 if has_nested(expr):
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
 
             is_supported = (expr.name in supported)
             if nested and expr.is_bool():
@@ -84,7 +84,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, [], nested=nested)
+                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, [], nested=nested, _has_nested=_has_nested)
                     newlist.append(all(decomposed))
 
                 else:
@@ -121,7 +121,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 if not decomp_rhs:
                     # nothing special, create a fresh version and recurse into arguments
                     expr = copy.copy(expr)
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
                     newlist.append(expr)
 
                 else:
@@ -133,7 +133,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             if decomp_lhs:
                 # recurse into lhs args
                 lhs = copy.copy(lhs)
-                lhs.args = decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True)
+                lhs.args = decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
 
                 # decompose comparison of lhs and rhs
                 dec = lhs.decompose_comparison(exprname, rhs)
@@ -144,7 +144,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                 _toplevel.extend(define)  # definitions should be added toplevel
                 # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=True)
+                decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=True, _has_nested=_has_nested)
                 newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
@@ -157,7 +157,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         return toplevel_list(newlist)
     else:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_reified, nested=False)
+        return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_reified, nested=False, _has_nested=_has_nested)
 
 
 # DEPRECATED!
