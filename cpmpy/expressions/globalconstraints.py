@@ -538,7 +538,7 @@ class Precedence(GlobalConstraint):
         for s,t in zip(precedence[:-1], precedence[1:]):
             if vals[0] == t: return False
             for j in range(len(args)):
-                if vals[0] == t and sum(args[:j] == s) == 0:
+                if vals[j] == t and sum(vals[:j] == s) == 0:
                     return False
         return True
 
