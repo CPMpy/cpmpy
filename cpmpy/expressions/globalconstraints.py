@@ -556,9 +556,9 @@ class NoOverlap(GlobalConstraint):
         return cons, []
     def value(self):
         start, dur, end = argvals(self.args)
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
         for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
-            if s1 + d1 != e1: return False
-            if s2 + d2 != e2: return False
             if e1 > s2 and e2 > s1:
                 return False
         return True
