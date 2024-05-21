@@ -503,6 +503,46 @@ class Cumulative(GlobalConstraint):
         return True
 
 
+class Precedence(GlobalConstraint):
+    """
+        Constraint enforcing some values have precedence over others.
+        Given an array of variables X and and a list of precedences P:
+        Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
+    """
+    def __init__(self, vars, precedence):
+        if not is_any_list(vars):
+            raise TypeError("Precedence expects a list of variables, but got", vars)
+        if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
+            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+        super().__init__("precedence", [vars, precedence])
+
+    def decompose(self):
+        """
+        Decomposition based on:
+        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
+        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
+        """
+        from .python_builtins import any as cpm_any
+
+        args, precedence = self.args
+        constraints = []
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            for j in range(len(args)):
+                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+        return constraints, []
+
+    def value(self):
+
+        args, precedence = self.args
+        vals = np.array(argvals(args))
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            if vals[0] == t: return False
+            for j in range(len(args)):
+                if vals[0] == t and sum(args[:j] == s) == 0:
+                    return False
+        return True
+
+
 class GlobalCardinalityCount(GlobalConstraint):
     """
     GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
