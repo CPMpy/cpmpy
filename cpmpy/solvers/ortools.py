@@ -383,11 +383,13 @@ class CPM_ortools(SolverInterface):
         print(f"c ort:get_vars took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
 
         cnt = 0.0
+        self.ttable = 0.0
         # transform and post the constraints
         for con in self.transform(cpm_expr):
             t0 = time.time()
             self._post_constraint(con)
             cnt += (time.time()-t0)
+        print(f"c ort-table took {self.ttable:.4f} -- {len(cpm_expr)}")
         print(f"c ort:post took {cnt:.4f} -- {len(cpm_expr)}")
 
         return self
@@ -413,6 +415,7 @@ class CPM_ortools(SolverInterface):
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
+        print("c ", cpm_expr.name, len(cpm_expr.args), [type(a) for a in cpm_expr.args])
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         if isinstance(cpm_expr, Operator):
@@ -494,7 +497,10 @@ class CPM_ortools(SolverInterface):
                 array, table = cpm_expr.args
                 array = self.solver_vars(array)
                 # table needs to be a list of lists of integers
-                return self.ort_model.AddAllowedAssignments(array, table)
+                t0 = time.time()
+                r = self.ort_model.AddAllowedAssignments(array, table)
+                self.ttable += (time.time()-t0)
+                return r
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
