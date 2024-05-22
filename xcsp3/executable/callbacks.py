@@ -24,6 +24,11 @@ class CallbacksCPMPy(Callbacks):
         self.print_general_methods = False
         self.print_specific_methods = False
 
+    def get_condition(self, condition):
+        map = {"LT": "<", "LE": "<=", "EQ": "=", "GE": ">=", "GT": ">"}
+        if condition.operator.name not in map:
+            raise ValueError("Unknown condition operator", condition.operator.name, "expected any of", set(map.keys()))
+
     def var_integer_range(self, x: Variable, min_value: int, max_value: int):
         if min_value == 0 and max_value == 1:
             #boolvar
@@ -418,13 +423,12 @@ class CallbacksCPMPy(Callbacks):
         if condition.operator.name == 'LE':
             self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, cpm_cap)
         else:
-            map = {"LT": "<", "EQ": "=", "GE": ">=", "GT": ">"}
             # post decomposition directly
             # be smart and chose task or time decomposition
             if max(get_bounds(cpm_ends)) >= 100:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, map[condition.operator.name])
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, self.get_condition(condition))
             else:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, map[condition.operator.name])
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, self.get_condition(condition))
 
     def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
         from cpmpy.expressions.utils import eval_comparison
@@ -467,6 +471,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, sizes, conditions)
 
     def ctr_knapsack(self, lst: list[Variable], weights: list[int], wcondition: Condition, profits: list[int], pcondition: Condition):
+
         self._unimplemented(lst, weights, wcondition, profits, pcondition)
 
     def ctr_flow(self, lst: list[Variable], balance: list[int] | list[Variable], arcs: list, capacities: None | list[range]):  # not in XCSP3-core
