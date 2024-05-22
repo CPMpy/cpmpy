@@ -29,7 +29,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -208,9 +208,9 @@ class CPM_choco(SolverInterface):
                         cpm_var._value = value
                 # print the desired display
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 
@@ -314,7 +314,8 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","increasing_strict","decreasing_strict","lex_lesseq", "lex_less"}
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less"}
+                     
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
                              "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue","lex_lesseq", "lex_less"}
@@ -348,6 +349,7 @@ class CPM_choco(SolverInterface):
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
+        # ensure all vars are known to solver
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
@@ -495,7 +497,7 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","increasing_strict","decreasing_strict","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -511,9 +513,9 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.increasing(chc_args,0)
                 elif cpm_expr.name == "decreasing":
                     return self.chc_model.decreasing(chc_args,0)
-                elif cpm_expr.name == "increasing_strict":
+                elif cpm_expr.name == "strictly_increasing":
                     return self.chc_model.increasing(chc_args,1)
-                elif cpm_expr.name == "decreasing_strict":
+                elif cpm_expr.name == "strictly_decreasing":
                     return self.chc_model.decreasing(chc_args,1)
                 elif cpm_expr.name in ["lex_lesseq", "lex_less"]:
                     if cpm_expr.name == "lex_lesseq":
