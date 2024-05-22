@@ -426,9 +426,9 @@ class CallbacksCPMPy(Callbacks):
             # post decomposition directly
             # be smart and chose task or time decomposition
             if max(get_bounds(cpm_ends)) >= 100:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, self.get_condition(condition))
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
             else:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, self.get_condition(condition))
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
 
     def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
         from cpmpy.expressions.utils import eval_comparison
@@ -471,8 +471,17 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, sizes, conditions)
 
     def ctr_knapsack(self, lst: list[Variable], weights: list[int], wcondition: Condition, profits: list[int], pcondition: Condition):
+        from cpmpy.expressions.utils import eval_comparison
 
-        self._unimplemented(lst, weights, wcondition, profits, pcondition)
+        vars = self.get_cpm_vars(lst)
+        cpm_weight = self.get_cpm_var(wcondition.operator.value)
+        cpm_profit = self.get_cpm_var(pcondition.operator.value)
+
+        total_weight = cp.sum(vars * weights)
+        total_profit = cp.sum(vars * profits)
+        self.cpm_model += eval_comparison(wcondition.operator.to_str(), total_weight, cpm_weight)
+        self.cpm_model += eval_comparison(pcondition.operator.to_str(), total_profit, cpm_profit)
+
 
     def ctr_flow(self, lst: list[Variable], balance: list[int] | list[Variable], arcs: list, capacities: None | list[range]):  # not in XCSP3-core
         self._unimplemented(lst, balance, arcs, capacities)
