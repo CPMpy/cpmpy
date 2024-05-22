@@ -197,21 +197,21 @@ def global_constraints(solver):
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
             expr = cls(NUM_ARGS, vals, cnts)
-        elif name = "LexLessEq":
+        elif name == "LexLessEq":
             X = intvar(0, 10, shape=10)
             Y = intvar(0, 10, shape=10)
             expr = LexLessEq(X, Y)
 
-        elif name = "LexLess":
+        elif name == "LexLess":
             X = intvar(0, 10, shape=10)
             Y = intvar(0, 10, shape=10)
             expr = LexLess(X, Y)
 
-        elif name = "LexChainLess":
+        elif name == "LexChainLess":
             X = intvar(0, 10, shape=(10,10))
             expr = LexChainLess(X)
             
-        elif name = "LexChainLessEq":
+        elif name == "LexChainLessEq":
             X = intvar(0, 10, shape=(10,10))
             expr = LexChainLess(X)        
         else: # default constructor, list of numvars
