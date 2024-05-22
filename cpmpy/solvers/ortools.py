@@ -489,25 +489,11 @@ class CPM_ortools(SolverInterface):
             if cpm_expr.name == 'alldifferent':
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
-
-                        
-
-
-
-
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
 
-
-                a, b = cpm_expr.args
-                a = np.array(a)
-                c = np.array(b)
-
-                array = self.solver_vars(a)
-                table = self.solver_vars(c)
-
-
-                # array, table = self.solver_vars(cpm_expr.args)
-                return self.ort_model.AddAllowedAssignments(array.tolist(), table.tolist())
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
