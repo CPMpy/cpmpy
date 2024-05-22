@@ -409,16 +409,50 @@ class CallbacksCPMPy(Callbacks):
         cpm_start = self.get_cpm_exprs(origins)
         cpm_durations = self.get_cpm_exprs(lengths)
         cpm_demands = self.get_cpm_exprs(heights)
+        cpm_cap = self.get_cpm_var(condition.operator.value)
+        cpm_ends = []
+        for s,d in zip(cpm_start, cpm_durations):
+            expr = s + d
+            cpm_ends.append(cp.intvar(*get_bounds(expr)))
+
         if condition.operator.name == 'LE':
-            lbs, ubs = get_bounds(cp.cpm_array(cpm_start) + cpm_durations)
-            lb = min(lbs)
-            ub = max(ubs)
-            cpm_ends = cp.intvar(lb, ub, len(cpm_start))
-            for i in range(len(cpm_start)):
-                self.cpm_model += cpm_start[i] + cpm_ends[i] == cpm_ends[i]
-            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, capacity=self.get_cpm_var(condition.operator.value))
+            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, cpm_cap)
+        else:
+            map = {"LT": "<", "EQ": "=", "GE": ">=", "GT": ">"}
+            # post decomposition directly
+            # be smart and chose task or time decomposition
+            if max(get_bounds(cpm_ends)) >= 100:
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, map[condition.operator.name])
+            else:
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, map[condition.operator.name])
 
+    def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
+        from cpmpy.expressions.utils import eval_comparison
+        cpm_demands = cp.cpm_array(cpm_demands)
+        # ensure durations are satisfied
+        for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
+            self.cpm_model += s + d == e
 
+        # task decomposition
+        for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
+            # find overlapping tasks
+            total_running = cp.sum(cpm_demands * ((cpm_start <= s) & (cpm_ends > s)))
+            self.cpm_model += eval_comparison(condition, total_running, capacity)
+
+    def _cumulative_time_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
+        from cpmpy.expressions.utils import eval_comparison
+        cpm_demands = cp.cpm_array(cpm_demands)
+
+        # ensure durations are satisfied
+        for s, d, e in zip(cpm_start, cpm_duration, cpm_ends):
+            self.cpm_model += s + d == e
+
+        lb = min(get_bounds(cpm_start)[0])
+        ub = max(get_bounds(cpm_ends)[1])
+        # time decomposition
+        for t in range(lb,ub+1):
+            total_running = cp.sum(cpm_demands * ((cpm_start <= t) & (cpm_ends > t)))
+            self.cpm_model += eval_comparison(condition, total_running, capacity)
 
     def ctr_binpacking(self, lst: list[Variable], sizes: list[int], condition: Condition):
         self._unimplemented(lst, sizes, condition)
