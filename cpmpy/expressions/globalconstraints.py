@@ -314,6 +314,7 @@ class Table(GlobalConstraint):
 
 class MDD(GlobalConstraint):
     """The values of the variables in 'array' correspond to a path in the mdd formed by the transition in 'transitions'
+    Root node is the first one used as a start in the first transition
     """
 
     def __init__(self, array, transitions):
@@ -321,8 +322,7 @@ class MDD(GlobalConstraint):
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("the first argument of an MDD constraint should only contain variables/expressions")
         super().__init__("mdd", [array, transitions])
-        self.root_node = "r"
-        self.sink_node = "t"
+        self.root_node = transitions[0][0]
         self.mapping = {}
         for s, v, e in transitions:
             self.mapping[(s, v)] = e
