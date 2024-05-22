@@ -676,6 +676,15 @@ class LexLess(GlobalConstraint):
         return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))))
 
 
+class LexChainLess(GlobalConstraint):
+    """ Given a matrix X,, enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        self.name = "lex_chain_less"
+        self.args = X
 
     def decompose(self):
         X = self.args
