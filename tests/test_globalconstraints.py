@@ -171,68 +171,133 @@ class TestGlobal(unittest.TestCase):
 
     def test_subcircuit(self):
 
-        def model_and_solve(n, not_included, start_index=None, negative=False, decompose=False):
-            x = cp.intvar(0, n-1, n)
-            c = []
-            if not negative:
-                # SubCircuit constraint
-                if (not decompose):
-                    c += [cp.SubCircuit(x, start_index=start_index)]
-                else:
-                    constraining, defining = cp.SubCircuit(x, start_index=start_index).decompose()
-                    c += constraining
-                    c += defining
-                # Side constraints based on test case restrictions
-                c += [x[i] == i for i in not_included]
-                c += [x[i] != i for i in range(n) if i not in not_included]
-            else:
-                c += [~cp.SubCircuit(x, start_index=start_index)]
-                # no decompose in the negative case
-                # c += ~cp.all(list(cp.SubCircuit(x, start_index=start_index).decompose()))
-
-            model = cp.Model(c)
-            sat = model.solve()
-            if sat:
-                return sat, x.value()
-            return sat, None
+        import numpy as np
         
-        def included(x):
-            return [xi for i, xi in enumerate(x) if xi != i]
-
-        def assert_positive(n, not_included, start_index, decompose):
-            sat, x = model_and_solve(n, not_included, start_index, negative=False, decompose=decompose)
-            self.assertTrue(sat)
-            self.assertEqual(len(included(x)), (n - len(not_included)))
-            self.assertTrue(cp.SubCircuit(x))
-            for i in not_included:
-                assert(i not in included(x))
-            if start_index is not None:
-                assert(start_index in included(x))
-
-        def assert_negative(n, not_included, start_index, decompose):
-            sat, x = model_and_solve(n, not_included, start_index, negative=True, decompose=decompose)
-            self.assertTrue(sat)
-
-        # Positive cases
-        # - global constraint
-        assert_positive(6, [], None, False)
-        assert_positive(6, [1], None, False)
-        assert_positive(6, [], 0, False)
-        # - decomposed
-        assert_positive(6, [], None, True)
-        assert_positive(6, [1], None, True)
-        assert_positive(6, [], 0, True)
-
-        # Negative cases
-        # - global constraint
-        assert_negative(6, [0, 1, 2, 3, 4, 5], None, False)
-        assert_negative(6, [0, 1, 2, 3, 4], None, False)
-        assert_negative(6, [0], 0, False)
-        # - decomposed
-        assert_negative(6, [0, 1, 2, 3, 4, 5], None, True)
-        assert_negative(6, [0, 1, 2, 3, 4], None, True)
-        assert_negative(6, [0], 0, True)
+        n = 6
         
+        # Find a subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(model.solveAll() == 410)
+        
+        # Find a max subcircuit (subcircuit = circuit)
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + list(x != np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == n)
+        self.assertTrue(model.solveAll() == 120) # 5 x 4 x 3 x 2 x 1
+
+        # Find a non-max subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] == 0] ) # Often index 0 is assumed to be the start_index internally
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) < n)
+        self.assertTrue(model.solveAll() == 85)
+
+        # Find an empty subcircuit 
+        x = cp.intvar(0, n-1, n)
+        sc = cp.SubCircuit(x)
+        model = cp.Model( [sc] + list(x == np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == 0)
+        self.assertTrue(model.solveAll() == 1)
+
+        # Find a non-empty subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] != 0] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) > 1)
+        self.assertTrue(model.solveAll() == 325)
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(not model.solve())
+
+    def test_subcircuit_reified(self):
+
+        import numpy as np
+
+        n = 6
+
+        # Find a subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True])
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(model.solveAll() == 410)
+
+         # Find a max subcircuit (subcircuit = circuit)
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x != np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == n)
+        self.assertTrue(model.solveAll() == 120) # 5 x 4 x 3 x 2 x 1
+
+        # Find a non-max subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] == 0] ) # Often index 0 is assumed to be the start_index internally
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) < n)
+        self.assertTrue(model.solveAll() == 85)
+
+        # Find an empty subcircuit 
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x == np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == 0)
+        self.assertTrue(model.solveAll() == 1)
+
+        # Find a non-empty subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] != 0] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) > 1)
+        self.assertTrue(model.solveAll() == 325)
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(not model.solve())
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x))] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(model.solve())
+        self.assertTrue(a.value() == False)
+
+    def test_subcircuit_choco(self):
+        """
+        See issue #1085
+        """
+
+        n = 3
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True] + [(x[0] == 2), (x[1] == 1), (x[2] == 0)])
+        assert( model.solve() )
+
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True] + [(x[0] != 0), (x[1] == 1), (x[2] != 2)])
+        assert( model.solve() )
+
 
     def test_inverse(self):
         # Arrays
@@ -1029,3 +1094,25 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+
+def circuit_length(succ):
+    # Find a start_index
+    start_index = None
+    for i,s in enumerate(succ):
+        if i != s:
+            # first non self-loop found is taken as start
+            start_index = i
+            break
+    # No valid start found, thus empty subcircuit
+    if start_index is None:
+        return 0
+
+    # Collect subcircuit
+    visited = set([start_index])
+    idx = succ[start_index]
+    while idx != start_index:
+        # Collect
+        visited.add(idx)
+        idx = succ[idx]
+
+    return len(visited)
