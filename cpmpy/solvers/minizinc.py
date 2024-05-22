@@ -34,7 +34,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
@@ -418,7 +418,7 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "lex_lesseq", "lex_less"}
+                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "lex_lesseq", "lex_less", "lex_chain_less", "lex_chain_lesseq"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
 
@@ -506,6 +506,15 @@ class CPM_minizinc(SolverInterface):
             X = [self._convert_expression(e) for e in expr.args[0]]
             Y = [self._convert_expression(e) for e in expr.args[1]]
             return f"{expr.name}({{}}, {{}})".format(X, Y)
+
+
+        if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
+            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            str_X = "[|\n"  # opening
+            for row in X.T: # Minizinc enforces lexicographic order on columns
+                str_X += ",".join(map(str, row)) + " |"  # rows
+            str_X += "\n|]"  # closing
+            return f"{expr.name}({{}})".format(str_X)
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element

@@ -495,7 +495,7 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","increasing_strict","decreasing_strict"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","increasing_strict","decreasing_strict","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -515,16 +515,15 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.increasing(chc_args,1)
                 elif cpm_expr.name == "decreasing_strict":
                     return self.chc_model.decreasing(chc_args,1)
+                elif cpm_expr.name in ["lex_lesseq", "lex_less"]:
+                    if cpm_expr.name == "lex_lesseq":
+                        return self.chc_model.lex_less_eq(*chc_args)
+                    return self.chc_model.lex_less(*chc_args)
+# Ready for when it is fixed in pychoco
+#                elif cpm_expr.name == "lex_chain_less":
+#                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
-            elif cpm_expr.name == "lex_lesseq":
-                assert (len(cpm_expr.args) == 2)  # args = [X, Y]
-                X, Y = self.solver_vars(cpm_expr.args)
-                return self.chc_model.lex_less_eq(X, Y)
-            elif cpm_expr.name == "lex_less":
-                assert (len(cpm_expr.args) == 2)  # args = [X, Y]
-                X, Y = self.solver_vars(cpm_expr.args)
-                return self.chc_model.lex_less(X,Y)
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
