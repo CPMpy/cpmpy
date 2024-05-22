@@ -316,7 +316,7 @@ class CPM_choco(SolverInterface):
                      "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
 
-        # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit
+        # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit (#1085)
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
                              "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
         # for when choco new release comes, fixing the bug on increasing, decreasing and subcircuit
