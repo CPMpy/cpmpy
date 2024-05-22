@@ -676,6 +676,17 @@ class LexLess(GlobalConstraint):
         return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))))
 
 
+
+    def decompose(self):
+        X = self.args
+        return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = self.args
+        from .python_builtins import all
+        return argval(all(LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])))
+
+
 class DirectConstraint(Expression):
     """
         A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
