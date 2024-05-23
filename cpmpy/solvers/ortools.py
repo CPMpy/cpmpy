@@ -335,10 +335,9 @@ class CPM_ortools(SolverInterface):
         print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        _has_nested = has_nested(cpm_cons)
         print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
         print(f"c ort:decompose took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         cpm_cons = flatten_constraint(cpm_cons)#, _has_nested=_has_nested)  # flat normal form

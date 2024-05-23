@@ -22,6 +22,7 @@
 """
 import warnings
 import time
+import numpy as np
 from enum import Enum
 
 from ..exceptions import NotSupportedError
