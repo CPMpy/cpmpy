@@ -53,7 +53,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, is_leaf
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 
 def BoolVar(shape=1, name=None):
@@ -116,7 +116,9 @@ def boolvar(shape=1, name=None):
     # create base data
     data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False  # we know
+    return r
 
 
 def IntVar(lb, ub, shape=1, name=None):
@@ -177,7 +179,9 @@ def intvar(lb, ub, shape=1, name=None):
     # create base data
     data = np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False  # we know
+    return r
 
 
 def cparray(arr):
@@ -245,8 +249,10 @@ class _NumVarImpl(Expression):
         """
         return False
 
-    def is_leaf(self):
-        return True
+    def has_subexpr(self) -> bool:
+        """ does it have non-variable Expressions as args?
+        """
+        return False
 
     def value(self):
         """ the value obtained in the last solve call
@@ -387,9 +393,6 @@ class NDVarArray(np.ndarray, Expression):
         """ is it a Boolean (return type) Operator?
         """
         return False
-
-    def is_leaf(self):
-        return all([is_leaf(x) for x in self])
 
     def value(self):
         """ the values, for each of the stored variables, obtained in the last solve call
