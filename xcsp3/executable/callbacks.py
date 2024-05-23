@@ -459,6 +459,17 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += eval_comparison(condition, total_running, capacity)
 
     def ctr_binpacking(self, lst: list[Variable], sizes: list[int], condition: Condition):
+        from cpmpy.expressions.utils import eval_comparison
+
+        cpm_vars = self.get_cpm_vars(lst)
+        rhs = self.get_cpm_var(condition.right_operand())
+
+        for bin in range(1, len(cpm_vars)+1):
+            self.cpm_model += eval_comparison(condition.operator.to_str(),
+                                              cp.sum((cpm_vars == bin) * sizes),
+                                              rhs)
+
+
         self._unimplemented(lst, sizes, condition)
 
     def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
