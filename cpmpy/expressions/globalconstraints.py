@@ -261,7 +261,9 @@ class Circuit(GlobalConstraint):
         visited = set()
         arr = argvals(self.args)
 
-        while idx not in visited:
+        for i in range(len(arr)):
+            if idx in visited:
+                break
             if idx is None:
                 return False
             if not (0 <= idx < len(arr)):
@@ -390,10 +392,19 @@ class SubCircuit(GlobalConstraint):
         if start_index is None:
             return True # Change to False if empty subcircuits not allowed
 
+        # Check AllDiff
+        if not AllDifferent(s).value():
+            return False
+
         # Collect subcircuit
         visited = set([start_index])
         idx = succ[start_index]
-        while idx != start_index:
+        for i in range(len(succ)):
+            if idx ==start_index:
+                break
+            else:
+                if idx in visited:
+                    return False
             # Something is wrong, certain variables didn't get values
             if idx is None: return False
             # Check bounds on successor value
