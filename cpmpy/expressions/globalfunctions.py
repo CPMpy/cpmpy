@@ -439,5 +439,15 @@ class IfThenElseNum(GlobalFunction):
 
         return [eval_comparison(cmp_op, iv, cpm_rhs)], defining
 
+    def get_bounds(self):
+        b,x,y = self.args
+        lbs,ubs = get_bounds([x,y])
+        return min(lbs), max(ubs)
+    def value(self):
+        b,x,y = self.args
+        if argval(b):
+            return argval(x)
+        else:
+            return argval(y)
 
 
