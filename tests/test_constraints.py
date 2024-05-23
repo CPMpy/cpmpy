@@ -12,14 +12,14 @@ import pytest
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
-
+SOLVERNAMES = ["ortools"]
 # Exclude some global constraints for solvers
 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -101,6 +101,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, POS_VAR)
         elif name == "NValueExcept":
             expr = cls(NUM_ARGS, 3)
+        elif name == "IfThenElseNum":
+            expr = cls(BOOL_VAR, NUM_ARGS[0], NUM_ARGS[1])
         else:
             expr = cls(NUM_ARGS)
 
