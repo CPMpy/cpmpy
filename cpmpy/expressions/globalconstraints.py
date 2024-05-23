@@ -113,7 +113,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, is_int
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -291,6 +291,28 @@ class Inverse(GlobalConstraint):
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
+class Channel(GlobalConstraint):
+    """
+        Channeling constraint. Channeling integer representation of a variable into a representation with boolean
+        indicators
+            for all 0<=i<len(arr) : arr[i] = 1 <=> value = i
+            exists 0<=i<len(arr) s.t. arr[i] = 1
+    """
+    def __init__(self, arr, v):
+        flatargs = flatlist([arr])
+        if not all(x.lb >= 0 and x.ub <= 1 for x in flatargs):
+            raise TypeError(
+                "the first argument of a Channel constraint should only contain 0-1 variables/expressions (i.e., " +
+                "intvars/intexprs with domain {0,1} or boolvars/boolexprs)")
+        super().__init__("channelValue", [arr, v])
+
+    def decompose(self):
+        arr, v = self.args
+        return [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
+
+    def value(self):
+        arr, v = self.args
+        return sum(x.value() for x in arr) == 1 and 0 <= v.value() < len(arr) and arr[v.value()] == 1
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
