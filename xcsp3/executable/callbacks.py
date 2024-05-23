@@ -414,7 +414,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_start = self.get_cpm_exprs(origins)
         cpm_durations = self.get_cpm_exprs(lengths)
         cpm_demands = self.get_cpm_exprs(heights)
-        cpm_cap = self.get_cpm_var(condition.operator.value)
+        cpm_cap = self.get_cpm_var(condition.right_operand())
         cpm_ends = []
         for s,d in zip(cpm_start, cpm_durations):
             expr = s + d
@@ -474,8 +474,8 @@ class CallbacksCPMPy(Callbacks):
         from cpmpy.expressions.utils import eval_comparison
 
         vars = self.get_cpm_vars(lst)
-        cpm_weight = self.get_cpm_var(wcondition.operator.value)
-        cpm_profit = self.get_cpm_var(pcondition.operator.value)
+        cpm_weight = self.get_cpm_var(wcondition.right_operand())
+        cpm_profit = self.get_cpm_var(pcondition.right_operand())
 
         total_weight = cp.sum(vars * weights)
         total_profit = cp.sum(vars * profits)
