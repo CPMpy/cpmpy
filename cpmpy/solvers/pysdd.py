@@ -26,7 +26,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_bool
+from ..expressions.utils import is_any_list, is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -121,7 +121,8 @@ class CPM_pysdd(SolverInterface):
                 if lit in sol:
                     cpm_var._value = bool(sol[lit])
                 else:
-                    raise ValueError(f"Var {cpm_var} is unknown to the PySDD solver, this is unexpected - please report on github...")
+                    cpm_var._value = cpm_var.get_bounds()[0] # dummy value - TODO: ensure Pysdd assigns an actual value
+                    # cpm_var._value = None  # not specified...
 
         return has_sol
 
@@ -177,9 +178,9 @@ class CPM_pysdd(SolverInterface):
 
                 # display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
             return solution_count

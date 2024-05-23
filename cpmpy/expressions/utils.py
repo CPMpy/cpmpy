@@ -121,11 +121,19 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    try:
-        return a.value() if hasattr(a, "value") else a
-    except IncompleteFunctionError as e:
-        if a.is_bool(): return False
-        raise e
+    if hasattr(a, "value"):
+        try:
+            return a.value()
+        except IncompleteFunctionError as e:
+            if a.is_bool():
+                return False
+            else:
+                raise e
+    return a
+
+
+def argvals(arr):
+    return [argval(a) for a in arr]
 
 
 def is_leaf(a):
