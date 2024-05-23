@@ -270,15 +270,22 @@ class Inverse(GlobalConstraint):
        Inverse (aka channeling / assignment) constraint. 'fwd' and
        'rev' represent inverse functions; that is,
 
-           fwd[i] == x  <==>  rev[x] == i
+            The symmetric version (where len(fwd) == len(rev)) is defined as:
+                fwd[i] == x  <==>  rev[x] == i
+            The asymmetric version (where len(fwd) < len(rev)) is defined as:
+                fwd[i] == x   =>   rev[x] == i
 
     """
     def __init__(self, fwd, rev):
         flatargs = flatlist([fwd,rev])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
-        assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, rev])
+        if len(fwd) > len(rev):
+            raise TypeError("len(fwd) should be equal to len(rev) for the symmetric inverse, or smaller than len(rev) for the asymmetric inverse")
+        if len(fwd) == len(rev):
+            super().__init__("inverse", [fwd, rev])
+        else:
+            super().__init__("inverseAsym", [fwd, rev])
 
     def decompose(self):
         from .python_builtins import all
