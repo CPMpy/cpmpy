@@ -468,15 +468,26 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += eval_comparison(condition.operator.to_str(),
                                               cp.sum((cpm_vars == bin) * sizes),
                                               rhs)
-
-
-        self._unimplemented(lst, sizes, condition)
-
     def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
-        self._unimplemented(lst, sizes, limits)
+        from cpmpy.expressions.utils import eval_comparison
+
+        cpm_vars = self.get_cpm_vars(lst)
+
+        for bin, lim in enumerate(limits):
+            self.cpm_model += eval_comparison("<=",
+                                              cp.sum((cpm_vars == (bin+1)) * sizes),
+                                              lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
-        self._unimplemented(lst, sizes, loads)
+        from cpmpy.expressions.utils import eval_comparison
+
+        cpm_vars = self.get_cpm_vars(lst)
+        cpm_loads = self.get_cpm_vars(loads)
+
+        for bin, load in enumerate(cpm_loads):
+            self.cpm_model += eval_comparison("==",
+                                              cp.sum((cpm_vars == (bin + 1)) * sizes),
+                                              load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
         self._unimplemented(lst, sizes, conditions)
