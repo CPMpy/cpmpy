@@ -71,7 +71,7 @@ import warnings
 from types import GeneratorType
 import numpy as np
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
+from .utils import is_bool, is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
 from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
@@ -109,6 +109,9 @@ class Expression(object):
         self._has_nested_map = [(not a.is_leaf()) if isinstance(a, Expression) else False for a in arg_list]
         self._has_nested = any(self._has_nested_map)
 
+        self._has_nested_boolean_constants_map = [is_bool(a) or (isinstance(a, Expression) and a.has_nested_boolean_constants()) for a in arg_list]
+        self._has_nested_boolean_constants = any(self._has_nested_boolean_constants_map)
+
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
         self._override_print = override_print
@@ -140,13 +143,12 @@ class Expression(object):
     def has_nested_expr(self):
         """ Does it contains nested Expressions?
             Is of importance when deciding whether transformation/decomposition is needed.
-            Default: yes
         """
-        # return self.args.has_nested_expr()
         return self._has_nested   # default
     
     def nested_expr(self):
-        # return self.args.nested_expr()
+        """ A boolean list indicating which of the expression's args are a nested expression.
+        """
         return self._has_nested_map
 
     def is_bool(self):
@@ -154,6 +156,16 @@ class Expression(object):
             Default: yes
         """
         return True
+    
+    def has_nested_boolean_constants(self):
+        """ Is there somewhere in the expression tree starting from this expression a boolean constant?
+        """
+        return self._has_nested_boolean_constants
+    
+    def nested_boolean_constants(self):
+        """ A boolean list indicating which of the args are or contain a boolean constant.
+        """
+        return self._has_nested_boolean_constants_map
     
     def is_leaf(self):
         """ Is it the leaf of an expression tree?

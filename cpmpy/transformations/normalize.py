@@ -40,43 +40,52 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
-def needs_simplify(expr):
-    if hasattr(expr, 'args'):
-        args = set()
-        for arg in expr.args:
-            if is_bool(arg):
-                return True  # boolean constants can be simplified away
-            args.add(is_boolexpr(arg))
-        return len(args) > 1  # mixed types should be simplified
-    else:
-        return False
+# def needs_simplify(expr):
+#     if hasattr(expr, 'args'):
+#         args = set()
+#         for arg in expr.args:
+#             if is_bool(arg):
+#                 return True  # boolean constants can be simplified away
+#             args.add(is_boolexpr(arg))
+#         return len(args) > 1  # mixed types should be simplified -> constant ints?
+#     else:
+#         return False
 
 
-def simplify_boolean(lst_of_expr, num_context=False):
+def simplify_boolean(lst_of_expr, num_context=False, filter=None):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
     - list_of_expr: list of CPMpy expressions
+    - filter: a list of booleans, indicating which expressions can be skipped
     """
     from .negation import recurse_negation # avoid circular import
     newlist = []
-    for expr in lst_of_expr:
-        if isinstance(expr, bool):
-            # not sure if this should happen here or at construction time
-            expr = BoolVal(expr)
 
-        if isinstance(expr, BoolVal):
+    for i, expr in enumerate(lst_of_expr):
+        # Filter expression
+        if (filter is not None) and (not filter[i]):
+            newlist.append(expr)
+
+        elif isinstance(expr, bool):
+            # not sure if BoolVal creation should happen here or at construction time
+            newlist.append(expr if num_context else BoolVal(expr))
+
+        elif isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
 
-        elif not has_nested(expr) and not needs_simplify(expr):
+        # Detect branch in expression tree where no boolean constants will follow
+        #  we should only get here when at the root of the expression tree
+        #  otherwise, the "filter" field will allow early-exit
+        elif isinstance(expr, Expression) and not expr.has_nested_boolean_constants():
             newlist.append(expr)
 
         elif isinstance(expr, Operator):
-            args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+            args = simplify_boolean(expr.args, num_context=not expr.is_bool(), filter=expr.nested_boolean_constants())
 
             if expr.name == "or":
-                if any(is_true_cst(arg) for arg in args):
-                    newlist.append(1 if num_context else BoolVal(True))
+                if any(is_true_cst(arg) for arg in args): # expr | True -> True
+                    newlist.append(1 if num_context else BoolVal(True)) # Why a boolval and not just True?
                 else:
                     filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
                     if len(filtered_args):
@@ -117,7 +126,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = simplify_boolean(expr.args, num_context=True)
+            lhs, rhs = simplify_boolean(expr.args, num_context=True, filter=expr.nested_boolean_constants())
             name = expr.name
             if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
                 if name == "<": name = ">"
@@ -174,7 +183,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(eval_comparison(name, lhs, rhs))
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
+            expr.args = simplify_boolean(expr.args, filter=expr.nested_boolean_constants()) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)
