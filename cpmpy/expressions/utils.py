@@ -39,13 +39,15 @@ def is_bool(arg):
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
