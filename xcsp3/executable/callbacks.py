@@ -12,7 +12,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
-from cpmpy.expressions.utils import is_any_list, get_bounds
+from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
 class CallbacksCPMPy(Callbacks):
@@ -95,7 +95,8 @@ class CallbacksCPMPy(Callbacks):
         "iff": (0, lambda x: cp.all(a == b for a, b in zip(x[:-1], x[1:]))),
         "imp": (2, lambda x, y: x.implies(y)),
         # control
-        "if": (3, lambda b, x, y: cp.IfThenElse(b, x, y))
+        "if": (3, lambda b, x, y: cp.IfThenElse(b, x, y) if is_boolexpr(x) and is_boolexpr(y)
+                                                         else cp.IfThenElseNum(b,x,y))
     }
 
     def intentionfromtree(self, node):
