@@ -330,15 +330,32 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
+        t0 = time.time()
         cpm_cons = toplevel_list(cpm_expr)
+        print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        _has_nested = has_nested(cpm_cons)
+        print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
+        cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
+        print(f"c ort:decompose took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
+        cpm_cons = flatten_constraint(cpm_cons)#, _has_nested=_has_nested)  # flat normal form
+        print(f"c ort:flatten took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        print(f"c ort:reifyRW took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        print(f"c ort:onlyNumexpr took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
         cpm_cons = only_bv_reifies(cpm_cons)
+        print(f"c ort:onlyBv took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        t0 = time.time()
         cpm_cons = only_implies(cpm_cons)  # everything that can create
                                              # reified expr must go before this
+        print(f"c ort:onlyImpl took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         return cpm_cons
 
     def __add__(self, cpm_expr):
@@ -360,11 +377,17 @@ class CPM_ortools(SolverInterface):
         :return: self
         """
         # add new user vars to the set
+        t0 = time.time()
         get_variables(cpm_expr, collect=self.user_vars)
+        print(f"c ort:get_vars took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
 
+        cnt = 0.0
         # transform and post the constraints
         for con in self.transform(cpm_expr):
+            t0 = time.time()
             self._post_constraint(con)
+            cnt += (time.time()-t0)
+        print(f"c ort:post took {cnt:.4f} -- {len(cpm_expr)}")
 
         return self
 
