@@ -413,6 +413,7 @@ class CPM_ortools(SolverInterface):
 
         :param reifiable: if True, will throw an error if cpm_expr can not be reified by ortools (for safety)
         """
+        #print("c ", cpm_expr.name, len(cpm_expr.args), [type(a) for a in cpm_expr.args])
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
         if isinstance(cpm_expr, Operator):

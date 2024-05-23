@@ -279,18 +279,18 @@ def run(args: Args):
 
     sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
-    # -------------------------- Configure XCSP3 parser -------------------------- #
-
-    start = time.time()
-    parser = ParserXCSP3(args.benchname)
-    callbacks = CallbacksCPMPy()
-    callbacks.force_exit = True
-    callbacker = CallbackerXCSP3(parser, callbacks)
-    print_comment(f"took {(time.time() - start):.4f} seconds to load callbacker")
-
     # ------------------------------ Parse instance ------------------------------ #
 
     start = time.time()
+    parser = ParserXCSP3(args.benchname)
+    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model")
+
+    # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
+    start = time.time()
+    callbacks = CallbacksCPMPy()
+    callbacks.force_exit = True
+    callbacker = CallbackerXCSP3(parser, callbacks)
+
     try:
         callbacker.load_instance()
     except NotImplementedError as e:
@@ -301,7 +301,7 @@ def run(args: Args):
         print_status(ExitStatus.unknown)
         print_comment(str(e))
         exit(1)
-    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model")
+    print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
     
     # ------------------------------ Solve instance ------------------------------ #
 
