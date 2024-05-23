@@ -179,58 +179,6 @@ def argval(a):
         if a.is_bool(): return False
         raise e
 
-def is_leaf_vectorized(a) -> bool: # 0.61 -> 0.57
-    # return all(map(is_leaf_helper, a.flat))
-    vectorized = np.vectorize(is_leaf_helper, otypes=[bool])
-    b = vectorized(a)
-    # return np.all(vectorized(a))
-    c = b[np.argmin(b)] # short-circuits
-    if isinstance(c, bool):
-        return c
-    else:
-        return b.flat[0]
-
-
-def is_leaf(a) -> bool:        
-    if hasattr(a, 'is_leaf'):
-        return a.is_leaf()
-    if is_any_list(a):
-        return all(map(is_leaf, a))
-    else:
-        return True
-    
-def is_leaf_helper(a) -> bool:
-    if hasattr(a, 'is_leaf'):
-        return a.is_leaf()
-    else:
-        return True
-
-
-
-def has_nested(expr) -> Union[bool, List[bool]]:
-    if hasattr(expr, 'args'):
-
-        if expr.name == "table": # small improvement for table, where args are very structured and ideal for vectorisation
-            a, b = expr.args
-            a = np.array(a)
-            if not is_leaf_vectorized(a):
-                return True
-            c = np.array(b)
-            if not is_leaf_vectorized(c):
-                return True
-            return False
-            
-        else: # default to checking all args independently
-            return not all(map(is_leaf, expr.args))
-
-    if is_any_list(expr):
-        return [has_nested(e) for e in expr]
-
-    if is_leaf_helper(expr):
-        return False
-    return True
-
-
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator

@@ -33,7 +33,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import has_nested, is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -336,13 +336,10 @@ class CPM_ortools(SolverInterface):
         print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        _has_nested = has_nested(cpm_cons)
-        print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, supported, _has_nested=_has_nested)
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
         print(f"c ort:decompose took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
-        cpm_cons = flatten_constraint(cpm_cons)#, _has_nested=_has_nested)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         print(f"c ort:flatten took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification

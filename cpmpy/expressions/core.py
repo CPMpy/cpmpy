@@ -72,7 +72,7 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -135,8 +135,23 @@ class Expression(object):
     def __hash__(self):
         return hash(self.__repr__())
 
-    def is_leaf(self):
-        return False  # default
+    def has_subexpr(self) -> bool:
+        """
+            Is any of the arguments an Expression other than _NumVarImpl?
+        """
+        def recursive_has_subexpr(lst) -> bool:
+            for el in lst:
+                if isinstance(el, Expression):  
+                    if el.has_subexpr():  # NDVarArrays are Expr and any_list
+                        return True
+                elif is_any_list(el) and recursive_has_subexpr(el):
+                    return True
+            return False
+                    
+        if not hasattr(self, '_has_subexpr'):
+            # args can have lists of lists...
+            self._has_subexpr = recursive_has_subexpr(self.args)
+        return self._has_subexpr
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -384,8 +399,8 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
-    def is_leaf(self):
-        return True
+    def has_subexpr(self):
+        return False
 
 
 class Comparison(Expression):

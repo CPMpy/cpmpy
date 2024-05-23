@@ -5,10 +5,10 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list, has_nested, is_boolexpr, is_bool
+from ..expressions.utils import is_any_list, is_boolexpr, is_bool
 
 
-def push_down_negation(lst_of_expr, toplevel=True, _has_nested=None):
+def push_down_negation(lst_of_expr, toplevel=True):
     """
         Transformation that checks all elements from the list,
         and pushes down any negation it finds with the `recurse_negation()` function.
@@ -25,9 +25,6 @@ def push_down_negation(lst_of_expr, toplevel=True, _has_nested=None):
         if is_any_list(expr):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
-
-        elif not has_nested(expr) and not (hasattr(expr, 'name') and (expr.name == 'not' or expr.name == '!=')):
-            newlist.append(expr)  # no need to do anything
 
         elif expr.name == "not":
             # the negative case, negate
@@ -47,8 +44,11 @@ def push_down_negation(lst_of_expr, toplevel=True, _has_nested=None):
             else:
                 newlist.append(expr)
 
+        elif not expr.has_subexpr():
+            newlist.append(expr)  # no need to do anything
+
         else:
-            # an Expression, we remain in the positive case
+            # a nested Expression, we remain in the positive case
             newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
             if str(newargs) != str(expr.args):
                 newexpr = copy.copy(expr)

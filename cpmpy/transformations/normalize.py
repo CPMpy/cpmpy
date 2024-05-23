@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, has_nested, is_bool
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -80,7 +80,7 @@ def needs_simplify(expr):
         return False
 
 
-def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
+def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
@@ -88,7 +88,7 @@ def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
     """
     from .negation import recurse_negation # avoid circular import
     newlist = []
-    for i_expr, expr in enumerate(lst_of_expr):
+    for expr in lst_of_expr:
         if isinstance(expr, bool):
             if num_context:
                 newlist.append(1 if expr else 0)
@@ -100,10 +100,7 @@ def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
         elif isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
 
-        elif _has_nested is not None and not _has_nested[i_expr] and not needs_simplify(expr):
-            newlist.append(expr)
-
-        elif _has_nested is None and not has_nested(expr) and not needs_simplify(expr):
+        elif not needs_simplify(expr):
             newlist.append(expr)
 
         elif isinstance(expr, Operator):
@@ -207,9 +204,12 @@ def simplify_boolean(lst_of_expr, num_context=False, _has_nested=None):
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
-        elif isinstance(expr, GlobalConstraint):
-            expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
+        #elif isinstance(expr, GlobalConstraint):
+            # TODO: how to determine boolean or numerical context?
+            # not sure this is needed at all... maybe in a XOR? but could damage it?
+            #if any(needs_simplify(a) for a in expr.args):
+            #    expr = copy.copy(expr)
+            #    expr.args = simplify_boolean(expr.args) 
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)

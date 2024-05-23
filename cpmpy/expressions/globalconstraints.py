@@ -319,6 +319,13 @@ class Table(GlobalConstraint):
         arrval = [argval(a) for a in arr]
         return arrval in tab
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'):
+            arr, tab = self.args
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
 class ShortTable(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     tuples in 'table' may contain the wildcard character '*' to indicate there are no restrictions for the corresponding
