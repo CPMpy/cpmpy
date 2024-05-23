@@ -71,10 +71,8 @@ import warnings
 from types import GeneratorType
 import numpy as np
 
-
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
 from ..exceptions import IncompleteFunctionError, TypeError
-
 
 class Expression(object):
     """
@@ -107,6 +105,10 @@ class Expression(object):
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self.args = arg_list
 
+
+        self._has_nested_map = [(not a.is_leaf()) if isinstance(a, Expression) else False for a in arg_list]
+        self._has_nested = any(self._has_nested_map)
+
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
         self._override_print = override_print
@@ -134,15 +136,31 @@ class Expression(object):
 
     def __hash__(self):
         return hash(self.__repr__())
-
-    def is_leaf(self):
-        return False  # default
+    
+    def has_nested_expr(self):
+        """ Does it contains nested Expressions?
+            Is of importance when deciding whether transformation/decomposition is needed.
+            Default: yes
+        """
+        # return self.args.has_nested_expr()
+        return self._has_nested   # default
+    
+    def nested_expr(self):
+        # return self.args.nested_expr()
+        return self._has_nested_map
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
+    
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+            This is only the case for decision variables (and constants).
+            Default: no
+        """
+        return False
 
     def value(self):
         return None # default

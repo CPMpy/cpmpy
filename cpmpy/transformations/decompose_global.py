@@ -50,14 +50,18 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             if any(isinstance(a,GlobalFunction) for a in expr.args):
                 expr, base_con = normalized_numexpr(expr)
                 _toplevel.extend(base_con)  # should be added toplevel
-            # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
-            newlist.append(Operator(expr.name, args))
+            if expr.has_nested_expr(): # Only recurse if there are nested expressions
+                # recurse into arguments, recreate through constructor (we know it stores no other state)
+                args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                newlist.append(Operator(expr.name, args))
+            else:
+                newlist.append(expr)
 
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
-            expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            if expr.has_nested_expr(): # only recurse if expression arguments contain a nested expression
+                expr = copy.copy(expr)
+                expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
 
             is_supported = (expr.name in supported)
             if nested and expr.is_bool():
@@ -96,8 +100,6 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
                     newlist.append(aux)  # replace original expression by aux
 
-        elif not has_nested(expr):
-            newlist.append(expr)
         elif isinstance(expr, Comparison):
             # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
             # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
@@ -109,9 +111,22 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
             if not decomp_lhs:
                 if not decomp_rhs:
-                    # nothing special, create a fresh version and recurse into arguments
-                    expr = copy.copy(expr)
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    # Check if either the lhs or the rhs containts nested expressions
+                    lhs_has_nested = isinstance(lhs, Expression) and lhs.has_nested_expr()
+                    rhs_has_nested = isinstance(rhs, Expression) and rhs.has_nested_expr()
+                    # If it contains one, decompose by recursion into the argument
+                    if lhs_has_nested:
+                        lhs = decompose_in_tree([lhs], supported, supported_reified, _toplevel, nested=True)[0]
+                    if rhs_has_nested:
+                        rhs = decompose_in_tree([rhs], supported, supported_reified, _toplevel, nested=True)[0]
+
+                    # Put the decompositions back together as the arguments of the original comparison
+                    if lhs_has_nested or rhs_has_nested: 
+                        expr = copy.copy(expr)
+                        expr.args = [lhs, rhs]
+            
+                    # expr = copy.copy(expr)
+                    # expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
                     newlist.append(expr)
 
                 else:
