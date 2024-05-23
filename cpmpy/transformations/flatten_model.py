@@ -468,7 +468,7 @@ def normalized_numexpr(expr):
         if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
             return normalized_numexpr(Operator("wsum", _wsum_make(expr)))
 
-        if all(__is_flat_var(arg) for arg in expr.args):
+        if not expr.has_nested_expr():
             return (expr, [])
 
         # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
