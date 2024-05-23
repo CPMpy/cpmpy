@@ -250,7 +250,17 @@ class _NumVarImpl(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return False
-
+    
+    def has_nested_boolean_constants(self):
+        """ Is there somewhere in the expression tree starting from this expression a boolean constant?
+        """
+        return False
+    
+    def nested_boolean_constants(self):
+        """ A boolean list indicating which of the args are or contain a boolean constant.
+        """
+        raise NotImplementedError(f"Variables don't have nested constants.")
+    
     def is_leaf(self):
         """ Is it the leaf of an expression tree?
             This is only the case for decision variables (and constants).
