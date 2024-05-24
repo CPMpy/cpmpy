@@ -199,6 +199,11 @@ class AllDifferentExcept0(GlobalConstraint):
 
 
 class AllDifferentLists(GlobalConstraint):
+    """
+        Ensures none of the lists given are exactly the same.
+        Called 'lex_alldifferent' in the global constraint catalog:
+        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
+    """
     def __init__(self, lists):
         super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
 
