@@ -205,6 +205,10 @@ class AllDifferentLists(GlobalConstraint):
         https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
     """
     def __init__(self, lists):
+        if any(not is_any_list(lst) for lst in lists):
+            raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
+        if any(len(lst) != len(lists[0]) for lst in lists):
+            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
         super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
 
     def decompose(self):
