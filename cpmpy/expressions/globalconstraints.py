@@ -707,8 +707,7 @@ class LexChainLess(GlobalConstraint):
         # Ensure the numpy array is 2D
         X = cpm_array(X)
         assert X.ndim == 2, "Input must be a 2D array or a list of lists"
-        self.name = "lex_chain_less"
-        self.args = X
+        super().__init__("lex_chain_less", X.tolist())
 
     def decompose(self):
         """ Decompose to a series of LexLess constraints between subsequent rows
@@ -728,8 +727,7 @@ class LexChainLessEq(GlobalConstraint):
         # Ensure the numpy array is 2D
         X = cpm_array(X)
         assert X.ndim == 2, "Input must be a 2D array or a list of lists"
-        self.name = "lex_chain_lesseq"
-        self.args = X
+        super().__init__("lex_chain_lesseq", X.tolist())
 
     def decompose(self):
         """ Decompose to a series of LexLessEq constraints between subsequent rows
