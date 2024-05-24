@@ -375,11 +375,6 @@ class NegBoolView(_BoolVarImpl):
         """
         return False
 
-    # TODO should this be here, since the docstring mentions that it is not an actual variable    
-    #   on the other hand, it's an "arg"-less expression
-    # def is_leaf(self):
-    #     return False
-
     def value(self):
         """ the negation of the value obtained in the last solve call by the viewed variable
             (or 'None')
@@ -416,6 +411,12 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
+    @property
+    def args(self):
+        """ The constructor for NDVarArray never gets called, so _args is never initialised
+        """
+        return self # we can just return self
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
@@ -448,7 +449,7 @@ class NDVarArray(np.ndarray, Expression):
             the constructor, so the Expression does not have 'args'
             set..
         """
-        if not hasattr(self, "args"):
+        if not hasattr(self, "_args"):
             self.name = "NDVarArray"
             self.update_args(self)
         return super().__repr__()

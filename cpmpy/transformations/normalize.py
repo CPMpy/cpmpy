@@ -71,8 +71,9 @@ def simplify_boolean(lst_of_expr, num_context=False):
             newlist.append(int(expr.value()) if num_context else expr)
 
         # Detect branch in expression tree where no boolean constants will follow
-        elif not needs_simplify(expr): # not expr.has_nested_boolean_constants():
-            newlist.append(expr)
+        #  Thomas > it causes a  [... <= -(BoolVal(True))] not to be detected TODO
+        # elif not needs_simplify(expr): # not expr.has_nested_boolean_constants():
+        #     newlist.append(expr)
 
         elif isinstance(expr, Operator):
             args = simplify_boolean(expr.args, num_context=not expr.is_bool())

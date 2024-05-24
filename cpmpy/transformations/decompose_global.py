@@ -133,8 +133,13 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     # From the comparison operator's point of view, neither lhs not rhs needs to be decomposed
 
                     # Check if either the lhs or the rhs contains nested expressions
-                    lhs_has_nested = isinstance(lhs, Expression) and lhs.has_subexpr()
-                    rhs_has_nested = isinstance(rhs, Expression) and rhs.has_subexpr()
+                    #   for == the checks seem to be correct
+                    #   for <=, >, etc. it seems to not be supported for Global constraints
+                    # technically, AllDiff(x,y,z) has no nested expressions, but it is not supported in AllDiff <= 4
+                    # So we still need to pass it through decompose_in_tree to get rid of the unsupported globals
+                    # On the other hand, the call is waisted on something like a sum <= 4
+                    lhs_has_nested = True # isinstance(lhs, Expression) and lhs.has_subexpr()
+                    rhs_has_nested = True # isinstance(rhs, Expression) and rhs.has_subexpr()
 
                     # If it contains one, decompose by recursion into the argument
                     if lhs_has_nested:
