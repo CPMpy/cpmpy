@@ -217,7 +217,7 @@ class AllDifferentLists(GlobalConstraint):
         from .python_builtins import any as cpm_any
         constraints = []
         for lst1, lst2 in all_pairs(self.args):
-            constraints += [cpm_any(var1 != var2) for var1, var2 in zip(lst1,lst2)]
+            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
         return constraints, []
 
     def value(self):
