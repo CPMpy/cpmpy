@@ -626,16 +626,16 @@ class LexLess(GlobalConstraint):
         super().__init__("lex_less", [X, Y])
 
     def decompose(self):
-        X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
-        length = len(X)
+        X, Y = cpm_array(self.args)
 
-        constraining = []
-        bvar = boolvar(shape=(length + 1))
-        from cpmpy.transformations.normalize import toplevel_list
-        defining = toplevel_list(bvar == ((X <= Y) &
-                          ((X < Y) | bvar[1:])))
-        defining.append(bvar[-1] == (X[-1] < Y[-1])) #for strict case use <
-        constraining.append(bvar[0])
+        bvar = boolvar(shape=(len(X) + 1))
+
+        # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
+        # until a strict inequality is encountered.
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
+        defining.append(bvar[-1] == (X[-1] < Y[-1]))
+        constraining = [bvar[0]]
 
         return constraining, defining
 
@@ -656,16 +656,12 @@ class LexLessEq(GlobalConstraint):
         super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):
-        X, Y = cpm_array(self.args[0]), cpm_array(self.args[1])
-        length = len(X)
+        X, Y = cpm_array(self.args)
 
-        constraining = []
-        bvar = boolvar(shape=(length + 1))
-        from cpmpy.transformations.normalize import toplevel_list
-        defining = toplevel_list(bvar == ((X <= Y) &
-                          ((X < Y) | bvar[1:])))
-        defining.append(bvar[-1] == (X[-1] <= Y[-1])) #for strict case use <
-        constraining.append(bvar[0])
+        bvar = boolvar(shape=(len(X) + 1))
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        defining.append(bvar[-1] == (X[-1] <= Y[-1]))
+        constraining = [bvar[0]]
 
         return constraining, defining
 
