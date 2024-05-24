@@ -16,7 +16,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentLists" "AllDifferentExcept0",
+    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
