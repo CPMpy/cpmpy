@@ -521,7 +521,7 @@ class CPM_choco(SolverInterface):
                     if cpm_expr.name == "lex_lesseq":
                         return self.chc_model.lex_less_eq(*chc_args)
                     return self.chc_model.lex_less(*chc_args)
-# Ready for when it is fixed in pychoco
+# Ready for when it is fixed in pychoco (https://github.com/chocoteam/pychoco/issues/30)
 #                elif cpm_expr.name == "lex_chain_less":
 #                    return self.chc_model.lex_chain_less(chc_args)
 
