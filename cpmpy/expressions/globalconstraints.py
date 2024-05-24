@@ -544,9 +544,8 @@ class Increasing(GlobalConstraint):
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return argval(all(args[i] <= args[i+1] for i in range(len(args)-1)))
+        args = argvals(self.args)
+        return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -567,9 +566,8 @@ class Decreasing(GlobalConstraint):
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return argval(all(args[i] >= args[i+1] for i in range(len(args)-1)))
+        args = argvals(self.args)
+        return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -590,9 +588,8 @@ class IncreasingStrict(GlobalConstraint):
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return argval(all(args[i] < args[i+1] for i in range(len(args)-1)))
+        args = argvals(self.args)
+        return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -613,9 +610,8 @@ class DecreasingStrict(GlobalConstraint):
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return argval(all(args[i] > args[i+1] for i in range(len(args)-1)))
+        args = argvals(self.args)
+        return all(args[i] > args[i+1] for i in range(len(args)-1))
 
 
 class LexLess(GlobalConstraint):
@@ -644,9 +640,8 @@ class LexLess(GlobalConstraint):
         return constraining, defining
 
     def value(self):
-        from .python_builtins import any, all
-        X, Y = self.args
-        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))))
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
 
 
 class LexLessEq(GlobalConstraint):
@@ -675,9 +670,8 @@ class LexLessEq(GlobalConstraint):
         return constraining, defining
 
     def value(self):
-        from .python_builtins import any, all
-        X, Y = self.args
-        return argval(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X))))
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
 
 
 class LexChainLess(GlobalConstraint):
@@ -695,9 +689,8 @@ class LexChainLess(GlobalConstraint):
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
     def value(self):
-        X = self.args
-        from .python_builtins import all
-        return argval(all(LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])))
+        X = argvals(self.args)
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class LexChainLessEq(GlobalConstraint):
@@ -715,9 +708,8 @@ class LexChainLessEq(GlobalConstraint):
         return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
     def value(self):
-        X = self.args
-        from .python_builtins import all
-        return argval(all(LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])))
+        X = argvals(self.args)
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
