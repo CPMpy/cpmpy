@@ -616,7 +616,6 @@ class DecreasingStrict(GlobalConstraint):
 
 class LexLess(GlobalConstraint):
     """ Given lists X,Y, enforcing that X is lexicographically less than Y.
-    Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
     """
     def __init__(self, list1, list2):
         X = flatlist(list1)
@@ -626,6 +625,22 @@ class LexLess(GlobalConstraint):
         super().__init__("lex_less", [X, Y])
 
     def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal. It needs to be strictly less in at least one index.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
         X, Y = cpm_array(self.args)
 
         bvar = boolvar(shape=(len(X) + 1))
@@ -646,7 +661,6 @@ class LexLess(GlobalConstraint):
 
 class LexLessEq(GlobalConstraint):
     """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
-    Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
     """
     def __init__(self, list1, list2):
         X = flatlist(list1)
@@ -656,6 +670,22 @@ class LexLessEq(GlobalConstraint):
         super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
         X, Y = cpm_array(self.args)
 
         bvar = boolvar(shape=(len(X) + 1))
@@ -671,7 +701,7 @@ class LexLessEq(GlobalConstraint):
 
 
 class LexChainLess(GlobalConstraint):
-    """ Given a matrix X,, enforces that all rows are lexicographically ordered.
+    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
     """
     def __init__(self, X):
         # Ensure the numpy array is 2D
@@ -681,6 +711,8 @@ class LexChainLess(GlobalConstraint):
         self.args = X
 
     def decompose(self):
+        """ Decompose to a series of LexLess constraints between subsequent rows
+        """
         X = self.args
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
@@ -690,7 +722,7 @@ class LexChainLess(GlobalConstraint):
 
 
 class LexChainLessEq(GlobalConstraint):
-    """ Given a matrix X,, enforces that all rows are lexicographically ordered.
+    """ Given a matrix X, LexChainLessEq enforces that all rows are lexicographically ordered.
     """
     def __init__(self, X):
         # Ensure the numpy array is 2D
@@ -700,6 +732,8 @@ class LexChainLessEq(GlobalConstraint):
         self.args = X
 
     def decompose(self):
+        """ Decompose to a series of LexLessEq constraints between subsequent rows
+        """
         X = self.args
         return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
