@@ -86,7 +86,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, is_boolexpr, has_nested
+from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from .negation import recurse_negation, push_down_negation
 
 
@@ -132,10 +132,12 @@ def flatten_constraint(expr):
     lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
     lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     for expr in lst_of_expr:
-        if not has_nested(expr):
-            newlist.append(expr)  # no need to do anything
 
-        elif isinstance(expr, Operator):
+        if not expr.has_subexpr():
+            newlist.append(expr)  # no need to do anything
+            continue
+
+        if isinstance(expr, Operator):
             """
             - Base Boolean operators: and([Var]), or([Var])        (CPMpy class 'Operator', is_bool())
             - Base Boolean impliciation: Var -> Var                (CPMpy class 'Operator', is_bool())
@@ -143,10 +145,7 @@ def flatten_constraint(expr):
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
-            if all(__is_flat_var(arg) for arg in expr.args):
-                newlist.append(expr)
-                continue
-            elif expr.name == 'or':
+            if expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
                 if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
@@ -226,7 +225,7 @@ def flatten_constraint(expr):
                 rewritten = True
 
             # already flat?
-            if all(__is_flat_var(arg) for arg in [lexpr, rexpr]):
+            if not expr.has_subexpr():
                 if not rewritten:
                     newlist.append(expr)  # original
                 else:
@@ -383,7 +382,7 @@ def normalized_boolexpr(expr):
         if expr.name == 'not':
             flatvar, flatcons = get_or_make_var(expr.args[0])
             return (~flatvar, flatcons)
-        if all(__is_flat_var(arg) for arg in expr.args):
+        if not expr.has_subexpr():
             return (expr, [])
         else:
             # one of the arguments is not flat, flatten all
@@ -392,7 +391,7 @@ def normalized_boolexpr(expr):
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
-        if expr.name != '!=' and all(__is_flat_var(arg) for arg in expr.args):
+        if (expr.name != '!=') and (not expr.has_subexpr()):
             return (expr, [])  # shortcut
         else:
             # LHS can be boolexpr, RHS has to be variable
@@ -427,7 +426,7 @@ def normalized_boolexpr(expr):
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         """
         # just recursively flatten args, which can be lists
-        if all(__is_flat_var_or_list(arg) for arg in expr.args):
+        if not expr.has_subexpr():
             return (expr, [])
         else:
             # recursively flatten all children
@@ -435,7 +434,7 @@ def normalized_boolexpr(expr):
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatargs
+            newexpr.update_args(flatargs)
             return (newexpr, [c for con in flatcons for c in con])
 
 
@@ -468,7 +467,7 @@ def normalized_numexpr(expr):
         if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
             return normalized_numexpr(Operator("wsum", _wsum_make(expr)))
 
-        if not expr.has_nested_expr():
+        if not expr.has_subexpr():
             return (expr, [])
 
         # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
@@ -513,7 +512,7 @@ def normalized_numexpr(expr):
         # Globalfunction (examples: Max,Min,Element)
 
         # just recursively flatten args, which can be lists
-        if all(__is_flat_var_or_list(arg) for arg in expr.args):
+        if not expr.has_subexpr():
             return (expr, [])
         else:
             # recursively flatten all children
@@ -521,7 +520,7 @@ def normalized_numexpr(expr):
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatvars
+            newexpr.update_args(flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
     raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug

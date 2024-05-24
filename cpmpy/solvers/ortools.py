@@ -340,7 +340,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         print(f"c ort:decompose took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
-        cpm_cons = flatten_constraint(cpm_cons)#, _has_nested=_has_nested)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_cons) # flat normal form
         print(f"c ort:flatten took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification

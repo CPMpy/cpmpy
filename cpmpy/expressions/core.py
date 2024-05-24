@@ -71,7 +71,7 @@ import warnings
 from types import GeneratorType
 import numpy as np
 
-from .utils import is_bool, is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf
+from .utils import is_bool, is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
 from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
@@ -103,14 +103,25 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
 
 
-        self._has_nested_map = [(not a.is_leaf()) if isinstance(a, Expression) else False for a in arg_list]
-        self._has_nested = any(self._has_nested_map)
+    @property
+    def args(self):
+        return self._args
+    
+    @args.setter
+    def args(self, args):
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'") 
 
-        self._has_nested_boolean_constants_map = [is_bool(a) or (isinstance(a, Expression) and a.has_nested_boolean_constants()) for a in arg_list]
-        self._has_nested_boolean_constants = any(self._has_nested_boolean_constants_map)
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        self._args = args
+        # Reset cached "_has_subexpr"
+        if hasattr(self, "_has_subexpr"):
+            del self._has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -140,27 +151,37 @@ class Expression(object):
     def __hash__(self):
         return hash(self.__repr__())
     
-    def has_nested_expr(self):
-        """ Does it contains nested Expressions?
-            Is of importance when deciding whether transformation/decomposition is needed.
+    def has_subexpr(self):
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed 
+            along particular paths of the expression tree.
+            Results are cached for future calls and reset when the expression changes
+            (in-place argument update).
         """
-        return self._has_nested   # default
-    
-    def nested_expr(self):
-        """ A boolean list indicating which of the expression's args are a nested expression.
-        """
-        return self._has_nested_map
 
+        def recursive_has_subexpr(lst) -> bool:
+            """ Recursive implementation to handle nested lists of expressions.
+            """
+            for el in lst:
+                if isinstance(el, Expression):  
+                    if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too (allows early-exit for decision var arrays)
+                        return True
+                elif is_any_list(el) and recursive_has_subexpr(el): # recursively call on list-like
+                    return True
+            return False
+                    
+        # If not an Expression (e.g. list-like) or _has_subexpr has not been computed before / has been reset
+        if not hasattr(self, '_has_subexpr'): 
+            # args can have lists of lists... -> need for recursive implementation
+            self._has_subexpr = recursive_has_subexpr(self.args)
+
+        return self._has_subexpr
+    
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
-    
-    def has_nested_boolean_constants(self):
-        """ Is there somewhere in the expression tree starting from this expression a boolean constant?
-        """
-        return self._has_nested_boolean_constants
     
     def nested_boolean_constants(self):
         """ A boolean list indicating which of the args are or contain a boolean constant.
@@ -169,7 +190,6 @@ class Expression(object):
     
     def is_leaf(self):
         """ Is it the leaf of an expression tree?
-            This is only the case for decision variables (and constants).
             Default: no
         """
         return False
@@ -415,7 +435,16 @@ class BoolVal(Expression):
         return self.args[0]
 
     def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+        """
         return True
+    
+    def has_subexpr(self) -> bool:
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed 
+            along particular paths of the expression tree.
+        """
+        return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
 
 class Comparison(Expression):
