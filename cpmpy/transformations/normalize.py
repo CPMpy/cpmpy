@@ -124,6 +124,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
             """
             if is_boolexpr(lhs) and is_num(rhs):
                 # direct simplification of boolean comparisons
+                if isinstance(rhs, BoolVal):
+                    rhs = int(rhs.value()) # ensure proper comparisons below
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
                 elif rhs == 0:
