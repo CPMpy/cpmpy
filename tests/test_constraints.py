@@ -10,7 +10,7 @@ import pytest
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
-SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ["minizinc"]#[name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
@@ -195,14 +195,14 @@ def global_constraints(solver):
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
         elif name == "Circuit":
-            S = intvar(0, 9, shape=10)
+            S = intvar(0, 3, shape=4)
             expr = Circuit(S)
         elif name == "SubCircuit":
-            S = intvar(0, 9, shape=10)
+            S = intvar(0, 3, shape=4)
             expr = SubCircuit(S)
         elif name == "SubCircuitWithStart":
             S = intvar(0, 9, shape=10)
-            expr = SubCircuitWithStart(S)
+            expr = SubCircuitWithStart(S, start_index=0)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)

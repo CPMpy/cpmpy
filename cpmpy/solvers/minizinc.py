@@ -430,7 +430,7 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
+                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit"})
 
@@ -586,10 +586,12 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == 'circuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
 
         elif expr.name == 'subcircuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
         
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args

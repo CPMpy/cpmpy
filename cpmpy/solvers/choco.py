@@ -312,8 +312,10 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
+        # when running the full test-suite, bugs appear for subcircuit
+        # it is probably related to issue #1085 (choco repo), but for now pychoco is still broken
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing"}
 
         # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit (#1085)

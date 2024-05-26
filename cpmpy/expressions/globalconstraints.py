@@ -230,9 +230,9 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
-        super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
+        super().__init__("circuit", flatargs)
 
     def decompose(self):
         """
@@ -261,9 +261,7 @@ class Circuit(GlobalConstraint):
         visited = set()
         arr = argvals(self.args)
 
-        for i in range(len(arr)):
-            if idx in visited:
-                break
+        while idx not in visited:
             if idx is None:
                 return False
             if not (0 <= idx < len(arr)):
@@ -303,7 +301,7 @@ class SubCircuit(GlobalConstraint):
         """
             Decomposition for SubCircuit
 
-            A mix of the above circuit implementation, with elements from the Minizinc implementation for the support of optional visits:
+            A mix of the above Circuit decomposition, with elements from the Minizinc implementation for the support of optional visits:
             https://github.com/MiniZinc/minizinc-old/blob/master/lib/minizinc/std/subcircuit.mzn
         """
         from .python_builtins import min as cpm_min
@@ -314,65 +312,43 @@ class SubCircuit(GlobalConstraint):
         n = len(succ)
 
         # Decision variables
-        order = intvar(0, n-1, shape=n) # Order variables for the stops within the subcircuit (if part of it, otherwise a remaining value in the domain as to satisfy AllDiff).
+        start_node = intvar(0, n-1) # The first stop in the subcircuit.
+        end_node = intvar(0, n-1) # The last stop in the subcircuit, before looping back to the "start_node".
+        index_within_subcircuit = intvar(0, n-1, shape=n) # The position each stop takes within the subcircuit, with the assumption that the stop "start_node" gets index 0.  
         is_part_of_circuit = boolvar(shape=n) # Whether a stop is part of the subcircuit.
-        end_index = intvar(0, n-1) # Index of the last stop in the subcircuit, before looping back to the start_index.
-        start_index = intvar(0, n-1) # An additional auxilary start_index variable, helps with ensuring only one subcircuit is present
         empty = boolvar() # To detect when a subcircuit is completely empty
 
+        # Constraining
         constraining = []
         constraining += [AllDifferent(succ)] # All stops should have a unique successor.
         constraining += list( is_part_of_circuit.implies(succ < len(succ)) ) # Successor values should remain within domain.
-
-        defining = []
-        defining += [ empty == cpm_all(succ == np.arange(n)) ] # Definition of empty subcircuit
-        defining += [ empty.implies(cpm_all(order == cpm_array([0]*n))) ] # If the subcircuit is empty, default all order values to 0
-        defining += [ empty.implies(start_index == 0) ] # If the subcircuit is empty, any stop could be a start of a 0-length circuit. Default to stop 0 as symmetry breaking.
-        defining += [ order[start_index] == 0 ] # The ordering starts at the start_index stop.   
         for i in range(0, n):
-            # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as order.
-            defining += [(is_part_of_circuit[i] & (i != end_index)).implies(
-                order[succ[i]] == (order[i] + 1)
+            # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
+            constraining += [(is_part_of_circuit[i] & (i != end_node)).implies(
+                index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
             )]
-        # Either a stop is part of the subcircuit, with an order value with the range [0, order[end_index]] (so never greater than the order of the last stop within the circuit),
-        # or it is not part of the subcircuit and thus must have an order value outside of this range (thus strictly greater that the order of the last stop within the circuit).
-        # All stops in the subcircuit will thus be the ones with an order value between 0 and order[end_index], whilst the rest is by definition outside of the subcircuit.
-        # The distribution of the order values within the range gets decided by the successor values (see previous constraint). Stops not placed on the subcircuit get the 
-        # the order[end_index] + 1 assigned to them. This is needed for removing the degeneracy caused by unconstrained assignment of the remaining order values to the
-        # non-subcircuit stops. This seems like a better approach than an AllDiff over 'order' and trying to add an ordering over the 'order' values of the non-subcircuit stops,
-        # i.e. (~is_part_of_circuit[i] and ~is_part_of_circuit[j]) -> ( ( (i > j) and (order[i] > order[j]) ) or ( (i < j) and (order[i] < order[j]) ) ).
-        # Since we don't know which nodes will be part of the subcircuit, this would have had to be formulated over all pairs of nodes.
-        # We additionally have to check for the empty case. Otherwise, forcing all 'order' values to be 0 for symmetry-breaking reasons would force `is_part_of_circuit` 
-        # to be true for all.
-        defining += [ (is_part_of_circuit[i] == ((~empty) & (order[end_index] + 1 != order[i]))) for i in range(n)] 
-        defining += [ ( empty | (is_part_of_circuit[start_index] == True) ) ] # The start index can only not belong to the subcircuit when the subcircuit is empty.
-        # These two should be added if we assume a subcircuit can never be empty.
-        #   It was not enforced in the end as to follow the convention of the solvers.
-        # defining += [is_part_of_circuit[start_index] == True, is_part_of_circuit[end_index] == True] # Both the start and end stops should be part of the circuit.
-        # defining += [start_index != end_index] # The end stop cannot be the start stop, thus the subcircuit length should be longer than 1.
-        defining += [succ[end_index] == start_index] # Definition of the last stop. As the successor we should cycle back to the start.
-        defining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
-        
-        
-        # The start_index decision variable can freely take the value of any of the stops inside the subcircuit, 
-        # whilst still resulting in the same subcircuit. The start_index is a completely internal component, not externally visible.
-        # Degenerate solutions will thus be created, resulting in a much higher solution count when doing solveAll()
-        # Thus some symmetry breaking is needed. By assuming that the start_index will take the smallest index
-        # of all stops included in the subcircuit, the degeneracy is removed.
+        constraining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
 
-        # Part of the formulation from the following is used:
-        # https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
-
-        # Auxiliary variable which will hold the indices of the subcircuit in a looping fashion.
-        # If we have 6 stops [0, .., 5] and the subcircuit is [0, 2, 1], then s = [0, 2, 1, 0, 2, 1].
-        # Thus s is a way to collect all the indices of stops which get visited.
-        s = intvar(0, n-1, shape=n)
-        defining += [s[0] == start_index]
-        defining += [s[i+1] == succ[s[i]] for i in range(n-1)]
-
-        # The free start_index could be any of the values of s, resulting in degenerate solutions.
-        # By enforcing start_index to take the smallest value, symmetry breaking is ensured.
-        defining += [start_index == cpm_min(s)]
+        # Defining
+        defining = []
+        defining += [ empty == cpm_all(succ == np.arange(n)) ] # Definition of empty subcircuit (all nodes self-loop)
+        defining += [ empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n))) ] # If the subcircuit is empty, default all index values to 0
+        defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
+        defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
+        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.   
+        defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
+        # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit. 
+        # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node]. 
+        # The case of an empty subcircuit is an exception, since "end_node" itself is not part of the subcircuit
+        defining += [ (is_part_of_circuit[i] == ((~empty) & (index_within_subcircuit[end_node] + 1 != index_within_subcircuit[i]))) for i in range(n)] 
+        # In a subcircuit any of the visited nodes can be the "start node", resulting in symmetrical solutions -> Symmetry breaking
+        # Part of the formulation from the following is used: https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
+        subcircuit_visits = intvar(0, n-1, shape=n) # The visited nodes in sequence of length n, with possible repeated stops. e.g. subcircuit [0, 2, 1] -> [0, 2, 1, 0, 2, 1]
+        defining += [subcircuit_visits[0] == start_node] # The start nodes is the first stop
+        defining += [subcircuit_visits[i+1] == succ[subcircuit_visits[i]] for i in range(n-1)] # We follow the successor values
+        # The free "start_node" could be any of the values of aux_subcircuit_visits (the actually visited nodes), resulting in degenerate solutions.
+        # By enforcing "start_node" to take the smallest value, symmetry breaking is ensured.
+        defining += [start_node == cpm_min(subcircuit_visits)]
 
         return constraining, defining
     
@@ -405,8 +381,6 @@ class SubCircuit(GlobalConstraint):
             else:
                 if idx in visited:
                     return False
-            # Something is wrong, certain variables didn't get values
-            if idx is None: return False
             # Check bounds on successor value
             if not (0 <= idx < n): return False
             # Collect
@@ -425,13 +399,13 @@ class SubCircuit(GlobalConstraint):
 class SubCircuitWithStart(GlobalConstraint):
 
     """
-        The sequence of variables form a subcircuits, where x[i] = j means that j is the successor of i.
+        The sequence of variables form a subcircuit, where x[i] = j means that j is the successor of i.
         Contrary to Circuit, there is no requirement on all nodes needing to be part of the circuit.
         Nodes which aren't part of the subcircuit, should self loop i.e. x[i] = i.
-        The size of the subcircuit should be strictly greater than 1, so not all stops can selfloop 
+        The size of the subcircuit should be strictly greater than 1, so not all stops can self loop 
         (as otherwise the start_index will never get visited).
         start_index will be treated as the start of the subcircuit. 
-        The only impact of this is that start_index will be garuanteed to be inside the subcircuit.
+        The only impact of start_index is that it will be guaranteed to be inside the subcircuit.
 
         Global Constraint Catalog:
         https://sofdem.github.io/gccat/gccat/Cproper_circuit.html
@@ -469,20 +443,7 @@ class SubCircuitWithStart(GlobalConstraint):
         succ = cpm_array(self.args) # Successor variables
 
         constraining = []
-
-        # Optional improvement by passing start_index to SubCircuit.
-        #   Whilst SubCircuit does not assume a start_index (and does not acdept one as an argument),
-        #   it still uses one internally as the enforce that only one subcircuit is present.
-        #   start_index takes form as a free decision variable, but by enforming SubCircuit of the
-        #   known start_index, we can improve its solving performance.
-        #   Unfortunately, directly accessing and modifying another constraint's private fields is 
-        #   a quite ugly approach.
-
-        # sc = SubCircuit(succ)
-        # sc.symmetry_breaking = False
-        # sc.start_index = start_index
-
-        constraining += [SubCircuit(succ)] # The successor variables should form a subcircuit.
+        constraining += [SubCircuit(self.args)] # The successor variables should form a subcircuit.
         constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
 
         defining = []
@@ -491,10 +452,12 @@ class SubCircuitWithStart(GlobalConstraint):
     
     def value(self):
         start_index = self.start_index
-        succ = cpm_array(self.args) # Successor variables
+        succ = [argval(a) for a in self.args] # Successor variables
 
-        # Check if we have a valid subcicircuit and that the start_index is part of it.
+        # Check if we have a valid subcircuit and that the start_index is part of it.
         return SubCircuit(succ).value() and (succ[start_index] != start_index)
+    
+
 class Inverse(GlobalConstraint):
     """
        Inverse (aka channeling / assignment) constraint. 'fwd' and

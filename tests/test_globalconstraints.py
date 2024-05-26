@@ -285,7 +285,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_subcircuit_choco(self):
         """
-        See issue #1085
+        See issue #1095: https://github.com/chocoteam/choco-solver/issues/1095
         """
 
         n = 3
@@ -297,6 +297,24 @@ class TestGlobal(unittest.TestCase):
 
         model = cp.Model([a.implies(cp.SubCircuit(x)), a == True] + [(x[0] != 0), (x[1] == 1), (x[2] != 2)])
         assert( model.solve() )
+
+    def test_subcircuitwithstart(self):
+        n = 5
+        x = cp.intvar(0, n-1, n)
+        
+        # Test satisfiability
+        model = cp.Model( [cp.SubCircuitWithStart(x)] )
+        self.assertTrue( model.solve() )
+        self.assertTrue( cp.SubCircuitWithStart(x).value() )
+
+        # Test default start position of 0
+        model = cp.Model( [cp.SubCircuitWithStart(x)] + [x[0] == 0] ) # force default start_index 0 to not be in the circuit
+        self.assertFalse( model.solve() )
+
+        # Test start position
+        start_index = 3
+        model = cp.Model( [cp.SubCircuitWithStart(x, start_index=start_index)] + [x[start_index] == start_index] ) # force start_index to not be in the circuit
+        self.assertFalse(model.solve())
 
 
     def test_inverse(self):
