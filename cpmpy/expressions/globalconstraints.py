@@ -322,6 +322,12 @@ class SubCircuit(GlobalConstraint):
         constraining = []
         constraining += [AllDifferent(succ)] # All stops should have a unique successor.
         constraining += list( is_part_of_circuit.implies(succ < len(succ)) ) # Successor values should remain within domain.
+        for i in range(0, n):
+            # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
+            constraining += [(is_part_of_circuit[i] & (i != end_node)).implies(
+                index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
+            )]
+        constraining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
 
         # Defining
         defining = []
@@ -330,12 +336,6 @@ class SubCircuit(GlobalConstraint):
         defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
         defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
         defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.   
-        for i in range(0, n):
-            # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
-            defining += [(is_part_of_circuit[i] & (i != end_node)).implies(
-                index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
-            )]
-        defining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
         defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
         # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit. 
         # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node]. 
