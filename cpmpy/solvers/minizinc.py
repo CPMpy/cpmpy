@@ -586,10 +586,12 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == 'circuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
 
         elif expr.name == 'subcircuit': 
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
         
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args

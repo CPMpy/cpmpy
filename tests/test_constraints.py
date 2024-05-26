@@ -202,7 +202,7 @@ def global_constraints(solver):
             expr = SubCircuit(S)
         elif name == "SubCircuitWithStart":
             S = intvar(0, 9, shape=10)
-            expr = SubCircuitWithStart(S)
+            expr = SubCircuitWithStart(S, start_index=0)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
