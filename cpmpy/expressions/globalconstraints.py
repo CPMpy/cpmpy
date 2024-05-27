@@ -538,7 +538,7 @@ class Cumulative(GlobalConstraint):
 class Precedence(GlobalConstraint):
     """
         Constraint enforcing some values have precedence over others.
-        Given an array of variables X and and a list of precedences P:
+        Given an array of variables X and a list of precedences P:
         Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
     """
     def __init__(self, vars, precedence):
