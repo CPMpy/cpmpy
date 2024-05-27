@@ -21,7 +21,7 @@ NUM_GLOBAL = {
     "Circuit", "SubCircuit", "SubCircuitWithStart",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum", "Among"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -105,6 +105,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, 3)
         elif name == "IfThenElseNum":
             expr = cls(BOOL_VAR, NUM_ARGS[0], NUM_ARGS[1])
+        elif name == "Among":
+            expr = cls(NUM_ARGS, [1,2])
         else:
             expr = cls(NUM_ARGS)
 

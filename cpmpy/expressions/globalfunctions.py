@@ -57,6 +57,7 @@
         Maximum
         Element
         Count
+        Among
         NValue
         Abs
 
@@ -67,7 +68,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
@@ -318,6 +319,35 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         return 0, len(arr)
+
+
+
+class Among(GlobalFunction):
+    """
+        The Among (numerical) global constraint represents the number of variable that take values among the values in arr
+    """
+
+    def __init__(self,arr,vals):
+        if not is_any_list(arr) or not is_any_list(vals):
+            raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        if any(isinstance(val, Expression) for val in vals):
+            raise TypeError(f"Among takes a set of values as input, not {vals}")
+        super().__init__("among", [arr,vals])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            Among(arr, vals) can only be decomposed if it's part of a comparison'
+        """
+        from .python_builtins import sum, any
+        arr, values = self.args
+        count_for_each_val = [Count(arr, val) for val in values]
+        return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
+
+    def value(self):
+        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
+
+    def get_bounds(self):
+        return 0, len(self.args[0])
 
 class NValue(GlobalFunction):
 
