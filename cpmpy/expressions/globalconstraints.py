@@ -101,7 +101,6 @@
         AllDifferentExceptN
         AllDifferentLists
         AllEqual
-        AllEqualExcept0
         AllEqualExceptN
         Circuit
         Inverse
@@ -266,13 +265,16 @@ class AllEqualExceptN(GlobalConstraint):
 
     def __init__(self, arr, n):
         flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
         super().__init__("allequal_except_n", [flatarr, n])
 
     def decompose(self):
-        return [((var1 == self.args[1]) | (var1 == var2) | (var2 == self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        from .python_builtins import any as cpm_any
+        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argval(self.args[1])]
         return len(set(vals)) == 1 or len(set(vals)) == 0
 
 
