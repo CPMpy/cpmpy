@@ -24,8 +24,8 @@ if 'y' in cwd[-2:]:
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCSP', "*.xml")))
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCOP', "*.xml")))
 else:
-    xmlmodels.extend(glob.glob(join('MiniCSP', "Diamond*.xml")))
-    xmlmodels.extend(glob.glob(join('MiniCOP', "Diamond*.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCSP', "*.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCOP', "*.xml")))
 
 #for subdividing the models (use 'instances' directory for xmlmodels)
 '''if 'y' in cwd[-2:]:
