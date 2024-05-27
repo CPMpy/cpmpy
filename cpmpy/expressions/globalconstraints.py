@@ -345,7 +345,7 @@ class MDD(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
-        if all(is_transition(transition) for transition in transitions):
+        if not all(is_transition(transition) for transition in transitions):
             raise TypeError("The second argument of an MDD constraint should be collection of transitions")
         super().__init__("mdd", [array, transitions])
         self.root_node = transitions[0][0]
