@@ -417,7 +417,6 @@ class CallbacksCPMPy(Callbacks):
         cpm_start = self.get_cpm_exprs(origins)
         cpm_durations = self.get_cpm_exprs(lengths)
         cpm_demands = self.get_cpm_exprs(heights)
-        cpm_cap = self.get_cpm_var(condition.right_operand())
         cpm_ends = []
         for s,d in zip(cpm_start, cpm_durations):
             expr = s + d
