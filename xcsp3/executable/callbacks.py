@@ -235,6 +235,7 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
+        # return
         self._unimplemented(scope, transitions, start_state, final_states) # TODO: add after Helene PR
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
@@ -422,9 +423,11 @@ class CallbacksCPMPy(Callbacks):
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
         self._unimplemented(lst, value)
 
-    def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable],
-                      zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
-        self._unimplemented(origins, lengths, zero_ignored)
+    def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable], zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
+        cpm_start = self.get_cpm_vars(origins)
+        cpm_dur = self.get_cpm_vars(lengths)
+        cpm_end = [cp.intvar(*((s+d).get_bounds())) for s,d in zip(cpm_start, cpm_dur)]
+        self.cpm_model += cp.NoOverlap(cpm_start, cpm_dur, cpm_end)
 
     def ctr_nooverlap_multi(self, origins: list[list[Variable]], lengths: list[list[int]] | list[list[Variable]], zero_ignored: bool):
         self._unimplemented(origins, lengths, zero_ignored)
