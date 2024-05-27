@@ -113,7 +113,8 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, \
+    is_transition
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -313,84 +314,130 @@ class Table(GlobalConstraint):
 
 
 class MDD(GlobalConstraint):
-    """The values of the variables in 'array' correspond to a path in the mdd formed by the transition in 'transitions'
-    Root node is the first one used as a start in the first transition
+    """
+    MDD-constraint: an MDD (Multi-valued Decision Diagram) is an acyclic layerd graph starting from a single node and
+    ending in one. Each edge layer corresponds to a variables and each path corresponds to a solution
+
+    The values of the variables in 'array' correspond to a path in the mdd formed by the transitions in 'transitions'.
+    Root node is the first node used as a start in the first transition (i.e. transitions[0][0])
+
+    spec:
+        - array: an array of CPMpy expressions (integer variable, global functions,...)
+        - transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifiers for the nodes
+        (int or str are fine)
+
+    Example:
+        The following transitions depict a 3 layer MDD, starting at 'r' and ending in 't'
+        ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+        ("n4", 0, "t"), ("n5", 1, "t")
+        Its graphical representation is:
+                  r
+              0/ |1  \2     X
+            n1   n2   n3
+            2| /2    /O     Y
+             n4     n5
+              0\   /1       Z
+                 t
+        It has 3 paths, corresponding to 3 solution for (X,Y,Z): (0,2,0), (1,2,0) and (2,0,1)
     """
 
     def __init__(self, array, transitions):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of an MDD constraint should only contain variables/expressions")
+            raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
+        if all(is_transition(transition) for transition in transitions):
+            raise TypeError("The second argument of an MDD constraint should be collection of transitions")
         super().__init__("mdd", [array, transitions])
         self.root_node = transitions[0][0]
         self.mapping = {}
         for s, v, e in transitions:
             self.mapping[(s, v)] = e
 
-    def transition_to_layer_representation(self):
+    def _transition_to_layer_representation(self):
+        """ auxiliary function to compute which nodes belongs to which node-layer and which transition belongs to which
+        edge-layer of the MDD, needed to compute decomposition
+        """
         arr, transitions = self.args
         nodes_by_level = [[self.root_node]]
         transitions_by_level = []
         tran = transitions
-        for i in range(len(arr)):
+        for i in range(len(arr)): # go through each layer
             nodes_by_level.append([])
             transitions_by_level.append([])
             remaining_tran = []
-            for ns, v, ne in tran:
-                if ns in nodes_by_level[i]:
+            for t in tran: # test each transition
+                ns, _, ne = t
+                if ns in nodes_by_level[i]: # add to the current layer if start node belongs to the node-layer
                     if ne not in nodes_by_level[i + 1]:
                         nodes_by_level[i + 1].append(ne)
-                    transitions_by_level[i].append((ns, v, ne))
+                    transitions_by_level[i].append(t)
                 else:
-                    remaining_tran.append((ns, v, ne))
+                    remaining_tran.append(t)
             tran = remaining_tran
         return nodes_by_level, transitions_by_level
 
     # auxillary method to transform into layered representation (gather all the node by node-layers)
-    def normalize_layer_representation(self, nodes_by_level, transitions_by_level):
+    def _normalize_layer_representation(self, nodes_by_level, transitions_by_level):
+        """ auxiliary function to normalize the names of the nodes in layer by layer representation. Node ID in
+        normalized representation goes from 0 to n-1 for each layer. Used by the decomposition of the constraint.
+        """
         nb_nodes_by_level = [len(x) for x in nodes_by_level]
         num_mapping = {}
         for lvl in nodes_by_level:
             for i in range(len(lvl)):
                 num_mapping[lvl[i]] = i
-        transitions_by_level_normalized = [[[num_mapping[n_in], v, num_mapping[n_out]] for n_in, v, n_out in lvl] for
-                                           lvl in
-                                           transitions_by_level]
+        transitions_by_level_normalized = [[[num_mapping[n_in], v, num_mapping[n_out]]
+                                            for n_in, v, n_out in lvl]
+                                           for lvl in transitions_by_level]
         return nb_nodes_by_level, num_mapping, transitions_by_level_normalized
 
 
     def decompose(self):
-        # Table decomposition (not by decomposition of the mdd into one big table, but by having transition table for
-        # each state and auxiliary variables for the nodes. Similar to decomposition of regular into table,
+        # Table decomposition (not by decomposition of the mdd into one big table, but by having transitions tables for
+        # each layer and auxiliary variables for the nodes. Similar to decomposition of regular into table,
         # but with one table for each layer
         arr, _ = self.args
         lb = [x.lb for x in arr]
         ub = [x.ub for x in arr]
-        nbl, tbl = self.transition_to_layer_representation()
-        nb_nodes_by_level, num_mapping, transitions_by_level_normalized = self.normalize_layer_representation(nbl, tbl)
+        # transform to layer representation
+        nbl, tbl = self._transition_to_layer_representation()
+        # normalize the naming of the nodes so it can be use as value for aux variables
+        nb_nodes_by_level, num_mapping, transitions_by_level_normalized = self._normalize_layer_representation(nbl, tbl)
+        # choose the best decomposition depending on number of levels
         if len(transitions_by_level_normalized) > 2:
             # decomposition with multiple transitions table and aux variables for the nodes
             aux = [intvar(0, nb_nodes) for nb_nodes in nb_nodes_by_level[1:]]
+            # complete the MDD with additional dummy transitions to get the false end node also represented,
+            # needed so the negation works.
+            # I.E., now any assignment have a path in the MDD, some, the solutions, ending in an accepting state
+            # (end node of the initial MDD), other, the non-solutions, ending in a rejecting state (dummy end node)
             for i in range(len(arr)):
+                # add for each state the missing transition to a dummy node on the next level
                 transition_dummy = [[num_mapping[n], v, nb_nodes_by_level[i+1]] for n in nbl[i] for v in range(lb[i], ub[i] + 1) if
                             (n, v) not in self.mapping]
                 if i != 0:
+                    # add transition from one dummy node to the other (not needed for initial layer as no dummy there)
                     transition_dummy += [[nb_nodes_by_level[i], v, nb_nodes_by_level[i+1]] for v in range(lb[i], ub[i] + 1)]
+                # add the new transitions
                 transitions_by_level_normalized[i] = transitions_by_level_normalized[i] + transition_dummy
-            tab_first = [x[1:] for x in transitions_by_level_normalized[0]]  # optimization for first level (one node)
-            return [aux[-1] == 0], [Table([arr[0], aux[0]], tab_first)] \
+            # optimization for first level (only one node, allows to deal with smaller table on first layer)
+            tab_first = [x[1:] for x in transitions_by_level_normalized[0]]
+            # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-MDD
+            defining = [Table([arr[0], aux[0]], tab_first)] \
                    + [Table([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
                       range(1, len(arr))]
-            # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-MDD
             # constraining constraint: end of the path in accepting node
+            constraining = [aux[-1] == 0]
+            return constraining, defining
         elif len(transitions_by_level_normalized) == 2:
-            # decomposition by unfolding into a table
+            # decomposition by unfolding into a table (i.e., extract all paths and list them as table entries),
+            # avoid auxiliary variables
             tab = [[t_a[1], t_b[1]] for t_a in transitions_by_level_normalized[0] for t_b in
                    transitions_by_level_normalized[1] if t_a[2] == t_b[0]]
             return [Table(arr, tab)], []
 
         elif len(transitions_by_level_normalized) == 1:
-            # decomposition to inDomain
+            # decomposition to inDomain, avoid auxiliary variables and tables
             return [InDomain(arr[0], [t[1] for t in transitions_by_level_normalized[0]])], []
 
     def value(self):
@@ -402,7 +449,7 @@ class MDD(GlobalConstraint):
                 curr_node = self.mapping[curr_node, v]
             else:
                 return False
-        return curr_node == self.sink_node
+        return True # can only have reached end node
 
 class Regular(GlobalConstraint):
     """The values of the variables in 'array' correspond to a path in the automaton formed by the transition in 'transitions'.
@@ -411,7 +458,9 @@ class Regular(GlobalConstraint):
     def __init__(self, array, transitions, start, ends):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a regular constraint should only contain variables/expressions")
+            raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
+        if all(is_transition(transition) for transition in transitions):
+            raise TypeError("The second argument of a regular constraint should be a collection of transitions")
         super().__init__("regular", [array, transitions, start, ends])
         self.mapping = {}
         for s, v, e in transitions:
