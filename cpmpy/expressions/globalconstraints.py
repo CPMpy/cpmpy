@@ -455,7 +455,8 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Ensures that the capacity of the resource is never exceeded
+        Equivalent to noOverlap when demand and capacity are equal to 1
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
@@ -531,6 +532,76 @@ class Cumulative(GlobalConstraint):
             if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
 
+        return True
+
+
+class Precedence(GlobalConstraint):
+    """
+        Constraint enforcing some values have precedence over others.
+        Given an array of variables X and a list of precedences P:
+        Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
+    """
+    def __init__(self, vars, precedence):
+        if not is_any_list(vars):
+            raise TypeError("Precedence expects a list of variables, but got", vars)
+        if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
+            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+        super().__init__("precedence", [vars, precedence])
+
+    def decompose(self):
+        """
+        Decomposition based on:
+        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
+        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
+        """
+        from .python_builtins import any as cpm_any
+
+        args, precedence = self.args
+        constraints = []
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            for j in range(len(args)):
+                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+        return constraints, []
+
+    def value(self):
+
+        args, precedence = self.args
+        vals = np.array(argvals(args))
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            if vals[0] == t: return False
+            for j in range(len(args)):
+                if vals[j] == t and sum(vals[:j] == s) == 0:
+                    return False
+        return True
+
+
+class NoOverlap(GlobalConstraint):
+
+    def __init__(self, start, dur, end):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+
+        super().__init__("no_overlap", [start, dur, end])
+
+    def decompose(self):
+        start, dur, end = self.args
+        cons = [s + d == e for s,d,e in zip(start, dur, end)]
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+            cons += [(e1 <= s2) | (e2 <= s1)]
+        return cons, []
+    def value(self):
+        start, dur, end = argvals(self.args)
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if e1 > s2 and e2 > s1:
+                return False
         return True
 
 

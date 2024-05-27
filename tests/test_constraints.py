@@ -16,8 +16,10 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
-    "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
+    "Precedence", "Cumulative", "NoOverlap",
+    "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
@@ -196,6 +198,14 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "Precedence":
+            x = intvar(0,5, shape=3, name="x")
+            expr = cls(x, [3,1,0])
+        elif name == "NoOverlap":
+            s = intvar(0, 10, shape=3, name="start")
+            e = intvar(0, 10, shape=3, name="end")
+            dur = [1,4,3]
+            expr = cls(s, dur, e)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
