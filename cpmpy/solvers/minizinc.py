@@ -420,7 +420,8 @@ class CPM_minizinc(SolverInterface):
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing",
                      "decreasing", "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq"}
+                     "lex_chain_lesseq","among"}
+                     
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit"})
 
 
@@ -619,6 +620,12 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             val = self._convert_expression(val)
             return "count({},{})".format(vars, val)
+
+        elif expr.name == "among":
+            vars, vals = expr.args
+            vars = self._convert_expression(vars)
+            vals = self._convert_expression(vals).replace("[", "{").replace("]", "}") # convert to set
+            return "among({},{})".format(vars, vals)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple

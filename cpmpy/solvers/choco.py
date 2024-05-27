@@ -314,11 +314,12 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less"}
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among"}
                      
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
-                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue","lex_lesseq", "lex_less"}
+                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
+                             "lex_lesseq", "lex_less",  "among"}
         # for when choco new release comes, fixing the bug on increasing and decreasing
         #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
@@ -481,6 +482,9 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'count': # count(vars, var/int) = var
                     arr, val = lhs.args
                     return self.chc_model.count(self.solver_var(val), self._to_vars(arr), chc_rhs)
+                elif lhs.name == "among":
+                    arr, vals = lhs.args
+                    return self.chc_model.among(chc_rhs, self._to_vars(arr), vals)
                 elif lhs.name == 'mul': # var * var/int = var/int
                     a,b = self.solver_vars(lhs.args)
                     if isinstance(a, int):
@@ -489,6 +493,8 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'pow': # var ^ int = var
                     chc_rhs = self._to_var(rhs)
                     return self.chc_model.pow(*self.solver_vars(lhs.args),chc_rhs)
+
+
 
                 raise NotImplementedError(
                     "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))

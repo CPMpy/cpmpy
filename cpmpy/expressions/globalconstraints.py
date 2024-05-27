@@ -362,10 +362,13 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        if argval(condition):
-            return argval(if_true)
-        else:
-            return argval(if_false)
+        try:
+            if argval(condition):
+                return argval(if_true)
+            else:
+                return argval(if_false)
+        except IncompleteFunctionError:
+            return False
 
     def decompose(self):
         condition, if_true, if_false = self.args
