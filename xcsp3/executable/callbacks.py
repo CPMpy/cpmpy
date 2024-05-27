@@ -351,7 +351,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == k)
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        self._unimplemented(lst, values, k) # TODO: add after Ignace PR
+        self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         arity, op = self.funcmap[condition.operator.name.lower()]
