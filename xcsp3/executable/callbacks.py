@@ -176,14 +176,32 @@ class CallbacksCPMPy(Callbacks):
                 self.cpm_model += cpm_op([cpm_aop([x, y]), z])
 
     def ctr_logic(self, lop: TypeLogicalOperator, scope: list[Variable]):  # lop(scope)
-        self._unimplemented(lop, scope)
+        if lop == TypeLogicalOperator.AND:
+            self.cpm_model += self.get_cpm_vars(scope)
+        elif lop == TypeLogicalOperator.OR:
+            self.cpm_model += cp.any(self.get_cpm_vars(scope))
+        elif lop ==TypeLogicalOperator.IFF:
+            assert len(scope) == 2
+            a,b = scope
+            self.cpm_model += self.get_cpm_var(a) == self.get_cpm_var(b)
+        elif lop == TypeLogicalOperator.IMP:
+            assert len(scope) == 2
+            a,b = scope
+            self.cpm_model += self.get_cpm_var(a).implies(self.get_cpm_var(b))
+        elif lop == TypeLogicalOperator.XOR:
+            self.cpm_model += cp.Xor(self.get_cpm_vars(scope))
+        else:
+            self._unimplemented(lop, scope)
 
     def ctr_logic_reif(self, x: Variable, y: Variable, op: TypeConditionOperator, k: int | Variable):  # x = y <op> k
+        from cpmpy.expressions.utils import eval_comparison
         assert op.is_rel()
-        self._unimplemented(x, y, op, k)
+        self.cpm_model += eval_comparison(op.to_str(),
+                                          self.get_cpm_var(x) == self.get_cpm_var(y),
+                                          self.get_cpm_var(k))
 
     def ctr_logic_eqne(self, x: Variable, op: TypeConditionOperator, lop: TypeLogicalOperator, scope: list[Variable]):  # x = lop(scope) or x != lop(scope)
-        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE)
+        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE) # TODO: what is this???
         self._unimplemented(x, op, lop, scope)
 
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
