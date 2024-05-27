@@ -121,14 +121,8 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_primitive1a(self, x: Variable, op: TypeConditionOperator, k: int):
         assert op.is_rel()
-        x = self.get_cpm_var(x)
-        arity, cpm_op = self.funcmap[op.name.lower()]
-        if arity == 2:
-            self.cpm_model += cpm_op(x, k)
-        elif arity == 0:
-            self.cpm_model += cpm_op([x, k])
-        else:
-            self._unimplemented(x, op, k)
+        cpm_x = self.get_cpm_var(x)
+        self.cpm_model += self.eval_cpm_comp(cpm_x, op, k)
 
     def ctr_primitive1b(self, x: Variable, op: TypeConditionOperator, term: list[int] | range):
         assert op.is_set()
@@ -198,11 +192,9 @@ class CallbacksCPMPy(Callbacks):
             self._unimplemented(lop, scope)
 
     def ctr_logic_reif(self, x: Variable, y: Variable, op: TypeConditionOperator, k: int | Variable):  # x = y <op> k
-        from cpmpy.expressions.utils import eval_comparison
         assert op.is_rel()
-        self.cpm_model += eval_comparison(op.to_str(),
-                                          self.get_cpm_var(x) == self.get_cpm_var(y),
-                                          self.get_cpm_var(k))
+        cpm_x, cpm_y, cpm_k = self.get_cpm_vars([x,y, k])
+        self.cpm_model += self.eval_cpm_comp(cpm_x == cpm_y, op, cpm_k)
 
     def ctr_logic_eqne(self, x: Variable, op: TypeConditionOperator, lop: TypeLogicalOperator, scope: list[Variable]):  # x = lop(scope) or x != lop(scope)
         assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE) # TODO: what is this???
@@ -366,22 +358,17 @@ class CallbacksCPMPy(Callbacks):
             self._unimplemented()
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.variable]
-        if arity == 0:
-            self.cpm_model += op([cp.Minimum(cpm_vars), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Minimum(cpm_vars), cpm_rhs)
+        cpm_vars = self.get_cpm_vars(lst) # TODO: check if list can be list of expressions too in comp?
+        self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
+                                             condition.operator,
+                                             self.get_cpm_var(condition.right_operand()))
+
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.variable]
-        if arity == 0:
-            self.cpm_model += op([cp.Maximum(cpm_vars), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Maximum(cpm_vars), cpm_rhs)
+        cpm_vars = self.get_cpm_vars(lst)  # TODO: check if list can be list of expressions too in comp?
+        self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
+                                             condition.operator,
+                                             self.get_cpm_var(condition.right_operand()))
 
     def ctr_minimum_arg(self, lst: list[Variable] | list[Node], condition: Condition, rank: TypeRank):  # should enter XCSP3-core
         self._unimplemented(lst, condition, rank)
@@ -442,19 +429,19 @@ class CallbacksCPMPy(Callbacks):
             expr = s + d
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
-        if condition.operator.name == 'LE':
-            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, cpm_cap)
+        if condition.operator == TypeConditionOperator.LE:
+            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly
             # be smart and chose task or time decomposition
             if max(get_bounds(cpm_ends)) >= 100:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
 
-    def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
-        from cpmpy.expressions.utils import eval_comparison
+    def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands,condition:Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
+        cpm_cap = self.get_cpm_var(condition.right_operand())
         # ensure durations are satisfied
         for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
             self.cpm_model += s + d == e
@@ -463,12 +450,11 @@ class CallbacksCPMPy(Callbacks):
         for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
             # find overlapping tasks
             total_running = cp.sum(cpm_demands * ((cpm_start <= s) & (cpm_ends > s)))
-            self.cpm_model += eval_comparison(condition, total_running, capacity)
+            self.cpm_model += self.eval_cpm_comp(total_running, condition.operator, cpm_cap)
 
-    def _cumulative_time_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
-        from cpmpy.expressions.utils import eval_comparison
+    def _cumulative_time_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, condition:Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
-
+        cpm_cap = self.get_cpm_var(condition.right_operand)
         # ensure durations are satisfied
         for s, d, e in zip(cpm_start, cpm_duration, cpm_ends):
             self.cpm_model += s + d == e
@@ -478,18 +464,16 @@ class CallbacksCPMPy(Callbacks):
         # time decomposition
         for t in range(lb,ub+1):
             total_running = cp.sum(cpm_demands * ((cpm_start <= t) & (cpm_ends > t)))
-            self.cpm_model += eval_comparison(condition, total_running, capacity)
+            self.cpm_model += self.eval_cpm_comp(total_running, condition.operator, cpm_cap)
 
     def ctr_binpacking(self, lst: list[Variable], sizes: list[int], condition: Condition):
-        from cpmpy.expressions.utils import eval_comparison
-
         cpm_vars = self.get_cpm_vars(lst)
-        rhs = self.get_cpm_var(condition.right_operand())
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
 
         for bin in range(1, len(cpm_vars)+1):
-            self.cpm_model += eval_comparison(condition.operator.to_str(),
-                                              cp.sum((cpm_vars == bin) * sizes),
-                                              rhs)
+            self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_vars == bin) * sizes),
+                                                 condition.operator,
+                                                 cpm_rhs)
     def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
         from cpmpy.expressions.utils import eval_comparison
 
@@ -515,7 +499,6 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, sizes, conditions)
 
     def ctr_knapsack(self, lst: list[Variable], weights: list[int], wcondition: Condition, profits: list[int], pcondition: Condition):
-        from cpmpy.expressions.utils import eval_comparison
 
         vars = self.get_cpm_vars(lst)
         cpm_weight = self.get_cpm_var(wcondition.right_operand())
@@ -523,8 +506,8 @@ class CallbacksCPMPy(Callbacks):
 
         total_weight = cp.sum(vars * weights)
         total_profit = cp.sum(vars * profits)
-        self.cpm_model += eval_comparison(wcondition.operator.to_str(), total_weight, cpm_weight)
-        self.cpm_model += eval_comparison(pcondition.operator.to_str(), total_profit, cpm_profit)
+        self.cpm_model += self.eval_cpm_comp(total_weight, wcondition.operator, cpm_weight)
+        self.cpm_model += self.eval_cpm_comp(total_profit, pcondition.operator, cpm_profit)
 
 
     def ctr_flow(self, lst: list[Variable], balance: list[int] | list[Variable], arcs: list, capacities: None | list[range]):  # not in XCSP3-core
