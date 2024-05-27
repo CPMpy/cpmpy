@@ -53,7 +53,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, is_leaf
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 
 def BoolVar(shape=1, name=None):
@@ -116,7 +116,9 @@ def boolvar(shape=1, name=None):
     # create base data
     data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 
 def IntVar(lb, ub, shape=1, name=None):
@@ -177,8 +179,9 @@ def intvar(lb, ub, shape=1, name=None):
     # create base data
     data = np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 def cparray(arr):
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
@@ -239,13 +242,32 @@ class _NumVarImpl(Expression):
         self.ub = ub
         self.name = name
         self._value = None
+    
+    def has_subexpr(self):
+        """Does it contains nested Expressions?
+           Is of importance when deciding whether transformation/decomposition is needed.
+        """
+        return False
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return False
-
+    
+    def has_nested_boolean_constants(self):
+        """ Is there somewhere in the expression tree starting from this expression a boolean constant?
+        """
+        return False
+    
+    def nested_boolean_constants(self):
+        """ A boolean list indicating which of the args are or contain a boolean constant.
+        """
+        raise NotImplementedError(f"Variables don't have nested constants.")
+    
     def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+            This is only the case for decision variables (and constants).
+        """
         return True
 
     def value(self):
@@ -287,7 +309,7 @@ class _IntVarImpl(_NumVarImpl):
             name = "IV{}".format(_IntVarImpl.counter)
             _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
-        super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
+        super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy   
 
     # special casing for intvars (and boolvars)
     def __abs__(self):
@@ -347,6 +369,12 @@ class NegBoolView(_BoolVarImpl):
         # __init__ from _IntVarImpl
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
 
+    def has_nested_expr(self):
+        """Does it contains nested Expressions?
+           Is of importance when deciding whether transformation/decomposition is needed.
+        """
+        return False
+
     def value(self):
         """ the negation of the value obtained in the last solve call by the viewed variable
             (or 'None')
@@ -383,13 +411,25 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
+    @property
+    def args(self):
+        """ The constructor for NDVarArray never gets called, so _args is never initialised
+        """
+        return self # we can just return self
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return False
 
     def is_leaf(self):
-        return all([is_leaf(x) for x in self])
+        """ Is it the leaf of an expression tree?
+        """
+        # In the case of a NDVarArray, the array is its own args. So, has_subexpr() returns
+        # whether there are any non-leaf Expressions (so not the _NumVarImpl and its variants)
+        # inside the array. If there are no non-leaf Expressions, then this array is a "leaf"
+        # in the expression tree.
+        return not self.has_subexpr()
 
     def value(self):
         """ the values, for each of the stored variables, obtained in the last solve call
@@ -409,9 +449,9 @@ class NDVarArray(np.ndarray, Expression):
             the constructor, so the Expression does not have 'args'
             set..
         """
-        if not hasattr(self, "args"):
+        if not hasattr(self, "_args"):
             self.name = "NDVarArray"
-            self.args = self
+            self.update_args(self)
         return super().__repr__()
 
     def __getitem__(self, index):
