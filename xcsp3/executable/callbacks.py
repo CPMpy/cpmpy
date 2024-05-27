@@ -258,7 +258,7 @@ class CallbacksCPMPy(Callbacks):
             self._unimplemented(scope, excepting)
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
-        self._unimplemented(lists, excepting)
+        self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
 
     def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
         if excepting is None:
