@@ -352,7 +352,7 @@ def get_or_make_var(expr, expr_store:ExprStore):
         else:
             # print("not found", flatexpr)
             ivar = _IntVarImpl(lb, ub)
-            expr_store[flatexpr] = bvar
+            expr_store[expr] = ivar
             return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, expr_store:ExprStore):
