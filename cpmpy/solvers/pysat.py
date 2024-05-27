@@ -38,7 +38,7 @@ from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 
 
@@ -233,6 +233,7 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
