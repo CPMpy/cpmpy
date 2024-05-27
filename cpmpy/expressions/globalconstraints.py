@@ -188,21 +188,23 @@ class AllDifferentExceptN(GlobalConstraint):
     """
     def __init__(self, arr, n):
         flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
         # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(var1 == self.args[1]) for var1, var2 in all_pairs(self.args[0])], []
+        return [(var1 == var2).implies(InDomain(var1,self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) != argval(self.args[1])]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
 
 class AllDifferentExcept0(AllDifferentExceptN):
     """
         All nonzero arguments have a distinct value
     """
-    def __init__(self, *arr):
+    def __init__(self, arr):
         super().__init__(arr, 0)
 
 
