@@ -339,7 +339,7 @@ class CPM_ortools(SolverInterface):
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         def decompose():
             global cpm_cons
-            cpm_cons = decompose_in_tree(cpm_cons, supported, expr_dict=self.expr_dict)
+            cpm_cons = decompose_in_tree(cpm_cons, supported)
         def flatten():
             global cpm_cons
             cpm_cons = flatten_constraint(cpm_cons, expr_dict=self.expr_dict)

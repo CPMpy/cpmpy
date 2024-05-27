@@ -9,7 +9,7 @@ from callbackscpmpy import CallbacksCPMPy
 from cpmpy.exceptions import TransformationNotImplementedError
 
 # give this a meaningful name, so we know what branch was tested after the results are safed.
-branch = 'quick'
+branch = 'perf_cse'
 # set solver to test (supported: ortools, exact)
 solver = 'ortools'
 # solver timeout in seconds
@@ -91,7 +91,7 @@ for xmlmodel in xmlmodels:
     result = None
     t_parse = timeit.timeit(stmt=parse, number=1)
     try:
-        with time_limiter(time_limit + 10):
+        #with time_limiter(time_limit + 10):
             s = cp.SolverLookup.get(solver, model)
     except TransformationNotImplementedError as e:
         s = Fakesolver()
@@ -110,7 +110,7 @@ for xmlmodel in xmlmodels:
         result = s.solve(time_limit=time_limit)
 
     try:
-        with time_limiter(time_limit + 30):
+        #with time_limiter(time_limit + 30):
             if not transonly:
                 print('solving')
                 if solver == 'ortools':
