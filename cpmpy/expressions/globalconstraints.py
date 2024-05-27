@@ -578,6 +578,15 @@ class Precedence(GlobalConstraint):
 class NoOverlap(GlobalConstraint):
 
     def __init__(self, start, dur, end):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+
         super().__init__("no_overlap", [start, dur, end])
 
     def decompose(self):
