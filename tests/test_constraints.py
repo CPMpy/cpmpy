@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "SubCircuit", "SubCircuitWithStart", "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum"
 }
@@ -170,7 +170,7 @@ def bool_exprs(solver):
 def global_constraints(solver):
     """
         Generate all global constraints
-        -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
+        -  AllDifferent, AllEqual, Circuit, SubCircuit, SubCircuitWithStart, Minimum, Maximum, Element,
            Xor, Cumulative, NValue, Count
     """
     classes = inspect.getmembers(cpmpy.expressions.globalconstraints, inspect.isclass)
@@ -196,6 +196,15 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "Circuit":
+            S = intvar(0, 9, shape=10)
+            expr = Circuit(S)
+        elif name == "SubCircuit":
+            S = intvar(0, 9, shape=10)
+            expr = SubCircuit(S)
+        elif name == "SubCircuitWithStart":
+            S = intvar(0, 9, shape=10)
+            expr = SubCircuitWithStart(S, start_index=0)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
