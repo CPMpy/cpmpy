@@ -274,7 +274,7 @@ class AllEqualExceptN(GlobalConstraint):
         return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) not in argval(self.args[1])]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == 1 or len(set(vals)) == 0
 
 
