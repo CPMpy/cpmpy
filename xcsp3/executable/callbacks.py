@@ -521,7 +521,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(pos, neg)
 
     def ctr_circuit(self, lst: list[Variable], size: None | int | Variable):  # size is None in XCSP3 competitions
-        return cp.Circuit(lst)
+        return cp.SubCircuitWithStart(lst, start_index=0)
 
     # # # # # # # # # #
     # All methods about objectives to be implemented
