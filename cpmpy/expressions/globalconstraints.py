@@ -277,15 +277,16 @@ class Inverse(GlobalConstraint):
 
     """
     def __init__(self, fwd, rev):
-        flatargs = flatlist([fwd,rev])
+        flatargs = flatlist([fwd, rev])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
         if len(fwd) > len(rev):
             raise TypeError("len(fwd) should be equal to len(rev) for the symmetric inverse, or smaller than len(rev) for the asymmetric inverse")
         if len(fwd) == len(rev):
-            super().__init__("inverse", [fwd, rev])
+            name = "inverse"
         else:
-            super().__init__("inverseAsym", [fwd, rev])
+            name = "inverseAsym"
+        super().__init__(name, [fwd, rev])
 
     def decompose(self):
         from .python_builtins import all
@@ -297,6 +298,11 @@ class Inverse(GlobalConstraint):
         fwd = [argval(a) for a in self.args[0]]
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
+
+class InverseOne(Inverse):
+    def __init__(self, x):
+        super().__init__(x, x)
+        self.name = "inverseOne"
 
 class Channel(GlobalConstraint):
     """
