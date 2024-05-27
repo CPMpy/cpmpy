@@ -24,11 +24,6 @@ class CallbacksCPMPy(Callbacks):
         self.print_general_methods = False
         self.print_specific_methods = False
 
-    def get_condition(self, condition):
-        map = {"LT": "<", "LE": "<=", "EQ": "=", "GE": ">=", "GT": ">"}
-        if condition.operator.name not in map:
-            raise ValueError("Unknown condition operator", condition.operator.name, "expected any of", set(map.keys()))
-
     def var_integer_range(self, x: Variable, min_value: int, max_value: int):
         if min_value == 0 and max_value == 1:
             #boolvar
