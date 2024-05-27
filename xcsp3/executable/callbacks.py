@@ -239,14 +239,10 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        #raise NotImplementedError('no cpmpy equivalent yet')
-        pass
-        #self._unimplemented(scope, transitions, start_state, final_states)
+        self._unimplemented(scope, transitions, start_state, final_states) # TODO: add after Helene PR
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        #raise NotImplementedError('no cpmpy equivalent yet')
-        #self._unimplemented(scope, transitions)
-        pass
+        self._unimplemented(scope, transitions) # TODO: add after Helen PR
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         if excepting is None:
@@ -255,7 +251,7 @@ class CallbacksCPMPy(Callbacks):
         elif excepting == [0]:
             return cp.AllDifferentExcept0(self.exprs_from_node(scope))
         else:
-            self._unimplemented(scope, excepting)
+            self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
         self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
@@ -289,12 +285,10 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, limit, operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
-        pass
-        #self._unimplemented(lists, operator)
+        self._unimplemented(lists, operator) # TODO: after merge of Dimos PR
 
     def ctr_lex_matrix(self, matrix: list[list[Variable]], operator: TypeOrderedOperator):
-        pass
-        #self._unimplemented(matrix, operator)
+        self._unimplemented(matrix, operator) # TODO: after merge of Dimos PR
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
         self._unimplemented(lst, values, covered)
@@ -345,8 +339,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == k)
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        pass
-        #self._unimplemented(lst, values, k)
+        self._unimplemented(lst, values, k) # TODO: add after Ignace PR
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         arity, op = self.funcmap[condition.operator.name.lower()]
@@ -408,7 +401,7 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += op(cp.Element(cpm_list, cpm_index), cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
-        pass#self._unimplemented(matrix, i, j, condition)
+        self._unimplemented(matrix, i, j, condition) # TOOD: implement, already in CPMpy
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
         if lst2 is None:
@@ -433,8 +426,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(origins, lengths, zero_ignored)
 
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
-        #self._unimplemented(xs, ys, lx, ly, zero_ignored)
-        pass
+        self._unimplemented(xs, ys, lx, ly, zero_ignored) # TODO: add after merge Ignace PR
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable], heights: list[int] | list[Variable], condition: Condition):
         #self._unimplemented(origins, lengths, heights, condition)
