@@ -429,7 +429,6 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(xs, ys, lx, ly, zero_ignored) # TODO: add after merge Ignace PR
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable], heights: list[int] | list[Variable], condition: Condition):
-        #self._unimplemented(origins, lengths, heights, condition)
         cpm_start = self.get_cpm_exprs(origins)
         cpm_durations = self.get_cpm_exprs(lengths)
         cpm_demands = self.get_cpm_exprs(heights)
