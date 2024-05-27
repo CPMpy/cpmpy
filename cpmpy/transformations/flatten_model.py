@@ -321,16 +321,18 @@ def get_or_make_var(expr, expr_store:ExprStore):
 
         if isinstance(flatexpr,_BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
+            expr_store[expr] = bvar
             return flatexpr,flatcons
         
+        
+        # if flatexpr in expr_store:
+        #     # print("found in store: ", expr_store[flatexpr], "->", flatexpr)
+        #     return (expr_store[flatexpr], []) # NOTE what about flatcons here?
+        # else:
         bvar = _BoolVarImpl()
-        if flatexpr in expr_store:
-            # print("found in store: ", expr_store[flatexpr], "->", flatexpr)
-            return (expr_store[flatexpr], []) # NOTE what about flatcons here?
-        else:
-            # print("not found", flatexpr)
-            expr_store[flatexpr] = bvar
-            return bvar, [flatexpr == bvar] + flatcons
+        # print("not found", flatexpr)
+        expr_store[expr] = bvar
+        return bvar, [flatexpr == bvar] + flatcons
 
     else:
         # normalize expr into a numexpr LHS,
@@ -343,12 +345,13 @@ def get_or_make_var(expr, expr_store:ExprStore):
                           "into an intvar with rounded bounds. \n Your constraints will stay the same.", UserWarning)
             lb, ub = math.floor(lb), math.ceil(ub)
 
-        ivar = _IntVarImpl(lb, ub)
+        
         if flatexpr in expr_store:
             # print("found in store: ", expr_store[flatexpr], "->", flatexpr)
             return (expr_store[flatexpr], []) # NOTE what about flatcons here?
         else:
             # print("not found", flatexpr)
+            ivar = _IntVarImpl(lb, ub)
             expr_store[flatexpr] = bvar
             return ivar, [flatexpr == ivar] + flatcons
 
