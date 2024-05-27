@@ -238,7 +238,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(scope, transitions, start_state, final_states) # TODO: add after Helene PR
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self._unimplemented(scope, transitions) # TODO: add after Helen PR
+        self._unimplemented(scope, transitions) # TODO: add after Helene PR
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         if excepting is None:
@@ -281,10 +281,26 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, limit, operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
-        self._unimplemented(lists, operator) # TODO: after merge of Dimos PR
+        cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
+        if operator == TypeOrderedOperator.STRICTLY_INCREASING:
+            self.cpm_model += cp.LexChainLess(cpm_lists)
+        elif operator == TypeOrderedOperator.INCREASING:
+            self.cpm_model += cp.LexChainLessEq(cpm_lists)
+        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            self.cpm_model += cp.LexChainLess(rev_lsts)
+        elif operator == TypeOrderedOperator.DECREASING:
+            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            self.cpm_model += cp.LexChainLessEq(rev_lsts)
+        else:
+            self._unimplemented(lists, operator)
 
     def ctr_lex_matrix(self, matrix: list[list[Variable]], operator: TypeOrderedOperator):
-        self._unimplemented(matrix, operator) # TODO: after merge of Dimos PR
+        import numpy as np
+        # lex_chain on rows
+        self.ctr_lex(matrix, operator)
+        # lex chain on columns
+        self.ctr_lex(np.array(matrix).T.tolist(), operator)
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
         self._unimplemented(lst, values, covered)
