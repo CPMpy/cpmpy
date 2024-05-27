@@ -543,11 +543,21 @@ class CallbacksCPMPy(Callbacks):
 
     def obj_minimize(self, term: Variable | Node):
         if isinstance(term, Node):
-            term = term.cnt
-        self.cpm_model.minimize(self.get_cpm_var(term))
+            cpm_expr = self.exprs_from_node([term])
+            assert len(cpm_expr) == 1
+            cpm_expr = cpm_expr[0]
+        else:
+            cpm_expr = self.get_cpm_var(term)
+        self.cpm_model.minimize(cpm_expr)
 
     def obj_maximize(self, term: Variable | Node):
-        self.cpm_model.maximize(self.get_cpm_exprs(term)[0])
+        if isinstance(term, Node):
+            cpm_expr = self.exprs_from_node([term])
+            assert len(cpm_expr) == 1
+            cpm_expr = cpm_expr[0]
+        else:
+            cpm_expr = self.get_cpm_var(term)
+        self.cpm_model.maximize(cpm_expr)
 
     def obj_minimize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
         if obj_type == TypeObj.SUM:
