@@ -37,7 +37,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
-from ..expressions.utils import flatlist
+from ..expressions.utils import flatlist, argvals
 
 import numpy as np
 import numbers
@@ -263,9 +263,9 @@ class CPM_exact(SolverInterface):
                 if display is not None:
                     self._fillObjAndVars()
                     if isinstance(display, Expression):
-                        print(display.value())
+                        print(argval(display))
                     elif isinstance(display, list):
-                        print([v.value() for v in display])
+                        print(argvals(display))
                     else:
                         display()  # callback
             elif my_status == 2: # found inconsistency

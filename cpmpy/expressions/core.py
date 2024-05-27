@@ -72,7 +72,7 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -143,6 +143,7 @@ class Expression(object):
 
     def value(self):
         return None # default
+
 
     def get_bounds(self):
         if self.is_bool():
@@ -400,10 +401,7 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        try:
-            arg_vals = [argval(a) for a in self.args]
-        except IncompleteFunctionError:
-            return False
+        arg_vals = argvals(self.args)
 
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
@@ -533,13 +531,9 @@ class Operator(Expression):
 
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
+            arg_vals = [self.args[0], argvals(self.args[1])]
         else:
-            try:
-                arg_vals = [argval(arg) for arg in self.args]
-            except IncompleteFunctionError as e:
-                if self.is_bool(): return False
-                raise e
+            arg_vals = argvals(self.args)
 
 
         if any(a is None for a in arg_vals): return None
@@ -555,7 +549,8 @@ class Operator(Expression):
             try:
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)

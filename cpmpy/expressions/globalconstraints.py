@@ -98,6 +98,7 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentLists
         AllEqual
         Circuit
         Inverse
@@ -120,7 +121,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -178,11 +179,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        try:
-            values = [argval(a) for a  in self.args]
-            return len(set(values)) == len(self.args)
-        except IncompleteFunctionError:
-            return False
+        return len(set(argvals(self.args))) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -197,11 +194,35 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        try:
-            vals = [a.value() for a in self.args if a.value() != 0]
-            return len(set(vals)) == len(vals)
-        except IncompleteFunctionError:
-            return False
+        vals = [argval(a) for a in self.args if argval(a) != 0]
+        return len(set(vals)) == len(vals)
+
+
+class AllDifferentLists(GlobalConstraint):
+    """
+        Ensures none of the lists given are exactly the same.
+        Called 'lex_alldifferent' in the global constraint catalog:
+        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
+    """
+    def __init__(self, lists):
+        if any(not is_any_list(lst) for lst in lists):
+            raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
+        if any(len(lst) != len(lists[0]) for lst in lists):
+            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
+        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
+
+    def decompose(self):
+        """Returns the decomposition
+        """
+        from .python_builtins import any as cpm_any
+        constraints = []
+        for lst1, lst2 in all_pairs(self.args):
+            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
+        return constraints, []
+
+    def value(self):
+        lst_vals = [tuple(argvals(a)) for a in self.args]
+        return len(set(lst_vals)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -221,11 +242,7 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        try:
-            values = [argval(a) for a in self.args]
-            return len(set(values)) == 1
-        except IncompleteFunctionError:
-            return False
+        return len(set(argvals(self.args))) == 1
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -268,10 +285,7 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        try:
-            arr = [argval(a) for a in self.args]
-        except IncompleteFunctionError:
-            return False
+        arr = argvals(self.args)
 
         while idx not in visited:
             if idx is None:
@@ -307,16 +321,13 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        try:
-            fwd = [argval(a) for a in self.args[0]]
-            rev = [argval(a) for a in self.args[1]]
-        except IncompleteFunctionError:
-            return False
+        fwd = argvals(self.args[0])
+        rev = argvals(self.args[1])
         # args are fine, now evaluate actual inverse cons
         try:
             return all(rev[x] == i for i, x in enumerate(fwd))
         except IndexError: # partiality of Element constraint
-            raise IncompleteFunctionError
+            return False
 
 
 class Table(GlobalConstraint):
@@ -335,11 +346,8 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        try:
-            arrval = [argval(a) for a in arr]
-            return arrval in tab
-        except IncompleteFunctionError:
-            return False
+        arrval = argvals(arr)
+        return arrval in tab
 
 
 
@@ -406,10 +414,7 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        try:
-            return argval(self.args[0]) in argval(self.args[1])
-        except IncompleteFunctionError:
-            return False
+        return argval(self.args[0]) in argvals(self.args[1])
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -439,10 +444,7 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        try:
-            return sum(argval(a) for a in self.args) % 2 == 1
-        except IncompleteFunctionError:
-            return False
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -511,17 +513,14 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        try:
-            argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
-                       else argval(arg) for arg in self.args]
-        except IncompleteFunctionError:
-            return False
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in arg_vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -614,7 +613,7 @@ class IncreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
-        super().__init__("increasing_strict", flatlist(args))
+        super().__init__("strictly_increasing", flatlist(args))
 
     def decompose(self):
         """
@@ -637,7 +636,7 @@ class DecreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
-        super().__init__("decreasing_strict", flatlist(args))
+        super().__init__("strictly_decreasing", flatlist(args))
 
     def decompose(self):
         """

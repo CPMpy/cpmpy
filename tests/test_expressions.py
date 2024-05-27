@@ -6,7 +6,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
-from cpmpy.expressions.utils import get_bounds
+from cpmpy.expressions.utils import get_bounds, argval
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -436,7 +436,8 @@ class TestBounds(unittest.TestCase):
         m = cp.Model([p.implies(cons), a == b])
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
-            self.assertFalse(cons.value())
+            self.assertRaises(IncompleteFunctionError, cons.value)
+            self.assertFalse(argval(cons))
 
         # mayhem
         cons = (arr[10 // (a - b)] == 1).implies(p)

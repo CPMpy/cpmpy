@@ -11,15 +11,17 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue",
+    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -31,6 +33,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "choco": {"Inverse"},
                   "ortools":{"Inverse"},
                   "exact": {"Inverse"},
+                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
                   }
 
 # Exclude certain operators for solvers.
@@ -98,6 +101,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             expr = cls(NUM_ARGS, POS_VAR)
+        elif name == "NValueExcept":
+            expr = cls(NUM_ARGS, 3)
         else:
             expr = cls(NUM_ARGS)
 
@@ -195,6 +200,9 @@ def global_constraints(solver):
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
             expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentLists":
+            vars = intvar(0,10, shape=(3,4))
+            expr = cls(vars)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)
 
@@ -220,12 +228,16 @@ def reify_imply_exprs(solver):
         yield BOOL_VAR.implies(comp_expr)
         yield comp_expr == BOOL_VAR
 
-
 def verify(cons):
     assert cons.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"),_generate_inputs(bool_exprs), ids=str)
+def verify(cons):
+    assert argval(cons)
+    assert cons.value()
+
+
+@pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
 def test_bool_constaints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
@@ -235,10 +247,10 @@ def test_bool_constaints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)
 
 
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(comp_constraints),  ids=str)
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
 def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
@@ -248,10 +260,10 @@ def test_comparison_constraints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver,Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)
 
 
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(reify_imply_exprs),  ids=str)
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
 def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
@@ -261,4 +273,4 @@ def test_reify_imply_constraints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert constraint.value()
+        assert argval(constraint)
