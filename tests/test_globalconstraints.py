@@ -273,6 +273,78 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertIn(bv.value(), vals)
 
+    def test_lex_lesseq(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLessEq(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLessEq(X, Y)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+    def test_lex_less(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLess(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLess(X, Y)
+        m = cp.Model(c)
+        self.assertFalse(m.solve("ortools"))
+
+        Z = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+        c = cp.LexLess(X, Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+
+    def test_lex_chain(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexChainLess([X, Y])
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexChainLessEq([X, Y])
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+        Z = cp.intvar(0, 1, shape=(3,2))
+        c = cp.LexChainLess(Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve())
+        self.assertTrue(sum(argval(Z[0])) == 0)
+        self.assertTrue(sum(argval(Z[1])) == 1)
+        self.assertTrue(sum(argval(Z[2])) >= 1)
+
+
     def test_indomain_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -728,6 +800,32 @@ class TestGlobal(unittest.TestCase):
 
         cp.Model(cons).solveAll(solver='minizinc')
 
+
+    def test_precedence(self):
+        iv = cp.intvar(0,5, shape=6, name="x")
+
+        cons = cp.Precedence(iv, [0,2,1])
+        self.assertTrue(cp.Model([cons, iv == [5,0,2,0,0,1]]).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
+        self.assertTrue(cons.value())
+        self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
+
+
+    def test_no_overlap(self):
+        start = cp.intvar(0,5, shape=3)
+        end = cp.intvar(0,5, shape=3)
+        cons = cp.NoOverlap(start, [2,1,1], end)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+
+        def check_val():
+            assert cons.value() is False
+
+        cp.Model(~cons).solveAll(display=check_val)
+
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
@@ -986,7 +1084,9 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3, name="x")
 
         for name, cls in cp.SolverLookup.base_solvers():
-            print(f"Testing {name}")
+
+            if cls.supported() is False:
+                continue
             try:
                 self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
                 self.assertTrue(all(x.value() in [1,2] for x in iv))

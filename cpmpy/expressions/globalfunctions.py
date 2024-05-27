@@ -68,7 +68,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
@@ -330,6 +330,8 @@ class Among(GlobalFunction):
     def __init__(self,arr,vals):
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        if any(isinstance(val, Expression) for val in vals):
+            raise TypeError(f"Among takes a set of values as input, not {vals}")
         super().__init__("among", [arr,vals])
 
     def decompose_comparison(self, cmp_op, cmp_rhs):
@@ -342,11 +344,11 @@ class Among(GlobalFunction):
         return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
 
     def value(self):
-        argvals = np.array([argval(a) for a in self.args[0]])
-        return len([a for a in argvals if a in set(self.args[1])])
+        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
 
     def get_bounds(self):
         return 0, len(self.args[0])
+
 
 class NValue(GlobalFunction):
 
