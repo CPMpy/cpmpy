@@ -13,7 +13,7 @@ branch = 'perf_cse'
 # set solver to test (supported: ortools, exact)
 solver = 'ortools'
 # solver timeout in seconds
-time_limit = 60
+time_limit = 120
 # set true to only time transformations, and not call the solver
 transonly = False
 
@@ -60,7 +60,7 @@ from contextlib import contextmanager
 
 class TimeoutException(Exception): pass
 
-'''@contextmanager
+@contextmanager
 def time_limiter(seconds):
     def signal_handler(signum, frame):
         raise TimeoutException("Timed out!")
@@ -69,7 +69,7 @@ def time_limiter(seconds):
     try:
         yield
     finally:
-        signal.alarm(0)'''
+        signal.alarm(0)
 
 print(xmlmodels)
 for xmlmodel in xmlmodels:
@@ -91,7 +91,7 @@ for xmlmodel in xmlmodels:
     result = None
     t_parse = timeit.timeit(stmt=parse, number=1)
     try:
-        #with time_limiter(time_limit + 10):
+        with time_limiter(time_limit + 10):
             s = cp.SolverLookup.get(solver, model)
     except TransformationNotImplementedError as e:
         s = Fakesolver()
@@ -110,7 +110,7 @@ for xmlmodel in xmlmodels:
         result = s.solve(time_limit=time_limit)
 
     try:
-        #with time_limiter(time_limit + 30):
+        with time_limiter(time_limit + 30):
             if not transonly:
                 print('solving')
                 if solver == 'ortools':
