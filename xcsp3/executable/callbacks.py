@@ -394,8 +394,9 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
         cpm_lst = self.get_cpm_vars(lst)
+        cpm_index = self.get_cpm_var(i)
         cpm_rhs = self.get_cpm_var(condition.right_operand())
-        self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst), condition.operator, cpm_rhs)
+        self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
         mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
