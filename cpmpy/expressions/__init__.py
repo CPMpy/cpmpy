@@ -22,7 +22,7 @@
 from .variables import boolvar, intvar, cpm_array
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentLists, AllEqual, Circuit, SubCircuit, SubCircuitWithStart, Inverse, Table, ShortTable, Xor, Cumulative, \
-    IfThenElse, GlobalCardinalityCount, DirectConstraint, InDomain, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLess, LexLessEq, LexChainLess, LexChainLessEq
+    IfThenElse, GlobalCardinalityCount, DirectConstraint, InDomain, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLess, LexLessEq, LexChainLess, LexChainLessEq,  Precedence, NoOverlap
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
 from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept, IfThenElseNum, Among
 from .core import BoolVal

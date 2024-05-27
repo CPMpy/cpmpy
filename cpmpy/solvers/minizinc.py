@@ -431,6 +431,7 @@ class CPM_minizinc(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                       "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
+                     "precedence", "no_overlap",
                      "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
                      "lex_chain_lesseq", "among"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit"})
@@ -615,6 +616,15 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
+
+        elif expr.name == "precedence":
+            return "value_precede_chain({},{})".format(args_str[1], args_str[0])
+
+        elif expr.name == "no_overlap":
+            start, dur, end = expr.args
+            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
+            format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
+            return format_str.format(args_str[0], args_str[1])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args

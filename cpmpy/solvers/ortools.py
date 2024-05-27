@@ -330,7 +330,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse", "no_overlap"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -470,6 +470,10 @@ class CPM_ortools(SolverInterface):
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "no_overlap":
+                start, dur, end = self.solver_vars(cpm_expr.args)
+                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars directly is recommended

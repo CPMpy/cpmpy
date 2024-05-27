@@ -975,6 +975,32 @@ class TestGlobal(unittest.TestCase):
 
         cp.Model(cons).solveAll(solver='minizinc')
 
+
+    def test_precedence(self):
+        iv = cp.intvar(0,5, shape=6, name="x")
+
+        cons = cp.Precedence(iv, [0,2,1])
+        self.assertTrue(cp.Model([cons, iv == [5,0,2,0,0,1]]).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
+        self.assertTrue(cons.value())
+        self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
+
+
+    def test_no_overlap(self):
+        start = cp.intvar(0,5, shape=3)
+        end = cp.intvar(0,5, shape=3)
+        cons = cp.NoOverlap(start, [2,1,1], end)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+
+        def check_val():
+            assert cons.value() is False
+
+        cp.Model(~cons).solveAll(display=check_val)
+
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)

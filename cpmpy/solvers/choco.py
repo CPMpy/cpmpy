@@ -314,7 +314,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "among"}
+                     "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "among", "precedence"}
 
         # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit (#1085)
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
@@ -550,6 +550,8 @@ class CPM_choco(SolverInterface):
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "precedence":
+                return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "subcircuit":
                 # Successor variables
                 succ = self.solver_vars(cpm_expr.args)
