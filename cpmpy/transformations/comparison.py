@@ -2,7 +2,7 @@ import copy
 
 from .flatten_model import get_or_make_var
 from ..expressions.core import Comparison, Operator
-from ..expressions.utils import is_boolexpr
+from ..expressions.utils import ExprStore, is_boolexpr, get_store
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 """
@@ -19,12 +19,15 @@ from ..expressions.variables import _NumVarImpl, _BoolVarImpl
     - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
-def only_numexpr_equality(constraints, supported=frozenset()):
+def only_numexpr_equality(constraints, supported=frozenset(), expr_store:ExprStore=None):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 
         :param supported  a (frozen)set of expression names that supports all comparisons in the solver
     """
+
+    if expr_store is None:
+        expr_store = get_store()
 
     # shallow copy (could support inplace too this way...)
     newcons = copy.copy(constraints)
@@ -34,13 +37,13 @@ def only_numexpr_equality(constraints, supported=frozenset()):
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
             if not isinstance(cond, _BoolVarImpl): # expr -> bv
-                res = only_numexpr_equality([cond], supported)
+                res = only_numexpr_equality([cond], supported, expr_store=expr_store)
                 if len(res) > 1:
                     newcons[i] = res[1].implies(subexpr)
                     newcons.insert(i, res[0])
 
             elif not isinstance(subexpr, _BoolVarImpl):  # expr -> bv
-                res = only_numexpr_equality([subexpr], supported)
+                res = only_numexpr_equality([subexpr], supported, expr_store=expr_store)
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])
                     newcons.insert(i, res[0])
@@ -54,13 +57,13 @@ def only_numexpr_equality(constraints, supported=frozenset()):
             if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification, check recursively
 
                 if not isinstance(lhs, _BoolVarImpl):  # expr == bv
-                    res = only_numexpr_equality([lhs], supported)
+                    res = only_numexpr_equality([lhs], supported, expr_store=expr_store)
                     if len(res) > 1:
                         newcons[i] = res[1] == rhs
                         newcons.insert(i, res[0])
 
                 elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
-                    res = only_numexpr_equality([rhs], supported)
+                    res = only_numexpr_equality([rhs], supported, expr_store=expr_store)
                     if len(res) > 1:
                         newcons[i] = lhs == res[1]
                         newcons.insert(i, res[0])
@@ -72,7 +75,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
                 lhs = cpm_expr.args[0]
                 if not isinstance(lhs, _NumVarImpl) and lhs.name not in supported:
                     # LHS is unsupported for LHS <op> IV, rewrite to `(LHS == A) & (A <op> IV)`
-                    (lhsvar, lhscons) = get_or_make_var(lhs)
+                    (lhsvar, lhscons) = get_or_make_var(lhs, expr_store=expr_store)
                     # replace comparison by A <op> IV
                     newcons[i] = Comparison(cpm_expr.name, lhsvar, cpm_expr.args[1])
                     # add lhscon(s), which will be [(LHS == A)]

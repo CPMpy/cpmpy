@@ -4,7 +4,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
-from ..expressions.utils import is_any_list
+from ..expressions.utils import ExprStore, is_any_list
 from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
@@ -24,7 +24,7 @@ from .negation import recurse_negation
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
-def only_bv_reifies(constraints):
+def only_bv_reifies(constraints, expr_store:ExprStore):
     newcons = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
@@ -34,11 +34,11 @@ def only_bv_reifies(constraints):
                 # BE -> BV :: ~BV -> ~BE
                 if cpm_expr.name == '->':
                     newexpr = (~a1).implies(recurse_negation(a0))
-                    newexpr = only_bv_reifies(flatten_constraint(newexpr))
+                    newexpr = only_bv_reifies(flatten_constraint(newexpr, expr_store=expr_store), expr_store=expr_store)
                 else:
                     newexpr = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        newexpr = flatten_constraint(newexpr)
+                        newexpr = flatten_constraint(newexpr, expr_store=expr_store)
                 newcons.extend(newexpr)
             else:
                 newcons.append(cpm_expr)
@@ -46,7 +46,7 @@ def only_bv_reifies(constraints):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints):
+def only_implies(constraints, expr_store:ExprStore):
     """
         Transforms all reifications to BV -> BE form
 
@@ -72,7 +72,7 @@ def only_implies(constraints):
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
                 bv2,bv3 = a1.args
                 newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
-                newcons.extend(only_implies(flatten_constraint(newexpr)))
+                newcons.extend(only_implies(flatten_constraint(newexpr, expr_store=expr_store), expr_store=expr_store))
             else:
                 newcons.append(cpm_expr)
 
@@ -93,7 +93,7 @@ def only_implies(constraints):
                 if isinstance(a1, GlobalConstraint):
                     newcons.extend(newexprs)
                 else:
-                    newcons.extend(only_implies(only_bv_reifies(flatten_constraint(newexprs))))
+                    newcons.extend(only_implies(only_bv_reifies(flatten_constraint(newexprs, expr_store=expr_store), expr_store=expr_store), expr_store=expr_store))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
@@ -101,7 +101,7 @@ def only_implies(constraints):
     return newcons
 
 
-def reify_rewrite(constraints, supported=frozenset()):
+def reify_rewrite(constraints, expr_store:ExprStore, supported=frozenset()):
     """
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
@@ -176,11 +176,11 @@ def reify_rewrite(constraints, supported=frozenset()):
                         # use IV < IV.lb which will be false...
                         decomp = (lhs.args[1] < lhs.args[1].lb)
                     reifexpr.args[boolexpr_index] = decomp
-                    newcons += flatten_constraint(reifexpr)
+                    newcons += flatten_constraint(reifexpr, expr_store=expr_store)
                 else:  # other cases (assuming LHS is a total function):
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
-                    (auxvar, cons) = get_or_make_var(lhs)
+                    (auxvar, cons) = get_or_make_var(lhs, expr_store=expr_store)
                     newcons += cons
                     reifexpr = copy.copy(cpm_expr)
                     reifexpr.args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)

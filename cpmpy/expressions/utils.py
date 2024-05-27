@@ -179,3 +179,17 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+
+class ExprStore(dict):
+    """
+        A datastructure to store / cache Expression == BoolVar formulations.
+        Is the basis for Commun Subexpression Elimination (CSE).
+    """
+    pass
+
+def get_store() -> ExprStore:
+    """
+        Returns an expression store for CSE.
+    """
+    return dict()

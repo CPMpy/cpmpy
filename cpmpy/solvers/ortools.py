@@ -32,7 +32,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import get_store, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -330,31 +330,71 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
-        t0 = time.time()
-        cpm_cons = toplevel_list(cpm_expr)
-        print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
+        start = time.time()
+        expr_store = get_store()
+
+        import os, sys, pathlib
+        sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+        from xcsp3.perf_timer import TimerContext
+
+        with TimerContext("top_level") as t:
+            cpm_cons = toplevel_list(cpm_expr)
+        print(f"c ort:toplevel_list took {(t.time):.4f} -- {len(cpm_expr)}")
+ 
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
-        print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        print(f"c ort:decompose took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = flatten_constraint(cpm_cons) # flat normal form
-        print(f"c ort:flatten took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        print(f"c ort:reifyRW took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        print(f"c ort:onlyNumexpr took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = only_bv_reifies(cpm_cons)
-        print(f"c ort:onlyBv took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
-        t0 = time.time()
-        cpm_cons = only_implies(cpm_cons)  # everything that can create
-                                             # reified expr must go before this
-        print(f"c ort:onlyImpl took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+
+        with TimerContext("decompose") as t:
+            cpm_cons = decompose_in_tree(cpm_cons, supported)
+        print(f"c ort:decompose_in_tree took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")
+
+        with TimerContext("flatten") as t:
+            cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store) # flat normal form
+        print(f"c ort:flatten_constraint took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")        
+
+        with TimerContext("reify") as t:
+            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
+        print(f"c ort:reify_rewrite took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")
+
+        with TimerContext("only_num") as t:
+            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # supports >, <, !=
+        print(f"c ort:only_numexpr_equality took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")
+
+        with TimerContext("only_bv") as t:
+            cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
+        print(f"c ort:only_bv_reifies took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")
+
+        with TimerContext("only_implies") as t:
+            cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # everything that can create
+                                                # reified expr must go before this
+        print(f"c ort:only_implies took {(t.time):.4f} -- {len(cpm_expr)}")
+
+        # print(cpm_cons)
+        # print("------------------")
+
+        import json
+        # print(expr_store)
+        # print(json.dumps(expr_store, sort_keys=True, indent=4))
+        print(f"c ort:transformation took {(time.time()-start):.4f}")
+        print("final size", len(cpm_cons))
+        print("STORE:", len(expr_store.items()))
+        
+        print(cpm_cons)
+
         return cpm_cons
 
     def __add__(self, cpm_expr):
@@ -378,7 +418,7 @@ class CPM_ortools(SolverInterface):
         # add new user vars to the set
         t0 = time.time()
         get_variables(cpm_expr, collect=self.user_vars)
-        print(f"c ort:get_vars took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        # print(f"c ort:get_vars took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
 
         cnt = 0.0
         # transform and post the constraints
@@ -386,7 +426,7 @@ class CPM_ortools(SolverInterface):
             t0 = time.time()
             self._post_constraint(con)
             cnt += (time.time()-t0)
-        print(f"c ort:post took {cnt:.4f} -- {len(cpm_expr)}")
+        # print(f"c ort:post took {cnt:.4f} -- {len(cpm_expr)}")
 
         return self
 
