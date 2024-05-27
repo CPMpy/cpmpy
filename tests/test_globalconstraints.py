@@ -55,6 +55,26 @@ class TestGlobal(unittest.TestCase):
                 var._value = val
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
+    def test_alldifferent_lists(self):
+        # test known input/outputs
+        tuples = [
+                  ([(1,2,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(1,2,3)], False),
+                  ([(0,0,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(3,3,3)], True)
+                 ]
+        iv = cp.intvar(0,4, shape=(3,3))
+        c = cp.AllDifferentLists(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                for (vr, vl) in zip(var, val):
+                    vr._value = vl
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
+
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
         pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
@@ -252,6 +272,78 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(bv.value(), vals)
+
+    def test_lex_lesseq(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLessEq(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLessEq(X, Y)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+    def test_lex_less(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLess(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLess(X, Y)
+        m = cp.Model(c)
+        self.assertFalse(m.solve("ortools"))
+
+        Z = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+        c = cp.LexLess(X, Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+
+    def test_lex_chain(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexChainLess([X, Y])
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexChainLessEq([X, Y])
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+        Z = cp.intvar(0, 1, shape=(3,2))
+        c = cp.LexChainLess(Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve())
+        self.assertTrue(sum(argval(Z[0])) == 0)
+        self.assertTrue(sum(argval(Z[1])) == 1)
+        self.assertTrue(sum(argval(Z[2])) >= 1)
+
 
     def test_indomain_onearg(self):
 
