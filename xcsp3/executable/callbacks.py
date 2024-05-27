@@ -241,11 +241,11 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(scope, transitions) # TODO: add after Helene PR
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
+        cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
-            cpm_exprs = self.exprs_from_node(scope)
-            return cp.AllDifferent(cpm_exprs)
+            self.cpm_model += cp.AllDifferent(cpm_exprs)
         elif excepting == [0]:
-            return cp.AllDifferentExcept0(self.exprs_from_node(scope))
+            self.cpm_model += cp.AllDifferentExcept0(cpm_exprs)
         else:
             self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
 
