@@ -253,6 +253,8 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
 
     def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]): # TODO check this...
+        # TODO: ignace: I'm pretty sure this is incorrect...
+        #           Have to check but think its alldiff on rows and alldiff on cols
         if excepting is None:
             cpm_exprs = self.exprs_from_node(matrix)
             return cp.AllDifferent(cpm_exprs)
