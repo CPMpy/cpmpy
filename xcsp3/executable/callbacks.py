@@ -601,12 +601,6 @@ class CallbacksCPMPy(Callbacks):
         elif obj_type == TypeObj.MINIMUM:
             self.cpm_model.maximize(cp.min(coefficients * self.get_cpm_exprs(terms)))
         elif obj_type == TypeObj.NVALUES:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.NValue(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        else:
-            self._unimplemented(obj_type, terms, coefficients)
             self.cpm_model.maximize(cp.NValue(coefficients * self.get_cpm_exprs(terms)))
         elif obj_type == TypeObj.EXPRESSION:
             assert all(coeff == 1 for coeff in coefficients)
