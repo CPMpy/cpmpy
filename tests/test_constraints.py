@@ -21,7 +21,7 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -103,6 +103,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, POS_VAR)
         elif name == "NValueExcept":
             expr = cls(NUM_ARGS, 3)
+        elif name == "Among":
+            expr = cls(NUM_ARGS, [1,2])
         else:
             expr = cls(NUM_ARGS)
 

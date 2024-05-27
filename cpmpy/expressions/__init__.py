@@ -25,6 +25,6 @@ from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentLi
     IfThenElse, GlobalCardinalityCount, DirectConstraint, InDomain, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, \
     LexLess, LexLessEq, LexChainLess, LexChainLessEq, Precedence, NoOverlap
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
-from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept
+from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept, Among
 from .core import BoolVal
 from .python_builtins import all, any, max, min, sum
