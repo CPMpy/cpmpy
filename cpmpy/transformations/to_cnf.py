@@ -23,7 +23,7 @@ from .flatten_model import flatten_constraint
   - BV -> BE
 """
 
-def to_cnf(constraints):
+def to_cnf(constraints, expr_dict=None):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
@@ -31,8 +31,10 @@ def to_cnf(constraints):
         - constraints: list[Expression] or Operator
         - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
-    fnf = flatten_constraint(constraints)
-    fnf = only_implies(fnf)
+    if expr_dict is None:
+        expr_dict = dict()
+    fnf = flatten_constraint(constraints, expr_dict=expr_dict)
+    fnf = only_implies(fnf, expr_dict=expr_dict)
     return flat2cnf(fnf)
 
 def flat2cnf(constraints):
