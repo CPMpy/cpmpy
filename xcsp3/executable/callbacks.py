@@ -94,6 +94,15 @@ class CallbacksCPMPy(Callbacks):
                                                          else cp.IfThenElseNum(b,x,y))
     }
 
+    def eval_cpm_comp(self, lhs, op:TypeConditionOperator, rhs):
+        arity, cpm_op = self.funcmap[op.name.lower()]
+        if arity == 2:
+            return cpm_op(lhs, rhs)
+        elif arity == 0:
+            return cpm_op([lhs,rhs])
+        else:
+            raise ValueError(f"Expected operator of arity 0 or 2 but got {cpm_op} which is of arity {arity}")
+
     def intentionfromtree(self, node):
         if isinstance(node, Node):
             if node.type.lowercase_name == 'var':
