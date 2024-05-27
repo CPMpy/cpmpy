@@ -349,6 +349,7 @@ class Among(GlobalFunction):
     def get_bounds(self):
         return 0, len(self.args[0])
 
+
 class NValue(GlobalFunction):
 
     """
