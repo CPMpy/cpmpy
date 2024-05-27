@@ -16,7 +16,8 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists",
+    "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
     "Table", "ShortTable",
     "Circuit", "SubCircuit", "SubCircuitWithStart",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
@@ -213,6 +214,9 @@ def global_constraints(solver):
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
             expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentLists":
+            vars = intvar(0,10, shape=(3,4))
+            expr = cls(vars)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)
 
