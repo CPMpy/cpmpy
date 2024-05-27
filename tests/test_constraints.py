@@ -14,11 +14,10 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
-
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
 }
@@ -170,7 +169,7 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative, NValue, Count
+           Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
     classes = inspect.getmembers(cpmpy.expressions.globalconstraints, inspect.isclass)
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
@@ -199,16 +198,34 @@ def global_constraints(solver):
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
             expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "LexLessEq":
+            X = intvar(0, 3, shape=3)
+            Y = intvar(0, 3, shape=3)
+            expr = LexLessEq(X, Y)
+
+        elif name == "LexLess":
+            X = intvar(0, 3, shape=3)
+            Y = intvar(0, 3, shape=3)
+            expr = LexLess(X, Y)
+
+        elif name == "LexChainLess":
+            X = intvar(0, 3, shape=(3,3))
+            expr = LexChainLess(X)
+            
+        elif name == "LexChainLessEq":
+            X = intvar(0, 3, shape=(3,3))
+            expr = LexChainLess(X)        
         elif name == "AllDifferentLists":
             vars = intvar(0,10, shape=(3,4))
             expr = cls(vars)
         else: # default constructor, list of numvars
-            expr= cls(NUM_ARGS)
+            expr= cls(NUM_ARGS)            
 
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
         else:
             yield expr
+
 
 def reify_imply_exprs(solver):
     """
