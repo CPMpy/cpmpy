@@ -101,6 +101,8 @@
         AllDifferentExceptN
         AllDifferentLists
         AllEqual
+        AllEqualExcept0
+        AllEqualExceptN
         Circuit
         Inverse
         Table
