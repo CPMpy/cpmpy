@@ -133,7 +133,9 @@ def argval(a):
 
 
 def argvals(arr):
-    return [argval(a) for a in arr]
+    if is_any_list(arr):
+        return [argvals(arg) for arg in arr]
+    return argval(arr)
 
 
 def is_leaf(a):

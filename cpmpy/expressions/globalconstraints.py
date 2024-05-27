@@ -792,9 +792,8 @@ class Increasing(GlobalConstraint):
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all(args[i].value() <= args[i+1].value() for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -815,9 +814,8 @@ class Decreasing(GlobalConstraint):
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all(args[i].value() >= args[i+1].value() for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -838,9 +836,8 @@ class IncreasingStrict(GlobalConstraint):
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all((args[i].value() < args[i+1].value()) for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -861,9 +858,134 @@ class DecreasingStrict(GlobalConstraint):
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all((args[i].value() > args[i+1].value()) for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] > args[i+1] for i in range(len(args)-1))
+
+
+class LexLess(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_less", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal. It needs to be strictly less in at least one index.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+
+        # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
+        # until a strict inequality is encountered.
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
+        defining.append(bvar[-1] == (X[-1] < Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
+
+
+class LexLessEq(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_lesseq", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        defining.append(bvar[-1] == (X[-1] <= Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
+
+
+class LexChainLess(GlobalConstraint):
+    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_less", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLess constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+
+
+class LexChainLessEq(GlobalConstraint):
+    """ Given a matrix X, LexChainLessEq enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_lesseq", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLessEq constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
