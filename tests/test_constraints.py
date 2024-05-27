@@ -15,7 +15,8 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
@@ -214,6 +215,9 @@ def global_constraints(solver):
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)        
+        elif name == "AllDifferentLists":
+            vars = intvar(0,10, shape=(3,4))
+            expr = cls(vars)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)            
 
