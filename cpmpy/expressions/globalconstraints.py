@@ -455,7 +455,8 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Ensures that the capacity of the resource is never exceeded
+        Equivalent to noOverlap when demand and capacity are equal to 1
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
