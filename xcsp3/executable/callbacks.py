@@ -273,9 +273,17 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
-        #raise NotImplementedError('Increasing global not in cpmpy')
-        pass
-        #self._unimplemented(lst, operator, lengths)
+        cpm_vars = self.get_cpm_vars(lst)
+        if operator == TypeOrderedOperator.INCREASING:
+            self.cpm_model += cp.Increasing(cpm_vars)
+        elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+            self.cpm_model += cp.IncreasingStrict(cpm_vars)
+        elif operator == TypeOrderedOperator.DECREASING:
+            self.cpm_model += cp.Decreasing(cpm_vars)
+        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+            self.cpm_model += cp.DecreasingStrict(cpm_vars)
+        else:
+            self._unimplemented(lst, operator, lengths)
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
         self._unimplemented(lst, limit, operator)
