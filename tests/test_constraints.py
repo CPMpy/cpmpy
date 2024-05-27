@@ -256,14 +256,9 @@ def reify_imply_exprs(solver):
         yield BOOL_VAR.implies(comp_expr)
         yield comp_expr == BOOL_VAR
 
-def verify(cons):
-    assert cons.value()
-
 
 def verify(cons):
     assert argval(cons)
-    assert cons.value()
-
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
 def test_bool_constaints(solver, constraint):
