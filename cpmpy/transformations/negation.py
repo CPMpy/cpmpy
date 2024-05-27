@@ -5,7 +5,7 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list, has_nested, is_boolexpr, is_bool
+from ..expressions.utils import is_any_list, is_boolexpr, is_bool
 
 
 def push_down_negation(lst_of_expr, toplevel=True):
@@ -22,11 +22,15 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
     newlist = []
     for expr in lst_of_expr:
+        
         if is_any_list(expr):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
 
-        elif not has_nested(expr) and not (hasattr(expr, 'name') and (expr.name == 'not' or expr.name == '!=')):
+        # TODO this should be removed and replaced with the check later in the code
+        # fails for now because push_down_negation gets called with a list of ints (constants)
+        # these don't have attribute 'name'
+        elif not (isinstance(expr, Expression) and expr.has_subexpr()) and not (hasattr(expr, 'name') and (expr.name == 'not' or expr.name == '!=')):
             newlist.append(expr)  # no need to do anything
 
         elif expr.name == "not":
@@ -47,12 +51,16 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(expr)
 
+        # elif not expr.has_subexpr():
+        #     newlist.append(expr)
+        #     continue
+
         else:
-            # an Expression, we remain in the positive case
+            # an nested Expression, we remain in the positive case
             newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
             if str(newargs) != str(expr.args):
                 newexpr = copy.copy(expr)
-                newexpr.args = newargs  # check if 'not' is present in arguments
+                newexpr.update_args(newargs)  # check if 'not' is present in arguments
                 newlist.append(newexpr)
             else:
                 newlist.append(expr)
@@ -82,7 +90,7 @@ def recurse_negation(expr):
         elif expr.name == '>':  newexpr.name = '<='
         else: raise ValueError(f"Unknown comparison to negate {expr}")
         # args are positive now, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return newexpr
 
     elif isinstance(expr, Operator):
@@ -106,14 +114,14 @@ def recurse_negation(expr):
             elif expr.name == "or": newexpr.name = "and"
             else: raise ValueError(f"Unknown operator to negate {expr}")
             # continue negating the args
-            newexpr.args = [recurse_negation(a) for a in expr.args]
+            newexpr.update_args([recurse_negation(a) for a in expr.args])
             return newexpr
 
     # global constraints
     elif hasattr(expr, "decompose"):
         newexpr = copy.copy(expr)
         # args are positive as we will negate the global, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return ~newexpr
 
     # numvars or direct constraint

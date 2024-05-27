@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "xcsp3"
+version = "0.1.0"
+description = ""
+authors = ["None"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+cpmpy = {path = "..", develop = true}
+pytest = "^8.2.0"
+setuptools = "^69.5.1"
+gitpython = "^3.1.43"
+tqdm = "^4.66.4"
+lxml = "^5.2.2"
+pycsp3 = { path="pycsp3", develop = true }
+pychoco = "^0.1.2"
+pytest-fast-first = "^1.0.5"
+pytest-sugar = "^1.0.0"
+pytest-profiling = "^1.7.0"
+pytest-repeat = "^0.9.3"
+exact = "^1.2.1"
+z3-solver = "^4.13.0.0"
+minizinc = "^0.9.0"
+cython = "^3.0.10"
+types-setuptools = "^69.5.0.20240519"
+ortools = "^9.10.4067"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "executable/test/test.py",
+]

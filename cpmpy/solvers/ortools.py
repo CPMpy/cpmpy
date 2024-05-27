@@ -269,10 +269,11 @@ class CPM_ortools(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
         """
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+        (flat_obj, flat_cons) = flatten_objective(expr, expr_dict=self.expr_dict)
+        if len(flat_cons) > 0:
+            self += flat_cons  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -341,19 +342,19 @@ class CPM_ortools(SolverInterface):
             cpm_cons = decompose_in_tree(cpm_cons, supported)
         def flatten():
             global cpm_cons
-            cpm_cons = flatten_constraint(cpm_cons)
+            cpm_cons = flatten_constraint(cpm_cons, expr_dict=self.expr_dict)
         def reify():
             global cpm_cons
-            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))
+            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_dict=self.expr_dict)
         def only_num():
             global cpm_cons
-            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))
+            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_dict=self.expr_dict)
         def only_bv():
             global cpm_cons
-            cpm_cons = only_bv_reifies(cpm_cons)
+            cpm_cons = only_bv_reifies(cpm_cons, expr_dict=self.expr_dict)
         def only_impl():
             global cpm_cons
-            cpm_cons = only_implies(cpm_cons)
+            cpm_cons = only_implies(cpm_cons, expr_dict=self.expr_dict)
 
         t_decomp = timeit.timeit(stmt=decompose,number=1)
         t_flatten = timeit.timeit(stmt=flatten,number=1)
@@ -498,7 +499,10 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
