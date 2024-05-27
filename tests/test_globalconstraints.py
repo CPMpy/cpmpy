@@ -145,6 +145,11 @@ class TestGlobal(unittest.TestCase):
         bv = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv[0], bv],4)]).solve())
 
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllDifferentExceptN([iv], [7,8])]).solve())
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv], [4, 1])]).solve())
+
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
@@ -958,6 +963,11 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 4)]).solve())
         self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 0)]).solve())
         self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b, y], -1)]).solve())
+
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllEqualExceptN([iv], [7,8]), iv[0] != iv[1]]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([iv], [4, 1]), iv[0] != iv[1]]).solve())
 
     def test_not_allEqualExceptn(self):
         x = cp.intvar(lb=0, ub=3, shape=3)
