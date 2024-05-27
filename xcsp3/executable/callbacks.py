@@ -377,22 +377,16 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, condition, rank)
 
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
-        cpm_list = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        if hasattr(condition, 'variable'):
-            cpm_rhs = self.cpm_variables[condition.variable]
-        elif hasattr(condition, 'value'):
-            cpm_rhs = condition.value
-        else:
-            self._unimplemented(lst, condition)
-        cpm_index = self.cpm_variables[i]
-        if arity == 0:
-            self.cpm_model += op([cp.Element(cpm_list,cpm_index), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Element(cpm_list, cpm_index), cpm_rhs)
+        cpm_lst = self.get_cpm_vars(lst)
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
-        self._unimplemented(matrix, i, j, condition) # TOOD: implement, already in CPMpy
+        mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
+        cpm_i, cpm_j = self.get_cpm_vars([i,j])
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
+
+        self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
         if lst2 is None:
