@@ -314,11 +314,13 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing"}
-
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
+                     
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
-                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
+                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
+                             "lex_lesseq", "lex_less",  "among"}
+
         # for when choco new release comes, fixing the bug on increasing and decreasing
         #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
@@ -481,6 +483,9 @@ class CPM_choco(SolverInterface):
                 elif lhs.name == 'count': # count(vars, var/int) = var
                     arr, val = lhs.args
                     return self.chc_model.count(self.solver_var(val), self._to_vars(arr), chc_rhs)
+                elif lhs.name == "among":
+                    arr, vals = lhs.args
+                    return self.chc_model.among(chc_rhs, self._to_vars(arr), vals)
                 elif lhs.name == 'mul': # var * var/int = var/int
                     a,b = self.solver_vars(lhs.args)
                     if isinstance(a, int):
@@ -490,6 +495,8 @@ class CPM_choco(SolverInterface):
                     chc_rhs = self._to_var(rhs)
                     return self.chc_model.pow(*self.solver_vars(lhs.args),chc_rhs)
 
+
+
                 raise NotImplementedError(
                     "Not a known supported Choco left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -497,7 +504,7 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -517,6 +524,13 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.increasing(chc_args,1)
                 elif cpm_expr.name == "strictly_decreasing":
                     return self.chc_model.decreasing(chc_args,1)
+                elif cpm_expr.name in ["lex_lesseq", "lex_less"]:
+                    if cpm_expr.name == "lex_lesseq":
+                        return self.chc_model.lex_less_eq(*chc_args)
+                    return self.chc_model.lex_less(*chc_args)
+# Ready for when it is fixed in pychoco (https://github.com/chocoteam/pychoco/issues/30)
+#                elif cpm_expr.name == "lex_chain_less":
+#                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
             elif cpm_expr.name == 'table':
@@ -536,9 +550,11 @@ class CPM_choco(SolverInterface):
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "precedence":
+                return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
-                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ))
+                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ), cpm_expr.closed)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 

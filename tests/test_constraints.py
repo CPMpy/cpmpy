@@ -14,13 +14,15 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
-
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentExceptN", "AllEqualExceptN",
-    "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "AllDifferentExceptN", "AllEqualExceptN",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
+    "Precedence", "Cumulative", "NoOverlap",
+    "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -102,6 +104,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, POS_VAR)
         elif name == "NValueExcept":
             expr = cls(NUM_ARGS, 3)
+        elif name == "Among":
+            expr = cls(NUM_ARGS, [1,2])
         else:
             expr = cls(NUM_ARGS)
 
@@ -170,7 +174,7 @@ def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative, NValue, Count
+           Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
     classes = inspect.getmembers(cpmpy.expressions.globalconstraints, inspect.isclass)
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
@@ -181,35 +185,67 @@ def global_constraints(solver):
             continue
 
         if name == "Xor":
-            yield cls(BOOL_ARGS)
+            expr = cls(BOOL_ARGS)
         elif name == "Inverse":
-            yield cls(NUM_ARGS, [1,0,2])
+            expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
-            yield cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "IfThenElse":
-            yield cls(*BOOL_ARGS)
+            expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
-            yield cls(NUM_VAR, [0,1,6])
+            expr = cls(NUM_VAR, [0,1,6])
         elif name == "Cumulative":
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            yield Cumulative(s, dur, e, demand, cap)
+            expr = Cumulative(s, dur, e, demand, cap)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
-            yield cls(NUM_ARGS, vals, cnts)
+            expr = cls(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
-            yield cls(NUM_ARGS, 3)
-            yield cls(NUM_ARGS, NUM_VAR)
+            expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "AllEqualExceptN":
-            yield cls(NUM_ARGS, 3)
-            yield cls(NUM_ARGS, NUM_VAR)
+            expr = cls(NUM_ARGS, NUM_VAR)
+        elif name == "Precedence":
+            x = intvar(0,5, shape=3, name="x")
+            expr = cls(x, [3,1,0])
+        elif name == "NoOverlap":
+            s = intvar(0, 10, shape=3, name="start")
+            e = intvar(0, 10, shape=3, name="end")
+            dur = [1,4,3]
+            expr = cls(s, dur, e)
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = intvar(0,10,shape=3)
+            expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "LexLessEq":
+            X = intvar(0, 3, shape=3)
+            Y = intvar(0, 3, shape=3)
+            expr = LexLessEq(X, Y)
+        elif name == "LexLess":
+            X = intvar(0, 3, shape=3)
+            Y = intvar(0, 3, shape=3)
+            expr = LexLess(X, Y)
+        elif name == "LexChainLess":
+            X = intvar(0, 3, shape=(3,3))
+            expr = LexChainLess(X)          
+        elif name == "LexChainLessEq":
+            X = intvar(0, 3, shape=(3,3))
+            expr = LexChainLess(X)        
+        elif name == "AllDifferentLists":
+            vars = intvar(0,10, shape=(3,4))
+            expr = cls(vars)
         else: # default constructor, list of numvars
-            yield cls(NUM_ARGS)
+            expr= cls(NUM_ARGS)            
 
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
+        else:
+            yield expr
+            
 
 def reify_imply_exprs(solver):
     """
