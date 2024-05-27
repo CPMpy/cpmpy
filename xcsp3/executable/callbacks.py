@@ -565,59 +565,41 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model.maximize(cpm_expr)
 
     def obj_minimize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
-        if obj_type == TypeObj.SUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.sum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.PRODUCT:
-            if coefficients is None:
-                self.cpm_model.minimize(reduce((lambda x, y: x*y),self.get_cpm_exprs(terms)))
-            else:
-                self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.EXPRESSION:
-            self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.MAXIMUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.Maximum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.MINIMUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.Minimum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.NVALUES:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.NValue(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        import numpy as np
+        if coefficients is None:
+            coefficients = np.ones(len(terms))
         else:
-            self._unimplemented(obj_type, terms, coefficients)
+            coefficients = np.array(coefficients)
+
+        if obj_type == TypeObj.SUM:
+            self.cpm_model.minimize(cp.sum(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MAXIMUM:
+            self.cpm_model.minimize(cp.max(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MINIMUM:
+            self.cpm_model.minimize(cp.min(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.NVALUES:
+            self.cpm_model.minimize(cp.NValue(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.EXPRESSION:
+            assert all(coeff == 1 for coeff in coefficients)
+            assert len(terms) == 1
+            cpm_expr = self.get_cpm_exprs(terms)[0]
+            self.cpm_model.minimize(cpm_expr)
+        else:
+            self._unimplemented(obj_type, coefficients, terms)
 
     def obj_maximize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
+        import numpy as np
+        if coefficients is None:
+            coefficients = np.ones(len(terms))
+        else:
+            coefficients = np.array(coefficients)
+
         if obj_type == TypeObj.SUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.sum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.PRODUCT:
-            if coefficients is None:
-                self.cpm_model.maximize(reduce((lambda x, y: x * y), self.get_cpm_exprs(terms)))
-            else:
-                self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.EXPRESSION:
-            self._unimplemented(obj_type, terms, coefficients)
+            self.cpm_model.maximize(cp.sum(coefficients * self.get_cpm_exprs(terms)))
         elif obj_type == TypeObj.MAXIMUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.Maximum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+            self.cpm_model.maximize(cp.max(coefficients * self.get_cpm_exprs(terms)))
         elif obj_type == TypeObj.MINIMUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.Minimum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+            self.cpm_model.maximize(cp.min(coefficients * self.get_cpm_exprs(terms)))
         elif obj_type == TypeObj.NVALUES:
             if coefficients is None:
                 self.cpm_model.maximize(cp.NValue(self.get_cpm_exprs(terms)))
@@ -625,6 +607,14 @@ class CallbacksCPMPy(Callbacks):
                 self.cpm_model.maximize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
         else:
             self._unimplemented(obj_type, terms, coefficients)
+            self.cpm_model.maximize(cp.NValue(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.EXPRESSION:
+            assert all(coeff == 1 for coeff in coefficients)
+            assert len(terms) == 1
+            cpm_expr = self.get_cpm_exprs(terms)[0]
+            self.cpm_model.maximize(cpm_expr)
+        else:
+            self._unimplemented(obj_type, coefficients, terms)
 
     def vars_from_node(self, scope):
         cpm_vars = []
