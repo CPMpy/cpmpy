@@ -1063,7 +1063,7 @@ class TestTypeChecks(unittest.TestCase):
 
         iv = cp.intvar(0,10, shape=3)
         SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
-        for name, cls in SOLVERNAMES:
+        for name in SOLVERNAMES:
             if name in ("pysat", "pysdd"): continue
             self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
             # test closed version
