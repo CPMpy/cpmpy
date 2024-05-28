@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
-    "Table", "ShortTable", "Precedence", "NoOverlap",
+    "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d"
     "Circuit", "SubCircuit", "SubCircuitWithStart",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
@@ -219,6 +219,14 @@ def global_constraints(solver):
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
             expr = cls(s, dur, e)
+        elif name == "NoOverlap2d":
+            start_x = intvar(0,10, shape=3, name="startx")
+            start_y = intvar(0,10, shape=3, name="starty")
+            end_x = intvar(0,10, shape=3, name="endx")
+            end_y = intvar(0,10, shape=3, name="endy")
+            dur_x = [3,4,5]
+            dur_y = intvar(3,5, shape=3, name="ly")
+            expr  = cls(start_x, dur_x, end_x, start_y, dur_y, end_y)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)

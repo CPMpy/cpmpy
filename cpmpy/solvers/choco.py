@@ -318,8 +318,11 @@ class CPM_choco(SolverInterface):
 
         # choco supports reification of any constraint, but has a bug in increasing, decreasing and subcircuit (#1085)
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
-                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "among",
+                             # for when choco new release comes, fixing the bug on increasing and decreasing
+                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
+                             "among",
                              "lex_lesseq", "lex_less"}
+
         # for when choco new release comes, fixing the bug on increasing, decreasing and subcircuit
         #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
@@ -560,7 +563,7 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.sub_circuit(succ, 0, subcircuit_length)
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
-                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ))
+                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ), cpm_expr.closed)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 

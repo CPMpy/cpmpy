@@ -824,6 +824,39 @@ class NoOverlap(GlobalConstraint):
                 return False
         return True
 
+class NoOverlap2d(GlobalConstraint):
+    """
+        2D-version of the NoOverlap constraint.
+        Ensures a set of rectangles is placed on a grid such that they do not overlap.
+    """
+    def __init__(self, start_x, dur_x, end_x,  start_y, dur_y, end_y):
+        assert len(start_x) == len(dur_x) == len(end_x) == len(start_y) == len(dur_y) == len(end_y)
+        super().__init__("no_overlap2d", [start_x, dur_x, end_x,  start_y, dur_y, end_y])
+
+    def decompose(self):
+        from .python_builtins import any as cpm_any
+
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = self.args
+        n = len(start_x)
+        cons =  [s + d == e for s,d,e in zip(start_x, dur_x, end_x)]
+        cons += [s + d == e for s,d,e in zip(start_y, dur_y, end_y)]
+
+        for i,j in all_pairs(list(range(n))):
+            cons += [cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
+                              end_y[i] <= start_y[j], end_y[j] <= start_y[i]])]
+        return cons,[]
+    def value(self):
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
+        n = len(start_x)
+        if any(s + d != e for s, d, e in zip(start_x, dur_x, end_x)):
+            return False
+        if any(s + d != e for s, d, e in zip(start_y, dur_y, end_y)):
+            return False
+        for i,j in all_pairs(list(range(n))):
+            if  end_x[i] > start_x[j] and end_x[j] > start_x[i] and \
+                 end_y[i] > start_y[j] and end_y[j] > start_y[i]:
+                return False
+        return True
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
@@ -831,16 +864,20 @@ class GlobalCardinalityCount(GlobalConstraint):
     must be equal to occ[i].
     """
 
-    def __init__(self, vars, vals, occ):
+    def __init__(self, vars, vals, occ, closed=False):
         flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         super().__init__("gcc", [vars,vals,occ])
+        self.closed = closed
 
     def decompose(self):
         from .globalfunctions import Count
         vars, vals, occ = self.args
-        return [Count(vars, i) == v for i, v in zip(vals, occ)], []
+        constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+        if self.closed:
+            constraints += [InDomain(v, vals) for v in vars]
+        return constraints, []
 
     def value(self):
         from .python_builtins import all

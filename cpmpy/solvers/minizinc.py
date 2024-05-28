@@ -636,7 +636,11 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals)
             occ = self._convert_expression(occ)
-            return "global_cardinality({},{},{})".format(vars,vals,occ)
+            if expr.closed is False:
+                name = "global_cardinality"
+            else:
+                name = "global_cardinality_closed"
+            return "{}({},{},{})".format(name,vars,vals,occ)
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
