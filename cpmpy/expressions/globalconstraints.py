@@ -317,8 +317,10 @@ class Table(GlobalConstraint):
         from .variables import boolvar
         arr, tab = self.args
         row_selected = boolvar(shape=len(tab))
+        if len(tab) == 1:
+            return [all(t == a for (t,a) in zip(tab[0], arr))]
         return [any(row_selected)] + \
-               [rs.implies(all(t == arr)) for (t,rs) in zip(tab, row_selected)]
+               [rs.implies(all([t == a for (t,a) in zip(row, arr)])) for (row,rs) in zip(tab, row_selected)]
   
     def value(self):
         arr, tab = self.args
@@ -351,6 +353,8 @@ class ShortTable(GlobalConstraint):
         from .variables import boolvar
         arr, tab = self.args
         row_selected = boolvar(shape=len(tab))
+        if len(tab) == 1:
+            return [all([r == a for (r,a) in zip(tab[0], arr) if r != "*"])]
         return [any(row_selected)] + \
                [rs.implies(
                    all([r == a for (r,a) in zip(row, arr) if r != "*"])
