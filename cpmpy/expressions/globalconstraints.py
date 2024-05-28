@@ -186,7 +186,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == len(self.args)
+        return len(set(argval(a) for a in self.args)) == len(self.args)
 
 class AllDifferentExceptN(GlobalConstraint):
     """
