@@ -18,7 +18,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
     "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "NoOverlap",
+    "Precedence", "Cumulative", "NoOverlap","NoOverlap2d"
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
@@ -206,6 +206,14 @@ def global_constraints(solver):
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
             expr = cls(s, dur, e)
+        elif name == "NoOverlap2d":
+            start_x = intvar(0,10, shape=3, name="startx")
+            start_y = intvar(0,10, shape=3, name="starty")
+            end_x = intvar(0,10, shape=3, name="endx")
+            end_y = intvar(0,10, shape=3, name="endy")
+            dur_x = [3,4,5]
+            dur_y = intvar(3,5, shape=3, name="ly")
+            expr  = cls(start_x, dur_x, end_x, start_y, dur_y, end_y)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
