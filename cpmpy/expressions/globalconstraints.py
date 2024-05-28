@@ -100,6 +100,7 @@
         AllDifferentExcept0
         AllDifferentExceptN
         AllDifferentLists
+        AllDifferentListsExceptN
         AllEqual
         AllEqualExceptN
         Circuit
@@ -239,6 +240,38 @@ class AllDifferentLists(GlobalConstraint):
     def value(self):
         lst_vals = [tuple(argvals(a)) for a in self.args]
         return len(set(lst_vals)) == len(self.args)
+
+
+class AllDifferentListsExceptN(GlobalConstraint):
+    """
+        Ensures none of the lists given are exactly the same. Excluding the tuples given in N
+        Called 'lex_alldifferent' in the global constraint catalog:
+        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
+    """
+    def __init__(self, lists, n):
+        if not is_any_list(n):
+            raise TypeError(f"AllDifferentListsExceptN expects a (list of) lists to exclude but got {n}")
+        if any(not is_any_list(x) for x in n): #only one list given, not a list of lists
+            n = [n]
+        if any(not is_any_list(lst) for lst in lists):
+            raise TypeError(f"AllDifferentListsExceptN expects a list of lists, but got {lists}")
+        if any(len(lst) != len(lists[0]) for lst in lists + n):
+            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
+        super().__init__("alldifferent_lists_except_n", [[flatlist(lst) for lst in lists], [flatlist(x) for x in n]])
+
+    def decompose(self):
+        """Returns the decomposition
+        """
+        from .python_builtins import all as cpm_all
+        constraints = []
+        for lst1, lst2 in all_pairs(self.args[0]):
+            constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(Table(lst1, self.args[1]))]
+        return constraints, []
+
+    def value(self):
+        lst_vals = [tuple(argvals(a)) for a in self.args[0]]
+        except_vals = [tuple(argvals(a)) for a in self.args[1]]
+        return len(set(lst_vals) - set(except_vals)) == len([x for x in lst_vals if x not in except_vals])
 
 
 def allequal(args):

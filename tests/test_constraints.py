@@ -15,7 +15,7 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists", "AllDifferentExceptN", "AllEqualExceptN",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists","AllDifferentListsExceptN", "AllDifferentExceptN", "AllEqualExceptN",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
     "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
     "Circuit", "SubCircuit", "SubCircuitWithStart",
@@ -259,6 +259,10 @@ def global_constraints(solver):
         elif name == "AllDifferentLists":
             vars = intvar(0,10, shape=(3,4))
             expr = cls(vars)
+        elif name == "AllDifferentListsExceptN":
+            vars = intvar(0, 10, shape=(3, 4))
+            excepting = intvar(0,1, shape=(2,4))
+            expr = cls(vars, excepting)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)
 
