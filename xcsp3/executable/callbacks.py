@@ -468,19 +468,22 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
+
         if lst2 is None:
-            raise NotImplementedError()
-        cpm_vars1 = self.get_cpm_vars(lst1)
-        cpm_vars2 = self.get_cpm_vars(lst2)
-        # make lists same length, last part is irrelevant if not same length
-        if len(cpm_vars2) > len(cpm_vars1):
-            cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
-        elif len(cpm_vars1) > len(cpm_vars2):
-            cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
-        self.cpm_model += cp.Inverse(cpm_vars1, cpm_vars2)
+            self.cpm_model += cp.InverseOne(self.get_cpm_vars(lst1))
+        else:
+            cpm_vars1 = self.get_cpm_vars(lst1)
+            cpm_vars2 = self.get_cpm_vars(lst2)
+            # Ignace: deprecated, we have InverseAsym now which gets constructed automatically
+            # # make lists same length, last part is irrelevant if not same length
+            # if len(cpm_vars2) > len(cpm_vars1):
+            #     cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
+            # elif len(cpm_vars1) > len(cpm_vars2):
+            #     cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
+            self.cpm_model += cp.Inverse(cpm_vars1, cpm_vars2)
 
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
-        self._unimplemented(lst, value)
+        self.cpm_model += cp.Channel(self.get_cpm_vars(lst), self.get_cpm_var(value))
 
     def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable], zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
         cpm_start = self.get_cpm_vars(origins)
