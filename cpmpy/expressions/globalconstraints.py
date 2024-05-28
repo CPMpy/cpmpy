@@ -382,7 +382,7 @@ class Channel(GlobalConstraint):
 
     def value(self):
         arr, v = self.args
-        return sum(x.value() for x in arr) == 1 and 0 <= v.value() < len(arr) and arr[v.value()] == 1
+        return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
