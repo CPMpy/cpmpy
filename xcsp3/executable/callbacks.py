@@ -371,10 +371,11 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += ~cp.AllEqual(cpm_vars)
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable], occurs: list[int] | list[Variable] | list[range], closed: bool):
-        if closed == False:
-            self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst), self.get_cpm_exprs(values), self.get_cpm_exprs(occurs))
-        else:
-            self._unimplemented()
+        self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
+                                                    self.get_cpm_exprs(values),
+                                                    self.get_cpm_exprs(occurs),
+                                                    closed=closed)
+
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
         cpm_vars = self.get_cpm_vars(lst) # TODO: check if list can be list of expressions too in comp?
