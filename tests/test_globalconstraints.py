@@ -114,6 +114,42 @@ class TestGlobal(unittest.TestCase):
         bv = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv[0], bv)]).solve())
 
+    def test_alldifferent_except_n(self):
+        # test known input/outputs
+        tuples = [
+            ((1, 2, 3), True),
+            ((1, 2, 1), False),
+            ((0, 1, 2), True),
+            ((2, 0, 3), True),
+            ((2, 0, 2), True),
+            ((0, 0, 2), False),
+        ]
+        iv = cp.intvar(0, 4, shape=3)
+        c = cp.AllDifferentExceptN(iv, 2)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals, oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var, val) in zip(iv, vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals, oracle}"
+
+        # and some more
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,2)]).solve())
+        self.assertTrue(cp.AllDifferentExceptN(iv,4).value())
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,7), iv == [7, 7, 1]]).solve())
+        self.assertTrue(cp.AllDifferentExceptN(iv,7).value())
+
+        # test with mixed types
+        bv = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv[0], bv],4)]).solve())
+
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllDifferentExceptN([iv], [7,8])]).solve())
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv], [4, 1])]).solve())
+
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([~cp.AllDifferentExcept0(iv)]).solve())
@@ -169,25 +205,25 @@ class TestGlobal(unittest.TestCase):
 
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
-        circuit_sols = set()
-        not_circuit_sols = set()
+        all_sols = set()
+        not_all_sols = set()
 
-        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_all_sols.add(tuple(x.value())))
 
         total = cp.Model(x == x).solveAll()
 
-        for sol in circuit_sols:
+        for sol in all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertTrue(circuit.value())
 
-        for sol in not_circuit_sols:
+        for sol in not_all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertFalse(circuit.value())
 
-        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
 
 
     def test_inverse(self):
@@ -914,7 +950,59 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllEqual(x,y,-1)]).solve())
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
-        #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
+        self.assertFalse(cp.Model([cp.AllEqual(x,y,b)]).solve())
+
+    def test_allEqualExceptn(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1],211)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1,4],4)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1,4],-1)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 4)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 0)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b, y], -1)]).solve())
+
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllEqualExceptN([iv], [7,8]), iv[0] != iv[1]]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([iv], [4, 1]), iv[0] != iv[1]]).solve())
+
+    def test_not_allEqualExceptn(self):
+        x = cp.intvar(lb=0, ub=3, shape=3)
+        n = 2
+        constr = cp.AllEqualExceptN(x,n)
+
+        model = cp.Model([~constr, x == [1, 2, 1]])
+        self.assertFalse(model.solve())
+
+        model = cp.Model([~constr])
+        self.assertTrue(model.solve())
+        self.assertFalse(constr.value())
+
+        self.assertFalse(cp.Model([constr, ~constr]).solve())
+
+        all_sols = set()
+        not_all_sols = set()
+
+        circuit_models = cp.Model(constr).solveAll(display=lambda: all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~constr).solveAll(display=lambda: not_all_sols.add(tuple(x.value())))
+
+        total = cp.Model(x == x).solveAll()
+
+        for sol in all_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertTrue(constr.value())
+
+        for sol in not_all_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertFalse(constr.value())
+
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
+
 
     def test_increasing(self):
         x = cp.intvar(-8, 8)

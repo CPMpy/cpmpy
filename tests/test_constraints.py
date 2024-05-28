@@ -16,6 +16,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
@@ -180,6 +181,8 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
 
         if name == "Xor":
             expr = cls(BOOL_ARGS)
@@ -198,6 +201,14 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = intvar(0,10,shape=3)
+            expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
+        elif name == "AllEqualExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "Precedence":
             x = intvar(0,5, shape=3, name="x")
             expr = cls(x, [3,1,0])
@@ -214,16 +225,13 @@ def global_constraints(solver):
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLessEq(X, Y)
-
         elif name == "LexLess":
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLess(X, Y)
-
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)
-            
+            expr = LexChainLess(X)          
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)        
@@ -237,7 +245,7 @@ def global_constraints(solver):
             continue
         else:
             yield expr
-
+            
 
 def reify_imply_exprs(solver):
     """
