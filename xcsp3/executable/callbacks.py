@@ -259,18 +259,17 @@ class CallbacksCPMPy(Callbacks):
             self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
-        self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
-
-    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]): # TODO check this...
-        # TODO: ignace: I'm pretty sure this is incorrect...
-        #           Have to check but think its alldiff on rows and alldiff on cols
         if excepting is None:
-            cpm_exprs = self.exprs_from_node(matrix)
-            return cp.AllDifferent(cpm_exprs)
-        elif excepting == [0]:
-            return cp.AllDifferentExcept0(self.exprs_from_node(matrix))
+            self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists])
         else:
-            self._unimplemented(excepting)
+            self.cpm_model += cp.AllDifferentListsExceptN([self.get_cpm_vars(lst) for lst in lists], excepting)
+
+    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
+        import numpy as np
+        for row in matrix:
+            self.ctr_all_different(row, excepting)
+        for col in np.array(matrix).T:
+            self.ctr_all_different(col, excepting)
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
