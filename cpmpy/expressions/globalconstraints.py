@@ -452,15 +452,44 @@ class MDD(GlobalConstraint):
         return True # can only have reached end node
 
 class Regular(GlobalConstraint):
-    """The values of the variables in 'array' correspond to a path in the automaton formed by the transition in 'transitions'.
-    The path starts in 'start' and ends in one of the ending states ('ends')
+    """
+    Regular-constraint (or Automaton-constraint): An automaton is a directed graph. Each node correspond to a state.
+    Each edge correspond to a transition from one state to the other given a value. A given node serves as start
+    node. A path a size N is a solution if, by following the transitions given by the values of the variables we end up
+    in one of the defined end nodes.
+
+    The values of the variables in 'array' correspond to a path in the automaton formed by the transitions in
+    'transitions'. The path starts in 'start' and ends in one of the ending states ('ends')
+
+    spec:
+        - array: an array of CPMpy expressions (integer variable, global functions,...)
+        - transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifiers for the nodes
+        (int or str)
+        - start: a singular nodeID node start of the automaton
+        - ends: a list of nodeID corresponding to the accepting end nodes
+
+    Example:
+        The following transitions depict an automaton, starting at 'a' and ending in ['c']
+        ("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")
+        Its graphical representation is:
+                |--0----|
+                v       |
+        a -1->  b  -1-> c --
+               ^  \     ^  |
+              |-0-|     |-1-
+        It has 2 solution for (X,Y,Z): (1,1,1) and (1,0,1)
+        It has 4 solutions for (W,X,Y,Z): (1,1,1,1), (1,1,0,1), (1,0,0,1) and (1,0,1,1)
     """
     def __init__(self, array, transitions, start, ends):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
-        if all(is_transition(transition) for transition in transitions):
+        if not all(is_transition(transition) for transition in transitions):
             raise TypeError("The second argument of a regular constraint should be a collection of transitions")
+        if not isinstance(start, (str, int)):
+            raise TypeError("The third argument of a regular constraint should be a nodeID")
+        if not (isinstance(ends, list) and all(isinstance(e, (str, int))for e in ends)):
+            raise TypeError("The fourth argument of a regular constraint should be a list of nodeID")
         super().__init__("regular", [array, transitions, start, ends])
         self.mapping = {}
         for s, v, e in transitions:
@@ -468,26 +497,33 @@ class Regular(GlobalConstraint):
 
     def decompose(self):
         arr, transitions, start, ends = self.args
+        # get the range of possible transition value
         lb = min([x.lb for x in arr])
         ub = max([x.ub for x in arr])
         # Table decomposition with aux variables for the states
         nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+        # normalization of the id of the node (from 0 to n-1)
         num_mapping = dict(zip(nodes, range(len(nodes))))  # map node to integer ids for the nodes
         num_transitions = [[num_mapping[n_in], v, num_mapping[n_out]] for n_in, v, n_out in
                            transitions]  # apply mapping to transition
+        # compute missing transition with an additionnal never-accepting sink node (dummy default node)
         id_dummy = len(nodes)  # default node id
         transition_dummy = [[num_mapping[n], v, id_dummy] for n in nodes for v in range(lb, ub + 1) if
                             (n, v) not in self.mapping] + [[id_dummy, v, id_dummy] for v in range(lb, ub + 1)]
         num_transitions = num_transitions + transition_dummy
+        # auxiliary variable representing the sequence of state node in the path
         aux_vars = intvar(0, id_dummy, shape=len(arr))
         id_start = num_mapping[start]
-        tab_first = [t[1:] for t in num_transitions if t[0] == id_start]  # optimization for first (one node)
+        # optimization for first level (only one node, allows to deal with smaller table on first layer)
+        tab_first = [t[1:] for t in num_transitions if t[0] == id_start]
         id_ends = [num_mapping[e] for e in ends]
-        return [InDomain(aux_vars[-1], id_ends)], [Table([arr[0], aux_vars[0]], tab_first)] + \
+        # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-Automaton
+        defining = [Table([arr[0], aux_vars[0]], tab_first)] + \
                                                   [Table([aux_vars[i - 1], arr[i], aux_vars[i]], num_transitions) for i
                                                    in range(1, len(arr))]
-        # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-Automaton
         # constraining constraint: end of the path in accepting node
+        constraining = [InDomain(aux_vars[-1], id_ends)]
+        return constraining, defining
 
     def value(self):
         arr, transitions, start, ends = self.args
