@@ -345,32 +345,47 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.Precedence(cpm_vars, values)
 
     def ctr_sum(self, lst: list[Variable] | list[Node], coefficients: None | list[int] | list[Variable], condition: Condition):
-        cpm_vars = []
-        if isinstance(lst[0], XVar):
-            for xvar in lst:
-                cpm_vars.append(self.cpm_variables[xvar])
-        else:
-            cpm_vars = self.exprs_from_node(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        if hasattr(condition, "variable"):
-            rhs = condition.variable
-        elif hasattr(condition, 'value'):
-            rhs = condition.value
-        elif hasattr(condition, 'max'):
-            #operator = in
-            rhs = [x for x in range(condition.min, condition.max + 1)]
-        else:
-            pass
-        cpm_rhs = self.get_cpm_var(rhs)
+        # cpm_vars = []
+        # if isinstance(lst[0], XVar):
+        #     for xvar in lst:
+        #         cpm_vars.append(self.cpm_variables[xvar])
+        # else:
+        #     cpm_vars = self.exprs_from_node(lst)
+        # arity, op = self.funcmap[condition.operator.name.lower()]
+        # if hasattr(condition, "variable"):
+        #     rhs = condition.variable
+        # elif hasattr(condition, 'value'):
+        #     rhs = condition.value
+        # elif hasattr(condition, 'max'):
+        #     #operator = in
+        #     rhs = [x for x in range(condition.min, condition.max + 1)]
+        # else:
+        #     pass
+        # cpm_rhs = self.get_cpm_var(rhs)
+        # if coefficients is None:
+        #     cpsum = cp.sum(cpm_vars)
+        # else:
+        #     cp_coeffs = self.get_cpm_vars(coefficients)
+        #     cpsum = cp.sum(cp.cpm_array(cpm_vars) * cp_coeffs)
+        # if arity == 0:
+        #     self.cpm_model += op([cpsum, cpm_rhs])
+        # else:
+        #     self.cpm_model += op(cpsum, cpm_rhs)
+
+        import numpy as np
         if coefficients is None:
-            cpsum = cp.sum(cpm_vars)
+            coefficients = np.ones(len(lst))
+
+        lhs = cp.sum(coefficients * self.get_cpm_exprs(lst))
+        if condition.operator == TypeConditionOperator.IN:
+            from pycsp3.classes.auxiliary.conditions import ConditionInterval
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`"
+            rhs = list(range(condition.min, condition.max+1))
         else:
-            cp_coeffs = self.get_cpm_vars(coefficients)
-            cpsum = cp.sum(cp.cpm_array(cpm_vars) * cp_coeffs)
-        if arity == 0:
-            self.cpm_model += op([cpsum, cpm_rhs])
-        else:
-            self.cpm_model += op(cpsum, cpm_rhs)
+            rhs = self.get_cpm_var(condition.right_operand())
+
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, rhs)
+
 
     def ctr_count(self, lst: list[Variable] | list[Node], values: list[int] | list[Variable], condition: Condition):
         cpm_vars = self.get_cpm_vars(lst)
