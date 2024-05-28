@@ -74,6 +74,28 @@ class TestGlobal(unittest.TestCase):
                     vr._value = vl
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
+    def test_alldifferent_lists_except_n(self):
+        # test known input/outputs
+        tuples = [
+                  ([(1,2,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(1,2,3)], False),
+                  ([(1,2,3),(1,3,3),(1,2,3),(2,2,2)], False),
+                  ([(0,0,3),(1,3,3),(1,2,4)], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3)], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3), [2,2,2]], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3), [2,2,2], [0,0,3]], False),
+                  ([(1,2,3),(1,3,3),(3,3,3)], True)
+                 ]
+        iv = cp.intvar(0,4, shape=(6,3))
+        c = cp.AllDifferentListsExceptN(iv, [[1,3,3],[2,2,2]])
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                for (vr, vl) in zip(var, val):
+                    vr._value = vl
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
@@ -113,6 +135,42 @@ class TestGlobal(unittest.TestCase):
         #test with mixed types
         bv = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllDifferentExcept0(iv[0], bv)]).solve())
+
+    def test_alldifferent_except_n(self):
+        # test known input/outputs
+        tuples = [
+            ((1, 2, 3), True),
+            ((1, 2, 1), False),
+            ((0, 1, 2), True),
+            ((2, 0, 3), True),
+            ((2, 0, 2), True),
+            ((0, 0, 2), False),
+        ]
+        iv = cp.intvar(0, 4, shape=3)
+        c = cp.AllDifferentExceptN(iv, 2)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals, oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var, val) in zip(iv, vals):
+                var._value = val
+            assert (c.value() == oracle), f"Wrong value function for {vals, oracle}"
+
+        # and some more
+        iv = cp.intvar(-8, 8, shape=3)
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,2)]).solve())
+        self.assertTrue(cp.AllDifferentExceptN(iv,4).value())
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,7), iv == [7, 7, 1]]).solve())
+        self.assertTrue(cp.AllDifferentExceptN(iv,7).value())
+
+        # test with mixed types
+        bv = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv[0], bv],4)]).solve())
+
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllDifferentExceptN([iv], [7,8])]).solve())
+        self.assertTrue(cp.Model([cp.AllDifferentExceptN([iv], [4, 1])]).solve())
 
     def test_not_alldifferentexcept0(self):
         iv = cp.intvar(-8, 8, shape=3)
@@ -169,39 +227,39 @@ class TestGlobal(unittest.TestCase):
 
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
-        circuit_sols = set()
-        not_circuit_sols = set()
+        all_sols = set()
+        not_all_sols = set()
 
-        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_all_sols.add(tuple(x.value())))
 
         total = cp.Model(x == x).solveAll()
 
-        for sol in circuit_sols:
+        for sol in all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertTrue(circuit.value())
 
-        for sol in not_circuit_sols:
+        for sol in not_all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertFalse(circuit.value())
 
-        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
 
     def test_subcircuit(self):
 
         import numpy as np
-        
+
         n = 6
-        
+
         # Find a subcircuit
         x = cp.intvar(0, n-1, n)
         model = cp.Model( [cp.SubCircuit(x)] )
         self.assertTrue(model.solve())
         self.assertTrue(cp.SubCircuit(x).value())
         self.assertTrue(model.solveAll() == 410)
-        
+
         # Find a max subcircuit (subcircuit = circuit)
         x = cp.intvar(0, n-1, n)
         model = cp.Model( [cp.SubCircuit(x)] + list(x != np.arange(n)) )
@@ -218,7 +276,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(circuit_length(x.value()) < n)
         self.assertTrue(model.solveAll() == 85)
 
-        # Find an empty subcircuit 
+        # Find an empty subcircuit
         x = cp.intvar(0, n-1, n)
         sc = cp.SubCircuit(x)
         model = cp.Model( [sc] + list(x == np.arange(n)) )
@@ -272,7 +330,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(circuit_length(x.value()) < n)
         self.assertTrue(model.solveAll() == 85)
 
-        # Find an empty subcircuit 
+        # Find an empty subcircuit
         x = cp.intvar(0, n-1, n)
         a = cp.boolvar()
         model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x == np.arange(n)) )
@@ -321,7 +379,7 @@ class TestGlobal(unittest.TestCase):
     def test_subcircuitwithstart(self):
         n = 5
         x = cp.intvar(0, n-1, n)
-        
+
         # Test satisfiability
         model = cp.Model( [cp.SubCircuitWithStart(x)] )
         self.assertTrue( model.solve() )
@@ -559,6 +617,42 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_negative_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        model += constraints[1].decompose()
+        self.assertFalse(model.solve())
+
     def test_table_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -569,6 +663,62 @@ class TestGlobal(unittest.TestCase):
                     self.assertTrue(cp.Model(cp.Table([iv], [[0]])).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_mdd(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 2, shape=3)
+        transitions = [
+            ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"),
+            ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+            ("n4", 0, "t"), ("n5", 0, "t")]
+
+        constraints = [cp.MDD(x, transitions)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        solutions = [[0, 2, 0], [1, 2, 0], [2, 0, 0]]
+
+        for i in range(4):
+            for j in range(4):
+                for k in range(4):
+                    candidate = [i, j, k]
+                    constraints = [cp.MDD(x, transitions), x == candidate]
+                    model = cp.Model(constraints)
+                    if candidate in solutions:
+                        self.assertTrue(model.solve())
+                        self.assertEqual([a.value() for a in x], candidate)
+                    else:
+                        self.assertFalse(model.solve())
+
+    def test_regular(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 1, shape=7)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 0, "d"), ("d", 0, "d"), ("d", 1, "e"),
+                       ("e", 0, "e")]
+        start = "a"
+        ends = ["e"]
+
+        constraints = [cp.Regular(x, transitions, start, ends)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        solutions = [[0,0,0,1,1,0,1],[0,0,1,1,0,0,1],[0,0,1,1,0,1,0],[0,1,1,0,0,0,1],[0,1,1,0,0,1,0],
+                     [0,1,1,0,1,0,0],[1,1,0,0,0,0,1],[1,1,0,0,0,1,0],[1,1,0,0,1,0,0],[1,1,0,1,0,0,0]]
+
+        def enum_candidate(n, candidate):
+            if n == 0:
+                constraints = [cp.Regular(x, transitions, start, ends), x == candidate]
+                model = cp.Model(constraints)
+                if candidate in solutions:
+                    self.assertTrue(model.solve())
+                    self.assertEqual([a.value() for a in x], candidate)
+                else:
+                    self.assertFalse(model.solve())
+            else:
+                enum_candidate(n-1, candidate+[0])
+                enum_candidate(n-1, candidate+[1])
+        enum_candidate(7, [])
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
@@ -1089,7 +1239,59 @@ class TestTypeChecks(unittest.TestCase):
         a = cp.boolvar()
         self.assertTrue(cp.Model([cp.AllEqual(x,y,-1)]).solve())
         self.assertTrue(cp.Model([cp.AllEqual(a,b,False, a | b)]).solve())
-        #self.assertTrue(cp.Model([cp.AllEqual(x,y,b)]).solve())
+        self.assertFalse(cp.Model([cp.AllEqual(x,y,b)]).solve())
+
+    def test_allEqualExceptn(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        b = cp.boolvar()
+        a = cp.boolvar()
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1],211)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1,4],4)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([x,y,-1,4],-1)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 4)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b], 0)]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([a,b,False, a | b, y], -1)]).solve())
+
+        # test with list of n
+        iv = cp.intvar(0, 4, shape=7)
+        self.assertFalse(cp.Model([cp.AllEqualExceptN([iv], [7,8]), iv[0] != iv[1]]).solve())
+        self.assertTrue(cp.Model([cp.AllEqualExceptN([iv], [4, 1]), iv[0] != iv[1]]).solve())
+
+    def test_not_allEqualExceptn(self):
+        x = cp.intvar(lb=0, ub=3, shape=3)
+        n = 2
+        constr = cp.AllEqualExceptN(x,n)
+
+        model = cp.Model([~constr, x == [1, 2, 1]])
+        self.assertFalse(model.solve())
+
+        model = cp.Model([~constr])
+        self.assertTrue(model.solve())
+        self.assertFalse(constr.value())
+
+        self.assertFalse(cp.Model([constr, ~constr]).solve())
+
+        all_sols = set()
+        not_all_sols = set()
+
+        circuit_models = cp.Model(constr).solveAll(display=lambda: all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~constr).solveAll(display=lambda: not_all_sols.add(tuple(x.value())))
+
+        total = cp.Model(x == x).solveAll()
+
+        for sol in all_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertTrue(constr.value())
+
+        for sol in not_all_sols:
+            for var, val in zip(x, sol):
+                var._value = val
+            self.assertFalse(constr.value())
+
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
+
 
     def test_increasing(self):
         x = cp.intvar(-8, 8)
@@ -1158,6 +1360,26 @@ class TestTypeChecks(unittest.TestCase):
         self.assertFalse(cp.Model([cp.Inverse([x,y,x],[x,y,x])]).solve())
         self.assertRaises(TypeError,cp.Inverse,[a,b],[x,y])
         self.assertRaises(TypeError,cp.Inverse,[a,b],[b,False])
+        self.assertFalse(cp.Model([cp.Inverse([x, y, x], [x, y, x, y, x])]).solve())
+
+    def test_inverseOne(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        self.assertFalse(cp.Model([cp.InverseOne([x, y, x])]).solve())
+
+    def test_channel(self):
+        N = 5
+        x = cp.intvar(0, 1, shape=N)
+        v = cp.intvar(-4, N + 5)
+        cst = cp.Channel(x, v)
+        for k in range(-4, 0):
+            self.assertFalse(cp.Model([cst, v == k]).solve())
+        for k in range(0, N):
+            self.assertTrue(cp.Model([cst, v == k]).solve())
+            self.assertEqual([a.value() for a in x], [0 if i != k else 1 for i in range(0,N)])
+        for k in range(N, N+6):
+            self.assertFalse(cp.Model([cst, v == k]).solve())
+
 
     def test_ITE(self):
         x = cp.intvar(-8, 8)

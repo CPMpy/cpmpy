@@ -82,6 +82,7 @@ class CallbacksCPMPy(Callbacks):
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),
+        #TODO 'notin' is the only other set operator (negative indomain)
         # Logic
         "not": (1, lambda x: ~x),
         "and": (0, lambda x: cp.all(x)),
@@ -143,7 +144,13 @@ class CallbacksCPMPy(Callbacks):
         self.ctr_primitive3(x, aop, p, op, k) #for cpmpy ints and vars are just interchangeable..
 
     def ctr_primitive2a(self, x: Variable, aop: TypeUnaryArithmeticOperator, y: Variable):
-        self._unimplemented(x, aop, y)
+        #TODO this was unimplemented not sure if it should be aop(x) == y or x == aop(y)..
+        arity, cpm_op = self.funcmap[aop.name.lower()]
+        assert arity == 1, "unary operator expected"
+        x = self.get_cpm_var(x)
+        y = self.get_cpm_var(y)
+        self.cpm_model += cpm_op(x) == y
+
 
     def ctr_primitive2b(self, x: Variable, aop: TypeArithmeticOperator, y: Variable, op: TypeConditionOperator, k: int):
         #(x aop y) rel k
@@ -197,8 +204,16 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += self.eval_cpm_comp(cpm_x == cpm_y, op, cpm_k)
 
     def ctr_logic_eqne(self, x: Variable, op: TypeConditionOperator, lop: TypeLogicalOperator, scope: list[Variable]):  # x = lop(scope) or x != lop(scope)
-        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE) # TODO: what is this???
-        self._unimplemented(x, op, lop, scope)
+        cpm_x = self.get_cpm_var(x)
+        arity, cpm_op = self.funcmap[(lop.name).lower()]
+        if arity == 0:
+            rhs = cpm_op(self.get_cpm_vars(scope))
+        elif arity == 2:
+            rhs = cpm_op(*self.get_cpm_vars(scope))
+        else:
+            self._unimplemented(lop, scope)
+
+        self.cpm_model += self.eval_cpm_comp(cpm_x, op, rhs)
 
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
         if positive:
@@ -206,13 +221,13 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize indomain like we did table?
         else:
             # negative, so not in domain
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) != values[0]
             else:
-                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values)
+                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize a negative indomain? probably not worth it.
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
@@ -231,54 +246,76 @@ class CallbacksCPMPy(Callbacks):
             if positive:
                 self.cpm_model += cp.Table(cpm_vars, tuples)
             else:
-                self.cpm_model += ~cp.Table(cpm_vars, tuples)
+                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        # return
-        self._unimplemented(scope, transitions, start_state, final_states) # TODO: add after Helene PR
+        self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self._unimplemented(scope, transitions) # TODO: add after Helene PR
+        self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
             self.cpm_model += cp.AllDifferent(cpm_exprs)
-        elif excepting == [0]:
-            self.cpm_model += cp.AllDifferentExcept0(cpm_exprs)
-        else:
-            self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
+        elif len(excepting) > 0:  # TODO changed this, we now support excepting list
+            self.cpm_model += cp.AllDifferentExceptN(cpm_exprs, excepting)
+        elif len(excepting) == 0:
+            # just in case they get tricky
+            self.cpm_model += cp.AllDifferent(cpm_exprs)
+        else:  # unsupported for competition
+            self._unimplemented(scope, excepting)
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
-        self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
-
-    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]): # TODO check this...
-        # TODO: ignace: I'm pretty sure this is incorrect...
-        #           Have to check but think its alldiff on rows and alldiff on cols
         if excepting is None:
-            cpm_exprs = self.exprs_from_node(matrix)
-            return cp.AllDifferent(cpm_exprs)
-        elif excepting == [0]:
-            return cp.AllDifferentExcept0(self.exprs_from_node(matrix))
+            self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists])
         else:
-            self._unimplemented(excepting)
+            self.cpm_model += cp.AllDifferentListsExceptN([self.get_cpm_vars(lst) for lst in lists], excepting)
+
+    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
+        import numpy as np
+        for row in matrix:
+            self.ctr_all_different(row, excepting)
+        for col in np.array(matrix).T:
+            self.ctr_all_different(col, excepting) #TODO: nice
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
-        self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
+        if excepting is None:
+            self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
+        else:
+            self.cpm_model += cp.AllEqualExceptN(self.get_cpm_exprs(scope), excepting)
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
+
         cpm_vars = self.get_cpm_vars(lst)
-        if operator == TypeOrderedOperator.INCREASING:
-            self.cpm_model += cp.Increasing(cpm_vars)
-        elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
-            self.cpm_model += cp.IncreasingStrict(cpm_vars)
-        elif operator == TypeOrderedOperator.DECREASING:
-            self.cpm_model += cp.Decreasing(cpm_vars)
-        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
-            self.cpm_model += cp.DecreasingStrict(cpm_vars)
-        else:
-            self._unimplemented(lst, operator, lengths)
+
+        if lengths is None:
+            if operator == TypeOrderedOperator.INCREASING:
+                self.cpm_model += cp.Increasing(cpm_vars)
+            elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+                self.cpm_model += cp.IncreasingStrict(cpm_vars)
+            elif operator == TypeOrderedOperator.DECREASING:
+                self.cpm_model += cp.Decreasing(cpm_vars)
+            elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+                self.cpm_model += cp.DecreasingStrict(cpm_vars)
+            else:
+                self._unimplemented(lst, operator, lengths)
+
+        # also handle the lengths parameter
+        if lengths is not None:
+            lengths = self.get_cpm_vars(lengths)
+            if operator == TypeOrderedOperator.INCREASING:
+                self.cpm_model += [x + l <= y for x,l,y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+                self.cpm_model += [x + l < y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.DECREASING:
+                self.cpm_model += [x + l >= y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+                self.cpm_model += [x + l > y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            else:
+                self._unimplemented(lst, operator, lengths)
+
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
         self._unimplemented(lst, limit, operator)
@@ -286,7 +323,7 @@ class CallbacksCPMPy(Callbacks):
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
         if operator == TypeOrderedOperator.STRICTLY_INCREASING:
-            self.cpm_model += cp.LexChainLess(cpm_lists)
+            self.cpm_model += cp.LexChainLess(cpm_lists) #TODO why is our less their increasing? is this opposite by accident? ok i checked seems correct
         elif operator == TypeOrderedOperator.INCREASING:
             self.cpm_model += cp.LexChainLessEq(cpm_lists)
         elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
@@ -306,40 +343,72 @@ class CallbacksCPMPy(Callbacks):
         self.ctr_lex(np.array(matrix).T.tolist(), operator)
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
-        self._unimplemented(lst, values, covered) # TODO: after merge of Ignace PR
+        if covered is True: # not supported for competition
+            self._unimplemented(lst, values, covered)
+
+        cpm_vars = self.get_cpm_vars(lst)
+        if values is None: # assumed to be ordered set of all values collected from domains in lst
+            lbs, ubs = get_bounds(cpm_vars)
+            values = sorted(range(min(lbs), max(lbs)+1))
+
+        self.cpm_model += cp.Precedence(cpm_vars, values)
 
     def ctr_sum(self, lst: list[Variable] | list[Node], coefficients: None | list[int] | list[Variable], condition: Condition):
-        cpm_vars = []
-        if isinstance(lst[0], XVar):
-            for xvar in lst:
-                cpm_vars.append(self.cpm_variables[xvar])
-        else:
-            cpm_vars = self.exprs_from_node(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        if hasattr(condition, "variable"):
-            rhs = condition.variable
-        elif hasattr(condition, 'value'):
-            rhs = condition.value
-        elif hasattr(condition, 'max'):
-            #operator = in
-            rhs = [x for x in range(condition.min, condition.max + 1)]
-        else:
-            pass
-        cpm_rhs = self.get_cpm_var(rhs)
+        # cpm_vars = []
+        # if isinstance(lst[0], XVar):
+        #     for xvar in lst:
+        #         cpm_vars.append(self.cpm_variables[xvar])
+        # else:
+        #     cpm_vars = self.exprs_from_node(lst)
+        # arity, op = self.funcmap[condition.operator.name.lower()]
+        # if hasattr(condition, "variable"):
+        #     rhs = condition.variable
+        # elif hasattr(condition, 'value'):
+        #     rhs = condition.value
+        # elif hasattr(condition, 'max'):
+        #     #operator = in
+        #     rhs = [x for x in range(condition.min, condition.max + 1)]
+        # else:
+        #     pass
+        # cpm_rhs = self.get_cpm_var(rhs)
+        # if coefficients is None:
+        #     cpsum = cp.sum(cpm_vars)
+        # else:
+        #     cp_coeffs = self.get_cpm_vars(coefficients)
+        #     cpsum = cp.sum(cp.cpm_array(cpm_vars) * cp_coeffs)
+        # if arity == 0:
+        #     self.cpm_model += op([cpsum, cpm_rhs])
+        # else:
+        #     self.cpm_model += op(cpsum, cpm_rhs)
+
+        import numpy as np
         if coefficients is None:
-            cpsum = cp.sum(cpm_vars)
+            coefficients = np.ones(len(lst)) # TODO I guess, if wsums are preferred over sums
+
+        lhs = cp.sum(coefficients * self.get_cpm_exprs(lst))
+        if condition.operator == TypeConditionOperator.IN:
+            from pycsp3.classes.auxiliary.conditions import ConditionInterval
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`" #TODO and not in? (notin)
+            rhs = list(range(condition.min, condition.max+1))
         else:
-            cp_coeffs = self.get_cpm_vars(coefficients)
-            cpsum = cp.sum(cp.cpm_array(cpm_vars) * cp_coeffs)
-        if arity == 0:
-            self.cpm_model += op([cpsum, cpm_rhs])
-        else:
-            self.cpm_model += op(cpsum, cpm_rhs)
+            rhs = self.get_cpm_var(condition.right_operand())
+
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, rhs)
+
 
     def ctr_count(self, lst: list[Variable] | list[Node], values: list[int] | list[Variable], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
+        # General case of count, can accept list of variables for any arg and any operator
+        cpm_vars = self.get_cpm_exprs(lst)
         cpm_vals = self.get_cpm_vars(values)
-        self._unimplemented(lst, values, condition)
+        if condition.operator == TypeConditionOperator.IN:
+            from pycsp3.classes.auxiliary.conditions import ConditionInterval
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`" #TODO notin?
+            rhs = list(range(condition.min, condition.max + 1))
+        else:
+            rhs = self.get_cpm_var(condition.right_operand())
+
+        count_for_each_val = [cp.Count(cpm_vars, val) for val in cpm_vals]
+        self.cpm_model += self.eval_cpm_comp(cp.sum(count_for_each_val), condition.operator, rhs)
 
     def ctr_atleast(self, lst: list[Variable], value: int, k: int):
         cpm_vars = self.get_cpm_vars(lst)
@@ -357,18 +426,17 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.right_operand()]
         if excepting is None:
-            if arity == 2: #should always be a comparison
-                self.cpm_model += op(cp.NValue(self.get_cpm_exprs(lst)), cpm_rhs)
-            else:
-                assert False, "condition should be a comparision"
+            lhs = cp.NValue(self.get_cpm_exprs(lst))
         else:
-            self._unimplemented()
+            assert len(excepting) == 1, "Competition only allows 1 integer value in excepting list"
+            lhs = cp.NValueExcept(self.get_cpm_exprs(lst), excepting[0])
+
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand())) #TODO this could also be in and notin with a range?
+
     def ctr_not_all_qual(self, lst: list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
-        self.cpm_model += ~cp.AllEqual(cpm_vars)
+        self.cpm_model += cp.NValue(cpm_vars) > 1
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable], occurs: list[int] | list[Variable] | list[range], closed: bool):
         self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
@@ -378,17 +446,17 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst) # TODO: check if list can be list of expressions too in comp?
+        cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand()))
+                                             self.get_cpm_var(condition.right_operand())) #TODO range for in/notin?
 
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)  # TODO: check if list can be list of expressions too in comp?
+        cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand()))
+                                             self.get_cpm_var(condition.right_operand()))  #TODO range for in/notin?
 
     def ctr_minimum_arg(self, lst: list[Variable] | list[Node], condition: Condition, rank: TypeRank):  # should enter XCSP3-core
         self._unimplemented(lst, condition, rank)
@@ -399,35 +467,38 @@ class CallbacksCPMPy(Callbacks):
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
         cpm_lst = self.get_cpm_vars(lst)
         cpm_index = self.get_cpm_var(i)
-        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin?
         self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
         mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
         cpm_i, cpm_j = self.get_cpm_vars([i,j])
-        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin? Sorry for spamming this, i think it's possible in theory according to the specs.
 
         self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
+
         if lst2 is None:
-            raise NotImplementedError()
-        cpm_vars1 = self.get_cpm_vars(lst1)
-        cpm_vars2 = self.get_cpm_vars(lst2)
-        # make lists same length, last part is irrelevant if not same length
-        if len(cpm_vars2) > len(cpm_vars1):
-            cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
-        elif len(cpm_vars1) > len(cpm_vars2):
-            cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
-        self.cpm_model += cp.Inverse(cpm_vars1, cpm_vars2)
+            self.cpm_model += cp.InverseOne(self.get_cpm_vars(lst1))
+        else:
+            cpm_vars1 = self.get_cpm_vars(lst1)
+            cpm_vars2 = self.get_cpm_vars(lst2)
+            # Ignace: deprecated, we have InverseAsym now which gets constructed automatically
+            # # make lists same length, last part is irrelevant if not same length
+            # if len(cpm_vars2) > len(cpm_vars1):
+            #     cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
+            # elif len(cpm_vars1) > len(cpm_vars2):
+            #     cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
+            self.cpm_model += cp.Inverse(cpm_vars1, cpm_vars2)
 
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
-        self._unimplemented(lst, value)
+        self.cpm_model += cp.Channel(self.get_cpm_vars(lst), self.get_cpm_var(value))
 
     def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable], zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
         cpm_start = self.get_cpm_vars(origins)
         cpm_dur = self.get_cpm_vars(lengths)
-        cpm_end = [cp.intvar(*((s+d).get_bounds())) for s,d in zip(cpm_start, cpm_dur)]
+        cpm_end = [cp.intvar(*get_bounds(s+d)) for s,d in zip(cpm_start, cpm_dur)]
         self.cpm_model += cp.NoOverlap(cpm_start, cpm_dur, cpm_end)
 
     def ctr_nooverlap_multi(self, origins: list[list[Variable]], lengths: list[list[int]] | list[list[Variable]], zero_ignored: bool):
@@ -481,8 +552,8 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly
-            # be smart and chose task or time decomposition
-            if max(get_bounds(cpm_ends)) >= 100:
+            # be smart and chose task or time decomposition #TODO you did task decomp in both cases
+            if max(get_bounds(cpm_ends)[1]) >= 100:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
@@ -518,7 +589,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_vars(lst)
         cpm_rhs = self.get_cpm_var(condition.right_operand())
 
-        for bin in range(1, len(cpm_vars)+1):
+        for bin in range(1, len(cpm_vars)+1): # bin labeling starts at 1
             self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_vars == bin) * sizes),
                                                  condition.operator,
                                                  cpm_rhs)
@@ -529,7 +600,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, lim in enumerate(limits):
             self.cpm_model += eval_comparison("<=",
-                                              cp.sum((cpm_vars == (bin+1)) * sizes),
+                                              cp.sum((cpm_vars == (bin+1)) * sizes), # bin labeling starts at 1
                                               lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
@@ -540,7 +611,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, load in enumerate(cpm_loads):
             self.cpm_model += eval_comparison("==",
-                                              cp.sum((cpm_vars == (bin + 1)) * sizes),
+                                              cp.sum((cpm_vars == (bin + 1)) * sizes), # bin labeling starts at 1
                                               load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
@@ -619,7 +690,7 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model.minimize(cpm_expr)
         else:
             self._unimplemented(obj_type, coefficients, terms)
-
+#TODO objectives are a bit confusing but i think it's correct
     def obj_maximize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
         import numpy as np
         if coefficients is None:

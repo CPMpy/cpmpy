@@ -15,10 +15,10 @@ SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.su
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists","AllDifferentListsExceptN", "AllDifferentExceptN", "AllEqualExceptN",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
-    "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
-    "Circuit", "SubCircuit", "SubCircuitWithStart",
+    "Table", "ShortTable", "NegativeTable", "Precedence", "NoOverlap", "NoOverlap2d",
+    "Circuit", "SubCircuit", "SubCircuitWithStart", "MDD", "Regular", "InverseOne", "Channel",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum", "Among"
@@ -29,11 +29,11 @@ SAT_SOLVERS = {"pysat", "pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "z3": {"Inverse"},
-                  "choco": {"Inverse"},
-                  "ortools":{"Inverse"},
-                  "exact": {"Inverse"},
-                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
+                  "z3": {"Inverse", "InverseOne", "Channel"},
+                  "choco": {"Inverse", "InverseOne", "Channel", "SubCircuit"},
+                  "ortools":{"Inverse", "InverseOne", "Channel"},
+                  "exact": {"Inverse", "InverseOne", "Channel"},
+                  "minizinc": {"IncreasingStrict", "InverseOne", "Channel" } # bug #813 reported on libminizinc
                   }
 
 # Exclude certain operators for solvers.
@@ -182,15 +182,28 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
 
         if name == "Xor":
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
+        elif name == "InverseOne":
+            expr = cls(NUM_ARGS)
+        elif name == "Channel":
+            expr = cls(BOOL_ARGS, NUM_VAR)
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "ShortTable":
             expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "MDD":
+            expr = MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+        ("n4", 0, "t"), ("n5", 1, "t")])
+        elif name == "Regular":
+            expr = Regular(NUM_ARGS, [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+        elif name == "NegativeTable":
+            expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
@@ -211,6 +224,14 @@ def global_constraints(solver):
         elif name == "SubCircuitWithStart":
             S = intvar(0, 9, shape=10)
             expr = SubCircuitWithStart(S, start_index=0)
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = intvar(0,10,shape=3)
+            expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
+        elif name == "AllEqualExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "Precedence":
             x = intvar(0,5, shape=3, name="x")
             expr = cls(x, [3,1,0])
@@ -235,12 +256,10 @@ def global_constraints(solver):
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLessEq(X, Y)
-
         elif name == "LexLess":
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLess(X, Y)
-
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)
@@ -251,6 +270,10 @@ def global_constraints(solver):
         elif name == "AllDifferentLists":
             vars = intvar(0,10, shape=(3,4))
             expr = cls(vars)
+        elif name == "AllDifferentListsExceptN":
+            vars = intvar(0, 10, shape=(3, 4))
+            excepting = ([0,1,2,3], [3,2,1,0], [1,1,1,1])
+            expr = cls(vars, excepting)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)
 

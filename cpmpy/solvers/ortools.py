@@ -396,8 +396,8 @@ class CPM_ortools(SolverInterface):
         # print(expr_store)
         # print(json.dumps(expr_store, sort_keys=True, indent=4))
         print(f"c ort:transformation took {(time.time()-starts):.4f}")
-        print("final size", len(cpm_cons))
-        print("STORE:", len(expr_store.items()))
+        print("c final size", len(cpm_cons))
+        print("c STORE:", len(expr_store.items()))
         
       
 
@@ -539,6 +539,11 @@ class CPM_ortools(SolverInterface):
                 array = self.solver_vars(array)
                 # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]

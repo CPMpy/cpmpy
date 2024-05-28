@@ -59,6 +59,7 @@
         Count
         Among
         NValue
+        NValueExcept
         Abs
 
 """
