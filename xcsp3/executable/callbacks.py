@@ -417,18 +417,17 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.right_operand()]
         if excepting is None:
-            if arity == 2: #should always be a comparison
-                self.cpm_model += op(cp.NValue(self.get_cpm_exprs(lst)), cpm_rhs)
-            else:
-                assert False, "condition should be a comparision"
+            lhs = cp.NValue(self.get_cpm_exprs(lst))
         else:
-            self._unimplemented()
+            assert len(excepting) == 1, "Competition only allows 1 integer value in excepting list"
+            lhs = cp.NValue(self.get_cpm_exprs(lst), excepting[0])
+
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand()))
+
     def ctr_not_all_qual(self, lst: list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
-        self.cpm_model += ~cp.AllEqual(cpm_vars)
+        self.cpm_model += cp.NValue(cpm_vars) > 1
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable], occurs: list[int] | list[Variable] | list[range], closed: bool):
         self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
