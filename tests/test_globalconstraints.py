@@ -74,6 +74,28 @@ class TestGlobal(unittest.TestCase):
                     vr._value = vl
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
+    def test_alldifferent_lists_except_n(self):
+        # test known input/outputs
+        tuples = [
+                  ([(1,2,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(1,2,3)], False),
+                  ([(1,2,3),(1,3,3),(1,2,3),(2,2,2)], False),
+                  ([(0,0,3),(1,3,3),(1,2,4)], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3)], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3), [2,2,2]], True),
+                  ([(0,0,3),(1,3,3),(1,2,4),(1,3,3), [2,2,2], [0,0,3]], False),
+                  ([(1,2,3),(1,3,3),(3,3,3)], True)
+                 ]
+        iv = cp.intvar(0,4, shape=(6,3))
+        c = cp.AllDifferentListsExceptN(iv, [[1,3,3],[2,2,2]])
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                for (vr, vl) in zip(var, val):
+                    vr._value = vl
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143

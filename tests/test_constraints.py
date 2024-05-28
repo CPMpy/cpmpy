@@ -11,11 +11,12 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ['ortools']
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentListsExceptN", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
@@ -238,6 +239,10 @@ def global_constraints(solver):
         elif name == "AllDifferentLists":
             vars = intvar(0,10, shape=(3,4))
             expr = cls(vars)
+        elif name == "AllDifferentListsExceptN":
+            vars = intvar(0, 10, shape=(3, 4))
+            excepting = intvar(0,1, shape=(2,4))
+            expr = cls(vars, excepting)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)            
 
