@@ -4,7 +4,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.python_builtins import all
-from ..expressions.utils import ExprStore, is_any_list
+from ..expressions.utils import ExprStore, get_store, is_any_list
 from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
