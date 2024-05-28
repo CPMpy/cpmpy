@@ -24,8 +24,8 @@ if 'y' in cwd[-2:]:
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCSP', "*.xml")))
     xmlmodels.extend(glob.glob(join("benchmarks", 'MiniCOP', "*.xml")))
 else:
-    xmlmodels.extend(glob.glob(join('MiniCSP', "Diamond*.xml")))
-    xmlmodels.extend(glob.glob(join('MiniCOP', "Diamond*.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCSP', "Rlfap-ext-graph-09-opt_c18.xml")))
+    xmlmodels.extend(glob.glob(join('MiniCOP', "Rlfap-ext-graph-09-opt_c18.xml")))
 
 #for subdividing the models (use 'instances' directory for xmlmodels)
 '''if 'y' in cwd[-2:]:
@@ -85,6 +85,7 @@ for xmlmodel in xmlmodels:
         cb = callbacker.cb
         global model
         model = cb.cpm_model
+        print(model)
     # print(cb.cpm_variables)
 
 
