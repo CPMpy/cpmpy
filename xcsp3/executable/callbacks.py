@@ -388,14 +388,14 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst) # TODO: check if list can be list of expressions too in comp?
+        cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
                                              condition.operator,
                                              self.get_cpm_var(condition.right_operand()))
 
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)  # TODO: check if list can be list of expressions too in comp?
+        cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
                                              condition.operator,
                                              self.get_cpm_var(condition.right_operand()))
