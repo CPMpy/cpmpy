@@ -57,6 +57,7 @@
         Maximum
         Element
         Count
+        Among
         NValue
         Abs
 
@@ -67,7 +68,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
@@ -257,7 +258,8 @@ class Element(GlobalFunction):
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
                 return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return None # default
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
@@ -317,6 +319,36 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         return 0, len(arr)
+
+
+
+class Among(GlobalFunction):
+    """
+        The Among (numerical) global constraint represents the number of variable that take values among the values in arr
+    """
+
+    def __init__(self,arr,vals):
+        if not is_any_list(arr) or not is_any_list(vals):
+            raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        if any(isinstance(val, Expression) for val in vals):
+            raise TypeError(f"Among takes a set of values as input, not {vals}")
+        super().__init__("among", [arr,vals])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            Among(arr, vals) can only be decomposed if it's part of a comparison'
+        """
+        from .python_builtins import sum, any
+        arr, values = self.args
+        count_for_each_val = [Count(arr, val) for val in values]
+        return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
+
+    def value(self):
+        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
+
+    def get_bounds(self):
+        return 0, len(self.args[0])
+
 
 class NValue(GlobalFunction):
 
@@ -419,3 +451,34 @@ class NValueExcept(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 0, len(self.args)
+
+
+class IfThenElseNum(GlobalFunction):
+    """
+        Function returning x if b is True and otherwise y
+    """
+    def __init__(self, b, x,y):
+        super().__init__("IfThenElseNum",[b,x,y])
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        b,x,y = self.args
+
+        lbx,ubx = get_bounds(x)
+        lby,uby = get_bounds(y)
+        iv = intvar(min(lbx,lby), max(ubx,uby))
+        defining = [b.implies(x == iv), (~b).implies(y == iv)]
+
+        return [eval_comparison(cmp_op, iv, cpm_rhs)], defining
+
+    def get_bounds(self):
+        b,x,y = self.args
+        lbs,ubs = get_bounds([x,y])
+        return min(lbs), max(ubs)
+    def value(self):
+        b,x,y = self.args
+        if argval(b):
+            return argval(x)
+        else:
+            return argval(y)
+
+

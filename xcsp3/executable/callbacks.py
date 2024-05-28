@@ -12,7 +12,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
-from cpmpy.expressions.utils import is_any_list, get_bounds
+from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
 class CallbacksCPMPy(Callbacks):
@@ -23,11 +23,6 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_variables = dict()
         self.print_general_methods = False
         self.print_specific_methods = False
-
-    def get_condition(self, condition):
-        map = {"LT": "<", "LE": "<=", "EQ": "=", "GE": ">=", "GT": ">"}
-        if condition.operator.name not in map:
-            raise ValueError("Unknown condition operator", condition.operator.name, "expected any of", set(map.keys()))
 
     def var_integer_range(self, x: Variable, min_value: int, max_value: int):
         if min_value == 0 and max_value == 1:
@@ -95,8 +90,18 @@ class CallbacksCPMPy(Callbacks):
         "iff": (0, lambda x: cp.all(a == b for a, b in zip(x[:-1], x[1:]))),
         "imp": (2, lambda x, y: x.implies(y)),
         # control
-        "if": (3, lambda b, x, y: cp.IfThenElse(b, x, y))
+        "if": (3, lambda b, x, y: cp.IfThenElse(b, x, y) if is_boolexpr(x) and is_boolexpr(y)
+                                                         else cp.IfThenElseNum(b,x,y))
     }
+
+    def eval_cpm_comp(self, lhs, op:TypeConditionOperator, rhs):
+        arity, cpm_op = self.funcmap[op.name.lower()]
+        if arity == 2:
+            return cpm_op(lhs, rhs)
+        elif arity == 0:
+            return cpm_op([lhs,rhs])
+        else:
+            raise ValueError(f"Expected operator of arity 0 or 2 but got {cpm_op} which is of arity {arity}")
 
     def intentionfromtree(self, node):
         if isinstance(node, Node):
@@ -116,14 +121,8 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_primitive1a(self, x: Variable, op: TypeConditionOperator, k: int):
         assert op.is_rel()
-        x = self.get_cpm_var(x)
-        arity, cpm_op = self.funcmap[op.name.lower()]
-        if arity == 2:
-            self.cpm_model += cpm_op(x, k)
-        elif arity == 0:
-            self.cpm_model += cpm_op([x, k])
-        else:
-            self._unimplemented(x, op, k)
+        cpm_x = self.get_cpm_var(x)
+        self.cpm_model += self.eval_cpm_comp(cpm_x, op, k)
 
     def ctr_primitive1b(self, x: Variable, op: TypeConditionOperator, term: list[int] | range):
         assert op.is_set()
@@ -175,14 +174,30 @@ class CallbacksCPMPy(Callbacks):
                 self.cpm_model += cpm_op([cpm_aop([x, y]), z])
 
     def ctr_logic(self, lop: TypeLogicalOperator, scope: list[Variable]):  # lop(scope)
-        self._unimplemented(lop, scope)
+        if lop == TypeLogicalOperator.AND:
+            self.cpm_model += self.get_cpm_vars(scope)
+        elif lop == TypeLogicalOperator.OR:
+            self.cpm_model += cp.any(self.get_cpm_vars(scope))
+        elif lop ==TypeLogicalOperator.IFF:
+            assert len(scope) == 2
+            a,b = scope
+            self.cpm_model += self.get_cpm_var(a) == self.get_cpm_var(b)
+        elif lop == TypeLogicalOperator.IMP:
+            assert len(scope) == 2
+            a,b = scope
+            self.cpm_model += self.get_cpm_var(a).implies(self.get_cpm_var(b))
+        elif lop == TypeLogicalOperator.XOR:
+            self.cpm_model += cp.Xor(self.get_cpm_vars(scope))
+        else:
+            self._unimplemented(lop, scope)
 
     def ctr_logic_reif(self, x: Variable, y: Variable, op: TypeConditionOperator, k: int | Variable):  # x = y <op> k
         assert op.is_rel()
-        self._unimplemented(x, y, op, k)
+        cpm_x, cpm_y, cpm_k = self.get_cpm_vars([x,y, k])
+        self.cpm_model += self.eval_cpm_comp(cpm_x == cpm_y, op, cpm_k)
 
     def ctr_logic_eqne(self, x: Variable, op: TypeConditionOperator, lop: TypeLogicalOperator, scope: list[Variable]):  # x = lop(scope) or x != lop(scope)
-        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE)
+        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE) # TODO: what is this???
         self._unimplemented(x, op, lop, scope)
 
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
@@ -220,28 +235,27 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        #raise NotImplementedError('no cpmpy equivalent yet')
-        pass
-        #self._unimplemented(scope, transitions, start_state, final_states)
+        # return
+        self._unimplemented(scope, transitions, start_state, final_states) # TODO: add after Helene PR
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        #raise NotImplementedError('no cpmpy equivalent yet')
-        #self._unimplemented(scope, transitions)
-        pass
+        self._unimplemented(scope, transitions) # TODO: add after Helene PR
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
+        cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
-            cpm_exprs = self.exprs_from_node(scope)
-            return cp.AllDifferent(cpm_exprs)
+            self.cpm_model += cp.AllDifferent(cpm_exprs)
         elif excepting == [0]:
-            return cp.AllDifferentExcept0(self.exprs_from_node(scope))
+            self.cpm_model += cp.AllDifferentExcept0(cpm_exprs)
         else:
-            self._unimplemented(scope, excepting)
+            self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
-        self._unimplemented(lists, excepting)
+        self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists]) # TODO: what about the excepting arg??
 
-    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
+    def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]): # TODO check this...
+        # TODO: ignace: I'm pretty sure this is incorrect...
+        #           Have to check but think its alldiff on rows and alldiff on cols
         if excepting is None:
             cpm_exprs = self.exprs_from_node(matrix)
             return cp.AllDifferent(cpm_exprs)
@@ -254,23 +268,45 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
-        #raise NotImplementedError('Increasing global not in cpmpy')
-        pass
-        #self._unimplemented(lst, operator, lengths)
+        cpm_vars = self.get_cpm_vars(lst)
+        if operator == TypeOrderedOperator.INCREASING:
+            self.cpm_model += cp.Increasing(cpm_vars)
+        elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+            self.cpm_model += cp.IncreasingStrict(cpm_vars)
+        elif operator == TypeOrderedOperator.DECREASING:
+            self.cpm_model += cp.Decreasing(cpm_vars)
+        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+            self.cpm_model += cp.DecreasingStrict(cpm_vars)
+        else:
+            self._unimplemented(lst, operator, lengths)
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
         self._unimplemented(lst, limit, operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
-        pass
-        #self._unimplemented(lists, operator)
+        cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
+        if operator == TypeOrderedOperator.STRICTLY_INCREASING:
+            self.cpm_model += cp.LexChainLess(cpm_lists)
+        elif operator == TypeOrderedOperator.INCREASING:
+            self.cpm_model += cp.LexChainLessEq(cpm_lists)
+        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            self.cpm_model += cp.LexChainLess(rev_lsts)
+        elif operator == TypeOrderedOperator.DECREASING:
+            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            self.cpm_model += cp.LexChainLessEq(rev_lsts)
+        else:
+            self._unimplemented(lists, operator)
 
     def ctr_lex_matrix(self, matrix: list[list[Variable]], operator: TypeOrderedOperator):
-        pass
-        #self._unimplemented(matrix, operator)
+        import numpy as np
+        # lex_chain on rows
+        self.ctr_lex(matrix, operator)
+        # lex chain on columns
+        self.ctr_lex(np.array(matrix).T.tolist(), operator)
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
-        self._unimplemented(lst, values, covered)
+        self._unimplemented(lst, values, covered) # TODO: after merge of Ignace PR
 
     def ctr_sum(self, lst: list[Variable] | list[Node], coefficients: None | list[int] | list[Variable], condition: Condition):
         cpm_vars = []
@@ -318,8 +354,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == k)
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        pass
-        #self._unimplemented(lst, values, k)
+        self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         arity, op = self.funcmap[condition.operator.name.lower()]
@@ -336,28 +371,24 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += ~cp.AllEqual(cpm_vars)
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable], occurs: list[int] | list[Variable] | list[range], closed: bool):
-        if closed == False:
-            self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst), self.get_cpm_exprs(values), self.get_cpm_exprs(occurs))
-        else:
-            self._unimplemented()
+        self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
+                                                    self.get_cpm_exprs(values),
+                                                    self.get_cpm_exprs(occurs),
+                                                    closed=closed)
+
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.variable]
-        if arity == 0:
-            self.cpm_model += op([cp.Minimum(cpm_vars), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Minimum(cpm_vars), cpm_rhs)
+        cpm_vars = self.get_cpm_vars(lst) # TODO: check if list can be list of expressions too in comp?
+        self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
+                                             condition.operator,
+                                             self.get_cpm_var(condition.right_operand()))
+
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        cpm_rhs = self.cpm_variables[condition.variable]
-        if arity == 0:
-            self.cpm_model += op([cp.Maximum(cpm_vars), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Maximum(cpm_vars), cpm_rhs)
+        cpm_vars = self.get_cpm_vars(lst)  # TODO: check if list can be list of expressions too in comp?
+        self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
+                                             condition.operator,
+                                             self.get_cpm_var(condition.right_operand()))
 
     def ctr_minimum_arg(self, lst: list[Variable] | list[Node], condition: Condition, rank: TypeRank):  # should enter XCSP3-core
         self._unimplemented(lst, condition, rank)
@@ -366,22 +397,17 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, condition, rank)
 
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
-        cpm_list = self.get_cpm_vars(lst)
-        arity, op = self.funcmap[condition.operator.name.lower()]
-        if hasattr(condition, 'variable'):
-            cpm_rhs = self.cpm_variables[condition.variable]
-        elif hasattr(condition, 'value'):
-            cpm_rhs = condition.value
-        else:
-            self._unimplemented(lst, condition)
-        cpm_index = self.cpm_variables[i]
-        if arity == 0:
-            self.cpm_model += op([cp.Element(cpm_list,cpm_index), cpm_rhs])
-        else:
-            self.cpm_model += op(cp.Element(cpm_list, cpm_index), cpm_rhs)
+        cpm_lst = self.get_cpm_vars(lst)
+        cpm_index = self.get_cpm_var(i)
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
-        pass#self._unimplemented(matrix, i, j, condition)
+        mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
+        cpm_i, cpm_j = self.get_cpm_vars([i,j])
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
+
+        self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
         if lst2 is None:
@@ -398,41 +424,72 @@ class CallbacksCPMPy(Callbacks):
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
         self._unimplemented(lst, value)
 
-    def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable],
-                      zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
-        self._unimplemented(origins, lengths, zero_ignored)
+    def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable], zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
+        cpm_start = self.get_cpm_vars(origins)
+        cpm_dur = self.get_cpm_vars(lengths)
+        cpm_end = [cp.intvar(*((s+d).get_bounds())) for s,d in zip(cpm_start, cpm_dur)]
+        self.cpm_model += cp.NoOverlap(cpm_start, cpm_dur, cpm_end)
 
     def ctr_nooverlap_multi(self, origins: list[list[Variable]], lengths: list[list[int]] | list[list[Variable]], zero_ignored: bool):
-        self._unimplemented(origins, lengths, zero_ignored)
+        dim = len(origins)
+        if dim == 2:
+            assert len(origins) == 2
+            assert len(lengths) == 2
 
+            start_x, start_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
+            dur_x, dur_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
+
+            end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
+            end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
+
+            self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+                                             start_y, dur_y, end_y)
+
+        else: # n-dimensional, post decomposition directly
+            from cpmpy.expressions.utils import all_pairs
+            from cpmpy import any as cpm_any
+            n = len(origins[0])
+            starts = cp.cpm_array([self.get_cpm_vars(lst) for lst in origins])
+            durs = cp.cpm_array([self.get_cpm_vars(lst) for lst in lengths])
+
+            for i, j in all_pairs(list(range(n))):
+                self.cpm_model += cpm_any([starts[d,i] + durs[d,i] <= starts[d,j] |\
+                                           starts[d,j] + durs[d,j] <= starts[d,i] for d in range(dim)])
+                
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
-        #self._unimplemented(xs, ys, lx, ly, zero_ignored)
-        pass
+        start_x = self.get_cpm_vars(xs)
+        start_y = self.get_cpm_vars(ys)
+        dur_x = self.get_cpm_vars(lx)
+        dur_y = ly
+
+        end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
+        end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
+
+        self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+                                         start_y, dur_y, end_y)
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable], heights: list[int] | list[Variable], condition: Condition):
-        #self._unimplemented(origins, lengths, heights, condition)
         cpm_start = self.get_cpm_exprs(origins)
         cpm_durations = self.get_cpm_exprs(lengths)
         cpm_demands = self.get_cpm_exprs(heights)
-        cpm_cap = self.get_cpm_var(condition.right_operand())
         cpm_ends = []
         for s,d in zip(cpm_start, cpm_durations):
             expr = s + d
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
-        if condition.operator.name == 'LE':
-            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, cpm_cap)
+        if condition.operator == TypeConditionOperator.LE:
+            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly
             # be smart and chose task or time decomposition
             if max(get_bounds(cpm_ends)) >= 100:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, cpm_cap, condition.operator.to_str())
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
 
-    def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
-        from cpmpy.expressions.utils import eval_comparison
+    def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands,condition:Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
+        cpm_cap = self.get_cpm_var(condition.right_operand())
         # ensure durations are satisfied
         for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
             self.cpm_model += s + d == e
@@ -441,12 +498,11 @@ class CallbacksCPMPy(Callbacks):
         for s,d,e in zip(cpm_start, cpm_duration, cpm_ends):
             # find overlapping tasks
             total_running = cp.sum(cpm_demands * ((cpm_start <= s) & (cpm_ends > s)))
-            self.cpm_model += eval_comparison(condition, total_running, capacity)
+            self.cpm_model += self.eval_cpm_comp(total_running, condition.operator, cpm_cap)
 
-    def _cumulative_time_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, capacity, condition):
-        from cpmpy.expressions.utils import eval_comparison
+    def _cumulative_time_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, condition:Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
-
+        cpm_cap = self.get_cpm_var(condition.right_operand)
         # ensure durations are satisfied
         for s, d, e in zip(cpm_start, cpm_duration, cpm_ends):
             self.cpm_model += s + d == e
@@ -456,33 +512,41 @@ class CallbacksCPMPy(Callbacks):
         # time decomposition
         for t in range(lb,ub+1):
             total_running = cp.sum(cpm_demands * ((cpm_start <= t) & (cpm_ends > t)))
-            self.cpm_model += eval_comparison(condition, total_running, capacity)
+            self.cpm_model += self.eval_cpm_comp(total_running, condition.operator, cpm_cap)
 
     def ctr_binpacking(self, lst: list[Variable], sizes: list[int], condition: Condition):
+        cpm_vars = self.get_cpm_vars(lst)
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
+
+        for bin in range(1, len(cpm_vars)+1):
+            self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_vars == bin) * sizes),
+                                                 condition.operator,
+                                                 cpm_rhs)
+    def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
         from cpmpy.expressions.utils import eval_comparison
 
         cpm_vars = self.get_cpm_vars(lst)
-        rhs = self.get_cpm_var(condition.right_operand())
 
-        for bin in range(1, len(cpm_vars)+1):
-            self.cpm_model += eval_comparison(condition.operator.to_str(),
-                                              cp.sum((cpm_vars == bin) * sizes),
-                                              rhs)
-
-
-        self._unimplemented(lst, sizes, condition)
-
-    def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
-        self._unimplemented(lst, sizes, limits)
+        for bin, lim in enumerate(limits):
+            self.cpm_model += eval_comparison("<=",
+                                              cp.sum((cpm_vars == (bin+1)) * sizes),
+                                              lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
-        self._unimplemented(lst, sizes, loads)
+        from cpmpy.expressions.utils import eval_comparison
+
+        cpm_vars = self.get_cpm_vars(lst)
+        cpm_loads = self.get_cpm_vars(loads)
+
+        for bin, load in enumerate(cpm_loads):
+            self.cpm_model += eval_comparison("==",
+                                              cp.sum((cpm_vars == (bin + 1)) * sizes),
+                                              load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
         self._unimplemented(lst, sizes, conditions)
 
     def ctr_knapsack(self, lst: list[Variable], weights: list[int], wcondition: Condition, profits: list[int], pcondition: Condition):
-        from cpmpy.expressions.utils import eval_comparison
 
         vars = self.get_cpm_vars(lst)
         cpm_weight = self.get_cpm_var(wcondition.right_operand())
@@ -490,8 +554,8 @@ class CallbacksCPMPy(Callbacks):
 
         total_weight = cp.sum(vars * weights)
         total_profit = cp.sum(vars * profits)
-        self.cpm_model += eval_comparison(wcondition.operator.to_str(), total_weight, cpm_weight)
-        self.cpm_model += eval_comparison(pcondition.operator.to_str(), total_profit, cpm_profit)
+        self.cpm_model += self.eval_cpm_comp(total_weight, wcondition.operator, cpm_weight)
+        self.cpm_model += self.eval_cpm_comp(total_profit, pcondition.operator, cpm_profit)
 
 
     def ctr_flow(self, lst: list[Variable], balance: list[int] | list[Variable], arcs: list, capacities: None | list[range]):  # not in XCSP3-core
@@ -509,7 +573,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(pos, neg)
 
     def ctr_circuit(self, lst: list[Variable], size: None | int | Variable):  # size is None in XCSP3 competitions
-        return cp.Circuit(lst)
+        return cp.SubCircuitWithStart(lst, start_index=0)
 
     # # # # # # # # # #
     # All methods about objectives to be implemented
@@ -517,73 +581,67 @@ class CallbacksCPMPy(Callbacks):
 
     def obj_minimize(self, term: Variable | Node):
         if isinstance(term, Node):
-            term = term.cnt
-        self.cpm_model.minimize(self.get_cpm_var(term))
+            cpm_expr = self.exprs_from_node([term])
+            assert len(cpm_expr) == 1
+            cpm_expr = cpm_expr[0]
+        else:
+            cpm_expr = self.get_cpm_var(term)
+        self.cpm_model.minimize(cpm_expr)
 
     def obj_maximize(self, term: Variable | Node):
-        self.cpm_model.maximize(self.get_cpm_exprs(term)[0])
+        if isinstance(term, Node):
+            cpm_expr = self.exprs_from_node([term])
+            assert len(cpm_expr) == 1
+            cpm_expr = cpm_expr[0]
+        else:
+            cpm_expr = self.get_cpm_var(term)
+        self.cpm_model.maximize(cpm_expr)
 
     def obj_minimize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
-        if obj_type == TypeObj.SUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.sum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.PRODUCT:
-            if coefficients is None:
-                self.cpm_model.minimize(reduce((lambda x, y: x*y),self.get_cpm_exprs(terms)))
-            else:
-                self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.EXPRESSION:
-            self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.MAXIMUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.Maximum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.MINIMUM:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.Minimum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.NVALUES:
-            if coefficients is None:
-                self.cpm_model.minimize(cp.NValue(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.minimize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        import numpy as np
+        if coefficients is None:
+            coefficients = np.ones(len(terms))
         else:
-            self._unimplemented(obj_type, terms, coefficients)
+            coefficients = np.array(coefficients)
+
+        if obj_type == TypeObj.SUM:
+            self.cpm_model.minimize(cp.sum(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MAXIMUM:
+            self.cpm_model.minimize(cp.max(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MINIMUM:
+            self.cpm_model.minimize(cp.min(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.NVALUES:
+            self.cpm_model.minimize(cp.NValue(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.EXPRESSION:
+            assert all(coeff == 1 for coeff in coefficients)
+            assert len(terms) == 1
+            cpm_expr = self.get_cpm_exprs(terms)[0]
+            self.cpm_model.minimize(cpm_expr)
+        else:
+            self._unimplemented(obj_type, coefficients, terms)
 
     def obj_maximize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
-        if obj_type == TypeObj.SUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.sum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.sum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.PRODUCT:
-            if coefficients is None:
-                self.cpm_model.maximize(reduce((lambda x, y: x * y), self.get_cpm_exprs(terms)))
-            else:
-                self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.EXPRESSION:
-            self._unimplemented(obj_type, terms, coefficients)
-        elif obj_type == TypeObj.MAXIMUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.Maximum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.Maximum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.MINIMUM:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.Minimum(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.Minimum(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
-        elif obj_type == TypeObj.NVALUES:
-            if coefficients is None:
-                self.cpm_model.maximize(cp.NValue(self.get_cpm_exprs(terms)))
-            else:
-                self.cpm_model.maximize(cp.NValue(cp.cpm_array(self.get_cpm_exprs(terms)) * coefficients))
+        import numpy as np
+        if coefficients is None:
+            coefficients = np.ones(len(terms))
         else:
-            self._unimplemented(obj_type, terms, coefficients)
+            coefficients = np.array(coefficients)
+
+        if obj_type == TypeObj.SUM:
+            self.cpm_model.maximize(cp.sum(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MAXIMUM:
+            self.cpm_model.maximize(cp.max(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.MINIMUM:
+            self.cpm_model.maximize(cp.min(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.NVALUES:
+            self.cpm_model.maximize(cp.NValue(coefficients * self.get_cpm_exprs(terms)))
+        elif obj_type == TypeObj.EXPRESSION:
+            assert all(coeff == 1 for coeff in coefficients)
+            assert len(terms) == 1
+            cpm_expr = self.get_cpm_exprs(terms)[0]
+            self.cpm_model.maximize(cpm_expr)
+        else:
+            self._unimplemented(obj_type, coefficients, terms)
 
     def vars_from_node(self, scope):
         cpm_vars = []

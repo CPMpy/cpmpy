@@ -55,6 +55,26 @@ class TestGlobal(unittest.TestCase):
                 var._value = val
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
+    def test_alldifferent_lists(self):
+        # test known input/outputs
+        tuples = [
+                  ([(1,2,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(1,2,3)], False),
+                  ([(0,0,3),(1,3,3),(1,2,4)], True),
+                  ([(1,2,3),(1,3,3),(3,3,3)], True)
+                 ]
+        iv = cp.intvar(0,4, shape=(3,3))
+        c = cp.AllDifferentLists(iv)
+        for (vals, oracle) in tuples:
+            ret = cp.Model(c, iv == vals).solve()
+            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
+            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
+            for (var,val) in zip(iv,vals):
+                for (vr, vl) in zip(var, val):
+                    vr._value = vl
+            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
+
+
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
         pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
@@ -169,6 +189,153 @@ class TestGlobal(unittest.TestCase):
 
         self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
 
+    def test_subcircuit(self):
+
+        import numpy as np
+        
+        n = 6
+        
+        # Find a subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(model.solveAll() == 410)
+        
+        # Find a max subcircuit (subcircuit = circuit)
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + list(x != np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == n)
+        self.assertTrue(model.solveAll() == 120) # 5 x 4 x 3 x 2 x 1
+
+        # Find a non-max subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] == 0] ) # Often index 0 is assumed to be the start_index internally
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) < n)
+        self.assertTrue(model.solveAll() == 85)
+
+        # Find an empty subcircuit 
+        x = cp.intvar(0, n-1, n)
+        sc = cp.SubCircuit(x)
+        model = cp.Model( [sc] + list(x == np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == 0)
+        self.assertTrue(model.solveAll() == 1)
+
+        # Find a non-empty subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] != 0] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) > 1)
+        self.assertTrue(model.solveAll() == 325)
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        model = cp.Model( [cp.SubCircuit(x)] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(not model.solve())
+
+    def test_subcircuit_reified(self):
+
+        import numpy as np
+
+        n = 6
+
+        # Find a subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True])
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(model.solveAll() == 410)
+
+         # Find a max subcircuit (subcircuit = circuit)
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x != np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == n)
+        self.assertTrue(model.solveAll() == 120) # 5 x 4 x 3 x 2 x 1
+
+        # Find a non-max subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] == 0] ) # Often index 0 is assumed to be the start_index internally
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) < n)
+        self.assertTrue(model.solveAll() == 85)
+
+        # Find an empty subcircuit 
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x == np.arange(n)) )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) == 0)
+        self.assertTrue(model.solveAll() == 1)
+
+        # Find a non-empty subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] != 0] )
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.SubCircuit(x).value())
+        self.assertTrue(circuit_length(x.value()) > 1)
+        self.assertTrue(model.solveAll() == 325)
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(not model.solve())
+
+        # Unsat subcircuit
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+        model = cp.Model( [a.implies(cp.SubCircuit(x))] + [x[0] == 1, x[1] == 1] ) # 0 -> 1 -> 1
+        self.assertTrue(model.solve())
+        self.assertTrue(a.value() == False)
+
+    def test_subcircuit_choco(self):
+        """
+        See issue #1095: https://github.com/chocoteam/choco-solver/issues/1095
+        """
+
+        n = 3
+        x = cp.intvar(0, n-1, n)
+        a = cp.boolvar()
+
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True] + [(x[0] == 2), (x[1] == 1), (x[2] == 0)])
+        assert( model.solve() )
+
+        model = cp.Model([a.implies(cp.SubCircuit(x)), a == True] + [(x[0] != 0), (x[1] == 1), (x[2] != 2)])
+        assert( model.solve() )
+
+    def test_subcircuitwithstart(self):
+        n = 5
+        x = cp.intvar(0, n-1, n)
+        
+        # Test satisfiability
+        model = cp.Model( [cp.SubCircuitWithStart(x)] )
+        self.assertTrue( model.solve() )
+        self.assertTrue( cp.SubCircuitWithStart(x).value() )
+
+        # Test default start position of 0
+        model = cp.Model( [cp.SubCircuitWithStart(x)] + [x[0] == 0] ) # force default start_index 0 to not be in the circuit
+        self.assertFalse( model.solve() )
+
+        # Test start position
+        start_index = 3
+        model = cp.Model( [cp.SubCircuitWithStart(x, start_index=start_index)] + [x[start_index] == start_index] ) # force start_index to not be in the circuit
+        self.assertFalse(model.solve())
+
 
     def test_inverse(self):
         # Arrays
@@ -252,6 +419,78 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertIn(bv.value(), vals)
+
+    def test_lex_lesseq(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLessEq(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLessEq(X, Y)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+    def test_lex_less(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexLess(X, Y)
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexLess(X, Y)
+        m = cp.Model(c)
+        self.assertFalse(m.solve("ortools"))
+
+        Z = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+        c = cp.LexLess(X, Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+
+    def test_lex_chain(self):
+        from cpmpy import BoolVal
+        X = cp.intvar(0, 3, shape=10)
+        c1 = X[:-1] == 1
+        Y = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        c = cp.LexChainLess([X, Y])
+        c2 = c != (BoolVal(True))
+        m = cp.Model([c1, c2])
+        self.assertTrue(m.solve())
+        self.assertTrue(c2.value())
+        self.assertFalse(c.value())
+
+        Y = cp.intvar(0, 0, shape=10)
+        c = cp.LexChainLessEq([X, Y])
+        m = cp.Model(c)
+        self.assertTrue(m.solve("ortools"))
+        from cpmpy.expressions.utils import argval
+        self.assertTrue(sum(argval(X)) == 0)
+
+        Z = cp.intvar(0, 1, shape=(3,2))
+        c = cp.LexChainLess(Z)
+        m = cp.Model(c)
+        self.assertTrue(m.solve())
+        self.assertTrue(sum(argval(Z[0])) == 0)
+        self.assertTrue(sum(argval(Z[1])) == 1)
+        self.assertTrue(sum(argval(Z[2])) >= 1)
+
 
     def test_indomain_onearg(self):
 
@@ -736,6 +975,32 @@ class TestGlobal(unittest.TestCase):
 
         cp.Model(cons).solveAll(solver='minizinc')
 
+
+    def test_precedence(self):
+        iv = cp.intvar(0,5, shape=6, name="x")
+
+        cons = cp.Precedence(iv, [0,2,1])
+        self.assertTrue(cp.Model([cons, iv == [5,0,2,0,0,1]]).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
+        self.assertTrue(cons.value())
+        self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
+
+
+    def test_no_overlap(self):
+        start = cp.intvar(0,5, shape=3)
+        end = cp.intvar(0,5, shape=3)
+        cons = cp.NoOverlap(start, [2,1,1], end)
+        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cons.value())
+        self.assertTrue(cp.Model(cons.decompose()).solve())
+        self.assertTrue(cons.value())
+
+        def check_val():
+            assert cons.value() is False
+
+        cp.Model(~cons).solveAll(display=check_val)
+
 class TestBounds(unittest.TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
@@ -963,7 +1228,7 @@ class TestTypeChecks(unittest.TestCase):
         b = cp.boolvar()
         a = cp.boolvar()
 
-        self.assertTrue(cp.Model([cp.GlobalCardinalityCount([x,y], [z,q], [h,v])]).solve())
+        # type checks
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [x,False], [h,v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x,y], [z,b], [h,v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [b,a], [a,b], [h,v])
@@ -971,6 +1236,13 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [True, v])
         self.assertRaises(TypeError, cp.GlobalCardinalityCount, [x, y], [x, h], [v, a])
 
+        iv = cp.intvar(0,10, shape=3)
+        SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
+        for name in SOLVERNAMES:
+            if name in ("pysat", "pysdd"): continue
+            self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
+            # test closed version
+            self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
 
     def test_count(self):
         x = cp.intvar(0, 1)
@@ -983,6 +1255,23 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.Count([x,y],z) == 1]).solve())
         self.assertRaises(TypeError, cp.Count, [x,y],[x,False])
 
+    def test_among(self):
+
+        iv = cp.intvar(0,10, shape=3, name="x")
+
+        for name, cls in cp.SolverLookup.base_solvers():
+
+            if cls.supported() is False:
+                continue
+            try:
+                self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
+                self.assertTrue(all(x.value() in [1,2] for x in iv))
+                self.assertTrue(cp.Model([cp.Among(iv, [1,100]) > 2]).solve(solver=name))
+                self.assertTrue(all(x.value() == 1 for x in iv))
+            except NotSupportedError:
+                continue
+
+
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
@@ -993,3 +1282,25 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+
+def circuit_length(succ):
+    # Find a start_index
+    start_index = None
+    for i,s in enumerate(succ):
+        if i != s:
+            # first non self-loop found is taken as start
+            start_index = i
+            break
+    # No valid start found, thus empty subcircuit
+    if start_index is None:
+        return 0
+
+    # Collect subcircuit
+    visited = set([start_index])
+    idx = succ[start_index]
+    while idx != start_index:
+        # Collect
+        visited.add(idx)
+        idx = succ[idx]
+
+    return len(visited)

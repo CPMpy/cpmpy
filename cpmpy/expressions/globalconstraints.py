@@ -98,8 +98,11 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentLists
         AllEqual
         Circuit
+        SubCircuit
+        SubCircuitWithStart
         Inverse
         Table
         ShortTable
@@ -121,7 +124,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -179,7 +182,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == len(self.args)
+        return len(set(argvals(self.args))) == len(self.args)
 
 
 class AllDifferentExcept0(GlobalConstraint):
@@ -194,9 +197,35 @@ class AllDifferentExcept0(GlobalConstraint):
         return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        vals = [a.value() for a in self.args if a.value() != 0]
+        vals = [argval(a) for a in self.args if argval(a) != 0]
         return len(set(vals)) == len(vals)
 
+
+class AllDifferentLists(GlobalConstraint):
+    """
+        Ensures none of the lists given are exactly the same.
+        Called 'lex_alldifferent' in the global constraint catalog:
+        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
+    """
+    def __init__(self, lists):
+        if any(not is_any_list(lst) for lst in lists):
+            raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
+        if any(len(lst) != len(lists[0]) for lst in lists):
+            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
+        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
+
+    def decompose(self):
+        """Returns the decomposition
+        """
+        from .python_builtins import any as cpm_any
+        constraints = []
+        for lst1, lst2 in all_pairs(self.args):
+            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
+        return constraints, []
+
+    def value(self):
+        lst_vals = [tuple(argvals(a)) for a in self.args]
+        return len(set(lst_vals)) == len(self.args)
 
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -216,8 +245,7 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == 1
-
+        return len(set(argvals(self.args))) == 1
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
@@ -231,9 +259,9 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
-        super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
+        super().__init__("circuit", flatargs)
 
     def decompose(self):
         """
@@ -260,7 +288,8 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        arr = [argval(a) for a in self.args]
+        arr = argvals(self.args)
+
         while idx not in visited:
             if idx is None:
                 return False
@@ -272,6 +301,191 @@ class Circuit(GlobalConstraint):
 
         return pathlen == len(self.args) and idx == 0
 
+class SubCircuit(GlobalConstraint):
+    """
+        The sequence of variables form a subcircuit, where x[i] = j means that j is the successor of i.
+        Contrary to Circuit, there is no requirement on all nodes needing to be part of the circuit.
+        Nodes which aren't part of the subcircuit, should self loop i.e. x[i] = i.
+        The subcircuit can be empty (all stops self-loop).
+        A length 1 subcircuit is treated as an empty subcircuit.
+
+        Global Constraint Catalog:
+        https://sofdem.github.io/gccat/gccat/Cproper_circuit.html
+    """
+
+    def __init__(self, *args):
+        flatargs = flatlist(args)
+
+        # Ensure all args are integer successor values
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("SubCircuit global constraint only takes arithmetic arguments: {}".format(flatargs))
+        # Ensure there are at least two stops to create a circuit with
+        if len(flatargs) < 2:
+            raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
+        
+        # Create the object
+        super().__init__("subcircuit", flatargs)
+
+    def decompose(self):
+        """
+            Decomposition for SubCircuit
+
+            A mix of the above Circuit decomposition, with elements from the Minizinc implementation for the support of optional visits:
+            https://github.com/MiniZinc/minizinc-old/blob/master/lib/minizinc/std/subcircuit.mzn
+        """
+        from .python_builtins import min as cpm_min
+        from .python_builtins import all as cpm_all
+        
+        # Input arguments
+        succ = cpm_array(self.args) # Successor variables
+        n = len(succ)
+
+        # Decision variables
+        start_node = intvar(0, n-1) # The first stop in the subcircuit.
+        end_node = intvar(0, n-1) # The last stop in the subcircuit, before looping back to the "start_node".
+        index_within_subcircuit = intvar(0, n-1, shape=n) # The position each stop takes within the subcircuit, with the assumption that the stop "start_node" gets index 0.  
+        is_part_of_circuit = boolvar(shape=n) # Whether a stop is part of the subcircuit.
+        empty = boolvar() # To detect when a subcircuit is completely empty
+
+        # Constraining
+        constraining = []
+        constraining += [AllDifferent(succ)] # All stops should have a unique successor.
+        constraining += list( is_part_of_circuit.implies(succ < len(succ)) ) # Successor values should remain within domain.
+        for i in range(0, n):
+            # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
+            constraining += [(is_part_of_circuit[i] & (i != end_node)).implies(
+                index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
+            )]
+        constraining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
+
+        # Defining
+        defining = []
+        defining += [ empty == cpm_all(succ == np.arange(n)) ] # Definition of empty subcircuit (all nodes self-loop)
+        defining += [ empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n))) ] # If the subcircuit is empty, default all index values to 0
+        defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
+        defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
+        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.   
+        defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
+        # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit. 
+        # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node]. 
+        # The case of an empty subcircuit is an exception, since "end_node" itself is not part of the subcircuit
+        defining += [ (is_part_of_circuit[i] == ((~empty) & (index_within_subcircuit[end_node] + 1 != index_within_subcircuit[i]))) for i in range(n)] 
+        # In a subcircuit any of the visited nodes can be the "start node", resulting in symmetrical solutions -> Symmetry breaking
+        # Part of the formulation from the following is used: https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
+        subcircuit_visits = intvar(0, n-1, shape=n) # The visited nodes in sequence of length n, with possible repeated stops. e.g. subcircuit [0, 2, 1] -> [0, 2, 1, 0, 2, 1]
+        defining += [subcircuit_visits[0] == start_node] # The start nodes is the first stop
+        defining += [subcircuit_visits[i+1] == succ[subcircuit_visits[i]] for i in range(n-1)] # We follow the successor values
+        # The free "start_node" could be any of the values of aux_subcircuit_visits (the actually visited nodes), resulting in degenerate solutions.
+        # By enforcing "start_node" to take the smallest value, symmetry breaking is ensured.
+        defining += [start_node == cpm_min(subcircuit_visits)]
+
+        return constraining, defining
+    
+    def value(self):
+
+        succ = [argval(a) for a in self.args]
+        n = len(succ)
+
+        # Find a start_index
+        start_index = None
+        for i,s in enumerate(succ):
+            if i != s:
+                # first non self-loop found is taken as start
+                start_index = i
+                break
+        # No valid start found, thus empty subcircuit
+        if start_index is None:
+            return True # Change to False if empty subcircuits not allowed
+
+        # Check AllDiff
+        if not AllDifferent(s).value():
+            return False
+
+        # Collect subcircuit
+        visited = set([start_index])
+        idx = succ[start_index]
+        for i in range(len(succ)):
+            if idx ==start_index:
+                break
+            else:
+                if idx in visited:
+                    return False
+            # Check bounds on successor value
+            if not (0 <= idx < n): return False
+            # Collect
+            visited.add(idx)
+            idx = succ[idx]
+
+        # Check subcircuit
+        for i in range(n):
+            # A stop is either visited or self-loops
+            if not ( (i in visited) or (succ[i] == i) ):
+                return False
+
+        # Check that subcircuit has length of at least 1.
+        return succ[start_index] != start_index
+
+class SubCircuitWithStart(GlobalConstraint):
+
+    """
+        The sequence of variables form a subcircuit, where x[i] = j means that j is the successor of i.
+        Contrary to Circuit, there is no requirement on all nodes needing to be part of the circuit.
+        Nodes which aren't part of the subcircuit, should self loop i.e. x[i] = i.
+        The size of the subcircuit should be strictly greater than 1, so not all stops can self loop 
+        (as otherwise the start_index will never get visited).
+        start_index will be treated as the start of the subcircuit. 
+        The only impact of start_index is that it will be guaranteed to be inside the subcircuit.
+
+        Global Constraint Catalog:
+        https://sofdem.github.io/gccat/gccat/Cproper_circuit.html
+    """
+
+    def __init__(self, *args, start_index:int=0):
+        flatargs = flatlist(args)
+
+        # Ensure all args are integer successor values
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("SubCircuitWithStart global constraint only takes arithmetic arguments: {}".format(flatargs))
+        # Ensure start_index is an integer
+        if not isinstance(start_index, int):
+            raise TypeError("SubCircuitWithStart global constraint's start_index argument must be an integer: {}".format(start_index))
+        # Ensure that the start_index is within range
+        if not ((start_index >= 0) and (start_index < len(flatargs))):
+            raise ValueError("SubCircuitWithStart's start_index must be within the range [0, #stops-1] and thus refer to an actual stop as provided through 'args'.")
+        # Ensure there are at least two stops to create a circuit with
+        if len(flatargs) < 2:
+            raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
+        
+        # Create the object
+        super().__init__("subcircuitwithstart", flatargs)
+        self.start_index = start_index
+
+    def decompose(self):
+        """
+            Decomposition for SubCircuitWithStart.
+
+            SubCircuitWithStart simply gets decomposed into SubCircuit and a constraint
+            enforcing the start_index to be part of the subcircuit.
+        """
+        # Get the arguments
+        start_index = self.start_index
+        succ = cpm_array(self.args) # Successor variables
+
+        constraining = []
+        constraining += [SubCircuit(self.args)] # The successor variables should form a subcircuit.
+        constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
+
+        defining = []
+
+        return constraining, defining
+    
+    def value(self):
+        start_index = self.start_index
+        succ = [argval(a) for a in self.args] # Successor variables
+
+        # Check if we have a valid subcircuit and that the start_index is part of it.
+        return SubCircuit(succ).value() and (succ[start_index] != start_index)
+    
 
 class Inverse(GlobalConstraint):
     """
@@ -295,9 +509,13 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        fwd = [argval(a) for a in self.args[0]]
-        rev = [argval(a) for a in self.args[1]]
-        return all(rev[x] == i for i, x in enumerate(fwd))
+        fwd = argvals(self.args[0])
+        rev = argvals(self.args[1])
+        # args are fine, now evaluate actual inverse cons
+        try:
+            return all(rev[x] == i for i, x in enumerate(fwd))
+        except IndexError: # partiality of Element constraint
+            return False
 
 
 class Table(GlobalConstraint):
@@ -316,7 +534,7 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = argvals(arr)
         return arrval in tab
 
 class ShortTable(GlobalConstraint):
@@ -350,21 +568,27 @@ class ShortTable(GlobalConstraint):
         #didn't find tuple that matches
         return False
 
+
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
-        if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
-            raise TypeError("only boolean expression allowed in IfThenElse")
+        if not is_boolexpr(condition):
+            raise TypeError("only Boolean expression allowed as condition")
+        if not is_boolexpr(if_true) or not is_boolexpr(if_false):
+            raise TypeError("only Boolean expressions allowed as result, use cpmpy.expressions.globalfunctions.IfThenElseNum instead")
         super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
         condition, if_true, if_false = self.args
-        if argval(condition):
-            return argval(if_true)
-        else:
-            return argval(if_false)
+        try:
+            if argval(condition):
+                return argval(if_true)
+            else:
+                return argval(if_false)
+        except IncompleteFunctionError:
+            return False
 
     def decompose(self):
         condition, if_true, if_false = self.args
@@ -410,7 +634,7 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        return argval(self.args[0]) in argval(self.args[1])
+        return argval(self.args[0]) in argvals(self.args[1])
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -440,7 +664,7 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        return sum(argval(a) for a in self.args) % 2 == 1
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -451,7 +675,8 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Ensures that the capacity of the resource is never exceeded
+        Equivalent to noOverlap when demand and capacity are equal to 1
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
@@ -509,14 +734,14 @@ class Cumulative(GlobalConstraint):
         return cons, []
 
     def value(self):
-        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in arg_vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -530,22 +755,129 @@ class Cumulative(GlobalConstraint):
         return True
 
 
+class Precedence(GlobalConstraint):
+    """
+        Constraint enforcing some values have precedence over others.
+        Given an array of variables X and a list of precedences P:
+        Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
+    """
+    def __init__(self, vars, precedence):
+        if not is_any_list(vars):
+            raise TypeError("Precedence expects a list of variables, but got", vars)
+        if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
+            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+        super().__init__("precedence", [vars, precedence])
+
+    def decompose(self):
+        """
+        Decomposition based on:
+        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
+        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
+        """
+        from .python_builtins import any as cpm_any
+
+        args, precedence = self.args
+        constraints = []
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            for j in range(len(args)):
+                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+        return constraints, []
+
+    def value(self):
+
+        args, precedence = self.args
+        vals = np.array(argvals(args))
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            if vals[0] == t: return False
+            for j in range(len(args)):
+                if vals[j] == t and sum(vals[:j] == s) == 0:
+                    return False
+        return True
+
+
+class NoOverlap(GlobalConstraint):
+
+    def __init__(self, start, dur, end):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+
+        super().__init__("no_overlap", [start, dur, end])
+
+    def decompose(self):
+        start, dur, end = self.args
+        cons = [s + d == e for s,d,e in zip(start, dur, end)]
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+            cons += [(e1 <= s2) | (e2 <= s1)]
+        return cons, []
+    def value(self):
+        start, dur, end = argvals(self.args)
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if e1 > s2 and e2 > s1:
+                return False
+        return True
+
+class NoOverlap2d(GlobalConstraint):
+    """
+        2D-version of the NoOverlap constraint.
+        Ensures a set of rectangles is placed on a grid such that they do not overlap.
+    """
+    def __init__(self, start_x, dur_x, end_x,  start_y, dur_y, end_y):
+        assert len(start_x) == len(dur_x) == len(end_x) == len(start_y) == len(dur_y) == len(end_y)
+        super().__init__("no_overlap2d", [start_x, dur_x, end_x,  start_y, dur_y, end_y])
+
+    def decompose(self):
+        from .python_builtins import any as cpm_any
+
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = self.args
+        n = len(start_x)
+        cons =  [s + d == e for s,d,e in zip(start_x, dur_x, end_x)]
+        cons += [s + d == e for s,d,e in zip(start_y, dur_y, end_y)]
+
+        for i,j in all_pairs(list(range(n))):
+            cons += [cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
+                              end_y[i] <= start_y[j], end_y[j] <= start_y[i]])]
+        return cons,[]
+    def value(self):
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
+        n = len(start_x)
+        if any(s + d != e for s, d, e in zip(start_x, dur_x, end_x)):
+            return False
+        if any(s + d != e for s, d, e in zip(start_y, dur_y, end_y)):
+            return False
+        for i,j in all_pairs(list(range(n))):
+            if  end_x[i] > start_x[j] and end_x[j] > start_x[i] and \
+                 end_y[i] > start_y[j] and end_y[j] > start_y[i]:
+                return False
+        return True
+
 class GlobalCardinalityCount(GlobalConstraint):
     """
     GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
     must be equal to occ[i].
     """
 
-    def __init__(self, vars, vals, occ):
+    def __init__(self, vars, vals, occ, closed=False):
         flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         super().__init__("gcc", [vars,vals,occ])
+        self.closed = closed
 
     def decompose(self):
         from .globalfunctions import Count
         vars, vals, occ = self.args
-        return [Count(vars, i) == v for i, v in zip(vals, occ)], []
+        constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+        if self.closed:
+            constraints += [InDomain(v, vals) for v in vars]
+        return constraints, []
 
     def value(self):
         from .python_builtins import all
@@ -571,9 +903,8 @@ class Increasing(GlobalConstraint):
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all(args[i].value() <= args[i+1].value() for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -594,9 +925,8 @@ class Decreasing(GlobalConstraint):
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all(args[i].value() >= args[i+1].value() for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -617,9 +947,8 @@ class IncreasingStrict(GlobalConstraint):
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all((args[i].value() < args[i+1].value()) for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -640,9 +969,134 @@ class DecreasingStrict(GlobalConstraint):
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
-        from .python_builtins import all
-        args = self.args
-        return all((args[i].value() > args[i+1].value()) for i in range(len(args)-1))
+        args = argvals(self.args)
+        return all(args[i] > args[i+1] for i in range(len(args)-1))
+
+
+class LexLess(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_less", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal. It needs to be strictly less in at least one index.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+
+        # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
+        # until a strict inequality is encountered.
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
+        defining.append(bvar[-1] == (X[-1] < Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
+
+
+class LexLessEq(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_lesseq", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        defining.append(bvar[-1] == (X[-1] <= Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
+
+
+class LexChainLess(GlobalConstraint):
+    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_less", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLess constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+
+
+class LexChainLessEq(GlobalConstraint):
+    """ Given a matrix X, LexChainLessEq enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_lesseq", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLessEq constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
