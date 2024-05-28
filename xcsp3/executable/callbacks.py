@@ -543,7 +543,7 @@ class CallbacksCPMPy(Callbacks):
         else:
             # post decomposition directly
             # be smart and chose task or time decomposition
-            if max(get_bounds(cpm_ends)) >= 100:
+            if max(get_bounds(cpm_ends)[1]) >= 100:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
