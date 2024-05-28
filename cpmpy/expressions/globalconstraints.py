@@ -98,8 +98,10 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentExceptN
         AllDifferentLists
         AllEqual
+        AllEqualExceptN
         Circuit
         Inverse
         Table
@@ -181,21 +183,32 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(a.value() for a in self.args)) == len(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
+class AllDifferentExceptN(GlobalConstraint):
     """
-    All nonzero arguments have a distinct value
+        All arguments except those equal to a value in n have a distinct value.
     """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except0", flatlist(args))
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
-        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
+        from .python_builtins import any as cpm_any
+        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
+        return [(var1 == var2).implies(cpm_any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args if argval(a) != 0]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
+
+class AllDifferentExcept0(AllDifferentExceptN):
+    """
+        All nonzero arguments have a distinct value
+    """
+    def __init__(self, *arr):
+        flatarr = flatlist(arr)
+        super().__init__(arr, 0)
 
 
 class AllDifferentLists(GlobalConstraint):
@@ -224,6 +237,7 @@ class AllDifferentLists(GlobalConstraint):
         lst_vals = [tuple(argvals(a)) for a in self.args]
         return len(set(lst_vals)) == len(self.args)
 
+
 def allequal(args):
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -243,6 +257,26 @@ class AllEqual(GlobalConstraint):
 
     def value(self):
         return len(set(argvals(self.args))) == 1
+
+class AllEqualExceptN(GlobalConstraint):
+    """
+    All arguments except those equal to a value in n have the same value.
+    """
+
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("allequal_except_n", [flatarr, n])
+
+    def decompose(self):
+        from .python_builtins import any as cpm_any
+        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+
+    def value(self):
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+        return len(set(vals)) == 1 or len(set(vals)) == 0
+
 
 def circuit(args):
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
