@@ -192,4 +192,4 @@ def get_store() -> ExprStore:
     """
         Returns an expression store for CSE.
     """
-    return dict()
+    return ExprStore()
