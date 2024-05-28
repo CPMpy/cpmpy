@@ -270,7 +270,7 @@ def global_constraints(solver):
             expr = cls(vars)
         elif name == "AllDifferentListsExceptN":
             vars = intvar(0, 10, shape=(3, 4))
-            excepting = intvar(0,1, shape=(2,4))
+            excepting = ([0,1,2,3], [3,2,1,0], [1,1,1,1])
             expr = cls(vars, excepting)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)
