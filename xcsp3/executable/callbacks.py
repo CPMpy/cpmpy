@@ -388,9 +388,18 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_count(self, lst: list[Variable] | list[Node], values: list[int] | list[Variable], condition: Condition):
-        cpm_vars = self.get_cpm_vars(lst)
+        # General case of count, can accept list of variables for any arg and any operator
+        cpm_vars = self.get_cpm_exprs(lst)
         cpm_vals = self.get_cpm_vars(values)
-        self._unimplemented(lst, values, condition)
+        if condition.operator == TypeConditionOperator.IN:
+            from pycsp3.classes.auxiliary.conditions import ConditionInterval
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`"
+            rhs = list(range(condition.min, condition.max + 1))
+        else:
+            rhs = self.get_cpm_var(condition.right_operand())
+
+        count_for_each_val = [cp.Count(cpm_vars, val) for val in cpm_vals]
+        self.cpm_model += self.eval_cpm_comp(cp.sum(count_for_each_val), condition.operator, rhs)
 
     def ctr_atleast(self, lst: list[Variable], value: int, k: int):
         cpm_vars = self.get_cpm_vars(lst)
