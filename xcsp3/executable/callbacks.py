@@ -253,10 +253,10 @@ class CallbacksCPMPy(Callbacks):
         cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
             self.cpm_model += cp.AllDifferent(cpm_exprs)
-        elif excepting == [0]:
-            self.cpm_model += cp.AllDifferentExcept0(cpm_exprs)
-        else:
-            self._unimplemented(scope, excepting) # TODO: parse to AllDifferentExceptN
+        elif len(excepting) == 1:
+            self.cpm_model += cp.AllDifferentExceptN(cpm_exprs, excepting[0])
+        else: # unsupported for competition
+            self._unimplemented(scope, excepting)
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
         if excepting is None:
