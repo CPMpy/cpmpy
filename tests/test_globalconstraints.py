@@ -205,25 +205,25 @@ class TestGlobal(unittest.TestCase):
 
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
-        circuit_sols = set()
-        not_circuit_sols = set()
+        all_sols = set()
+        not_all_sols = set()
 
-        circuit_models = cp.Model(circuit).solveAll(display=lambda : circuit_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_circuit_sols.add(tuple(x.value())))
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_all_sols.add(tuple(x.value())))
 
         total = cp.Model(x == x).solveAll()
 
-        for sol in circuit_sols:
+        for sol in all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertTrue(circuit.value())
 
-        for sol in not_circuit_sols:
+        for sol in not_all_sols:
             for var,val in zip(x, sol):
                 var._value = val
             self.assertFalse(circuit.value())
 
-        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
 
 
     def test_inverse(self):
@@ -983,25 +983,25 @@ class TestTypeChecks(unittest.TestCase):
 
         self.assertFalse(cp.Model([constr, ~constr]).solve())
 
-        circuit_sols = set()
-        not_circuit_sols = set()
+        all_sols = set()
+        not_all_sols = set()
 
-        circuit_models = cp.Model(constr).solveAll(display=lambda: circuit_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(~constr).solveAll(display=lambda: not_circuit_sols.add(tuple(x.value())))
+        circuit_models = cp.Model(constr).solveAll(display=lambda: all_sols.add(tuple(x.value())))
+        not_circuit_models = cp.Model(~constr).solveAll(display=lambda: not_all_sols.add(tuple(x.value())))
 
         total = cp.Model(x == x).solveAll()
 
-        for sol in circuit_sols:
+        for sol in all_sols:
             for var, val in zip(x, sol):
                 var._value = val
             self.assertTrue(constr.value())
 
-        for sol in not_circuit_sols:
+        for sol in not_all_sols:
             for var, val in zip(x, sol):
                 var._value = val
             self.assertFalse(constr.value())
 
-        self.assertEqual(total, len(circuit_sols) + len(not_circuit_sols))
+        self.assertEqual(total, len(all_sols) + len(not_all_sols))
 
 
     def test_increasing(self):
