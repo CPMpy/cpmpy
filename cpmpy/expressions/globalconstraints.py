@@ -299,10 +299,29 @@ class Inverse(GlobalConstraint):
         rev = [argval(a) for a in self.args[1]]
         return all(rev[x] == i for i, x in enumerate(fwd))
 
-class InverseOne(Inverse):
-    def __init__(self, x):
-        super().__init__(x, x)
-        self.name = "inverseOne"
+class InverseOne(GlobalConstraint):
+    """
+       Inverse (aka channeling / assignment) constraint but with only one array.
+       Equivalent to Inverse(x,x)
+
+                arr[i] == j  <==>  arr[j] == i
+
+    """
+    def __init__(self, arr):
+        flatargs = flatlist([arr])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
+        super().__init__("inverseOne", [arr])
+
+    def decompose(self):
+        from .python_builtins import all
+        arr = self.args[0]
+        arr = cpm_array(arr)
+        return [all(arr[x] == i for i, x in enumerate(arr))], []
+
+    def value(self):
+        valsx = [argval(a) for a in self.args[0]]
+        return all(valsx[x] == i for i, x in enumerate(valsx))
 
 class Channel(GlobalConstraint):
     """
