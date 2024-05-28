@@ -18,7 +18,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists","AllDifferentListsExceptN", "AllDifferentExceptN", "AllEqualExceptN",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
     "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
-    "Circuit", "SubCircuit", "SubCircuitWithStart",
+    "Circuit", "SubCircuit", "SubCircuitWithStart", "MDD", "Regular",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum", "Among"
@@ -193,6 +193,11 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "ShortTable":
             expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "MDD":
+            expr = MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+        ("n4", 0, "t"), ("n5", 1, "t")])
+        elif name == "Regular":
+            expr = Regular(NUM_ARGS, [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
