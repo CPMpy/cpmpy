@@ -334,7 +334,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse", "no_overlap", "nooverlap2d"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse", "no_overlap", "no_overlap2d"}
         print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         cpm_cons = decompose_in_tree(cpm_cons, supported)
