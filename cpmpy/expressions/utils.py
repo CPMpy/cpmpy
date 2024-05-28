@@ -39,13 +39,15 @@ def is_bool(arg):
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
@@ -137,24 +139,6 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
-
-def is_leaf(a):
-    if hasattr(a, 'is_leaf'):
-        return a.is_leaf()
-    if is_any_list(a):
-        return all([is_leaf(x) for x in a])
-    else:
-        return True
-
-
-def has_nested(expr):
-    if is_leaf(expr):
-        return False
-    if hasattr(expr, 'args'):
-        return not all([is_leaf(x) for x in expr.args])
-    return True
-
-
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator
@@ -205,3 +189,17 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+
+class ExprStore(dict):
+    """
+        A datastructure to store / cache Expression == BoolVar formulations.
+        Is the basis for Commun Subexpression Elimination (CSE).
+    """
+    pass
+
+def get_store() -> ExprStore:
+    """
+        Returns an expression store for CSE.
+    """
+    return ExprStore()

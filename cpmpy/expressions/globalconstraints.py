@@ -528,14 +528,29 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
+        """
+            This decomposition is only valid in a non-reified setting.
+        """
         from .python_builtins import any, all
+        from .variables import boolvar
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
-
+        row_selected = boolvar(shape=len(tab))
+        if len(tab) == 1:
+            return [all(t == a for (t,a) in zip(tab[0], arr))]
+        return [any(row_selected)] + \
+               [rs.implies(all([t == a for (t,a) in zip(row, arr)])) for (row,rs) in zip(tab, row_selected)]
+  
     def value(self):
         arr, tab = self.args
         arrval = argvals(arr)
         return arrval in tab
+    
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 
 class ShortTable(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
@@ -549,10 +564,20 @@ class ShortTable(GlobalConstraint):
         super().__init__("shorttable", [array, table])
 
     def decompose(self):
+        """
+            This decomposition is only valid in a non-reified setting.
+        """
         from .python_builtins import any, all
+        from .variables import boolvar
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row) if ri != '*') for row in tab)], []
-
+        row_selected = boolvar(shape=len(tab))
+        if len(tab) == 1:
+            return [all([r == a for (r,a) in zip(tab[0], arr) if r != "*"])]
+        return [any(row_selected)] + \
+               [rs.implies(
+                   all([r == a for (r,a) in zip(row, arr) if r != "*"])
+                ) for (row,rs) in zip(tab, row_selected)]
+    
     def value(self):
         arr, tab = self.args
         arrval = [argval(a) for a in arr]

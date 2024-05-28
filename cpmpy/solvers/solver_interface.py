@@ -28,7 +28,7 @@ from enum import Enum
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
 from ..transformations.get_variables import get_variables
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import ExprStore, get_store, is_num, is_any_list
 from ..expressions.python_builtins import any,all
 
 
@@ -76,6 +76,8 @@ class SolverInterface(object):
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
+        
+        self.expr_store:ExprStore = get_store()
 
         # rest uses own API
         if cpm_model is not None:
@@ -165,9 +167,10 @@ class SolverInterface(object):
         """
            Like `solver_var()` but for arbitrary shaped lists/tensors
         """
-        # Tias not sure this is a good idea... we can fix the table special case better
-        vectorized_create_object = np.vectorize(self.solver_var, otypes=[object])
-        return vectorized_create_object(cpm_vars).tolist()
+  
+        if is_any_list(cpm_vars):
+            return [self.solver_vars(v) for v in cpm_vars]
+        return self.solver_var(cpm_vars)
 
     def transform(self, cpm_expr):
         """
