@@ -10,7 +10,7 @@ from ..expressions.utils import ExprStore, get_store, is_any_list, eval_comparis
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
-def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
+def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), expr_store:ExprStore=None, _toplevel=None, nested=False):
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
@@ -44,12 +44,12 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
             
             if isinstance(expr, NDVarArray): # NDVarArray is also an expression, so we can call has_subexpr on it for a possible early-exit
                 if expr.has_subexpr():
-                    newexpr = decompose_in_tree(expr, expr_store, supported, supported_reified, _toplevel, nested=True)
+                    newexpr = decompose_in_tree(expr, supported, supported_reified, expr_store, _toplevel, nested=True)
                     newlist.append(cpm_array(newexpr))
                 else:
                     newlist.append(expr)
             else: # a normal list-like (list, tuple, np.ndarray), must be called recursively and check all elements
-                newexpr = decompose_in_tree(expr, expr_store, supported, supported_reified, _toplevel, nested=True)
+                newexpr = decompose_in_tree(expr, supported, supported_reified, expr_store, _toplevel, nested=True)
                 newlist.append(newexpr)
             continue
 
@@ -64,7 +64,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
                 _toplevel.extend(base_con)  # should be added toplevel
 
             # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, expr_store, supported, supported_reified, _toplevel, nested=True)
+            args = decompose_in_tree(expr.args, supported, supported_reified, expr_store, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
   
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
@@ -86,7 +86,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
                 # Recursively decompose the subexpression arguments
                 else:
                     expr = copy.copy(expr)
-                    expr.update_args(decompose_in_tree(expr.args, expr_store, supported, supported_reified, _toplevel, nested=True))
+                    expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, expr_store, _toplevel, nested=True))
                     newlist.append(expr)
 
             else:
@@ -101,7 +101,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
 
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other (global constraint) subexpressions, check it
-                    decomposed = decompose_in_tree(decomposed, expr_store, supported, supported_reified, [], nested=nested)
+                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, expr_store, _toplevel, nested=nested)
                     newlist.append(all(decomposed))
 
                 else:
@@ -145,9 +145,9 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
 
                     # If it contains one, decompose by recursion into the argument
                     if lhs_has_nested:
-                        lhs = decompose_in_tree([lhs], expr_store, supported, supported_reified, _toplevel, nested=True)[0]
+                        lhs = decompose_in_tree([lhs], supported, supported_reified, expr_store, _toplevel, nested=True)[0]
                     if rhs_has_nested:
-                        rhs = decompose_in_tree([rhs], expr_store, supported, supported_reified, _toplevel, nested=True)[0]
+                        rhs = decompose_in_tree([rhs], supported, supported_reified, expr_store, _toplevel, nested=True)[0]
 
                     # Put the decompositions back together as the arguments of the original comparison
                     if lhs_has_nested or rhs_has_nested: 
@@ -166,7 +166,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
                 if lhs.has_subexpr(): 
                     # recurse into lhs args and decompose nested subexpressions
                     lhs = copy.copy(lhs)
-                    lhs.update_args(decompose_in_tree(lhs.args, expr_store, supported, supported_reified, _toplevel, nested=True))
+                    lhs.update_args(decompose_in_tree(lhs.args, supported, supported_reified, expr_store, _toplevel, nested=True))
 
                 # decompose comparison of lhs and rhs
                 dec = lhs.decompose_comparison(exprname, rhs)
@@ -177,7 +177,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
 
                 _toplevel.extend(define)  # definitions should be added toplevel
                 # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, expr_store, supported, supported_reified, _toplevel, nested=True)
+                decomposed = decompose_in_tree(decomposed, supported, supported_reified, expr_store, _toplevel, nested=True)
                 newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
@@ -190,7 +190,7 @@ def decompose_in_tree(lst_of_expr, expr_store:ExprStore=None, supported=set(), s
         return toplevel_list(newlist)
     else:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return toplevel_list(newlist) + decompose_in_tree(_toplevel, expr_store, supported, supported_reified, nested=False)
+        return toplevel_list(newlist) + decompose_in_tree(toplevel_list(_toplevel), supported, supported_reified, expr_store, nested=False)
 
 
 # DEPRECATED!

@@ -312,8 +312,12 @@ class CPM_choco(SolverInterface):
         """
 
         expr_store = self.expr_store
+        # print(cpm_expr)
+        # print("--------------------")
 
         cpm_cons = toplevel_list(cpm_expr)
+        # print(cpm_cons)
+        # print("--------------------")
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "among", "precedence"}
@@ -327,11 +331,21 @@ class CPM_choco(SolverInterface):
 
         # for when choco new release comes, fixing the bug on increasing, decreasing and subcircuit
         #supported_reified = supported
-        cpm_cons = decompose_in_tree(cpm_cons, expr_store, supported, supported_reified)
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified, expr_store)
+        # print(cpm_cons)
+        # print("--------------------")
         cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
+        # print(cpm_cons)
+        # print("--------------------")
         cpm_cons = canonical_comparison(cpm_cons)
+        # print(cpm_cons)
+        # print("--------------------")
         cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"}, expr_store=expr_store)  # constraints that support reification
+        # print(cpm_cons)
+        # print("--------------------")
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # support >, <, !=
+        # print(cpm_cons)
+        # print("--------------------")
 
         return cpm_cons
 

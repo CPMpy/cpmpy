@@ -72,7 +72,7 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, is_leaf, argvals
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
@@ -190,12 +190,7 @@ class Expression(object):
             Default: yes
         """
         return True
-    
-    def nested_boolean_constants(self):
-        """ A boolean list indicating which of the args are or contain a boolean constant.
-        """
-        return self._has_nested_boolean_constants_map
-    
+        
     def is_leaf(self):
         """ Is it the leaf of an expression tree?
             Default: no

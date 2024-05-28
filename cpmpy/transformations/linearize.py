@@ -47,11 +47,11 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import ExprStore, is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import ExprStore, get_store, is_any_list, is_num, eval_comparison, is_bool
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
-def linearize_constraint(lst_of_expr, expr_store:ExprStore, supported={"sum","wsum"}, reified=False):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprStore=None, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -61,6 +61,8 @@ def linearize_constraint(lst_of_expr, expr_store:ExprStore, supported={"sum","ws
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
 
     """
+    if expr_store is None:
+        expr_store = get_store()
 
     newlist = []
     for cpm_expr in lst_of_expr:

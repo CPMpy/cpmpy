@@ -30,7 +30,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
         # TODO this should be removed and replaced with the check later in the code
         # fails for now because push_down_negation gets called with a list of ints (constants)
         # these don't have attribute 'name'
-        if not (isinstance(expr, Expression) and expr.contains_negation()):
+        elif not (isinstance(expr, Expression) and expr.contains_negation()):
             newlist.append(expr)
 
         elif expr.name == "not":

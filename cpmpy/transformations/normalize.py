@@ -52,7 +52,7 @@ def toplevel_list(cpm_expr, merge_and=True):
 #         return False
 
 
-def simplify_boolean(lst_of_expr, num_context=False, filter=None):
+def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
@@ -77,7 +77,7 @@ def simplify_boolean(lst_of_expr, num_context=False, filter=None):
         #     newlist.append(expr)
 
         elif isinstance(expr, Operator):
-            args = simplify_boolean(expr.args, num_context=not expr.is_bool(), filter=expr.nested_boolean_constants())
+            args = simplify_boolean(expr.args, num_context=not expr.is_bool())
 
             if expr.name == "or":
                 if any(is_true_cst(arg) for arg in args): # expr | True -> True
@@ -122,7 +122,7 @@ def simplify_boolean(lst_of_expr, num_context=False, filter=None):
                 newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = simplify_boolean(expr.args, num_context=True, filter=expr.nested_boolean_constants())
+            lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
             if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
                 if name == "<": name = ">"

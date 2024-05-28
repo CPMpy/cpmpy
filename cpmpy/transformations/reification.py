@@ -107,7 +107,7 @@ def only_implies(constraints, expr_store:ExprStore):
     return newcons
 
 
-def reify_rewrite(constraints, expr_store:ExprStore, supported=frozenset()):
+def reify_rewrite(constraints, supported=frozenset(), expr_store:ExprStore=None):
     """
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.

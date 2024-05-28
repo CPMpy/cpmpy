@@ -252,27 +252,11 @@ class _NumVarImpl(Expression):
         """
         return False
 
-    def has_nested_expr(self):
-        """Does it contains nested Expressions?
-           Is of importance when deciding whether transformation/decomposition is needed.
-        """
-        return False
-
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return False
-    
-    def has_nested_boolean_constants(self):
-        """ Is there somewhere in the expression tree starting from this expression a boolean constant?
-        """
-        return False
-    
-    def nested_boolean_constants(self):
-        """ A boolean list indicating which of the args are or contain a boolean constant.
-        """
-        raise NotImplementedError(f"Variables don't have nested constants.")
-    
+            
     def is_leaf(self):
         """ Is it the leaf of an expression tree?
             This is only the case for decision variables (and constants).
@@ -320,12 +304,6 @@ class _IntVarImpl(_NumVarImpl):
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy   
 
-    def has_nested_expr(self):
-        """Does it contains nested Expressions?
-           Is of importance when deciding whether transformation/decomposition is needed.
-        """
-        return False
-
     # special casing for intvars (and boolvars)
     def __abs__(self):
         if self.lb >= 0:
@@ -356,12 +334,6 @@ class _BoolVarImpl(_IntVarImpl):
         """
         return True
 
-    def has_nested_expr(self):
-        """Does it contains nested Expressions?
-           Is of importance when deciding whether transformation/decomposition is needed.
-        """
-        return False
-
     def __invert__(self):
         return NegBoolView(self)
 
@@ -389,12 +361,6 @@ class NegBoolView(_BoolVarImpl):
         # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
         # __init__ from _IntVarImpl
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
-
-    def has_nested_expr(self):
-        """Does it contains nested Expressions?
-           Is of importance when deciding whether transformation/decomposition is needed.
-        """
-        return False
 
     def value(self):
         """ the negation of the value obtained in the last solve call by the viewed variable

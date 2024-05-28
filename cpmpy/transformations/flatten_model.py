@@ -267,7 +267,7 @@ def flatten_constraint(expr, expr_store:ExprStore):
     return newlist
 
 
-def flatten_objective(expr, expr_store:ExprStore=None, supported=frozenset(["sum","wsum"])):
+def flatten_objective(expr, supported=frozenset(["sum","wsum"]), expr_store:ExprStore=None):
     """
     - Decision variable: Var
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')

@@ -330,14 +330,22 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
+        starts = time.time()
+
+        expr_store = self.expr_store
+
+        start = time.time()
         cpm_cons = toplevel_list(cpm_expr)
         print(f"c ort:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+
+        # print(cpm_cons)
+        # print("------------------")
  
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse", "subcircuit", "subcircuitwithstart"}
 
         # with TimerContext("decompose") as t:
         start = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, expr_store, supported)
+        cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
         print(f"c ort:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
