@@ -358,8 +358,11 @@ class InverseOne(GlobalConstraint):
         return [all(arr[x] == i for i, x in enumerate(arr))], []
 
     def value(self):
-        valsx = [argval(a) for a in self.args[0]]
-        return all(valsx[x] == i for i, x in enumerate(valsx))
+        valsx = argvals(self.args[0])
+        try:
+            return all(valsx[x] == i for i, x in enumerate(valsx))
+        except IndexError: # partiality of Element constraint
+            return False
 
 class Channel(GlobalConstraint):
     """
