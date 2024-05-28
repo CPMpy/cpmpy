@@ -431,10 +431,42 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.NoOverlap(cpm_start, cpm_dur, cpm_end)
 
     def ctr_nooverlap_multi(self, origins: list[list[Variable]], lengths: list[list[int]] | list[list[Variable]], zero_ignored: bool):
-        self._unimplemented(origins, lengths, zero_ignored)
+        dim = len(origins)
+        if dim == 2:
+            assert len(origins) == 2
+            assert len(lengths) == 2
 
+            start_x, start_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
+            dur_x, dur_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
+
+            end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
+            end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
+
+            self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+                                             start_y, dur_y, end_y)
+
+        else: # n-dimensional, post decomposition directly
+            from cpmpy.expressions.utils import all_pairs
+            from cpmpy import any as cpm_any
+            n = len(origins[0])
+            starts = cp.cpm_array([self.get_cpm_vars(lst) for lst in origins])
+            durs = cp.cpm_array([self.get_cpm_vars(lst) for lst in lengths])
+
+            for i, j in all_pairs(list(range(n))):
+                self.cpm_model += cpm_any([starts[d,i] + durs[d,i] <= starts[d,j] |\
+                                           starts[d,j] + durs[d,j] <= starts[d,i] for d in range(dim)])
+                
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
-        self._unimplemented(xs, ys, lx, ly, zero_ignored) # TODO: add after merge Ignace PR
+        start_x = self.get_cpm_vars(xs)
+        start_y = self.get_cpm_vars(ys)
+        dur_x = self.get_cpm_vars(lx)
+        dur_y = ly
+
+        end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
+        end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
+
+        self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+                                         start_y, dur_y, end_y)
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable], heights: list[int] | list[Variable], condition: Condition):
         cpm_start = self.get_cpm_exprs(origins)
