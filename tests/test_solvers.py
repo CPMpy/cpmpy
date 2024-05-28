@@ -693,7 +693,7 @@ class TestSolvers(unittest.TestCase):
                 #test unique sols, should be same number
                 self.assertEqual(len(sols),8)
 
-                
+
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
     def test_count_mzn(self):
@@ -707,4 +707,3 @@ class TestSolvers(unittest.TestCase):
 
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
-
