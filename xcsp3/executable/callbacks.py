@@ -272,7 +272,10 @@ class CallbacksCPMPy(Callbacks):
             self.ctr_all_different(col, excepting)
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
-        self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
+        if excepting is None:
+            self.cpm_model += cp.AllEqual(self.get_cpm_exprs(scope))
+        else:
+            self.cpm_model += cp.AllEqualExceptN(self.get_cpm_exprs(scope), excepting)
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
