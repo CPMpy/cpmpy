@@ -313,7 +313,10 @@ class CallbacksCPMPy(Callbacks):
         self.ctr_lex(np.array(matrix).T.tolist(), operator)
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
-        self._unimplemented(lst, values, covered) # TODO: after merge of Ignace PR
+        if values is None:
+            self._unimplemented(lst, values, covered)
+        else:
+            self.cpm_model += cp.Precedence(self.get_cpm_vars(lst), values)
 
     def ctr_sum(self, lst: list[Variable] | list[Node], coefficients: None | list[int] | list[Variable], condition: Condition):
         cpm_vars = []
