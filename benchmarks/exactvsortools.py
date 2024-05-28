@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 slowthreshold = 0.2
 fastthreshold = 0.2
 #filename of reference instance, should be in results folder!
-refname = 'quick_exact_2024-05-17 16.02.25.077955.csv'
+refname = 'perf_cse_exact_2024-05-27 21.32.32.737203.csv'
 
 results = []
 cwd = os.getcwd()
@@ -67,21 +67,22 @@ for r in results:
 
 for x in dfs_list:
     print(x.name)
-print(full_list[0])
-dfexact = full_list[0] + full_list[1]
-dfortools = full_list[2] + full_list[3]
+dfexact = full_list[0]
+dfortools = full_list[1]
 print(dfexact)
 
 # Create boolean masks
-mask1 = dfexact['decompose'] != 140
+mask1 = dfexact['decompose'] != 130
 mask2 = dfexact['solve'] != 0
-mask3 = dfortools['decompose'] != 140
+mask3 = dfortools['decompose'] != 130
 mask4 = dfortools['solve'] != 0
 mask5 = dfexact['solve'] < 120
 mask6 = dfortools['solve'] < 120
 exacted = dfexact[mask1&mask2&mask3&mask4&mask5&mask6].sum()
+exacted = dfexact.sum()
 exacted.name = 'exact'
 ortooled = dfortools[mask3&mask4&mask1&mask2&mask5&mask6].sum()
+ortooled = dfortools.sum()
 ortooled.name = 'ortools'
 
 print(exacted)

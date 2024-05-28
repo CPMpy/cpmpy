@@ -19,7 +19,7 @@ from ..expressions.variables import _NumVarImpl, _BoolVarImpl
     - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
-def only_numexpr_equality(constraints, supported=frozenset()):
+def only_numexpr_equality(constraints, supported=frozenset(),expr_dict=None):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
 
@@ -27,6 +27,8 @@ def only_numexpr_equality(constraints, supported=frozenset()):
     """
 
     # shallow copy (could support inplace too this way...)
+    if expr_dict is None:
+        expr_dict = dict()
     newcons = copy.copy(constraints)
 
     for i,cpm_expr in enumerate(newcons):
@@ -34,13 +36,13 @@ def only_numexpr_equality(constraints, supported=frozenset()):
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
             if not isinstance(cond, _BoolVarImpl): # expr -> bv
-                res = only_numexpr_equality([cond], supported)
+                res = only_numexpr_equality([cond], supported, expr_dict=expr_dict)
                 if len(res) > 1:
                     newcons[i] = res[1].implies(subexpr)
                     newcons.insert(i, res[0])
 
             elif not isinstance(subexpr, _BoolVarImpl):  # expr -> bv
-                res = only_numexpr_equality([subexpr], supported)
+                res = only_numexpr_equality([subexpr], supported, expr_dict=expr_dict)
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])
                     newcons.insert(i, res[0])
@@ -54,13 +56,13 @@ def only_numexpr_equality(constraints, supported=frozenset()):
             if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification, check recursively
 
                 if not isinstance(lhs, _BoolVarImpl):  # expr == bv
-                    res = only_numexpr_equality([lhs], supported)
+                    res = only_numexpr_equality([lhs], supported, expr_dict=expr_dict)
                     if len(res) > 1:
                         newcons[i] = res[1] == rhs
                         newcons.insert(i, res[0])
 
                 elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
-                    res = only_numexpr_equality([rhs], supported)
+                    res = only_numexpr_equality([rhs], supported, expr_dict=expr_dict)
                     if len(res) > 1:
                         newcons[i] = lhs == res[1]
                         newcons.insert(i, res[0])

@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, has_nested, is_bool
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -40,18 +40,6 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
-def needs_simplify(expr):
-    if hasattr(expr, 'args'):
-        args = set()
-        for arg in expr.args:
-            if is_bool(arg):
-                return True  # boolean constants can be simplified away
-            args.add(is_boolexpr(arg))
-        return len(args) > 1  # mixed types should be simplified
-    else:
-        return False
-
-
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
@@ -61,15 +49,13 @@ def simplify_boolean(lst_of_expr, num_context=False):
     from .negation import recurse_negation # avoid circular import
     newlist = []
     for expr in lst_of_expr:
+
         if isinstance(expr, bool):
             # not sure if this should happen here or at construction time
             expr = BoolVal(expr)
 
         if isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
-
-        elif not has_nested(expr) and not needs_simplify(expr):
-            newlist.append(expr)
 
         elif isinstance(expr, Operator):
             args = simplify_boolean(expr.args, num_context=not expr.is_bool())
@@ -138,6 +124,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
             """
             if is_boolexpr(lhs) and is_num(rhs):
                 # direct simplification of boolean comparisons
+                if isinstance(rhs, BoolVal):
+                    rhs = int(rhs.value()) # ensure proper comparisons below
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
                 elif rhs == 0:
@@ -146,15 +134,15 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "==" or name == "<=":
                         newlist.append(recurse_negation(lhs))
                     if name == "<":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == ">=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                 elif 0 < rhs < 1:
                     # a floating point value
                     if name == "==":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == "!=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                     if name == "<" or name == "<=":
                         newlist.append(recurse_negation(lhs))
                     if name == ">" or name == ">=":
@@ -165,9 +153,9 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "!=" or name == "<":
                         newlist.append(recurse_negation(lhs))
                     if name == ">":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == "<=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                 elif rhs > 1:
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:

@@ -39,13 +39,15 @@ def is_bool(arg):
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
@@ -126,24 +128,6 @@ def argval(a):
     except IncompleteFunctionError as e:
         if a.is_bool(): return False
         raise e
-
-
-def is_leaf(a):
-    if hasattr(a, 'is_leaf'):
-        return a.is_leaf()
-    if is_any_list(a):
-        return all([is_leaf(x) for x in a])
-    else:
-        return True
-
-
-def has_nested(expr):
-    if is_leaf(expr):
-        return False
-    if hasattr(expr, 'args'):
-        return not all([is_leaf(x) for x in expr.args])
-    return True
-
 
 def eval_comparison(str_op, lhs, rhs):
     """
