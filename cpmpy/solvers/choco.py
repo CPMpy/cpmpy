@@ -311,6 +311,8 @@ class CPM_choco(SolverInterface):
         :return: list of Expression
         """
 
+        expr_store = self.expr_store
+
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
@@ -321,11 +323,11 @@ class CPM_choco(SolverInterface):
                              "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue"}
         # for when choco new release comes, fixing the bug on increasing and decreasing
         #supported_reified = supported
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, expr_store, supported, supported_reified)
+        cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"})  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"}, expr_store=expr_store)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # support >, <, !=
 
         return cpm_cons
 

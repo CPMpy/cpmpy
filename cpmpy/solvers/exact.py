@@ -37,7 +37,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
-from ..expressions.utils import flatlist
+from ..expressions.utils import flatlist, get_store
 
 import numpy as np
 import numbers
@@ -408,17 +408,55 @@ class CPM_exact(SolverInterface):
         :return: list of Expression
         """
 
+        starts = time.time()
+        expr_store = get_store()
+
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+        start = time.time()
         cpm_cons = toplevel_list(cpm_expr)
+        print(f"c exact:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+
+        start = time.time()
         cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialzed MIP decomp
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        print(f"c exact:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        # print(cpm_cons)
+        # print("------------------")
+
+        start = time.time()
+        cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
+        print(f"c exact:flatten_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
+        print(f"c exact:reify_rewrite took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), expr_store=expr_store)  # supports >, <, !=
+        print(f"c exact:only_numexpr_equality took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
+        print(f"c exact:only_bv_reifies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = only_implies(cpm_cons,expr_store=expr_store)  # anything that can create full reif should go above...
+        print(f"c exact:only_implies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}), expr_store=expr_store)  # the core of the MIP-linearization
+        print(f"c exact:linearize_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        
+        start = time.time()
+        cpm_cons = only_positive_bv(cpm_cons, expr_store=expr_store)  # after linearisation, rewrite ~bv into 1-bv
+        print(f"c exact:only_positive_bv took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+
+
+        print(f"c exact:transformation took {(time.time()-starts):.4f}")
+        print("c final size", len(cpm_cons))
+        print("c STORE:", len(expr_store.items()))
+
         return cpm_cons
 
         # NOTE: the transformations that are still done specifically for Exact are two-fold:

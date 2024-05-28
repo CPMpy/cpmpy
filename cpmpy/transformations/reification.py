@@ -25,6 +25,9 @@ from .negation import recurse_negation
 """
 
 def only_bv_reifies(constraints, expr_store:ExprStore):
+    if expr_store is None:
+        expr_store = get_store()
+        
     newcons = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
