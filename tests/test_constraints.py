@@ -30,10 +30,10 @@ SAT_SOLVERS = {"pysat", "pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "z3": {"Inverse", "InverseOne"},
-                  "choco": {"Inverse", "InverseOne"},
-                  "ortools":{"Inverse", "InverseOne"},
-                  "exact": {"Inverse", "InverseOne"},
+                  "z3": {"Inverse", "InverseOne", "Channel"},
+                  "choco": {"Inverse", "InverseOne", "Channel"},
+                  "ortools":{"Inverse", "InverseOne", "Channel"},
+                  "exact": {"Inverse", "InverseOne", "Channel"},
                   "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
                   }
 
