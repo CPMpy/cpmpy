@@ -197,8 +197,16 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += self.eval_cpm_comp(cpm_x == cpm_y, op, cpm_k)
 
     def ctr_logic_eqne(self, x: Variable, op: TypeConditionOperator, lop: TypeLogicalOperator, scope: list[Variable]):  # x = lop(scope) or x != lop(scope)
-        assert op in (TypeConditionOperator.EQ, TypeConditionOperator.NE) # TODO: what is this???
-        self._unimplemented(x, op, lop, scope)
+        cpm_x = self.get_cpm_var(x)
+        arity, cpm_op = self.funcmap[(lop.name).lower()]
+        if arity == 0:
+            rhs = cpm_op(self.get_cpm_vars(scope))
+        elif arity == 2:
+            rhs = cpm_op(*self.get_cpm_vars(scope))
+        else:
+            self._unimplemented(lop, scope)
+
+        self.cpm_model += self.eval_cpm_comp(cpm_x, op, rhs)
 
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
         if positive:
