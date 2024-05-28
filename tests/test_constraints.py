@@ -16,7 +16,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "InverseOne", "Channel", "Table", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -185,6 +185,10 @@ def global_constraints(solver):
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
+        elif name == "InverseOne":
+            expr = cls(NUM_ARGS)
+        elif name == "Channel":
+            expr = cls(BOOL_ARGS, NUM_VAR)
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "IfThenElse":
