@@ -334,7 +334,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         print(f"c ort:toplevel_list took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse", "no_overlap", "no_overlap2d"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "subcircuit", "subcircuitwithstart", "inverse", "no_overlap", "no_overlap2d"}
         print(f"c ort:has_nested took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
         t0 = time.time()
         cpm_cons = decompose_in_tree(cpm_cons, supported)
@@ -493,6 +493,11 @@ class CPM_ortools(SolverInterface):
                 array = self.solver_vars(array)
                 # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]

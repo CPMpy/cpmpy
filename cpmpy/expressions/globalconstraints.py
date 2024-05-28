@@ -109,6 +109,7 @@
         Inverse
         Table
         ShortTable
+        NegativeTable
         Xor
         Cumulative
         IfThenElse
@@ -917,6 +918,27 @@ class Regular(GlobalConstraint):
             else:
                 return False
         return curr_node in ends
+
+class NegativeTable(GlobalConstraint):
+    """The values of the variables in 'array' do not correspond to any row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("negative_table", [array, table])
+
+    def decompose(self):
+        from .python_builtins import all as cpm_all
+        from .python_builtins import any as cpm_any
+        arr, tab = self.args
+        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = argvals(arr)
+        tabval = argvals(tab)
+        return arrval not in tabval
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)

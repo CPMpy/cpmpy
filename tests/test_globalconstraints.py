@@ -250,16 +250,16 @@ class TestGlobal(unittest.TestCase):
     def test_subcircuit(self):
 
         import numpy as np
-        
+
         n = 6
-        
+
         # Find a subcircuit
         x = cp.intvar(0, n-1, n)
         model = cp.Model( [cp.SubCircuit(x)] )
         self.assertTrue(model.solve())
         self.assertTrue(cp.SubCircuit(x).value())
         self.assertTrue(model.solveAll() == 410)
-        
+
         # Find a max subcircuit (subcircuit = circuit)
         x = cp.intvar(0, n-1, n)
         model = cp.Model( [cp.SubCircuit(x)] + list(x != np.arange(n)) )
@@ -276,7 +276,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(circuit_length(x.value()) < n)
         self.assertTrue(model.solveAll() == 85)
 
-        # Find an empty subcircuit 
+        # Find an empty subcircuit
         x = cp.intvar(0, n-1, n)
         sc = cp.SubCircuit(x)
         model = cp.Model( [sc] + list(x == np.arange(n)) )
@@ -330,7 +330,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(circuit_length(x.value()) < n)
         self.assertTrue(model.solveAll() == 85)
 
-        # Find an empty subcircuit 
+        # Find an empty subcircuit
         x = cp.intvar(0, n-1, n)
         a = cp.boolvar()
         model = cp.Model( [a.implies(cp.SubCircuit(x)), a == True] + list(x == np.arange(n)) )
@@ -379,7 +379,7 @@ class TestGlobal(unittest.TestCase):
     def test_subcircuitwithstart(self):
         n = 5
         x = cp.intvar(0, n-1, n)
-        
+
         # Test satisfiability
         model = cp.Model( [cp.SubCircuitWithStart(x)] )
         self.assertTrue( model.solve() )
@@ -615,6 +615,42 @@ class TestGlobal(unittest.TestCase):
 
         constraints = [cp.ShortTable(iv, [[10, 8, '*'], [5, 9, '*']])]
         model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
+    def test_negative_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        model += constraints[1].decompose()
         self.assertFalse(model.solve())
 
     def test_table_onearg(self):
