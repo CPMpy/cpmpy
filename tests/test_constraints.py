@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
-    "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d"
+    "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
     "Circuit", "SubCircuit", "SubCircuitWithStart",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
