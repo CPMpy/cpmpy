@@ -334,10 +334,15 @@ class CallbacksCPMPy(Callbacks):
         self.ctr_lex(np.array(matrix).T.tolist(), operator)
 
     def ctr_precedence(self, lst: list[Variable], values: None | list[int], covered: bool):
-        if values is None:
+        if covered is True: # not supported for competition
             self._unimplemented(lst, values, covered)
-        else:
-            self.cpm_model += cp.Precedence(self.get_cpm_vars(lst), values)
+
+        cpm_vars = self.get_cpm_vars(lst)
+        if values is None: # assumed to be ordered set of all values collected from domains in lst
+            lbs, ubs = get_bounds(cpm_vars)
+            values = sorted(range(min(lbs), max(lbs)+1))
+
+        self.cpm_model += cp.Precedence(cpm_vars, values)
 
     def ctr_sum(self, lst: list[Variable] | list[Node], coefficients: None | list[int] | list[Variable], condition: Condition):
         cpm_vars = []
