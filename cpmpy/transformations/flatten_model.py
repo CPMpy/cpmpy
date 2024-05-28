@@ -321,16 +321,10 @@ def get_or_make_var(expr, expr_store:ExprStore):
 
         if isinstance(flatexpr,_BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
-            expr_store[expr] = bvar
+            expr_store[expr] = flatexpr
             return flatexpr,flatcons
         
-        
-        # if flatexpr in expr_store:
-        #     # print("found in store: ", expr_store[flatexpr], "->", flatexpr)
-        #     return (expr_store[flatexpr], []) # NOTE what about flatcons here?
-        # else:
         bvar = _BoolVarImpl()
-        # print("not found", flatexpr)
         expr_store[expr] = bvar
         return bvar, [flatexpr == bvar] + flatcons
 
@@ -339,21 +333,17 @@ def get_or_make_var(expr, expr_store:ExprStore):
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr, expr_store=expr_store)
 
+        # NOTE can we also get in a iv == iv or iv != iv type of situation here?
+
         lb, ub = flatexpr.get_bounds()
         if not(isinstance(lb,int) and isinstance(ub,int)):
             warnings.warn("CPMPy only uses integer variables, non-integer expression detected that will be reified "
                           "into an intvar with rounded bounds. \n Your constraints will stay the same.", UserWarning)
             lb, ub = math.floor(lb), math.ceil(ub)
-
         
-        if flatexpr in expr_store:
-            # print("found in store: ", expr_store[flatexpr], "->", flatexpr)
-            return (expr_store[flatexpr], []) # NOTE what about flatcons here?
-        else:
-            # print("not found", flatexpr)
-            ivar = _IntVarImpl(lb, ub)
-            expr_store[expr] = ivar
-            return ivar, [flatexpr == ivar] + flatcons
+        ivar = _IntVarImpl(lb, ub)
+        expr_store[expr] = ivar
+        return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, expr_store:ExprStore):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
