@@ -253,6 +253,9 @@ class AllDifferentListsExceptN(GlobalConstraint):
             raise TypeError(f"AllDifferentListsExceptN expects a (list of) lists to exclude but got {n}")
         if any(not is_any_list(x) for x in n): #only one list given, not a list of lists
             n = [n]
+        for lst in n:
+            if not all(is_num(x) for x in lst):
+                raise TypeError("Can only use constants as excepting argument")
         if any(not is_any_list(lst) for lst in lists):
             raise TypeError(f"AllDifferentListsExceptN expects a list of lists, but got {lists}")
         if any(len(lst) != len(lists[0]) for lst in lists + n):
