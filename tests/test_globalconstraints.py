@@ -1324,6 +1324,26 @@ class TestTypeChecks(unittest.TestCase):
         self.assertFalse(cp.Model([cp.Inverse([x,y,x],[x,y,x])]).solve())
         self.assertRaises(TypeError,cp.Inverse,[a,b],[x,y])
         self.assertRaises(TypeError,cp.Inverse,[a,b],[b,False])
+        self.assertFalse(cp.Model([cp.Inverse([x, y, x], [x, y, x, y, x])]).solve())
+
+    def test_inverseOne(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7, -1)
+        self.assertFalse(cp.Model([cp.InverseOne([x, y, x])]).solve())
+
+    def test_channel(self):
+        N = 5
+        x = cp.intvar(0, 1, shape=N)
+        v = cp.intvar(-4, N + 5)
+        cst = cp.Channel(x, v)
+        for k in range(-4, 0):
+            self.assertFalse(cp.Model([cst, v == k]).solve())
+        for k in range(0, N):
+            self.assertTrue(cp.Model([cst, v == k]).solve())
+            self.assertEqual([a.value() for a in x], [0 if i != k else 1 for i in range(0,N)])
+        for k in range(N, N+6):
+            self.assertFalse(cp.Model([cst, v == k]).solve())
+
 
     def test_ITE(self):
         x = cp.intvar(-8, 8)

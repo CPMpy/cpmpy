@@ -18,7 +18,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists","AllDifferentListsExceptN", "AllDifferentExceptN", "AllEqualExceptN",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
     "Table", "ShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
-    "Circuit", "SubCircuit", "SubCircuitWithStart", "MDD", "Regular",
+    "Circuit", "SubCircuit", "SubCircuitWithStart", "MDD", "Regular", "InverseOne", "Channel",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "NValue", "NValueExcept", "IfThenElseNum", "Among"
@@ -29,11 +29,11 @@ SAT_SOLVERS = {"pysat", "pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "z3": {"Inverse"},
-                  "choco": {"Inverse"},
-                  "ortools":{"Inverse"},
-                  "exact": {"Inverse"},
-                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
+                  "z3": {"Inverse", "InverseOne", "Channel"},
+                  "choco": {"Inverse", "InverseOne", "Channel"},
+                  "ortools":{"Inverse", "InverseOne", "Channel"},
+                  "exact": {"Inverse", "InverseOne", "Channel"},
+                  "minizinc": {"IncreasingStrict", "InverseOne", "Channel" } # bug #813 reported on libminizinc
                   }
 
 # Exclude certain operators for solvers.
@@ -189,6 +189,10 @@ def global_constraints(solver):
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
+        elif name == "InverseOne":
+            expr = cls(NUM_ARGS)
+        elif name == "Channel":
+            expr = cls(BOOL_ARGS, NUM_VAR)
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "ShortTable":

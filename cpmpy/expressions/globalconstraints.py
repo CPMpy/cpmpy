@@ -127,7 +127,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_transition
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_transition, is_int
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -185,7 +185,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(argvals(self.args))) == len(self.args)
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 class AllDifferentExceptN(GlobalConstraint):
     """
@@ -389,7 +389,7 @@ class SubCircuit(GlobalConstraint):
         # Ensure there are at least two stops to create a circuit with
         if len(flatargs) < 2:
             raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
-        
+
         # Create the object
         super().__init__("subcircuit", flatargs)
 
@@ -402,7 +402,7 @@ class SubCircuit(GlobalConstraint):
         """
         from .python_builtins import min as cpm_min
         from .python_builtins import all as cpm_all
-        
+
         # Input arguments
         succ = cpm_array(self.args) # Successor variables
         n = len(succ)
@@ -410,7 +410,7 @@ class SubCircuit(GlobalConstraint):
         # Decision variables
         start_node = intvar(0, n-1) # The first stop in the subcircuit.
         end_node = intvar(0, n-1) # The last stop in the subcircuit, before looping back to the "start_node".
-        index_within_subcircuit = intvar(0, n-1, shape=n) # The position each stop takes within the subcircuit, with the assumption that the stop "start_node" gets index 0.  
+        index_within_subcircuit = intvar(0, n-1, shape=n) # The position each stop takes within the subcircuit, with the assumption that the stop "start_node" gets index 0.
         is_part_of_circuit = boolvar(shape=n) # Whether a stop is part of the subcircuit.
         empty = boolvar() # To detect when a subcircuit is completely empty
 
@@ -431,12 +431,12 @@ class SubCircuit(GlobalConstraint):
         defining += [ empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n))) ] # If the subcircuit is empty, default all index values to 0
         defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
         defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
-        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.   
+        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.
         defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
-        # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit. 
-        # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node]. 
+        # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit.
+        # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node].
         # The case of an empty subcircuit is an exception, since "end_node" itself is not part of the subcircuit
-        defining += [ (is_part_of_circuit[i] == ((~empty) & (index_within_subcircuit[end_node] + 1 != index_within_subcircuit[i]))) for i in range(n)] 
+        defining += [ (is_part_of_circuit[i] == ((~empty) & (index_within_subcircuit[end_node] + 1 != index_within_subcircuit[i]))) for i in range(n)]
         # In a subcircuit any of the visited nodes can be the "start node", resulting in symmetrical solutions -> Symmetry breaking
         # Part of the formulation from the following is used: https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
         subcircuit_visits = intvar(0, n-1, shape=n) # The visited nodes in sequence of length n, with possible repeated stops. e.g. subcircuit [0, 2, 1] -> [0, 2, 1, 0, 2, 1]
@@ -447,7 +447,7 @@ class SubCircuit(GlobalConstraint):
         defining += [start_node == cpm_min(subcircuit_visits)]
 
         return constraining, defining
-    
+
     def value(self):
 
         succ = [argval(a) for a in self.args]
@@ -498,9 +498,9 @@ class SubCircuitWithStart(GlobalConstraint):
         The sequence of variables form a subcircuit, where x[i] = j means that j is the successor of i.
         Contrary to Circuit, there is no requirement on all nodes needing to be part of the circuit.
         Nodes which aren't part of the subcircuit, should self loop i.e. x[i] = i.
-        The size of the subcircuit should be strictly greater than 1, so not all stops can self loop 
+        The size of the subcircuit should be strictly greater than 1, so not all stops can self loop
         (as otherwise the start_index will never get visited).
-        start_index will be treated as the start of the subcircuit. 
+        start_index will be treated as the start of the subcircuit.
         The only impact of start_index is that it will be guaranteed to be inside the subcircuit.
 
         Global Constraint Catalog:
@@ -522,7 +522,7 @@ class SubCircuitWithStart(GlobalConstraint):
         # Ensure there are at least two stops to create a circuit with
         if len(flatargs) < 2:
             raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
-        
+
         # Create the object
         super().__init__("subcircuitwithstart", flatargs)
         self.start_index = start_index
@@ -545,29 +545,37 @@ class SubCircuitWithStart(GlobalConstraint):
         defining = []
 
         return constraining, defining
-    
+
     def value(self):
         start_index = self.start_index
         succ = [argval(a) for a in self.args] # Successor variables
 
         # Check if we have a valid subcircuit and that the start_index is part of it.
         return SubCircuit(succ).value() and (succ[start_index] != start_index)
-    
+
 
 class Inverse(GlobalConstraint):
     """
        Inverse (aka channeling / assignment) constraint. 'fwd' and
        'rev' represent inverse functions; that is,
 
-           fwd[i] == x  <==>  rev[x] == i
+            The symmetric version (where len(fwd) == len(rev)) is defined as:
+                fwd[i] == x  <==>  rev[x] == i
+            The asymmetric version (where len(fwd) < len(rev)) is defined as:
+                fwd[i] == x   =>   rev[x] == i
 
     """
     def __init__(self, fwd, rev):
-        flatargs = flatlist([fwd,rev])
+        flatargs = flatlist([fwd, rev])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
-        assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, rev])
+        if len(fwd) > len(rev):
+            raise TypeError("len(fwd) should be equal to len(rev) for the symmetric inverse, or smaller than len(rev) for the asymmetric inverse")
+        if len(fwd) == len(rev):
+            name = "inverse"
+        else:
+            name = "inverseAsym"
+        super().__init__(name, [fwd, rev])
 
     def decompose(self):
         from .python_builtins import all
@@ -584,6 +592,55 @@ class Inverse(GlobalConstraint):
         except IndexError: # partiality of Element constraint
             return False
 
+class InverseOne(GlobalConstraint):
+    """
+       Inverse (aka channeling / assignment) constraint but with only one array.
+       Equivalent to Inverse(x,x)
+
+                arr[i] == j  <==>  arr[j] == i
+
+    """
+    def __init__(self, arr):
+        flatargs = flatlist([arr])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
+        super().__init__("inverseOne", [arr])
+
+    def decompose(self):
+        from .python_builtins import all
+        arr = self.args[0]
+        arr = cpm_array(arr)
+        return [all(arr[x] == i for i, x in enumerate(arr))], []
+
+    def value(self):
+        valsx = argvals(self.args[0])
+        try:
+            return all(valsx[x] == i for i, x in enumerate(valsx))
+        except IndexError: # partiality of Element constraint
+            return False
+
+class Channel(GlobalConstraint):
+    """
+        Channeling constraint. Channeling integer representation of a variable into a representation with boolean
+        indicators
+            for all 0<=i<len(arr) : arr[i] = 1 <=> value = i
+            exists 0<=i<len(arr) s.t. arr[i] = 1
+    """
+    def __init__(self, arr, v):
+        flatargs = flatlist([arr])
+        if not all(x.lb >= 0 and x.ub <= 1 for x in flatargs):
+            raise TypeError(
+                "the first argument of a Channel constraint should only contain 0-1 variables/expressions (i.e., " +
+                "intvars/intexprs with domain {0,1} or boolvars/boolexprs)")
+        super().__init__("channelValue", [arr, v])
+
+    def decompose(self):
+        arr, v = self.args
+        return [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
+
+    def value(self):
+        arr, v = self.args
+        return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
