@@ -310,10 +310,16 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
+        """
+            This decomposition is only valid in a non-reified setting.
+        """
         from .python_builtins import any, all
+        from .variables import boolvar
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
-
+        row_selected = boolvar(shape=len(tab))
+        return [any(row_selected)] + \
+               [rs.implies(all(t == arr)) for (t,rs) in zip(tab, row_selected)]
+  
     def value(self):
         arr, tab = self.args
         arrval = [argval(a) for a in arr]
@@ -338,10 +344,18 @@ class ShortTable(GlobalConstraint):
         super().__init__("shorttable", [array, table])
 
     def decompose(self):
+        """
+            This decomposition is only valid in a non-reified setting.
+        """
         from .python_builtins import any, all
+        from .variables import boolvar
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row) if ri != '*') for row in tab)], []
-
+        row_selected = boolvar(shape=len(tab))
+        return [any(row_selected)] + \
+               [rs.implies(
+                   all([r == a for (r,a) in zip(row, arr) if r != "*"])
+                ) for (row,rs) in zip(tab, row_selected)]
+    
     def value(self):
         arr, tab = self.args
         arrval = [argval(a) for a in arr]
