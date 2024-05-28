@@ -279,14 +279,17 @@ def run(args: Args):
 
     sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
-    # -------------------------- Configure XCSP3 parser -------------------------- #
+    # ------------------------------ Parse instance ------------------------------ #
 
+    start = time.time()
     parser = ParserXCSP3(args.benchname)
+    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model")
+
+    # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
+    start = time.time()
     callbacks = CallbacksCPMPy()
     callbacks.force_exit = True
     callbacker = CallbackerXCSP3(parser, callbacks)
-
-    # ------------------------------ Parse instance ------------------------------ #
 
     try:
         callbacker.load_instance()
@@ -298,6 +301,7 @@ def run(args: Args):
         print_status(ExitStatus.unknown)
         print_comment(str(e))
         exit(1)
+    print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
     
     # ------------------------------ Solve instance ------------------------------ #
 
@@ -307,14 +311,15 @@ def run(args: Args):
     # Transfer model to solver
     start = time.time()
     s = cp.SolverLookup.get(args.solver + ((":" + args.subsolver) if args.subsolver is not None else ""), model)
-    transfer_time = time.time() - start
-    print_comment(f"took {transfer_time} seconds to transfer model to {args.solver}")
+    print_comment(f"took {(time.time() - start):.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
+    start = time.time()
     sat = s.solve(
         time_limit = args.time_limit - transfer_time - args.time_buffer if args.time_limit is not None else None,
         **solver_arguments(args)
     ) 
+    print_comment(f"took {(time.time() - start):.4f} seconds to solve")
 
     # ------------------------------- Print result ------------------------------- #
 
