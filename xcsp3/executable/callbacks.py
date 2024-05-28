@@ -82,6 +82,7 @@ class CallbacksCPMPy(Callbacks):
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),
+        #TODO 'notin' is the only other set operator (negative indomain)
         # Logic
         "not": (1, lambda x: ~x),
         "and": (0, lambda x: cp.all(x)),
@@ -143,7 +144,13 @@ class CallbacksCPMPy(Callbacks):
         self.ctr_primitive3(x, aop, p, op, k) #for cpmpy ints and vars are just interchangeable..
 
     def ctr_primitive2a(self, x: Variable, aop: TypeUnaryArithmeticOperator, y: Variable):
-        self._unimplemented(x, aop, y)
+        #TODO this was unimplemented not sure if it should be aop(x) == y or x == aop(y)..
+        arity, cpm_op = self.funcmap[aop.name.lower()]
+        assert arity == 1, "unary operator expected"
+        x = self.get_cpm_var(x)
+        y = self.get_cpm_var(y)
+        self.cpm_model += cpm_op(x) == y
+
 
     def ctr_primitive2b(self, x: Variable, aop: TypeArithmeticOperator, y: Variable, op: TypeConditionOperator, k: int):
         #(x aop y) rel k
@@ -214,13 +221,13 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize indomain like we did table?
         else:
             # negative, so not in domain
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) != values[0]
             else:
-                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values)
+                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize a negative indomain? probably not worth it.
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
@@ -239,7 +246,7 @@ class CallbacksCPMPy(Callbacks):
             if positive:
                 self.cpm_model += cp.Table(cpm_vars, tuples)
             else:
-                self.cpm_model += ~cp.Table(cpm_vars, tuples)
+                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
@@ -252,9 +259,12 @@ class CallbacksCPMPy(Callbacks):
         cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
             self.cpm_model += cp.AllDifferent(cpm_exprs)
-        elif len(excepting) == 1:
-            self.cpm_model += cp.AllDifferentExceptN(cpm_exprs, excepting[0])
-        else: # unsupported for competition
+        elif len(excepting) > 0:  # TODO changed this, we now support excepting list
+            self.cpm_model += cp.AllDifferentExceptN(cpm_exprs, excepting)
+        elif len(excepting) == 0:
+            # just in case they get tricky
+            self.cpm_model += cp.AllDifferent(cpm_exprs)
+        else:  # unsupported for competition
             self._unimplemented(scope, excepting)
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
@@ -268,7 +278,7 @@ class CallbacksCPMPy(Callbacks):
         for row in matrix:
             self.ctr_all_different(row, excepting)
         for col in np.array(matrix).T:
-            self.ctr_all_different(col, excepting)
+            self.ctr_all_different(col, excepting) #TODO: nice
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         if excepting is None:
@@ -313,7 +323,7 @@ class CallbacksCPMPy(Callbacks):
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
         if operator == TypeOrderedOperator.STRICTLY_INCREASING:
-            self.cpm_model += cp.LexChainLess(cpm_lists)
+            self.cpm_model += cp.LexChainLess(cpm_lists) #TODO why is our less their increasing? is this opposite by accident? ok i checked seems correct
         elif operator == TypeOrderedOperator.INCREASING:
             self.cpm_model += cp.LexChainLessEq(cpm_lists)
         elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
@@ -373,12 +383,12 @@ class CallbacksCPMPy(Callbacks):
 
         import numpy as np
         if coefficients is None:
-            coefficients = np.ones(len(lst))
+            coefficients = np.ones(len(lst)) # TODO I guess, if wsums are preferred over sums
 
         lhs = cp.sum(coefficients * self.get_cpm_exprs(lst))
         if condition.operator == TypeConditionOperator.IN:
             from pycsp3.classes.auxiliary.conditions import ConditionInterval
-            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`"
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`" #TODO and not in? (notin)
             rhs = list(range(condition.min, condition.max+1))
         else:
             rhs = self.get_cpm_var(condition.right_operand())
@@ -392,7 +402,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_vals = self.get_cpm_vars(values)
         if condition.operator == TypeConditionOperator.IN:
             from pycsp3.classes.auxiliary.conditions import ConditionInterval
-            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`"
+            assert isinstance(condition, ConditionInterval), "Competition only supports intervals when operator is `in`" #TODO notin?
             rhs = list(range(condition.min, condition.max + 1))
         else:
             rhs = self.get_cpm_var(condition.right_operand())
@@ -420,9 +430,9 @@ class CallbacksCPMPy(Callbacks):
             lhs = cp.NValue(self.get_cpm_exprs(lst))
         else:
             assert len(excepting) == 1, "Competition only allows 1 integer value in excepting list"
-            lhs = cp.NValue(self.get_cpm_exprs(lst), excepting[0])
+            lhs = cp.NValueExcept(self.get_cpm_exprs(lst), excepting[0])
 
-        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand()))
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand())) #TODO this could also be in and notin with a range?
 
     def ctr_not_all_qual(self, lst: list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
@@ -439,14 +449,14 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand()))
+                                             self.get_cpm_var(condition.right_operand())) #TODO range for in/notin?
 
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
         cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand()))
+                                             self.get_cpm_var(condition.right_operand()))  #TODO range for in/notin?
 
     def ctr_minimum_arg(self, lst: list[Variable] | list[Node], condition: Condition, rank: TypeRank):  # should enter XCSP3-core
         self._unimplemented(lst, condition, rank)
@@ -457,13 +467,13 @@ class CallbacksCPMPy(Callbacks):
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
         cpm_lst = self.get_cpm_vars(lst)
         cpm_index = self.get_cpm_var(i)
-        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin?
         self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
         mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
         cpm_i, cpm_j = self.get_cpm_vars([i,j])
-        cpm_rhs = self.get_cpm_var(condition.right_operand())
+        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin? Sorry for spamming this, i think it's possible in theory according to the specs.
 
         self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
@@ -542,7 +552,7 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly
-            # be smart and chose task or time decomposition
+            # be smart and chose task or time decomposition #TODO you did task decomp in both cases
             if max(get_bounds(cpm_ends)[1]) >= 100:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
@@ -680,7 +690,7 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model.minimize(cpm_expr)
         else:
             self._unimplemented(obj_type, coefficients, terms)
-
+#TODO objectives are a bit confusing but i think it's correct
     def obj_maximize_special(self, obj_type: TypeObj, terms: list[Variable] | list[Node], coefficients: None | list[int]):
         import numpy as np
         if coefficients is None:
