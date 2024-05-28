@@ -185,7 +185,7 @@ class AllDifferent(GlobalConstraint):
 
 class AllDifferentExceptN(GlobalConstraint):
     """
-        All arguments except those equal to n have a distinct value.
+        All arguments except those equal to a value in n have a distinct value.
     """
     def __init__(self, arr, n):
         flatarr = flatlist(arr)
@@ -260,7 +260,7 @@ class AllEqual(GlobalConstraint):
 
 class AllEqualExceptN(GlobalConstraint):
     """
-    All arguments except those equal to n have a distinct value.
+    All arguments except those equal to a value in n have the same value.
     """
 
     def __init__(self, arr, n):
