@@ -311,7 +311,8 @@ def run(args: Args):
     # Transfer model to solver
     start = time.time()
     s = cp.SolverLookup.get(args.solver + ((":" + args.subsolver) if args.subsolver is not None else ""), model)
-    print_comment(f"took {(time.time() - start):.4f} seconds to transfer model to {args.solver}")
+    transfer_time = time.time() - start
+    print_comment(f"took {transfer_time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
     start = time.time()
