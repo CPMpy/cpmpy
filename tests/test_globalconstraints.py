@@ -286,6 +286,7 @@ class TestGlobal(unittest.TestCase):
                     pass
 
     def test_mdd(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
         x = cp.intvar(0, 2, shape=3)
         transitions = [
             ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"),
@@ -306,10 +307,12 @@ class TestGlobal(unittest.TestCase):
                     model = cp.Model(constraints)
                     if candidate in solutions:
                         self.assertTrue(model.solve())
+                        self.assertEqual([a.value() for a in x], candidate)
                     else:
                         self.assertFalse(model.solve())
 
     def test_regular(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
         x = cp.intvar(0, 1, shape=7)
 
         transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 0, "d"), ("d", 0, "d"), ("d", 1, "e"),
@@ -330,6 +333,7 @@ class TestGlobal(unittest.TestCase):
                 model = cp.Model(constraints)
                 if candidate in solutions:
                     self.assertTrue(model.solve())
+                    self.assertEqual([a.value() for a in x], candidate)
                 else:
                     self.assertFalse(model.solve())
             else:
