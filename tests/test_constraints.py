@@ -34,7 +34,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "choco": {"Inverse", "InverseOne", "Channel"},
                   "ortools":{"Inverse", "InverseOne", "Channel"},
                   "exact": {"Inverse", "InverseOne", "Channel"},
-                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
+                  "minizinc": {"IncreasingStrict", "InverseOne", "Channel" } # bug #813 reported on libminizinc
                   }
 
 # Exclude certain operators for solvers.
