@@ -114,6 +114,11 @@ class Expression(object):
     def args(self, args):
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'") 
 
+    def contains_negation(self):
+        if not hasattr(self, "_contains_negation"):
+            self._contains_negation = any(hasattr(arg, "contains_negation") and arg.contains_negation() for arg in self.args)
+        return self._contains_negation
+    
     def update_args(self, args):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
@@ -122,6 +127,8 @@ class Expression(object):
         # Reset cached "_has_subexpr"
         if hasattr(self, "_has_subexpr"):
             del self._has_subexpr
+        if hasattr(self, "_contains_negation"):
+            del self._contains_negation
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -424,6 +431,9 @@ class BoolVal(Expression):
         assert is_true_cst(arg) or is_false_cst(arg)
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
+    def containts_negation(self):
+        return False
+
     def value(self):
         return self.args[0]
 
@@ -455,6 +465,9 @@ class Comparison(Expression):
     def __init__(self, name, left, right):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
+    
+    def containts_negation(self):
+        return self.name == '!='
 
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
@@ -563,6 +576,9 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
+    
+    def containts_negation(self):
+        return self.name == "not"
     
     def __repr__(self):
         printname = self.name
