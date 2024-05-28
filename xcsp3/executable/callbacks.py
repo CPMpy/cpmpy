@@ -278,17 +278,35 @@ class CallbacksCPMPy(Callbacks):
             self.cpm_model += cp.AllEqualExceptN(self.get_cpm_exprs(scope), excepting)
 
     def ctr_ordered(self, lst: list[Variable], operator: TypeOrderedOperator, lengths: None | list[int] | list[Variable]):
+
         cpm_vars = self.get_cpm_vars(lst)
-        if operator == TypeOrderedOperator.INCREASING:
-            self.cpm_model += cp.Increasing(cpm_vars)
-        elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
-            self.cpm_model += cp.IncreasingStrict(cpm_vars)
-        elif operator == TypeOrderedOperator.DECREASING:
-            self.cpm_model += cp.Decreasing(cpm_vars)
-        elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
-            self.cpm_model += cp.DecreasingStrict(cpm_vars)
-        else:
-            self._unimplemented(lst, operator, lengths)
+
+        if lengths is None:
+            if operator == TypeOrderedOperator.INCREASING:
+                self.cpm_model += cp.Increasing(cpm_vars)
+            elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+                self.cpm_model += cp.IncreasingStrict(cpm_vars)
+            elif operator == TypeOrderedOperator.DECREASING:
+                self.cpm_model += cp.Decreasing(cpm_vars)
+            elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+                self.cpm_model += cp.DecreasingStrict(cpm_vars)
+            else:
+                self._unimplemented(lst, operator, lengths)
+
+        # also handle the lengths parameter
+        if lengths is not None:
+            lengths = self.get_cpm_vars(lengths)
+            if operator == TypeOrderedOperator.INCREASING:
+                self.cpm_model += [x + l <= y for x,l,y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.STRICTLY_INCREASING:
+                self.cpm_model += [x + l < y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.DECREASING:
+                self.cpm_model += [x + l >= y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
+                self.cpm_model += [x + l > y for x, l, y in zip(cpm_vars[:-1], lengths, cpm_vars[1:])]
+            else:
+                self._unimplemented(lst, operator, lengths)
+
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
         self._unimplemented(lst, limit, operator)
