@@ -123,6 +123,8 @@ def flatten_constraint(expr, expr_store:ExprStore):
         RE TODO: we now have custom NotImpl/NotSupported
     """
     from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
+    if expr_store is None:
+        expr_store = get_store()
 
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
@@ -265,12 +267,15 @@ def flatten_constraint(expr, expr_store:ExprStore):
     return newlist
 
 
-def flatten_objective(expr, supported=frozenset(["sum","wsum"]), expr_store:ExprStore=None):
+def flatten_objective(expr, expr_store:ExprStore=None, supported=frozenset(["sum","wsum"])):
     """
     - Decision variable: Var
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
               wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
     """
+    if expr_store is None:
+        expr_store = get_store()
+
     # lets be very explicit here
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead

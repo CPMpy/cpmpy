@@ -59,6 +59,9 @@ def only_implies(constraints, expr_store:ExprStore):
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
         AFTER `flatten()` and 'only_bv_reifies()'.
     """
+    if expr_store is None:
+        expr_store = get_store()
+        
     newcons = []
 
     for cpm_expr in constraints:
@@ -120,6 +123,9 @@ def reify_rewrite(constraints, expr_store:ExprStore, supported=frozenset()):
     if not is_any_list(constraints):
         # assume list, so make list
         constraints = [constraints]
+
+    if expr_store is None:
+        expr_store = get_store()
 
     newcons = []
     for cpm_expr in constraints:
