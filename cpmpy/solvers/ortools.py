@@ -26,6 +26,10 @@
 import sys  # for stdout checking
 import numpy as np
 
+import os, pathlib
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -330,81 +334,78 @@ class CPM_ortools(SolverInterface):
 
         :return: list of Expression
         """
-        starts = time.time()
+        with TimerContext("transformation") as top_tc:
 
-        expr_store = self.expr_store
+            expr_store = self.expr_store
 
-        # print(cpm_expr)
-        # print("------------------")
- 
+            # print(cpm_expr)
+            # print("------------------")
+    
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            print(f"ort:toplevel_list took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        start = time.time()
-        cpm_cons = toplevel_list(cpm_expr)
-        print(f"ort:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+    
+            supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse", "subcircuit", "subcircuitwithstart"}
 
-        # print(cpm_cons)
-        # print("------------------")
- 
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse", "subcircuit", "subcircuitwithstart"}
+            # with TimerContext("decompose") as t:
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
+            print(f"ort:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # with TimerContext("decompose") as t:
-        start = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
-        print(f"ort:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
 
-        # print(cpm_cons)
-        # print("------------------")
+            # with TimerContext("flatten") as t:
+            with TimerContext("flatten_constraint") as tc:
+                cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store) # flat normal form
+            print(f"ort:flatten_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # with TimerContext("flatten") as t:
-        start = time.time()
-        cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store) # flat normal form
-        print(f"ort:flatten_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")        
 
-        # print(cpm_cons)
-        # print("------------------")        
+            # with TimerContext("reify") as t:
+            with TimerContext("reify_rewrite") as tc:
+                cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
+            print(f"ort:reify_rewrite took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # with TimerContext("reify") as t:
-        start = time.time()
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
-        print(f"ort:reify_rewrite took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
 
-        # print(cpm_cons)
-        # print("------------------")
+            # with TimerContext("only_num") as t:
+            with TimerContext("only_numexpr_equality") as tc:
+                cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # supports >, <, !=
+            print(f"ort:only_numexpr_equality took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # with TimerContext("only_num") as t:
-        start = time.time()
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # supports >, <, !=
-        print(f"ort:only_numexpr_equality took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
 
-        # print(cpm_cons)
-        # print("------------------")
+            # with TimerContext("only_bv") as t:
+            with TimerContext("only_bv_reifies") as tc:
+                cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
+            print(f"ort:only_bv_reifies took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # with TimerContext("only_bv") as t:
-        start = time.time()
-        cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
-        print(f"ort:only_bv_reifies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
 
-        # print(cpm_cons)
-        # print("------------------")
+        # with TimerContext("only_implies") as t:
+            with TimerContext("only_implies") as tc:
+                cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # everything that can create
+                                                    # reified expr must go before this
+            print(f"ort:only_implies took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-    # with TimerContext("only_implies") as t:
-        start = time.time()
-        cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # everything that can create
-                                                # reified expr must go before this
-        print(f"ort:only_implies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
 
-        # print(cpm_cons)
-        # print("------------------")
-
-        import json
+     
         # print(expr_store)
         # print(json.dumps(expr_store, sort_keys=True, indent=4))
-        print(f"ort:transformation took {(time.time()-starts):.4f}")
+        print(f"ort:transformation took {(top_tc.time):.4f}")
         print("final size", len(cpm_cons))
         print("STORE:", len(expr_store.items()))
         
-      
-
         return cpm_cons
 
     def __add__(self, cpm_expr):
