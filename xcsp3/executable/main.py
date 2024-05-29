@@ -195,8 +195,8 @@ def supported_solver(solver:Optional[str]):
 @dataclass
 class Args:
     benchpath:str
-    benchdir:str
-    benchname:str
+    benchdir:str=None
+    benchname:str=None
     seed:int=None
     time_limit:int=None
     mem_limit:int=None
@@ -210,7 +210,7 @@ class Args:
     sat:bool=False
     opt:bool=False
     solve:bool=True
-    profile:bool=False
+    profiler:bool=False
 
     def __post_init__(self):
         if self.dir is not None:
@@ -220,13 +220,13 @@ class Args:
         if self.subsolver is not None:
             if not is_supported_subsolver(self.solver, self.subsolver):
                 raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
+        self.benchdir = os.path.join(*(str(self.benchpath).split(os.path.sep)[:-1]))
+        self.benchname = str(self.benchpath).split(os.path.sep)[-1].split(".")[0]
 
     @staticmethod
     def from_cli(args):
         return Args(
             benchpath = args.benchname,
-            benchdir = os.path.join(*(str(args.benchname).split(os.path.sep)[:-1])),
-            benchname = str(args.benchname).split(os.path.sep)[-1].split(".")[0],
             seed = args.seed,
             time_limit = args.time_limit if args.time_limit is not None else args.time_out,
             mem_limit = mib_as_bytes(args.mem_limit) if args.mem_limit is not None else None, # MiB to bytes
@@ -238,7 +238,7 @@ class Args:
             time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
             intermediate = args.intermediate if args.intermediate is not None else False,
             solve = not args.only_transform,
-            profile = args.profile,
+            profiler = args.profiler,
         )
     
     @property
@@ -423,15 +423,21 @@ def main():
     # Disable solving, only do transformation
     parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
     # Enable profiling measurements
-    parser.add_argument("--profile", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--profiler", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
-    perf = run(args)
+    run(args)
 
-    if args.profile:
+def run(args: Args):
+    with PerfContext() as perf:
+        with TimerContext("total") as tc:
+            run_helper(args)
+    print_comment(f"Total time taken: {tc.time}")
+    
+    if args.profiler:
         perf_dir = os.path.join(pathlib.Path(__file__).parent.resolve(), "perf_stats", args.solver)
         if args.subsolver is not None:
             perf_dir = os.path.join(perf_dir, args.subsolver)
@@ -439,14 +445,6 @@ def main():
         path = os.path.join(perf_dir, args.benchname)
         with open(path, 'w') as f:
             json.dump(perf.measurements, f, indent=4)
-
-
-def run(args: Args):
-    with PerfContext() as perf:
-        with TimerContext("total") as tc:
-            run_helper(args)
-    print_comment(f"Total time taken: {tc.time}")
-    return perf
 
 def run_helper(args:Args):
     import sys, os

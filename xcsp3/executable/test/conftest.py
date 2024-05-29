@@ -98,6 +98,7 @@ def pytest_addoption(parser):
     parser.addoption("--type", action="store", default=None)
     parser.addoption("--intermediate", action="store_true")
     parser.addoption("--competition", action="store_true")
+    parser.addoption("--profiler", action="store_true")
 
 
 def pytest_generate_tests(metafunc):
@@ -155,3 +156,7 @@ def pytest_generate_tests(metafunc):
     # If intermediate solutions should be shown
     if "competition" in metafunc.fixturenames:
         metafunc.parametrize("competition", [metafunc.config.getoption("competition")])
+
+    # If the executable should log performance profiles
+    if "profiler" in metafunc.fixturenames:
+        metafunc.parametrize("profiler", [metafunc.config.getoption("profiler")])
