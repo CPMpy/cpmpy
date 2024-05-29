@@ -424,7 +424,7 @@ class CPM_ortools(SolverInterface):
         # add new user vars to the set
         t0 = time.time()
         get_variables(cpm_expr, collect=self.user_vars)
-        print(f"c ort:get_vars took {(time.time()-t0):.4f} -- {len(cpm_expr)}")
+        print(f"c ort:get_vars took {(time.time()-t0):.4f}")
 
         cnt = 0.0
         # transform and post the constraints
@@ -432,7 +432,7 @@ class CPM_ortools(SolverInterface):
             t0 = time.time()
             self._post_constraint(con)
             cnt += (time.time()-t0)
-        print(f"c ort:post took {cnt:.4f} -- {len(cpm_expr)}")
+        print(f"c ort:post took {cnt:.4f}")
 
         return self
 
