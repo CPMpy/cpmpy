@@ -205,6 +205,7 @@ class Args:
     intermediate:bool=False
     sat:bool=False
     opt:bool=False
+    solve:bool=True
 
     def __post_init__(self):
         if self.dir is not None:
@@ -229,6 +230,7 @@ class Args:
             subsolver = args.subsolver if args.subsolver is not None else None,
             time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
             intermediate = args.intermediate if args.intermediate is not None else False,
+            solve = not args.only_transform,
         )
     
     @property
@@ -344,7 +346,7 @@ def gurobi_arguments(args: Args, model:cp.Model):
         "Threads": args.cores,
     }
     if args.intermediate:
-        res |= { "solution_callback": Callback(model, lambda x,_: x.getObjective().getValue()).callback }
+        res |= { "solution_callback": Callback(model, lambda x,_: int(x.getObjective().getValue())).callback }
     return {k:v for (k,v) in res.items() if v is not None}
 
 def solver_arguments(args: Args, model:cp.Model):
@@ -367,6 +369,8 @@ def subsolver_arguments(args: Args, model:cp.Model):
 # ---------------------------------------------------------------------------- #
 
 def main():
+
+    start = time.time()
 
     # ------------------------------ Argument parsing ------------------------------ #
 
@@ -402,15 +406,16 @@ def main():
     parser.add_argument("--time_buffer", required=False, type=int)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
+    # Disable solving, only do transformation
+    parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
 
-    # Process cli arguments
- 
+    # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
-    run(args)
+    run(args, start_time=start)
 
-def run(args: Args):
+def run(args: Args, start_time=None):
     import sys, os
 
     # --------------------------- Global Configuration --------------------------- #
@@ -480,17 +485,18 @@ def run(args: Args):
         print_status(ExitStatus.unknown)
         return 
     
-    start = time.time()
-    try:
-        sat = s.solve(
-            time_limit=time_limit,
-            **solver_arguments(args, model)
-        ) 
-        print_comment(f"took {(time.time() - start):.4f} seconds to solve")
-    except MemoryError:
-        print_comment("Ran out of memory when trying to solve.")
-    except GurobiError as e:
-        print_comment("Error from Gurobi: " + str(e))
+    if args.solve:
+        try:
+            start = time.time()
+            sat = s.solve(
+                time_limit=time_limit,
+                **solver_arguments(args, model)
+            ) 
+            print_comment(f"took {(time.time() - start):.4f} seconds to solve")
+        except MemoryError:
+            print_comment("Ran out of memory when trying to solve.")
+        except GurobiError as e:
+            print_comment("Error from Gurobi: " + str(e))
 
 
     # ------------------------------- Print result ------------------------------- #
@@ -507,6 +513,9 @@ def run(args: Args):
         print_status(ExitStatus.unknown)
     else:
         print_status(ExitStatus.unknown)
+
+    if start_time is not None:
+        print_comment(f"Total time taken: {time.time() - start_time}")
       
     
 if __name__ == "__main__":

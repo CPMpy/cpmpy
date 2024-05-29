@@ -409,7 +409,7 @@ class CPM_exact(SolverInterface):
         """
 
         starts = time.time()
-        expr_store = get_store()
+        expr_store = self.expr_store
 
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
