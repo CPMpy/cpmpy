@@ -30,7 +30,10 @@ def push_down_negation(lst_of_expr, toplevel=True):
         # TODO this should be removed and replaced with the check later in the code
         # fails for now because push_down_negation gets called with a list of ints (constants)
         # these don't have attribute 'name'
-        elif not (isinstance(expr, Expression) and expr.contains_negation()):
+        # thomas > expr.contains_negation() is not a good enough check
+        #           (iv > 5) == False -> fails to push negation to '>' to invert it
+        #           maybe combine with has_subexpr()
+        elif not (isinstance(expr, Expression) and expr.has_subexpr()):
             newlist.append(expr)
 
         elif expr.name == "not":

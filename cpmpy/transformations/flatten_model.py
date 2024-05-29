@@ -90,11 +90,14 @@ from ..expressions.utils import is_num, is_any_list, is_boolexpr, get_store, Exp
 from .negation import recurse_negation, push_down_negation
 
 
-def flatten_model(orig_model, expr_store:ExprStore):
+def flatten_model(orig_model, expr_store:ExprStore=None):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
     from ..model import Model  # otherwise circular dependency...
+
+    if expr_store is None:
+        expr_store = get_store()
 
     # the top-level constraints
     basecons = flatten_constraint(orig_model.constraints, expr_store=expr_store)
@@ -305,12 +308,15 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
-def get_or_make_var(expr, expr_store:ExprStore):
+def get_or_make_var(expr, expr_store:ExprStore=None):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
+    if expr_store is None:
+        expr_store = get_store()
+
     if expr in expr_store:
         # print("found in store: ", expr_store[expr], "->", expr)
         return (expr_store[expr], [])
@@ -364,7 +370,7 @@ def get_or_make_var_or_list(expr, expr_store:ExprStore):
         return get_or_make_var(expr, expr_store=expr_store)
 
 
-def normalized_boolexpr(expr, expr_store:ExprStore):
+def normalized_boolexpr(expr, expr_store:ExprStore=None):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -385,6 +391,9 @@ def normalized_boolexpr(expr, expr_store:ExprStore):
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
+
+    if expr_store is None:
+        expr_store = get_store()
 
     if isinstance(expr, Operator):
         # and, or, ->

@@ -1,4 +1,4 @@
-from cpmpy.expressions.utils import ExprStore
+from cpmpy.expressions.utils import ExprStore, get_store
 from ..expressions.core import Operator, Comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .reification import only_implies
@@ -24,7 +24,7 @@ from .flatten_model import flatten_constraint
   - BV -> BE
 """
 
-def to_cnf(constraints, expr_store:ExprStore):
+def to_cnf(constraints, expr_store:ExprStore=None):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
@@ -32,6 +32,9 @@ def to_cnf(constraints, expr_store:ExprStore):
         - constraints: list[Expression] or Operator
         - supported: (frozen)set of global constraint names that do not need to be decomposed
     """
+    if expr_store is None:
+        expr_store = get_store()
+        
     fnf = flatten_constraint(constraints, expr_store=expr_store)
     fnf = only_implies(fnf, expr_store=expr_store)
     return flat2cnf(fnf)

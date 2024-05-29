@@ -24,7 +24,7 @@ from .negation import recurse_negation
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
 
-def only_bv_reifies(constraints, expr_store:ExprStore):
+def only_bv_reifies(constraints, expr_store:ExprStore=None):
     if expr_store is None:
         expr_store = get_store()
         
@@ -49,7 +49,7 @@ def only_bv_reifies(constraints, expr_store:ExprStore):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints, expr_store:ExprStore):
+def only_implies(constraints, expr_store:ExprStore=None):
     """
         Transforms all reifications to BV -> BE form
 

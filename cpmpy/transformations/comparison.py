@@ -79,7 +79,10 @@ def only_numexpr_equality(constraints, supported=frozenset(), expr_store:ExprSto
                     # replace comparison by A <op> IV
                     newcons[i] = Comparison(cpm_expr.name, lhsvar, cpm_expr.args[1])
                     # add lhscon(s), which will be [(LHS == A)]
-                    assert(len(lhscons) == 1), "only_numexpr_eq: lhs surprisingly non-flat"
-                    newcons.insert(i, lhscons[0])
+                    print(lhscons)
+                    # len(lhscons) can be zero due to CSE. Expression gets only put once on top level
+                    assert(len(lhscons) <= 1), "only_numexpr_eq: lhs surprisingly non-flat"
+                    if len(lhscons) == 1:
+                        newcons.insert(i, lhscons[0])
 
     return newcons
