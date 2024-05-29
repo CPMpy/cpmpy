@@ -199,13 +199,16 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
     return newlist
 
 
-def only_positive_bv(lst_of_expr, expr_store:ExprStore):
+def only_positive_bv(lst_of_expr, expr_store:ExprStore=None):
     """
         Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
         cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
 
         Resulting expression is linear.
     """
+    if expr_store is None:
+        expr_store = get_store()
+
     newlist = []
     for cpm_expr in lst_of_expr:
 
