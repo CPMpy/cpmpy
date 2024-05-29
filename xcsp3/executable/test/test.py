@@ -13,7 +13,7 @@ from .conftest import TEST_OUTPUT_DIR, JAR
 
 from signal import SIGTERM
 
-def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = False, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False, profiler:bool=False):
+def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = False, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False, profiler:bool=False, only_transform:bool=False):
     """
         Prepares the environment, runs the executable and checks the solution with SolutionChecker.
         Pipes all executable outputs to a file and adds additional, usefull data as comments 
@@ -55,6 +55,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                 if time_limit is not None: cmd += [f"--time-limit={time_limit}"]
                 if memory_limit is not None: cmd += [f"--mem-limit={memory_limit}"]
                 if intermediate: cmd += [f"--intermediate"]
+                if only_transform: cmd += [f"--only-transform"]
 
                 # Run command
                 p = subprocess.Popen(cmd, start_new_session=True, stdout=f)
@@ -86,7 +87,8 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                     solver=solver,
                     subsolver=subsolver,
                     intermediate=intermediate,
-                    profiler=profiler
+                    profiler=profiler,
+                    solve=not only_transform
                 )
                 main.run(args)
             f.close()
@@ -97,26 +99,28 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
         cpm_time = time.time() - start
     
     # Run SolutionChecker
-    start = time.time()
-    test_res_str = subprocess.check_output(["java", "-jar", JAR, instance_location, out_file, "-cm"], stderr=subprocess.STDOUT if verbose else None).decode("utf8").replace("\n", "")
-    checker_time = time.time() - start
+    if not only_transform:
+        start = time.time()
+        test_res_str = subprocess.check_output(["java", "-jar", JAR, instance_location, out_file, "-cm"], stderr=subprocess.STDOUT if verbose else None).decode("utf8").replace("\n", "")
+        checker_time = time.time() - start
 
-    if verbose: print(test_res_str)
+        if verbose: print(test_res_str)
 
-    # Add SolutionChecker results in comments
-    if (not already_tested) or fresh:
-        f = open(out_file, "a")
-        f.write("c" + chr(32) + test_res_str + "\n")
-        f.write("c" + chr(32) + f"cpmpy time: {cpm_time}" + "\n")
-        f.write("c" + chr(32) + f"validation time: {checker_time}" + "\n")
-        f.write("c" + chr(32) + f"elapsed time: {cpm_time + checker_time}" + "\n")
-        f.close()
+        # Add SolutionChecker results in comments
+        if (not already_tested) or fresh:
+            f = open(out_file, "a")
+            f.write("c" + chr(32) + test_res_str + "\n")
+            f.write("c" + chr(32) + f"cpmpy time: {cpm_time}" + "\n")
+            f.write("c" + chr(32) + f"validation time: {checker_time}" + "\n")
+            f.write("c" + chr(32) + f"elapsed time: {cpm_time + checker_time}" + "\n")
+            f.close()
     
-    return test_res_str
+        return test_res_str
+
 
 # Pytest test function
 # @pytest.mark.repeat(10)
-def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, memory_limit, intermediate, verbose: bool = True, test=True, competition=False, profiler=True):
+def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, memory_limit, intermediate, profiler, only_transform, verbose: bool = True, test=True, competition=False):
     """
         This is the actual function which gets called by pytest. All inputs are defined in `conftest.py`.
     """
@@ -125,10 +129,10 @@ def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, 
 
     if verbose: print(f"Running instance {instance_name} on {solver}" + (f":{subsolver}" if subsolver is not None else ""))
 
-    test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition, profiler=profiler)
+    test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition, profiler=profiler, only_transform=only_transform)
 
     # Assert that the result must be correct
-    if test: #assert("OK	" == test_res_str)
+    if test and not only_transform: #assert("OK	" == test_res_str)
         assert("OK" in test_res_str), f"SolutionChecker output: {test_res_str}"
 
 if __name__ == "__main__":

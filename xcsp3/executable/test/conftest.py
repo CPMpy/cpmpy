@@ -99,6 +99,7 @@ def pytest_addoption(parser):
     parser.addoption("--intermediate", action="store_true")
     parser.addoption("--competition", action="store_true")
     parser.addoption("--profiler", action="store_true")
+    parser.addoption("--only_transform", action="store_true")
 
 
 def pytest_generate_tests(metafunc):
@@ -160,3 +161,7 @@ def pytest_generate_tests(metafunc):
     # If the executable should log performance profiles
     if "profiler" in metafunc.fixturenames:
         metafunc.parametrize("profiler", [metafunc.config.getoption("profiler")])
+
+    # Only transform, don't solve
+    if "only_transform" in metafunc.fixturenames:
+        metafunc.parametrize("only_transform", [metafunc.config.getoption("only_transform")])
