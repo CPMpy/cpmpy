@@ -221,6 +221,9 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += self.eval_cpm_comp(cpm_x, op, rhs)
 
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
+        if len(values) == 1 and isinstance(values[0], range):
+            values = list(eval(str(values[0])))
+
         if positive:
             #unary table constraint is just an inDomain
             if len(values) == 1:
