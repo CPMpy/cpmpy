@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import psutil
 from io import StringIO 
 from gurobipy import GurobiError
+import json
 
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
@@ -29,8 +30,11 @@ from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 
 # Utils
+import os, pathlib
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve()))
 from solution import solution_xml
 from callbacks import CallbacksCPMPy
+from xcsp3.perf_timer import PerfContext, TimerContext
 
 # Configuration
 SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]
@@ -68,10 +72,8 @@ def get_subsolver(args:Args, model:cp.Model):
     if args.solver == "z3":
         if model.has_objective():
             args.subsolver = "opt"
-            args.opt = True
         else:
             args.subsolver = "sat"
-            args.sat = True
     elif args.subsolver == None:
         if args.solver in SUPPORTED_SUBSOLVERS:
             args.subsolver = SUPPORTED_SUBSOLVERS[args.solver][0]
@@ -192,6 +194,8 @@ def supported_solver(solver:Optional[str]):
 
 @dataclass
 class Args:
+    benchpath:str
+    benchdir:str
     benchname:str
     seed:int=None
     time_limit:int=None
@@ -206,6 +210,7 @@ class Args:
     sat:bool=False
     opt:bool=False
     solve:bool=True
+    profile:bool=False
 
     def __post_init__(self):
         if self.dir is not None:
@@ -219,7 +224,9 @@ class Args:
     @staticmethod
     def from_cli(args):
         return Args(
-            benchname = args.benchname,
+            benchpath = args.benchname,
+            benchdir = os.path.join(*(str(args.benchname).split(os.path.sep)[:-1])),
+            benchname = str(args.benchname).split(os.path.sep)[-1].split(".")[0],
             seed = args.seed,
             time_limit = args.time_limit if args.time_limit is not None else args.time_out,
             mem_limit = mib_as_bytes(args.mem_limit) if args.mem_limit is not None else None, # MiB to bytes
@@ -231,6 +238,7 @@ class Args:
             time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
             intermediate = args.intermediate if args.intermediate is not None else False,
             solve = not args.only_transform,
+            profile = args.profile,
         )
     
     @property
@@ -278,7 +286,7 @@ def ortools_arguments(args: Args, model:cp.Model):
     }
     if args.seed is not None: 
         res |= { "random_seed": args.seed }
-    if args.intermediate:
+    if args.intermediate and args.opt:
         # res |= { "solution_callback": Callback(model) }
         res |= { "solution_callback": OrtSolutionCallback() }
     return res
@@ -345,11 +353,17 @@ def gurobi_arguments(args: Args, model:cp.Model):
         "Seed": args.seed,
         "Threads": args.cores,
     }
-    if args.intermediate:
+    if args.intermediate and args.opt:
         res |= { "solution_callback": Callback(model, lambda x,_: int(x.getObjective().getValue())).callback }
     return {k:v for (k,v) in res.items() if v is not None}
 
 def solver_arguments(args: Args, model:cp.Model):
+
+    if model.objective_ is not None:
+        args.opt = True
+    else:
+        args.sat = True
+
     if args.solver == "ortools": return ortools_arguments(args, model)
     elif args.solver == "exact": return exact_arguments(args, model)
     elif args.solver == "choco": return choco_arguments(args, model)
@@ -408,14 +422,33 @@ def main():
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
     # Disable solving, only do transformation
     parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
+    # Enable profiling measurements
+    parser.add_argument("--profile", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
-    run(args, start_time=start)
+    perf = run(args)
 
-def run(args: Args, start_time=None):
+    if args.profile:
+        perf_dir = os.path.join(pathlib.Path(__file__).parent.resolve(), "perf_stats", args.solver)
+        if args.subsolver is not None:
+            perf_dir = os.path.join(perf_dir, args.subsolver)
+        Path(perf_dir).mkdir(parents=True, exist_ok=True)
+        path = os.path.join(perf_dir, args.benchname)
+        with open(path, 'w') as f:
+            json.dump(perf.measurements, f, indent=4)
+
+
+def run(args: Args):
+    with PerfContext() as perf:
+        with TimerContext("total") as tc:
+            run_helper(args)
+    print_comment(f"Total time taken: {tc.time}")
+    return perf
+
+def run_helper(args:Args):
     import sys, os
 
     # --------------------------- Global Configuration --------------------------- #
@@ -434,8 +467,8 @@ def run(args: Args, start_time=None):
     # ------------------------------ Parse instance ------------------------------ #
 
     start = time.time()
-    parser = ParserXCSP3(args.benchname)
-    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model")
+    parser = ParserXCSP3(args.benchpath)
+    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
 
     # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
     start = time.time()
@@ -465,16 +498,15 @@ def run(args: Args, start_time=None):
     subsolver = get_subsolver(args, model)
 
     # Transfer model to solver
-    start = time.time()
     with Capturing() as output:
-        s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
-    transfer_time = time.time() - start
+        with TimerContext("transform") as tc:
+            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
     for o in output:
         print_comment(o)
-    print_comment(f"took {transfer_time:.4f} seconds to transfer model to {args.solver}")
+    print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
-    time_limit = args.time_limit - transfer_time - args.time_buffer if args.time_limit is not None else None
+    time_limit = args.time_limit - tc.time - args.time_buffer if args.time_limit is not None else None
     
     # If not time left
     if time_limit is not None and time_limit <= 0:
@@ -487,12 +519,12 @@ def run(args: Args, start_time=None):
     
     if args.solve:
         try:
-            start = time.time()
-            sat = s.solve(
-                time_limit=time_limit,
-                **solver_arguments(args, model)
-            ) 
-            print_comment(f"took {(time.time() - start):.4f} seconds to solve")
+            with TimerContext("solve") as tc:
+                sat = s.solve(
+                    time_limit=time_limit,
+                    **solver_arguments(args, model)
+                ) 
+            print_comment(f"took {(tc.time):.4f} seconds to solve")
         except MemoryError:
             print_comment("Ran out of memory when trying to solve.")
         except GurobiError as e:
@@ -513,9 +545,7 @@ def run(args: Args, start_time=None):
         print_status(ExitStatus.unknown)
     else:
         print_status(ExitStatus.unknown)
-
-    if start_time is not None:
-        print_comment(f"Total time taken: {time.time() - start_time}")
+ 
       
     
 if __name__ == "__main__":

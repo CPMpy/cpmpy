@@ -153,3 +153,5 @@ pycsp3/
 xcsp3/prof/
 reportlog.jsonl
 .pytest-runtimes
+perf_stats/
+perf_stats_0/

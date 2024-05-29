@@ -9,6 +9,7 @@ import os, sys, pathlib
 sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), ".."))
 from xcsp3 import __perf_context, __timer_context
 
+__timer_context.set([])
 
 def get_perf_context() -> PerfContext:
     try:
@@ -19,14 +20,17 @@ def get_perf_context() -> PerfContext:
 def set_perf_context(context:Optional[PerfContext]):
     __perf_context.set(context)
 
-def get_timer_context() -> TimerContext:
+def get_timer_context(level:int=0) -> TimerContext:
     try:
-        return __timer_context.get()
+        return __timer_context.get()[0]
     except LookupError:
         return None
     
 def set_timer_context(context:Optional[TimerContext]):
-    __timer_context.set(context)
+    timer_context = __timer_context.get()
+    timer_context.append(context)
+    __timer_context.set(timer_context)
+    return len(timer_context)-1
 
 class PerfContext:
     name:str = "no_name"
@@ -73,7 +77,7 @@ class TimerContext:
         self.label = label
 
     def __enter__(self):
-        set_timer_context(self)
+        self.level = set_timer_context(self)
         self.start = time.time()
         return self
     
