@@ -31,6 +31,10 @@ from datetime import timedelta # for mzn's timeout
 
 import numpy as np
 
+import os, pathlib
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -428,13 +432,17 @@ class CPM_minizinc(SolverInterface):
 
         :return: list of Expression
         """
-        cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
-                     "precedence", "no_overlap",
-                     "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
-                     "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit", "precedence"})
+        with TimerContext("transformation") as top_tc:
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
+                        "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
+                        "precedence", "no_overlap",
+                        "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
+                        "lex_chain_lesseq", "among"}
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit", "precedence"})
+        return cpm_cons
 
     def __add__(self, cpm_expr):
         """
