@@ -22,7 +22,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
     newlist = []
     for expr in lst_of_expr:
-        
+
         if is_any_list(expr):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
@@ -33,7 +33,8 @@ def push_down_negation(lst_of_expr, toplevel=True):
         # thomas > expr.contains_negation() is not a good enough check
         #           (iv > 5) == False -> fails to push negation to '>' to invert it
         #           maybe combine with has_subexpr()
-        elif not (isinstance(expr, Expression) and expr.has_subexpr()):
+
+        elif not (isinstance(expr, Expression)):
             newlist.append(expr)
 
         elif expr.name == "not":
@@ -54,10 +55,9 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(expr)
 
-        # elif not expr.has_subexpr():
-        #     newlist.append(expr)
-        #     continue
-
+        elif not expr.has_subexpr():
+            newlist.append(expr)
+            
         else:
             # an nested Expression, we remain in the positive case
             newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
