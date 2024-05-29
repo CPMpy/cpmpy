@@ -96,6 +96,11 @@ class CallbacksCPMPy(Callbacks):
     }
 
     def eval_cpm_comp(self, lhs, op:TypeConditionOperator, rhs):
+        if op == TypeConditionOperator.IN:
+            assert isinstance(rhs, list), f"Expected list as rhs but got {rhs}"
+        if op == TypeConditionOperator.NOTIN:
+            raise ValueError("Not supported in competition??")
+
         arity, cpm_op = self.funcmap[op.name.lower()]
         if arity == 2:
             return cpm_op(lhs, rhs)
