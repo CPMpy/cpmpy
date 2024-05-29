@@ -385,6 +385,7 @@ class CallbacksCPMPy(Callbacks):
         if coefficients is None:
             coefficients = np.ones(len(lst)) # TODO I guess, if wsums are preferred over sums
 
+        coefficients = np.array(coefficients)
         lhs = cp.sum(coefficients * self.get_cpm_exprs(lst))
         if condition.operator == TypeConditionOperator.IN:
             from pycsp3.classes.auxiliary.conditions import ConditionInterval
