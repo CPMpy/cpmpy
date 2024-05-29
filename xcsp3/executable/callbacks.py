@@ -391,10 +391,13 @@ class CallbacksCPMPy(Callbacks):
         #     self.cpm_model += op(cpsum, cpm_rhs)
 
         import numpy as np
-        if coefficients is None:
-            coefficients = np.ones(len(lst)) # TODO I guess, if wsums are preferred over sums
+        if coefficients is None or len(coefficients) == 0:
+            coefficients = np.ones(len(lst), dtype=int) # TODO I guess, if wsums are preferred over sums
+        elif isinstance(coefficients[0], Variable): # convert to cpmpy var
+            coefficients = cp.cpm_array(self.get_cpm_vars(coefficients))
+        else:
+            coefficients = np.array(coefficients)
 
-        coefficients = np.array(coefficients)
         lhs = cp.sum(coefficients * self.get_cpm_exprs(lst))
         if condition.operator == TypeConditionOperator.IN:
             from pycsp3.classes.auxiliary.conditions import ConditionInterval
