@@ -20,6 +20,11 @@
 
         CPM_z3
 """
+
+import os, pathlib, sys
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -250,10 +255,14 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
+        with TimerContext("transformation") as top_tc:
 
-        cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
     def __add__(self, cpm_expr):
