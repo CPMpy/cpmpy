@@ -334,9 +334,13 @@ class CPM_ortools(SolverInterface):
 
         expr_store = self.expr_store
 
+        # print(cpm_expr)
+        # print("------------------")
+ 
+
         start = time.time()
         cpm_cons = toplevel_list(cpm_expr)
-        print(f"c ort:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -346,7 +350,7 @@ class CPM_ortools(SolverInterface):
         # with TimerContext("decompose") as t:
         start = time.time()
         cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
-        print(f"c ort:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -354,7 +358,7 @@ class CPM_ortools(SolverInterface):
         # with TimerContext("flatten") as t:
         start = time.time()
         cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store) # flat normal form
-        print(f"c ort:flatten_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:flatten_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")        
@@ -362,7 +366,7 @@ class CPM_ortools(SolverInterface):
         # with TimerContext("reify") as t:
         start = time.time()
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
-        print(f"c ort:reify_rewrite took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:reify_rewrite took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -370,7 +374,7 @@ class CPM_ortools(SolverInterface):
         # with TimerContext("only_num") as t:
         start = time.time()
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # supports >, <, !=
-        print(f"c ort:only_numexpr_equality took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:only_numexpr_equality took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -378,7 +382,7 @@ class CPM_ortools(SolverInterface):
         # with TimerContext("only_bv") as t:
         start = time.time()
         cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
-        print(f"c ort:only_bv_reifies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:only_bv_reifies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -387,7 +391,7 @@ class CPM_ortools(SolverInterface):
         start = time.time()
         cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # everything that can create
                                                 # reified expr must go before this
-        print(f"c ort:only_implies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+        print(f"ort:only_implies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
 
         # print(cpm_cons)
         # print("------------------")
@@ -395,9 +399,9 @@ class CPM_ortools(SolverInterface):
         import json
         # print(expr_store)
         # print(json.dumps(expr_store, sort_keys=True, indent=4))
-        print(f"c ort:transformation took {(time.time()-starts):.4f}")
-        print("c final size", len(cpm_cons))
-        print("c STORE:", len(expr_store.items()))
+        print(f"ort:transformation took {(time.time()-starts):.4f}")
+        print("final size", len(cpm_cons))
+        print("STORE:", len(expr_store.items()))
         
       
 
@@ -424,7 +428,7 @@ class CPM_ortools(SolverInterface):
         # add new user vars to the set
         t0 = time.time()
         get_variables(cpm_expr, collect=self.user_vars)
-        print(f"c ort:get_vars took {(time.time()-t0):.4f}")
+        print(f"ort:get_vars took {(time.time()-t0):.4f}")
 
         cnt = 0.0
         # transform and post the constraints
@@ -432,7 +436,7 @@ class CPM_ortools(SolverInterface):
             t0 = time.time()
             self._post_constraint(con)
             cnt += (time.time()-t0)
-        print(f"c ort:post took {cnt:.4f}")
+        print(f"ort:post took {cnt:.4f}")
 
         return self
 
