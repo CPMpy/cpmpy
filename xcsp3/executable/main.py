@@ -1,6 +1,7 @@
 """
     CLI script for the XCSP3 competition.
 """
+from __future__ import annotations
 import argparse
 import signal
 import time
@@ -13,6 +14,9 @@ from pathlib import Path
 from typing import Optional
 import pathlib
 from dataclasses import dataclass
+import psutil
+from io import StringIO 
+
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
 
@@ -28,16 +32,52 @@ from solution import solution_xml
 from callbacks import CallbacksCPMPy
 
 # Configuration
-SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc"]
+SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]
 SUPPORTED_SUBSOLVERS = {
-    "minizinc": ["gecode", "chuffed", "scip"]
+    "minizinc": ["gecode", "chuffed"]
 }
 DEFAULT_SOLVER = "ortools"
 TIME_BUFFER = 1 # seconds
 # TODO : see if good value
-MEMORY_BUFFER_SOFT = 20 # MiB
-MEMORY_BUFFER_HARD = 2 # MiB
+MEMORY_BUFFER_SOFT = 20 # MB
+MEMORY_BUFFER_HARD = 2 # MMB
+MEMORY_BUFFER_SOLVER = 20 # MB
 
+def mib_as_bytes(mib: int) -> int:
+    return mib * 1024 * 1024
+
+def mb_as_bytes(mb: int) -> int:
+    return mb * 1000 * 1000
+
+def bytes_as_mb(bytes: int) -> int:
+    return bytes // (1000 * 1000)
+
+def bytes_as_gb(bytes: int) -> int:
+    return bytes // (1000 * 1000 * 1000)
+
+def current_memory_usage() -> int: # returns bytes
+    # not really sure which memory measurement to use: https://stackoverflow.com/questions/7880784/what-is-rss-and-vsz-in-linux-memory-management/21049737#21049737
+    return psutil.Process(os.getpid()).memory_info().rss
+
+def remaining_memory(limit:int) -> int: # bytes
+    return limit - current_memory_usage()
+
+def get_subsolver(args:Args, model:cp.Model):
+    # Update subsolver in args
+    if args.solver == "z3":
+        if model.has_objective():
+            args.subsolver = "opt"
+            args.opt = True
+        else:
+            args.subsolver = "sat"
+            args.sat = True
+    elif args.subsolver == None:
+        if args.solver in SUPPORTED_SUBSOLVERS:
+            args.subsolver = SUPPORTED_SUBSOLVERS[args.solver][0]
+        else:
+            pass
+
+    return args.subsolver
 
 def sigterm_handler(_signo, _stack_frame):
     """
@@ -48,6 +88,36 @@ def sigterm_handler(_signo, _stack_frame):
     print_comment("SIGTERM raised.")
     print(flush=True)
     sys.exit(0)
+
+class Capturing(list):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio    # free up some memory
+        sys.stdout = self._stdout
+
+class Callback:
+
+    def __init__(self, model:cp.Model, callback_function):
+        self.__start_time = time.time()
+        self.__solution_count = 1
+        self.model = model
+        self.callback_function = callback_function
+
+    def callback(self, *args, **kwargs):
+        current_time = time.time()
+        try:
+            obj = self.callback_function(*args, **kwargs)
+            # obj = self.model.objective_value()
+            print_comment('Solution %i, time = %0.2fs' % 
+                        (self.__solution_count, current_time - self.__start_time))
+            print_objective(obj)
+            self.__solution_count += 1
+        except AttributeError:
+            pass
 
 # ---------------------------------------------------------------------------- #
 #                            XCSP3 Output formatting                           #
@@ -103,7 +173,7 @@ def is_supported_solver(solver:Optional[str]):
         return True
     
 def is_supported_subsolver(solver, subsolver:Optional[str]):
-    if (subsolver is not None) and (subsolver not in SUPPORTED_SUBSOLVERS[solver]):
+    if (subsolver is not None) and (subsolver not in SUPPORTED_SUBSOLVERS.get(solver, [None])):
         return False
     else:
         return True
@@ -118,6 +188,7 @@ def supported_solver(solver:Optional[str]):
 # ---------------------------------------------------------------------------- #
 #                         Executable & Solver arguments                        #
 # ---------------------------------------------------------------------------- #
+
 @dataclass
 class Args:
     benchname:str
@@ -131,7 +202,8 @@ class Args:
     subsolver:str=None
     time_buffer:int=TIME_BUFFER
     intermediate:bool=False
-
+    sat:bool=False
+    opt:bool=False
 
     def __post_init__(self):
         if self.dir is not None:
@@ -148,7 +220,7 @@ class Args:
             benchname = args.benchname,
             seed = args.seed,
             time_limit = args.time_limit if args.time_limit is not None else args.time_out,
-            mem_limit = args.mem_limit,
+            mem_limit = mib_as_bytes(args.mem_limit) if args.mem_limit is not None else None, # MiB to bytes
             cores = args.cores if args.cores is not None else 1,
             tmpdir = args.tmpdir,
             dir = args.dir,
@@ -157,14 +229,19 @@ class Args:
             time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
             intermediate = args.intermediate if args.intermediate is not None else False,
         )
+    
+    @property
+    def parallel(self) -> bool:
+        return self.cores > 1
 
     def __str__(self):
         return f"Args(benchname='{self.benchname}', seed={self.seed}, time_limit={self.time_limit}[s], mem_limit={self.mem_limit}[MiB], cores={self.cores}, tmpdir='{self.tmpdir}', dir='{self.dir}, solver='{self.solver}')"
 
-def choco_arguments(args: Args): 
+def choco_arguments(args: Args, model:cp.Model): 
+    # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
     return {}
 
-def ortools_arguments(args: Args):
+def ortools_arguments(args: Args, model:cp.Model):
 
     from ortools.sat.python import cp_model as ort
     class OrtSolutionCallback(ort.CpSolverSolutionCallback):
@@ -199,25 +276,90 @@ def ortools_arguments(args: Args):
     if args.seed is not None: 
         res |= { "random_seed": args.seed }
     if args.intermediate:
+        # res |= { "solution_callback": Callback(model) }
         res |= { "solution_callback": OrtSolutionCallback() }
     return res
         
-def exact_arguments(args: Args):
+def exact_arguments(args: Args, model:cp.Model):
+    # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
+    res = {
+        "seed": args.seed,
+    }
+    return {k:v for (k,v) in res.items() if v is not None}
+
+def z3_arguments(args: Args, model:cp.Model):
+    # Documentation: https://microsoft.github.io/z3guide/programming/Parameters/
+
+    # Global parameters
+    res = {
+        "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+        "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+        "type_check": False # disable type checker 
+    }
+    # Sat parameters
+    if args.sat:
+        res |= {
+            "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+            "sat.random_seed": args.seed,
+            "sat.threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
+        }
+    # Opt parameters
+    # /
+    # Parallel parameters
+    if args.parallel:
+        res |= {
+            "parallel.enable": True,
+            "parallel.threads.max": args.cores
+        }
+    return {k:v for (k,v) in res.items() if v is not None}
+
+
+def minizinc_arguments(args: Args, model:cp.Model):
+
+    # Documentation: https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
+
+    res = {
+        "processes": args.cores,
+        "random_seed": args.seed,
+    } + solver_arguments(args.subsolver)
+
+    return {k:v for (k,v) in res.items() if v is not None}
+
+def gecode_arguments(args: Args, model:cp.Model):
+    # Documentation: https://www.minizinc.org/doc-2.4.3/en/lib-gecode.html
     return {}
 
-def z3_arguments(args: Args):
+def chuffed_arguments(args:Args, model:cp.Model):
+    # Documentation: 
+    # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
+    # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
     return {}
 
-def minizinc_arguments(args: Args):
-    return {}
+def gurobi_arguments(args: Args, model:cp.Model):
+    # Documentation: https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
+    res = {
+        "MemLimit": bytes_as_gb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+        "Seed": args.seed,
+        "Threads": args.cores,
+    }
+    if args.intermediate:
+        res |= { "solution_callback": Callback(model, lambda x,_: x.getObjective().getValue()).callback }
+    return {k:v for (k,v) in res.items() if v is not None}
 
-def solver_arguments(args: Args):
-    if args.solver == "ortools": return ortools_arguments(args)
-    elif args.solver == "exact": return exact_arguments(args)
-    elif args.solver == "choco": return choco_arguments(args)
-    elif args.solver == "z3": return z3_arguments(args)
-    elif args.solver == "minizinc": return minizinc_arguments(args)
+def solver_arguments(args: Args, model:cp.Model):
+    if args.solver == "ortools": return ortools_arguments(args, model)
+    elif args.solver == "exact": return exact_arguments(args, model)
+    elif args.solver == "choco": return choco_arguments(args, model)
+    elif args.solver == "z3": return z3_arguments(args, model)
+    elif args.solver == "minizinc": return minizinc_arguments(args, model)
+    elif args.solver == "gurobi": return gurobi_arguments(args, model)
     else: raise()
+
+def subsolver_arguments(args: Args, model:cp.Model):
+    if args.subsolver == "gecode": return gecode_arguments(args, model)
+    elif args.subsolver == "chuffed": return choco_arguments(args, model)
+    else: raise()
+
 
 # ---------------------------------------------------------------------------- #
 #                                     Main                                     #
@@ -261,12 +403,14 @@ def main():
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments
+ 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
     run(args)
 
 def run(args: Args):
+    import sys, os
 
     # --------------------------- Global Configuration --------------------------- #
 
@@ -274,9 +418,9 @@ def run(args: Args):
         random.seed(args.seed)
     if args.mem_limit is not None:
         # TODO : validate if it works
-        soft = (args.mem_limit - MEMORY_BUFFER_SOFT) * 1024 * 1024 # MiB to bytes
-        hard = (args.mem_limit - MEMORY_BUFFER_HARD) * 1024 * 1024 # MiB to bytes
-        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+        soft = args.mem_limit - mb_as_bytes(MEMORY_BUFFER_SOFT)
+        hard = args.mem_limit - mb_as_bytes(MEMORY_BUFFER_HARD)
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
 
     sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
@@ -302,6 +446,7 @@ def run(args: Args):
         print_status(ExitStatus.unknown)
         print_comment(str(e))
         exit(1)
+
     print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
     
     # ------------------------------ Solve instance ------------------------------ #
@@ -309,17 +454,34 @@ def run(args: Args):
     # CPMpy model
     model = callbacks.cpm_model
 
+    # Subsolver
+    subsolver = get_subsolver(args, model)
+
     # Transfer model to solver
     start = time.time()
-    s = cp.SolverLookup.get(args.solver + ((":" + args.subsolver) if args.subsolver is not None else ""), model)
+    with Capturing() as output:
+        s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
     transfer_time = time.time() - start
+    for o in output:
+        print_comment(o)
     print_comment(f"took {transfer_time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
+    time_limit = args.time_limit - transfer_time - args.time_buffer if args.time_limit is not None else None
+    
+    # If not time left
+    if time_limit is not None and time_limit <= 0:
+        # Not enough time to start a solve call (we're already over the limit)
+        # We should never get in this situation, as a SIGTERM will be raised by the competition runner
+        #   if we get over time during the transformation
+        print_comment("Giving up, not enough time to start solving.")
+        print_status(ExitStatus.unknown)
+        return 
+    
     start = time.time()
     sat = s.solve(
-        time_limit = args.time_limit - transfer_time - args.time_buffer if args.time_limit is not None else None,
-        **solver_arguments(args)
+        time_limit=time_limit,
+        **solver_arguments(args, model)
     ) 
     print_comment(f"took {(time.time() - start):.4f} seconds to solve")
 

@@ -106,6 +106,9 @@ class CPM_choco(SolverInterface):
             - time_limit:  maximum solve time in seconds (float, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
 
+            The Choco solver parameters are defined in its repo:
+            https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
+
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))

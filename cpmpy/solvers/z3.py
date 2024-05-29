@@ -96,6 +96,7 @@ class CPM_z3(SolverInterface):
 
             Arguments that correspond to solver parameters:
                 - ... (no common examples yet)
+            Some of the parameters: https://microsoft.github.io/z3guide/programming/Parameters/
             The full list doesn't seem to be documented online, you have to run its help() function:
             ```
             import z3
