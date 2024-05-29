@@ -743,17 +743,21 @@ class CallbacksCPMPy(Callbacks):
         else:
             return x #constants
 
-    def get_cpm_vars(self, list):
-        if isinstance(list[0], (XVar, int)):
-            return [self.get_cpm_var(x) for x in list]
+    def get_cpm_vars(self, lst):
+        if isinstance(lst[0], (XVar, int)):
+            return [self.get_cpm_var(x) for x in lst]
+        if isinstance(lst[0], range):
+            return list(eval(str(lst[0])))
         else:
-            return self.vars_from_node(list)
+            return self.vars_from_node(lst)
 
-    def get_cpm_exprs(self, list):
-        if isinstance(list[0], XVar):
-            return [self.get_cpm_var(x) for x in list]
+    def get_cpm_exprs(self, lst):
+        if isinstance(lst[0], XVar):
+            return [self.get_cpm_var(x) for x in lst]
+        if isinstance(lst[0], range):
+            return list(eval(str(lst[0])))
         else:
-            return self.exprs_from_node(list)
+            return self.exprs_from_node(lst)
 
     def end_instance(self):
         pass
