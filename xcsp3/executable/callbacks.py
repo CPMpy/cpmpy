@@ -82,6 +82,7 @@ class CallbacksCPMPy(Callbacks):
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),
+        'set': (0, lambda x: list(set(x))),
         #TODO 'notin' is the only other set operator (negative indomain)
         # Logic
         "not": (1, lambda x: ~x),
