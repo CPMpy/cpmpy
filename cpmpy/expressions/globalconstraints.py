@@ -665,9 +665,14 @@ class Table(GlobalConstraint):
         row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
             return [all(t == a for (t,a) in zip(tab[0], arr))], []
+        
         # Decomposition wil fail in negated setting
-        return [Xor(row_selected)] + \
-               [rs.implies(all([t == a for (t,a) in zip(row, arr)])) for (row,rs) in zip(tab, row_selected)], []
+        constraining = [any(row_selected)] 
+
+        for (row,rs) in zip(tab, row_selected):
+            constraining += [ rs.implies(all([t == a for (t,a) in zip(row, arr)])) ]
+
+        return constraining, []
   
     def value(self):
         arr, tab = self.args
@@ -702,10 +707,10 @@ class ShortTable(GlobalConstraint):
         row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
             return [all([r == a for (r,a) in zip(tab[0], arr) if r != "*"])], []
-        return [any(row_selected)], \
-               [rs == (
+        return [any(row_selected)]+ \
+               [rs.implies(
                    all([r == a for (r,a) in zip(row, arr) if r != "*"])
-                ) for (row,rs) in zip(tab, row_selected)] # == instead of implies, otherwise fails in negated setting TODO
+                ) for (row,rs) in zip(tab, row_selected)], [] # == instead of implies, otherwise fails in negated setting TODO
     
     def value(self):
         arr, tab = self.args
