@@ -25,6 +25,10 @@ import time
 import pkg_resources
 from pkg_resources import VersionConflict
 
+import os, pathlib
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -408,76 +412,76 @@ class CPM_exact(SolverInterface):
         :return: list of Expression
         """
 
-        starts = time.time()
-        expr_store = self.expr_store
+        with TimerContext("transformation") as top_tc:
+            expr_store = self.expr_store
 
-        # apply transformations, then post internally
-        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-        start = time.time()
-        cpm_cons = toplevel_list(cpm_expr)
-        print(f"exact:toplevel_list took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # apply transformations, then post internally
+            # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            print(f"exact:toplevel_list took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_expr)
-        # print("------------------")
+            # print(cpm_expr)
+            # print("------------------")
 
-        start = time.time()
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialized MIP decomp
-        print(f"exact:decompose_in_tree took {(time.time()-start):.4f} -- {len(cpm_cons)}")
-        
-        # print(cpm_cons)
-        # print("------------------")
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialized MIP decomp
+            print(f"exact:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
+            
+            # print(cpm_cons)
+            # print("------------------")
 
-        start = time.time()
-        cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
-        print(f"exact:flatten_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            with TimerContext("flatten_constraint") as tc:
+                cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
+            print(f"exact:flatten_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
-        print(f"exact:reify_rewrite took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("reify_rewrite") as tc:
+                cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
+            print(f"exact:reify_rewrite took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), expr_store=expr_store)  # supports >, <, !=
-        print(f"exact:only_numexpr_equality took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("only_numexpr_equality") as tc:
+                cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), expr_store=expr_store)  # supports >, <, !=
+            print(f"exact:only_numexpr_equality took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
-        print(f"exact:only_bv_reifies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("only_bv_reifies") as tc:
+                cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
+            print(f"exact:only_bv_reifies took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = only_implies(cpm_cons,expr_store=expr_store)  # anything that can create full reif should go above...
-        print(f"exact:only_implies took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("only_implies") as tc:
+                cpm_cons = only_implies(cpm_cons,expr_store=expr_store)  # anything that can create full reif should go above...
+            print(f"exact:only_implies took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}), expr_store=expr_store)  # the core of the MIP-linearization
-        print(f"exact:linearize_constraint took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("linearize_constraint") as tc:
+                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}), expr_store=expr_store)  # the core of the MIP-linearization
+            print(f"exact:linearize_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
-        
-        start = time.time()
-        cpm_cons = only_positive_bv(cpm_cons, expr_store=expr_store)  # after linearisation, rewrite ~bv into 1-bv
-        print(f"exact:only_positive_bv took {(time.time()-start):.4f} -- {len(cpm_cons)}")
+            # print(cpm_cons)
+            # print("------------------")
+            
+            with TimerContext("only_positive_bv") as tc:
+                cpm_cons = only_positive_bv(cpm_cons, expr_store=expr_store)  # after linearisation, rewrite ~bv into 1-bv
+            print(f"exact:only_positive_bv took {(tc.time):.4f} -- {len(cpm_cons)}")
 
-        # print(cpm_cons)
-        # print("------------------")
+            # print(cpm_cons)
+            # print("------------------")
 
 
-        print(f"exact:transformation took {(time.time()-starts):.4f}")
+        print(f"exact:transformation took {(top_tc.time):.4f}")
         print("final size", len(cpm_cons))
         print("STORE:", len(expr_store.items()))
 
