@@ -429,7 +429,7 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_exactly(self, lst: list[Variable], value: int, k: int | Variable):
         cpm_vars = self.get_cpm_exprs(lst)
-        self.cpm_model += (cp.Count(cpm_vars, value) == k)
+        self.cpm_model += (cp.Count(cpm_vars, value) == self.get_cpm_var(k))
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
         self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
