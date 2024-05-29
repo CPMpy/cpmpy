@@ -111,7 +111,7 @@ def flatten_model(orig_model, expr_store:ExprStore):
             return Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr, expr_store:ExprStore):
+def flatten_constraint(expr, expr_store:ExprStore=None):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -123,6 +123,7 @@ def flatten_constraint(expr, expr_store:ExprStore):
         RE TODO: we now have custom NotImpl/NotSupported
     """
     from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
+    
     if expr_store is None:
         expr_store = get_store()
 
