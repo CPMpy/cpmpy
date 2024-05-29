@@ -16,6 +16,7 @@ import pathlib
 from dataclasses import dataclass
 import psutil
 from io import StringIO 
+from gurobipy import GurobiError
 
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
@@ -39,7 +40,7 @@ SUPPORTED_SUBSOLVERS = {
 DEFAULT_SOLVER = "ortools"
 TIME_BUFFER = 1 # seconds
 # TODO : see if good value
-MEMORY_BUFFER_SOFT = 20 # MB
+MEMORY_BUFFER_SOFT = 2 # MB
 MEMORY_BUFFER_HARD = 2 # MMB
 MEMORY_BUFFER_SOLVER = 20 # MB
 
@@ -60,7 +61,7 @@ def current_memory_usage() -> int: # returns bytes
     return psutil.Process(os.getpid()).memory_info().rss
 
 def remaining_memory(limit:int) -> int: # bytes
-    return limit - current_memory_usage()
+    return limit # - current_memory_usage()
 
 def get_subsolver(args:Args, model:cp.Model):
     # Update subsolver in args
@@ -418,8 +419,9 @@ def run(args: Args):
         random.seed(args.seed)
     if args.mem_limit is not None:
         # TODO : validate if it works
-        soft = args.mem_limit - mb_as_bytes(MEMORY_BUFFER_SOFT)
-        hard = args.mem_limit - mb_as_bytes(MEMORY_BUFFER_HARD)
+        soft = max(args.mem_limit - mb_as_bytes(MEMORY_BUFFER_SOFT), mb_as_bytes(MEMORY_BUFFER_SOFT))
+        hard = max(args.mem_limit - mb_as_bytes(MEMORY_BUFFER_HARD), mb_as_bytes(MEMORY_BUFFER_HARD))
+        print_comment(f"Setting memory limit: {soft}-{hard}")
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
 
     sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
@@ -479,11 +481,17 @@ def run(args: Args):
         return 
     
     start = time.time()
-    sat = s.solve(
-        time_limit=time_limit,
-        **solver_arguments(args, model)
-    ) 
-    print_comment(f"took {(time.time() - start):.4f} seconds to solve")
+    try:
+        sat = s.solve(
+            time_limit=time_limit,
+            **solver_arguments(args, model)
+        ) 
+        print_comment(f"took {(time.time() - start):.4f} seconds to solve")
+    except MemoryError:
+        print_comment("Ran out of memory when trying to solve.")
+    except GurobiError as e:
+        print_comment("Error from Gurobi: " + str(e))
+
 
     # ------------------------------- Print result ------------------------------- #
 
