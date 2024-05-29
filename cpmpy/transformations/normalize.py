@@ -66,7 +66,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
    
         if isinstance(expr, bool):
             # not sure if BoolVal creation should happen here or at construction time
-            newlist.append(expr if num_context else BoolVal(expr))
+            newlist.append(int(expr) if num_context else BoolVal(expr))
 
         elif isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
