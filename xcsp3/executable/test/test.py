@@ -8,10 +8,12 @@ import signal
 from contextlib import contextmanager
 from pathlib import Path
 
+# sys.path.append(pathlib.Path(__file__).parent.resolve())
 from .conftest import TEST_OUTPUT_DIR, JAR
 
+from signal import SIGTERM
 
-def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = True, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False):
+def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = False, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False):
     """
         Prepares the environment, runs the executable and checks the solution with SolutionChecker.
         Pipes all executable outputs to a file and adds additional, usefull data as comments 
@@ -48,7 +50,8 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
             # https://alexandra-zaharia.github.io/posts/kill-subprocess-and-its-children-on-timeout-python/
             try:
                 # Create command
-                cmd = ["python", os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "main.py"), instance_location, f"--solver={solver}", f"--subsolver={subsolver}"]
+                cmd = ["python", os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "main.py"), instance_location, f"--solver={solver}"]
+                if subsolver is not None: cmd += [f"--subsolver={subsolver}"]
                 if time_limit is not None: cmd += [f"--time-limit={time_limit}"]
                 if memory_limit is not None: cmd += [f"--mem-limit={memory_limit}"]
                 if intermediate: cmd += [f"--intermediate"]
@@ -66,11 +69,11 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                 # If executable has not returned before timeout, send SIGTERM
                 print(f'Timeout for {solver}' + (f':{subsolver}' if subsolver is not None else "") + f':{instance_name} ({time_limit}s) expired', file=sys.stderr)
                 print('Terminating the whole process group...', file=sys.stderr)
-                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+                os.killpg(os.getpgid(p.pid), SIGTERM)
 
         else:
             # Reset command line arguments, only then import (otherwise breaks pycsp3)
-            sys.argv = [] 
+            sys.argv = ["-nocompile"] 
             sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), ".."))
             import main
 
@@ -94,7 +97,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
     
     # Run SolutionChecker
     start = time.time()
-    test_res_str = subprocess.check_output(["java", "-jar", JAR, instance_location, out_file, "-cm"], stderr=subprocess.STDOUT if verbose else None).decode("utf8")
+    test_res_str = subprocess.check_output(["java", "-jar", JAR, instance_location, out_file, "-cm"], stderr=subprocess.STDOUT if verbose else None).decode("utf8").replace("\n", "")
     checker_time = time.time() - start
 
     if verbose: print(test_res_str)
@@ -124,8 +127,8 @@ def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, 
     test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition)
 
     # Assert that the result must be correct
-    if test: assert(test_res_str[:2] == "OK")
+    if test: assert("OK	" == test_res_str)
 
 if __name__ == "__main__":
-    test_instance(None, "prof/test_instance\[instance5-ortools-True-None-None-True\].prof", "ortools", False, None, None, False)
-
+    # test_instance(None, "prof/test_instance\[instance5-ortools-True-None-None-True\].prof", "ortools", False, None, None, False)
+    test_instance(None, ["test", "/mnt/c/Users/thoma/Documents/KULeuven/XCSP3/cpmpy/xcsp3/executable/test/../../instancesXCSP22/MiniCSP/AztecDiamond-025_c22.xml"], 'ortools', None, True, time_limit=60, memory_limit=None, intermediate=False, competition=True)

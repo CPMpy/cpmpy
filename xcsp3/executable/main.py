@@ -109,7 +109,7 @@ def is_supported_subsolver(solver, subsolver:Optional[str]):
         return True
 
 def supported_solver(solver:Optional[str]):
-    if is_supported_solver(solver):
+    if not is_supported_solver(solver):
         argparse.ArgumentTypeError(f"solver:{solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}")
     else:
         return solver
@@ -138,8 +138,9 @@ class Args:
             self.dir = dir_path(self.dir)
         if not is_supported_solver(self.solver):
             raise(ValueError(f"solver:{self.solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}"))
-        if not is_supported_subsolver(self.solver, self.subsolver):
-            raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
+        if self.subsolver is not None:
+            if not is_supported_subsolver(self.solver, self.subsolver):
+                raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
 
     @staticmethod
     def from_cli(args):
@@ -158,7 +159,7 @@ class Args:
         )
 
     def __str__(self):
-        return f"Args(benchname='{self.benchname}', seed={self.seed}, time_limit={self.time_limit}[s], mem_limit={self.mem_limit}[MiB], cores={self.cores}, tmpdir='{self.tmpdir}', dir='{self.dir})"
+        return f"Args(benchname='{self.benchname}', seed={self.seed}, time_limit={self.time_limit}[s], mem_limit={self.mem_limit}[MiB], cores={self.cores}, tmpdir='{self.tmpdir}', dir='{self.dir}, solver='{self.solver}')"
 
 def choco_arguments(args: Args): 
     return {}
@@ -342,6 +343,8 @@ if __name__ == "__main__":
     # Configure signal handles
     # signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
     main()
