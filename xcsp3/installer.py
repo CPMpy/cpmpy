@@ -1,14 +1,15 @@
 import sys, os
-import requests
+
 import pathlib
 import zipfile
 import subprocess
-import tqdm
-from git import Repo
+
 
 CHUNK_SIZE = 32768
 
 def install_solution_checker():
+    import requests
+    import tqdm
     """
         Downloads the SolutionChecker Jar file.
     """
@@ -28,6 +29,8 @@ def install_solution_checker():
                 f.write(chunk)
 
 def install_xcsp3_instances():
+    import requests
+    import tqdm
     """
         Downloads the XCSP3 2022 main and mini track problem instances.
     """
@@ -66,6 +69,7 @@ def install_xcsp3_instances():
                 convert(filename)
 
 def install_pycsp3():
+    from git import Repo
     """
         Downloads the pycsp3 repository.
     """
@@ -74,7 +78,9 @@ def install_pycsp3():
     PYCSP3_REPO_DIR = os.path.join(pathlib.Path(__file__).parent.resolve(), "pycsp3", "pycsp3")
 
     print("Cloning pycsp3 repository ...")
-
+    if os.path.isdir(PYCSP3_REPO_DIR):
+        print("Skipping pycsp3: directory already exists.")
+        return
     Repo.clone_from(PYCSP3_REPO_URL, PYCSP3_REPO_DIR)
 
 def update_pycsp3():
@@ -99,7 +105,18 @@ def update_pycsp3():
     code_file_to_edit = os.path.join(pathlib.Path(__file__).parent.resolve(), "pycsp3", "pycsp3", "tools", "xcsp.py")
     replace_line(code_file_to_edit, lines_that_contain(code_file_to_edit, "Warning: no variables in this model (and so, no generated file)!")[0], "")
 
-install_solution_checker()
-install_xcsp3_instances()
-install_pycsp3()
-update_pycsp3()
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(
+                    prog='Installer',
+                    description='Dependency installer script for the CPMpy entry in the XCSP3 2024 competition.')
+    parser.add_argument("--dev", action=argparse.BooleanOptionalAction, help="Whether to install dev dependencies.")
+    parser.add_argument("--skip-instances", action=argparse.BooleanOptionalAction, help="Whether to skip the downloading of the XCSP3 2023 instances.")
+    args = parser.parse_args()
+
+    install_pycsp3()
+    if args.dev:
+        install_solution_checker()
+        if not args.skip_instances:
+            install_xcsp3_instances()
+
