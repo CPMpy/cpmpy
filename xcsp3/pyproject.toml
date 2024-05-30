@@ -26,6 +26,9 @@ minizinc = "^0.9.0"
 cython = "^3.0.10"
 types-setuptools = "^69.5.0.20240519"
 ortools = "^9.10.4067"
+python-sat = {extras = ["aiger", "approxmc", "cryptosat", "pblib"], version = "^1.8.dev13"}
+psutil = "^5.9.8"
+gurobipy = "^11.0.2"
 
 [build-system]
 requires = ["poetry-core"]
