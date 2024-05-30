@@ -29,6 +29,7 @@ ortools = "^9.10.4067"
 python-sat = {extras = ["aiger", "approxmc", "cryptosat", "pblib"], version = "^1.8.dev13"}
 psutil = "^5.9.8"
 gurobipy = "^11.0.2"
+readline = "^6.2.4.1"
 
 [build-system]
 requires = ["poetry-core"]
