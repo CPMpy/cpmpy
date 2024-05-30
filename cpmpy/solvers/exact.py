@@ -307,11 +307,12 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addVariable(revar,0,1)
         elif isinstance(cpm_var, _IntVarImpl):
             lb, ub = cpm_var.get_bounds()
+            encoding = "order" if ub-lb < 64 else "log"
             if max(abs(lb),abs(ub)) > 1e18:
                 # larger than 64 bit should be passed by string
-                self.xct_solver.addVariable(revar,str(lb), str(ub), self.encoding)
+                self.xct_solver.addVariable(revar,str(lb), str(ub), encoding)
             else:
-                self.xct_solver.addVariable(revar,lb,ub, self.encoding)
+                self.xct_solver.addVariable(revar,lb,ub, encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
