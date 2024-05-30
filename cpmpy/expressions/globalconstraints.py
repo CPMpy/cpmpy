@@ -679,6 +679,10 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
     
+    @property
+    def vars(self):
+        return self._args[0]
+    
     # specialisation to avoid recursing over big tables
     def has_subexpr(self):
         if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
@@ -727,6 +731,10 @@ class ShortTable(GlobalConstraint):
                 return True
         #didn't find tuple that matches
         return False
+    
+    @property
+    def vars(self):
+        return self._args[0]
 
 class MDD(GlobalConstraint):
     """
