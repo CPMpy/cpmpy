@@ -403,8 +403,8 @@ class CPM_ortools(SolverInterface):
         # print(expr_store)
         # print(json.dumps(expr_store, sort_keys=True, indent=4))
         print(f"ort:transformation took {(top_tc.time):.4f}")
-        print("final size", len(cpm_cons))
-        print("STORE:", len(expr_store.items()))
+        print("final size: " + str(len(cpm_cons)))
+        print("STORE: " + str(len(expr_store.items())))
         
         return cpm_cons
 

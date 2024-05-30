@@ -313,8 +313,8 @@ class CPM_gurobi(SolverInterface):
             print(f"gurobi:only_positive_bv took {(tc.time):.4f} -- {len(cpm_cons)}")
 
         print(f"gurobi:transformation took {(top_tc.time):.4f}")
-        print("final size", len(cpm_cons))
-        print("STORE:", len(expr_store.items()))
+        print("final size: " + str(len(cpm_cons)))
+        print("STORE: " + str(len(expr_store.items())))
 
         return cpm_cons
 

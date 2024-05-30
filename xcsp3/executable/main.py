@@ -3,6 +3,7 @@
 """
 from __future__ import annotations
 import argparse
+from contextlib import contextmanager
 import signal
 import time
 import sys, os
@@ -377,6 +378,34 @@ def subsolver_arguments(args: Args, model:cp.Model):
     elif args.subsolver == "chuffed": return choco_arguments(args, model)
     else: raise()
 
+@contextmanager
+def prepend_print():
+    # Save the original stdout
+    original_stdout = sys.stdout
+    
+    class PrependStream:
+        def __init__(self, stream):
+            self.stream = stream
+        
+        def write(self, message):
+            # Prepend 'c' to each message before writing it
+            if message.strip():  # Avoid prepending 'c' to empty messages (like newlines)
+                self.stream.write('c ' + message)
+            else:
+                self.stream.write(message)
+        
+        def flush(self):
+            self.stream.flush()
+    
+    # Override stdout with our custom stream
+    sys.stdout = PrependStream(original_stdout)
+    
+    try:
+        yield
+    finally:
+        # Restore the original stdout
+        sys.stdout = original_stdout
+
 
 # ---------------------------------------------------------------------------- #
 #                                     Main                                     #
@@ -496,11 +525,11 @@ def run_helper(args:Args):
     subsolver = get_subsolver(args, model)
 
     # Transfer model to solver
-    with Capturing() as output:
+    with prepend_print():# as output: #TODO immediately print
         with TimerContext("transform") as tc:
             s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
-    for o in output:
-        print_comment(o)
+    # for o in output:
+    #     print_comment(o)
     print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
