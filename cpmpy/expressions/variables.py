@@ -555,6 +555,40 @@ class NDVarArray(np.ndarray, Expression):
 
         return np.apply_along_axis(cpm_all, axis=axis, arr=self)
 
+    def alldifferent(self, axis=None):
+        from .globalconstraints import AllDifferent
+        return np.apply_along_axis(lambda arr : AllDifferent(arr), axis=axis, arr=self)
+
+    def alldifferent_except0(self, axis=None):
+        from .globalconstraints import AllDifferentExcept0
+        return np.apply_along_axis(lambda arr: AllDifferentExcept0(arr), axis=axis, arr=self)
+
+    def allequal(self, axis=None):
+        from .globalconstraints import AllEqual
+        return np.apply_along_axis(lambda arr: AllEqual(arr), axis=axis, arr=self)
+
+    def circuit(self, axis=None):
+        from .globalconstraints import Circuit
+        return np.apply_along_axis(lambda arr: Circuit(arr), axis=axis, arr=self)
+
+    def increasing(self, axis=None):
+        from .globalconstraints import Increasing
+        return np.apply_along_axis(lambda arr: Increasing(arr), axis=axis, arr=self)
+
+    def increasing_strict(self, axis=None):
+        from .globalconstraints import IncreasingStrict
+        return np.apply_along_axis(lambda arr: IncreasingStrict(arr), axis=axis, arr=self)
+
+    def decreasing(self, axis=None):
+        from .globalconstraints import Decreasing
+        return np.apply_along_axis(lambda arr: Decreasing(arr), axis=axis, arr=self)
+
+    def decreasing_strict(self, axis=None):
+        from .globalconstraints import DecreasingStrict
+        return np.apply_along_axis(lambda arr: DecreasingStrict(arr), axis=axis, arr=self)
+
+
+
     def get_bounds(self):
         lbs, ubs = zip(*[get_bounds(e) for e in self])
         return cpm_array(lbs), cpm_array(ubs)
