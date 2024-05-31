@@ -488,9 +488,9 @@ class NDVarArray(np.ndarray, Expression):
             raise NotImplementedError()
 
         if axis is None:  # simple case where we want the maximum over the whole array
-            return Operator("mul", self)
+            return reduce(lambda a, b: a * b, self.flatten())
 
-        # TODO: is there a better way? This does pairwise multiplication
+        # TODO: is there a better way? This does pairwise multiplication still
         return np.multiply.reduce(self, axis=axis)
 
     def max(self, axis=None, out=None):
