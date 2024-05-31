@@ -246,6 +246,9 @@ class _NumVarImpl(Expression):
     def contains_negation(self):
         return False
     
+    def contains_non_leaf_negation(self):
+        return False
+    
     def has_subexpr(self):
         """Does it contains nested Expressions?
            Is of importance when deciding whether transformation/decomposition is needed.

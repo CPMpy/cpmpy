@@ -55,18 +55,15 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(expr)
 
-        elif not expr.contains_negation():
+        elif not expr.contains_non_leaf_negation():
             newlist.append(expr)
             
         else:
-            # an nested Expression, we remain in the positive case
             newargs = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
-            if str(newargs) != str(expr.args):
-                newexpr = copy.copy(expr)
-                newexpr.update_args(newargs)  # check if 'not' is present in arguments
-                newlist.append(newexpr)
-            else:
-                newlist.append(expr)
+            newexpr = copy.copy(expr)
+            newexpr.update_args(newargs)  # check if 'not' is present in arguments
+            newlist.append(newexpr)
+
     return newlist
 
 def recurse_negation(expr):

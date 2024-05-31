@@ -124,6 +124,11 @@ class Expression(object):
             self._contains_negation = any(hasattr(arg, "contains_negation") and arg.contains_negation() for arg in self.args)
         return self._contains_negation
     
+    def contains_non_leaf_negation(self):
+        if not hasattr(self, "_contains_non_leaf_negation"):
+            self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+        return self._contains_non_leaf_negation
+    
     def update_args(self, args):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
@@ -134,6 +139,8 @@ class Expression(object):
             del self._has_subexpr
         if hasattr(self, "_contains_negation"):
             del self._contains_negation
+        if hasattr(self, "_contains_non_leaf_negation"):
+            del self._contains_non_leaf_negation
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -472,7 +479,21 @@ class Comparison(Expression):
             return True
         else:
             return super().contains_negation()
-
+        
+    def contains_non_leaf_negation(self):
+        if self.name == '!=':
+            if all(is_boolexpr(a) for a in self.args):
+                return True
+            else:
+                return False
+        else:
+            """
+            Inlined code from super()
+            """
+            if not hasattr(self, "_contains_non_leaf_negation"):
+                self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+            return self._contains_non_leaf_negation
+        
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
@@ -583,10 +604,24 @@ class Operator(Expression):
         return Operator.allowed[self.name][1]
     
     def contains_negation(self):
-        if self.name == "not": 
+        if self.name == 'not':
             return True
         else:
             return super().contains_negation()
+        
+    def contains_non_leaf_negation(self):
+        if self.name == "not":
+            if (self.has_subexpr() or (isinstance(self.args[0], Expression) and self.args[0].name[0] == "~")): # ~ : ugly way to detect a NegBoolView without having to import
+                return True
+            else:
+                return False
+        else:
+            """
+            Inlined code from super()
+            """
+            if not hasattr(self, "_contains_non_leaf_negation"):
+                self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+            return self._contains_non_leaf_negation
     
     def __repr__(self):
         printname = self.name
