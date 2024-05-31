@@ -82,11 +82,13 @@ class TimerContext:
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
+    
+        perf_context = get_perf_context()
+        self.end = time.time()
+        set_timer_context(None)
+        
         try:
-            perf_context = get_perf_context()
-            self.end = time.time()
             perf_context.add_time_measurement(self.label, self.end - self.start)
-            set_timer_context(None)
         except:
             pass
 
