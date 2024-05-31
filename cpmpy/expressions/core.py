@@ -467,8 +467,11 @@ class Comparison(Expression):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
     
-    def containts_negation(self):
-        return self.name == '!='
+    def contains_negation(self):
+        if self.name == '!=':
+            return True
+        else:
+            return super().contains_negation()
 
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
@@ -579,8 +582,11 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
     
-    def containts_negation(self):
-        return self.name == "not"
+    def contains_negation(self):
+        if self.name == "not": 
+            return True
+        else:
+            return super().contains_negation()
     
     def __repr__(self):
         printname = self.name

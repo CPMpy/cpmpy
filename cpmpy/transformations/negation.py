@@ -34,7 +34,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
         #           (iv > 5) == False -> fails to push negation to '>' to invert it
         #           maybe combine with has_subexpr()
 
-        elif not (isinstance(expr, Expression)):
+        elif not (isinstance(expr, Expression)) or expr.is_leaf():
             newlist.append(expr)
 
         elif expr.name == "not":
@@ -55,7 +55,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(expr)
 
-        elif not expr.has_subexpr():
+        elif not expr.contains_negation():
             newlist.append(expr)
             
         else:
