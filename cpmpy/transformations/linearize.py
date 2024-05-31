@@ -61,10 +61,20 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
 
     """
+    return _linearize_constraint_helper(lst_of_expr, supported, expr_store, reified)[0]
+
+
+def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprStore=None, reified=False):
+    """
+    Helper function for linearize_constraint.
+    Besides a list of linearised expressions, also keeps track for the newly introduced variables as to prevent unwanted symmetries.
+    """
+
     if expr_store is None:
         expr_store = get_store()
 
-    newlist = []
+    newlist = [] # to collect the linearized constraints
+    newvars = [] # to collect the newly introduced variables
     for cpm_expr in lst_of_expr:
 
         # boolvar
@@ -97,12 +107,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
 
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
-                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True, expr_store=expr_store)
+                    lin_sub, new_vars = _linearize_constraint_helper([sub_expr], supported=supported, reified=True, expr_store=expr_store)
                     newlist += [cond.implies(lin) for lin in lin_sub]
-                    # ensure no new solutions are created
-                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified, expr_store=expr_store)
-
+                    a, b = _linearize_constraint_helper([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified, expr_store=expr_store)
+                    newlist += a
+                    newvars += b
 
         # comparisons
         elif isinstance(cpm_expr, Comparison):
@@ -132,11 +141,19 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
             if cpm_expr.name == "<":
                 new_rhs, cons = get_or_make_var(rhs - 1, expr_store=expr_store) # if rhs is constant, will return new constant
                 newlist.append(lhs <= new_rhs)
-                newlist += linearize_constraint(cons, expr_store=expr_store)
+                if isinstance(new_rhs, _NumVarImpl):
+                    newvars.append(new_rhs)
+                a,b = _linearize_constraint_helper(cons, expr_store=expr_store)
+                newlist += a
+                newvars += b
             elif cpm_expr.name == ">":
                 new_rhs, cons = get_or_make_var(rhs + 1, expr_store=expr_store) # if rhs is constant, will return new constant
                 newlist.append(lhs >= new_rhs)
-                newlist += linearize_constraint(cons, expr_store=expr_store)
+                if isinstance(new_rhs, _NumVarImpl):
+                    newvars.append(new_rhs)
+                a,b = _linearize_constraint_helper(cons, expr_store=expr_store)
+                newlist += a
+                newvars += b
             elif cpm_expr.name == "!=":
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -156,13 +173,16 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
                     _, M1 = (lhs - rhs + 1).get_bounds()
                     _, M2 = (rhs - lhs + 1).get_bounds()
                     cons = [lhs + -M1*z <= rhs-1, lhs  + -M2*z >= rhs-M2+1]
-                    newlist += linearize_constraint(flatten_constraint(cons, expr_store=expr_store), supported=supported, reified=reified, expr_store=expr_store)
-
+                    a,b = _linearize_constraint_helper(flatten_constraint(cons, expr_store=expr_store), supported=supported, reified=reified, expr_store=expr_store)
+                    newlist += a
+                    newvars += b + [z]
                 else:
                     # introduce new indicator constraints
                     z = boolvar()
                     constraints = [z.implies(lhs < rhs), (~z).implies(lhs > rhs)]
-                    newlist += linearize_constraint(constraints, supported=supported, reified=reified, expr_store=expr_store)
+                    a,b = _linearize_constraint_helper(constraints, supported=supported, reified=reified, expr_store=expr_store)
+                    newlist += a
+                    newvars += b + [z]
             else:
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
@@ -189,14 +209,15 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprS
                 constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
 
             newlist += constraints
+            newvars += [sigma]
 
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
             raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
-
-    return newlist
+    
+    return (newlist, newvars)
 
 
 def only_positive_bv(lst_of_expr, expr_store:ExprStore=None):
