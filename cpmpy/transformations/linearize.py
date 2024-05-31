@@ -303,7 +303,8 @@ def canonical_comparison(lst_of_expr):
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                # bring all vars to lhs
+                # Bring all vars from rhs to lhs
+                # 1) collect the variables to bring over
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
@@ -316,10 +317,12 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
+                # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
-                    lhs, rhs = lhs + lhs2, rhs
+                    if len(lhs2) != 0:
+                        lhs, rhs = lhs + lhs2, rhs
                 else:
                     raise ValueError(
                         f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
