@@ -312,9 +312,22 @@ class TestArrayExpressions(unittest.TestCase):
         res = np.array([all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
+
+    def test_multidim(self):
+
+        functions = ["all", "any", "max", "min", "sum", "prod"]
+        bv = cp.boolvar(shape=(5,4,3,2)) # high dimensional tensor
+        arr = np.zeros(shape=bv.shape) # numpy "ground truth"
+
+        for axis in range(len(bv.shape)):
+            for func in functions:
+                cpm_res = getattr(bv, func)(axis=axis)
+                np_res = getattr(arr, func)(axis=axis)
+                self.assertEqual(cpm_res.shape, np_res.shape)
+
         
 def inclusive_range(lb,ub):
-        return range(lb,ub+1)
+    return range(lb,ub+1)
 
 class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
