@@ -316,13 +316,19 @@ class TestArrayExpressions(unittest.TestCase):
     def test_multidim(self):
 
         functions = ["all", "any", "max", "min", "sum", "prod"]
+        constraints = ["alldifferent", "alldifferent_except0", "allequal", "circuit",
+                       "increasing", "increasing_strict", "decreasing", "decreasing_strict"]
         bv = cp.boolvar(shape=(5,4,3,2)) # high dimensional tensor
+        iv = cp.intvar(0,10,shape=(5,4,3,2))
         arr = np.zeros(shape=bv.shape) # numpy "ground truth"
 
         for axis in range(len(bv.shape)):
+            np_res = arr.sum(axis=axis)
             for func in functions:
                 cpm_res = getattr(bv, func)(axis=axis)
-                np_res = getattr(arr, func)(axis=axis)
+                self.assertEqual(cpm_res.shape, np_res.shape)
+            for cons in constraints:
+                cpm_res = getattr(iv, func)(axis=axis)
                 self.assertEqual(cpm_res.shape, np_res.shape)
 
         
