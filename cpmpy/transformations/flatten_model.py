@@ -114,7 +114,7 @@ def flatten_model(orig_model, expr_store:ExprStore=None):
             return Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr, expr_store:ExprStore=None):
+def flatten_constraint(expr, expr_store:ExprStore=None, skip_simplify_bool=False):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -136,7 +136,8 @@ def flatten_constraint(expr, expr_store:ExprStore=None):
     # e.g. `toplevel_list()` ensures it is a list
     lst_of_expr = toplevel_list(expr)               # ensure it is a list
     lst_of_expr = push_down_negation(lst_of_expr)   # push negation into the arguments to simplify expressions
-    lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
+    if not skip_simplify_bool:
+        lst_of_expr = simplify_boolean(lst_of_expr)     # simplify boolean expressions, and ensure types are correct
     for expr in lst_of_expr:
 
         if not expr.has_subexpr():
@@ -160,7 +161,7 @@ def flatten_constraint(expr, expr_store:ExprStore=None):
                         if isinstance(a, Operator) and a.name == '->':
                             newargs[i:i+1] = [~a.args[0],a.args[1]]
                     # there could be nested implications
-                    newlist.extend(flatten_constraint(Operator('or', newargs), expr_store=expr_store))
+                    newlist.extend(flatten_constraint(Operator('or', newargs), expr_store=expr_store, skip_simplify_bool=True))
                     continue
                 # conjunctions in disjunctions could be split out by applying distributivity,
                 # but this would explode the number of constraints in favour of having less auxiliary variables.
@@ -171,19 +172,19 @@ def flatten_constraint(expr, expr_store:ExprStore=None):
                 if expr.args[1].name == 'and':
                     a1s = expr.args[1].args
                     a0 = expr.args[0]
-                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s], expr_store=expr_store))
+                    lst_of_expr.extend([a0.implies(a1) for a1 in a1s])
                     continue
                 # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
                 elif expr.args[0].name == 'or':
                     a0s = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s], expr_store=expr_store))
+                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s], expr_store=expr_store, skip_simplify_bool=True))
                     continue
                 # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
                 elif expr.args[0].name == '->':
                     a01,a02 = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)], expr_store=expr_store))
+                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)], expr_store=expr_store, skip_simplify_bool=True))
                     continue
 
                 # ->, allows a boolexpr on one side
