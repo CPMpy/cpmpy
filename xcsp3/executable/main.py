@@ -355,7 +355,7 @@ def minizinc_arguments(args: Args, model:cp.Model):
     res = {
         "processes": args.cores,
         "random_seed": args.seed,
-    } + solver_arguments(args.subsolver)
+    } | subsolver_arguments(args, model)
 
     return {k:v for (k,v) in res.items() if v is not None}
 
