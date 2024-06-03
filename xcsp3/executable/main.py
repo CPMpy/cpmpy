@@ -61,6 +61,12 @@ def bytes_as_mb(bytes: int) -> int:
 def bytes_as_gb(bytes: int) -> int:
     return bytes // (1000 * 1000 * 1000)
 
+def bytes_as_mb_float(bytes: int) -> float:
+    return bytes / (1000 * 1000)
+
+def bytes_as_gb_float(bytes: int) -> float:
+    return bytes / (1000 * 1000 * 1000)
+
 def current_memory_usage() -> int: # returns bytes
     # not really sure which memory measurement to use: https://stackoverflow.com/questions/7880784/what-is-rss-and-vsz-in-linux-memory-management/21049737#21049737
     return psutil.Process(os.getpid()).memory_info().rss
@@ -90,6 +96,12 @@ def sigterm_handler(_signo, _stack_frame):
     # Report that we haven't found a solution in time
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
+    print(flush=True)
+    sys.exit(0)
+
+def memory_error_handler(args: Args):
+    print_status(ExitStatus.unknown)
+    print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(args.mem_limit)} MB / {bytes_as_gb_float(args.mem_limit)} GB")
     print(flush=True)
     sys.exit(0)
 
@@ -458,7 +470,18 @@ def main():
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
     
-    run(args)
+    from xml.etree.ElementTree import ParseError
+    try:
+        run(args)
+    except MemoryError as e:
+        memory_error_handler(args)
+    except ParseError as e:
+        if "out of memory" in e.msg:
+            memory_error_handler(args)
+        else:
+            raise e
+    except Exception as e:
+        raise e
 
 def run(args: Args):
     with PerfContext() as perf:
