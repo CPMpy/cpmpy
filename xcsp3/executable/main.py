@@ -105,6 +105,13 @@ def memory_error_handler(args: Args):
     print(flush=True)
     sys.exit(0)
 
+def error_handler(e: Exception):
+    print_status(ExitStatus.unknown)
+    print_comment(f"An error got raised: {e}")
+    print(flush=True)
+    sys.exit(0)
+
+
 class Capturing(list):
     def __enter__(self):
         self._stdout = sys.stdout
@@ -606,4 +613,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    main()
+    try:
+        main()
+    except Exception as e:
+        error_handler(e)
