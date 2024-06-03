@@ -326,9 +326,11 @@ class TestArrayExpressions(unittest.TestCase):
             np_res = arr.sum(axis=axis)
             for func in functions:
                 cpm_res = getattr(bv, func)(axis=axis)
+                self.assertIsInstance(cpm_res, NDVarArray)
                 self.assertEqual(cpm_res.shape, np_res.shape)
             for cons in constraints:
-                cpm_res = getattr(iv, func)(axis=axis)
+                cpm_res = getattr(iv, cons)(axis=axis)
+                self.assertIsInstance(cpm_res, NDVarArray)
                 self.assertEqual(cpm_res.shape, np_res.shape)
 
         
