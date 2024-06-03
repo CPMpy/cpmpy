@@ -77,7 +77,7 @@ def remaining_memory(limit:int) -> int: # bytes
 def get_subsolver(args:Args, model:cp.Model):
     # Update subsolver in args
     if args.solver == "z3":
-        if model.has_objective():
+        if model.objective_ is not None:
             args.subsolver = "opt"
         else:
             args.subsolver = "sat"
@@ -320,20 +320,23 @@ def exact_arguments(args: Args, model:cp.Model):
 
 def z3_arguments(args: Args, model:cp.Model):
     # Documentation: https://microsoft.github.io/z3guide/programming/Parameters/
+    # -> is outdated, just let it crash and z3 will report the available options
 
     # Global parameters
     res = {
-        "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        "type_check": False # disable type checker 
+        # "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+        "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+        # "type_check": False # disable type checker 
     }
+    
     # Sat parameters
     if args.sat:
         res |= {
-            "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-            "sat.random_seed": args.seed,
-            "sat.threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
+            # "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+            "random_seed": args.seed,
+            "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
         }
+    return {k:v for (k,v) in res.items() if v is not None}
     # Opt parameters
     # /
     # Parallel parameters
