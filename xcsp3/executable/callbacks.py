@@ -12,6 +12,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
+from cpmpy import cpm_array
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
@@ -603,7 +604,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_rhs = self.get_cpm_var(condition.right_operand())
 
         for bin in range(1, len(cpm_vars)+1): # bin labeling starts at 1
-            self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_vars == bin) * sizes),
+            self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_array(cpm_vars) == bin) * sizes),
                                                  condition.operator,
                                                  cpm_rhs)
     def ctr_binpacking_limits(self, lst: list[Variable], sizes: list[int], limits: list[int] | list[Variable]):
@@ -613,7 +614,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, lim in enumerate(limits):
             self.cpm_model += eval_comparison("<=",
-                                              cp.sum((cpm_vars == (bin+1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin+1)) * sizes), # bin labeling starts at 1
                                               lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
@@ -624,7 +625,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, load in enumerate(cpm_loads):
             self.cpm_model += eval_comparison("==",
-                                              cp.sum((cpm_vars == (bin + 1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin + 1)) * sizes), # bin labeling starts at 1
                                               load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
@@ -632,7 +633,7 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_knapsack(self, lst: list[Variable], weights: list[int], wcondition: Condition, profits: list[int], pcondition: Condition):
 
-        vars = self.get_cpm_vars(lst)
+        vars = cpm_array(self.get_cpm_vars(lst))
         cpm_weight = self.get_cpm_var(wcondition.right_operand())
         cpm_profit = self.get_cpm_var(pcondition.right_operand())
 
