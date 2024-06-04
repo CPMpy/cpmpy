@@ -736,6 +736,38 @@ class ShortTable(GlobalConstraint):
     def vars(self):
         return self._args[0]
 
+class NegativeShortTable(GlobalConstraint):
+    """The values of the variables in 'array' do not correspond to any row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("negative_shorttable", [array, table])
+
+    def decompose(self):
+        from .python_builtins import all as cpm_all
+        from .python_builtins import any as cpm_any
+        arr, tab = self.args
+        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = [argval(a) for a in arr]
+        for tup in tab:
+            thistup = True
+            for aval, tval in zip(arrval, tup):
+                if tval != '*':
+                    if aval != tval:
+                        thistup = False
+                        break
+            if thistup:
+                # found tuple that matches
+                return False
+        # didn't find tuple that matches
+        return True
+
+
 class MDD(GlobalConstraint):
     """
     MDD-constraint: an MDD (Multi-valued Decision Diagram) is an acyclic layerd graph starting from a single node and
