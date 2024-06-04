@@ -1054,12 +1054,10 @@ class InDomain(GlobalConstraint):
 
     def decompose(self):
         """
-        Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+        This decomp only works in positive context
         """
-        from .python_builtins import any
+        from .python_builtins import any, all
+        from .variables import boolvar
         expr, arr = self.args
         lb, ub = expr.get_bounds()
 
@@ -1070,11 +1068,15 @@ class InDomain(GlobalConstraint):
             defining.append(aux == expr)
             expr = aux
 
-        expressions = any(isinstance(a, Expression) for a in arr)
-        if expressions:
-            return [any(expr == a for a in arr)], defining
-        else:
-            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+        if not any(isinstance(a, Expression) for a in arr):
+            given = len(set(arr))
+            missing = ub + 1 - lb - given
+            if 3 * missing <= given:  # a lot more given in the domain than missing, so we use the opposites.
+                return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+
+        row_selected = boolvar(shape=len(arr))
+        return [any(row_selected)] + \
+               [rs.implies(expr == a) for (rs, a) in zip(row_selected, arr)], defining
 
 
     def value(self):
@@ -1082,6 +1084,47 @@ class InDomain(GlobalConstraint):
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
+
+
+class NotInDomain(GlobalConstraint):
+    """
+        The "NotInDomain" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        super().__init__("NotInDomain", [expr, arr])
+
+    def decompose(self):
+        """
+        This decomp only works in positive context
+        """
+        from .python_builtins import any, all
+        from .variables import boolvar
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        defining = []
+        #if expr is not a var
+        if not isinstance(expr,_IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
+        if not any(isinstance(a, Expression) for a in arr):
+            given = len(set(arr))
+            missing = ub + 1 - lb - given
+            if missing < 2 * given:  # != leads to double the amount of constraints
+                # use == if there is less than twice as many gaps in the domain.
+                row_selected = boolvar(shape=missing)
+                return [any(row_selected)] + [rs.implies(expr == val) for val,rs in zip(range(lb, ub + 1), row_selected) if val not in arr], defining
+        return [all([(expr != a) for a in arr])], defining
+
+
+    def value(self):
+        return argval(self.args[0]) not in argvals(self.args[1])
+
+    def __repr__(self):
+        return "{} not in {}".format(self.args[0], self.args[1])
 
 
 class Xor(GlobalConstraint):

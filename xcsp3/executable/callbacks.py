@@ -230,13 +230,13 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize indomain like we did table?
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
         else:
             # negative, so not in domain
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) != values[0]
             else:
-                self.cpm_model += ~cp.InDomain(self.get_cpm_var(x), values) #TODO should we optimize a negative indomain? probably not worth it.
+                self.cpm_model += cp.NotInDomain(self.get_cpm_var(x), values)
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
@@ -268,7 +268,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_exprs = self.get_cpm_exprs(scope)
         if excepting is None:
             self.cpm_model += cp.AllDifferent(cpm_exprs)
-        elif len(excepting) > 0:  # TODO changed this, we now support excepting list
+        elif len(excepting) > 0:
             self.cpm_model += cp.AllDifferentExceptN(cpm_exprs, excepting)
         elif len(excepting) == 0:
             # just in case they get tricky
@@ -287,7 +287,7 @@ class CallbacksCPMPy(Callbacks):
         for row in matrix:
             self.ctr_all_different(row, excepting)
         for col in np.array(matrix).T:
-            self.ctr_all_different(col, excepting) #TODO: nice
+            self.ctr_all_different(col, excepting)
 
     def ctr_all_equal(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         if excepting is None:
@@ -332,7 +332,7 @@ class CallbacksCPMPy(Callbacks):
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
         if operator == TypeOrderedOperator.STRICTLY_INCREASING:
-            self.cpm_model += cp.LexChainLess(cpm_lists) #TODO why is our less their increasing? is this opposite by accident? ok i checked seems correct
+            self.cpm_model += cp.LexChainLess(cpm_lists)
         elif operator == TypeOrderedOperator.INCREASING:
             self.cpm_model += cp.LexChainLessEq(cpm_lists)
         elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
