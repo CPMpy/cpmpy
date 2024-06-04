@@ -446,7 +446,7 @@ class CallbacksCPMPy(Callbacks):
             assert len(excepting) == 1, "Competition only allows 1 integer value in excepting list"
             lhs = cp.NValueExcept(self.get_cpm_exprs(lst), excepting[0])
 
-        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand())) #TODO this could also be in and notin with a range?
+        self.cpm_model += self.eval_cpm_comp(lhs, condition.operator, self.get_cpm_var(condition.right_operand()))
 
     def ctr_not_all_qual(self, lst: list[Variable]):
         cpm_vars = self.get_cpm_vars(lst)
@@ -463,14 +463,14 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Minimum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand())) #TODO range for in/notin?
+                                             self.get_cpm_var(condition.right_operand()))
 
 
     def ctr_maximum(self, lst: list[Variable] | list[Node], condition: Condition):
         cpm_vars = self.get_cpm_exprs(lst)
         self.cpm_model += self.eval_cpm_comp(cp.Maximum(cpm_vars),
                                              condition.operator,
-                                             self.get_cpm_var(condition.right_operand()))  #TODO range for in/notin?
+                                             self.get_cpm_var(condition.right_operand()))
 
     def ctr_minimum_arg(self, lst: list[Variable] | list[Node], condition: Condition, rank: TypeRank):  # should enter XCSP3-core
         self._unimplemented(lst, condition, rank)
@@ -481,13 +481,13 @@ class CallbacksCPMPy(Callbacks):
     def ctr_element(self, lst: list[Variable] | list[int], i: Variable, condition: Condition):
         cpm_lst = self.get_cpm_vars(lst)
         cpm_index = self.get_cpm_var(i)
-        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin?
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
         self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable, condition: Condition):
         mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
         cpm_i, cpm_j = self.get_cpm_vars([i,j])
-        cpm_rhs = self.get_cpm_var(condition.right_operand())  #TODO range for in/notin? Sorry for spamming this, i think it's possible in theory according to the specs.
+        cpm_rhs = self.get_cpm_var(condition.right_operand())
 
         self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
 
@@ -570,7 +570,7 @@ class CallbacksCPMPy(Callbacks):
             if max(get_bounds(cpm_ends)[1]) >= 100:
                 self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
             else:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
+                self._cumulative_time_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
 
     def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands,condition:Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
