@@ -249,7 +249,7 @@ class CallbacksCPMPy(Callbacks):
             if positive:
                 self.cpm_model += cp.ShortTable(cpm_vars, exttuples)
             else:
-                self.cpm_model += ~cp.ShortTable(cpm_vars, exttuples)
+                self.cpm_model += cp.NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
