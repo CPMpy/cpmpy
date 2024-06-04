@@ -714,7 +714,7 @@ class ShortTable(GlobalConstraint):
         return [any(row_selected)]+ \
                [rs.implies(
                    all([r == a for (r,a) in zip(row, arr) if r != "*"])
-                ) for (row,rs) in zip(tab, row_selected)], [] # == instead of implies, otherwise fails in negated setting TODO
+                ) for (row,rs) in zip(tab, row_selected)], []
     
     def value(self):
         arr, tab = self.args
