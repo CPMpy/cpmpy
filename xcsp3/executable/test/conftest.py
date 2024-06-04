@@ -52,7 +52,7 @@ def get_all_instances(instance_dir: os.PathLike):
     }
 
 # Instance type filters
-main_instance_types = ["COP", "CSP"]
+main_instance_types = ["CSP", "COP"]
 mini_instance_types = ["MiniCSP", "MiniCOP"]
 cop_instance_types = ["COP", "MiniCOP"]
 csp_instance_types = ["CSP", "MiniCSP"]
@@ -100,6 +100,7 @@ def pytest_addoption(parser):
     parser.addoption("--competition", action="store_true")
     parser.addoption("--profiler", action="store_true")
     parser.addoption("--only_transform", action="store_true")
+    parser.addoption("--check", action="store_true")
 
 
 def pytest_generate_tests(metafunc):
@@ -146,7 +147,7 @@ def pytest_generate_tests(metafunc):
     if "time_limit" in metafunc.fixturenames:
         metafunc.parametrize("time_limit", [metafunc.config.getoption("time_limit")])
 
-    # Memory limit
+    # Memory limit -> does not work through pytest (must also use competition mode)
     if "memory_limit" in metafunc.fixturenames:
         metafunc.parametrize("memory_limit", [metafunc.config.getoption("memory_limit")])
 
@@ -165,3 +166,7 @@ def pytest_generate_tests(metafunc):
     # Only transform, don't solve
     if "only_transform" in metafunc.fixturenames:
         metafunc.parametrize("only_transform", [metafunc.config.getoption("only_transform")])
+
+    # Check the solution with the SolutionChecker (takes some time)
+    if "check" in metafunc.fixturenames:
+        metafunc.parametrize("check", [metafunc.config.getoption("check")])
