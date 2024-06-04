@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0", "AllDifferentLists","AllDifferentListsExceptN", "AllDifferentExceptN", "AllEqualExceptN",
     "Cumulative", "GlobalCardinalityCount", "InDomain", "Inverse",
-    "Table", "ShortTable", "NegativeTable", "Precedence", "NoOverlap", "NoOverlap2d",
+    "Table", "ShortTable", "NegativeTable", "NegativeShortTable", "Precedence", "NoOverlap", "NoOverlap2d",
     "Circuit", "SubCircuit", "SubCircuitWithStart", "MDD", "Regular", "InverseOne", "Channel",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
@@ -196,6 +196,8 @@ def global_constraints(solver):
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "ShortTable":
+            expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "NegativeShortTable":
             expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
         elif name == "MDD":
             expr = MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
