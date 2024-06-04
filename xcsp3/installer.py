@@ -28,7 +28,7 @@ def install_solution_checker():
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
 
-def install_xcsp3_instances():
+def install_xcsp3_instances_22():
     import requests
     import tqdm
     """
@@ -40,7 +40,7 @@ def install_xcsp3_instances():
     XCSP3_INSTANCES_DESTINATION_FILE = "temp.zip"
     XCSP3_INSTANCES_EXTRACTION_TIMEOUT = 100
 
-    print("Installing XCSP3 instances ...")
+    print("Installing XCSP3 2022 instances ...")
 
     session = requests.Session()
     response = session.get(XCSP3_INSTANCES_URL, stream=True)
@@ -62,6 +62,46 @@ def install_xcsp3_instances():
 
     target = ".lzma"
     for root, dir, files in os.walk(os.path.join(pathlib.Path(__file__).parent.resolve(), "instancesXCSP22")):
+        print(f"Extracting {root}")
+        for file in tqdm.tqdm(files):
+            if target in file:
+                filename = os.path.join(root, file)
+                convert(filename)
+
+def install_xcsp3_instances_23():
+    import requests
+    import tqdm
+    """
+        Downloads the XCSP3 2023 main and mini track problem instances.
+    """
+
+    XCSP3_INSTANCES_URL = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP23.zip"
+    XCSP3_INSTANCES_DESTINATION_PATH = os.path.join(pathlib.Path(__file__).parent.resolve())
+    XCSP3_INSTANCES_DESTINATION_FILE = "temp.zip"
+    XCSP3_INSTANCES_EXTRACTION_TIMEOUT = 100
+
+    print("Installing XCSP3 2023 instances ...")
+
+    session = requests.Session()
+    response = session.get(XCSP3_INSTANCES_URL, stream=True)
+
+    with open(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, XCSP3_INSTANCES_DESTINATION_FILE), "wb") as f:
+        for chunk in response.iter_content(CHUNK_SIZE):
+            if chunk:  # filter out keep-alive new chunks
+                f.write(chunk)
+
+    with zipfile.ZipFile(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, XCSP3_INSTANCES_DESTINATION_FILE), 'r') as zip_ref:
+        zip_ref.extractall(XCSP3_INSTANCES_DESTINATION_PATH)
+
+    pathlib.Path(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, XCSP3_INSTANCES_DESTINATION_FILE)).unlink()
+
+    def convert(file):
+        p = subprocess.Popen(["xz", "-d", file], start_new_session=True)
+        p.wait(timeout=XCSP3_INSTANCES_EXTRACTION_TIMEOUT)
+
+
+    target = ".lzma"
+    for root, dir, files in os.walk(os.path.join(pathlib.Path(__file__).parent.resolve(), "XCSP23_V2")):
         print(f"Extracting {root}")
         for file in tqdm.tqdm(files):
             if target in file:
@@ -118,5 +158,6 @@ if __name__ == "__main__":
     if args.dev:
         install_solution_checker()
         if not args.skip_instances:
-            install_xcsp3_instances()
+            install_xcsp3_instances_22()
+            install_xcsp3_instances_23()
 
