@@ -526,9 +526,9 @@ def run_helper(args:Args):
 
     # ------------------------------ Parse instance ------------------------------ #
 
-    start = time.time()
+    parse_start = time.time()
     parser = ParserXCSP3(args.benchpath)
-    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
+    print_comment(f"took {(time.time() - parse_start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
 
     # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
     start = time.time()
@@ -566,7 +566,7 @@ def run_helper(args:Args):
     print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
-    time_limit = args.time_limit - tc.time - args.time_buffer if args.time_limit is not None else None
+    time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
     
     # If not time left
     if time_limit is not None and time_limit <= 0:
