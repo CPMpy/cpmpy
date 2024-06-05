@@ -752,7 +752,9 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], (XVar, int)):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            assert len(lst) == 1, "Expected range here, but got list with multiple elements, what's the semantics???
+            return list(lst[0]) # this should work without converting to str first
+            # return list(eval(str(lst[0])))
         else:
             return self.vars_from_node(lst)
 
@@ -760,7 +762,9 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            assert len(lst) == 1, "Expected range here, but got list with multiple elements, what's the semantics???
+            return list(lst[0]) # this should work without converting to str first
+            # return list(eval(str(lst[0])))
         else:
             return self.exprs_from_node(lst)
 
