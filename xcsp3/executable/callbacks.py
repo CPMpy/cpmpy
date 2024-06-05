@@ -658,7 +658,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(pos, neg)
 
     def ctr_circuit(self, lst: list[Variable], size: None | int | Variable):  # size is None in XCSP3 competitions
-        return cp.SubCircuitWithStart(lst, start_index=0)
+        self.cpm_model += cp.SubCircuitWithStart(lst, start_index=0)
 
     # # # # # # # # # #
     # All methods about objectives to be implemented
@@ -752,7 +752,9 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], (XVar, int)):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            assert len(lst) == 1, "Expected range here, but got list with multiple elements, what's the semantics???"
+            return list(lst[0]) # this should work without converting to str first
+            # return list(eval(str(lst[0])))
         else:
             return self.vars_from_node(lst)
 
@@ -760,7 +762,9 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            assert len(lst) == 1, "Expected range here, but got list with multiple elements, what's the semantics???"
+            return list(lst[0]) # this should work without converting to str first
+            # return list(eval(str(lst[0])))
         else:
             return self.exprs_from_node(lst)
 

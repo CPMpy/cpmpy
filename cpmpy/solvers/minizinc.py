@@ -433,15 +433,25 @@ class CPM_minizinc(SolverInterface):
         :return: list of Expression
         """
         with TimerContext("transformation") as top_tc:
+            expr_store = self.expr_store
+
             with TimerContext("toplevel_list") as tc:
                 cpm_cons = toplevel_list(cpm_expr)
+            print(f"mzn:toplevel_list took {(tc.time):.4f} -- {len(cpm_cons)}")
+
             supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
                         "inverse", "ite" "xor", "table", "cumulative", "circuit", "subcircuit", "gcc", "increasing",
                         "precedence", "no_overlap",
                         "decreasing","strictly_increasing","strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
                         "lex_chain_lesseq", "among"}
             with TimerContext("decompose_in_tree") as tc:
-                cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit", "precedence"})
+                cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "subcircuit", "precedence"}, expr_store=expr_store)
+            print(f"mzn:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
+
+        print(f"ort:transformation took {(top_tc.time):.4f}")
+        print("final size: " + str(len(cpm_cons)))
+        print("STORE: " + str(len(expr_store.items())))
+
         return cpm_cons
 
     def __add__(self, cpm_expr):
