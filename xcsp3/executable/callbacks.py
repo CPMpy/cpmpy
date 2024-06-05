@@ -359,7 +359,10 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_vars(lst)
         if values is None: # assumed to be ordered set of all values collected from domains in lst
             lbs, ubs = get_bounds(cpm_vars)
-            values = sorted(range(min(lbs), max(lbs)+1))
+            values = set()
+            for lb, ub in zip(lbs, ubs):
+                values.update(list(range(lb, ub+1)))
+            values = sorted(values)
 
         self.cpm_model += cp.Precedence(cpm_vars, values)
 
