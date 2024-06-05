@@ -617,7 +617,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, lim in enumerate(limits):
             self.cpm_model += eval_comparison("<=",
-                                              cp.sum((cpm_array(cpm_vars) == (bin+1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin)) * sizes), 
                                               lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
@@ -628,7 +628,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, load in enumerate(cpm_loads):
             self.cpm_model += eval_comparison("==",
-                                              cp.sum((cpm_array(cpm_vars) == (bin + 1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin)) * sizes),
                                               load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
