@@ -96,7 +96,7 @@ class CPM_exact(SolverInterface):
         from exact import Exact as xct
 
         # initialise the native solver object
-        options = [("ca-liftdegree","100000")] # options is a list of string-pairs, e.g. [("verbosity","1")]
+        options = [] # options is a list of string-pairs, e.g. [("verbosity","1")]
         self.xct_solver = xct(options)
 
         # for solving with assumption variables,
@@ -427,7 +427,7 @@ class CPM_exact(SolverInterface):
             # print("------------------")
             
             with TimerContext("linearize_constraint") as tc:
-                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum"}), expr_store=expr_store)  # the core of the MIP-linearization
+                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul"}), expr_store=expr_store)  # the core of the MIP-linearization
             print(f"exact:linearize_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
 
             # print(cpm_cons)
@@ -455,15 +455,12 @@ class CPM_exact(SolverInterface):
     def _add_xct_constr(self, xct_cfvars, uselb, lb, useub, ub):
         self.xct_solver.addConstraint(xct_cfvars, uselb, self.fix(lb), useub, self.fix(ub))
 
-    def _add_xct_reif(self, head, sign, xct_cfvars, lb):
-        self.xct_solver.addReification(head, sign, xct_cfvars, self.fix(lb))
-
     def _add_xct_reif_right(self, head, sign, xct_cfvars, xct_rhs):
         self.xct_solver.addRightReification(head, sign, xct_cfvars, self.fix(xct_rhs))
 
-    def _add_xct_reif_left(self, head, sign, xct_cfvars, xct_rhs):
-        self.xct_solver.addLeftReification(head, sign, xct_cfvars, self.fix(xct_rhs))
-
+    @staticmethod
+    def is_multiplication(cpm_expr):
+        return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
 
     def __add__(self, cpm_expr_orig):
         """
@@ -493,20 +490,34 @@ class CPM_exact(SolverInterface):
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-                xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
 
-                # linearize removed '<', '>' and '!='
-                if cpm_expr.name == '<=':
-                    self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
-                elif cpm_expr.name == '>=':
-                    self._add_xct_constr(xct_cfvars, True, xct_rhs, False, 0)
-                elif cpm_expr.name == '==':
-                    # a BoundedLinearExpression LHS, special case, like in objective
-                    self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
+                if cpm_expr.name not in ['==', '<=', '>=']:
+                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
+
+                if self.is_multiplication(cpm_expr.args[0]) or self.is_multiplication(cpm_expr.args[1]):
+                    assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} only supported by Exact version 2.1.0 and above"
+                    mult = cpm_expr.args[0]
+                    head = cpm_expr.args[1]
+                    assert cpm_expr.name == '==', f"Multiplication constraint {cpm_expr} must be an equality after linearization"
+                    if self.is_multiplication(head):
+                        mult, head = head, mult
+                    assert isinstance(head, _IntVarImpl), f"Multiplication constraint {cpm_expr} must have a single variable on one side of the equality"
+                    assert all(isinstance(v, _IntVarImpl) for v in mult.args), f"Multiplication constraint {cpm_expr} must have a multiplication of variables on one side of the equality"
+                    headvar = self.solver_var(head)
+                    self.xct_solver.addMultiplication(self.solver_vars(mult.args), True, headvar, True, headvar)
+
                 else:
-                    raise NotImplementedError(
-                        "Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
+                    lhs, rhs = cpm_expr.args
+                    xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
+
+                    # linearize removed '<', '>' and '!='
+                    if cpm_expr.name == '<=':
+                        self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
+                    elif cpm_expr.name == '>=':
+                        self._add_xct_constr(xct_cfvars, True, xct_rhs, False, 0)
+                    elif cpm_expr.name == '==':
+                        # a BoundedLinearExpression LHS, special case, like in objective
+                        self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
             elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
                 # Indicator constraints
