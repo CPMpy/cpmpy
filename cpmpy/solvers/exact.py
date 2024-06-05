@@ -161,7 +161,7 @@ class CPM_exact(SolverInterface):
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
-            self.xct_solver.setAssumption(zip(assump_vars,assump_vals))
+            self.xct_solver.setAssumption(list(zip(assump_vars,assump_vals)))
 
         # call the solver, with parameters
         start = time.time()
@@ -350,7 +350,7 @@ class CPM_exact(SolverInterface):
         elif lhs.name == "sum":
             xcfvars = [(1,x) for x in self.solver_vars(lhs.args)]
         elif lhs.name == "wsum":
-            xcfvars = zip([self.fix(c) for c in lhs.args[0]],self.solver_vars(lhs.args[1]))
+            xcfvars = list(zip([self.fix(c) for c in lhs.args[0]],self.solver_vars(lhs.args[1])))
         else:
             raise NotImplementedError("Exact: Unexpected lhs {} for expression {}".format(lhs.name,lhs))
 
@@ -575,4 +575,4 @@ class CPM_exact(SolverInterface):
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
-        self.xct_solver.setSolutionHints(zip(self.solver_vars(cpm_vars), vals))
+        self.xct_solver.setSolutionHints(list(zip(self.solver_vars(cpm_vars), vals)))
