@@ -43,7 +43,7 @@ SUPPORTED_SUBSOLVERS = {
     "minizinc": ["gecode", "chuffed"]
 }
 DEFAULT_SOLVER = "ortools"
-TIME_BUFFER = 1 # seconds
+TIME_BUFFER = 5 # seconds
 # TODO : see if good value
 MEMORY_BUFFER_SOFT = 2 # MB
 MEMORY_BUFFER_HARD = 2 # MMB
