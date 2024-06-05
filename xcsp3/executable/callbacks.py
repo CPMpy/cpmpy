@@ -770,7 +770,7 @@ class CallbacksCPMPy(Callbacks):
             if len(lst) == 1:
                 return list(lst[0]) # this should work without converting to str first
             else:
-                return [cp.intvar(l.start, l.stop) for l in lst]
+                return [cp.intvar(l.start, l.stop-1) for l in lst]
             
             # return list(eval(str(lst[0])))
         else:
