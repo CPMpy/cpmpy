@@ -603,7 +603,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_vars(lst)
         cpm_rhs = self.get_cpm_var(condition.right_operand())
 
-        for bin in range(1, len(cpm_vars)+1): # bin labeling starts at 1
+        for bin in range(0, len(cpm_vars)): # bin labeling starts at 0, contradicting the xcsp3 specification document?
             self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_array(cpm_vars) == bin) * sizes),
                                                  condition.operator,
                                                  cpm_rhs)
