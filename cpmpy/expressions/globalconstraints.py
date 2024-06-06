@@ -1266,7 +1266,7 @@ class Precedence(GlobalConstraint):
 
         args, precedence = self.args
         if not isinstance(args, NDVarArray):
-            args = cpm_array(args)
+            args = cpm_array(args) #TODO i think we can do this in the init, also should go to master
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
