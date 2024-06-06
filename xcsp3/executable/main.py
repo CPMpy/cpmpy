@@ -398,7 +398,7 @@ def solver_arguments(args: Args, model:cp.Model):
 def subsolver_arguments(args: Args, model:cp.Model):
     if args.subsolver == "gecode": return gecode_arguments(args, model)
     elif args.subsolver == "chuffed": return choco_arguments(args, model)
-    else: raise()
+    else: return {}
 
 @contextmanager
 def prepend_print():
