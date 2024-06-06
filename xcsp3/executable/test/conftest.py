@@ -13,7 +13,7 @@ JAR = os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "..", "xcsp3-s
 SUPPORTED_SOLVERS = ["choco", "ortools"] # Solvers supported by this testsuite (and the executable)
 INSTANCES_DIR = os.path.join(pathlib.Path(__file__).parent.resolve(), "..", "..")
 
-def get_all_instances(instance_dir: os.PathLike, year:str):
+def get_all_instances(instance_dir: os.PathLike, year:str, relative=False):
     """
         Collects all problem instances in a dict:
         {
@@ -39,13 +39,13 @@ def get_all_instances(instance_dir: os.PathLike, year:str):
                     location = os.path.join(root, file)
 
                     if "MiniCOP" in location:
-                        MiniCOP[name] = location
+                        MiniCOP[name] = location if not relative else location[len(instance_dir):]
                     elif "MiniCSP" in location:
-                        MiniCSP[name] = location
+                        MiniCSP[name] = location if not relative else location[len(instance_dir):]
                     elif "COP" in location:
-                        COP[name] = location
+                        COP[name] = location if not relative else location[len(instance_dir):]
                     elif "CSP" in location:
-                        CSP[name] = location
+                        CSP[name] = location if not relative else location[len(instance_dir):]
     
     elif year == "2023":
         instance_dir = os.path.join(instance_dir, "XCSP23_V2")
@@ -58,13 +58,13 @@ def get_all_instances(instance_dir: os.PathLike, year:str):
                     location = os.path.join(root, file)
 
                     if "MiniCOP23" in location:
-                        MiniCOP[name] = location
+                        MiniCOP[name] = location if not relative else location[len(instance_dir):]
                     elif "MiniCSP23" in location:
-                        MiniCSP[name] = location
+                        MiniCSP[name] = location if not relative else location[len(instance_dir):]
                     elif "COP23" in location:
-                        COP[name] = location
+                        COP[name] = location if not relative else location[len(instance_dir):]
                     elif "CSP23" in location:
-                        CSP[name] = location
+                        CSP[name] = location if not relative else location[len(instance_dir):]
                 
     return {
         "COP": COP,
@@ -79,7 +79,7 @@ mini_instance_types = ["MiniCSP", "MiniCOP"]
 cop_instance_types = ["COP", "MiniCOP"]
 csp_instance_types = ["CSP", "MiniCSP"]
 
-def instances(type, year, filter) -> list:
+def instances(type, year) -> list:
     """
         Filters and aggregates problem instances based on the provided `type`.
     """
@@ -103,13 +103,9 @@ def instances(type, year, filter) -> list:
         instances = get_all_instances(INSTANCES_DIR, year)["COP"]
     else:
         raise()
-    
                 
     # return instances.keys(), instances.values()
-    res = list(instances.items())
-    if filter is not None:
-        res = [i for i in res if filter in i[0]]
-    return res
+    return list(instances.items())
 
 def pytest_addoption(parser):
     """
@@ -128,7 +124,6 @@ def pytest_addoption(parser):
     parser.addoption("--only_transform", action="store_true")
     parser.addoption("--check", action="store_true")
     parser.addoption("--year", action="store", default="2022")
-    parser.addoption("--filter", action="store", default=None)
 
 
 def pytest_generate_tests(metafunc):
@@ -137,7 +132,7 @@ def pytest_generate_tests(metafunc):
     """
 
     # Get the test instances based on the provided filter
-    instance = instances(type=metafunc.config.getoption("type"), year=metafunc.config.getoption("year"), filter=metafunc.config.getoption("filter"))
+    instance = instances(type=metafunc.config.getoption("type"), year=metafunc.config.getoption("year"))
 
     # The test instances to solve
     if "instance" in metafunc.fixturenames:

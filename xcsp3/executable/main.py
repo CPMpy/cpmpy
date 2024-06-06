@@ -325,13 +325,13 @@ def z3_arguments(args: Args, model:cp.Model):
     # Global parameters
     res = {
         "random_seed": args.seed,
-        "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
     }
     
     # Sat parameters
     if args.sat:
         res |= {
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
+            "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
         }
     # Opt parameters
     if args.opt:
@@ -611,7 +611,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    try:
-        main()
-    except Exception as e:
-        error_handler(e)
+    # try:
+    main()
+    # except Exception as e:
+    #     error_handler(e)
