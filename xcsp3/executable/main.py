@@ -324,27 +324,20 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        # "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
+        "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+        "random_seed": args.seed,
         "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        # "type_check": False # disable type checker 
     }
     
     # Sat parameters
     if args.sat:
         res |= {
-            # "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-            "random_seed": args.seed,
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
         }
-    return {k:v for (k,v) in res.items() if v is not None}
     # Opt parameters
-    # /
-    # Parallel parameters
-    if args.parallel:
-        res |= {
-            "parallel.enable": True,
-            "parallel.threads.max": args.cores
-        }
+    if args.opt:
+        res |= {}
+
     return {k:v for (k,v) in res.items() if v is not None}
 
 
