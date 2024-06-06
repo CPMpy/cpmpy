@@ -324,27 +324,22 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        # "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        # "type_check": False # disable type checker 
+        "random_seed": args.seed,
     }
     
     # Sat parameters
     if args.sat:
         res |= {
-            # "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-            "random_seed": args.seed,
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
+            "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
         }
-    return {k:v for (k,v) in res.items() if v is not None}
     # Opt parameters
-    # /
-    # Parallel parameters
-    if args.parallel:
+    if args.opt:
         res |= {
-            "parallel.enable": True,
-            "parallel.threads.max": args.cores
+            # opt does not seem to support setting max memory
+            # "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
         }
+
     return {k:v for (k,v) in res.items() if v is not None}
 
 
@@ -617,7 +612,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    try:
-        main()
-    except Exception as e:
-        error_handler(e)
+    # try:
+    main()
+    # except Exception as e:
+    #     error_handler(e)
