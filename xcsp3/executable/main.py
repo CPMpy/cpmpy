@@ -567,7 +567,8 @@ def run_helper(args:Args):
 
     # Solve model
     time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
-    
+    print_comment(f"{time_limit}s left to solve")
+
     # If not time left
     if time_limit is not None and time_limit <= 0:
         # Not enough time to start a solve call (we're already over the limit)
