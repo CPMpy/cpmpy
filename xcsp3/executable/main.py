@@ -324,7 +324,6 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
         "random_seed": args.seed,
         "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
     }
@@ -336,7 +335,9 @@ def z3_arguments(args: Args, model:cp.Model):
         }
     # Opt parameters
     if args.opt:
-        res |= {}
+        res |= {
+            "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+        }
 
     return {k:v for (k,v) in res.items() if v is not None}
 
