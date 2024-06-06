@@ -222,6 +222,15 @@ class CallbacksCPMPy(Callbacks):
 
         self.cpm_model += self.eval_cpm_comp(cpm_x, op, rhs)
 
+    def unroll(self, values):
+        res = []
+        for v in values:
+            if isinstance(v, range):
+                res.extend(v)
+            else:
+                res.append(v)
+        return res
+
     def ctr_extension_unary(self, x: Variable, values: list[int], positive: bool, flags: set[str]):
         if len(values) == 1 and isinstance(values[0], range):
             values = list(eval(str(values[0])))
@@ -231,13 +240,13 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += cp.InDomain(self.get_cpm_var(x), values)
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), self.unroll(values))
         else:
             # negative, so not in domain
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) != values[0]
             else:
-                self.cpm_model += cp.NotInDomain(self.get_cpm_var(x), values)
+                self.cpm_model += cp.NotInDomain(self.get_cpm_var(x), self.unroll(values))
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
