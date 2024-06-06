@@ -1262,8 +1262,11 @@ class Precedence(GlobalConstraint):
         Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
         """
         from .python_builtins import any as cpm_any
+        from .variables import NDVarArray
 
         args, precedence = self.args
+        if not isinstance(args, NDVarArray):
+            args = cpm_array(args)
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):

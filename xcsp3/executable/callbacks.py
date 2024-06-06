@@ -359,7 +359,10 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_vars(lst)
         if values is None: # assumed to be ordered set of all values collected from domains in lst
             lbs, ubs = get_bounds(cpm_vars)
-            values = sorted(range(min(lbs), max(lbs)+1))
+            values = set()
+            for lb, ub in zip(lbs, ubs):
+                values.update(list(range(lb, ub+1)))
+            values = sorted(values)
 
         self.cpm_model += cp.Precedence(cpm_vars, values)
 
@@ -603,7 +606,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_vars = self.get_cpm_vars(lst)
         cpm_rhs = self.get_cpm_var(condition.right_operand())
 
-        for bin in range(1, len(cpm_vars)+1): # bin labeling starts at 1
+        for bin in range(0, len(cpm_vars)): # bin labeling starts at 0, contradicting the xcsp3 specification document?
             self.cpm_model += self.eval_cpm_comp(cp.sum((cpm_array(cpm_vars) == bin) * sizes),
                                                  condition.operator,
                                                  cpm_rhs)
@@ -614,7 +617,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, lim in enumerate(limits):
             self.cpm_model += eval_comparison("<=",
-                                              cp.sum((cpm_array(cpm_vars) == (bin+1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin)) * sizes), 
                                               lim)
 
     def ctr_binpacking_loads(self, lst: list[Variable], sizes: list[int], loads: list[int] | list[Variable]):
@@ -625,7 +628,7 @@ class CallbacksCPMPy(Callbacks):
 
         for bin, load in enumerate(cpm_loads):
             self.cpm_model += eval_comparison("==",
-                                              cp.sum((cpm_array(cpm_vars) == (bin + 1)) * sizes), # bin labeling starts at 1
+                                              cp.sum((cpm_array(cpm_vars) == (bin)) * sizes),
                                               load)
 
     def ctr_binpacking_conditions(self, lst: list[Variable], sizes: list[int], conditions: list[Condition]):  # not in XCSP3-core
@@ -658,7 +661,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(pos, neg)
 
     def ctr_circuit(self, lst: list[Variable], size: None | int | Variable):  # size is None in XCSP3 competitions
-        return cp.SubCircuitWithStart(lst, start_index=0)
+        self.cpm_model += cp.SubCircuitWithStart(lst, start_index=0)
 
     # # # # # # # # # #
     # All methods about objectives to be implemented
@@ -752,7 +755,9 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], (XVar, int)):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            assert len(lst) == 1, "Expected range here, but got list with multiple elements, what's the semantics???"
+            return list(lst[0]) # this should work without converting to str first
+            # return list(eval(str(lst[0])))
         else:
             return self.vars_from_node(lst)
 
@@ -760,7 +765,14 @@ class CallbacksCPMPy(Callbacks):
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            return list(eval(str(lst[0])))
+            # assert len(lst) == 1, f"Expected range here, but got list with multiple elements, what's the semantics???{lst}"
+
+            if len(lst) == 1:
+                return list(lst[0]) # this should work without converting to str first
+            else:
+                return [cp.intvar(l.start, l.stop-1) for l in lst]
+            
+            # return list(eval(str(lst[0])))
         else:
             return self.exprs_from_node(lst)
 

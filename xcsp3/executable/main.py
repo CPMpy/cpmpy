@@ -43,7 +43,7 @@ SUPPORTED_SUBSOLVERS = {
     "minizinc": ["gecode", "chuffed"]
 }
 DEFAULT_SOLVER = "ortools"
-TIME_BUFFER = 1 # seconds
+TIME_BUFFER = 5 # seconds
 # TODO : see if good value
 MEMORY_BUFFER_SOFT = 2 # MB
 MEMORY_BUFFER_HARD = 2 # MMB
@@ -237,9 +237,9 @@ class Args:
             self.dir = dir_path(self.dir)
         if not is_supported_solver(self.solver):
             raise(ValueError(f"solver:{self.solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}"))
-        if self.subsolver is not None:
-            if not is_supported_subsolver(self.solver, self.subsolver):
-                raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
+        # if self.subsolver is not None:
+        #     if not is_supported_subsolver(self.solver, self.subsolver):
+        #         raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
         self.benchdir = os.path.join(*(str(self.benchpath).split(os.path.sep)[:-1]))
         self.benchname = str(self.benchpath).split(os.path.sep)[-1].split(".")[0]
 
@@ -398,7 +398,7 @@ def solver_arguments(args: Args, model:cp.Model):
 def subsolver_arguments(args: Args, model:cp.Model):
     if args.subsolver == "gecode": return gecode_arguments(args, model)
     elif args.subsolver == "chuffed": return choco_arguments(args, model)
-    else: raise()
+    else: return {}
 
 @contextmanager
 def prepend_print():
@@ -526,9 +526,9 @@ def run_helper(args:Args):
 
     # ------------------------------ Parse instance ------------------------------ #
 
-    start = time.time()
+    parse_start = time.time()
     parser = ParserXCSP3(args.benchpath)
-    print_comment(f"took {(time.time() - start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
+    print_comment(f"took {(time.time() - parse_start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
 
     # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
     start = time.time()
@@ -566,7 +566,7 @@ def run_helper(args:Args):
     print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
-    time_limit = args.time_limit - tc.time - args.time_buffer if args.time_limit is not None else None
+    time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
     
     # If not time left
     if time_limit is not None and time_limit <= 0:
