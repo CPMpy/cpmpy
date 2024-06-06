@@ -178,7 +178,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), exp
                 _toplevel.extend(define)  # definitions should be added toplevel
                 # the `decomposed` expression (and rhs) might contain other global constraints, check it
                 decomposed = decompose_in_tree(decomposed, supported, supported_reified, expr_store, _toplevel, nested=True)
-                newlist.extend(decomposed)
+                newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
             newlist.append(expr)
