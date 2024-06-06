@@ -237,9 +237,9 @@ class Args:
             self.dir = dir_path(self.dir)
         if not is_supported_solver(self.solver):
             raise(ValueError(f"solver:{self.solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}"))
-        if self.subsolver is not None:
-            if not is_supported_subsolver(self.solver, self.subsolver):
-                raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
+        # if self.subsolver is not None:
+        #     if not is_supported_subsolver(self.solver, self.subsolver):
+        #         raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
         self.benchdir = os.path.join(*(str(self.benchpath).split(os.path.sep)[:-1]))
         self.benchname = str(self.benchpath).split(os.path.sep)[-1].split(".")[0]
 
