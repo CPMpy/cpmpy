@@ -336,7 +336,8 @@ def z3_arguments(args: Args, model:cp.Model):
     # Opt parameters
     if args.opt:
         res |= {
-            "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+            # opt does not seem to support setting max memory
+            # "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
         }
 
     return {k:v for (k,v) in res.items() if v is not None}
