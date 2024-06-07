@@ -537,10 +537,7 @@ def run_helper(args:Args):
         print_status(ExitStatus.unsupported)
         print_comment(str(e))
         exit(1)
-    except Exception as e:
-        print_status(ExitStatus.unknown)
-        print_comment(str(e))
-        exit(1)
+
 
     print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
     
