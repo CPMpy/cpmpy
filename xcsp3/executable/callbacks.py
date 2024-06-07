@@ -550,8 +550,8 @@ class CallbacksCPMPy(Callbacks):
             durs = cp.cpm_array([self.get_cpm_vars(lst) for lst in lengths])
 
             for i, j in all_pairs(list(range(n))):
-                self.cpm_model += cpm_any([starts[d,i] + durs[d,i] <= starts[d,j] |\
-                                           starts[d,j] + durs[d,j] <= starts[d,i] for d in range(dim)])
+                self.cpm_model += cpm_any([(starts[d,i] + durs[d,i] <= starts[d,j]) |\
+                                           (starts[d,j] + durs[d,j] <= starts[d,i]) for d in range(dim)])
                 
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
         start_x = self.get_cpm_vars(xs)
