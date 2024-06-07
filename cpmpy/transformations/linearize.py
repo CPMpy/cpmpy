@@ -40,9 +40,11 @@ General comparisons or expressions
 import copy
 import numpy as np
 from cpmpy.transformations.normalize import toplevel_list
+from .decompose_global import decompose_in_tree
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .get_variables import get_variables
+from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -129,7 +131,21 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-                #elif lhs.name == 'div' and is:
+                elif lhs.name == 'div':
+                    a, b = lhs.args
+                    # if division is total, b is either strictly negative or strictly positive!
+                    lb, ub = get_bounds(b)
+                    if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+                        raise TypeError(
+                            f"Can't divide by a domain containing 0, safen the expression first")
+                    r = intvar(0, max(abs(lb) - 1, abs(ub) - 1))  # remainder is always positive for floordivision.
+                    cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
+                    cond = [r < Abs(b)]
+                    decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
+                    cpm_exprs = toplevel_list(decomp + cpm_expr)
+                    exprs = linearize_constraint(flatten_constraint(cpm_exprs, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+                    newlist.extend(exprs)
+                    continue
                     #newrhs = lhs.args[0]
                     #lhs = lhs.args[1] * rhs #operator is actually always '==' here due to only_numexpr_equality
                     #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
