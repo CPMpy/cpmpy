@@ -1,6 +1,6 @@
 # Competition
 
-These are the instructions for the XCSP3 2024 competition.
+These are the installation and usage instructions for the CPMpy submission to the XCSP3 2024 competition.
 
 ## Setup
 
@@ -8,14 +8,22 @@ Since the competition will be run on a cluster of CentOS 8.3 servers, the instal
 
 ### Dependencies
 
+CPMpy is a python library, and thus python is the main dependency. But many of the libraries on which it depends for communicating with the different solvers, have their own dependencies, often requirering certain C libraries. The next steps should be done in order, since they need to be available when compiling python3.11 from source. When installing python3.11 through any other means, there is no guarantee that it has been build with these dependencies included (The anaconda builds do seem to include everything). 
+
+
 1) C compiler & other dev tools
+
+    Some python libraries have C dependencies and need to be able to compile them
+    upon setup (when pip installing). The following installs various development tools (like g++) :
+
     ```bash
     yum group install "Development Tools"
     ```
 
 2) libffi-devel
 
-    To get _ctypes in python (must be installed when compiling python3.11, if python3.11 is not already installed)
+    To get _ctypes in python. Similarly as the previous dependency, is required to
+    build some of the python libraries. Must be installed before compiling python3.11 (if python3.11 is not already installed)
     ```bash
     yum install -y libffi-devel
     ```
@@ -27,7 +35,23 @@ Since the competition will be run on a cluster of CentOS 8.3 servers, the instal
     yum install -y ncurses-devel
     ```
 
-4) Python
+4) boost-devel
+
+    Needed for the `Exact` solver.
+    ```bash
+    yum install boost-devel
+    ```
+
+5) libGL divers
+
+    For some reason, the `GeCode` solver requires graphics drivers to be able to run (probably uses them for vector operations?). Without them, GeCode will complain (when running, not when in stalling) about a missing shared object file: `libEGL.so.1`. This might not be present on a headless install.
+
+    ```bash
+    yum install mesa-libGL mesa-dri-drivers libselinux libXdamage libXxf86vm libXext
+    dnf install mesa-libEGL
+    ```
+
+6) Python
     - version: 3.11(.7)
 
     These are the steps we used to install it:
@@ -38,8 +62,52 @@ Since the competition will be run on a cluster of CentOS 8.3 servers, the instal
     ./configure --enable-optimizations 
     make altinstall 
     ```   
+    Python should now be available with the command `python3.11`
+
+    > [!WARNING]
+    > If the above dependencies are not installed at the time of building python, later installation steps for some of the solvers will fail.
+
+### Solvers
+
+1) Minizinc
+
+
+    To download Minizinc, run the following:
+    ```bash
+    wget https://github.com/MiniZinc/MiniZincIDE/releases/download/2.8.5/MiniZincIDE-2.8.5-bundle-linux-x86_64.tgz
+    tar zxvf MiniZincIDE-2.8.5-bundle-linux-x86_64.tgz 
+    ```
+    Now add the `/bin` directory inside the extracted directory to `PATH`.
+
+    E.g.:
+    ```bash
+    export PATH="$HOME/MiniZincIDE-2.8.5-bundle-linux-x86_64/bin/:$PATH"
+    ```
+
+2) Gurobi licence
+
+    It might be that you already have a licence or that, depending on how the licence was acquired, the installation of the license differs. The following steps are for installing a single-person single-machine academic license, aquired through the Gurobi User Portal.
+
+    First, get a licence from Gurobi's site. It should give you a command looking like: `grbgetkey <your licence key>`
+
+    Next, get the license installer:
+
+    ```bash
+    wget https://packages.gurobi.com/lictools/licensetools11.0.2_linux64.tar.gz
+    tar zxvf licensetools11.0.2_linux64.tar.gz 
+    ```
+
+    Now install the license:
+    ```bash
+    ./grbgetkey <your licence key>
+    ```
+    It will ask where you would like to install the license. As long as Gurobi can find the license again,
+    the exact location does not matter for CPMpy.
+
 
 ### Installation
+
+These are the final steps to install everything from CPMpy's side. We will create a python virtual environment and install all libraries inside it.
 
 1) Enter competition directory
     ```bash
@@ -66,7 +134,7 @@ Since the competition will be run on a cluster of CentOS 8.3 servers, the instal
     ```bash
     pip install GitPython
     ```
-    Install Poetry
+    Install Poetry (a python dependency manager)
     ```bash
     pip install poetry
     ```
@@ -81,19 +149,21 @@ Since the competition will be run on a cluster of CentOS 8.3 servers, the instal
     ```
 Now we should be all set up!
 
+
+
 ## Running code
 
 This section will explain how to run the executable on problem instances. 
 
 The interface of the executable is as follows:
 ```bash
-python executable/main.py <benchname> 
+python executable/main.py <BENCHNAME> 
     [-s/--seed <RANDOMSEED>] 
     [-l/--time-limit=<TIMELIMIT>] 
     [-m/--mem-limit <MEMLIMIT>] 
     [-c/--cores <NBCORES>]              
     [--solver <SOLVER>]             # Name of solver
-    [--subsolver <SUBSOLVER>]       # Name of subsolver
+    [--subsolver <SUBSOLVER>]       # Name of subsolver (if applicable)
     [--intermediate]                # If intermediate results should be reported (only for COP and a subset of solvers)
 ```
 
@@ -109,12 +179,12 @@ The commands are as follows:
 
 | Solver | Subsolver | Command |
 | - | - | - |
-| OR-Tools | / | python executable/main.py BENCHNAME --intermediate --cores=\NBCORES --profiler --solver=ortools --mem-limit=MEMLIMIT --time-limit==TIMELIMIT | 
-| Exact | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT | 
-| Z3 | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT | 
-| Gurobi | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT | 
-| Minizinc | Chuffed | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT | 
-| Minizinc | GeCode | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT | 
+| OR-Tools | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=ortools --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Exact | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Z3 | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEE | 
+| Gurobi | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Minizinc | Chuffed | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Minizinc | GeCode | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
 
 
