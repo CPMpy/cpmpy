@@ -79,7 +79,7 @@ class CPM_exact(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, **kwargs):
         """
         Constructor of the native solver object
 
@@ -98,7 +98,8 @@ class CPM_exact(SolverInterface):
         from exact import Exact as xct
 
         # initialise the native solver object
-        options = [] # options is a list of string-pairs, e.g. [("verbosity","1")]
+        options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
+        options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
         self.xct_solver = xct(options)
 
         # for solving with assumption variables,

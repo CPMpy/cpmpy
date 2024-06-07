@@ -555,7 +555,10 @@ def run_helper(args:Args):
     # Transfer model to solver
     with prepend_print():# as output: #TODO immediately print
         with TimerContext("transform") as tc:
-            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
+            if args.solver == "exact": # Exact2 takes its options at creation time
+                s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model, **solver_arguments(args, model))
+            else:
+                s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
     # for o in output:
     #     print_comment(o)
     print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
@@ -576,10 +579,15 @@ def run_helper(args:Args):
     if args.solve:
         try:
             with TimerContext("solve") as tc:
-                sat = s.solve(
-                    time_limit=time_limit,
-                    **solver_arguments(args, model)
-                ) 
+                if args.solver == "exact": # Exact2 takes its options at creation time
+                    sat = s.solve(
+                        time_limit=time_limit,
+                    ) 
+                else:
+                    sat = s.solve(
+                        time_limit=time_limit,
+                        **solver_arguments(args, model)
+                    ) 
             print_comment(f"took {(tc.time):.4f} seconds to solve")
         except MemoryError:
             print_comment("Ran out of memory when trying to solve.")
