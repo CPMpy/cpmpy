@@ -72,11 +72,13 @@ class CPM_exact(SolverInterface):
             import pkg_resources
             pkg_resources.require("exact>=1.1.5")
             return True
-        except ImportError as e:
-            return False
+        except ModuleNotFoundError as e:
+            return False 
         except VersionConflict:
             warnings.warn(f"CPMpy requires Exact version >=1.1.5 is required but you have version {pkg_resources.get_distribution('exact').version}")
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
