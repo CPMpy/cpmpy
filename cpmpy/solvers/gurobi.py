@@ -80,9 +80,12 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except Exception as e:
-            print(e) # For when the error message is actually because the licence is not set
+        except ModuleNotFoundError as e:
             return False
+        except gp.GurobiError as e:
+            raise Exception(
+                f"CPM_gurobi: gurobi raise an internal exception when importing: {str(e)}"
+            )
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
