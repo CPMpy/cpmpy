@@ -1086,6 +1086,43 @@ class InDomain(GlobalConstraint):
         return "{} in {}".format(self.args[0], self.args[1])
 
 
+class InDomainNested(GlobalConstraint):
+    """
+        The "InDomain" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        super().__init__("InDomainNested", [expr, arr])
+
+    def decompose(self):
+        """
+        This decomp works in all contexts
+        """
+        from .python_builtins import any
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        defining = []
+        # if expr is not a var
+        if not isinstance(expr, _IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
+        expressions = any(isinstance(a, Expression) for a in arr)
+        if expressions:
+            return [any(expr == a for a in arr)], defining
+        else:
+            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+
+
+    def value(self):
+        return argval(self.args[0]) in argvals(self.args[1])
+
+    def __repr__(self):
+        return "{} in {}".format(self.args[0], self.args[1])
+
+
 class NotInDomain(GlobalConstraint):
     """
         The "NotInDomain" constraint, defining non-interval domains for an expression
