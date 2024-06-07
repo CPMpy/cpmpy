@@ -324,27 +324,22 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        # "memory_max_alloc_count": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        # "type_check": False # disable type checker 
+        "random_seed": args.seed,
     }
     
     # Sat parameters
     if args.sat:
         res |= {
-            # "sat.max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-            "random_seed": args.seed,
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
+            "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
         }
-    return {k:v for (k,v) in res.items() if v is not None}
     # Opt parameters
-    # /
-    # Parallel parameters
-    if args.parallel:
+    if args.opt:
         res |= {
-            "parallel.enable": True,
-            "parallel.threads.max": args.cores
+            # opt does not seem to support setting max memory
+            # "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
         }
+
     return {k:v for (k,v) in res.items() if v is not None}
 
 
@@ -567,7 +562,8 @@ def run_helper(args:Args):
 
     # Solve model
     time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
-    
+    print_comment(f"{time_limit}s left to solve")
+
     # If not time left
     if time_limit is not None and time_limit <= 0:
         # Not enough time to start a solve call (we're already over the limit)
