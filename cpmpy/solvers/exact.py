@@ -286,9 +286,13 @@ class CPM_exact(SolverInterface):
         elif isinstance(cpm_var, _IntVarImpl):
             lb, ub = cpm_var.get_bounds()
             # encoding for integer variables in Exact - one of "log", "onehot", "order"
-            # for domain sizes >= 64, the most efficient one is probably "log", so that is the default
+            # for large domain sizes, the most efficient one is probably "log", so that is the default
             # "onehot" is less efficient, but required to prune domains with Exact
-            encoding = "order" if ub-lb < 64 else "log"
+            # a quick experiment on the XCSP23 instances:
+            # domain size limit for order: 0  8 16 64
+            # solved instances:           89 89 87 80
+            # so we go for a limit of 8 for now.
+            encoding = "order" if ub-lb < 8 else "log"
             self.xct_solver.addVariable(revar, lb, ub, encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
