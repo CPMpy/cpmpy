@@ -612,7 +612,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    # try:
-    main()
-    # except Exception as e:
-    #     error_handler(e)
+    try:
+        main()
+    except Exception as e:
+        error_handler(e)
