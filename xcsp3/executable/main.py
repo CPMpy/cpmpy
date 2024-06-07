@@ -324,20 +324,21 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        "random_seed": args.seed,
+        
     }
     
     # Sat parameters
     if args.sat:
         res |= {
+            "random_seed": args.seed,
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
             "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
         }
     # Opt parameters
     if args.opt:
-        res |= {
+        res |= {          
             # opt does not seem to support setting max memory
-            # "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+            # opt does also not allow setting the random seed
         }
 
     return {k:v for (k,v) in res.items() if v is not None}
