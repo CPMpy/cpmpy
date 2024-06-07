@@ -47,9 +47,10 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import ExprStore, get_store, is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import ExprStore, get_store, is_any_list, is_num, eval_comparison, is_bool, get_bounds
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, expr_store:ExprStore=None, reified=False):
     """
@@ -128,6 +129,18 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                #elif lhs.name == 'div' and is:
+                    #newrhs = lhs.args[0]
+                    #lhs = lhs.args[1] * rhs #operator is actually always '==' here due to only_numexpr_equality
+                    #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
+                elif lhs.name == 'mod':  # x mod y == x - (x//y) * y
+                    x = lhs.args[0]
+                    y = lhs.args[1]
+                    lhs = x - (x//y) * y
+                    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                    exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+                    newlist.extend(exprs)
+                    continue
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
 
