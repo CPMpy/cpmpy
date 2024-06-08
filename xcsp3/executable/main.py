@@ -89,23 +89,28 @@ def get_subsolver(args:Args, model:cp.Model):
 
     return args.subsolver
 
+original_stdout = sys.stdout
+
 def sigterm_handler(_signo, _stack_frame):
     """
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
     """
     # Report that we haven't found a solution in time
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
     print(flush=True)
     sys.exit(0)
 
 def memory_error_handler(args: Args):
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(args.mem_limit)} MB / {bytes_as_gb_float(args.mem_limit)} GB")
     print(flush=True)
     sys.exit(0)
 
 def error_handler(e: Exception):
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment(f"An error got raised: {e}")
     print(flush=True)
