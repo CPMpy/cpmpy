@@ -72,6 +72,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                 print(f'Timeout for {solver}' + (f':{subsolver}' if subsolver is not None else "") + f':{instance_name} ({time_limit}s) expired', file=sys.stderr)
                 print('Terminating the whole process group...', file=sys.stderr)
                 os.killpg(os.getpgid(p.pid), SIGTERM)
+                time.sleep(1)
 
         else:
             print("NO COMPETITION")
