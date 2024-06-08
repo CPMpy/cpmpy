@@ -89,23 +89,28 @@ def get_subsolver(args:Args, model:cp.Model):
 
     return args.subsolver
 
+original_stdout = sys.stdout
+
 def sigterm_handler(_signo, _stack_frame):
     """
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
     """
     # Report that we haven't found a solution in time
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
     print(flush=True)
     sys.exit(0)
 
 def memory_error_handler(args: Args):
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(args.mem_limit)} MB / {bytes_as_gb_float(args.mem_limit)} GB")
     print(flush=True)
     sys.exit(0)
 
 def error_handler(e: Exception):
+    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment(f"An error got raised: {e}")
     print(flush=True)
@@ -324,20 +329,21 @@ def z3_arguments(args: Args, model:cp.Model):
 
     # Global parameters
     res = {
-        "random_seed": args.seed,
+        
     }
     
     # Sat parameters
     if args.sat:
         res |= {
+            "random_seed": args.seed,
             "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
             "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
         }
     # Opt parameters
     if args.opt:
-        res |= {
+        res |= {          
             # opt does not seem to support setting max memory
-            # "memory_max_size": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
+            # opt does also not allow setting the random seed
         }
 
     return {k:v for (k,v) in res.items() if v is not None}
@@ -537,10 +543,7 @@ def run_helper(args:Args):
         print_status(ExitStatus.unsupported)
         print_comment(str(e))
         exit(1)
-    except Exception as e:
-        print_status(ExitStatus.unknown)
-        print_comment(str(e))
-        exit(1)
+
 
     print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
     

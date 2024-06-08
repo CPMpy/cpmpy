@@ -150,11 +150,57 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                     #lhs = lhs.args[1] * rhs #operator is actually always '==' here due to only_numexpr_equality
                     #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
                 elif lhs.name == 'mod':  # x mod y == x - (x//y) * y
-                    x = lhs.args[0]
-                    y = lhs.args[1]
-                    lhs = x - (x//y) * y
-                    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-                    exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+
+                    # This creates a devision between decision variables (gurobi will fail)
+                    # x = lhs.args[0]
+                    # y = lhs.args[1]
+                    # lhs = x - (x//y) * y
+                    # cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                    # exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+
+                    # Also fails due to unsupported expression
+                    # x = lhs.args[0]
+                    # y = lhs.args[1]
+                    # d = intvar(0, abs(get_bounds(x)[1] // get_bounds(y)[0])+1)
+                    # lhs = x - d * y
+                    # cpm_expr = [eval_comparison(cpm_expr.name, lhs, rhs), (x//y == d)]
+                    # exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+
+                    # No idea if this alternative is correct, but it seems to make some xcsp3 instances solvable
+                    # x mod y = r
+                    # x // y = d
+                    # x = d*y + r
+                    x_bounds = [abs(b) for b in get_bounds(lhs.args[0])]
+                    x = intvar(min(x_bounds), max(x_bounds))
+                    y_bounds = [abs(b) for b in get_bounds(lhs.args[1])]
+                    y = intvar(min(y_bounds), max(y_bounds))
+                    r = rhs
+                    d = intvar(0, abs(get_bounds(x)[1] // get_bounds(y)[0])+1)
+
+                    if cpm_expr.name == "==": # x mod y == r
+                        expr = (0 <= r) & (r < y) & (d*y + r == x)
+                    
+                    elif cpm_expr.name == "!=": # x mod y != r
+                        expr = (r < 0) | (r >= y) | ((d*y <= x) & ((d+1)*y > x) & (d*y + r != x))
+
+                    elif cpm_expr.name == "<=": # x mod y <= r
+                        expr = (r < 0) | ((r < y) & (d*y <= x) & ((d+1)*y > x) & (d*y + r <= x))
+
+                    elif cpm_expr.name == "<": # x mod y < r
+                        expr = (r < 0) | ((r < y) & (d*y < x) & ((d+1)*y > x) & (d*y + r < x))
+
+                    elif cpm_expr.name == ">=": # x mod y >= r
+                        expr = (r >= y-1) | ((r > 0) & (d*y <= x) & ((d+1)*y > x) & (d*y + r >= x))
+
+                    elif cpm_expr.name == ">": # x mod y > r
+                        expr = (r > y-1) | ((r > 0) & (d*y <= x) & ((d+1)*y > x) & (d*y + r > x))
+
+                    else:
+                        raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} does not (yet) have a linearization within '{cpm_expr.name}'. Please report on github")
+
+                    expr &= (Abs(lhs.args[0]) == x) & (Abs(lhs.args[1]) == y)
+
+                    exprs = linearize_constraint(flatten_constraint(expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
                     newlist.extend(exprs)
                     continue
                 else:

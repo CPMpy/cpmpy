@@ -79,7 +79,7 @@ mini_instance_types = ["MiniCSP", "MiniCOP"]
 cop_instance_types = ["COP", "MiniCOP"]
 csp_instance_types = ["CSP", "MiniCSP"]
 
-def instances(type, year) -> list:
+def instances(type, year, filter) -> list:
     """
         Filters and aggregates problem instances based on the provided `type`.
     """
@@ -103,9 +103,13 @@ def instances(type, year) -> list:
         instances = get_all_instances(INSTANCES_DIR, year)["COP"]
     else:
         raise()
+    
                 
     # return instances.keys(), instances.values()
-    return list(instances.items())
+    res = list(instances.items())
+    if filter is not None:
+        res = [i for i in res if filter in i[0]]
+    return res
 
 def pytest_addoption(parser):
     """
@@ -124,6 +128,7 @@ def pytest_addoption(parser):
     parser.addoption("--only_transform", action="store_true")
     parser.addoption("--check", action="store_true")
     parser.addoption("--year", action="store", default="2022")
+    parser.addoption("--filter", action="store", default=None)
 
 
 def pytest_generate_tests(metafunc):
@@ -132,7 +137,7 @@ def pytest_generate_tests(metafunc):
     """
 
     # Get the test instances based on the provided filter
-    instance = instances(type=metafunc.config.getoption("type"), year=metafunc.config.getoption("year"))
+    instance = instances(type=metafunc.config.getoption("type"), year=metafunc.config.getoption("year"), filter=metafunc.config.getoption("filter"))
 
     # The test instances to solve
     if "instance" in metafunc.fixturenames:

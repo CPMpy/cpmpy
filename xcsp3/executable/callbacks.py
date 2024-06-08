@@ -82,7 +82,7 @@ class CallbacksCPMPy(Callbacks):
         "ne": (2, lambda x, y: x != y),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
-        'in': (2, lambda x, y: cp.InDomain(x, y)),
+        'in': (2, lambda x, y: cp.InDomainNested(x, y)),
         'set': (0, lambda x: list(set(x))),
         #TODO 'notin' is the only other set operator (negative indomain)
         # Logic
@@ -528,13 +528,11 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.NoOverlap(cpm_start, cpm_dur, cpm_end)
 
     def ctr_nooverlap_multi(self, origins: list[list[Variable]], lengths: list[list[int]] | list[list[Variable]], zero_ignored: bool):
-        dim = len(origins)
+        dim = len(origins[0])
         if dim == 2:
-            assert len(origins) == 2
-            assert len(lengths) == 2
 
-            start_x, start_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
-            dur_x, dur_y = self.get_cpm_vars(origins[0]), self.get_cpm_vars(origins[1])
+            start_x, start_y = self.get_cpm_vars([o[0] for o in origins]), self.get_cpm_vars([o[1] for o in origins])
+            dur_x, dur_y = self.get_cpm_vars([l[0] for l in lengths]), self.get_cpm_vars([l[1] for l in lengths])
 
             end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
             end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
@@ -545,13 +543,12 @@ class CallbacksCPMPy(Callbacks):
         else: # n-dimensional, post decomposition directly
             from cpmpy.expressions.utils import all_pairs
             from cpmpy import any as cpm_any
-            n = len(origins[0])
             starts = cp.cpm_array([self.get_cpm_vars(lst) for lst in origins])
             durs = cp.cpm_array([self.get_cpm_vars(lst) for lst in lengths])
 
-            for i, j in all_pairs(list(range(n))):
-                self.cpm_model += cpm_any([starts[d,i] + durs[d,i] <= starts[d,j] |\
-                                           starts[d,j] + durs[d,j] <= starts[d,i] for d in range(dim)])
+            for i, j in all_pairs(list(range(len(origins)))):
+                self.cpm_model += cpm_any([(starts[i,d] + durs[i,d] <= starts[j,d]) |\
+                                           (starts[j,d] + durs[j,d] <= starts[i,d]) for d in range(dim)])
                 
     def ctr_nooverlap_mixed(self, xs: list[Variable], ys: list[Variable], lx: list[Variable], ly: list[int], zero_ignored: bool):
         start_x = self.get_cpm_vars(xs)
