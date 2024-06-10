@@ -495,19 +495,20 @@ def main():
         raise e
 
 def run(args: Args):
-    with PerfContext() as perf:
-        with TimerContext("total") as tc:
-            run_helper(args)
-    print_comment(f"Total time taken: {tc.time}")
-    
     if args.profiler:
         perf_dir = os.path.join(pathlib.Path(__file__).parent.resolve(), "perf_stats", args.solver)
         if args.subsolver is not None:
             perf_dir = os.path.join(perf_dir, args.subsolver)
         Path(perf_dir).mkdir(parents=True, exist_ok=True)
         path = os.path.join(perf_dir, args.benchname)
-        with open(path, 'w') as f:
-            json.dump(perf.measurements, f, indent=4)
+    else:
+        path = None
+
+    with PerfContext(path=path):
+        with TimerContext("total") as tc:
+            run_helper(args)
+    print_comment(f"Total time taken: {tc.time}")
+    
 
 def run_helper(args:Args):
     import sys, os
