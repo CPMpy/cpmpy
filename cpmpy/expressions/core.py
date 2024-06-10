@@ -533,6 +533,7 @@ class Operator(Expression):
         'sub': (2, False), # x - y
         'mul': (2, False),
         'div': (2, False),
+        'idiv': (2, False),
         'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
@@ -673,6 +674,12 @@ class Operator(Expression):
             except ZeroDivisionError:
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                               + "\n Use argval(expr) to get the value of expr with relational semantics.")
+        elif self.name == "idiv":
+            try:
+                return int(arg_vals[0] / arg_vals[1])
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -718,6 +725,13 @@ class Operator(Expression):
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("division by domain containing 0 is not supported")
             bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+            lowerbound, upperbound = min(bounds), max(bounds)
+        elif self.name == 'idiv':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("division by domain containing 0 is not supported")
+            bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])

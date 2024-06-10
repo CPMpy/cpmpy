@@ -13,6 +13,7 @@ from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
 from cpmpy import cpm_array
+from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
@@ -67,7 +68,7 @@ class CallbacksCPMPy(Callbacks):
         "add": (0, lambda x: cp.sum(x)),
         "sub": (2, lambda x, y: x - y),
         "mul": (0, lambda x: reduce((lambda x, y: x*y),x)),
-        "div": (2, lambda x, y: x // y),
+        "div": (2, lambda x, y: Operator(name="idiv", arg_list=[x,y])),
         "mod": (2, lambda x, y: x % y),
         "sqr": (1, lambda x: x ** 2),
         "pow": (2, lambda x, y: x ** y),
