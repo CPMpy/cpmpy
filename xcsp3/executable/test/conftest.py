@@ -108,8 +108,11 @@ def instances(type, year, filter) -> list:
     # return instances.keys(), instances.values()
     res = list(instances.items())
     if filter is not None:
-        res = [i for i in res if filter in i[0]]
+        res = [i for i in res if any([f in i[0] for f in filter])]
     return res
+
+def list_of_filters(arg):
+    return list(map(str, arg.split(',')))
 
 def pytest_addoption(parser):
     """
@@ -128,7 +131,7 @@ def pytest_addoption(parser):
     parser.addoption("--only_transform", action="store_true")
     parser.addoption("--check", action="store_true")
     parser.addoption("--year", action="store", default="2022")
-    parser.addoption("--filter", action="store", default=None)
+    parser.addoption("--filter", action="store", default=None, type=list_of_filters)
 
 
 def pytest_generate_tests(metafunc):

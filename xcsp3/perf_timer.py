@@ -2,7 +2,7 @@ from __future__ import annotations
 import contextvars
 from statistics import mean
 from typing import List, Union, Dict, Optional
-import time, math
+import time, math, json
 
 import os, sys, pathlib
 
@@ -37,8 +37,8 @@ class PerfContext:
     label_counter: int = 0
     measurements = {}
 
-    def __init__(self):
-        pass
+    def __init__(self, path=None):
+        self.path = path
 
     def __enter__(self):
         try:
@@ -59,6 +59,10 @@ class PerfContext:
     
     def add_time_measurement(self, label, time):
         self.measurements[label] = self.measurements.get(label, []) + [time] 
+
+        if self.path is not None:
+            with open(self.path, 'w') as f:
+                json.dump(self.measurements, f, indent=4)
 
     def aggregate(self):
         for k,v in self.measurements.items():
@@ -87,10 +91,10 @@ class TimerContext:
         self.end = time.time()
         set_timer_context(None)
         
-        try:
-            perf_context.add_time_measurement(self.label, self.end - self.start)
-        except:
-            pass
+        # try:
+        perf_context.add_time_measurement(self.label, self.end - self.start)
+        # except:
+        #     pass
 
     @property
     def time(self):
