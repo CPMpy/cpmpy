@@ -392,7 +392,7 @@ class CPM_exact(SolverInterface):
             # print("------------------")
 
             with TimerContext("decompose_in_tree") as tc:
-                cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialized MIP decomp
+                cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent', 'mod'})) # Alldiff has a specialized MIP decomp | support for "Mod" is faked
             print(f"exact:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
             
             # print(cpm_cons)
@@ -434,7 +434,7 @@ class CPM_exact(SolverInterface):
             # print("------------------")
             
             with TimerContext("linearize_constraint") as tc:
-                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul"}), expr_store=expr_store)  # the core of the MIP-linearization
+                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul","mod"}), expr_store=expr_store)  # the core of the MIP-linearization | support for "Mod" is faked
             print(f"exact:linearize_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
 
             # print(cpm_cons)
@@ -515,6 +515,20 @@ class CPM_exact(SolverInterface):
 
                 else:
                     lhs, rhs = cpm_expr.args
+                    if lhs.name == "mod":
+                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                        #   -> acts differently for negative numbers
+                        # "mod" is a partial function
+                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        x,y = lhs.args
+                        lby, uby = get_bounds(y)
+                        if (lby <= 0) and (uby >= 0): # if 0 is within the bounds
+                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                        k = intvar(*get_bounds((x - rhs) // y)) 
+                        self += (k * y) + rhs == x
+                        self += rhs < abs(y)
+                        continue
+
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
 
                     # linearize removed '<', '>' and '!='
