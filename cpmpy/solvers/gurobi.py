@@ -289,7 +289,7 @@ class CPM_gurobi(SolverInterface):
             with TimerContext("toplevel_list") as tc:
                 cpm_cons = toplevel_list(cpm_expr)
             print(f"gurobi:toplevel_list took {(tc.time):.4f} -- {len(cpm_cons)}")
-            supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
+            supported = {"min", "max", "abs", "alldifferent", "mod"} # alldiff has a specialized MIP decomp in linearize | support for "Mod" is faked
             with TimerContext("decompose_in_tree") as tc:
                 cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
             print(f"gurobi:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
@@ -309,7 +309,7 @@ class CPM_gurobi(SolverInterface):
                 cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # anything that can create full reif should go above...
             print(f"gurobi:only_implies took {(tc.time):.4f} -- {len(cpm_cons)}")
             with TimerContext("linearize_constraint") as tc:
-                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div"}), expr_store=expr_store)  # the core of the MIP-linearization
+                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div","mod"}), expr_store=expr_store)  # the core of the MIP-linearization | support for "Mod" is faked
             print(f"gurobi:linearize_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
             with TimerContext("only_positive_bv") as tc:
                 cpm_cons = only_positive_bv(cpm_cons, expr_store=expr_store)  # after linearization, rewrite ~bv into 1-bv
