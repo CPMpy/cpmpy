@@ -378,6 +378,19 @@ class CPM_gurobi(SolverInterface):
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
+                elif lhs.name == "mod":
+                    # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                    #   -> acts differently for negative numbers
+                    # "mod" is a partial function
+                    #   -> x % 0 = x (unless x == 0, then undefined)
+                    x,y = lhs.args
+                    lby, uby = get_bounds(y)
+                    if (lby <= 0) and (uby >= 0): # if 0 is within the bounds
+                        raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                    k = intvar(*get_bounds((x - rhs) // y)) 
+                    self += (k * y) + rhs == x
+                    self += rhs < abs(y)
+
                 else:
                     # General constraints
                     # grbrhs should be a variable for gurobi in the subsequent, fake it

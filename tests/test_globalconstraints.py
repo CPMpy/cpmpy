@@ -780,6 +780,20 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertNotEqual(str(abs(iv.value())), '4')
 
+        iv = cp.intvar(-8, 0)
+        constraints = [cp.Abs(iv) + 9 <= 8]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.Abs(iv - 4) + 1 > 12]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Model(decompose_in_tree(constraints)).solve()) #test with decomposition
+
+        model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
+        self.assertTrue(model.solve())
+        self.assertNotEqual(str(abs(iv.value())), '4')
+
     def test_element(self):
         # test 1-D
         iv = cp.intvar(-8, 8, 3)
