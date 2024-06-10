@@ -151,6 +151,7 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                     #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
                 elif lhs.name == 'mod':  # x mod y == x - (x//y) * y
                     # gets handles in the solver interface
+                    # We should never get here, since both Gurobi and Exact have "faked support" for "Mod"
                     newlist.append(cpm_expr)
                     continue
                 else:
