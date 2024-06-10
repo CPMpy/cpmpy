@@ -202,7 +202,16 @@ class Abs(GlobalFunction):
                they should be enforced toplevel.
         """
         arg = self.args[0]
-        return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
+        
+        lb, ub = get_bounds(arg)
+        # when argument is exclusively on one side of the sign
+        if lb >= 0:
+            return [Comparison(cpm_op, arg, cpm_rhs)], []
+        elif ub <= 0:
+            return [Comparison(cpm_op, -arg, cpm_rhs)], []
+        # when domain crosses over 0
+        else:
+            return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
 
 
     def get_bounds(self):
