@@ -1073,8 +1073,9 @@ class InDomain(GlobalConstraint):
             missing = ub + 1 - lb - given
             if 3 * missing <= given:  # a lot more given in the domain than missing, so we use the opposites.
                 return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
-
-        if len(arr) > 1:
+        if len(arr) == 0:
+            row_selected = []
+        elif len(arr) > 1:
             row_selected = boolvar(shape=len(arr))
         else:
             row_selected = [boolvar(shape=len(arr))]
