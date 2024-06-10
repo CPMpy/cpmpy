@@ -150,75 +150,9 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                     #lhs = lhs.args[1] * rhs #operator is actually always '==' here due to only_numexpr_equality
                     #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
                 elif lhs.name == 'mod':  # x mod y == x - (x//y) * y
-
-                    # This creates a devision between decision variables (gurobi will fail)
-                    # x = lhs.args[0]
-                    # y = lhs.args[1]
-                    # lhs = x - (x//y) * y
-                    # cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-                    # exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
-
-                    # Also fails due to unsupported expression
-                    # x = lhs.args[0]
-                    # y = lhs.args[1]
-                    # d = intvar(0, abs(get_bounds(x)[1] // get_bounds(y)[0])+1)
-                    # lhs = x - d * y
-                    # cpm_expr = [eval_comparison(cpm_expr.name, lhs, rhs), (x//y == d)]
-                    # exprs = linearize_constraint(flatten_constraint(cpm_expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
-
-                    # No idea if this alternative is correct, but it seems to make some xcsp3 instances solvable
-                    # x mod y = r
-                    # x // y = d
-                    # x = d*y + r
-
-                    assert cpm_expr.name == "==", f"should only get x % y == z here, but got {cpm_expr}, make sure to run `only_numexpr_equality first!"
-                    x,y  = lhs.args
-                    k = intvar(*get_bounds(x - rhs) // y)
-                    if is_num(y): # module with constant, can rewrite to weighted sum
-                        lhs  = Operator("wsum", [[-1,y,1], [x,k,rhs]])
-                        cpm_expr = eval_comparison(cpm_expr.name, lhs, 0)
-                    else:
-                        newvar, cons = get_or_make_var(k*y, expr_store) # cons should be flat here
-                        newlist.extend(cons)
-                        lhs = Operator("wsum", [[-1,1,1], [x,newvar,rhs]])
-                        cpm_expr = eval_comparison(cpm_expr.name, lhs, 0)
-                #     #
-                #     #
-                #     #
-                #     #
-                #     # x_bounds = [abs(b) for b in get_bounds(lhs.args[0])]
-                #     # x = intvar(min(x_bounds), max(x_bounds))
-                #     # y_bounds = [abs(b) for b in get_bounds(lhs.args[1])]
-                #     # y = intvar(min(y_bounds), max(y_bounds))
-                #     # r = rhs
-                #     # d = intvar(0, abs(get_bounds(x)[1] // get_bounds(y)[0])+1)
-                #     #
-                #     # if cpm_expr.name == "==": # x mod y == r
-                #     #     expr = (0 <= r) & (r < y) & (d*y + r == x)
-                #     #
-                #     # elif cpm_expr.name == "!=": # x mod y != r
-                #     #     expr = (r < 0) | (r >= y) | ((d*y <= x) & ((d+1)*y > x) & (d*y + r != x))
-                #     #
-                #     # elif cpm_expr.name == "<=": # x mod y <= r
-                #     #     expr = (r < 0) | ((r < y) & (d*y <= x) & ((d+1)*y > x) & (d*y + r <= x))
-                #     #
-                #     # elif cpm_expr.name == "<": # x mod y < r
-                #     #     expr = (r < 0) | ((r < y) & (d*y < x) & ((d+1)*y > x) & (d*y + r < x))
-                #     #
-                #     # elif cpm_expr.name == ">=": # x mod y >= r
-                #     #     expr = (r >= y-1) | ((r > 0) & (d*y <= x) & ((d+1)*y > x) & (d*y + r >= x))
-                #     #
-                #     # elif cpm_expr.name == ">": # x mod y > r
-                #     #     expr = (r > y-1) | ((r > 0) & (d*y <= x) & ((d+1)*y > x) & (d*y + r > x))
-                #     #
-                #     # else:
-                #     #     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} does not (yet) have a linearization within '{cpm_expr.name}'. Please report on github")
-                #     #
-                #     # expr &= (Abs(lhs.args[0]) == x) & (Abs(lhs.args[1]) == y)
-                #     #
-                #     # exprs = linearize_constraint(flatten_constraint(expr, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
-                #     # newlist.extend(exprs)
-                #     # continue
+                    # gets handles in the solver interface
+                    newlist.append(cpm_expr)
+                    continue
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
 
