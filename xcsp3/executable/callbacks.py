@@ -338,7 +338,8 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
-        self._unimplemented(lst, limit, operator)
+        self.ctr_lex([lst, limit], operator)
+        #self._unimplemented(lst, limit, operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
