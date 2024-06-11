@@ -132,6 +132,7 @@ def pytest_addoption(parser):
     parser.addoption("--check", action="store_true")
     parser.addoption("--year", action="store", default="2022")
     parser.addoption("--filter", action="store", default=None, type=list_of_filters)
+    parser.addoption("--cores", action="store", default=None, type=int)
 
 
 def pytest_generate_tests(metafunc):
@@ -201,3 +202,7 @@ def pytest_generate_tests(metafunc):
     # Check the solution with the SolutionChecker (takes some time)
     if "check" in metafunc.fixturenames:
         metafunc.parametrize("check", [metafunc.config.getoption("check")])
+
+    # Set the number of processing cores to use when solving
+    if "cores" in metafunc.fixturenames:
+        metafunc.parametrize("cores", [metafunc.config.getoption("cores")])

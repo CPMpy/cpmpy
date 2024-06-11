@@ -13,7 +13,7 @@ from .conftest import TEST_OUTPUT_DIR, JAR
 
 from signal import SIGTERM
 
-def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = False, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False, profiler:bool=False, only_transform:bool=False, check:bool=False):
+def run_instance(instance_name: str, instance_location: os.PathLike, solver: str, subsolver:str, verbose: bool = False, fresh: bool = False, time_limit:int=None, memory_limit:int=None, intermediate:bool=False, competition:bool=False, profiler:bool=False, only_transform:bool=False, check:bool=False, cores=None):
     """
         Prepares the environment, runs the executable and checks the solution with SolutionChecker.
         Pipes all executable outputs to a file and adds additional, usefull data as comments 
@@ -57,6 +57,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                 if intermediate: cmd += [f"--intermediate"]
                 if only_transform: cmd += [f"--only-transform"]
                 if profiler: cmd += [f"--profiler"]
+                if cores is not None: cmd += [f"--cores={cores}"]
 
                 # Run command
                 p = subprocess.Popen(cmd, start_new_session=True, stdout=f)
@@ -91,7 +92,8 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
                     subsolver=subsolver,
                     intermediate=intermediate,
                     profiler=profiler,
-                    solve=not only_transform
+                    solve=not only_transform,
+                    cores=cores if cores is not None else 1,
                 )
                 main.run(args)
             f.close()
@@ -123,7 +125,7 @@ def run_instance(instance_name: str, instance_location: os.PathLike, solver: str
 
 # Pytest test function
 # @pytest.mark.repeat(10)
-def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, memory_limit, intermediate, profiler, only_transform, check, competition, verbose: bool = True, test=True):
+def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, memory_limit, intermediate, profiler, only_transform, check, competition, cores, verbose: bool = True, test=True):
     """
         This is the actual function which gets called by pytest. All inputs are defined in `conftest.py`.
     """
@@ -132,7 +134,7 @@ def test_instance(pytestconfig, instance, solver, subsolver, fresh, time_limit, 
 
     if verbose: print(f"Running instance {instance_name} on {solver}" + (f":{subsolver}" if subsolver is not None else ""))
 
-    test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition, profiler=profiler, only_transform=only_transform, check=check)
+    test_res_str = run_instance(instance_name, instance_location, solver=solver, subsolver=subsolver, verbose=verbose, fresh=fresh, time_limit=time_limit, memory_limit=memory_limit, intermediate=intermediate, competition=competition, profiler=profiler, only_transform=only_transform, check=check, cores=cores)
 
     # Assert that the result must be correct
     if test and not only_transform and check: #assert("OK	" == test_res_str)
