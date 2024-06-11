@@ -8,7 +8,7 @@ This submission is the basis for multiple solver submissions. CPMpy can translat
 
 The following solvers will compete in the following tracks:
 
-| Solver | CSP sequential | COP sequential | COP parallel | mini CSP | mini COP |
+| Solver | CSP sequential | COP sequential (30') | COP parallel | mini CSP | mini COP |
 | - | - | - | - | - | - |
 | OR-Tools | yes | yes | yes | yes | yes |
 | Exact | yes | yes | no | yes | yes |
@@ -196,11 +196,11 @@ The commands are as follows:
 | Solver | Subsolver | Command |
 | - | - | - |
 | OR-Tools | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=ortools --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Exact | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Z3 | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Gurobi | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Minizinc | Chuffed | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Minizinc | GeCode | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Exact | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Z3 | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Gurobi | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Minizinc | Chuffed | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Minizinc | GeCode | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
 
 
