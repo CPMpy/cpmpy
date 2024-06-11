@@ -4,7 +4,9 @@ These are the installation and usage instructions for the CPMpy submission to th
 
 ## Submission
 
-This submission is the basis for multiple solver submissions. CPMpy can translate to many different solvers, six of which have been chosen for the XCSP3 competition. The data files and install instructions are shared (some solvers have additional steps). The biggest difference is the actual command for the executable, where the correct solver must be set.
+This submission is the basis for multiple solver submissions. CPMpy is a modelling system which can translate to many different solvers, six of which have been chosen for the XCSP3 competition. 
+The data files and install instructions are shared (some solvers have additional steps). 
+The major difference is the actual command used to run the executable, where the correct solver must be set.
 
 The following solvers will compete in the following tracks:
 
@@ -38,7 +40,7 @@ CPMpy is a python library, and thus python is the main dependency. But many of t
 
 2) libffi-devel
 
-    To get _ctypes in python. Similarly as the previous dependency, is required to
+    To get _ctypes in python. Similarly as the previous dependency, it is required to
     build some of the python libraries. Must be installed before compiling python3.11 (if python3.11 is not already installed)
     ```bash
     yum install -y libffi-devel
@@ -60,14 +62,16 @@ CPMpy is a python library, and thus python is the main dependency. But many of t
 
 5) libGL divers
 
-    For some reason, the `GeCode` solver requires graphics drivers to be able to run (probably uses them for vector operations?). Without them, GeCode will complain (when running, not when in stalling) about a missing shared object file: `libEGL.so.1`. This might not be present on a headless install.
+    The `GeCode` solver requires certain graphics drivers to be installed on the system (probably uses them for vector operations?).
+   Without them, GeCode will crash (when running, not when in installing) on a missing shared object file: `libEGL.so.1`.
+   This might not be present on a headless install of the OS.
 
     ```bash
     yum install mesa-libGL mesa-dri-drivers libselinux libXdamage libXxf86vm libXext
     dnf install mesa-libEGL
     ```
 
-6) Python
+7) Python
     - version: 3.11(.7)
 
     These are the steps we used to install it:
@@ -87,7 +91,6 @@ CPMpy is a python library, and thus python is the main dependency. But many of t
 
 1) Minizinc
 
-
     To download Minizinc, run the following:
     ```bash
     wget https://github.com/MiniZinc/MiniZincIDE/releases/download/2.8.5/MiniZincIDE-2.8.5-bundle-linux-x86_64.tgz
@@ -102,7 +105,9 @@ CPMpy is a python library, and thus python is the main dependency. But many of t
 
 2) Gurobi licence
 
-    It might be that you already have a licence or that, depending on how the licence was acquired, the installation of the license differs. The following steps are for installing a single-person single-machine academic license, aquired through the Gurobi User Portal.
+    Gurobi is a commercial MIP solver that requires a licence to run at its full potential.
+    Depending on the type of licence, the installation instructions differ.
+    The following instructions are tailored to installing a "Academic Named-User License", which can be aquired on the [Gurobi licence portal](https://www.gurobi.com/academia/academic-program-and-licenses).
 
     First, get a licence from Gurobi's site. It should give you a command looking like: `grbgetkey <your licence key>`
 
@@ -183,13 +188,13 @@ python executable/main.py <BENCHNAME>
     [--intermediate]                # If intermediate results should be reported (only for COP and a subset of solvers)
 ```
 
-The executable supports multiple solvers and is used for multiple submissions to the competition. The submitted solvers are:
-- ortools
-- exact
-- z3
-- gurobi
-- minizinc:chuffed
-- minizinc:gecode
+The executable supports multiple solvers and is used for all of the submissions to the competition. The submitted solvers are:
+- `ortools`
+- `exact`
+- `z3`
+- `gurobi`
+- `minizinc:chuffed`
+- `minizinc:gecode`
 
 The commands are as follows:
 
