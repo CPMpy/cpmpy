@@ -236,6 +236,8 @@ class Args:
     opt:bool=False
     solve:bool=True
     profiler:bool=False
+    throw:bool=False
+    solve_all:bool=False
 
     def __post_init__(self):
         if self.dir is not None:
@@ -264,6 +266,8 @@ class Args:
             intermediate = args.intermediate if args.intermediate is not None else False,
             solve = not args.only_transform,
             profiler = args.profiler,
+            throw = args.throw,
+            solve_all = args.all,
         )
     
     @property
@@ -436,8 +440,6 @@ def prepend_print():
 
 def main():
 
-    start = time.time()
-
     # ------------------------------ Argument parsing ------------------------------ #
 
     parser = argparse.ArgumentParser(
@@ -476,10 +478,24 @@ def main():
     parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
     # Enable profiling measurements
     parser.add_argument("--profiler", action=argparse.BooleanOptionalAction)
+    # Whether the executable should throw an exception (instead of capturing it) (should be off during competition)
+    parser.add_argument("--throw", action=argparse.BooleanOptionalAction)
+    # SolveAll (instead of Solve)
+    parser.add_argument("--all", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
+
+    try:
+        main_helper(args)
+    except Exception as e:
+        if args.throw:
+            raise e
+        else:
+            error_handler(e)
+
+def main_helper(args):
     
     from xml.etree.ElementTree import ParseError
     try:
@@ -583,15 +599,28 @@ def run_helper(args:Args):
     if args.solve:
         try:
             with TimerContext("solve") as tc:
-                if args.solver == "exact": # Exact2 takes its options at creation time
-                    sat = s.solve(
-                        time_limit=time_limit,
-                    ) 
+                if args.solver == "exact": # Exact takes its options at creation time
+                    if args.solve_all:
+                        nr_sols = s.solveAll(
+                            time_limit=time_limit
+                        )
+                        print_comment(f"Found {nr_sols} solutions.")
+                    else:
+                        sat = s.solve(
+                            time_limit=time_limit
+                        )
                 else:
-                    sat = s.solve(
-                        time_limit=time_limit,
-                        **solver_arguments(args, model)
-                    ) 
+                    if args.solve_all:
+                        nr_sols = s.solveAll(
+                            time_limit=time_limit,
+                            **solver_arguments(args, model)
+                        ) 
+                        print_comment(f"Found {nr_sols} solutions.")
+                    else:
+                        sat = s.solve(
+                            time_limit=time_limit,
+                            **solver_arguments(args, model)
+                        ) 
             print_comment(f"took {(tc.time):.4f} seconds to solve")
         except MemoryError:
             print_comment("Ran out of memory when trying to solve.")
@@ -624,7 +653,4 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    try:
-        main()
-    except Exception as e:
-        error_handler(e)
+    main()

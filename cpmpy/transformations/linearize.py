@@ -149,6 +149,23 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                     #newrhs = lhs.args[0]
                     #lhs = lhs.args[1] * rhs #operator is actually always '==' here due to only_numexpr_equality
                     #cpm_expr = eval_comparison(cpm_expr.name, lhs, newrhs)
+                elif lhs.name == 'idiv':
+                    a, b = lhs.args
+                    # if division is total, b is either strictly negative or strictly positive!
+                    lb, ub = get_bounds(b)
+                    if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+                        raise TypeError(
+                            f"Can't divide by a domain containing 0, safen the expression first")
+                    r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1)) # remainder can be both positive and negative
+                    cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
+                    cond = [Abs(r) < Abs(b), Abs(b * rhs) < Abs(a)]
+                    decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
+                    cpm_exprs = toplevel_list(decomp + cpm_expr)
+                    exprs = linearize_constraint(flatten_constraint(cpm_exprs, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
+                    newlist.extend(exprs)
+                    continue
+
+                    
                 elif lhs.name == 'mod':  # x mod y == x - (x//y) * y
                     # gets handles in the solver interface
                     # We should never get here, since both Gurobi and Exact have "faked support" for "Mod"

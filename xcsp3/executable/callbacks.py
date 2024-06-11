@@ -13,6 +13,7 @@ from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
 from cpmpy import cpm_array
+from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
@@ -337,7 +338,7 @@ class CallbacksCPMPy(Callbacks):
 
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
-        self._unimplemented(lst, limit, operator)
+        self.ctr_lex([lst, limit], operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
