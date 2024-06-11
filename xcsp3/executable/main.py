@@ -236,6 +236,7 @@ class Args:
     opt:bool=False
     solve:bool=True
     profiler:bool=False
+    throw:bool=False
     solve_all:bool=False
 
     def __post_init__(self):
@@ -265,6 +266,7 @@ class Args:
             intermediate = args.intermediate if args.intermediate is not None else False,
             solve = not args.only_transform,
             profiler = args.profiler,
+            throw = args.throw,
             solve_all = args.all,
         )
     
@@ -438,8 +440,6 @@ def prepend_print():
 
 def main():
 
-    start = time.time()
-
     # ------------------------------ Argument parsing ------------------------------ #
 
     parser = argparse.ArgumentParser(
@@ -478,12 +478,24 @@ def main():
     parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
     # Enable profiling measurements
     parser.add_argument("--profiler", action=argparse.BooleanOptionalAction)
+    # Whether the executable should throw an exception (instead of capturing it) (should be off during competition)
+    parser.add_argument("--throw", action=argparse.BooleanOptionalAction)
     # SolveAll (instead of Solve)
     parser.add_argument("--all", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
     print_comment(str(args))
+
+    try:
+        main_helper(args)
+    except Exception as e:
+        if args.throw:
+            raise e
+        else:
+            error_handler(e)
+
+def main_helper(args):
     
     from xml.etree.ElementTree import ParseError
     try:
@@ -627,7 +639,4 @@ if __name__ == "__main__":
     signal.signal(signal.SIGABRT, sigterm_handler)
 
     # Main program
-    try:
-        main()
-    except Exception as e:
-        error_handler(e)
+    main()
