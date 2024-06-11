@@ -93,7 +93,7 @@ class SolverLookup():
         return names
 
     @classmethod
-    def get(cls, name=None, model=None):
+    def get(cls, name=None, model=None, **kwargs):
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
@@ -105,7 +105,7 @@ class SolverLookup():
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return solver_cls(model, subsolver=subname)
+        return solver_cls(model, subsolver=subname, **kwargs)
 
     @classmethod
     def lookup(cls, name=None):

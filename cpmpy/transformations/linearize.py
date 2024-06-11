@@ -140,8 +140,8 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, expr_sto
                             f"Can't divide by a domain containing 0, safen the expression first")
                     r = intvar(0, max(abs(lb) - 1, abs(ub) - 1))  # remainder is always positive for floordivision.
                     cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
-                    cond = [r < Abs(b)]
-                    decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
+                    cond = [r < Abs(b)] # decomposition of Abs + flatten_constraint will twice flip the order around when b is a constant (a bit wastefull)
+                    decomp = toplevel_list(flatten_constraint(decompose_in_tree(cond), expr_store=expr_store))  # decompose abs
                     cpm_exprs = toplevel_list(decomp + cpm_expr)
                     exprs = linearize_constraint(flatten_constraint(cpm_exprs, expr_store=expr_store, skip_simplify_bool=True), supported=supported, expr_store=expr_store)
                     newlist.extend(exprs)
