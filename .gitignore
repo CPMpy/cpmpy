@@ -156,3 +156,4 @@ reportlog.jsonl
 .pytest-runtimes
 perf_stats/
 perf_stats_0/
+checkingInstancesXCSP24/
