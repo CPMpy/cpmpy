@@ -4,20 +4,21 @@ These are the installation and usage instructions for the CPMpy submission to th
 
 ## Submission
 
-This submission is the basis for multiple solver submissions. CPMpy is a modelling system which can translate to many different solvers, six of which have been chosen for the XCSP3 competition. 
+This submission is the basis for multiple submissions with different solver backends. CPMpy is a modelling system which can translate to many different solvers, six of which have been chosen for the XCSP3 competition. 
 The data files and install instructions are shared (some solvers have additional steps). 
-The major difference is the actual command used to run the executable, where the correct solver must be set.
+From the executable's point of view, the major difference between the submissions is the actual command used to run the executable, where the correct solver must be set. These commands are listed later on.
+Internally, different solver-tailored backends will be used, where the COP and CSP models get transformed as to satisfy the modelling capabilities of the selected solver target.
 
-The following solvers will compete in the following tracks:
+The CPMpy modelling system will compete in the following tracks, using the following solver backends:
 
-| Solver | CSP sequential | COP sequential (30') | COP parallel | mini CSP | mini COP |
+| CPMpy_backend | CSP sequential | COP sequential (30') | COP parallel | mini CSP | mini COP |
 | - | - | - | - | - | - |
-| OR-Tools | yes | yes | yes | yes | yes |
-| Exact | yes | yes | no | yes | yes |
-| Z3 | yes | yes | no | yes | yes |
-| Gurobi | yes | yes | no | yes | yes |
-| Minizinc : GeCode | yes | yes | no | yes | yes |
-| Minizinc : Chuffed | yes | yes | no | yes | yes |
+| cpmpy_ortools | yes | yes | yes | yes | yes |
+| cpmpy_exact | yes | yes | no | yes | yes |
+| cpmpy_z3 | yes | yes | no | yes | yes |
+| cpmpy_gurobi | yes | yes | no | yes | yes |
+| cpmpy_mnz-gecode | yes | yes | no | yes | yes |
+| cpmpy_mnz-chuffed | yes | yes | no | yes | yes |
 
 
 ## Setup
@@ -188,24 +189,24 @@ python executable/main.py <BENCHNAME>
     [--intermediate]                # If intermediate results should be reported (only for COP and a subset of solvers)
 ```
 
-The executable supports multiple solvers and is used for all of the submissions to the competition. The submitted solvers are:
-- `ortools`
-- `exact`
-- `z3`
-- `gurobi`
-- `minizinc:chuffed`
-- `minizinc:gecode`
+The same executable supports multiple solver backends and is used for all of the submissions to the competition. The submitted cpmpy + backends are:
+- `cpmpy_ortools`
+- `cpmpy_exact`
+- `cpmpy_z3`
+- `cpmpy_gurobi`
+- `cpmpy_mnz-chuffed`
+- `cpmpy_mnz-gecode`
 
 The commands are as follows:
 
-| Solver | Subsolver | Command |
-| - | - | - |
-| OR-Tools | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=ortools --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Exact | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Z3 | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Gurobi | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Minizinc | Chuffed | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Minizinc | GeCode | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Submission | Command |
+| - | - |
+| **cpmpy_ortools** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=ortools --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_exact** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_z3** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_gurobi** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_mnz-chuffed** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_mnz-gecode** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
 
 
