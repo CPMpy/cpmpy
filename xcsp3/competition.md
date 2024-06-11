@@ -2,6 +2,22 @@
 
 These are the installation and usage instructions for the CPMpy submission to the XCSP3 2024 competition.
 
+## Submission
+
+This submission is the basis for multiple solver submissions. CPMpy can translate to many different solvers, six of which have been chosen for the XCSP3 competition. The data files and install instructions are shared (some solvers have additional steps). The biggest difference is the actual command for the executable, where the correct solver must be set.
+
+The following solvers will compete in the following tracks:
+
+| Solver | CSP sequential | COP sequential | COP parallel | mini CSP | mini COP |
+| - | - | - | - | - | - |
+| OR-Tools | yes | yes | yes | yes | yes |
+| Exact | yes | yes | no | yes | yes |
+| Z3 | yes | yes | no | yes | yes |
+| Gurobi | yes | yes | no | yes | yes |
+| Minizinc : GeCode | yes | yes | no | yes | yes |
+| Minizinc : Chuffed | yes | yes | no | yes | yes |
+
+
 ## Setup
 
 Since the competition will be run on a cluster of CentOS 8.3 servers, the installation steps have been talored to that particular OS. Our submission is not inherently dependant on any particular OS, but some dependencies might be missing on a clean install (which are for example included in a standard Ubuntu install).
