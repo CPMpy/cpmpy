@@ -91,10 +91,10 @@ class TimerContext:
         self.end = time.time()
         set_timer_context(None)
         
-        # try:
-        perf_context.add_time_measurement(self.label, self.end - self.start)
-        # except:
-        #     pass
+        try:
+            perf_context.add_time_measurement(self.label, self.end - self.start)
+        except:
+            pass
 
     @property
     def time(self):
