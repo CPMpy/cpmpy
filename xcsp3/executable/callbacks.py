@@ -68,7 +68,7 @@ class CallbacksCPMPy(Callbacks):
         "add": (0, lambda x: cp.sum(x)),
         "sub": (2, lambda x, y: x - y),
         "mul": (0, lambda x: reduce((lambda x, y: x*y),x)),
-        "div": (2, lambda x, y: Operator(name="idiv", arg_list=[x,y])),
+        "div": (2, lambda x, y: x // y),
         "mod": (2, lambda x, y: x % y),
         "sqr": (1, lambda x: x ** 2),
         "pow": (2, lambda x, y: x ** y),
@@ -339,7 +339,6 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_lex_limit(self, lst: list[Variable], limit: list[int], operator: TypeOrderedOperator):  # should soon enter XCSP3-core
         self.ctr_lex([lst, limit], operator)
-        #self._unimplemented(lst, limit, operator)
 
     def ctr_lex(self, lists: list[list[Variable]], operator: TypeOrderedOperator):
         cpm_lists = [self.get_cpm_vars(lst) for lst in lists]
