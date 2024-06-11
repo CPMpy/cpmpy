@@ -236,6 +236,7 @@ class Args:
     opt:bool=False
     solve:bool=True
     profiler:bool=False
+    solve_all:bool=False
 
     def __post_init__(self):
         if self.dir is not None:
@@ -264,6 +265,7 @@ class Args:
             intermediate = args.intermediate if args.intermediate is not None else False,
             solve = not args.only_transform,
             profiler = args.profiler,
+            solve_all = args.all,
         )
     
     @property
@@ -476,6 +478,8 @@ def main():
     parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
     # Enable profiling measurements
     parser.add_argument("--profiler", action=argparse.BooleanOptionalAction)
+    # SolveAll (instead of Solve)
+    parser.add_argument("--all", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = Args.from_cli(parser.parse_args())
@@ -580,10 +584,17 @@ def run_helper(args:Args):
     if args.solve:
         try:
             with TimerContext("solve") as tc:
-                sat = s.solve(
-                    time_limit=time_limit,
-                    **solver_arguments(args, model)
-                ) 
+                if args.solve_all:
+                    nr_sols = s.solveAll(
+                        time_limit=time_limit,
+                        **solver_arguments(args, model)
+                    ) 
+                    print_comment(f"Found {nr_sols} solutions.")
+                else:
+                    sat = s.solve(
+                        time_limit=time_limit,
+                        **solver_arguments(args, model)
+                        ) 
             print_comment(f"took {(tc.time):.4f} seconds to solve")
         except MemoryError:
             print_comment("Ran out of memory when trying to solve.")
