@@ -13,12 +13,12 @@ The CPMpy modelling system will compete in the following tracks, using the follo
 
 | CPMpy_backend | CSP sequential | COP sequential (30') | COP parallel | mini CSP | mini COP |
 | - | - | - | - | - | - |
-| cpmpy_ortools | yes | yes | yes | yes | yes |
-| cpmpy_exact | yes | yes | no | yes | yes |
-| cpmpy_z3 | yes | yes | no | yes | yes |
-| cpmpy_gurobi | yes | yes | no | yes | yes |
-| cpmpy_mnz-gecode | yes | yes | no | yes | yes |
-| cpmpy_mnz-chuffed | yes | yes | no | yes | yes |
+| **cpmpy_ortools** | yes | yes | yes | yes | yes |
+| **cpmpy_exact** | yes | yes | no | yes | yes |
+| **cpmpy_z3** | yes | yes | no | yes | yes |
+| **cpmpy_gurobi** | yes | yes | no | yes | yes |
+| **cpmpy_mnz_gecode** | yes | yes | no | yes | yes |
+| **cpmpy_mnz_chuffed** | yes | yes | no | yes | yes |
 
 
 ## Setup
@@ -194,8 +194,8 @@ The same executable supports multiple solver backends and is used for all of the
 - `cpmpy_exact`
 - `cpmpy_z3`
 - `cpmpy_gurobi`
-- `cpmpy_mnz-chuffed`
-- `cpmpy_mnz-gecode`
+- `cpmpy_mnz_chuffed`
+- `cpmpy_mnz_gecode`
 
 The commands are as follows:
 
@@ -205,8 +205,8 @@ The commands are as follows:
 | **cpmpy_exact** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | **cpmpy_z3** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | **cpmpy_gurobi** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| **cpmpy_mnz-chuffed** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| **cpmpy_mnz-gecode** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_mnz_chuffed** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_mnz_gecode** | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
 
 
