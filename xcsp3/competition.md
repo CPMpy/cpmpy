@@ -197,9 +197,9 @@ The commands are as follows:
 | - | - | - |
 | OR-Tools | / | python executable/main.py BENCHNAME --intermediate --cores=NBCORES --solver=ortools --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | Exact | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=exact --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Z3 | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEE | 
+| Z3 | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | Gurobi | / | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| Minizinc | Chuffed | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --profiler --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| Minizinc | Chuffed | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | Minizinc | GeCode | python executable/main.py <BENCHNAME> --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
 
