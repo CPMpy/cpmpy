@@ -17,6 +17,12 @@ class MinizincNameException(CPMpyException):
 class MinizincBoundsException(CPMpyException):
     pass
 
+class ChocoTypeException(CPMpyException):
+    pass
+
+class ChocoBoundsException(CPMpyException):
+    pass
+
 class NotSupportedError(CPMpyException):
     pass
 
@@ -24,4 +30,8 @@ class IncompleteFunctionError(CPMpyException):
     pass
 
 class TypeError(CPMpyException):
+    pass
+
+
+class TransformationNotImplementedError(CPMpyException):
     pass
