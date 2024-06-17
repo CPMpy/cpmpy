@@ -123,7 +123,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_int
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -181,7 +181,7 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(argvals(self.args))) == len(self.args)
+        return len(set(a.value() for a in self.args)) == len(self.args)
 
 class AllDifferentExceptN(GlobalConstraint):
     """
@@ -338,15 +338,23 @@ class Inverse(GlobalConstraint):
        Inverse (aka channeling / assignment) constraint. 'fwd' and
        'rev' represent inverse functions; that is,
 
-           fwd[i] == x  <==>  rev[x] == i
+            The symmetric version (where len(fwd) == len(rev)) is defined as:
+                fwd[i] == x  <==>  rev[x] == i
+            The asymmetric version (where len(fwd) < len(rev)) is defined as:
+                fwd[i] == x   =>   rev[x] == i
 
     """
     def __init__(self, fwd, rev):
-        flatargs = flatlist([fwd,rev])
+        flatargs = flatlist([fwd, rev])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
-        assert len(fwd) == len(rev)
-        super().__init__("inverse", [fwd, rev])
+        if len(fwd) > len(rev):
+            raise TypeError("len(fwd) should be equal to len(rev) for the symmetric inverse, or smaller than len(rev) for the asymmetric inverse")
+        if len(fwd) == len(rev):
+            name = "inverse"
+        else:
+            name = "inverseAsym"
+        super().__init__(name, [fwd, rev])
 
     def decompose(self):
         from .python_builtins import all
@@ -363,6 +371,55 @@ class Inverse(GlobalConstraint):
         except IndexError: # partiality of Element constraint
             return False
 
+class InverseOne(GlobalConstraint):
+    """
+       Inverse (aka channeling / assignment) constraint but with only one array.
+       Equivalent to Inverse(x,x)
+
+                arr[i] == j  <==>  arr[j] == i
+
+    """
+    def __init__(self, arr):
+        flatargs = flatlist([arr])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
+        super().__init__("inverseOne", [arr])
+
+    def decompose(self):
+        from .python_builtins import all
+        arr = self.args[0]
+        arr = cpm_array(arr)
+        return [all(arr[x] == i for i, x in enumerate(arr))], []
+
+    def value(self):
+        valsx = argvals(self.args[0])
+        try:
+            return all(valsx[x] == i for i, x in enumerate(valsx))
+        except IndexError: # partiality of Element constraint
+            return False
+
+class Channel(GlobalConstraint):
+    """
+        Channeling constraint. Channeling integer representation of a variable into a representation with boolean
+        indicators
+            for all 0<=i<len(arr) : arr[i] = 1 <=> value = i
+            exists 0<=i<len(arr) s.t. arr[i] = 1
+    """
+    def __init__(self, arr, v):
+        flatargs = flatlist([arr])
+        if not all(x.lb >= 0 and x.ub <= 1 for x in flatargs):
+            raise TypeError(
+                "the first argument of a Channel constraint should only contain 0-1 variables/expressions (i.e., " +
+                "intvars/intexprs with domain {0,1} or boolvars/boolexprs)")
+        super().__init__("channelValue", [arr, v])
+
+    def decompose(self):
+        arr, v = self.args
+        return [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
+
+    def value(self):
+        arr, v = self.args
+        return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
