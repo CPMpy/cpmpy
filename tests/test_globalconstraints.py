@@ -439,6 +439,12 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
 
+        constraints = [~cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertFalse(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
         constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
