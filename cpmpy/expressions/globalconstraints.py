@@ -99,7 +99,6 @@
         AllDifferent
         AllDifferentExcept0
         AllDifferentExceptN
-        AllDifferentLists
         AllEqual
         AllEqualExceptN
         Circuit
@@ -202,6 +201,7 @@ class AllDifferentExceptN(GlobalConstraint):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
 
+
 class AllDifferentExcept0(AllDifferentExceptN):
     """
         All nonzero arguments have a distinct value
@@ -209,33 +209,6 @@ class AllDifferentExcept0(AllDifferentExceptN):
     def __init__(self, *arr):
         flatarr = flatlist(arr)
         super().__init__(arr, 0)
-
-
-class AllDifferentLists(GlobalConstraint):
-    """
-        Ensures none of the lists given are exactly the same.
-        Called 'lex_alldifferent' in the global constraint catalog:
-        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
-    """
-    def __init__(self, lists):
-        if any(not is_any_list(lst) for lst in lists):
-            raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
-        if any(len(lst) != len(lists[0]) for lst in lists):
-            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
-        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
-
-    def decompose(self):
-        """Returns the decomposition
-        """
-        from .python_builtins import any as cpm_any
-        constraints = []
-        for lst1, lst2 in all_pairs(self.args):
-            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
-        return constraints, []
-
-    def value(self):
-        lst_vals = [tuple(argvals(a)) for a in self.args]
-        return len(set(lst_vals)) == len(self.args)
 
 
 def allequal(args):
@@ -257,6 +230,7 @@ class AllEqual(GlobalConstraint):
 
     def value(self):
         return len(set(argvals(self.args))) == 1
+
 
 class AllEqualExceptN(GlobalConstraint):
     """
