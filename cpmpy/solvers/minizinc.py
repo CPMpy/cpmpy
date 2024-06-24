@@ -27,20 +27,19 @@ import re
 import warnings
 import sys
 import os
-from datetime import timedelta # for mzn's timeout
+from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar, cpm_array
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argvals, argval
+from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.get_variables import get_variables
 from ..exceptions import MinizincPathException, NotSupportedError
-from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_minizinc(SolverInterface):
@@ -72,6 +71,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     required_version = (2, 8, 2)
+
     @staticmethod
     def supported():
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
@@ -80,7 +80,7 @@ class CPM_minizinc(SolverInterface):
     def installed():
         # try to import the package
         try:
-            #check if MiniZinc Python is installed
+            #  check if MiniZinc Python is installed
             import minizinc
             return True
         except ImportError as e:
@@ -131,6 +131,7 @@ class CPM_minizinc(SolverInterface):
                           'symdiff', 'test', 'then', 'true', 'tuple', 'type', 'union', 'var', 'where', 'xor'])
     # variable names must have this pattern
     mzn_name_pattern = re.compile('^[A-Za-z][A-Za-z0-9_]*$')
+
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -142,7 +143,7 @@ class CPM_minizinc(SolverInterface):
         """
         if not self.installed():
             raise Exception("CPM_minizinc: Install the python package 'minizinc'")
-        if not self.executable_installed():
+        elif not self.executable_installed():
             raise Exception("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
         elif self.outdated():
             version = str(self.required_version[0])
@@ -157,7 +158,7 @@ class CPM_minizinc(SolverInterface):
             # default solver
             subsolver = "gecode"
         elif subsolver.startswith('minizinc:'):
-            subsolver = subsolver[9:] # strip 'minizinc:'
+            subsolver = subsolver[9:]  # strip 'minizinc:'
 
         # initialise the native solver object
         # (so its params can still be changed before calling solve)
@@ -169,10 +170,8 @@ class CPM_minizinc(SolverInterface):
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
 
-
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
-
 
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
@@ -183,12 +182,12 @@ class CPM_minizinc(SolverInterface):
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
-        copy_model = self.mzn_model.__copy__() # it is implemented
+        copy_model = self.mzn_model.__copy__()  # it is implemented
         copy_model.add_string(self.mzn_txt_solve)
         # Transform Model into an instance
         mzn_inst = minizinc.Instance(self.mzn_solver, copy_model)
 
-        kwargs['output-time'] = True # required for time getting
+        kwargs['output-time'] = True  # required for time getting
         return (kwargs, mzn_inst)
 
     def solve(self, time_limit=None, **kwargs):
@@ -222,7 +221,7 @@ class CPM_minizinc(SolverInterface):
         try:
             self.mzn_result = mzn_inst.solve(**mzn_kwargs)
         except minizinc.error.MiniZincError as e:
-            if sys.platform == "win32" or sys.platform == "cygwin": #path error can occur in windows
+            if sys.platform == "win32" or sys.platform == "cygwin":  # path error can occur in windows
                 path = os.environ.get("path")
                 if "MiniZinc" in str(path):
                     warnings.warn('You might have the wrong minizinc PATH set (windows user Environment Variables')
@@ -239,7 +238,7 @@ class CPM_minizinc(SolverInterface):
 
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
-        if has_sol: #mzn_result.status.has_solution():
+        if has_sol:  # mzn_result.status.has_solution():
             mznsol = self.mzn_result.solution
             if is_any_list(mznsol):
                 print("Warning: multiple solutions found, only returning last one")
@@ -274,7 +273,7 @@ class CPM_minizinc(SolverInterface):
             if runtime != 0:
                 self.cpm_status.runtime = runtime
             else:
-                raise NotImplementedError #Please report on github, minizinc probably changed their time names/types
+                raise NotImplementedError  # Please report on github, minizinc probably changed their time names/types
 
         # translate exit status
         mzn_status = mzn_result.status
@@ -303,7 +302,7 @@ class CPM_minizinc(SolverInterface):
         elif isinstance(time, timedelta):
             return time.total_seconds()  # --output-time
         else:
-            raise NotImplementedError #unexpected type for time
+            raise NotImplementedError  # unexpected type for time
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
@@ -336,7 +335,7 @@ class CPM_minizinc(SolverInterface):
                 elif isinstance(display, list):
                     print(argvals(display))
                 else:
-                    display() # callback
+                    display()  # callback
 
             # count and stop
             solution_count += 1
@@ -350,7 +349,6 @@ class CPM_minizinc(SolverInterface):
         self._post_solve(mzn_result)
 
         return solution_count
-
 
     def solver_var(self, cpm_var) -> str:
         """
@@ -375,7 +373,7 @@ class CPM_minizinc(SolverInterface):
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
 
-            #test if the name is a valid minizinc identifier
+            # test if the name is a valid minizinc identifier
             if not self.mzn_name_pattern.search(mzn_var):
                 raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores. "
                                 "First character must be an alphabetic character")
@@ -392,7 +390,6 @@ class CPM_minizinc(SolverInterface):
 
         return self._varmap[cpm_var]
 
-
     def objective(self, expr, minimize):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -402,7 +399,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        #get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
+        # get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -427,12 +424,11 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing","decreasing",
-                     "precedence","no_overlap",
+                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
+                     "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq","among"}
+                     "lex_chain_lesseq", "among"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
-
 
     def __add__(self, cpm_expr):
         """
@@ -477,11 +473,11 @@ class CPM_minizinc(SolverInterface):
                 expr_str = [self._convert_expression(e) for e in expr]
             return "[{}]".format(",".join(expr_str))
 
-        if isinstance(expr,(bool,np.bool_)):
+        if isinstance(expr, (bool, np.bool_)):
             expr = BoolVal(expr)
 
         if not isinstance(expr, Expression):
-            return self.solver_var(expr) # constants
+            return self.solver_var(expr)  # constants
 
         if isinstance(expr, BoolVal):
             return str(expr.args[0]).lower()
@@ -519,11 +515,10 @@ class CPM_minizinc(SolverInterface):
             Y = [self._convert_expression(e) for e in expr.args[1]]
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
-
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
             X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
             str_X = "[|\n"  # opening
-            for row in X.T: # Minizinc enforces lexicographic order on columns
+            for row in X.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
@@ -533,7 +528,7 @@ class CPM_minizinc(SolverInterface):
         if isinstance(expr, Comparison):
             # wrap args that are a subexpression in ()
             for i, arg_str in enumerate(args_str):
-                if isinstance(expr.args[i], Expression): #(Comparison, Operator)
+                if isinstance(expr.args[i], Expression):  # (Comparison, Operator)
                     args_str[i] = "(" + args_str[i] + ")"
             # infix notation
             return "{} {} {}".format(args_str[0], expr.name, args_str[1])
@@ -561,7 +556,7 @@ class CPM_minizinc(SolverInterface):
                 # I don't think there is a more direct way unfortunately
                 w = [self._convert_expression(wi) for wi in expr.args[0]]
                 x = [self._convert_expression(xi) for xi in expr.args[1]]
-                args_str = [f"{wi}*({xi})" for wi,xi in zip(w,x)]
+                args_str = [f"{wi}*({xi})" for wi, xi in zip(w, x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
             # special case, infix: two args
@@ -604,7 +599,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
 
-            durstr = self._convert_expression([s + d == e for s,d,e in zip(start, dur, end)])
+            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
             format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
 
             return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
@@ -632,7 +627,7 @@ class CPM_minizinc(SolverInterface):
                 name = "global_cardinality"
             else:
                 name = "global_cardinality_closed"
-            return "{}({},{},{})".format(name,vars,vals,occ)
+            return "{}({},{},{})".format(name, vars, vals, occ)
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
@@ -646,7 +641,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "among":
             vars, vals = expr.args
             vars = self._convert_expression(vars)
-            vals = self._convert_expression(vals).replace("[", "{").replace("]", "}") # convert to set
+            vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
@@ -654,7 +649,7 @@ class CPM_minizinc(SolverInterface):
         elif isinstance(expr, DirectConstraint):
             return "{}({})".format(expr.name, ",".join(args_str))
 
-        print_map = {"allequal":"all_equal", "xor":"xorall"}
+        print_map = {"allequal": "all_equal", "xor": "xorall"}
         if expr.name in print_map:
             return "{}([{}])".format(print_map[expr.name], ",".join(args_str))
 
