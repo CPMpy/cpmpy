@@ -26,8 +26,15 @@
     ==============
 """
 
+import time
+
+import os, pathlib, sys
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -56,7 +63,7 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-    - grb_model: object, TEMPLATE's model object
+        - grb_model: object, TEMPLATE's model object
 
     The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
@@ -73,8 +80,12 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except:
+        except ModuleNotFoundError as e:
             return False
+        except gp.GurobiError as e:
+            raise Exception(
+                f"CPM_gurobi: gurobi raise an internal exception when importing: {str(e)}"
+            )
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -114,6 +125,9 @@ class CPM_gurobi(SolverInterface):
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -265,18 +279,46 @@ class CPM_gurobi(SolverInterface):
 
         :return: list of Expression
         """
-        # apply transformations, then post internally
-        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
-        cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+
+        with TimerContext("transformation") as top_tc:
+
+            expr_store = self.expr_store
+
+            # apply transformations, then post internally
+            # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            print(f"gurobi:toplevel_list took {(tc.time):.4f} -- {len(cpm_cons)}")
+            supported = {"min", "max", "abs", "alldifferent", "mod"} # alldiff has a specialized MIP decomp in linearize | support for "Mod" is faked
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
+            print(f"gurobi:decompose_in_tree took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("flatten_constraint") as tc:
+                cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)  # flat normal form
+            print(f"gurobi:flatten_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("reify_rewrite") as tc:
+                cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)  # constraints that support reification
+            print(f"gurobi:reify_rewrite took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("only_numexpr_equality") as tc:
+                cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)  # supports >, <, !=
+            print(f"gurobi:only_numexpr_equality took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("only_bv_reifies") as tc:
+                cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
+            print(f"gurobi:only_bv_reifies took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("only_implies") as tc:
+                cpm_cons = only_implies(cpm_cons, expr_store=expr_store)  # anything that can create full reif should go above...
+            print(f"gurobi:only_implies took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("linearize_constraint") as tc:
+                cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div","mod"}), expr_store=expr_store)  # the core of the MIP-linearization | support for "Mod" is faked
+            print(f"gurobi:linearize_constraint took {(tc.time):.4f} -- {len(cpm_cons)}")
+            with TimerContext("only_positive_bv") as tc:
+                cpm_cons = only_positive_bv(cpm_cons, expr_store=expr_store)  # after linearization, rewrite ~bv into 1-bv
+            print(f"gurobi:only_positive_bv took {(tc.time):.4f} -- {len(cpm_cons)}")
+
+        print(f"gurobi:transformation took {(top_tc.time):.4f}")
+        print("final size: " + str(len(cpm_cons)))
+        print("STORE: " + str(len(expr_store.items())))
+
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
@@ -335,6 +377,19 @@ class CPM_gurobi(SolverInterface):
                     assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
+
+                elif lhs.name == "mod":
+                    # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                    #   -> acts differently for negative numbers
+                    # "mod" is a partial function
+                    #   -> x % 0 = x (unless x == 0, then undefined)
+                    x,y = lhs.args
+                    lby, uby = get_bounds(y)
+                    if (lby <= 0) and (uby >= 0): # if 0 is within the bounds
+                        raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                    k = intvar(*get_bounds((x - rhs) // y)) 
+                    self += (k * y) + rhs == x
+                    self += rhs < abs(y)
 
                 else:
                     # General constraints
@@ -458,9 +513,9 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

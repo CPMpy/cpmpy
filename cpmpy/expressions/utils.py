@@ -24,27 +24,30 @@ Internal utilities for expression handling.
 
 import numpy as np
 import math
-from collections.abc import Iterable # for _flatten
-from itertools import chain, combinations
+from collections.abc import Iterable  # for flatten
+from itertools import combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal))
 
 
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
@@ -91,6 +94,12 @@ def is_any_list(arg):
     return isinstance(arg, (list, tuple, np.ndarray))
 
 
+def is_transition(arg):
+    """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
+    a transition value and an ending node"""
+    return len(arg) == 3 and \
+        isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
@@ -117,15 +126,24 @@ def all_pairs(args):
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
-        
+
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    try:
-        return a.value() if hasattr(a, "value") else a
-    except IncompleteFunctionError as e:
-        if a.is_bool(): return False
-        raise e
+    if hasattr(a, "value"):
+        try:
+            return a.value()
+        except IncompleteFunctionError as e:
+            if a.is_bool():
+                return False
+            else:
+                raise e
+    return a
 
+
+def argvals(arr):
+    if is_any_list(arr):
+        return [argvals(arg) for arg in arr]
+    return argval(arr)
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -177,3 +195,17 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+
+class ExprStore(dict):
+    """
+        A datastructure to store / cache Expression == BoolVar formulations.
+        Is the basis for Commun Subexpression Elimination (CSE).
+    """
+    pass
+
+def get_store() -> ExprStore:
+    """
+        Returns an expression store for CSE.
+    """
+    return ExprStore()

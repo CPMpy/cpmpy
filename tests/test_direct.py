@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -127,4 +127,17 @@ class TestDirectGurobi(unittest.TestCase):
 
         self.assertEqual(y.value(), poly_val)
 
+@pytest.mark.skipif(not CPM_choco.supported(),
+                    reason="pychoco not installed")
+class TestDirectChoco(unittest.TestCase):
+
+    def test_direct_global(self):
+        iv = intvar(1,9, shape=3)
+
+        model = SolverLookup.get("choco")
+
+        model += DirectConstraint("increasing", iv)
+        model += iv[1] < iv[0]
+
+        self.assertFalse(model.solve())
 

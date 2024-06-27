@@ -3,7 +3,7 @@ import copy
 import numpy as np
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -40,29 +40,48 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+# def needs_simplify(expr):
+#     if hasattr(expr, 'args'):
+#         args = set()
+#         for arg in expr.args:
+#             if is_bool(arg):
+#                 return True  # boolean constants can be simplified away
+#             args.add(is_boolexpr(arg))
+#         return len(args) > 1  # mixed types should be simplified -> constant ints?
+#     else:
+#         return False
+
+
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
     - list_of_expr: list of CPMpy expressions
+    - filter: a list of booleans, indicating which expressions can be skipped
     """
     from .negation import recurse_negation # avoid circular import
     newlist = []
+
     for expr in lst_of_expr:
-
+   
         if isinstance(expr, bool):
-            # not sure if this should happen here or at construction time
-            expr = BoolVal(expr)
+            # not sure if BoolVal creation should happen here or at construction time
+            newlist.append(int(expr) if num_context else BoolVal(expr))
 
-        if isinstance(expr, BoolVal):
+        elif isinstance(expr, BoolVal):
             newlist.append(int(expr.value()) if num_context else expr)
+
+        # Detect branch in expression tree where no boolean constants will follow
+        #  Thomas > it causes a  [... <= -(BoolVal(True))] not to be detected TODO
+        # elif not needs_simplify(expr): # not expr.has_nested_boolean_constants():
+        #     newlist.append(expr)
 
         elif isinstance(expr, Operator):
             args = simplify_boolean(expr.args, num_context=not expr.is_bool())
 
             if expr.name == "or":
-                if any(is_true_cst(arg) for arg in args):
-                    newlist.append(1 if num_context else BoolVal(True))
+                if any(is_true_cst(arg) for arg in args): # expr | True -> True
+                    newlist.append(1 if num_context else BoolVal(True)) # Why a boolval and not just True?
                 else:
                     filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
                     if len(filtered_args):
@@ -124,6 +143,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
             """
             if is_boolexpr(lhs) and is_num(rhs):
                 # direct simplification of boolean comparisons
+                if isinstance(rhs, BoolVal):
+                    rhs = int(rhs.value()) # ensure proper comparisons below
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
                 elif rhs == 0:
@@ -132,15 +153,15 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "==" or name == "<=":
                         newlist.append(recurse_negation(lhs))
                     if name == "<":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == ">=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                 elif 0 < rhs < 1:
                     # a floating point value
                     if name == "==":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == "!=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                     if name == "<" or name == "<=":
                         newlist.append(recurse_negation(lhs))
                     if name == ">" or name == ">=":
@@ -151,17 +172,21 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "!=" or name == "<":
                         newlist.append(recurse_negation(lhs))
                     if name == ">":
-                        newlist.append(BoolVal(False))
+                        newlist.append(0 if num_context else BoolVal(False))
                     if name == "<=":
-                        newlist.append(BoolVal(True))
+                        newlist.append(1 if num_context else BoolVal(True))
                 elif rhs > 1:
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
-        elif isinstance(expr, GlobalConstraint):
-            expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
-            newlist.append(expr)
+
+        
+        #elif isinstance(expr, GlobalConstraint):
+            # TODO: how to determine boolean or numerical context?
+            # not sure this is needed at all... maybe in a XOR? but could damage it?
+            #if any(needs_simplify(a) for a in expr.args):
+            #    expr = copy.copy(expr)
+            #    expr.update_args(simplify_boolean(expr.args))
         else: # variables/constants/direct constraints
             newlist.append(expr)
     return newlist

@@ -20,6 +20,11 @@
 
         CPM_z3
 """
+
+import os, pathlib, sys
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -41,7 +46,7 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-    z3_solver: object, z3's Solver() object
+        - z3_solver: object, z3's Solver() object
 
     The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
@@ -96,6 +101,7 @@ class CPM_z3(SolverInterface):
 
             Arguments that correspond to solver parameters:
                 - ... (no common examples yet)
+            Some of the parameters: https://microsoft.github.io/z3guide/programming/Parameters/
             The full list doesn't seem to be documented online, you have to run its help() function:
             ```
             import z3
@@ -111,6 +117,9 @@ class CPM_z3(SolverInterface):
             ```
         """
         import z3
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             # z3 expects milliseconds in int
@@ -246,10 +255,14 @@ class CPM_z3(SolverInterface):
 
         :return: list of Expression
         """
+        with TimerContext("transformation") as top_tc:
 
-        cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
+            with TimerContext("toplevel_list") as tc:
+                cpm_cons = toplevel_list(cpm_expr)
+            supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+
+            with TimerContext("decompose_in_tree") as tc:
+                cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
     def __add__(self, cpm_expr):

@@ -141,3 +141,19 @@ bugs/
 
 # Intellij
 .idea/
+
+# XCSP3
+instances/
+*.tgz
+jar/
+*.jar
+out/
+instancesXCSP22/
+XCSP23_V2/
+pycsp3/
+xcsp3/prof/
+reportlog.jsonl
+.pytest-runtimes
+perf_stats/
+perf_stats_0/
+checkingInstancesXCSP24/

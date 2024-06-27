@@ -6,12 +6,11 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
-from ..expressions.utils import is_any_list, eval_comparison
+from ..expressions.utils import ExprStore, get_store, is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
-
-def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
+def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), expr_store:ExprStore=None, _toplevel=None, nested=False):
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
@@ -27,48 +26,72 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         Supported numerical global functions remain in the expression tree as is. They can be rewritten using
             `cpmpy.transformations.reification.reify_rewrite`
             The following `bv -> NumExpr <comp> Var/Const` can be rewritten as  [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
-            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
+            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     if _toplevel is None:
         _toplevel = []
 
+    if expr_store is None:
+        expr_store = get_store()
+
+    # swap the arguments of a comparison while maintaining its semantics
     flipmap = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
 
     newlist = []  # decomposed constraints will go here
     for expr in lst_of_expr:
-
         if is_any_list(expr):
             assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run cpmpy.transformations.normalize.toplevel_list first."
-            newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True)
-            if isinstance(expr, NDVarArray):
-                newlist.append(cpm_array(newexpr))
-            else:
+            
+            if isinstance(expr, NDVarArray): # NDVarArray is also an expression, so we can call has_subexpr on it for a possible early-exit
+                if expr.has_subexpr():
+                    newexpr = decompose_in_tree(expr, supported, supported_reified, expr_store, _toplevel, nested=True)
+                    newlist.append(cpm_array(newexpr))
+                else:
+                    newlist.append(expr)
+            else: # a normal list-like (list, tuple, np.ndarray), must be called recursively and check all elements
+                newexpr = decompose_in_tree(expr, supported, supported_reified, expr_store, _toplevel, nested=True)
                 newlist.append(newexpr)
             continue
 
         elif isinstance(expr, Operator):
+
+            if not expr.has_subexpr(): # Only recurse if there are nested expressions
+                newlist.append(expr)
+                continue
+
             if any(isinstance(a,GlobalFunction) for a in expr.args):
-                expr, base_con = normalized_numexpr(expr)
+                expr, base_con = normalized_numexpr(expr, expr_store=expr_store)
                 _toplevel.extend(base_con)  # should be added toplevel
+
             # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            args = decompose_in_tree(expr.args, supported, supported_reified, expr_store, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
-
+  
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
-            # first create a fresh version and recurse into arguments
-            expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
-
-            is_supported = (expr.name in supported)
+        
+            # NOTE an early-exit here would not check if constaint in itself is even supported
+   
+            # Check if the global constraint is supported by the solver
             if nested and expr.is_bool():
                 # special case: reified (Boolean) global
                 is_supported = (expr.name in supported_reified)
+            else:
+                is_supported = (expr.name in supported)
 
             if is_supported:
-                newlist.append(expr)
+                # If no nested expressions, don't recurse the arguments
+                if not expr.has_subexpr(): 
+                    newlist.append(expr)
+                    continue
+                # Recursively decompose the subexpression arguments
+                else:
+                    expr = copy.copy(expr)
+                    expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, expr_store, _toplevel, nested=True))
+                    newlist.append(expr)
+
             else:
                 if expr.is_bool():
-                    assert isinstance(expr, GlobalConstraint)
+                    assert isinstance(expr, GlobalConstraint) # Not a GlobalFunction
                     # boolean global constraints
                     dec = expr.decompose()
                     if not isinstance(dec, tuple):
@@ -77,8 +100,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     decomposed, define = dec
 
                     _toplevel.extend(define)  # definitions should be added toplevel
-                    # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, [], nested=nested)
+                    # the `decomposed` expression might contain other (global constraint) subexpressions, check it
+                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, expr_store, _toplevel, nested=nested)
                     newlist.append(all(decomposed))
 
                 else:
@@ -86,6 +109,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     assert isinstance(expr, GlobalFunction)
                     lb,ub = expr.get_bounds()
                     aux = intvar(lb, ub)
+
+                    # NOTE Do we need to decompose here (the expr's args)? As done in the Comparison's section?
 
                     dec = expr.decompose_comparison("==", aux)
                     if not isinstance(dec, tuple):
@@ -107,9 +132,28 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
             if not decomp_lhs:
                 if not decomp_rhs:
-                    # nothing special, create a fresh version and recurse into arguments
-                    expr = copy.copy(expr)
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    # From the comparison operator's point of view, neither lhs not rhs needs to be decomposed
+
+                    # Check if either the lhs or the rhs contains nested expressions
+                    #   for == the checks seem to be correct
+                    #   for <=, >, etc. it seems to not be supported for Global constraints
+                    # technically, AllDiff(x,y,z) has no nested expressions, but it is not supported in AllDiff <= 4
+                    # So we still need to pass it through decompose_in_tree to get rid of the unsupported globals
+                    # On the other hand, the call is waisted on something like a sum <= 4
+                    lhs_has_nested = True # isinstance(lhs, Expression) and lhs.has_subexpr()
+                    rhs_has_nested = True # isinstance(rhs, Expression) and rhs.has_subexpr()
+
+                    # If it contains one, decompose by recursion into the argument
+                    if lhs_has_nested:
+                        lhs = decompose_in_tree([lhs], supported, supported_reified, expr_store, _toplevel, nested=True)[0]
+                    if rhs_has_nested:
+                        rhs = decompose_in_tree([rhs], supported, supported_reified, expr_store, _toplevel, nested=True)[0]
+
+                    # Put the decompositions back together as the arguments of the original comparison
+                    if lhs_has_nested or rhs_has_nested: 
+                        expr = copy.copy(expr)
+                        expr.update_args([lhs, rhs])
+            
                     newlist.append(expr)
 
                 else:
@@ -119,9 +163,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     decomp_lhs, decomp_rhs = True, False  # continue into next 'if'
 
             if decomp_lhs:
-                # recurse into lhs args
-                lhs = copy.copy(lhs)
-                lhs.args = decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True)
+                if lhs.has_subexpr(): 
+                    # recurse into lhs args and decompose nested subexpressions
+                    lhs = copy.copy(lhs)
+                    lhs.update_args(decompose_in_tree(lhs.args, supported, supported_reified, expr_store, _toplevel, nested=True))
 
                 # decompose comparison of lhs and rhs
                 dec = lhs.decompose_comparison(exprname, rhs)
@@ -132,7 +177,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                 _toplevel.extend(define)  # definitions should be added toplevel
                 # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=True)
+                decomposed = decompose_in_tree(decomposed, supported, supported_reified, expr_store, _toplevel, nested=True)
                 newlist.append(all(decomposed))
 
         else:  # constants, variables, direct constraints
@@ -145,7 +190,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         return toplevel_list(newlist)
     else:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_reified, nested=False)
+        return toplevel_list(newlist) + decompose_in_tree(toplevel_list(_toplevel), supported, supported_reified, expr_store, nested=False)
 
 
 # DEPRECATED!

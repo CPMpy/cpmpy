@@ -38,7 +38,7 @@ from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
-from ..transformations.normalize import toplevel_list
+from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 
 
@@ -53,8 +53,8 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation.html
 
     Creates the following attributes (see parent constructor for more):
-    pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
+        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
     The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
@@ -137,6 +137,10 @@ class CPM_pysat(SolverInterface):
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
@@ -185,9 +189,8 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = True
                 elif -lit in sol:
                     cpm_var._value = False
-                else:
-                    # not specified...
-                    cpm_var._value = None
+                else: # not specified, dummy val
+                    cpm_var._value = True
 
         return has_sol
 
@@ -230,6 +233,7 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)

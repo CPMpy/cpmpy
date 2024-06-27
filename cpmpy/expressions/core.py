@@ -72,9 +72,8 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_bool, is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
-
 
 class Expression(object):
     """
@@ -105,7 +104,43 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
+
+
+    @property
+    def args(self):
+        return self._args
+    
+    @property
+    def vars(self):
+        return self._args
+    
+    @args.setter
+    def args(self, args):
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'") 
+
+    def contains_negation(self):
+        if not hasattr(self, "_contains_negation"):
+            self._contains_negation = any(hasattr(arg, "contains_negation") and arg.contains_negation() for arg in self.args)
+        return self._contains_negation
+    
+    def contains_non_leaf_negation(self):
+        if not hasattr(self, "_contains_non_leaf_negation"):
+            self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+        return self._contains_non_leaf_negation
+    
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        self._args = args
+        # Reset cached "_has_subexpr"
+        if hasattr(self, "_has_subexpr"):
+            del self._has_subexpr
+        if hasattr(self, "_contains_negation"):
+            del self._contains_negation
+        if hasattr(self, "_contains_non_leaf_negation"):
+            del self._contains_non_leaf_negation
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -134,15 +169,48 @@ class Expression(object):
 
     def __hash__(self):
         return hash(self.__repr__())
+    
+    def has_subexpr(self):
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed 
+            along particular paths of the expression tree.
+            Results are cached for future calls and reset when the expression changes
+            (in-place argument update).
+        """
 
+        def recursive_has_subexpr(lst) -> bool:
+            """ Recursive implementation to handle nested lists of expressions.
+            """
+            for el in lst:
+                if isinstance(el, Expression):  
+                    if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too (allows early-exit for decision var arrays)
+                        return True
+                elif is_any_list(el) and recursive_has_subexpr(el): # recursively call on list-like
+                    return True
+            return False
+                    
+        # If not an Expression (e.g. list-like) or _has_subexpr has not been computed before / has been reset
+        if not hasattr(self, '_has_subexpr'): 
+            # args can have lists of lists... -> need for recursive implementation
+            self._has_subexpr = recursive_has_subexpr(self.args)
+
+        return self._has_subexpr
+    
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
+        
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+            Default: no
+        """
+        return False
 
     def value(self):
         return None # default
+
 
     def get_bounds(self):
         if self.is_bool():
@@ -371,6 +439,9 @@ class BoolVal(Expression):
         assert is_true_cst(arg) or is_false_cst(arg)
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
+    def containts_negation(self):
+        return False
+
     def value(self):
         return self.args[0]
 
@@ -381,6 +452,18 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+        """
+        return True
+    
+    def has_subexpr(self) -> bool:
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed 
+            along particular paths of the expression tree.
+        """
+        return False # BoolVal is a wrapper for a python or numpy constant boolean.
+
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
@@ -390,7 +473,27 @@ class Comparison(Expression):
     def __init__(self, name, left, right):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
-
+    
+    def contains_negation(self):
+        if self.name == '!=':
+            return True
+        else:
+            return super().contains_negation()
+        
+    def contains_non_leaf_negation(self):
+        if self.name == '!=':
+            if all(is_boolexpr(a) for a in self.args):
+                return True
+            else:
+                return False
+        else:
+            """
+            Inlined code from super()
+            """
+            if not hasattr(self, "_contains_non_leaf_negation"):
+                self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+            return self._contains_non_leaf_negation
+        
     def __repr__(self):
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
@@ -400,7 +503,8 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [argval(a) for a in self.args]
+        arg_vals = argvals(self.args)
+
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
         elif self.name == "!=": return arg_vals[0] != arg_vals[1]
@@ -429,6 +533,7 @@ class Operator(Expression):
         'sub': (2, False), # x - y
         'mul': (2, False),
         'div': (2, False),
+        'idiv': (2, False),
         'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
@@ -499,6 +604,26 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
     
+    def contains_negation(self):
+        if self.name == 'not':
+            return True
+        else:
+            return super().contains_negation()
+        
+    def contains_non_leaf_negation(self):
+        if self.name == "not":
+            if (self.has_subexpr() or (isinstance(self.args[0], Expression) and self.args[0].name[0] == "~")): # ~ : ugly way to detect a NegBoolView without having to import
+                return True
+            else:
+                return False
+        else:
+            """
+            Inlined code from super()
+            """
+            if not hasattr(self, "_contains_non_leaf_negation"):
+                self._contains_non_leaf_negation = any(hasattr(arg, "contains_non_leaf_negation") and arg.contains_non_leaf_negation() for arg in self.args)
+            return self._contains_non_leaf_negation
+    
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:
@@ -526,11 +651,12 @@ class Operator(Expression):
         return "{}({})".format(self.name, self.args)
 
     def value(self):
+
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
+            arg_vals = [self.args[0], argvals(self.args[1])]
         else:
-            arg_vals = [argval(arg) for arg in self.args]
+            arg_vals = argvals(self.args)
 
 
         if any(a is None for a in arg_vals): return None
@@ -546,7 +672,14 @@ class Operator(Expression):
             try:
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
+        elif self.name == "idiv":
+            try:
+                return int(arg_vals[0] / arg_vals[1])
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -592,6 +725,13 @@ class Operator(Expression):
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("division by domain containing 0 is not supported")
             bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+            lowerbound, upperbound = min(bounds), max(bounds)
+        elif self.name == 'idiv':
+            lb1, ub1 = get_bounds(self.args[0])
+            lb2, ub2 = get_bounds(self.args[1])
+            if lb2 <= 0 <= ub2:
+                raise ZeroDivisionError("division by domain containing 0 is not supported")
+            bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])

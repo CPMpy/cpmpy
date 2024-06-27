@@ -26,13 +26,17 @@
 import sys  # for stdout checking
 import numpy as np
 
+import os, pathlib
+sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
+from xcsp3.perf_timer import TimerContext
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, cpm_array
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals, get_store
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -51,8 +55,8 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/install
 
     Creates the following attributes (see parent constructor for more):
-    ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
-    ort_solver: the ortools cp_model.CpSolver() instance used in solve()
+        - ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
+        - ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
     The `DirectConstraint`, when used, calls a function on the `ort_model` object.
     """
@@ -136,6 +140,8 @@ class CPM_ortools(SolverInterface):
 
         """
         from ortools.sat.python import cp_model as ort
+        # ensure all user vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # set time limit?
         if time_limit is not None:
@@ -175,7 +181,10 @@ class CPM_ortools(SolverInterface):
         if self.ort_status == ort.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.OPTIMAL:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
@@ -199,7 +208,7 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    cpm_var._value = None  # probably got optimized away by our transformations
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
 
             # translate objective
             if self.has_objective():
@@ -267,10 +276,11 @@ class CPM_ortools(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)
         """
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+        (flat_obj, flat_cons) = flatten_objective(expr, self.expr_store)
+        if len(flat_cons) > 0:
+            self += flat_cons  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -336,22 +346,28 @@ class CPM_ortools(SolverInterface):
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         def decompose():
             global cpm_cons
-            cpm_cons = decompose_in_tree(cpm_cons, supported)
+            global expr_store
+            cpm_cons = decompose_in_tree(cpm_cons, supported, expr_store=expr_store)
         def flatten():
             global cpm_cons
-            cpm_cons = flatten_constraint(cpm_cons)
+            global expr_store
+            cpm_cons = flatten_constraint(cpm_cons, expr_store=expr_store)
         def reify():
             global cpm_cons
-            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))
+            global expr_store
+            cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), expr_store=expr_store)
         def only_num():
             global cpm_cons
-            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))
+            global expr_store
+            cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), expr_store=expr_store)
         def only_bv():
             global cpm_cons
-            cpm_cons = only_bv_reifies(cpm_cons)
+            global expr_store
+            cpm_cons = only_bv_reifies(cpm_cons, expr_store=expr_store)
         def only_impl():
             global cpm_cons
-            cpm_cons = only_implies(cpm_cons)
+            global expr_store
+            cpm_cons = only_implies(cpm_cons, expr_store=expr_store)
 
         t_decomp = timeit.timeit(stmt=decompose,number=1)
         t_flatten = timeit.timeit(stmt=flatten,number=1)
@@ -496,15 +512,32 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "no_overlap":
+                start, dur, end = self.solver_vars(cpm_expr.args)
+                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                return self.ort_model.add_no_overlap(intervals)
+            elif cpm_expr.name == "no_overlap2d":
+                start_x, dur_x, end_x, start_y, dur_y, end_y = self.solver_vars(cpm_expr.args)
+                intervals_x = [self.ort_model.NewIntervalVar(s,d,e, f"xinterval_{s}-{d}-{d}") for s,d,e in zip(start_x,dur_x,end_x)]
+                intervals_y = [self.ort_model.NewIntervalVar(s,d,e, f"yinterval_{s}-{d}-{d}") for s,d,e in zip(start_y,dur_y,end_y)]
+                return self.ort_model.add_no_overlap_2d(intervals_x, intervals_y)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
-                # when using an objective over arcs, using these vars direclty is recommended
+                # when using an objective over arcs, using these vars directly is recommended
                 # (see PCTSP-path model in the future)
                 x = cpm_expr.args
                 N = len(x)
@@ -512,8 +545,28 @@ class CPM_ortools(SolverInterface):
                 # post channeling constraints from int to bool
                 self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
                 # post the global constraint
-                # when posting arcs on diagonal (i==j), it would do subcircuit
+                # when posting arcs on diagonal (i==j), it would do subcircuit (see subcircuit)
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
+                return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == "subcircuit":
+                x = cpm_expr.args
+                N = len(x)
+                arcvars = boolvar(shape=(N,N))
+                # post channeling constraints from int to bool
+                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                # post the global constraint
+                # posting arcs on diagonal (i==j) allows for subcircuits
+                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars)] # Allows for empty subcircuits
+                return self.ort_model.AddCircuit(ort_arcs)
+            elif cpm_expr.name == "subcircuitwithstart":
+                x = cpm_expr.args
+                N = len(x)
+                arcvars = boolvar(shape=(N,N))
+                # post channeling constraints from int to bool
+                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                # post the global constraint
+                # posting arcs on diagonal (i==j) allows for subcircuits
+                ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == cpm_expr.start_index))] # The start index cannot self loop and thus must be part of the subcircuit.
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
@@ -589,12 +642,12 @@ class CPM_ortools(SolverInterface):
             List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
         """
         return {
-            'use_branching_in_lp': [False, True],
+            # 'use_branching_in_lp': [False, True], # removed in OR-tools >= v9.9
             'optimize_with_core' : [False, True],
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'core_minimization_level' : [0,1,2], # new in OR-tools>=v9.8
+            'core_minimization_level' : [0,1,2], # new in OR-tools>= v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -606,7 +659,7 @@ class CPM_ortools(SolverInterface):
     @classmethod
     def default_params(cls):
         return {
-            'use_branching_in_lp': False,
+            # 'use_branching_in_lp': False, # removed in OR-tools >= v9.9
             'optimize_with_core': False,
             'search_branching': 0,
             'boolean_encoding_level': 1,
@@ -721,10 +774,10 @@ try:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 
                 if isinstance(self._display, Expression):
-                    print(self._display.value())
+                    print(argval(self._display))
                 elif isinstance(self._display, list):
                     # explicit list of expressions to display
-                    print([v.value() for v in self._display])
+                    print(argvals(self._display))
                 else: # callable
                     self._display()
 
