@@ -7,7 +7,7 @@ import warnings # for deprecation warning
 import numpy as np
 
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
+from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray, _DirectVarImpl
 from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
@@ -51,6 +51,9 @@ def get_variables(expr, collect=None):
                     extract(e.args[1], append)  # skip data in arg0
                 elif e.name == "table":
                     extract(e.args[0], append)  # skip data in arg1
+                elif isinstance(e, _DirectVarImpl) and e.novar is not None:
+                    # custom variables, skip novar arguments
+                    extract([a for i,a in enumerate(e.args) if i not in e.novar], append)
                 else:
                     extract(e.args, append)
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):

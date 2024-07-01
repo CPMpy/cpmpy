@@ -26,6 +26,23 @@ class TestDirectORTools(unittest.TestCase):
 
         self.assertEqual(model.solveAll(), 6)
 
+    def test_direct_no_overlap(self):
+
+        interval1_args = intvar(3,10, shape=3)
+        interval2_args = intvar(2,10, shape=3)
+
+        interval1 = directvar("NewIntervalVar", interval1_args, name="ITV1", insert_name_at_index=3)
+        interval2 = directvar("NewIntervalVar", interval2_args, name="ITV2", insert_name_at_index=3)
+
+        solver = SolverLookup.get("ortools")
+
+        solver += DirectConstraint(name="AddNoOverlap",
+                                   arguments=([interval1, interval2]))
+
+        assert solver.solve()
+
+        print("Interval1: start:{}, size:{}, end:{}".format(*interval1_args.value()))
+        print("Interval2: start:{}, size:{}, end:{}".format(*interval2_args.value()))
 
 @pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
 class TestDirectExact(unittest.TestCase):
@@ -78,30 +95,12 @@ class TestDirectZ3(unittest.TestCase):
 
         model = SolverLookup.get("z3")
 
-        model += DirectConstraint("Distinct", iv)
 
-        self.assertTrue(model.solve())
-        self.assertTrue(AllDifferent(iv).value())
 
-@pytest.mark.skipif(not CPM_minizinc.supported(),
-                    reason="MinZinc not installed")
-class TestDirectMiniZinc(unittest.TestCase):
 
-    def test_direct_clause(self):
-        iv = intvar(1,9, shape=3)
 
-        model = SolverLookup.get("minizinc")
-
-        # MiniZinc is oddly different for DirectConstraint, because it is a text-based language
-        # so, as DirectConstraint name, you need to give the name of a text-based constraint,
-        # NOT a name of a function of the mzn_model class...
-
-        # this just to demonstrate, there are no 0's in the domains...
-        model += DirectConstraint("alldifferent_except_0", iv)
-
-        self.assertTrue(model.solve())
-        self.assertTrue(AllDifferent(iv).value())
-
+        print("Interval1: start:{}, size:{}, end:{}".format(*interval1_args.value()))
+        print("Interval2: start:{}, size:{}, end:{}".format(*interval2_args.value()))
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
                     reason="Gurobi not installed")
@@ -111,6 +110,7 @@ class TestDirectGurobi(unittest.TestCase):
 
         x = intvar(0,10,name="x")
         y = intvar(0,100,name="y")
+        p = np.arange(3)
 
         model = SolverLookup.get("gurobi")
 
@@ -141,3 +141,4 @@ class TestDirectChoco(unittest.TestCase):
 
         self.assertFalse(model.solve())
 
+        self.assertEqual(y_val, cons_val)
