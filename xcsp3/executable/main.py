@@ -17,7 +17,7 @@ import pathlib
 from dataclasses import dataclass
 import psutil
 from io import StringIO 
-from gurobipy import GurobiError
+from gurobipy import GurobiError, GRB
 import json
 
 
@@ -129,23 +129,28 @@ class Capturing(list):
 
 class Callback:
 
-    def __init__(self, model:cp.Model, callback_function):
+    def __init__(self, model:cp.Model):
         self.__start_time = time.time()
-        self.__solution_count = 1
+        self.__solution_count = 0
         self.model = model
-        self.callback_function = callback_function
 
     def callback(self, *args, **kwargs):
         current_time = time.time()
-        try:
-            obj = self.callback_function(*args, **kwargs)
-            # obj = self.model.objective_value()
-            print_comment('Solution %i, time = %0.2fs' % 
-                        (self.__solution_count, current_time - self.__start_time))
-            print_objective(obj)
-            self.__solution_count += 1
-        except AttributeError:
-            pass
+        model, state = args
+
+        # Callback codes: https://www.gurobi.com/documentation/current/refman/cb_codes.html#sec:CallbackCodes
+        
+        # if state == GRB.Callback.MESSAGE: # verbose logging
+        #     print_comment("log message: " + str(model.cbGet(GRB.Callback.MSG_STRING)))
+        if state == GRB.Callback.MIP: # callback from the MIP solver
+            if model.cbGet(GRB.Callback.MIP_SOLCNT) > self.__solution_count: # do we have a new solution?
+
+                obj = int(model.cbGet(GRB.Callback.MIP_OBJBST))
+                print_comment('Solution %i, time = %0.2fs' % 
+                            (self.__solution_count, current_time - self.__start_time))
+                print_objective(obj)
+                self.__solution_count = model.cbGet(GRB.Callback.MIP_SOLCNT)
+
 
 # ---------------------------------------------------------------------------- #
 #                            XCSP3 Output formatting                           #
@@ -382,7 +387,7 @@ def gurobi_arguments(args: Args, model:cp.Model):
         "Threads": args.cores,
     }
     if args.intermediate and args.opt:
-        res |= { "solution_callback": Callback(model, lambda x,_: int(x.getObjective().getValue())).callback }
+        res |= { "solution_callback": Callback(model).callback }
     return {k:v for (k,v) in res.items() if v is not None}
 
 def solver_arguments(args: Args, model:cp.Model):
