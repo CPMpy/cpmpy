@@ -92,6 +92,12 @@ def is_any_list(arg):
     return isinstance(arg, (list, tuple, np.ndarray))
 
 
+def is_transition(arg):
+    """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
+    a transition value and an ending node"""
+    return len(arg) == 3 and \
+        isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
@@ -118,7 +124,7 @@ def all_pairs(args):
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
-        
+
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     if hasattr(a, "value"):
