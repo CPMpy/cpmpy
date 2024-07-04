@@ -487,7 +487,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the maximum over the whole array
+        if axis is None:  # simple case where we want the product over the whole array
             return reduce(lambda a, b: a * b, self.flatten())
 
         # TODO: is there a better way? This does pairwise multiplication still
@@ -514,7 +514,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the maximum over the whole array
+        if axis is None:    # simple case where we want the minimum over the whole array
             return cpm_min(self)
 
         return cpm_array(np.apply_along_axis(cpm_min, axis=axis, arr=self))
@@ -523,7 +523,7 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.any(NDVarArray)
         """
-        from .python_builtins import max as cpm_any
+        from .python_builtins import any as cpm_any
 
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
@@ -531,7 +531,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the maximum over the whole array
+        if axis is None:    # simple case where we want a disjunction over the whole array
             return cpm_any(self)
 
         return cpm_array(np.apply_along_axis(cpm_any, axis=axis, arr=self))
@@ -542,7 +542,7 @@ class NDVarArray(np.ndarray, Expression):
             overwrite np.any(NDVarArray)
         """
 
-        from .python_builtins import max as cpm_all
+        from .python_builtins import all as cpm_all
 
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
@@ -550,7 +550,7 @@ class NDVarArray(np.ndarray, Expression):
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:  # simple case where we want the maximum over the whole array
+        if axis is None:  # simple case where we want a conjunction over the whole array
             return cpm_all(self)
 
         return cpm_array(np.apply_along_axis(cpm_all, axis=axis, arr=self))
