@@ -27,11 +27,12 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         Supported numerical global functions remain in the expression tree as is. They can be rewritten using
             `cpmpy.transformations.reification.reify_rewrite`
             The following `bv -> NumExpr <comp> Var/Const` can be rewritten as  [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
-            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions.
+            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     if _toplevel is None:
         _toplevel = []
 
+    # swap the arguments of a comparison while maintaining its semantics
     flipmap = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
 
     newlist = []  # decomposed constraints will go here
@@ -78,7 +79,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                     _toplevel.extend(define)  # definitions should be added toplevel
                     # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, [], nested=nested)
+                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=nested)
                     newlist.append(all(decomposed))
 
                 else:
@@ -145,7 +146,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         return toplevel_list(newlist)
     else:
         # we are toplevel and some new constraints are introduced, decompose new constraints!
-        return toplevel_list(newlist) + decompose_in_tree(_toplevel, supported, supported_reified, nested=False)
+        return toplevel_list(newlist) + decompose_in_tree(toplevel_list(_toplevel), supported, supported_reified, nested=False)
 
 
 # DEPRECATED!

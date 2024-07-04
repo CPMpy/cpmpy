@@ -115,15 +115,42 @@ With this smaller set of constraints, repeat the visual inspection steps above.
 
 (Note that for an UNSAT problem there can be many MUSes, the `examples/advanced/` folder has the MARCO algorithm that can enumerate all MSS/MUSes.)
 
+### Correcting an UNSAT program
+
+As many MUSes (=conflicts) may exist in the problem, resolving one of them does not necessarily make the model satisfiable.
+
+In order to find which constraints are to be corrected, you can use the `tools.mcs` tool which computes a 'Minimal Correction Subset' (MCS).
+By removing these contraints (or altering them), the model will become satisfiable.
+
+Note that a Minimal Correction Subset is the complement of a Maximal Satisfiable Subset (MSS).
+MSSes can be calculated optimally using a Max-CSP (resp. Max-SAT) formuation.
+By weighting each of the constraints, you can define some preferences on which constraints should be satisfied over others.
+
+```python
+from cpmpy.tools import mcs, mss
+import cpmpy as cp
+
+x = cp.boolvar(shape=3, name="x")
+model = cp.Model(
+    x[0],
+    x[0] | x[1],
+    x[2].implies(x[1]),
+    ~x[0],
+    )
+
+sat_cons = mss(model.constraints) # x[0] or x[1], x[2] -> x[1], ~x[0]
+cons_to_remove = (mcs(model.constraints)) # x[0]
+```
 
 ## Debugging a satisfiable model, that does not contain an expected solution
 
-We will ignore the (possible) objective function here and focus on the feasibility part. Actualy, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
+We will ignore the (possible) objective function here and focus on the feasibility part. 
+Actually, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
 
 Add the solution that you know should be a feasible solution as a constraint:
 `model.add( (x == 1) & (y == 2) & (z == 3) ) # yes, brackets around each!`
 
-You now have an UNSAT program! That means you can follow the steps above on 'Automatically minimising the UNSAT program' to better understand it.
+You now have an UNSAT program! That means you can follow the steps above to better understand and correct it.
 
 ## Debugging a satisfiable model, which returns an impossible solution
 

@@ -12,11 +12,13 @@
         :nosignatures:
 
         ortools
+        minizinc
         pysat
         gurobi
         pysdd
         z3
         exact
+        choco
         utils
 
     ===============
@@ -26,11 +28,13 @@
         :nosignatures:
 
         CPM_ortools
+        CPM_minizinc
         CPM_pysat
         CPM_gurobi
         CPM_pysdd
         CPM_z3
         CPM_exact
+        CPM_choco
 
     =================
     List of functions
@@ -49,3 +53,5 @@ from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
+from .choco import CPM_choco
+

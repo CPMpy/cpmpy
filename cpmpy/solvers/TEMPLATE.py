@@ -97,6 +97,9 @@ class CPM_template(SolverInterface):
             <Add link to documentation of all solver parameters>
         """
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             raise NotImplementedError("TEMPLATE: TODO, implement time_limit")
 

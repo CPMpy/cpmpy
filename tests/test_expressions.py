@@ -6,6 +6,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
+from cpmpy.expressions.utils import get_bounds, argval
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -436,6 +437,7 @@ class TestBounds(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
             self.assertRaises(IncompleteFunctionError, cons.value)
+            self.assertFalse(argval(cons))
 
         # mayhem
         cons = (arr[10 // (a - b)] == 1).implies(p)
@@ -443,6 +445,27 @@ class TestBounds(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3"))
             self.assertTrue(cons.value())
+
+
+    def test_list(self):
+
+        # cpm_array
+        iv = cp.intvar(0,10,shape=3)
+        lbs, ubs = iv.get_bounds()
+        self.assertListEqual([0,0,0], lbs.tolist())
+        self.assertListEqual([10,10,10], ubs.tolist())
+        # list
+        iv = [cp.intvar(0,10) for _ in range(3)]
+        lbs, ubs = get_bounds(iv)
+        self.assertListEqual([0, 0, 0], lbs)
+        self.assertListEqual([10, 10, 10], ubs)
+        # nested list
+        exprs = [intvar(0,1), [intvar(2,3), intvar(4,5)], [intvar(5,6)]]
+        lbs, ubs = get_bounds(exprs)
+        self.assertListEqual([0,[2,4],[5]], lbs)
+        self.assertListEqual([1,[3,5],[6]], ubs)
+
+
 
     def test_not_operator(self):
         p = boolvar()
@@ -466,10 +489,10 @@ class TestBounds(unittest.TestCase):
     def test_description(self):
 
         a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both")
 
-        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
         self.assertEqual(str(cons), "either a or b should be true, but not both")
 
         # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
@@ -480,19 +503,19 @@ class TestBounds(unittest.TestCase):
             self.assertTrue(cp.Model(cons).solve(solver=solver))
 
         ## test extra attributes of set_description
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both",
                              override_print=False)
 
-        self.assertEqual(repr(cons), "a xor b")
-        self.assertEqual(str(cons), "a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
+        self.assertEqual(str(cons), "(a) or (b)")
 
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both",
                              full_print=True)
 
-        self.assertEqual(repr(cons), "a xor b")
-        self.assertEqual(str(cons), "either a or b should be true, but not both -- a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
+        self.assertEqual(str(cons), "either a or b should be true, but not both -- (a) or (b)")
 
 
 

@@ -81,7 +81,7 @@ class ParameterTuner:
             # Convert numpy array back to dictionary
             params_dict = self._np_to_params(params_np)
             # set fixed params
-            params_dict |= fix_params
+            params_dict.update(fix_params)
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
@@ -98,7 +98,7 @@ class ParameterTuner:
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
-        self.best_params |= fix_params
+        self.best_params.update(fix_params)
         return self.best_params
 
     def _get_score(self, combos):
@@ -150,7 +150,7 @@ class GridSearchTuner(ParameterTuner):
             # Make new solver
             solver = SolverLookup.get(self.solvername, self.model)
             # set fixed params
-            params_dict |= fix_params
+            params_dict.update(fix_params)
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:

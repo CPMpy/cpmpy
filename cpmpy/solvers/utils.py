@@ -29,6 +29,7 @@ from .glasgowconstraintsolver import CPM_glasgowconstraintsolver
 from .pysat import CPM_pysat
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
+from .choco import CPM_choco
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -62,8 +63,8 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
                             cur_params=cur_params)
 
 class SolverLookup():
-    @staticmethod
-    def base_solvers():
+    @classmethod
+    def base_solvers(cls):
         """
             Return ordered list of (name, class) of base CPMpy
             solvers
@@ -78,12 +79,13 @@ class SolverLookup():
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
+                ("choco", CPM_choco),
                ]
 
-    @staticmethod
-    def solvernames():
+    @classmethod
+    def solvernames(cls):
         names = []
-        for (basename, CPM_slv) in SolverLookup.base_solvers():
+        for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
                 names.append(basename)
                 if hasattr(CPM_slv, "solvernames"):
@@ -92,23 +94,23 @@ class SolverLookup():
                         names.append(basename+":"+subn)
         return names
 
-    @staticmethod
-    def get(name=None, model=None):
+    @classmethod
+    def get(cls, name=None, model=None):
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
             This is the preferred way to initialise a solver from its name
         """
-        cls = SolverLookup.lookup(name=name)
+        solver_cls = cls.lookup(name=name)
 
         # check for a 'solver:subsolver' name
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return cls(model, subsolver=subname)
+        return solver_cls(model, subsolver=subname)
 
-    @staticmethod
-    def lookup(name=None):
+    @classmethod
+    def lookup(cls, name=None):
         """
             lookup a solver _class_ by its name
 
@@ -117,7 +119,7 @@ class SolverLookup():
         """
         if name is None:
             # first solver class
-            return SolverLookup.base_solvers()[0][1]
+            return cls.base_solvers()[0][1]
 
         # split name if relevant
         solvername = name
@@ -126,7 +128,7 @@ class SolverLookup():
             solvername,_ = solvername.split(':',maxsplit=1)
 
 
-        for (basename, CPM_slv) in SolverLookup.base_solvers():
+        for (basename, CPM_slv) in cls.base_solvers():
             if basename == solvername:
                 # found the right solver
                 return CPM_slv
@@ -136,7 +138,7 @@ class SolverLookup():
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
 # Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact]
+builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, CPM_choco]
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.

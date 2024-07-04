@@ -41,7 +41,7 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-    z3_solver: object, z3's Solver() object
+        - z3_solver: object, z3's Solver() object
 
     The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
@@ -111,6 +111,9 @@ class CPM_z3(SolverInterface):
             ```
         """
         import z3
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             # z3 expects milliseconds in int
