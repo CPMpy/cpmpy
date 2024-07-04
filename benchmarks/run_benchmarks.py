@@ -47,7 +47,7 @@ for xmlmodel in xmlmodels:
         name = os.path.basename(xmlmodel)
         os.rename(xmlmodel, xmlmodel[:len(xmlmodel) - len(name)] + 'unsupported\\' + name)
 '''
-
+print(xmlmodels)
 for xmlmodel in xmlmodels:
     model = XCSPParser(xmlmodel)
     s = cp.SolverLookup.get('ortools',model)

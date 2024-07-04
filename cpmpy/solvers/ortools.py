@@ -342,6 +342,8 @@ class CPM_ortools(SolverInterface):
         """
         import timeit
         global cpm_cons
+        global expr_store
+        expr_store = self.expr_store
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
         def decompose():
