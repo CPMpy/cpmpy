@@ -27,12 +27,12 @@ from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.linearize import linearize_constraint, only_positive_bv, linearize_objective
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
@@ -330,7 +330,7 @@ class CPM_exact(SolverInterface):
         self.objective_minimize = minimize
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = linearize_objective(expr)
         self += flat_cons  # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
 

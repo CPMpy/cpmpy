@@ -41,13 +41,13 @@ import copy
 import numpy as np
 from cpmpy.transformations.normalize import toplevel_list
 
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, flatten_objective
 from .get_variables import get_variables
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool, flatlist
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
@@ -331,3 +331,20 @@ def canonical_comparison(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+
+def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
+    """
+    - Decision variable: Var
+    - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
+              wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+              no negated BoolVars
+
+    Only difference with flatten_objective is that no negated boolvars are allowed.
+    """
+    flatexpr, flatcons = flatten_objective(expr, supported=supported)
+    if any([isinstance(x, NegBoolView) for x in flatlist(flatexpr.args)]):  # negated boolvars
+        var, cons = get_or_make_var(flatexpr)
+        return var, cons + flatcons
+    else:
+        return flatexpr, flatcons
