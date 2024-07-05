@@ -400,6 +400,48 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_negative_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [~cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertFalse(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        model += constraints[1].decompose()
+        self.assertFalse(model.solve())
+
     def test_table_onearg(self):
 
         iv = cp.intvar(0, 10)

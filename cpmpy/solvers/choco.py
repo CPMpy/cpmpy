@@ -313,12 +313,12 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
                      
         # choco supports reification of any constraint, but has a bug in increasing and decreasing
         supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
-                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
+                             "allequal", "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
                              "lex_lesseq", "lex_less",  "among"}
 
         # for when choco new release comes, fixing the bug on increasing and decreasing
@@ -537,6 +537,10 @@ class CPM_choco(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr.args)
+                return self.chc_model.table(array, table, False)
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
