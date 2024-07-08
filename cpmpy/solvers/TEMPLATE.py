@@ -88,7 +88,7 @@ class CPM_template(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
-        #           internally, constructor relies on __add__ which uses solver native objects
+        #           internally, the constructor relies on __add__ which uses solver native objects
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
