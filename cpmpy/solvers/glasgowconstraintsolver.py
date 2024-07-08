@@ -12,7 +12,7 @@
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
@@ -84,6 +84,8 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             Arguments that correspond to solver parameters:
             #TODO document solver parameters (there are none at the moment)
         """
+        # ensure all user vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             raise NotImplementedError("Glasgow Constraint Solver does not currently support timeouts.")
@@ -135,8 +137,6 @@ class CPM_glasgowconstraintsolver(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective:
                 self.objective_value_ = self.gcs.get_solution_value(self.objective_var)
-        
-
         
         return has_sol
 
@@ -223,15 +223,14 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "alldifferent", "element", 'table', }  # alldiff has a specialized MIP decomp in linearize
+        supported = {"min", "max", "abs", "alldifferent", "element", 'table', 'xor'}  # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['xor','sum','wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
         return cpm_cons
-
 
     def __add__(self, cpm_cons):
         """
@@ -243,7 +242,8 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         :type cpm_con (list of) Expression(s)
         """
         # add new user vars to the set
-        self.user_vars.update(get_variables(cpm_cons))
+                # add new user vars to the set
+        get_variables(cpm_cons, collect=self.user_vars)
 
         for con in self.transform(cpm_cons):
             self._post_constraint(con)
@@ -257,6 +257,11 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
             return self.gcs.post_or([self.solver_var(cpm_expr)])
+        elif isinstance(cpm_expr, BoolVal):
+            if not cpm_expr:
+                return self.gcs.post_or([])
+            else:
+                return
         elif isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
@@ -384,7 +389,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         elif cpm_expr.name == 'alldifferent':
             return self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
-            return self.gcs.post_table(*self.solver_vars(cpm_expr.args))
+            return self.gcs.post_table(self.solver_vars(cpm_expr.args[0]), cpm_expr.args[1])
         elif isinstance(cpm_expr, GlobalConstraint):
             # GCS also supports 'count', 'in', and 'NValue' but can't see options for them here at pressent.
 

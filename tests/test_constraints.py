@@ -36,7 +36,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "ortools":{"Inverse"},
                   "exact": {"Inverse"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "glasgowconstraintsolver": {"Cumulative"}
+                  "glasgowconstraintsolver": {}
                   }
 
 # Exclude certain operators for solvers.
