@@ -16,9 +16,9 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -191,6 +191,8 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+        elif name == "NegativeTable":
+            expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
@@ -235,10 +237,7 @@ def global_constraints(solver):
             expr = LexChainLess(X)          
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)        
-        elif name == "AllDifferentLists":
-            vars = intvar(0,10, shape=(3,4))
-            expr = cls(vars)
+            expr = LexChainLess(X)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)            
 
