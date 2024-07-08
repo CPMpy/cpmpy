@@ -370,7 +370,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
                 elif lhs.name == 'min':
                     return self.gcs.post_min(self.solver_vars(lhs.args), self.solver_var(rhs))   
                 elif lhs.name == 'element':
-                    return self.gcs.post_element(self.solver_vars(lhs.args), self.solver_var(rhs)) 
+                    return self.gcs.post_element(self.solver_var(rhs), self.solver_vars(lhs.args[1]), self.solver_vars(lhs.args[0])) 
                 else:
                     # Think that's all the possible NumExprs?
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
