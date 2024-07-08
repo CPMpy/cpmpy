@@ -64,7 +64,7 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        self.gcs = gcspy.GlasgowConstraintSolver()
+        self.gcs = gcspy.GCS()
         self.has_objective = False
         self.objective_var = None
 
@@ -100,12 +100,12 @@ class CPM_glasgowconstraintsolver(SolverInterface):
         gcs_stats = self.gcs.solve(**kwargs)
 
         # Either rename or delete the proof files
-        if new_proofname is not None:
-            shutil.move(old_proofname + ".opb", new_proofname + ".opb")
-            shutil.move(old_proofname + ".veripb", new_proofname + ".veripb")
-        else:
-            os.remove(old_proofname + ".opb")
-            os.remove(old_proofname + ".veripb")
+        # if new_proofname is not None:
+        #     shutil.move(old_proofname + ".opb", new_proofname + ".opb")
+        #     shutil.move(old_proofname + ".veripb", new_proofname + ".veripb")
+        # else:
+        #     os.remove(old_proofname + ".")
+        #     os.remove(old_proofname + ".veripb")
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
