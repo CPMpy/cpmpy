@@ -88,7 +88,7 @@ class CPM_template(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
-        #           internally, the constructor relies on __add__ which uses solver native objects
+        #           internally, the constructor relies on __add__ which uses the above solver native object(s)
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
@@ -101,9 +101,9 @@ class CPM_template(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-            <Please document key solver arguments that the user might wish to change
-             for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...>
-            <Add link to documentation of all solver parameters>
+            # [GUIDELINE] Please document key solver arguments that the user might wish to change
+            #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
+            # [GUIDELINE] Add link to documentation of all solver parameters
         """
 
         # ensure all vars are known to solver
@@ -114,11 +114,11 @@ class CPM_template(SolverInterface):
 
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
-        #       then translate assumptions here assumptions are a list of (negated) Boolean variables
+        #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
 
         # call the solver, with parameters
         my_status = self.TPL_solver.solve(**kwargs)
-        # [GUIDELINE] consider saving status as self.TPL_status such that CPMpy users can access the status object.
+        # [GUIDELINE] consider saving the status as self.TPL_status so that advanced CPMpy users can access the status object.
         #       This is mainly useful when more elaborate information about the solve-call is saved into the status
 
         # new status, translate runtime
@@ -163,7 +163,7 @@ class CPM_template(SolverInterface):
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
-        # [GUIDELINE] some solver interefaces explitely create variables on the solver.
+        # [GUIDELINE] some solver interfaces explicitely create variables on a solver object
         #       then use self.TPL_solver.NewBoolVar(...) instead of TEMPLATEpy.NewBoolVar(...)
 
         # special case, negative-bool-view
@@ -185,7 +185,7 @@ class CPM_template(SolverInterface):
         return self._varmap[cpm_var]
 
 
-    # [GUIDELINE] if TEMPLATE does not support objective functions, you can delete objective()
+    # [GUIDELINE] if TEMPLATE does not support objective functions, you can delete this function definition
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize
@@ -217,9 +217,9 @@ class CPM_template(SolverInterface):
 
     def _make_numexpr(self, cpm_expr):
         """
-            Turns a numeric CPMpy 'flat' expression into a solver-specific numeric expression
+            Converts a numeric CPMpy 'flat' expression into a solver-specific numeric expression
 
-            Used especially to post an expression as objective function and eases constraint posting
+            Primarily used for setting objective functions, and optionally in constraint posting
         """
 
         # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
@@ -309,6 +309,7 @@ class CPM_template(SolverInterface):
                     self.TPL_solver.add_clause(self.solver_vars(cpm_expr.args))
                 elif cpm_expr.name == "->": # half-reification
                     bv, subexpr = cpm_expr.args
+                    # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
                     if isinstance(subexpr, Comparison):
                         lhs, rhs = subexpr.args
                         if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
