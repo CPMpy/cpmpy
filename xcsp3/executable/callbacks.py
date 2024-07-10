@@ -347,10 +347,10 @@ class CallbacksCPMPy(Callbacks):
         elif operator == TypeOrderedOperator.INCREASING:
             self.cpm_model += cp.LexChainLessEq(cpm_lists)
         elif operator == TypeOrderedOperator.STRICTLY_DECREASING:
-            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            rev_lsts = list(reversed(cpm_lists))
             self.cpm_model += cp.LexChainLess(rev_lsts)
         elif operator == TypeOrderedOperator.DECREASING:
-            rev_lsts = [list(reversed(lst)) for lst in cpm_lists]
+            rev_lsts = list(reversed(cpm_lists))
             self.cpm_model += cp.LexChainLessEq(rev_lsts)
         else:
             self._unimplemented(lists, operator)
