@@ -793,3 +793,9 @@ class CallbacksCPMPy(Callbacks):
 
     def load_objectives(self, objectives):
         pass
+
+    def ann_decision(self, lst: list[Variable]):
+        pass
+
+    def ann_val_heuristic_static(self, lst: list[Variable], order: list[int]):
+        pass
