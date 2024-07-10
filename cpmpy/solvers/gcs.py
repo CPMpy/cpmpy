@@ -13,15 +13,12 @@ from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
-
-import shutil # For renaming the proof file
-import os
 
 from ..transformations.normalize import toplevel_list
 
@@ -30,9 +27,13 @@ class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API
     Requires that the 'gcspy' python package is installed:
-    $ pip install gcspy
-
-    See detailed installation instructions at: TODO
+    Current installation instructions:
+    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
+    - If necessary `export CXX=<your up to date compiler>`
+    - Ensure you have Boost installed
+    - `git clone https://github.com/ciaranm/glasgow-constraint-solver.git`
+    - `cd glasgow-constraint-solver/python`
+    - `pip install .`
 
     Creates the following attributes (see parent constructor for more):
     gcs: the gcspy solver object
@@ -90,24 +91,8 @@ class CPM_gcs(SolverInterface):
         if time_limit is not None:
             raise NotImplementedError("Glasgow Constraint Solver does not currently support timeouts.")
         
-        if "proof" in kwargs: # Don't pass the proof argument directly to the solver
-            new_proofname = kwargs["proof"]
-            kwargs = dict(kwargs)
-            del kwargs["proof"]
-        else:
-            new_proofname = None
-        old_proofname = self.gcs.get_proof_filename()
-
         # call the solver, with parameters
         gcs_stats = self.gcs.solve(**kwargs)
-
-        # Either rename or delete the proof files
-        # if new_proofname is not None:
-        #     shutil.move(old_proofname + ".opb", new_proofname + ".opb")
-        #     shutil.move(old_proofname + ".veripb", new_proofname + ".veripb")
-        # else:
-        #     os.remove(old_proofname + ".")
-        #     os.remove(old_proofname + ".veripb")
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -154,7 +139,7 @@ class CPM_gcs(SolverInterface):
             # gcs only works with integer variables, so not(x) = -x + 1
             return self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # Bool vars are just int vars with [0, 1] domain
@@ -223,13 +208,31 @@ class CPM_gcs(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "alldifferent", "element", 'table', 'xor'}  # alldiff has a specialized MIP decomp in linearize
+        supported = {
+            "min", 
+            "max", 
+            "abs", 
+            "alldifferent", 
+            "element", 
+            'table', 
+            'negative_table', 
+            'count', 
+            'nvalue',
+            'inverse', 
+            'circuit', 
+            'xor'}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons)  # supports >, <, !=
+
+        # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
+        # but no reification for linear not equals and not half reification for linear equality. 
+        # Maybe a future transformation (or future work on the GCS solver).
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+
+        # NB: GCS supports a small number of simple expressions as the reifying term
+        # e.g. (x > 3) -> constraint could in principle be supported in future. 
         cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
         return cpm_cons
 
     def __add__(self, cpm_cons):
@@ -269,27 +272,26 @@ class CPM_gcs(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.gcs.post_or(self.solver_vars(cpm_expr.args))
 
-            # Part-Reified constraint: Var -> Boolexpr
+            # Reified constraint: BoolVar -> Boolexpr or BoolVar == Boolexpr
             # LHS must be boolvar due to only_bv_reifies
-            elif cpm_expr.name == '->':
+            elif cpm_expr.name == '->' or cpm_expr.name == '==':
+                fully_reify = (cpm_expr.name == '==')
                 assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  
                 bool_lhs = cpm_expr.args[0]
                 reif_var = self.solver_var(bool_lhs)
                 bool_expr = cpm_expr.args[1]
 
-                # Reified boolean operator:
+                # Just a plain implies or equals between two boolvars
                 if isinstance(bool_expr, _BoolVarImpl): # bv1 -> bv2
-                    return self.gcs.post_implies(*self.solver_vars([bool_lhs, bool_expr]))
-                if isinstance(bool_expr, Operator): # bv -> and(...), bv -> or(...)  # not sure about ('xor' and '->' ???)
+                    return (self.gcs.post_equals if fully_reify else self.gcs.post_implies)\
+                        (*self.solver_vars([bool_lhs, bool_expr]))
+                if isinstance(bool_expr, Operator): # bv -> and(...), bv -> or(...)  bv -> [->]
                     if bool_expr.name == 'and':
-                        return self.gcs.post_and_if(self.solver_vars(bool_expr.args), reif_var)
+                        return self.gcs.post_and_reif(self.solver_vars(bool_expr.args), reif_var, fully_reify)
                     elif bool_expr.name == 'or':
-                        return self.gcs.post_or_if(self.solver_vars(bool_expr.args), reif_var)
+                        return self.gcs.post_or_reif(self.solver_vars(bool_expr.args), reif_var, fully_reify)
                     elif bool_expr.name == '->':
-                        return self.gcs.post_implies_if(self.solver_vars(bool_expr.args), reif_var)
-                    elif bool_expr.name == 'xor' and len(bool_expr.args) == 2: # OR-tools implementation doesn't seem to deal with this case?
-                        # only binary, non-binary will be decomposed lower
-                        return self.gcs.post_binary_xor_if(self.solver_vars(bool_expr.args), reif_var)
+                        return self.gcs.post_implies_reif(self.solver_vars(bool_expr.args), reif_var, fully_reify)
                     else:
                         # Shouldn't happen if reify_rewrite worked?
                         raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -299,25 +301,26 @@ class CPM_gcs(SolverInterface):
                     lhs = bool_expr.args[0]
                     rhs = bool_expr.args[1]
                     if bool_expr.name == '==':
-                        return self.gcs.post_equals_if(*self.solver_vars([lhs, rhs]), reif_var)
+                        return self.gcs.post_equals_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '<=':
-                        return self.gcs.post_compare_less_if(*self.solver_vars([lhs, rhs]), reif_var, True)
+                        return self.gcs.post_less_equal_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '<':
-                        return self.gcs.post_compare_less_if(*self.solver_vars([lhs, rhs]), reif_var, False)
+                        return self.gcs.post_less_if(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '>=':
-                        return self.gcs.post_compare_less_if(*self.solver_vars([rhs, lhs]), reif_var, True)
+                        return self.gcs.post_greater_equal_reif(*self.solver_vars([rhs, lhs]), reif_var, fully_reify)
                     elif bool_expr.name == '>':
-                        return self.gcs.post_compare_less_if(*self.solver_vars([rhs, lhs]), reif_var, False)
+                        return self.gcs.post_greater_reif(*self.solver_vars([rhs, lhs]), reif_var, fully_reify)
                     elif bool_expr.name == '!=':
-                        # Note: GCS doesn't currently support NotEqualsIf, so we need this ugly workaround for now:
+                        # Note: GCS doesn't currently support reified NotEquals, so we need this ugly workaround for now:
                         # bv -> x != y can be written as 
                         # bv -> OR(lt, gt) with lt, gt being BoolVars and the additional constraints
                         # lt == x < y
                         # gt == x > y
-                        lt_bool = _BoolVarImpl()
-                        gt_bool = _BoolVarImpl()
+                        lt_bool, gt_bool = boolvar(shape=2)
                         self += (lhs < rhs) == lt_bool
                         self += (lhs > rhs) == gt_bool
+                        if fully_reify:
+                            self += (~reif_var).implies(lhs == rhs)
                         return self.gcs.post_or_if(self.solver_vars([lt_bool, gt_bool]), reif_var)
                     else:
                         raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -338,21 +341,22 @@ class CPM_gcs(SolverInterface):
                 elif cpm_expr.name == '!=':
                     return self.gcs.post_not_equals(*self.solver_vars([lhs, rhs]))
                 elif cpm_expr.name == '<=':
-                    return self.gcs.post_compare_less(*self.solver_vars([lhs, rhs]), True)
+                    return self.gcs.post_less_equal(*self.solver_vars([lhs, rhs]))
                 elif cpm_expr.name == '<':
-                    return self.gcs.post_compare_less(*self.solver_vars([lhs, rhs]), False)
+                    return self.gcs.post_less_than(*self.solver_vars([lhs, rhs]), False)
                 elif cpm_expr.name == '>=':
-                    return self.gcs.post_compare_less(*self.solver_vars([rhs, lhs]), True)
+                    return self.gcs.post_greater_equal(*self.solver_vars([rhs, lhs]), True)
                 elif cpm_expr.name == '>':
-                    return self.gcs.post_compare_less(*self.solver_vars([rhs, lhs]), False)
+                    return self.gcs.post_greater_than(*self.solver_vars([rhs, lhs]), False)
                 else:
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
             
             # If the comparison is '==' we can have a NumExpr on the lhs
             elif cpm_expr.name == '==':
                 if lhs.name == 'abs':
+                    assert(len(lhs.args) == 1) # Should not have a nested expression inside abs
                     return self.gcs.post_abs(*self.solver_vars(list(lhs.args) + [rhs]))
-                elif lhs.name in ['mul', 'div', 'pow', 'mod', 'abs']:
+                elif lhs.name in ['mul', 'div', 'pow', 'mod']:
                     return self.gcs.post_arithmetic(*self.solver_vars(list(lhs.args) + [rhs]), lhs.name)
                 elif lhs.name == 'sub':
                     var1 = self.solver_var(lhs.args[0])
@@ -376,6 +380,10 @@ class CPM_gcs(SolverInterface):
                     return self.gcs.post_min(self.solver_vars(lhs.args), self.solver_var(rhs))   
                 elif lhs.name == 'element':
                     return self.gcs.post_element(self.solver_var(rhs), self.solver_vars(lhs.args[1]), self.solver_vars(lhs.args[0])) 
+                elif lhs.name == 'count':
+                    return self.gcs.post_count(self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1]), self.solver_var(rhs))
+                elif lhs.name == 'nvalue':
+                    return self.gcs.post_nvalue(self.solver_vars(lhs.args), self.solver_var(rhs))
                 else:
                     # Think that's all the possible NumExprs?
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
@@ -383,16 +391,21 @@ class CPM_gcs(SolverInterface):
                 raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
         
         # rest: base (Boolean) global constraints
-        elif cpm_expr.name == 'xor' and len(cpm_expr.args) == 2:
-            # only binary, non-binary will be decomposed lower
-            return self.gcs.post_binary_xor(self.solver_vars(cpm_expr.args))
+        elif cpm_expr.name == 'xor':
+            return self.gcs.post_xor(self.solver_vars(cpm_expr.args))
+        elif cpm_expr.name == 'circuit':
+            return self.gcs.post_circuit(self.solver_vars(cpm_expr.args))
+        elif cpm_expr.name == 'inverse':
+            return self.gcs.post_inverse(self.solver_vars(cpm_expr.args[0]), self.solver_vars(cpm_expr.args[1]))
         elif cpm_expr.name == 'alldifferent':
             return self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
         elif cpm_expr.name == 'table':
             return self.gcs.post_table(self.solver_vars(cpm_expr.args[0]), cpm_expr.args[1])
+        elif cpm_expr.name == 'negative_table':
+            return self.gcs.post_negative_table(self.solver_vars(cpm_expr.args[0]), cpm_expr.args[1])
         elif isinstance(cpm_expr, GlobalConstraint):
-            # GCS also supports 'count', 'in', and 'NValue' but can't see options for them here at pressent.
-
+            # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
+            # which could be added in future. 
             self += cpm_expr.decompose()  # assumes a decomposition exists...
             return None # will throw error if used in reification
 
