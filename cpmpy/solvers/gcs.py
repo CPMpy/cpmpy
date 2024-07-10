@@ -26,7 +26,7 @@ import os
 from ..transformations.normalize import toplevel_list
 
 
-class CPM_glasgowconstraintsolver(SolverInterface):
+class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API
     Requires that the 'gcspy' python package is installed:

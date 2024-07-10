@@ -11,7 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-SOLVERNAMES = ['glasgowconstraintsolver']
+SOLVERNAMES = ['gcs']
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
@@ -36,7 +36,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "ortools":{"Inverse"},
                   "exact": {"Inverse"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "glasgowconstraintsolver": {}
+                  "gcs": {}
                   }
 
 # Exclude certain operators for solvers.
