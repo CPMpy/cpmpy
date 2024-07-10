@@ -41,6 +41,8 @@ x = cp.intvar(1,10, name="x")
 
 Decision variables have a **domain**, a set of allowed values. For Boolean variables this is implicitly the values 'False' and 'True'. For Integer decision variables, you have to specify the lower-bound and upper-bound (`1` and `10` respectively above).
 
+If you want a **sparse domain**, containing only a few values, you can either define a suitable lower/upper bound and then forbid specific values, e.g. `x != 3, x != 5, x != 7`; or you can use the shorthand *InDomain* global constraint: `InDomain(x, [1,2,4,6,8,9])`.
+
 Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned to it. If you print `print(b, x)` decision variables, it will print the name. Did we already say the name must be unique? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named variables.
 
 A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable in multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. 
@@ -60,6 +62,8 @@ print(x)  # [[x[0,0] x[0,1]]
 You can also call `v.value()` on these n-dimensional arrays, which will return an n-dimensional **numpy** array of values. And you can do vectorized operations and comparisons, like in regular numpy. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific python tools, including machine learning and visualisation libraries, so a lot less glue code to write.
 
 See [the API documentation on variables](api/expressions/variables.html) for more detailed information.
+
+Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last succesful solve call.
 
 ## Creating a model
 
