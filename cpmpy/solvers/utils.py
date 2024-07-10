@@ -125,13 +125,11 @@ class SolverLookup():
         if ':' in solvername:
             solvername,_ = solvername.split(':',maxsplit=1)
 
-
         for (basename, CPM_slv) in cls.base_solvers():
             if basename == solvername:
                 # found the right solver
                 return CPM_slv
-
-        return None
+        raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
