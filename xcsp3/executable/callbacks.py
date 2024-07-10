@@ -44,7 +44,7 @@ class CallbacksCPMPy(Callbacks):
             newvar = cp.intvar(mini, maxi, name=x.id)
         self.cpm_variables[x] = newvar
         nbvals = maxi - mini + 1
-        if nbvals < len(values):
+        if len(values) < nbvals:
             # only do this if there are holes in the domain
             self.cpm_model += cp.InDomain(newvar, values)
 
