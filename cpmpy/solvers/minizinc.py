@@ -470,7 +470,6 @@ class CPM_minizinc(SolverInterface):
 
         :return: self
         """
-        # all variables are user variables, handled in `solver_var()`
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
