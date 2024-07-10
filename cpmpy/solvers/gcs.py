@@ -78,9 +78,6 @@ class CPM_gcs(SolverInterface):
             Arguments:
             - time_limit:  #TODO maximum solve time in seconds (float, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
-            Additional keyword arguments:
-            - proof: filename/path for the two files ".opb" and ".veripb" necessary for proof verification
-            (if this argument is not supplied the proof files created by the solver are deleted).
 
             Arguments that correspond to solver parameters:
             #TODO document solver parameters (there are none at the moment)
@@ -92,7 +89,8 @@ class CPM_gcs(SolverInterface):
             raise NotImplementedError("Glasgow Constraint Solver does not currently support timeouts.")
         
         # call the solver, with parameters
-        gcs_stats = self.gcs.solve(**kwargs)
+        
+        gcs_stats = self.gcs.solve(all_solutions=self.has_objective, **kwargs)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -206,7 +204,6 @@ class CPM_gcs(SolverInterface):
         :return: list of Expression
         """
         # apply transformations, then post internally
-        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         supported = {
             "min", 
@@ -233,6 +230,9 @@ class CPM_gcs(SolverInterface):
         # NB: GCS supports a small number of simple expressions as the reifying term
         # e.g. (x > 3) -> constraint could in principle be supported in future. 
         cpm_cons = only_bv_reifies(cpm_cons)
+        str_rep = ""
+        for c in cpm_cons:
+            str_rep += str(c) + '\n'
         return cpm_cons
 
     def __add__(self, cpm_cons):
@@ -253,7 +253,7 @@ class CPM_gcs(SolverInterface):
 
         return self
 
-    def _post_constraint(self, cpm_expr, reify=False):
+    def _post_constraint(self, cpm_expr):
         """
             Post a primitive CPMpy constraint to the GCS solver API
         """
@@ -265,7 +265,12 @@ class CPM_gcs(SolverInterface):
                 return self.gcs.post_or([])
             else:
                 return
-        elif isinstance(cpm_expr, Operator):
+        elif isinstance(cpm_expr, Operator) or \
+            (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
+             and not isinstance(cpm_expr.args[1], _NumVarImpl)): 
+            # ^ Somewhat awkward, but want to deal with full and half reifications
+            # in one go here, and then deal with regular == comparisons later.l
+
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
                 return self.gcs.post_and(self.solver_vars(cpm_expr.args))
@@ -303,13 +308,13 @@ class CPM_gcs(SolverInterface):
                     if bool_expr.name == '==':
                         return self.gcs.post_equals_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '<=':
-                        return self.gcs.post_less_equal_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
+                        return self.gcs.post_less_than_equal_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '<':
-                        return self.gcs.post_less_if(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
+                        return self.gcs.post_less_than_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '>=':
-                        return self.gcs.post_greater_equal_reif(*self.solver_vars([rhs, lhs]), reif_var, fully_reify)
+                        return self.gcs.post_greater_than_equal_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '>':
-                        return self.gcs.post_greater_reif(*self.solver_vars([rhs, lhs]), reif_var, fully_reify)
+                        return self.gcs.post_greater_than_reif(*self.solver_vars([lhs, rhs]), reif_var, fully_reify)
                     elif bool_expr.name == '!=':
                         # Note: GCS doesn't currently support reified NotEquals, so we need this ugly workaround for now:
                         # bv -> x != y can be written as 
@@ -320,8 +325,8 @@ class CPM_gcs(SolverInterface):
                         self += (lhs < rhs) == lt_bool
                         self += (lhs > rhs) == gt_bool
                         if fully_reify:
-                            self += (~reif_var).implies(lhs == rhs)
-                        return self.gcs.post_or_if(self.solver_vars([lt_bool, gt_bool]), reif_var)
+                            self += (~bool_lhs).implies(lhs == rhs)
+                        return self.gcs.post_or_reif(self.solver_vars([lt_bool, gt_bool]), reif_var, False)
                     else:
                         raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
                 else:
@@ -333,24 +338,49 @@ class CPM_gcs(SolverInterface):
             lhs = cpm_expr.args[0]
             rhs = cpm_expr.args[1]
 
-            # Due to only_numexpr_equality we can only have non '==' when the lhs is a variable
-            if isinstance(lhs, _NumVarImpl):
-                assert(isinstance(rhs, _NumVarImpl) or is_num(rhs))
-                if cpm_expr.name == '==':
-                    return self.gcs.post_equals(*self.solver_vars([lhs, rhs]))
-                elif cpm_expr.name == '!=':
-                    return self.gcs.post_not_equals(*self.solver_vars([lhs, rhs]))
-                elif cpm_expr.name == '<=':
-                    return self.gcs.post_less_equal(*self.solver_vars([lhs, rhs]))
-                elif cpm_expr.name == '<':
-                    return self.gcs.post_less_than(*self.solver_vars([lhs, rhs]), False)
-                elif cpm_expr.name == '>=':
-                    return self.gcs.post_greater_equal(*self.solver_vars([rhs, lhs]), True)
-                elif cpm_expr.name == '>':
-                    return self.gcs.post_greater_than(*self.solver_vars([rhs, lhs]), False)
+            # Due to only_numexpr_equality we can only have '!=', "<=", etc.
+            # when the lhs is a variable, sum or wsum
+            if isinstance(lhs, _NumVarImpl) or lhs.name == 'sum' or lhs.name == 'wsum':
+                if lhs.name == 'sum' or lhs.name == 'wsum':
+                    if lhs.name == 'sum':
+                        summands = self.solver_vars(lhs.args)
+                        summands.append(self.solver_var(rhs))
+                        coeffs = [1]*len(lhs.args) + [-1]
+                    else:
+                        summands = self.solver_vars(lhs.args[1])
+                        summands.append(self.solver_var(rhs))
+                        coeffs = list(lhs.args[0]) + [-1]
+
+                    if cpm_expr.name == '==':
+                        return self.gcs.post_linear_equality(summands, coeffs, 0)
+                    elif cpm_expr.name == '!=':
+                        return self.gcs.post_linear_not_equal(summands, coeffs, 0)
+                    elif cpm_expr.name == '<=':
+                        return self.gcs.post_linear_less_equal(summands, coeffs, 0)
+                    elif cpm_expr.name == '<':
+                        return self.gcs.post_linear_less_equal(summands, coeffs, -1)
+                    elif cpm_expr.name == '>=':
+                        return self.gcs.post_linear_greater_equal(summands, coeffs, 0)
+                    elif cpm_expr.name == '>':
+                        return self.gcs.post_linear_greater_equal(summands, coeffs, 1)
+                    else:
+                        raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
                 else:
-                    raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
-            
+                    if cpm_expr.name == '==':
+                        return self.gcs.post_equals(*self.solver_vars([lhs, rhs]))
+                    elif cpm_expr.name == '!=':
+                        return self.gcs.post_not_equals(*self.solver_vars([lhs, rhs]))
+                    elif cpm_expr.name == '<=':
+                        return self.gcs.post_less_than_equal(*self.solver_vars([lhs, rhs]))
+                    elif cpm_expr.name == '<':
+                        return self.gcs.post_less_than(*self.solver_vars([lhs, rhs]))
+                    elif cpm_expr.name == '>=':
+                        return self.gcs.post_greater_than_equal(*self.solver_vars([lhs, rhs]))
+                    elif cpm_expr.name == '>':
+                        return self.gcs.post_greater_than(*self.solver_vars([lhs, rhs]))
+                    else:
+                        raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
+
             # If the comparison is '==' we can have a NumExpr on the lhs
             elif cpm_expr.name == '==':
                 if lhs.name == 'abs':
@@ -383,7 +413,7 @@ class CPM_gcs(SolverInterface):
                 elif lhs.name == 'count':
                     return self.gcs.post_count(self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1]), self.solver_var(rhs))
                 elif lhs.name == 'nvalue':
-                    return self.gcs.post_nvalue(self.solver_vars(lhs.args), self.solver_var(rhs))
+                    return self.gcs.post_nvalue(self.solver_var(rhs), self.solver_vars(lhs.args))
                 else:
                     # Think that's all the possible NumExprs?
                     raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}'".format(cpm_expr))
