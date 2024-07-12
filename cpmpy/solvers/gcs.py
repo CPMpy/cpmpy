@@ -101,7 +101,7 @@ class CPM_gcs(SolverInterface):
         return self.objective_var != None
     
     def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
-              verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=False, **kwargs):
+              verify=True, verify_time_limit=30, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
             Arguments:
@@ -128,6 +128,8 @@ class CPM_gcs(SolverInterface):
                 self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
             else:
                 self.proof_name = "gcs_proof"
+        else:
+            self.proof_name = proof_name
         self.proof_location = proof_location
      
         # call the solver, with parameters    
@@ -178,7 +180,7 @@ class CPM_gcs(SolverInterface):
         return has_sol
 
     def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
-                 prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=False, **kwargs):
+                 prove=False, proof_name=None, proof_location=".", verify=True, verify_time_limit=30, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
