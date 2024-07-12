@@ -28,7 +28,7 @@ def get_variables_model(model):
 def vars_expr(expr):
     warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
     return get_variables(expr)
-def get_variables(expr, collect=None):
+def get_variables(expr, collect=None, return_direct=False):
     """
         Get variables of an expression, does not include direct variables
 
@@ -53,6 +53,8 @@ def get_variables(expr, collect=None):
                     extract(e.args[0], append)  # skip data in arg1
                 elif isinstance(e, _DirectVarImpl):
                     # custom variables, skip novar arguments
+                    if return_direct:
+                        append(e)
                     if e.novar is None:
                         extract(e.args, append)
                     else:
