@@ -144,35 +144,38 @@ class CPM_gcs(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        gcs_stats = self.gcs.solve(all_solutions=True, timeout=time_limit, solution_limit=solution_limit, **kwargs)
+    
+        def display_callback(solution_map):
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if isinstance(cpm_var, _BoolVarImpl):
+                    # Convert back to bool
+                    cpm_var._value = bool(solution_map[sol_var])
+                else:
+                    cpm_var._value = solution_map[sol_var]
+
+            if isinstance(display, Expression):
+                print(argval(display))
+            elif isinstance(display, list):
+                # explicit list of expressions to display
+                print(argvals(display))
+            elif callable(display):
+                display()
+            else:
+                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type.".format(cpm_var))
+            return 
+        sol_callback = None
+        if display:
+            sol_callback=display_callback
+
+        gcs_stats = self.gcs.solve(all_solutions=True, timeout=time_limit, solution_limit=solution_limit, callback=sol_callback, **kwargs)
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = gcs_stats["solve_time"]
 
-        # display if needed
-        if display is not None:
-            # TODO: GCS does have a native solution callbacks API but it's going to 
-            # be a bit of work to integrate it into the python interface so this will do for now
-            for i in range(gcs_stats["solutions"]):
-                # map the solution to user vars
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if isinstance(sol_var, _BoolVarImpl):
-                        # Convert back to bool
-                        cpm_var._value = bool(self.gcs.get_solution_value(sol_var, i))
-                    else:
-                        cpm_var._value = self.gcs.get_solution_value(sol_var, i)
-                # print the desired display
-
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
-
         return gcs_stats["solutions"]
+
 
     def solver_var(self, cpm_var):
         """
