@@ -55,6 +55,7 @@ import numpy as np
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, is_any_list
 
+from copy import copy
 
 def BoolVar(shape=1, name=None):
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
