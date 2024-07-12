@@ -27,7 +27,7 @@ from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, _DirectVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
@@ -308,6 +308,8 @@ class CPM_exact(SolverInterface):
                 self.xct_solver.addVariable(revar,str(lb), str(ub), self.encoding)
             else:
                 self.xct_solver.addVariable(revar,lb,ub, self.encoding)
+        elif isinstance(cpm_var, _DirectVarImpl):
+            revar = cpm_var.callSolver(self, self.xct_solver)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar
