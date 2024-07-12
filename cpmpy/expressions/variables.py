@@ -186,8 +186,9 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
         Direct decision variables call a function of the underlying solver when added to a CPMpy solver,
         and store the solver's response as identifier like it does for other CPMpy variables.
 
-        You can create them at any shape and give them names like other CPMpy variables. They can be used
-        in DirectConstraints just like you use other CPMpy variables.
+        You can create them at any shape and give them names like other CPMpy variables.
+        They can only be used in DirectConstraints, and can only contain CPMpy variables or constants as arguments as
+            the arguments will not be transformed before posting to the solver.
 
         Parameters:
             directname: name of the solver function that you wish to call
@@ -208,12 +209,12 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
         begin = intvar(1,9, name="begin")
         end = intvar(1,9, name="end")
         size = 3
-        directvar("IntervalVar", (begin, size, end, "ITV0"), name="ITV0")
+        directvar("NewIntervalVar", (begin, size, end, "ITV0"), name="ITV0")
         ```
 
         The last one is equivalent to:
         ```
-        directvar("IntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV0")
+        directvar("NewIntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV0")
         ```
 
         Advanced usage, with automatic vectorization:
@@ -221,14 +222,14 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
         begin = intvar(1,9, shape=(2,2), name="begin")
         end = intvar(1,9, shape=(2,2), name="end")
         size = 3*np.ones(shape=(2,2))
-        directvar("IntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV", shape=(2,2))
+        directvar("NewIntervalVar", (begin, size, end), insert_name_at_index=3, name="ITV", shape=(2,2))
         ```
 
         will create 4 direct variables:
-            ITV[0,0]:"IntervalVar"(begin[0,0], 3, end[0,0], "ITV[0,0]")
-            ITV[0,1]:"IntervalVar"(begin[0,1], 3, end[0,1], "ITV[0,1]")
-            ITV[1,0]:"IntervalVar"(begin[1,0], 3, end[1,0], "ITV[1,0]")
-            ITV[1,1]:"IntervalVar"(begin[1,1], 3, end[1,1], "ITV[1,1]")
+            ITV[0,0]:"NewIntervalVar"(begin[0,0], 3, end[0,0], "ITV[0,0]")
+            ITV[0,1]:"NewIntervalVar"(begin[0,1], 3, end[0,1], "ITV[0,1]")
+            ITV[1,0]:"NewIntervalVar"(begin[1,0], 3, end[1,0], "ITV[1,0]")
+            ITV[1,1]:"NewIntervalVar"(begin[1,1], 3, end[1,1], "ITV[1,1]")
 
         If name is None then a name 'DV<unique number>' will be assigned to it.
         If shape is different from 1, indices are automatically added to the name.
