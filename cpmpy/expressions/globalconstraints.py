@@ -123,7 +123,8 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, \
+    is_var_or_cst
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -902,6 +903,15 @@ class DirectConstraint(Expression):
         """
         if not isinstance(arguments, tuple):
             arguments = (arguments,)  # force tuple
+
+        def valid_arg(expr):
+            if is_any_list(expr):
+                return all(valid_arg(e) for e in expr)
+            return is_var_or_cst(expr)
+
+        if not all(valid_arg(arguments)):
+            raise TypeError(f"DirectConstraint only accepts (collections of) variables or constants, but got {arguments}")
+
         super().__init__(name, arguments)
         self.novar = novar
 
