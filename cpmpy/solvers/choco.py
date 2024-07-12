@@ -243,6 +243,9 @@ class CPM_choco(SolverInterface):
                     raise ChocoBoundsException(
                         "Choco does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
+            elif isinstance(cpm_var, _DirectVarImpl):
+                revar = cpm_var.callSolver(self, self.chc_model)
+
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
