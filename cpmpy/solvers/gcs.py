@@ -98,10 +98,10 @@ class CPM_gcs(SolverInterface):
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
 
     def has_objective(self):
-        return self.objective_var != None
+        return self.objective_var is not None
     
     def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
-              verify=True, verify_time_limit=30, veripb_args = [], display_verifier_output=True, **kwargs):
+              verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
             Arguments:
@@ -171,7 +171,7 @@ class CPM_gcs(SolverInterface):
 
             # translate objective, for optimisation problems only
             if self.has_objective():
-                self.objective_value_ = self.gcs.get_solution_value(self.objective_var)
+                self.objective_value_ = self.gcs.get_solution_value(self.solver_var(self.objective_var))
         
         # Verify proof, if requested
         if verify:
@@ -180,7 +180,8 @@ class CPM_gcs(SolverInterface):
         return has_sol
 
     def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
-                 prove=False, proof_name=None, proof_location=".", verify=True, verify_time_limit=30, veripb_args = [], display_verifier_output=True, **kwargs):
+                 prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
+                 display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
@@ -304,9 +305,9 @@ class CPM_gcs(SolverInterface):
         self.objective_var = obj
 
         if minimize:
-            self.gcs.minimise(obj)  
+            self.gcs.minimise(self.solver_var(obj))  
         else:
-            self.gcs.maximise(obj)
+            self.gcs.maximise(self.solver_var(obj))
 
     def transform(self, cpm_expr):
         """
