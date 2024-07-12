@@ -62,21 +62,6 @@ class TestDirectORTools(unittest.TestCase):
         self.assertTrue(solver.solve())
         self.assertFalse(solver.solve(assumptions=bvars))
 
-
-class TestDirectConstructor(unittest.TestCase):
-
-    def test_no_var_arg(self):
-
-        start = intvar(0,10,shape=3)
-        end = intvar(0,10,shape=3)
-        dur = [3,4,5]
-
-        self.assertRaises(TypeError,
-                          lambda : directvar("NewIntervalVar", [start+[1,2,3], dur, end])
-                          )
-
-
-
 @pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
 class TestDirectExact(unittest.TestCase):
 
@@ -123,17 +108,52 @@ class TestDirectPySDD(unittest.TestCase):
                     reason="Z3py not installed")
 class TestDirectZ3(unittest.TestCase):
 
-    def test_direct_clause(self):
+    def test_direct_distinct(self):
         iv = intvar(1,9, shape=3)
 
         model = SolverLookup.get("z3")
 
+        model += DirectConstraint("Distinct", iv)
+
+        self.assertTrue(model.solve())
+        self.assertTrue(AllDifferent(iv).value())
+
+    # def test_string_cons(self):
+    #
+    #     str1 = directvar("String", arguments=("string 1",), novar=[0])
+    #     str2 = directvar("String", arguments=("string 2",), novar=[0])
+    #
+    #     solver = SolverLookup.get("z3")
+    #     length1 = directvar("Length", (str1,))
+    #     z3_3 = directvar("IntVal", arguments=(3,))
+    #     eqcons = DirectConstraint("eq", (length1, z3_3))
+    #     solver += eqcons
+    #
+    #     assert solver.solve()
 
 
 
+@pytest.mark.skipif(not CPM_minizinc.supported(),
+                    reason="MinZinc not installed")
+class TestDirectMiniZinc(unittest.TestCase):
 
-        print("Interval1: start:{}, size:{}, end:{}".format(*interval1_args.value()))
-        print("Interval2: start:{}, size:{}, end:{}".format(*interval2_args.value()))
+    def test_direct_clause(self):
+        iv = intvar(1,9, shape=3)
+
+        model = SolverLookup.get("minizinc")
+
+        # MiniZinc is oddly different for DirectConstraint, because it is a text-based language
+        # so, as DirectConstraint name, you need to give the name of a text-based constraint,
+        # NOT a name of a function of the mzn_model class...
+
+        # this just to demonstrate, there are no 0's in the domains...
+        model += DirectConstraint("alldifferent_except_0", iv)
+
+        self.assertTrue(model.solve())
+        self.assertTrue(AllDifferent(iv).value())
+
+    # TODO: how would we do directVar for minizinc??
+
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
                     reason="Gurobi not installed")
@@ -174,4 +194,15 @@ class TestDirectChoco(unittest.TestCase):
 
         self.assertFalse(model.solve())
 
-        self.assertEqual(y_val, cons_val)
+    def test_set_var(self):
+
+        set1 = directvar("setvar", ([1,2,3],), keyword_name="name", name="set1")
+        set2 = directvar("setvar", ([3,4,5],), keyword_name="name", name="set2")
+        # variable that can take subsets of {0,1,2,3,4,5,6,7,8,9}
+        set3 = directvar("setvar", (list(), list(range(10))), keyword_name="name", name="set3")
+        solver = SolverLookup.get("choco")
+        solver += DirectConstraint("set_union", ([set1, set2], set3))
+
+        self.assertTrue(solver.solve())
+        chc_setvar = solver.solver_var(set3)
+        self.assertSetEqual({1,2,3,4,5},solver.chc_sol.get_set_val(chc_setvar))
