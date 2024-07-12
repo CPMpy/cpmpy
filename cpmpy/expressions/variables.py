@@ -181,7 +181,7 @@ def intvar(lb, ub, shape=1, name=None):
     return NDVarArray(shape, dtype=object, buffer=data)
 
 
-def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name_at_index=None):
+def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name_at_index=None, keyword_name=None):
     """
         Direct decision variables call a function of the underlying solver when added to a CPMpy solver,
         and store the solver's response as identifier like it does for other CPMpy variables.
@@ -199,6 +199,9 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
             name: name of the CPMpy variable, in case of n-dimensional array will automatically have index appended
             insert_name_at_index: if not None then the name of the variable will be inserted at this position
                                   of the argument list (and `novar` will be updated accordingly)
+            keyword_name: if not None, then the name of the variable will be set using this keyword when creating the
+                                  variable on the native solver object. May be used when non-default arguments in the
+                                  solver API are omitted. For an example see tests/test_direct/test_direct_choco.
 
         Vectorized arguments: any argument that is a numpy ndarray and that has the same shape as the 'shape' parameter.
         will be assumed to be a vectorized parameter meaning that every variable will only get the parameter at the
@@ -237,6 +240,8 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
 
+    assert insert_name_at_index is None or keyword_name is None, "cannot post name using position and keyword"
+
     # update the novar list if a name will be inserted later
     if insert_name_at_index is not None:
         if novar is None:
@@ -266,7 +271,7 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
                     subargs.append(arg)
             if insert_name_at_index is not None:
                 subargs.insert(insert_name_at_index, subname)
-            data.append(_DirectVarImpl(directname, subargs, novar=novar, name=subname))
+            data.append(_DirectVarImpl(directname, subargs, novar=novar, name=subname, keyword_name=keyword_name))
 
         # insert into custom ndarray
         return NDVarArray(shape, dtype=object, buffer=np.array(data))
@@ -468,7 +473,7 @@ class _DirectVarImpl(Expression):
     """
     counter = 0
 
-    def __init__(self, directname, arguments, novar=None, name=None):
+    def __init__(self, directname, arguments, novar=None, name=None, keyword_name=None):
         """
             directname: name of the solver function that you wish to call
             arguments: tuple of arguments to pass to the solver function with name 'name'
@@ -486,6 +491,7 @@ class _DirectVarImpl(Expression):
 
         self.directname = directname
         self.novar = novar
+        self.keyword_name = keyword_name
 
     def __str__(self):
         return f"{self.name}:{self.directname}({str(self.args)})"
@@ -509,7 +515,11 @@ class _DirectVarImpl(Expression):
                 # it may contain variables, replace
                 solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
         # len(native_args) should match nr of arguments of `native_function`
-        return solver_function(*solver_args)
+        if self.keyword_name is None:
+            return solver_function(*solver_args)
+        else:
+            return solver_function(*solver_args, **{self.keyword_name:self.name})
+
 
 # subclass numericexpression for operators (first), ndarray for all the rest
 class NDVarArray(np.ndarray, Expression):
