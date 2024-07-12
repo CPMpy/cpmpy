@@ -73,7 +73,6 @@ import numpy as np
 
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
-from .variables import _DirectVarImpl
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -390,6 +389,8 @@ class Comparison(Expression):
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
     def __init__(self, name, left, right):
+        from .variables import _DirectVarImpl
+
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         assert not isinstance(left, _DirectVarImpl), f"Direct variables cannot be used in CPMPy-expressions: {left}"
         assert not isinstance(right, _DirectVarImpl),  f"Direct variables cannot be used in CPMPy-expressions: {right}"
@@ -445,6 +446,7 @@ class Operator(Expression):
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool_op = Operator.allowed[name]
 
+        from .variables import _DirectVarImpl
         for arg in arg_list:
             assert not isinstance(arg, _DirectVarImpl),  f"Direct variables cannot be used in CPMPy-expressions: {arg}"
         if is_bool_op:
