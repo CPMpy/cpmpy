@@ -44,6 +44,39 @@ class TestDirectORTools(unittest.TestCase):
         print("Interval1: start:{}, size:{}, end:{}".format(*interval1_args.value()))
         print("Interval2: start:{}, size:{}, end:{}".format(*interval2_args.value()))
 
+
+    def test_direct_optional_interval(self):
+
+        start = intvar(0,10, shape=3)
+        end = intvar(0,10,shape=3)
+        dur = [3,4,5]
+        bvars = boolvar(shape=3, name="bv")
+
+        intervals = directvar("NewOptionalIntervalVar",
+                              arguments=(start, np.array(dur), end, bvars),
+                              shape=3,
+                              insert_name_at_index=4)
+
+        solver = SolverLookup.get("ortools")
+        solver += DirectConstraint(name="AddNoOverlap", arguments=intervals)
+        self.assertTrue(solver.solve())
+        self.assertFalse(solver.solve(assumptions=bvars))
+
+
+class TestDirectConstructor(unittest.TestCase):
+
+    def test_no_var_arg(self):
+
+        start = intvar(0,10,shape=3)
+        end = intvar(0,10,shape=3)
+        dur = [3,4,5]
+
+        self.assertRaises(TypeError,
+                          lambda : directvar("NewIntervalVar", [start+[1,2,3], dur, end])
+                          )
+
+
+
 @pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
 class TestDirectExact(unittest.TestCase):
 
