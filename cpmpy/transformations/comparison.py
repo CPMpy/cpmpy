@@ -6,22 +6,26 @@ from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 """
-  Transformations regarding Comparison constraints.
+  Transformations regarding Comparison constraints (originally).
+  Now, it is regarding numeric expressions in general, including nested ones.
   
-  Comparisons in Flat Normal Form are of the kind
-    - NumExpr == IV
-    - BoolExpr == BV
+  Let with <op> one of == or !=,<,<=,>,>=
+  Numeric expressions in Flat Normal Form are of the kind
+    - NumExpr <op> IV
+    - BoolVar == NumExpr <op> IV
+    - BoolVar -> NumExpr <op> IV
+    - NumExpr <op> IV -> BoolVar
+
+  The NumExpr can be a sum, wsum or global function with a non-bool return type.
     
-  The latter is a reified expression, not considered here.
-  (for handling of all reified expressions, see `reification.py` transformations)
-  
   This file implements:
-    - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
+    - only_numexpr_equality():    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
 def only_numexpr_equality(constraints, supported=frozenset()):
     """
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
+        also for the reified uses of NumExpr
 
         :param supported  a (frozen)set of expression names that supports all comparisons in the solver
     """
@@ -39,7 +43,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
                     newcons[i] = res[1].implies(subexpr)
                     newcons.insert(i, res[0])
 
-            elif not isinstance(subexpr, _BoolVarImpl):  # expr -> bv
+            elif not isinstance(subexpr, _BoolVarImpl):  # bv -> expr
                 res = only_numexpr_equality([subexpr], supported)
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])
