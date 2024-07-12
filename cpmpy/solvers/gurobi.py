@@ -29,7 +29,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.utils import argvals
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, _DirectVarImpl
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
@@ -192,6 +192,8 @@ class CPM_gurobi(SolverInterface):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
+            elif isinstance(cpm_var, _DirectVarImpl):
+                revar = cpm_var.callSolver(self, self.grb_model)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
