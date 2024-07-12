@@ -22,7 +22,6 @@ jobs:
           pip install pycryptosat
           pip install z3-solver
           pip install exact
-          pip install gcspy
           pip install pysdd
           pip install pychoco
           sudo snap install minizinc --classic
