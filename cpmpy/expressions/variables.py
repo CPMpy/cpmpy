@@ -252,6 +252,8 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
             arguments.insert(insert_name_at_index, name)
         return _DirectVarImpl(directname, arguments, novar=novar, name=name)
     else:
+        if isinstance(shape, int):
+            shape = (shape,) # make sure remainder works for 1D arrays
         data = []
         for idxs in np.ndindex(shape):
             subname = _genname(name, idxs)
@@ -501,7 +503,7 @@ class _DirectVarImpl(Expression):
         """
         # get the solver function, will raise an AttributeError if it does not exist
         solver_function = getattr(Native_solver, self.directname)
-        solver_args = copy.copy(self.args)
+        solver_args = copy(self.args)
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace
