@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## pysdd.py
+##
 """
     Interface to PySDD's API
 
@@ -19,6 +24,10 @@
         :nosignatures:
 
         CPM_pysdd
+
+    ==============
+    Module details
+    ==============
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#-*- coding:utf-8 -*-
 ##
 ## globalfunctions.py
 ##
 """
+    Global functions conveniently express numerical global constraints.
 
     Using global functions
     ------------------------

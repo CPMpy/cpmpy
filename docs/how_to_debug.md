@@ -7,7 +7,7 @@ The bug can be situated in one of three layers:
 - the CPMpy library
 - the solver
 
-coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
+Coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
 
 If you don't have a bug yet, but are curious, here is some general advise from expert modeller [Håkan Kjellerstrand](http://www.hakank.org/):
 - Test the model early and often. This makes it easier to detect problems in the model.
@@ -36,7 +36,7 @@ Here are a few quirks in Python/CPMpy:
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 
-If you don't find it, report it on the CPMpy github Issues page and we'll help you (and maybe even extend the above list of quirks).
+If you don't find it, report it on the CPMpy GitHub Issues page and we'll help you (and maybe even extend the above list of quirks).
 
 ## Debugging a `solve()` error
 
@@ -52,9 +52,9 @@ for c in model.constraints:
     Model(c).solve()
 ```
 
-The last constraint printed before the exception is the curlpit... Please report on Github. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+The last constraint printed before the exception is the curlpit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub Issues page.
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on Github and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on GitHub and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 
@@ -158,5 +158,5 @@ This one is most annoying... Double check the printing of the model for oddities
 
 Try generating an explanation sequence for the solution... this requires a satisfaction problem, so remove the objective function or add a constraint that constraints the objective function to the value attained by the impossible solution.
 
-As to generating the explanation sequence, check out our advanced example on [stepwise OCUS explanations](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py)
+As to generating the explanation sequence, check out our advanced example on [stepwise OCUS explanations](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py).
 

@@ -28,6 +28,10 @@
         :nosignatures:
 
         CPM_pysat
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError

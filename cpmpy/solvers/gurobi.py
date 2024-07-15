@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## gurobi.py
+##
 """
     Interface to the python 'gurobi' package
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## minizinc.py
+##
 """
     Interface to MiniZinc's Python API
 
@@ -22,6 +26,10 @@
         :nosignatures:
 
         CPM_minizinc
+
+    ==============
+    Module details
+    ==============
 """
 import re
 import warnings

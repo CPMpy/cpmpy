@@ -2,8 +2,8 @@
     CPMpy interfaces to (the Python API interface of) solvers
 
     Solvers typically use some of the generic transformations in
-    `transformations` as well as specific reformulations to map the
-    CPMpy expression to the solver's Python API
+    :mod:`cpmpy.transformations` as well as specific reformulations to map the
+    CPMpy expression to the solver's Python API.
 
     ==================
     List of submodules

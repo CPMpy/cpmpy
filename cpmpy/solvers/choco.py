@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
 ## choco.py
 ##
 """
@@ -18,6 +20,10 @@
         :nosignatures:
 
         CPM_choco
+    
+    ==============
+    Module details
+    ==============
 """
 import time
 

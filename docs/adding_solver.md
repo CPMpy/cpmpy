@@ -12,7 +12,7 @@ Implementing the template consists of the following parts:
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
   * `objective()` if your solver supports optimisation
   * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports
-  * `__add__()` where you call transform and map the resulting CPMpy expressions that the solver supports, to API function calls on the underlying solver
+  * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
   * `solveAll()` optionally, if the solver natively supports solution enumeration
 
 ## Transformations and posting constraints

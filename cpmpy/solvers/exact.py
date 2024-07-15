@@ -6,8 +6,11 @@
 """
     Interface to Exact
 
-    Exact solves decision and optimization problems formulated as integer linear programs. Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
+    Exact solves decision and optimization problems formulated as integer linear programs. 
+    Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
+    propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
 
+    The solver's git repository:
     https://gitlab.com/JoD/exact
 
     ===============
@@ -18,6 +21,10 @@
         :nosignatures:
 
         CPM_exact
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import time

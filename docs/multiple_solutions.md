@@ -6,8 +6,8 @@ When using `solveAll()`, a solver will use an optimized native implementation be
 
 It has two special named optional arguments:
 
-  * `display=...`: accepts a CPMpy expression, a list of CPMpy expressions or a callback function that will be called on every solution found (default: None)
-  * `solution_limit=...`: stop after this many solutions (default: None)
+  - `display=...` : accepts a CPMpy expression, a list of CPMpy expressions or a callback function that will be called on every solution found (default: None)
+  - `solution_limit=...` : stop after this many solutions (default: None)
 
 It also accepts named argument `time_limit=...` and any other keyword argument is passed on to the solver just like `solve()` does.
 
@@ -93,7 +93,7 @@ while s.solve():
     s += ~all(x == x.value())
 ```
 
-In case of multiple variables you should put them in one long python-native list, as such:
+In case of multiple variables you should put them in one long Python-native list, as such:
 ```python
 x = intvar(0,3, shape=2)
 b = boolvar()
@@ -130,7 +130,7 @@ while len(store) < 3 and s.solve():
     s.maximize(sum([sum(x != sol) for sol in store]))
 ```
 
-As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is Numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write much less loops while modelling.
+As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is Numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write much less loops while modeling.
 
 To use the Euclidian distance, only the last line needs to be changed. We again use vectorized operations and obtain succinct models. The creation of intermediate variables (with appropriate domains) is done by CPMpy behind the scenes.
 

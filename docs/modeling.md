@@ -14,13 +14,13 @@ See [installation instructions](installation_instructions.html) for more details
 
 ## Using the library
 
-To conveniently use CPMpy in your python project, include it as follows:
+To conveniently use CPMpy in your Python project, include it as follows:
 ```python
 from cpmpy import *
 ```
 This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code.
 
-You can also import it as a package, which does not overload the python built-ins:
+You can also import it as a package, which does not overload the Python built-ins:
 ```python
 import cpmpy as cp
 ```
@@ -174,7 +174,7 @@ For reverse implication, you switch the arguments yourself; it is difficult to r
 
 ### Simple comparison constraints
 
-We overload Pythons comparison operators: `==, !=, <, <=, >, >=`. Comparisons are allowed between any CPMpy expressions as well as Boolean and integer constants.
+We overload Python's comparison operators: `==, !=, <, <=, >, >=`. Comparisons are allowed between any CPMpy expressions as well as Boolean and integer constants.
 
 On a technical note, we treat Booleans as a subclass of integer expressions. This means that a Boolean (output) expression can be used anywhere a numeric expression can be used, where `True` is treated as `1` and `False` as `0`. But the inverse is not true: integers can NOT be used with Boolean operators, even when you intialise their domain to (0,1) they are still not Boolean:
 
@@ -226,7 +226,7 @@ m = cp.Model(
 
 ### Arithmetic constraints
 
-We overload Python's built-in arithmetic operators `+,-,*,//,%`. These can be used to built arbitrarily nested numeric expressions, which can then be turned into a constraint by adding a comparison to it.
+We overload Python's built-in arithmetic operators `+,-,*,//,%`. These can be used to build arbitrarily nested numeric expressions, which can then be turned into a constraint by adding a comparison to it.
 
 We also overwrite the built-in functions `abs(),sum(),min(),max()` which can be used to created numeric expressions. Some examples:
 
@@ -258,7 +258,7 @@ m = cp.Model(
 )
 ```
 
-Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum(), `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()/.max()` (including the axis= argument), so these are safe to use.
+Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()`/`.max()` (including the axis= argument), so these are safe to use.
 
 
 ### Global constraints
@@ -341,7 +341,7 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
 
 This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
 
@@ -521,7 +521,7 @@ On a technical note, remark that a solver object does not modify the Model objec
 ## Setting solver parameters
 
 Now lets use our solver-specific powers. 
-For example, with `m` a CPMpy Model(), you can do the following to make or-tools use 8 parallel cores and print search progress:
+For example, with `m` a CPMpy Model(), you can do the following to make OR-Tools use 8 parallel cores and print search progress:
 
 ```python
 import cpmpy as cp
@@ -530,7 +530,7 @@ s = cp.SolverLookup.get("ortools", m)
 s.solve(num_search_workers=8, log_search_progress=True)
 ```
 
-Modern CP-solvers support a variety of hyperparameters. (See the full list of [OR-tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
+Modern CP-solvers support a variety of hyperparameters. (See the full list of [OR-Tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
 Using the solver interface, any parameter that the solver supports can be passed using the `.solve()` call.
 These parameters will be posted to the native solver before solving the model.
 
@@ -545,7 +545,7 @@ See [the API documentation of the solvers](api/solvers.html) for information and
 ## Accessing the underlying solver object
 
 After solving, we can access the underlying solver object to retrieve some information about the solve.
-For example in ortools we can find the number of search branches like this, expanding our previous example.
+For example in OR-Tools we can find the number of search branches like this (expanding on our previous example):
 ```python
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
@@ -556,7 +556,7 @@ s.solve()
 print(s.ort_solver.NumBranches())
 ```
 
-Other solvers, like Minizinc might have other native objects stored.
+Other solvers, like Minizinc, might have other native objects stored.
 You can see which solver native objects are initialized for each solver in [the API documentation](api/solvers.html) of the solver.
 We can access the solver statistics from the mzn_result object like this:
 
@@ -568,7 +568,7 @@ s = cp.SolverLookup.get("minizinc")
 s += (cp.sum(x) <= 5)
 s.solve()
 print(s.mzn_result.statistics)
-print(s.mzn_result.statistics['nodes']) #if we are only interested in the nb of search nodes
+print(s.mzn_result.statistics['nodes']) # if we are only interested in the nb of search nodes
 
 ```
 ## Incremental solving
@@ -577,7 +577,7 @@ It is important to realize that a CPMpy solver interface is _eager_. That means 
 This has two potential benefits for incremental solving, whereby you add more constraints and variables inbetween solve calls:
 
   1) CPMpy only translates and posts each constraint once, even if the model is solved multiple times; and 
-  2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `solve` call.
+  2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `.solve()` call.
 
 ```python
 gs = SolverLookup.get("gurobi")

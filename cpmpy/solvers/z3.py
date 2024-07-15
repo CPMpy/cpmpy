@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## z3.py
+##
 """
     Interface to z3's API
 
@@ -19,6 +23,10 @@
         :nosignatures:
 
         CPM_z3
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
