@@ -55,7 +55,7 @@ Tools are not part of the core of CPMpy. They are additional tools that _use_ CP
 
 ## GitHub practices
 
-When filing a bug, please add a small case that allows us to reproduce it. If the testcase is confidential, mail Tias directly.
+When filing a bug, please add a small case that allows us to reproduce it. If the testcase is confidential, mail [Tias](mailto:tias.guns@kuleuven.be) directly.
 
 Only documentation changes can be directly applied on the master branch. All other changes should be submitted as a pull request.
 

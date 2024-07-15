@@ -35,7 +35,7 @@ The way that CPMpy succeeds to be an incremental modeling language, is by making
 
 That also makes them modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
 
-Most transformations do not need any state, they just do a bit of rewriting. Some transformations do, for example in the case of common subexpression elimination. In that case, the solver interface (you who are reading this), should store a dictionary in your solver interface class, and pass that as (optional) argument to the transformation function. The transformation function will read and write to that dictionary as it needs, while still remaining stateless on its own. Each transformation function documents when it supports an optional state dictionary, see all available transformations in `cpmpy/transformations/`.
+Most transformations do not need any state, they just do a bit of rewriting. Some transformations do, for example in the case of [Common Subexpression Elimination (CSE)](https://en.wikipedia.org/wiki/Common_subexpression_elimination). In that case, the solver interface (you who are reading this), should store a dictionary in your solver interface class, and pass that as (optional) argument to the transformation function. The transformation function will read and write to that dictionary as it needs, while still remaining stateless on its own. Each transformation function documents when it supports an optional state dictionary, see all available transformations in `cpmpy/transformations/`.
 
 
 ## What is a good Python interface for a solver?
@@ -87,7 +87,7 @@ class SolverX {
 }
 ```
 
-If you have such a C++ API, then there exist automatic python packages that can make Python bindings, such as [CPPYY](https://cppyy.readthedocs.io/en/latest/).
+If you have such a C++ API, then there exist automatic python packages that can make Python bindings, such as [CPPYY](https://cppyy.readthedocs.io/en/latest/) or [pybind11](https://pybind11.readthedocs.io/en/stable/).
 
 We have not done this ourselves yet, so get in touch to share your experience and advice!
 

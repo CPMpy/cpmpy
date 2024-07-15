@@ -4,7 +4,7 @@ This page explains and demonstrates how to use CPMpy to model and solve combinat
 
 ## Installation
 
-Installation is available through the `pip` python package manager. This will also install and use `ortools` as default solver:
+Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](./modeling.html#selecting-a-solver)):
 
 ```commandline
 pip install cpmpy
@@ -95,6 +95,8 @@ print(f"The model contains {len(m.constraints)} constraints")
 print(m)  # pretty printing of the model, very useful for debugging
 ```
 The `Model()` object has a number of other helpful functions, such as `to_file()` to store the model and `copy()` for creating a copy.
+
+See [the API documentation on models](api/model.html) for more detailed information.
 
 ## Expressing constraints
 
@@ -436,6 +438,7 @@ print("Nr of solutions:", n)  # Nr of solutions: 6
 When using `solveAll()`, a solver will use an optimized native implementation behind the scenes when that exists.
 
 It has a `display=...` argument that can be used to display expressions or as a callback, as well as the `solution_limit=...` argument to set a solution limit. It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts.
+It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts. For more information about the available arguments, look at [the solver API documentation](api/solvers.html) for the solver in question.
 ```python
 n = m.solveAll(display=[x,cp.sum(x)], solution_limit=3)
 # [array([1, 0]), 1]
@@ -470,8 +473,9 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 
 ## Selecting a solver
 
-The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
+The list of supported solver interfaces can be found in [the API documentation](api/solvers.html).
 See the full list of solvers known by CPMpy with:
 
 ```python
@@ -597,7 +601,7 @@ _Technical note_: OR-Tools its model representation is incremental but its solvi
 SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
 Assumption variables are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
-Many explanation-generation algorithms (see `cpmpy.tools.explain`) make use of this feature to speed up the solving.
+Many explanation-generation algorithms ([see](api/tools/explain.html) `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
 ```python
 import cpmpy as cp
@@ -709,7 +713,7 @@ Because CPMpy offers programmatic access to the solver API, hyperparameter searc
 
 ### Built-in tuners
 
-The tools directory contains a utility to efficiently search through the hyperparameter space defined by the solvers `tunable_params`.
+The tools directory contains a [utility](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/tools/tune_solver.py) to efficiently search through the hyperparameter space defined by the solvers' `tunable_params`.
 
 Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
 

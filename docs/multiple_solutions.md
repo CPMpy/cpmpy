@@ -111,7 +111,7 @@ while s.solve():
 ## Diverse solution search
 A better, more complex example of repeated solving is when searching for diverse solutions.
 
-The goal is to iteratively find solutions that are as diverse as possible with the previous solutions. Many definitions of diversity between solutions exist. We can for example measure the difference between two solutions with the Hamming distance (comparing the number of different values) or the Euclidian distance (compare the absolute difference in value for the variables).
+The goal is to iteratively find solutions that are as diverse as possible with the previous solutions. Many definitions of diversity between solutions exist. We can for example measure the difference between two solutions with the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance#:~:text=In%20information%20theory%2C%20the%20Hamming,the%20corresponding%20symbols%20are%20different.) (comparing the number of different values) or the [Euclidian distance](https://en.wikipedia.org/wiki/Euclidean_distance) (compare the absolute difference in value for the variables).
 
 Here is the example code for enumerating K diverse solutions with Hamming distance, which overwrites the objective function in each iteration:
 
@@ -157,3 +157,4 @@ cb = OrtSolutionPrinter()
 s.solve(enumerate_all_solutions=True, solution_callback=cb)
 print("Nr of solutions:",cb.solution_count())
 ```
+Have a look at `OrtSolutionPrinter`'s [implementation](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/ortools.py#L640).
