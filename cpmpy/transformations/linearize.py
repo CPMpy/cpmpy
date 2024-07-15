@@ -47,9 +47,10 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool, get_bounds
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
@@ -99,7 +100,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     newlist += [cond.implies(lin) for lin in lin_sub]
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified)
+                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
 
 
         # comparisons
@@ -117,6 +118,23 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
+                elif lhs.name == "mod" and "mul" in supported:
+                    # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                    #   -> acts differently for negative numbers
+                    # "mod" is a partial function
+                    #   -> x % 0 = x (unless x == 0, then undefined)
+                    x, y = lhs.args
+                    lby, uby = get_bounds(y)
+                    if lby <= 0 <= uby:
+                        raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                    k = intvar(*get_bounds((x - rhs) // y))
+                    mult_res, newcons = get_or_make_var(k * y)
+                    newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+
+
+                    cpm_expr = eval_comparison(cpm_expr.name, mult_res + rhs, x)
+
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
 
