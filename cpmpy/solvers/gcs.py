@@ -409,8 +409,6 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, BoolVal):
                 if not cpm_expr:
                     self.gcs.post_or([])
-                else:
-                    return
             elif isinstance(cpm_expr, Operator) or \
                 (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
                 and not isinstance(cpm_expr.args[1], _NumVarImpl)): 
