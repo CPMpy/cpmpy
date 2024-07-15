@@ -10,11 +10,12 @@
 
         $ pip install gurobipy
     
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
     
     In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
 
     ===============
     List of classes

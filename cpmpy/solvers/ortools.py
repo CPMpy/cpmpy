@@ -5,6 +5,11 @@
 ##
 """
     Interface to OR-Tools' CP-SAT Python API. 
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can be installed through `pip`:
+
+        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.

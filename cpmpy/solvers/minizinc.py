@@ -6,7 +6,13 @@
 """
     Interface to MiniZinc's Python API
 
-    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+    Requires that the 'minizinc' python package is installed:
+
+        $ pip install minizinc
+
+    as well as the Minizinc bundled binary packages, downloadable from:
+    https://github.com/MiniZinc/MiniZincIDE/releases
+
 
     MiniZinc is a free and open-source constraint modeling language.
     MiniZinc is used to model constraint satisfaction and optimization problems in
@@ -17,6 +23,8 @@
 
     Documentation of the solver's own Python API:
     https://minizinc-python.readthedocs.io/
+
+    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
 
     ===============
     List of classes

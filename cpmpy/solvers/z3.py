@@ -6,6 +6,10 @@
 """
     Interface to z3's API
 
+    Requires that the 'z3-solver' python package is installed:
+    
+        $ pip install z3-solver
+
     Z3 is a highly versatile and effective theorem prover from Microsoft.
     Underneath, it is an SMT solver with a wide scala of theory solvers.
     We will interface to the finite-domain integer related parts of the API

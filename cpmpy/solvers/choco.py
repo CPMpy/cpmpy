@@ -6,7 +6,10 @@
 """
     Interface to Choco solver's Python API
 
-    ...
+    Requires that the 'pychoco' python package is installed:
+
+        $ pip install pychoco
+
 
     Documentation of the solver's own Python API:
     https://pypi.org/project/pychoco/
