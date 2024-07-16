@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## utils.py
+##
+"""
+    Utilities for explanation techniques
+
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        make_assump_model
+"""
+
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 

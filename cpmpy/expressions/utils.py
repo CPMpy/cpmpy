@@ -12,14 +12,22 @@ Internal utilities for expression handling.
     .. autosummary::
         :nosignatures:
 
+        is_bool
         is_int
         is_num
+        is_false_cst
+        is_true_cst
+        is_boolexpr
         is_pure_list
         is_any_list
+        is_transition
         flatlist
         all_pairs
         argval
+        argvals
         eval_comparison
+        get_bounds
+        get_store
 """
 
 import numpy as np
