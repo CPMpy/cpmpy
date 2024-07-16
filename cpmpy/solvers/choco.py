@@ -98,6 +98,13 @@ class CPM_choco(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="choco", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.chc_model
+
     def solve(self, time_limit=None, **kwargs):
         """
             Call the Choco solver

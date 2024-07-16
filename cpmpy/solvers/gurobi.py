@@ -96,6 +96,13 @@ class CPM_gurobi(SolverInterface):
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.grb_model
+
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """

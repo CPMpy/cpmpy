@@ -174,6 +174,14 @@ class CPM_minizinc(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.mzn_model
+
+
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
         import minizinc
