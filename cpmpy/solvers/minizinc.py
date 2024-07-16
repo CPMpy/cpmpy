@@ -682,7 +682,7 @@ class CPM_minizinc(SolverInterface):
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                - kwargs:      any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
             Returns: number of solutions found
         """

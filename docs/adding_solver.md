@@ -29,7 +29,7 @@ So for any solver you wish to add, chances are that most of the transformations 
 
 ## Stateless transformation functions
 
-Because CPMpy solver interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()` add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
+Because CPMpy's solver-interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()` add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
 The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
 
@@ -102,5 +102,6 @@ After posting the constraint, the answer of your solver is checked so you will b
 
 ## Tunable hyperparameters
 CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](solver_parameters.md)).
-Solver wanting to support this tool should add the following attributes to their solver interface: `tunable_params` and `default_params` (see [ortools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
+Solvers wanting to support this tool should add the following attributes to their interface: `tunable_params` and `default_params` (see [OR-Tools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
+
 

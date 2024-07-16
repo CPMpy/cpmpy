@@ -91,7 +91,7 @@ class CPM_exact(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception("Install 'exact' as a Python package to use this solver interface")

@@ -27,12 +27,13 @@ Either you have the same output, and it is not the solver's fault, or you have a
 
 ## Debugging a modeling error
 
-You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar examples of what you wish to express.
+You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar instances of what you wish to express.
 
 Here are a few quirks in Python/CPMpy:
   - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter wont work, because Python will unfortunately think you meant `x == (1 & (y == 0))`.
   - you can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
   - only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
+  - when providing names for decision variables, make shure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 

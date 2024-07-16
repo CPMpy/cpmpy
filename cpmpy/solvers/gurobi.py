@@ -88,6 +88,7 @@ class CPM_gurobi(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception(
