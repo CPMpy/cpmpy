@@ -4,9 +4,10 @@ A list of things in CPMpy's docs which need fixed / which are optional improveme
 
 A lot of proof-reading is still needed to catch all formatting mistakes (especially in the API section, as taken for the code's docstrings)
 
+
 - [ ] Outdated copyright
     - whilst updated on the repo, ReadTheDocs still gives 2021 as copyright year
-
+    
 - [ ] Mention Exact
     - In many places where solvers get listed, Exact is not inluded (especially for things that make Exact stand out; e.g. unsat core extraction)
 
