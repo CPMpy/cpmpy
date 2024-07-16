@@ -18,7 +18,6 @@
   - BE -> BV
   - BV -> BE
 """
-from cpmpy.expressions.utils import ExprStore, get_store
 from ..expressions.core import Operator, Comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from .reification import only_implies

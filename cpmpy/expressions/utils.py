@@ -26,8 +26,7 @@ Internal utilities for expression handling.
         argval
         argvals
         eval_comparison
-        get_bounds
-        get_store
+        get_bounds     
 """
 
 import numpy as np

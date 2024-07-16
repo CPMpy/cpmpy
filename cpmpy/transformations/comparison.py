@@ -18,7 +18,7 @@
 import copy
 from .flatten_model import get_or_make_var
 from ..expressions.core import Comparison, Operator
-from ..expressions.utils import ExprStore, is_boolexpr, get_store
+from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 def only_numexpr_equality(constraints, supported=frozenset()):
