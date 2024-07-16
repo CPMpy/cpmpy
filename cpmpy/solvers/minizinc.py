@@ -698,13 +698,13 @@ class CPM_minizinc(SolverInterface):
                 asyncio.events.set_event_loop(None)
                 loop.close()
 
-    def minizinc_string(self) -> list[str]:
+    def minizinc_string(self) -> str:
         """
             Returns the model as represented in the Minizinc language.
         """
         return "".join(self._pre_solve()[1]._code_fragments)
 
-    def flatzinc_string(self, **kwargs) -> list[str]:
+    def flatzinc_string(self, **kwargs) -> str:
         """
             Returns the model as represented in the Flatzinc language.
         """
