@@ -180,6 +180,7 @@ class CPM_gcs(SolverInterface):
             
             if self.veripb_return_code > 0:
                 raise GCSVerificationException("Glasgow Constraint Solver: Proof failed to verify.")
+            
         return has_sol
 
     def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
@@ -395,13 +396,12 @@ class CPM_gcs(SolverInterface):
                                     capture_output=True, text=True, timeout=time_limit)
             self.proof_check_timeout = False
             self.veripb_return_code = result.returncode
+            if display_output:
+                print(result.stdout)
+                print(result.stderr)
         except subprocess.TimeoutExpired:
             self.proof_check_timeout = True
             self.veripb_return_code = 0
-
-        if display_output:
-            print(result.stdout)
-            print(result.stderr)
 
         return self.veripb_return_code
     
