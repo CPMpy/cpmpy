@@ -125,6 +125,13 @@ class CPM_pysat(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysat_solver
+
 
     def solve(self, time_limit=None, assumptions=None):
         """
