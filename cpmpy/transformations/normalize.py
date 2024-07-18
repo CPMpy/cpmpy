@@ -1,3 +1,7 @@
+"""
+    Normalizing the constraints given to a CPMpy model.
+"""
+
 import copy
 
 import numpy as np
