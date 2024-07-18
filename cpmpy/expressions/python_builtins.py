@@ -111,7 +111,7 @@ def min(*iterable, **kwargs):
     return Minimum(iterable)
 
 
-def sum(iterable, **kwargs):
+def sum(*iterable, **kwargs):
     """
         sum() overwrites the python built-in to support decision variables.
 
