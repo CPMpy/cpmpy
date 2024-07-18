@@ -50,7 +50,7 @@ class CPM_pysat(SolverInterface):
     $ pip install python-sat
 
     See detailed installation instructions at:
-    https://pysathq.github.io/installation.html
+    https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
         - pysat_vpool: a pysat.formula.IDPool for the variable mapping
