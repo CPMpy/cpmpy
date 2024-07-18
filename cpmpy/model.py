@@ -15,9 +15,9 @@
 
     See the examples for basic usage, which involves:
 
-    - creation, e.g. m = Model(cons, minimize=obj)
-    - solving, e.g. m.solve()
-    - optionally, checking status/runtime, e.g. m.status()
+    - creation, e.g. `m = Model(cons, minimize=obj)`
+    - solving, e.g. `m.solve()`
+    - optionally, checking status/runtime, e.g. `m.status()`
 
     ===============
     List of classes
