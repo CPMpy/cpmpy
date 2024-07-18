@@ -4,7 +4,12 @@
 ## ortools.py
 ##
 """
-    Interface to ortools' CP-SAT Python API
+    Interface to OR-Tools' CP-SAT Python API. 
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can be installed through `pip`:
+
+        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
@@ -22,6 +27,10 @@
         :nosignatures:
 
         CPM_ortools
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import numpy as np
@@ -32,7 +41,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -42,7 +51,7 @@ from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the python 'ortools' CP-SAT API
+    Interface to the Python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
@@ -79,7 +88,7 @@ class CPM_ortools(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this solver interface")
@@ -133,6 +142,8 @@ class CPM_ortools(SolverInterface):
 
         """
         from ortools.sat.python import cp_model as ort
+        # ensure all user vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # set time limit?
         if time_limit is not None:
@@ -196,7 +207,7 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    cpm_var._value = None  # probably got optimized away by our transformations
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
 
             # translate objective
             if self.has_objective():
@@ -328,7 +339,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -464,10 +475,18 @@ class CPM_ortools(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr.args)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "no_overlap":
+                start, dur, end = self.solver_vars(cpm_expr.args)
+                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
@@ -555,12 +574,12 @@ class CPM_ortools(SolverInterface):
             List compiled based on a conversation with OR-tools' Laurent Perron (issue #138).
         """
         return {
-            'use_branching_in_lp': [False, True],
+            # 'use_branching_in_lp': [False, True], # removed in OR-tools >= v9.9
             'optimize_with_core' : [False, True],
             'search_branching': [0,1,2,3,4,5,6],
             'boolean_encoding_level' : [0,1,2,3],
             'linearization_level': [0, 1, 2],
-            'core_minimization_level' : [0,1,2], # new in OR-tools>=v9.8
+            'core_minimization_level' : [0,1,2], # new in OR-tools>= v9.8
             'cp_model_probing_level': [0, 1, 2, 3],
             'cp_model_presolve' : [False, True],
             'clause_cleanup_ordering' : [0,1],
@@ -572,7 +591,7 @@ class CPM_ortools(SolverInterface):
     @classmethod
     def default_params(cls):
         return {
-            'use_branching_in_lp': False,
+            # 'use_branching_in_lp': False, # removed in OR-tools >= v9.9
             'optimize_with_core': False,
             'search_branching': 0,
             'boolean_encoding_level': 1,
@@ -687,10 +706,10 @@ try:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 
                 if isinstance(self._display, Expression):
-                    print(self._display.value())
+                    print(argval(self._display))
                 elif isinstance(self._display, list):
                     # explicit list of expressions to display
-                    print([v.value() for v in self._display])
+                    print(argvals(self._display))
                 else: # callable
                     self._display()
 

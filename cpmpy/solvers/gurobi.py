@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## gurobi.py
+##
 """
     Interface to the python 'gurobi' package
 
@@ -6,11 +10,12 @@
 
         $ pip install gurobipy
     
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
     
     In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
 
     ===============
     List of classes
@@ -28,6 +33,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -82,6 +88,7 @@ class CPM_gurobi(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception(
@@ -114,6 +121,9 @@ class CPM_gurobi(SolverInterface):
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -458,9 +468,9 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

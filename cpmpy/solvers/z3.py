@@ -1,6 +1,14 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## z3.py
+##
 """
     Interface to z3's API
+
+    Requires that the 'z3-solver' python package is installed:
+    
+        $ pip install z3-solver
 
     Z3 is a highly versatile and effective theorem prover from Microsoft.
     Underneath, it is an SMT solver with a wide scala of theory solvers.
@@ -19,6 +27,10 @@
         :nosignatures:
 
         CPM_z3
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -111,6 +123,9 @@ class CPM_z3(SolverInterface):
             ```
         """
         import z3
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             # z3 expects milliseconds in int

@@ -6,8 +6,11 @@
 """
     Interface to Exact
 
-    Exact solves decision and optimization problems formulated as integer linear programs. Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
+    Exact solves decision and optimization problems formulated as integer linear programs. 
+    Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
+    propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
 
+    The solver's git repository:
     https://gitlab.com/JoD/exact
 
     ===============
@@ -18,6 +21,10 @@
         :nosignatures:
 
         CPM_exact
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import time
@@ -37,7 +44,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
-from ..expressions.utils import flatlist
+from ..expressions.utils import flatlist, argvals
 
 import numpy as np
 import numbers
@@ -84,7 +91,7 @@ class CPM_exact(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception("Install 'exact' as a Python package to use this solver interface")
@@ -155,6 +162,9 @@ class CPM_exact(SolverInterface):
         """
         from exact import Exact as xct
 
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if not self.solver_is_initialized:
             assert not self.objective_given
             # NOTE: initialization of exact is also how it fixes the objective function.
@@ -223,6 +233,9 @@ class CPM_exact(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if self.objective_given:
             raise NotSupportedError("Exact does not support finding all optimal solutions.")
 
@@ -257,9 +270,9 @@ class CPM_exact(SolverInterface):
                 if display is not None:
                     self._fillObjAndVars()
                     if isinstance(display, Expression):
-                        print(display.value())
+                        print(argval(display))
                     elif isinstance(display, list):
-                        print([v.value() for v in display])
+                        print(argvals(display))
                     else:
                         display()  # callback
             elif my_status == 2: # found inconsistency

@@ -11,7 +11,7 @@
 
     Here is a list of standard python operators and what object (with what expr.name) it creates:
 
-    Comparisons:
+    **Comparisons**:
 
     - x == y        Comparison("==", x, y)
     - x != y        Comparison("!=", x, y)
@@ -20,9 +20,9 @@
     - x > y         Comparison(">", x, y)
     - x >= y        Comparison(">=", x, y)
 
-    Mathematical operators:
+    **Mathematical operators**:
 
-    - -x            Operator("-", [x])
+    - −x            Operator("-", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
     - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
@@ -32,7 +32,7 @@
     - x % y         Operator("mod", [x,y])
     - x ** y        Operator("pow", [x,y])
 
-    Logical operators:
+    **Logical operators**:
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
@@ -47,14 +47,16 @@
 
     Apart from operator overloading, expressions implement two important functions:
 
-    - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
-                    If it does, the expression can be used as top-level constraint
-                    or in logical operators.
+    - `is_bool()`   
+        which returns whether the return type of the expression is Boolean.
+        If it does, the expression can be used as top-level constraint
+        or in logical operators.
 
-    - `value()`     computes the value of this expression, by calling .value() on its
-                    subexpressions and doing the appropriate computation
-                    this is used to conveniently print variable values, objective values
-                    and any other expression value (e.g. during debugging).
+    - `value()`     
+        computes the value of this expression, by calling .value() on its
+        subexpressions and doing the appropriate computation
+        this is used to conveniently print variable values, objective values
+        and any other expression value (e.g. during debugging).
     
     ===============
     List of classes
@@ -72,7 +74,7 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -143,6 +145,7 @@ class Expression(object):
 
     def value(self):
         return None # default
+
 
     def get_bounds(self):
         if self.is_bool():
@@ -400,7 +403,8 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [argval(a) for a in self.args]
+        arg_vals = argvals(self.args)
+
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
         elif self.name == "!=": return arg_vals[0] != arg_vals[1]
@@ -526,11 +530,12 @@ class Operator(Expression):
         return "{}({})".format(self.name, self.args)
 
     def value(self):
+
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
+            arg_vals = [self.args[0], argvals(self.args[1])]
         else:
-            arg_vals = [argval(arg) for arg in self.args]
+            arg_vals = argvals(self.args)
 
 
         if any(a is None for a in arg_vals): return None
@@ -546,7 +551,8 @@ class Operator(Expression):
             try:
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)

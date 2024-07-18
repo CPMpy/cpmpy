@@ -4,7 +4,7 @@ This page explains and demonstrates how to use CPMpy to model and solve combinat
 
 ## Installation
 
-Installation is available through the `pip` python package manager. This will also install and use `ortools` as default solver:
+Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](./modeling.html#selecting-a-solver)):
 
 ```commandline
 pip install cpmpy
@@ -14,16 +14,18 @@ See [installation instructions](installation_instructions.html) for more details
 
 ## Using the library
 
-To conveniently use CPMpy in your python project, include it as follows:
+To conveniently use CPMpy in your Python project, include it as follows:
 ```python
 from cpmpy import *
 ```
-This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code.
+This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code (even when no CPMpy decision variables are involved).
 
-You can also import it as a package, which does not overload the python built-ins:
+You can also import it as a package, which does not overload the Python built-ins:
 ```python
 import cpmpy as cp
 ```
+The build-in operators can now be accessed through the package (for example `cp.any()`) without overloading Python's defaults.
+
 We will use the latter in this document.
 
 ## Decision variables
@@ -35,17 +37,19 @@ CPMpy supports discrete decision variables, namely Boolean and integer decision 
 ```python
 import cpmpy as cp
 
-b = cp.boolvar(name="b")
-x = cp.intvar(1,10, name="x")
+b = cp.boolvar(name="b")        # a Boolean decision variable
+x = cp.intvar(1,10, name="x")   # an Integer decision variable
 ```
 
-Decision variables have a **domain**, a set of allowed values. For Boolean variables this is implicitly the values 'False' and 'True'. For Integer decision variables, you have to specify the lower-bound and upper-bound (`1` and `10` respectively above).
+Decision variables have a **domain**, a set of allowed values. For Boolean variables this is implicitly the values 'False' and 'True'. For Integer decision variables, you have to specify the lower-bound and upper-bound (`1` and `10` respectively in the above example).
 
-Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned to it. If you print `print(b, x)` decision variables, it will print the name. Did we already say the name must be unique? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named variables.
+If you want a **sparse domain**, containing only a few values, you can either define a suitable lower/upper bound and then forbid specific values, e.g. `x != 3, x != 5, x != 7`; or you can use the shorthand *InDomain* global constraint: `InDomain(x, [1,2,4,6,8,9])`.
 
-A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable in multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. 
+Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned. If you print decision variables (`print(b)` or `print(x)`), it will display the name. Did we already say the name <u>must be unique</u>? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named decision variables.
 
-Finally, by providing a **shape** you automatically create a **numpy n-dimensional array** of decision variables. They automatically get their index appended to their name to ensure it is unique:
+A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable across multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. Before solving, this value will be `None`. After solving it has either taken a boolean or integer value, or it is still None. For example when the solver didn't find any solution or when the decision variable was never used in the model, i.e. never appeared in a constraint or the objective function (a stale decision variable).
+
+Finally, by providing a **shape** you automatically create a **numpy n-dimensional array** of decision variables. These variables automatically get their index appended to their name (the name is provided on the array-level) as to ensure its uniqueness:
 
 ```python
 import cpmpy as cp
@@ -57,15 +61,19 @@ x = cp.intvar(1,10, shape=(2,2), name="x")
 print(x)  # [[x[0,0] x[0,1]]
           #  [x[1,0] x[1,1]]]
 ```
-You can also call `v.value()` on these n-dimensional arrays, which will return an n-dimensional **numpy** array of values. And you can do vectorized operations and comparisons, like in regular numpy. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific python tools, including machine learning and visualisation libraries, so a lot less glue code to write.
+Similar to individual decision variables, you can call `v.value()` on these n-dimensional arrays. This will return an n-dimensional **numpy** array of values, one value for each of the included decision variables. 
+
+Since the arrays of decision variables are based on numpy, you can do **vectorized operations** and **comparisons** on them. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific Python tools, including machine learning and visualisation libraries. A lot less glue code will need to be written!
 
 See [the API documentation on variables](api/expressions/variables.html) for more detailed information.
 
+Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last succesful solve call.
+
 ## Creating a model
 
-A **model** is a collection of constraints over decision variables, optionally with an objective function. It represents a problem for which a solution must be found, e.g. by a solver. A solution is an assignment to the decision variables, such that each of the constraints is satisfied.
+A **model** is a collection of constraints over decision variables, optionally with an objective function. It represents a problem for which a solution must be found, e.g. through the use of a solver. A solution is an assignment of values to the decision variables, such that the values lie within their respective variables' domain and such that each of the constraints is satisfied.
 
-In CPMpy, the `Model()` object is a simple container that stores a list of CPMpy expressions representing constraints. It can also store a CPMpy expression representing an objective function that must be minimized or maximized. Constraints are added in the constructor, or using the built-in `+=` addition operator that corresponds to calling the `__add__()` function.
+In CPMpy, the `Model()` object is a simple container that stores a list of CPMpy expressions representing constraints. In the case of an optimisation problem, it can also store a CPMpy expression representing an objective function that must be minimized or maximized. Constraints are added in the constructor, or using the built-in `+=` addition operator that corresponds to calling the `__add__()` function.
 
 Here is an example, where we explain how to express constraints in the next section:
 
@@ -91,6 +99,8 @@ print(f"The model contains {len(m.constraints)} constraints")
 print(m)  # pretty printing of the model, very useful for debugging
 ```
 The `Model()` object has a number of other helpful functions, such as `to_file()` to store the model and `copy()` for creating a copy.
+
+See [the API documentation on models](api/model.html) for more detailed information.
 
 ## Expressing constraints
 
@@ -158,10 +168,10 @@ import cpmpy as cp
 a,b,c = cp.boolvar(shape=3)
 
 m = cp.Model(
-    a.implies(b),
-    b.implies(a),
-    a.implies(~c),
-    (~c).implies(a)
+    a.implies(b),       # a -> b
+    b.implies(a),       # b -> a
+    a.implies(~c),      # a -> (~c)
+    (~c).implies(a)     # (~c) -> a
 )
 ```
 For reverse implication, you switch the arguments yourself; it is difficult to read reverse implications out loud anyway. And as before, always use brackets around subexpressions to avoid surprises!
@@ -170,7 +180,7 @@ For reverse implication, you switch the arguments yourself; it is difficult to r
 
 ### Simple comparison constraints
 
-We overload Pythons comparison operators: `==, !=, <, <=, >, >=`. Comparisons are allowed between any CPMpy expressions as well as Boolean and integer constants.
+We overload Python's comparison operators: `==, !=, <, <=, >, >=`. Comparisons are allowed between any CPMpy expressions as well as Boolean and integer constants.
 
 On a technical note, we treat Booleans as a subclass of integer expressions. This means that a Boolean (output) expression can be used anywhere a numeric expression can be used, where `True` is treated as `1` and `False` as `0`. But the inverse is not true: integers can NOT be used with Boolean operators, even when you intialise their domain to (0,1) they are still not Boolean:
 
@@ -222,9 +232,9 @@ m = cp.Model(
 
 ### Arithmetic constraints
 
-We overload Python's built-in arithmetic operators `+,-,*,//,%`. These can be used to built arbitrarily nested numeric expressions, which can then be turned into a constraint by adding a comparison to it.
+We overload Python's built-in arithmetic operators `+,-,*,//,%`. These can be used to build arbitrarily nested numeric expressions, which can then be turned into a constraint by adding a comparison to it.
 
-We also overwrite the built-in functions `abs(),sum(),min(),max()` which can be used to created numeric expressions. Some examples:
+We also overwrite the built-in functions `abs(),sum(),min(),max()` which can be used for creating numeric expressions. Some examples:
 
 ```python
 import cpmpy as cp
@@ -254,7 +264,7 @@ m = cp.Model(
 )
 ```
 
-Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum(), `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()/.max()` (including the axis= argument), so these are safe to use.
+Note that because of our overloading of `+,-,*,//` some numpy functions like `np.sum(some_array)` will also create a CPMpy expression when used on CPMpy decision variables. However, this is not guaranteed, and other functions like `np.max(some_array)` will not. To **avoid surprises**, you should hence always take care to call the CPMpy functions `cp.sum()`, `cp.max()` etc. We did overload `some_cpm_array.sum()` and `.min()`/`.max()` (including the axis= argument), so these are safe to use.
 
 
 ### Global constraints
@@ -265,15 +275,17 @@ In constraint solving, a global constraint is a function that expresses a relati
 
 A good example is the `AllDifferent()` global constraint that ensures all its arguments have distinct values. `AllDifferent(x,y,z)` can be decomposed into `[x!=y, x!=z, y!=z]`. For AllDifferent, the decomposition consists of _n*(n-1)_ pairwise inequalities, which are simpler constraints that most solvers support.
 
-However, a solver that has specialised datastructures for this constraint specifically does not need to create the decomposition. Furthermore, for AllDifferent solvers can implement specialised algorithms that can propagate strictly stronger than the decomposed constraints can.
+However, a solver that has specialised datastructures for this constraint specifically does not need to create the decomposition. Furthermore, solvers can implement specialised algorithms that can propagate strictly stronger than the decomposed constraints can.
 
 
 
 #### Global constraints
 
-A non-exhaustive list of global constraints that are available in CPMpy is: `Xor(), AllDifferent(), AllDifferentExcept0(), Table(), Circuit(), Cumulative(), GlobalCardinalityCount()`.   
+Many global constraints are available in CPMpy. Some include `Xor(), AllDifferent(), AllDifferentExcept0(), Table(), Circuit(), Cumulative(), GlobalCardinalityCount()`.   
 
-For their meaning and more information on how to define your own global constraints, see [the API documentation on global constraints](api/expressions/globalconstraints.html). Global constraints can also be reified (e.g. used in an implication or equality constraint). 
+For a complete list of global constraints, their meaning and more information on how to define your own, see [the API documentation on global constraints](api/expressions/globalconstraints.html). 
+
+Global constraints can also be reified (e.g. used in an implication or equality constraint). 
 
 CPMpy will automatically decompose them if needed. If you want to see the decomposition yourself, you can call the `decompose()` function on them.
 
@@ -283,24 +295,24 @@ x = cp.intvar(1,4, shape=4, name="x")
 b = cp.boolvar()
 cp.Model(
     cp.AllDifferent(x),
-    cp.AllDifferent(x).decompose(),  # equivalent: [(x[0]) != (x[1]), (x[0]) != (x[2]), ...
+    cp.AllDifferent(x).decompose()[0],  # equivalent: [(x[0]) != (x[1]), (x[0]) != (x[2]), ...
     b.implies(cp.AllDifferent(x)),
     cp.Xor(b, cp.AllDifferent(x)),  # etc...
 )
 ```
-`decompose()` returns two arguments, one that represents the constraints and an optional one that defines any new variables needed. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](api/expressions/globalconstraints.html).
+`decompose()` returns two arguments, one that represents the constraints and another that defines any newly created decision variables during the decomposition process. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](api/expressions/globalconstraints.html).
 
-#### Numeric global constraints
+#### Global functions
 
 Coming back to the Python-builtin functions `min(),max(),abs()`, these are a bit special because they have a numeric return type. In fact, constraint solvers typically implement a global constraint `MinimumEq(args, var)` that represents `min(args) == var`, so it combines a numeric function with a comparison, where it will ensure that the bounds of the expressions on both sides satisfy the comparison relation.
 
 However, CPMpy also wishes to support the expressions `min(xs) > v` as well as `v + min(xs) != 4` and other nested expressions.
 
-In CPMpy we do this by instantiating min/max/abs as **numeric global constraints**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the numeric global constraint is used in a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` on the numeric global constraint, which will decompose e.g. `min(xs) == v`.
+In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](api/expressions/globalfunctions.html#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
 
 A non-exhaustive list of **numeric global constraints** that are available in CPMpy is: `Minimum(), Maximum(), Count(), Element()`.   
 
-For their meaning and more information on how to define your own global constraints, see [the API documentation on global functions](api/expressions/globalfunctions.html).
+For their meaning and more information on how to define your own global functions, see [the API documentation on global functions](api/expressions/globalfunctions.html).
 
 ```python
 import cpmpy as cp
@@ -318,7 +330,7 @@ print(s.transform(cp.min(x) + cp.max(x) - 5 > 2*cp.Count(x, 2)))
 
 ```
 
-#### The Element numeric global constraint
+#### The Element global function
 
 The `Element(Arr,Idx)` global function enforces that the result equals `Arr[Idx]` with `Arr` an array of constants or variables (the first argument) and `Idx` an integer decision variable, representing the index into the array.
 
@@ -337,7 +349,7 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 # example output -- arr: [2 1 3 4], idx: 0, val: 2
 ```
 
-The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
+The `arr[idx]` works because `arr` is a CPMpy `NDVarArray()` and we overloaded the `__getitem__()` Python function. It even supports multi-dimensional access, e.g. `arr[idx1,idx2]`.
 
 This does not work on NumPy arrays though, as they don't know CPMpy. So you have to **wrap the array** in our `cpm_array()` or call `Element()` directly:
 
@@ -367,7 +379,7 @@ print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
 
 ## Objective functions
 
-If a model has no objective function specified, then it is a satisfaction problem: the goal is to find out whether a solution, any solution, exists. When an objective function is added, this function needs to be minimized or maximized.
+If a model has no objective function specified, then it represents a satisfaction problem: the goal is to find out whether a solution, any solution, exists. When an objective function is added, this function needs to be minimized or maximized.
 
 Any CPMpy expression can be added as objective function. Solvers are especially good in optimizing linear functions or the minimum/maximum of a set of expressions. Other (non-linear) expressions are supported too, just give it a try.
 
@@ -429,21 +441,29 @@ n = m.solveAll()
 print("Nr of solutions:", n)  # Nr of solutions: 6
 ```
 
-When using `solveAll()`, a solver will use an optimized native implementation behind the scenes when that exists.
+When using `solveAll()`, a solver will use an optimized native implementation behind the scenes when that exists. Otherwise it will be emulated with an iterative approach, resulting in a performance impact.
 
-It has a `display=...` argument that can be used to display expressions or as a callback, as well as the `solution_limit=...` argument to set a solution limit. It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts.
+It has a `display=...` argument that can be used to display expressions (provide a list of expressions to be evaluated) or as a more generic callback (provide a function), both to be evaluated for each found solution.
+It has a `solution_limit=...` argument to set a limit on the number of solutions to solve for. 
+It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts. For more information about the available arguments, look at [the solver API documentation](api/solvers.html) for the solver in question.
 ```python
+# Using list of expressions
 n = m.solveAll(display=[x,cp.sum(x)], solution_limit=3)
 # [array([1, 0]), 1]
 # [array([2, 0]), 2]
 # [array([3, 0]), 3]
+
+# Using callback function
+n = m.solveAll(display=lambda: print([x.value(), cp.sum(x).value()]), solution_limit=3)
+# ...
 ```
+(Note that the Exact solver, unlike other solvers, takes most of its arguments at construction time.)
 
 There is much more to say on enumerating solutions and the use of callbacks or blocking clauses. See the [the detailed documentation on finding multiple solutions](multiple_solutions.html).
 
 ## Debugging a model
 
-If the solver is complaining about your model, then a good place to start debugging is to **print** the model you have created, or the individual constraints. If they look fine (e.g. no integers, or shorter or longer expressions then what you intended) and you don't know which constraint specifically is causing the error, then you can feed the constraints incrementally to the solver you are using:
+If the solver is complaining about your model, then a good place to start debugging is to **print** the model (or individual constraints) that you have created. If they look fine (e.g. no integers, or shorter or longer expressions then what you intended) and you don't know which constraint specifically is causing the error, then you can feed the constraints incrementally to the solver you are using:
 
 ```python
 import cpmpy as cp
@@ -456,7 +476,7 @@ m = cp.Model(cons)  # any model created
 # e.g. if you wrote `all(x)` instead of `cp.all(x)` it will contain 'True' instead of the conjunction
 print(m)
 
-s = cp.SolverLookup.get("ortools")
+s = cp.SolverLookup.get("ortools") # will be explained later
 # feed the constraints one-by-one 
 for c in m.constraints:
     s += c  # add the constraints incrementally until you hit the error
@@ -466,8 +486,9 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 
 ## Selecting a solver
 
-The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
+The list of supported solver interfaces can be found in [the API documentation](api/solvers.html).
 See the full list of solvers known by CPMpy with:
 
 ```python
@@ -475,7 +496,7 @@ import cpmpy as cp
 cp.SolverLookup.solvernames()
 ```
 
-On my system, with pysat and minizinc installed, this gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']
+On a system with pysat and minizinc installed, this for example gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']`
 
 You can specify a solvername when calling `solve()` on a model:
 
@@ -487,11 +508,11 @@ m = cp.Model(cp.sum(x) <= 5)
 m.solve(solver="minizinc:chuffed")
 ```
 
-Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "minizinc", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](api/solvers.html) of the solver for detailed installation instructions.
+Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](api/solvers.html) of the solver for detailed installation instructions.
 
 ## Model versus solver interface
 
-A `Model()` is a **lazy container**. It simply stores the constraints. Only when `solve()` is called will it instantiate a solver, and send the entire model to it at once. So `m.solve("ortools")` is equivalent to:
+A `Model()` is a **lazy container**. It simply stores the constraints. Only when `solve()` is called will it instantiate a solver instance, and send the entire model to it at once. So `m.solve("ortools")` is equivalent to:
 ```python
 s = SolverLookup.get("ortools", m)
 s.solve()
@@ -517,7 +538,7 @@ On a technical note, remark that a solver object does not modify the Model objec
 ## Setting solver parameters
 
 Now lets use our solver-specific powers. 
-For example, with `m` a CPMpy Model(), you can do the following to make or-tools use 8 parallel cores and print search progress:
+For example, with `m` a CPMpy Model(), you can do the following to make OR-Tools use 8 parallel cores and print search progress:
 
 ```python
 import cpmpy as cp
@@ -526,7 +547,7 @@ s = cp.SolverLookup.get("ortools", m)
 s.solve(num_search_workers=8, log_search_progress=True)
 ```
 
-Modern CP-solvers support a variety of hyperparameters. (See the full list of [OR-tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
+Modern CP-solvers support a variety of hyperparameters. (See the full list of [OR-Tools parameters](https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto) for example).
 Using the solver interface, any parameter that the solver supports can be passed using the `.solve()` call.
 These parameters will be posted to the native solver before solving the model.
 
@@ -541,7 +562,7 @@ See [the API documentation of the solvers](api/solvers.html) for information and
 ## Accessing the underlying solver object
 
 After solving, we can access the underlying solver object to retrieve some information about the solve.
-For example in ortools we can find the number of search branches like this, expanding our previous example.
+For example in OR-Tools we can find the number of search branches like this (expanding on our previous example):
 ```python
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
@@ -552,7 +573,7 @@ s.solve()
 print(s.ort_solver.NumBranches())
 ```
 
-Other solvers, like Minizinc might have other native objects stored.
+Other solvers, like Minizinc, might have other native objects stored.
 You can see which solver native objects are initialized for each solver in [the API documentation](api/solvers.html) of the solver.
 We can access the solver statistics from the mzn_result object like this:
 
@@ -564,7 +585,7 @@ s = cp.SolverLookup.get("minizinc")
 s += (cp.sum(x) <= 5)
 s.solve()
 print(s.mzn_result.statistics)
-print(s.mzn_result.statistics['nodes']) #if we are only interested in the nb of search nodes
+print(s.mzn_result.statistics['nodes']) # if we are only interested in the nb of search nodes
 
 ```
 ## Incremental solving
@@ -573,18 +594,18 @@ It is important to realize that a CPMpy solver interface is _eager_. That means 
 This has two potential benefits for incremental solving, whereby you add more constraints and variables inbetween solve calls:
 
   1) CPMpy only translates and posts each constraint once, even if the model is solved multiple times; and 
-  2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `solve` call.
+  2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `.solve()` call.
 
 ```python
-gs = SolverLookup.get("gurobi")
+s = SolverLookup.get("gurobi")
 
-gs += sum(ivar) <= 5 
-gs.solve()
+s += sum(ivar) <= 5 
+s.solve()
 
-gs += sum(ivar) == 3
+s += sum(ivar) == 3
 # the underlying gurobi instance is reused, only the new constraint is added to it.
 # gurobi is an incremental solver and will look for solutions starting from the previous one.
-gs.solve()
+s.solve()
 ```
  
 _Technical note_: OR-Tools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
@@ -593,7 +614,7 @@ _Technical note_: OR-Tools its model representation is incremental but its solvi
 SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
 Assumption variables are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
-Many explanation-generation algorithms (see `cpmpy.tools.explain`) make use of this feature to speed up the solving.
+Many explanation-generation algorithms ([see](api/tools/explain.html) `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
 ```python
 import cpmpy as cp
@@ -608,7 +629,7 @@ cp.Model([c1,c2,c3]).solve() # Will be UNSAT
 
 s = cp.SolverLookup.get("exact") # OR-tools, PySAT and Exact support solving under assumptions
 assump = cp.boolvar(shape=3, name="assump")
-s += assump.implies([c1,c2,c3])
+s += assump.implies([c1,c2,c3]) # assump[0] -> c1, assump[1] -> c2, assump[2] -> c3
 
 # Underlying solver state will be kept inbetween solve-calls
 s.solve(assumptions=assump[0,1]) # Will be SAT
@@ -620,15 +641,15 @@ s.solve(assumptions=assump[1,2]) # Will be SAT
 
 ## Using solver-specific CPMpy features
 
-We sometimes add solver-specific functions to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools and PySAT solvers and interfaces. Other solvers may work differently and not have these concepts.
+We sometimes add solver-specific functions to the CPMpy interface, for convenient access. Two examples of this are `solution_hint()` and `get_core()` which is supported by the OR-Tools, PySAT and Exact solvers and interfaces. Other solvers may work differently and not have these concepts.
 
-`solution_hint()` tells the solver that it could use these variable-values first during search, e.g. typically from a previous solution:
+`solution_hint()` tells the solver that it could start from these value-to-variable assignments during search, e.g. start from a previous solution:
 ```python
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 s = cp.SolverLookup.get("ortools")
 s += cp.sum(x) <= 5
-# we are operating on a ortools' interface here
+# we are operating on an ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
 print(x.value())
@@ -679,7 +700,10 @@ s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
 
-The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) which uses a helper function that generates automatons with DirectConstraints; [vrp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/vrp_ortools.ipynb) demonstrating ortools' newly introduced multi-circuit global constraint through DirectConstraint; and [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/tree/master/examples/pctsp_ortools.ipynb) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
+The `DirectConstraint` is a very powerful primitive to get the most out of specific solvers. See the following examples: 
+- [nonogram_ortools.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/nonogram_ortools.ipynb) which uses a helper function that generates automatons with DirectConstraints; 
+- [vrp_ortools.py](https://github.com/CPMpy/cpmpy/blob/master/examples/vrp_ortools.py) demonstrating OR-Tools' newly introduced multi-circuit global constraint through DirectConstraint; and 
+- [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/blob/master/examples/pctsp_ortools.py) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
 
 ### Directly accessing the underlying solver
 
@@ -705,7 +729,7 @@ Because CPMpy offers programmatic access to the solver API, hyperparameter searc
 
 ### Built-in tuners
 
-The tools directory contains a utility to efficiently search through the hyperparameter space defined by the solvers `tunable_params`.
+The tools directory contains a [utility](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/tools/tune_solver.py) to efficiently search through the hyperparameter space defined by the solvers' `tunable_params`.
 
 Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
 

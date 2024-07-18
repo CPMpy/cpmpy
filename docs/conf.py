@@ -24,7 +24,7 @@ copyright = '2024, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.18'
+release = '0.9.21'
 
 # variables to be accessed from html
 html_context = {

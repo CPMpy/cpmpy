@@ -245,7 +245,12 @@ def flatten_constraint(expr):
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
-                (lhs, lcons) = normalized_boolexpr(lexpr)
+                if rvar.is_bool():
+                    # this is a reification
+                    (lhs, lcons) = normalized_boolexpr(lexpr)
+                else:
+                    # integer comparison
+                    (lhs, lcons) = get_or_make_var(lexpr)
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr)
 
@@ -319,10 +324,10 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_boolexpr(expr)
 
         if isinstance(flatexpr,_BoolVarImpl):
-            #avoids unnecessary bv == bv or bv == ~bv assignments
+            # avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
         bvar = _BoolVarImpl()
-        return (bvar, [flatexpr == bvar]+flatcons)
+        return bvar, [flatexpr == bvar] + flatcons
 
     else:
         # normalize expr into a numexpr LHS,
@@ -330,8 +335,12 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
+        if not(isinstance(lb,int) and isinstance(ub,int)):
+            warnings.warn("CPMPy only uses integer variables, non-integer expression detected that will be reified "
+                          "into an intvar with rounded bounds. \n Your constraints will stay the same.", UserWarning)
+            lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
-        return (ivar, [flatexpr == ivar]+flatcons)
+        return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr):
     """ Like get_or_make_var() but also accepts and recursively transforms lists

@@ -2,8 +2,8 @@
     CPMpy interfaces to (the Python API interface of) solvers
 
     Solvers typically use some of the generic transformations in
-    `transformations` as well as specific reformulations to map the
-    CPMpy expression to the solver's Python API
+    :mod:`cpmpy.transformations` as well as specific reformulations to map the
+    CPMpy expression to the solver's Python API.
 
     ==================
     List of submodules
@@ -18,6 +18,7 @@
         pysdd
         z3
         exact
+        choco
         utils
 
     ===============
@@ -33,6 +34,7 @@
         CPM_pysdd
         CPM_z3
         CPM_exact
+        CPM_choco
 
     =================
     List of functions
@@ -51,3 +53,5 @@ from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
+from .choco import CPM_choco
+

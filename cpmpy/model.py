@@ -15,9 +15,9 @@
 
     See the examples for basic usage, which involves:
 
-    - creation, e.g. `m = Model(cons, minimize=obj)`
-    - solving, e.g. `m.solve()`
-    - optionally, checking status/runtime, e.g. `m.status()`
+    - creation, e.g. `m = Model(cons, minimize=obj)` 
+    - solving, e.g. `m.solve()` 
+    - optionally, checking status/runtime, e.g. `m.status()` 
 
     ===============
     List of classes
@@ -266,7 +266,7 @@ class Model(object):
     def copy(self):
         """
             Makes a shallow copy of the model.
-            Constraints and variables are shared among the original and copied model.
+            Constraints and variables are shared among the original and copied model (references to the same Expression objects). The /list/ of constraints itself is different, so adding or removing constraints from one model does not affect the other.
         """
         if self.objective_is_min:
             return Model(self.constraints, minimize=self.objective_)
