@@ -118,7 +118,8 @@ def sum(*iterable, **kwargs):
         if iterable does not contain CPMpy expressions, the built-in is called
         checks if all constants and uses built-in sum() in that case
     """
-    iterable = tuple(iterable) # Fix generator polling
+    if len(iterable) == 1:
+        iterable = tuple(iterable[0]) # Fix generator polling
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
         return builtins.sum(iterable, **kwargs)
 
