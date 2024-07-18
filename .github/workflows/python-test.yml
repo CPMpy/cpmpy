@@ -18,7 +18,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest requests pandas
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install python-sat[aiger,approxmc,cryptosat,pblib]
+          pip install python-sat
           pip install z3-solver
           pip install exact
           pip install pysdd

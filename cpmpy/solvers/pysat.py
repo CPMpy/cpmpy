@@ -81,7 +81,7 @@ class CPM_pysat(SolverInterface):
         from pysat.solvers import SolverNames
         names = []
         for name, attr in vars(SolverNames).items():
-            if not name.startswith('__') and isinstance(attr, tuple):
+            if not name.startswith('__') and isinstance(attr, tuple) and not 'crypto' in name:
                 if name not in attr:
                     name = attr[-1]
                 names.append(name)
