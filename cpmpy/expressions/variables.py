@@ -67,14 +67,18 @@ def boolvar(shape=1, name=None):
     
     Arguments:
     shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string, default: None)
+    name -- name to give to the variables (string or list/tuple/array of string, default: None)
 
     If name is None then a name 'BV<unique number>' will be assigned to it.
+    If name is a string, then assign it as the suffix of variable names.
+    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
 
     If shape is different from 1, then each element of the array will have the location
     of this specific variable in the array append to its name.
 
-    For example, `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
+    For example,
+    - `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
+    - `print(boolvar(shape=3, name=list("xyz"))` will print `[x, y, z]`
 
 
     The following examples show how to create Boolean variables of different shapes:
@@ -95,13 +99,15 @@ def boolvar(shape=1, name=None):
             # note that with Python's unpacking, you can assign them
             # to intermediate variables. This allows for fine-grained use of variables when
             # defining the constraints of the model
-            e, x, a, m, p, l = boolvar(shape=6)
+            e, x, a, m, p, l = boolvar(shape=6, name=list("exampl"))
 
     - the creation of a matrix or higher-order tensor of Boolean variables. 
         .. code-block:: python
 
             # creation of a 9x9 matrix of Boolean variables:
             matrix = boolvar(shape=(9, 9), name="matrix")
+            # creation of a 2x2 matrix of Boolean variables, and give a name for each element:
+            matrix2 = boolvar(shape=(2, 2), name=[['a', 'b'], ['c', 'd']])
 
             # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
             # the dimensions of the tensor, a matrix of multiple-dimensions.
@@ -112,9 +118,7 @@ def boolvar(shape=1, name=None):
         raise NullShapeError(shape)
     if shape == 1:
         return _BoolVarImpl(name=name)
-
-    # create base data
-    data = np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
+    data = _get_boolvar_data(shape=shape, name=name)
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -133,13 +137,15 @@ def intvar(lb, ub, shape=1, name=None):
     lb -- lower bound on the values the variable can take (int)
     ub -- upper bound on the values the variable can take (int)
     shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string, default: None)
+    name -- name to give to the variables (string or list/tuple/array of string, default: None)
 
     The range of values between lb..ub is called the __domain__ of the integer variable.
     All variables in an array start from the same domain.
     Specific values in the domain of individual variables can be forbidden with constraints.
 
     If name is None then a name 'IV<unique number>' will be assigned to it.
+    If name is a string, then assign it as the suffix of variable names.
+    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
 
     If shape is different from 1, then each element of the array will have the location
     of this specific variable in the array append to its name.
@@ -161,7 +167,7 @@ def intvar(lb, ub, shape=1, name=None):
             x = intvar(3, 8, shape=5, name="x")
 
             # Python's unpacking can assign multiple intermediate variables at once
-            e, x, a, m, p, l = intvar(3, 8, shape=5)
+            e, x, a, m, p, l = intvar(3, 8, shape=6, name=list("exampl"))
 
     - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
         .. code-block:: python
@@ -175,7 +181,7 @@ def intvar(lb, ub, shape=1, name=None):
         return _IntVarImpl(lb, ub, name=name)
 
     # create base data
-    data = np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)]) # repeat new instances
+    data = _get_intvar_data(lb, ub, shape=shape, name=name)
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -710,6 +716,57 @@ class NDVarArray(np.ndarray, Expression):
 
     # TODO?
     #object.__matmul__(self, other)
+
+
+def _check_name_array(shape, name: np.ndarray):
+    """
+    To verify if the name array is valid,
+    i.e., matching the shape and has no duplicated values.
+    """
+    if isinstance(shape, int):
+        shape = (shape,)
+    if name.shape != shape:
+        raise ValueError(f"The shape of name sequence {name.shape} does not match {shape}.")
+    unique, count = np.unique(name, return_counts=True)
+    duplicates = unique[count > 1]
+    if len(duplicates):
+        raise ValueError(f"Duplicated names: {duplicates}.")
+
+
+def _get_boolvar_data(shape, name):
+    """
+    Helper function to get an array of bool vars.
+    - shape: the shape of variables during creation
+    - name: the name given, as a string or a sequence of string
+
+    output: an array of bool vars
+    """
+    if name is None or isinstance(name, str):
+        return np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)])
+    elif isinstance(name, (list, tuple, np.ndarray)):
+        name_arr = np.array(name)
+        _check_name_array(shape, name_arr)
+        return np.array([_BoolVarImpl(name=name_arr[idxs]) for idxs in np.ndindex(shape)])
+    raise TypeError(f"Unsupported type for name: {type(name)}")
+
+
+def _get_intvar_data(lb, ub, shape, name):
+    """
+    Helper function to get an array of int vars.
+    - lb: the lower bound during creation
+    - ub: the upper bound during creation
+    - shape: the shape of variables during creation
+    - name: the name given, as a string or a sequence of string
+
+    output: an array of int vars
+    """
+    if name is None or isinstance(name, str):
+        return np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)])
+    elif isinstance(name, (list, tuple, np.ndarray)):
+        name_arr = np.array(name)
+        _check_name_array(shape, name_arr)
+        return np.array([_IntVarImpl(lb, ub, name=name_arr[idxs]) for idxs in np.ndindex(shape)])
+    raise TypeError(f"Unsupported type for name: {type(name)}.")
 
 
 def _genname(basename, idxs):
