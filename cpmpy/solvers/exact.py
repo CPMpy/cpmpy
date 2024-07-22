@@ -226,13 +226,13 @@ class CPM_exact(SolverInterface):
                 return 0
 
         solsfound = 0
-        while solution_limit == None or solsfound < solution_limit:
+        while solution_limit is None or solsfound < solution_limit:
             # call the solver, with parameters
             my_status = self.xct_solver.runFull(False,timelim)
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
-            if my_status == "UNSATISFIABLE": # found unsatisfiability
+            if my_status == "UNSAT": # found unsatisfiability
                 self._fillObjAndVars() # erases the solution
-                return 0
+                return solsfound
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
