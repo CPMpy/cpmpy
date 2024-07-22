@@ -39,6 +39,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
+from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 
 
@@ -367,8 +368,6 @@ class CPM_minizinc(SolverInterface):
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
-            # we assume all variables are user variables (because no transforms)
-            self.user_vars.add(cpm_var)
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
@@ -448,8 +447,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: self
         """
-        # all variables are user variables, handled in `solver_var()`
-
+        get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
             # Get text expression, add to the solver
