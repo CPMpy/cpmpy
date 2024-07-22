@@ -162,7 +162,8 @@ class CPM_exact(SolverInterface):
 
         # call the solver, with parameters
         start = time.time()
-        my_status = self.xct_solver.runFull(self.has_obj, time_limit if time_limit is not None else 0)
+        my_status = self.xct_solver.runFull(optimize=self.has_obj,
+                                            timeout=time_limit if time_limit is not None else 0)
         end = time.time()
 
         # new status, translate runtime
@@ -228,7 +229,7 @@ class CPM_exact(SolverInterface):
         solsfound = 0
         while solution_limit is None or solsfound < solution_limit:
             # call the solver, with parameters
-            my_status = self.xct_solver.runFull(False,timelim)
+            my_status = self.xct_solver.runFull(optimize=False, timeout=timelim)
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability
                 self._fillObjAndVars() # erases the solution
