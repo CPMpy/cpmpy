@@ -53,7 +53,7 @@ class CPM_exact(SolverInterface):
         - xct_solver: the Exact instance used in solve() and solveAll()
         - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
     to recover which expressions were in the core
-        - self.has_obj: whether an objective function is given to xct_solver
+        - objective_: the objective function given to Exact, initially None
     as Exact can only minimize
     """
 
@@ -108,7 +108,7 @@ class CPM_exact(SolverInterface):
 
         # for solving with assumption variables,
         self.assumption_dict = None
-        self.has_obj = False
+        self.objective_ = False
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
@@ -168,7 +168,7 @@ class CPM_exact(SolverInterface):
 
         # call the solver, with parameters
         start = time.time()
-        my_status = self.xct_solver.runFull(optimize=self.has_obj,
+        my_status = self.xct_solver.runFull(optimize=self.has_objective(),
                                             timeout=time_limit if time_limit is not None else 0)
         end = time.time()
 
@@ -178,7 +178,7 @@ class CPM_exact(SolverInterface):
 
         # translate exit status
         if my_status == "UNSAT": # found unsatisfiability
-            if self.has_obj and self.xct_solver.hasSolution():
+            if self.has_objective() and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -222,15 +222,17 @@ class CPM_exact(SolverInterface):
 
         timelim = time_limit if time_limit is not None else 0
 
-        if self.has_obj:
-            (objval, my_status) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
-            if my_status == "UNSATISFIABLE": # found unsatisfiability
+        if self.has_objective():
+            (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
+            if my_status == "UNSAT": # found unsatisfiability
                 self._fillObjAndVars() # erases the solution
                 return 0
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
                 return 0
+
+            self += self.objective_ == objval # fix obj val
 
         solsfound = 0
         while solution_limit is None or solsfound < solution_limit:
@@ -263,7 +265,7 @@ class CPM_exact(SolverInterface):
         """
             Returns whether the solver has an objective function or not.
         """
-        return self.has_obj
+        return self.objective_ is not None
 
 
     def solver_var(self, cpm_var):
@@ -306,7 +308,7 @@ class CPM_exact(SolverInterface):
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
-        self.has_obj = True
+        self.objective_ = expr
 
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
