@@ -103,6 +103,9 @@ class CPM_exact(SolverInterface):
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
         self.xct_solver = xct(options)
 
+        # can override encoding of variables
+        self.encoding = None
+
         # for solving with assumption variables,
         self.assumption_dict = None
         self.has_obj = False
@@ -284,7 +287,10 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addVariable(revar)
         elif isinstance(cpm_var, _IntVarImpl):
             lb, ub = cpm_var.get_bounds()
-            encoding = "order" if ub-lb < 8 else "log" # heuristic bound
+            if self.encoding is None:
+                encoding = "order" if ub-lb < 8 else "log" # heuristic bound
+            else:
+                encoding = self.encoding # can also force it
             self.xct_solver.addVariable(revar, lb, ub, encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
