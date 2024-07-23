@@ -161,7 +161,7 @@ class CPM_exact(SolverInterface):
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
-            self.xct_solver.setAssumption(list(zip(assump_vars,assump_vals)))
+            self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
         # call the solver, with parameters
         start = time.time()
