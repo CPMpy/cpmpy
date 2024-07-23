@@ -212,7 +212,7 @@ class CPM_exact(SolverInterface):
             Returns: number of solutions found
         """
         # set additional keyword arguments
-        if(len(kwargs.items())>0):
+        if len(kwargs.items()) > 0:
             warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
 
         # ensure all vars are known to solver
