@@ -118,7 +118,12 @@ def boolvar(shape=1, name=None):
         raise NullShapeError(shape)
     if shape == 1:
         return _BoolVarImpl(name=name)
-    data = _get_boolvar_data(shape=shape, name=name)
+
+    # collect the `names` of each individual decision variable
+    names = _gen_var_names(name, shape)
+
+    # create np.array 'data' representation of the decision variables
+    data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -172,7 +177,7 @@ def intvar(lb, ub, shape=1, name=None):
     - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
         .. code-block:: python
 
-            arrx = intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
+            arrx s= intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
 
     """
     if shape == 0 or shape is None:
@@ -180,8 +185,11 @@ def intvar(lb, ub, shape=1, name=None):
     if shape == 1:
         return _IntVarImpl(lb, ub, name=name)
 
-    # create base data
-    data = _get_intvar_data(lb, ub, shape=shape, name=name)
+    # collect the `names` of each individual decision variable
+    names = _gen_var_names(name, shape)
+
+    # create np.array 'data' representation of the decision variables
+    data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
     return NDVarArray(shape, dtype=object, buffer=data)
 
@@ -718,56 +726,27 @@ class NDVarArray(np.ndarray, Expression):
     #object.__matmul__(self, other)
 
 
-def _check_name_array(shape, name: np.ndarray):
+def _gen_var_names(name, shape):
     """
-    To verify if the name array is valid,
-    i.e., matching the shape and has no duplicated values.
-    """
-    if isinstance(shape, int):
-        shape = (shape,)
-    if name.shape != shape:
-        raise ValueError(f"The shape of name sequence {name.shape} does not match {shape}.")
-    unique, count = np.unique(name, return_counts=True)
-    duplicates = unique[count > 1]
-    if len(duplicates):
-        raise ValueError(f"Duplicated names: {duplicates}.")
+    Helper function to collect the name of all decision variables (in np.ndindex(shape) order)
 
-
-def _get_boolvar_data(shape, name):
-    """
-    Helper function to get an array of bool vars.
-    - shape: the shape of variables during creation
-    - name: the name given, as a string or a sequence of string
-
-    output: an array of bool vars
+    `name` can be None, str, or an enumerable with the same shape as `shape`.
+    Raises errors if invalid name
     """
     if name is None or isinstance(name, str):
-        return np.array([_BoolVarImpl(name=_genname(name, idxs)) for idxs in np.ndindex(shape)])
+        return [_genname(name, idx) for idx in np.ndindex(shape)]
     elif isinstance(name, (list, tuple, np.ndarray)):
+        # special case: should match shape of decision variables
         name_arr = np.array(name)
-        _check_name_array(shape, name_arr)
-        return np.array([_BoolVarImpl(name=name_arr[idxs]) for idxs in np.ndindex(shape)])
-    raise TypeError(f"Unsupported type for name: {type(name)}")
-
-
-def _get_intvar_data(lb, ub, shape, name):
-    """
-    Helper function to get an array of int vars.
-    - lb: the lower bound during creation
-    - ub: the upper bound during creation
-    - shape: the shape of variables during creation
-    - name: the name given, as a string or a sequence of string
-
-    output: an array of int vars
-    """
-    if name is None or isinstance(name, str):
-        return np.array([_IntVarImpl(lb, ub, name=_genname(name, idxs)) for idxs in np.ndindex(shape)])
-    elif isinstance(name, (list, tuple, np.ndarray)):
-        name_arr = np.array(name)
-        _check_name_array(shape, name_arr)
-        return np.array([_IntVarImpl(lb, ub, name=name_arr[idxs]) for idxs in np.ndindex(shape)])
-    raise TypeError(f"Unsupported type for name: {type(name)}.")
-
+        if isinstance(shape, int):
+            shape = (shape,)
+        if name_arr.shape != shape:
+            raise ValueError(f"The shape of name sequence {name_arr.shape} does not match {shape}.")
+        if len(name_arr.flat) != len(np.unique(name_arr)):
+            raise ValueError(f"Duplicated names in {name_arr}.")
+        return [name_arr[idx] for idx in np.ndindex(shape)]
+    else:
+        raise TypeError(f"Unsupported type for name: {type(name)}")
 
 def _genname(basename, idxs):
     """
