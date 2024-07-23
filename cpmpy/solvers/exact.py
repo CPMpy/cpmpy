@@ -223,6 +223,9 @@ class CPM_exact(SolverInterface):
         timelim = time_limit if time_limit is not None else 0
 
         if self.has_objective():
+            if not call_from_model:
+                warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
+
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
                 self._fillObjAndVars() # erases the solution
@@ -231,7 +234,8 @@ class CPM_exact(SolverInterface):
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
                 return 0
-
+            else:
+                assert my_status == "SAT", "Unexpected status from Exact"
             self += self.objective_ == objval # fix obj val
 
         solsfound = 0
