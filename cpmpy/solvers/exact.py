@@ -84,6 +84,12 @@ class CPM_exact(SolverInterface):
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: None
+
+        Additional keyword arguments:
+        The Exact solver parameters are defined by https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp#L207
+        Note some parameters use "-" which cannot be used in a keyword argument.
+        A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
+
         """
         if not self.supported():
             raise Exception("Install 'exact' as a Python package to use this solver interface")
@@ -133,9 +139,6 @@ class CPM_exact(SolverInterface):
 
             :param time_limit: optional, time limit in seconds
             :type time_limit: int or float
-
-            Additional keyword arguments:
-            The Exact solver parameters are defined by https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp#L207
 
             :return: Bool:
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
