@@ -1,16 +1,21 @@
 """
-Deletion-based Minimum Unsatisfiable Subset (MUS) algorithm.
+    Re-impementation of MUS-computation techniques in CPMPy
 
 Loosely based on PySat's MUSX:
 https://github.com/pysathq/pysat/blob/master/examples/musx.py
 
+    - Deletion-based MUS
+    - QuickXplain
+    - Optimal MUS
 """
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
 
+from .mss import mss_grow_naive
 from .utils import make_assump_model
+from ...expressions.utils import is_num
 
 
 def mus(soft, hard=[], solver="ortools"):
@@ -108,6 +113,51 @@ def quickxplain(soft, hard=[], solver="ortools"):
     return [dmap[a] for a in core]
 
 
+def optimal_mus(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools"):
+    """
+        Find an optimal MUS according to a linear objective function.
+        Works by iteratively generating correction subsets and computing optimal hitting sets to those enumerated sets.
+        For better performance of the algorithm, use an incemental solver to compute the hitting sets such as Gurobi.
+
+        Assumption-based implementation for solvers that support s.solve(assumptions=...)
+        More naive version available as `optimal_mus_naive` to use with other solvers.
+
+        CPMpy implementation of the "SMUS" algorithm from
+            Ignatiev, Alexey, et al. "Smallest MUS extraction with minimal hitting set dualization."
+            International Conference on Principles and Practice of Constraint Programming. Cham: Springer International Publishing, 2015.
+    """
+
+
+    model, soft, assump = make_assump_model(soft, hard)
+    dmap = dict(zip(assump, soft))
+
+    s = cp.SolverLookup.get(solver, model)
+    # s.solution_hint(assump, [1]*len(assump)) # causes weirdness in OR-Tools: https://github.com/google/or-tools/issues/4324
+    assert s.solve(assumptions=assump) is False
+
+    # initialize hitting set solver
+    if is_num(weights):
+        weights = np.ones(len(assump), dtype=int)
+    hs_solver = cp.SolverLookup.get(hs_solver)
+    hs_solver.minimize(cp.sum(assump * np.array(weights)))
+
+    while hs_solver.solve() is True:
+        hitting_set = [a for a in assump if a.value()]
+        if s.solve(assumptions=hitting_set) is False:
+            break
+
+        # SAT, use hitting set as start for disjoint MCS enumeration
+        sat_subset = list(hitting_set)  # make new list
+        while s.solve(assumptions=sat_subset) is True:
+            new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
+            hs_solver += cp.sum(new_mcs) >= 1
+            sat_subset += new_mcs # extend sat subset with new MCS
+
+    return [dmap[a] for a in hitting_set]
+
+
+
+
 ## Naive, non-assumption based versions of MUS-algos above
 def mus_naive(soft, hard=[], solver="ortools"):
     """
@@ -184,3 +234,31 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
 
     core = do_recursion(soft, hard, [])
     return core
+
+def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools", grow=mss_grow_naive):
+    """
+        Naive implementation of `optimal_mus` without assumption variables and incremental solving
+    """
+
+    soft = toplevel_list(soft, merge_and=False)
+    bvs = cp.boolvar(shape=len(soft))
+
+    if is_num(weights):
+        weights = np.ones(len(bvs), dtype=int)
+    hs_solver = cp.SolverLookup.get(hs_solver)
+    hs_solver.minimize(cp.sum(bvs * np.array(weights)))
+
+    while hs_solver.solve() is True:
+
+        hitting_set = [c for bv, c in zip(bvs, soft) if bv.value()]
+        if cp.Model(hard + hitting_set).solve(solver=solver) is False:
+            break
+        # SAT, how to do grow without assumptions?
+        #   for now, using naive grow methods from tools/explain/mcs
+        mss = grow(soft=[c for bv, c in zip(bvs, soft) if not bv.value()],
+                   hard=hitting_set + hard,
+                   solver=solver)
+        mcs = [bv for bv,c in zip(bvs, soft) if c not in frozenset(hitting_set + mss)]
+        hs_solver += cp.sum(mcs) >= 1
+
+    return hitting_set
