@@ -108,7 +108,7 @@ class CPM_exact(SolverInterface):
 
         # for solving with assumption variables,
         self.assumption_dict = None
-        self.objective_ = False
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
