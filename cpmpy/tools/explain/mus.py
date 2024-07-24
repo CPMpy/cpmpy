@@ -120,9 +120,13 @@ def optimal_mus(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools")
         Assumption-based implementation for solvers that support s.solve(assumptions=...)
         More naive version available as `optimal_mus_naive` to use with other solvers.
 
-        CPMpy implementation of the "SMUS" algorithm from
+        CPMpy implementation loosely based on the "SMUS" algorithm from
             Ignatiev, Alexey, et al. "Smallest MUS extraction with minimal hitting set dualization."
             International Conference on Principles and Practice of Constraint Programming. Cham: Springer International Publishing, 2015.
+        and OCUS from:
+            Gamba, Emilio, Bart Bogaerts, and Tias Guns. "Efficiently explaining CSPs with unsatisfiable subset optimization."
+            Journal of Artificial Intelligence Research 78 (2023): 709-746.
+
     """
 
 
