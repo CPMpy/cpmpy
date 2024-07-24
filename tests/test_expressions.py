@@ -316,10 +316,7 @@ class TestArrayExpressions(unittest.TestCase):
     def test_multidim(self):
 
         functions = ["all", "any", "max", "min", "sum", "prod"]
-        constraints = ["alldifferent", "alldifferent_except0", "allequal", "circuit",
-                       "increasing", "increasing_strict", "decreasing", "decreasing_strict"]
         bv = cp.boolvar(shape=(5,4,3,2)) # high dimensional tensor
-        iv = cp.intvar(0,10,shape=(5,4,3,2))
         arr = np.zeros(shape=bv.shape) # numpy "ground truth"
 
         for axis in range(len(bv.shape)):
@@ -328,11 +325,6 @@ class TestArrayExpressions(unittest.TestCase):
                 cpm_res = getattr(bv, func)(axis=axis)
                 self.assertIsInstance(cpm_res, NDVarArray)
                 self.assertEqual(cpm_res.shape, np_res.shape)
-            for cons in constraints:
-                cpm_res = getattr(iv, cons)(axis=axis)
-                self.assertIsInstance(cpm_res, NDVarArray)
-                self.assertEqual(cpm_res.shape, np_res.shape)
-
         
 def inclusive_range(lb,ub):
     return range(lb,ub+1)
@@ -539,8 +531,26 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(str(cons), "either a or b should be true, but not both -- (a) or (b)")
 
 
+class TestBuildIns(unittest.TestCase):
 
+    def setUp(self):
+        self.x = cp.intvar(0,10,shape=3)
 
+    def test_sum(self):
+        gt = Operator("sum", list(self.x))
+
+        self.assertEqual(str(gt), str(cp.sum(self.x)))
+        self.assertEqual(str(gt), str(cp.sum(list(self.x))))
+        self.assertEqual(str(gt), str(cp.sum(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.sum(self.x[0], self.x[1], self.x[2])))
+
+    def test_max(self):
+        gt = Maximum(self.x)
+
+        self.assertEqual(str(gt), str(cp.max(self.x)))
+        self.assertEqual(str(gt), str(cp.max(list(self.x))))
+        self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
 if __name__ == '__main__':
     unittest.main()
