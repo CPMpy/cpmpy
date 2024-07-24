@@ -541,6 +541,8 @@ class CPM_exact(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+        # clear previous solution hints
+        self.xct_solver.clearSolutionHints(self.solver_vars(list(self.user_vars)))
 
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
