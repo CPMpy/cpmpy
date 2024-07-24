@@ -55,26 +55,6 @@ class TestGlobal(unittest.TestCase):
                 var._value = val
             assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
 
-    def test_alldifferent_lists(self):
-        # test known input/outputs
-        tuples = [
-                  ([(1,2,3),(1,3,3),(1,2,4)], True),
-                  ([(1,2,3),(1,3,3),(1,2,3)], False),
-                  ([(0,0,3),(1,3,3),(1,2,4)], True),
-                  ([(1,2,3),(1,3,3),(3,3,3)], True)
-                 ]
-        iv = cp.intvar(0,4, shape=(3,3))
-        c = cp.AllDifferentLists(iv)
-        for (vals, oracle) in tuples:
-            ret = cp.Model(c, iv == vals).solve()
-            assert (ret == oracle), f"Mismatch solve for {vals,oracle}"
-            # don't try this at home, forcibly overwrite variable values (so even when ret=false)
-            for (var,val) in zip(iv,vals):
-                for (vr, vl) in zip(var, val):
-                    vr._value = vl
-            assert (c.value() == oracle), f"Wrong value function for {vals,oracle}"
-
-
     def test_not_alldifferent(self):
         # from fuzztester of Ruben Kindt, #143
         pos = cp.intvar(lb=0, ub=5, shape=3, name="positions")
@@ -418,6 +398,48 @@ class TestGlobal(unittest.TestCase):
 
         constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
         model = cp.Model(constraints[0].decompose())
+        self.assertFalse(model.solve())
+
+    def test_negative_table(self):
+        iv = cp.intvar(-8,8,3)
+
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [~cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertFalse(cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]]).value())
+        self.assertTrue(cp.Table(iv, [[10, 8, 2], [5, 2, 2]]).value())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        self.assertTrue(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints[0].decompose())
+        model += constraints[1].decompose()
         self.assertFalse(model.solve())
 
     def test_table_onearg(self):

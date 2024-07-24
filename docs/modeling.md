@@ -41,6 +41,8 @@ x = cp.intvar(1,10, name="x")
 
 Decision variables have a **domain**, a set of allowed values. For Boolean variables this is implicitly the values 'False' and 'True'. For Integer decision variables, you have to specify the lower-bound and upper-bound (`1` and `10` respectively above).
 
+If you want a **sparse domain**, containing only a few values, you can either define a suitable lower/upper bound and then forbid specific values, e.g. `x != 3, x != 5, x != 7`; or you can use the shorthand *InDomain* global constraint: `InDomain(x, [1,2,4,6,8,9])`.
+
 Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned to it. If you print `print(b, x)` decision variables, it will print the name. Did we already say the name must be unique? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named variables.
 
 A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable in multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. 
@@ -60,6 +62,8 @@ print(x)  # [[x[0,0] x[0,1]]
 You can also call `v.value()` on these n-dimensional arrays, which will return an n-dimensional **numpy** array of values. And you can do vectorized operations and comparisons, like in regular numpy. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific python tools, including machine learning and visualisation libraries, so a lot less glue code to write.
 
 See [the API documentation on variables](api/expressions/variables.html) for more detailed information.
+
+Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last succesful solve call.
 
 ## Creating a model
 
@@ -693,10 +697,10 @@ iv = cp.intvar(1,9, shape=3)
 s = cp.SolverLookup.get("ortools")
 
 s += AllDifferent(iv)  # the traditional way, equivalent to:
-s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
+s.native_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API (OR-Tools' python library), has to be with native variables
 ```
 
-observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly.  This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint.
+Observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly (in the case of OR-Tools, the `native_model` property returns a `CpModel` instance). This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint. Consult [the solver API documentation](api/solvers.html) for more information on the available solver specific objects which can be accessed directly.
 
 While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so it can be part of a model like any other CPMpy constraint. Note that it can only be used as top-level (non-nested, non-reified) constraint.
 

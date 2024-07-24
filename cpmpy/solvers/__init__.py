@@ -19,6 +19,7 @@
         z3
         exact
         choco
+        gcs
         utils
 
     ===============
@@ -35,6 +36,7 @@
         CPM_z3
         CPM_exact
         CPM_choco
+        CPM_gcs
 
     =================
     List of functions
@@ -54,4 +56,5 @@ from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
 from .choco import CPM_choco
+from .gcs import CPM_gcs
 

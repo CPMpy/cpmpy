@@ -132,10 +132,6 @@ class Minimum(GlobalFunction):
                they should be enforced toplevel.
         """
         from .python_builtins import any, all
-        if cpm_op == "==":  # can avoid creating aux var
-            return [any(x <= cpm_rhs for x in self.args),
-                    all(x >= cpm_rhs for x in self.args)], []
-
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
         return [eval_comparison(cpm_op, _min, cpm_rhs)], \
@@ -173,10 +169,6 @@ class Maximum(GlobalFunction):
                they should be enforced toplevel.
         """
         from .python_builtins import any, all
-        if cpm_op == "==":  # can avoid creating aux var here
-            return [any(x >= cpm_rhs for x in self.args),
-                    all(x <= cpm_rhs for x in self.args)], []
-
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
         return [eval_comparison(cpm_op, _max, cpm_rhs)], \
