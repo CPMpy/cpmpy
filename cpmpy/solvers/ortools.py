@@ -107,6 +107,12 @@ class CPM_ortools(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.ort_model
 
 
     def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):

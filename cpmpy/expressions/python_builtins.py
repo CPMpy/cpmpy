@@ -18,7 +18,6 @@
         min
         sum
 """
-import numpy as np
 import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst
@@ -70,7 +69,7 @@ def any(iterable):
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append(elem)
         else:
-            raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
+            raise Exception("Non-Boolean argument '{}' to 'any'".format(elem))
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
@@ -78,33 +77,51 @@ def any(iterable):
     return False
 
 
-def max(iterable):
+def max(*iterable, **kwargs):
     """
-        max() overwrites python built-in,
-        checks if all constants and computes np.max() in that case
+        max() overwrites the python built-in to support decision variables.
+
+        if iterable does not contain CPMpy expressions, the built-in is called
+        else a Maximum functional global constraint is constructed; no keyword
+          arguments are supported in that case
     """
+    if len(iterable) == 1:
+        iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return np.max(iterable)
+        return builtins.max(*iterable, **kwargs)
+
+    assert len(kwargs)==0, "max over decision variables does not support keyword arguments"
     return Maximum(iterable)
 
 
-def min(iterable):
+def min(*iterable, **kwargs):
     """
-        min() overwrites python built-in,
-        checks if all constants and computes np.min() in that case
+        min() overwrites the python built-in to support decision variables.
+
+        if iterable does not contain CPMpy expressions, the built-in is called
+        else a Minimum functional global constraint is constructed; no keyword
+          arguments are supported in that case
     """
+    if len(iterable) == 1:
+        iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return np.min(iterable)
+        return builtins.min(*iterable, **kwargs)
+
+    assert len(kwargs)==0, "min over decision variables does not support keyword arguments"
     return Minimum(iterable)
 
 
-def sum(iterable):
+def sum(*iterable, **kwargs):
     """
-        sum() overwrites python built-in,
-        checks if all constants and computes np.sum() in that case
-        otherwise, makes a sum Operator directly on `iterable`
+        sum() overwrites the python built-in to support decision variables.
+
+        if iterable does not contain CPMpy expressions, the built-in is called
+        checks if all constants and uses built-in sum() in that case
     """
-    iterable = list(iterable) # Fix generator polling
+    if len(iterable) == 1:
+        iterable = tuple(iterable[0]) # Fix generator polling
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return np.sum(iterable)
+        return builtins.sum(iterable, **kwargs)
+
+    assert len(kwargs)==0, "sum over decision variables does not support keyword arguments"
     return Operator("sum", iterable)

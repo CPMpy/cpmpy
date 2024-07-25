@@ -190,6 +190,14 @@ class CPM_minizinc(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.mzn_model
+
+
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
         import minizinc
@@ -713,3 +721,19 @@ class CPM_minizinc(SolverInterface):
             finally:
                 asyncio.events.set_event_loop(None)
                 loop.close()
+
+    def minizinc_string(self) -> str:
+        """
+            Returns the model as represented in the Minizinc language.
+        """
+        return "".join(self._pre_solve()[1]._code_fragments)
+
+    def flatzinc_string(self, **kwargs) -> str:
+        """
+            Returns the model as represented in the Flatzinc language.
+        """
+        with self._pre_solve()[1].flat(**kwargs) as (fzn, ozn, statistics):
+            with open(fzn.name) as f:
+                f.seek(0)
+                contents = f.readlines()
+        return "".join(contents)

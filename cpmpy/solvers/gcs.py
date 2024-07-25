@@ -18,7 +18,7 @@
 """
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
-from ..exceptions import NotSupportedError
+from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
@@ -59,7 +59,7 @@ class CPM_gcs(SolverInterface):
     - objective_var: optional: the variable used as objective
     - proof_location: location of the last proof produced by the solver
     - proof_name: name of the last proof (means <proof_name>.opb and <proof_name>.pbp will be present at the proof location)
-    - proof_verification_failed: whether the last VeriPB check failed to verify the proof.
+    - veripb_return_code: return code from the last VeriPB check.
     - proof_check_timeout: whether the last VeriPB check timed out.
     """
 
@@ -92,7 +92,7 @@ class CPM_gcs(SolverInterface):
         self.proof_location = None
         self.proof_name = None
         self.proof_check_timeout = True
-        self.proof_verification_failed = False
+        self.veripb_return_code = False
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
@@ -177,6 +177,10 @@ class CPM_gcs(SolverInterface):
         if verify:
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
                         veripb_args=veripb_args, display_output=display_verifier_output)
+            
+            if self.veripb_return_code > 0:
+                raise GCSVerificationException("Glasgow Constraint Solver: Proof failed to verify.")
+            
         return has_sol
 
     def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
@@ -358,6 +362,8 @@ class CPM_gcs(SolverInterface):
         """
         Verify a solver-produced proof using VeriPB.
 
+        Requires that the 'veripb' tool is installed and on system path. 
+        See `https://gitlab.com/MIAOresearch/software/VeriPB#installation` for installation instructions. 
         Arguments:
             - name:             name for the the proof files (default to self.proof_name)
             - location:         location for the proof files (default to current working directory).
@@ -366,27 +372,38 @@ class CPM_gcs(SolverInterface):
             - display_output:   whether to print the output from VeriPB
         """
         if not which("veripb"):
-            raise Exception("Unable to run VeriPB: check it is installed and on system path")
+            raise Exception("Unable to run VeriPB: check it is installed and on system path - see https://gitlab.com/MIAOresearch/software/VeriPB#installation.")
 
         if name is None:
             name = self.proof_name
+        
         if name is None: # Still None?
             raise ValueError("No proof to verify")
         
+        if not isinstance(veripb_args, list):
+            raise ValueError("veripb_args should be a list")
+        
+        opb_file = path.join(location, name +".opb")
+        pbp_file = path.join(location, name +".pbp")
+
+        if not path.isfile(opb_file):
+            raise FileNotFoundError("Can't find " + opb_file)
+        if not path.isfile(pbp_file):
+            raise FileNotFoundError("Can't find " + pbp_file)
+        
         try:
-            result = subprocess.run(["veripb", path.join(location, name +".opb"), path.join(location, name +".pbp")] + veripb_args, 
+            result = subprocess.run(["veripb"] + veripb_args + [opb_file, pbp_file], 
                                     capture_output=True, text=True, timeout=time_limit)
             self.proof_check_timeout = False
-            self.proof_verification_failed = result.returncode
+            self.veripb_return_code = result.returncode
+            if display_output:
+                print(result.stdout)
+                print(result.stderr)
         except subprocess.TimeoutExpired:
             self.proof_check_timeout = True
-            self.proof_verification_failed = False
+            self.veripb_return_code = 0
 
-        if display_output:
-            print(result.stdout)
-            print(result.stderr)
-
-        return self.proof_verification_failed
+        return self.veripb_return_code
     
     def __add__(self, cpm_cons):
         """
@@ -409,8 +426,6 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, BoolVal):
                 if not cpm_expr:
                     self.gcs.post_or([])
-                else:
-                    return
             elif isinstance(cpm_expr, Operator) or \
                 (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
                 and not isinstance(cpm_expr.args[1], _NumVarImpl)): 

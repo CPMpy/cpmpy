@@ -717,10 +717,10 @@ iv = cp.intvar(1,9, shape=3)
 s = cp.SolverLookup.get("ortools")
 
 s += AllDifferent(iv)  # the traditional way, equivalent to:
-s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
+s.native_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API (OR-Tools' python library), has to be with native variables
 ```
 
-observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly.  This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint.
+Observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly (in the case of OR-Tools, the `native_model` property returns a `CpModel` instance). This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint. Consult [the solver API documentation](api/solvers.html) for more information on the available solver specific objects which can be accessed directly.
 
 While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so it can be part of a model like any other CPMpy constraint. Note that it can only be used as top-level (non-nested, non-reified) constraint.
 
