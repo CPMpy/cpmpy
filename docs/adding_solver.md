@@ -101,7 +101,7 @@ As not every solver should support all possible constraints, you can exclude som
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
 ## Tunable hyperparameters
-CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](solver_parameters.md)).
+CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](./solver_parameters.md)).
 Solvers wanting to support this tool should add the following attributes to their interface: `tunable_params` and `default_params` (see [OR-Tools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
 
 

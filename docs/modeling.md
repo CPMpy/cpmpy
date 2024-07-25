@@ -4,13 +4,13 @@ This page explains and demonstrates how to use CPMpy to model and solve combinat
 
 ## Installation
 
-Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](./modeling.html#selecting-a-solver)):
+Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](#selecting-a-solver)):
 
 ```commandline
 pip install cpmpy
 ```
 
-See [installation instructions](installation_instructions.html) for more details. 
+See [installation instructions](./installation_instructions.rst) for more details. 
 
 ## Using the library
 
@@ -65,7 +65,7 @@ Similar to individual decision variables, you can call `v.value()` on these n-di
 
 Since the arrays of decision variables are based on numpy, you can do **vectorized operations** and **comparisons** on them. As we will see below, this is very convenient and avoids having to write out many loops. It also makes it compatible with many existing scientific Python tools, including machine learning and visualisation libraries. A lot less glue code will need to be written!
 
-See [the API documentation on variables](api/expressions/variables.html) for more detailed information.
+See [the API documentation on variables](./api/expressions/variables.rst) for more detailed information.
 
 Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last succesful solve call.
 
@@ -100,7 +100,7 @@ print(m)  # pretty printing of the model, very useful for debugging
 ```
 The `Model()` object has a number of other helpful functions, such as `to_file()` to store the model and `copy()` for creating a copy.
 
-See [the API documentation on models](api/model.html) for more detailed information.
+See [the API documentation on models](./api/model.rst) for more detailed information.
 
 ## Expressing constraints
 
@@ -283,7 +283,7 @@ However, a solver that has specialised datastructures for this constraint specif
 
 Many global constraints are available in CPMpy. Some include `Xor(), AllDifferent(), AllDifferentExcept0(), Table(), Circuit(), Cumulative(), GlobalCardinalityCount()`.   
 
-For a complete list of global constraints, their meaning and more information on how to define your own, see [the API documentation on global constraints](api/expressions/globalconstraints.html). 
+For a complete list of global constraints, their meaning and more information on how to define your own, see [the API documentation on global constraints](./api/expressions/globalconstraints.rst). 
 
 Global constraints can also be reified (e.g. used in an implication or equality constraint). 
 
@@ -300,7 +300,7 @@ cp.Model(
     cp.Xor(b, cp.AllDifferent(x)),  # etc...
 )
 ```
-`decompose()` returns two arguments, one that represents the constraints and another that defines any newly created decision variables during the decomposition process. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](api/expressions/globalconstraints.html).
+`decompose()` returns two arguments, one that represents the constraints and another that defines any newly created decision variables during the decomposition process. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](./api/expressions/globalconstraints.rst).
 
 #### Global functions
 
@@ -308,11 +308,11 @@ Coming back to the Python-builtin functions `min(),max(),abs()`, these are a bit
 
 However, CPMpy also wishes to support the expressions `min(xs) > v` as well as `v + min(xs) != 4` and other nested expressions.
 
-In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](api/expressions/globalfunctions.html#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
+In CPMpy we do this by instantiating min/max/abs as **global functions**. E.g. `min([x,y,z])` becomes `Minimum([x,y,z])` which inherits from `GlobalFunction` because it has a numeric return type. Our library will transform the constraint model, including arbitrarly nested expressions, such that the global function is used within a comparison with a variable. Then, the solver will either support it, or we will call `decompose_comparison()` ([link](./api/expressions/globalfunctions.rst#cpmpy.expressions.globalfunctions.Abs.decompose_comparison)) on the global function.
 
 A non-exhaustive list of **numeric global constraints** that are available in CPMpy is: `Minimum(), Maximum(), Count(), Element()`.   
 
-For their meaning and more information on how to define your own global functions, see [the API documentation on global functions](api/expressions/globalfunctions.html).
+For their meaning and more information on how to define your own global functions, see [the API documentation on global functions](./api/expressions/globalfunctions.rst).
 
 ```python
 import cpmpy as cp
@@ -445,7 +445,7 @@ When using `solveAll()`, a solver will use an optimized native implementation be
 
 It has a `display=...` argument that can be used to display expressions (provide a list of expressions to be evaluated) or as a more generic callback (provide a function), both to be evaluated for each found solution.
 It has a `solution_limit=...` argument to set a limit on the number of solutions to solve for. 
-It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts. For more information about the available arguments, look at [the solver API documentation](api/solvers.html) for the solver in question.
+It also accepts any named argument, like `time_limit=...`, that the underlying solver accepts. For more information about the available arguments, look at [the solver API documentation](./api/solvers.rst) for the solver in question.
 ```python
 # Using list of expressions
 n = m.solveAll(display=[x,cp.sum(x)], solution_limit=3)
@@ -459,7 +459,7 @@ n = m.solveAll(display=lambda: print([x.value(), cp.sum(x).value()]), solution_l
 ```
 (Note that the Exact solver, unlike other solvers, takes most of its arguments at construction time.)
 
-There is much more to say on enumerating solutions and the use of callbacks or blocking clauses. See the [the detailed documentation on finding multiple solutions](multiple_solutions.html).
+There is much more to say on enumerating solutions and the use of callbacks or blocking clauses. See the [the detailed documentation on finding multiple solutions](./multiple_solutions.md).
 
 ## Debugging a model
 
@@ -482,13 +482,13 @@ for c in m.constraints:
     s += c  # add the constraints incrementally until you hit the error
 ```
 
-If that is not sufficient or you want to debug an unexpected (non)solution, have a look at our detailed [Debugging guide](how_to_debug.md).
+If that is not sufficient or you want to debug an unexpected (non)solution, have a look at our detailed [Debugging guide](./how_to_debug.md).
 
 ## Selecting a solver
 
 The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
-The list of supported solver interfaces can be found in [the API documentation](api/solvers.html).
+The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst).
 See the full list of solvers known by CPMpy with:
 
 ```python
@@ -508,7 +508,7 @@ m = cp.Model(cp.sum(x) <= 5)
 m.solve(solver="minizinc:chuffed")
 ```
 
-Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](api/solvers.html) of the solver for detailed installation instructions.
+Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
 
 ## Model versus solver interface
 
@@ -557,7 +557,7 @@ s.solve(cp_model_probing_level = 2,
         symmetry_level = 1)
 ```
 
-See [the API documentation of the solvers](api/solvers.html) for information and links on the parameters supported. See our documentation page on [solver parameters](solver_parameters.html) if you want to tune your hyperparameters automatically. 
+See [the API documentation of the solvers](./api/solvers.rst) for information and links on the parameters supported. See our documentation page on [solver parameters](./solver_parameters.md) if you want to tune your hyperparameters automatically. 
 
 ## Accessing the underlying solver object
 
@@ -574,7 +574,7 @@ print(s.ort_solver.NumBranches())
 ```
 
 Other solvers, like Minizinc, might have other native objects stored.
-You can see which solver native objects are initialized for each solver in [the API documentation](api/solvers.html) of the solver.
+You can see which solver native objects are initialized for each solver in [the API documentation](./api/solvers.rst) of the solver.
 We can access the solver statistics from the mzn_result object like this:
 
 ```python
@@ -614,7 +614,7 @@ _Technical note_: OR-Tools its model representation is incremental but its solvi
 SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
 Assumption variables are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
-Many explanation-generation algorithms ([see](api/tools/explain.html) `cpmpy.tools.explain`) make use of this feature to speed up the solving.
+Many explanation-generation algorithms ([see](./api/tools/explain.rst) `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
 ```python
 import cpmpy as cp
@@ -655,9 +655,9 @@ s.solve()
 print(x.value())
 ```
 
-`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
+`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](./unsat_core_extraction.md).
 
-See [the API documentation of the solvers](api/solvers.html) to learn about their special functions.
+See [the API documentation of the solvers](./api/solvers.rst) to learn about their special functions.
 
 
 ## Direct solver access
@@ -720,7 +720,7 @@ s += AllDifferent(iv)  # the traditional way, equivalent to:
 s.native_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API (OR-Tools' python library), has to be with native variables
 ```
 
-Observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly (in the case of OR-Tools, the `native_model` property returns a `CpModel` instance). This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint. Consult [the solver API documentation](api/solvers.html) for more information on the available solver specific objects which can be accessed directly.
+Observe how we first map the CPMpy variables to native variables by calling `s.solver_vars()`, and then give these to the native solver API directly (in the case of OR-Tools, the `native_model` property returns a `CpModel` instance). This is in fact what happens behind the scenes when posting a DirectConstraint, or any CPMpy constraint. Consult [the solver API documentation](./api/solvers.rst) for more information on the available solver specific objects which can be accessed directly.
 
 While directly calling the solver offers a lot of freedom, it is a bit more cumbersome as you have to map the variables manually each time. Also, you no longer have a declarative model that you can pass along, print or inspect. In contrast, a `DirectConstraint` is a CPMpy expression so it can be part of a model like any other CPMpy constraint. Note that it can only be used as top-level (non-nested, non-reified) constraint.
 

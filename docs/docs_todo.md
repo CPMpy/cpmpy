@@ -7,7 +7,7 @@ A lot of proof-reading is still needed to catch all formatting mistakes (especia
 
 - [ ] Outdated copyright
     - whilst updated on the repo, ReadTheDocs still gives 2021 as copyright year
-    
+
 - [ ] Mention Exact
     - In many places where solvers get listed, Exact is not inluded (especially for things that make Exact stand out; e.g. unsat core extraction)
 
@@ -30,4 +30,8 @@ A lot of proof-reading is still needed to catch all formatting mistakes (especia
 
 - [ ] Gurobi GRB_ENV subsolver
     document this
+
+- [ ] Jupyter notebooks
+
+- [ ] Use of "warning" boxes & others
 

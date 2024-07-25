@@ -21,7 +21,7 @@ If you get an error and have difficulty understanding it, try searching on the i
 
 If you don't find it, or if the solver runs fine and without error, but you don't get the answer you expect; then try swapping out the solver for another solver and see what gives...
 
-Replace `model.solve()` by `model.solve(solver='minizinc')` for example. You do need to install MiniZinc and minizinc-python first though. Take a look at [the solver API interface](api/solvers.html) for the install instructions. 
+Replace `model.solve()` by `model.solve(solver='minizinc')` for example. You do need to install MiniZinc and minizinc-python first though. Take a look at [the solver API interface](./api/solvers.rst) for the install instructions. 
 
 Either you have the same output, and it is not the solver's fault, or you have a different output and you actually found one of these rare solver bugs. Report on the bugtracker of the solver, or on the CPMpy github page where we will help you file a bug 'upstream' (or maybe even work around it in CPMpy).
 
@@ -96,7 +96,7 @@ print(f"Optimizing {obj_var} subject to", s.transform(obj_expr))
 ### Automatically minimising the UNSAT program
 If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to a 'Minimal Unsatisfiable Subset' (MUS).
 
-This is now part of our [standard tools](api/tools.html), that you can use as follows:
+This is now part of our [standard tools](./api/tools.rst), that you can use as follows:
 
 ```python
 from cpmpy.tools import mus
@@ -143,7 +143,7 @@ sat_cons = mss(model.constraints) # x[0] or x[1], x[2] -> x[1], ~x[0]
 cons_to_remove = (mcs(model.constraints)) # x[0]
 ```
 
-More information about these tools can be found in [their API documentation](api/tools/explain.html).
+More information about these tools can be found in [their API documentation](./api/tools/explain.rst).
 
 ## Debugging a satisfiable model, that does not contain an expected solution
 

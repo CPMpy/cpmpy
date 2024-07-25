@@ -157,4 +157,4 @@ cb = OrtSolutionPrinter()
 s.solve(enumerate_all_solutions=True, solution_callback=cb)
 print("Nr of solutions:",cb.solution_count())
 ```
-Have a look at `OrtSolutionPrinter`'s [implementation](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/ortools.py#L640).
+Have a look at `OrtSolutionPrinter`'s [implementation](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/ortools.py#L650).
