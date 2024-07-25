@@ -24,9 +24,18 @@
 
     Boolean and Integer decision variables are the key elements of a CP model.
 
-    All variables in CPMpy are n-dimensional array objects and have defined dimensions. Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors with more than 2 dimensions are all supported too. For the implementation of this, CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits (vectorized operators and advanced indexing).
+    All variables in CPMpy are n-dimensional array objects and have defined dimensions. 
+    Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. 
+    In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape 
+    is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors 
+    with more than 2 dimensions are all supported too. For the implementation of this, 
+    CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits 
+    (vectorized operators and advanced indexing).
 
-    This module contains the cornerstone `boolvar()` and `intvar()` functions, which create (numpy arrays of) variables. There is also a helper function `cpm_array` for wrapping standard numpy arrays so they can be indexed by a variable. Apart from these 3 functions, none of the classes in this module should be directly created; they are created by these 3 helper functions.
+    This module contains the cornerstone `boolvar()` and `intvar()` functions, which create (numpy arrays of) 
+    variables. There is also a helper function `cpm_array()` for wrapping standard numpy arrays so they can be 
+    indexed by a variable. Apart from these 3 functions, none of the classes in this module should be directly 
+    instantiated; they are created by these 3 helper functions.
 
 
     ===============
@@ -135,7 +144,7 @@ def IntVar(lb, ub, shape=1, name=None):
 
 def intvar(lb, ub, shape=1, name=None):
     """
-    Integer decision variables are constructed by specifying the lowest (lb)
+    Integer decision variables are constructed by specifying the lowest (lb) value
     the decision variable can take, as well as the highest value (ub).
 
     Arguments:
