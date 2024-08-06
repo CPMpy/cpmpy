@@ -4,7 +4,12 @@
 ## ortools.py
 ##
 """
-    Interface to ortools' CP-SAT Python API
+    Interface to OR-Tools' CP-SAT Python API. 
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can be installed through `pip`:
+
+        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
@@ -22,6 +27,10 @@
         :nosignatures:
 
         CPM_ortools
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import numpy as np
@@ -42,7 +51,7 @@ from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the python 'ortools' CP-SAT API
+    Interface to the Python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
@@ -79,7 +88,7 @@ class CPM_ortools(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this solver interface")

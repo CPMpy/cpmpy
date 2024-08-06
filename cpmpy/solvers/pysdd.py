@@ -1,5 +1,14 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## pysdd.py
+##
 """
     Interface to PySDD's API
+
+    Requires that the 'PySDD' python package is installed:
+
+        $ pip install PySDD
 
     PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
     https://pysdd.readthedocs.io/en/latest/
@@ -19,6 +28,10 @@
         :nosignatures:
 
         CPM_pysdd
+
+    ==============
+    Module details
+    ==============
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus

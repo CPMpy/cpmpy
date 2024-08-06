@@ -6,8 +6,11 @@
 """
     Interface to Exact
 
-    Exact solves decision and optimization problems formulated as integer linear programs. Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
+    Exact solves decision and optimization problems formulated as integer linear programs. 
+    Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
+    propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
 
+    The solver's git repository:
     https://gitlab.com/JoD/exact
 
     ===============
@@ -18,6 +21,10 @@
         :nosignatures:
 
         CPM_exact
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import time
@@ -89,7 +96,6 @@ class CPM_exact(SolverInterface):
         The Exact solver parameters are defined by https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp#L207
         Note some parameters use "-" which cannot be used in a keyword argument.
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
-
         """
         if not self.supported():
             raise Exception("Install 'exact' as a Python package to use this solver interface")
@@ -205,7 +211,8 @@ class CPM_exact(SolverInterface):
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
-            Compute all solutions and optionally display the solutions.
+            Compute all solutions and optionallycpmpy/solvers/exact.py
+ display the solutions.
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
@@ -354,7 +361,8 @@ class CPM_exact(SolverInterface):
         xcfvars = []
         xrhs = 0
         
-        assert is_num(rhs), "RHS of inequality should be numeric after transformations: {}".format(rhs)
+        assert is_num(rhs), "RHS of inequality scpmpy/solvers/exact.py
+hould be numeric after transformations: {}".format(rhs)
         xrhs += rhs
 
         if is_num(lhs):
@@ -471,7 +479,8 @@ class CPM_exact(SolverInterface):
 
                 elif cpm_expr.name == "<=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
-                    self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
+                    self._add_xct_constr(xct_cfvcpmpy/solvers/exact.py
+ars, False, 0, True, xct_rhs)
 
                 elif cpm_expr.name == ">=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
