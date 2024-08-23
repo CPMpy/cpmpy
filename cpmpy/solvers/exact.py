@@ -450,7 +450,8 @@ class CPM_exact(SolverInterface):
                 lhs, rhs = cpm_expr.args
                 if cpm_expr.name == "==":
                     # can be wsum or mul
-                    if isinstance(lhs, Operator) and lhs.name == "mul":
+                    assert isinstance(lhs, Operator) and (lhs.name == "wsum" or lhs.name == "mul")
+                    if lhs.name == "mul":
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
                             rhs = intvar(rhs, rhs)
@@ -458,20 +459,6 @@ class CPM_exact(SolverInterface):
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be rewritten by linearize"
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
-                    # elif isinstance(lhs, Operator) and lhs.name == "mod":
-                    #     if lhs.name == "mod":
-                    #         # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
-                    #         #   -> acts differently for negative numbers
-                    #         # "mod" is a partial function
-                    #         #   -> x % 0 = x (unless x == 0, then undefined)
-                    #         x, y = lhs.args
-                    #         lby, uby = get_bounds(y)
-                    #         if (lby <= 0) and (uby >= 0):  # if 0 is within the bounds
-                    #             raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
-                    #         k = intvar(*get_bounds((x - rhs) // y))
-                    #         self += (k * y) + rhs == x
-                    #         self += rhs < abs(y)
-                    #         continue
                     else:
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
@@ -486,7 +473,6 @@ class CPM_exact(SolverInterface):
 
                 else:
                     raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
 
             elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
                 # Indicator constraints
