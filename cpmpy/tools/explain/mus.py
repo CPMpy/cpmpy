@@ -152,15 +152,18 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
         if s.solve(assumptions=hitting_set) is False:
             break
 
-        # SAT, derive correction subset from current hitting set
-        new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
-        hs_solver += cp.sum(new_mcs) >= 1
-        # greedily search for other MCSes disjoint to this one
-        sat_subset = list(hitting_set) + new_mcs
+        # else, the hitting set is SAT, now try to extend it without extra solve calls.
+        # Check which other assumptions/constraints are satisfied (using c.value())
+        # complement of grown subset is a correction subset
+        new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
+        hs_solver += cp.sum(new_corr_subset) >= 1
+
+        # greedily search for other corr subsets disjoint to this one
+        sat_subset = list(hitting_set) + new_corr_subset
         while s.solve(assumptions=sat_subset) is True:
-            new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
-            sat_subset += new_mcs # extend sat subset with new MCS, guarenteed to be disjoint
-            hs_solver += cp.sum(new_mcs) >= 1 # add new mcs to hitting set solver
+            new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
+            sat_subset += new_corr_subset # extend sat subset with new corr subset, guarenteed to be disjoint
+            hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
 
     return [dmap[a] for a in hitting_set]
 
