@@ -110,9 +110,10 @@ def quickxplain(soft, hard=[], solver="ortools"):
     return [dmap[a] for a in core]
 
 
-def optimal_mus(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools"):
+def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
     """
         Find an optimal MUS according to a linear objective function.
+        By not providing a weightvector, this function will return the smallest mus.
         Works by iteratively generating correction subsets and computing optimal hitting sets to those enumerated sets.
         For better performance of the algorithm, use an incemental solver to compute the hitting sets such as Gurobi.
 
@@ -137,7 +138,7 @@ def optimal_mus(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools")
     assert s.solve(assumptions=assump) is False
 
     # initialize hitting set solver
-    if is_num(weights):
+    if weights is None:
         weights = np.ones(len(assump), dtype=int)
     hs_solver = cp.SolverLookup.get(hs_solver)
     hs_solver.minimize(cp.sum(assump * np.array(weights)))
