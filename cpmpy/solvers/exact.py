@@ -478,8 +478,7 @@ class CPM_exact(SolverInterface):
 
                 elif cpm_expr.name == "<=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
-                    self._add_xct_constr(xct_cfvcpmpy/solvers/exact.py
-ars, False, 0, True, xct_rhs)
+                    self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
 
                 elif cpm_expr.name == ">=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
