@@ -4,7 +4,6 @@
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
-    - MUS enumeration with MARCO
 """
 import numpy as np
 import cpmpy as cp
