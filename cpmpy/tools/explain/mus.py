@@ -248,7 +248,7 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
     core = do_recursion(soft, hard, [])
     return core
 
-def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools", grow=mss_grow_naive):
+def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools"):
     """
         Naive implementation of `optimal_mus` without assumption variables and incremental solving
     """
@@ -266,13 +266,22 @@ def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ort
         hitting_set = [c for bv, c in zip(bvs, soft) if bv.value()]
         if cp.Model(hard + hitting_set).solve(solver=solver) is False:
             break
-        # SAT, how to do grow without assumptions?
-        #   for now, using naive grow methods from tools/explain/mcs
-        mss = grow(soft=[c for bv, c in zip(bvs, soft) if not bv.value()],
-                   hard=hitting_set + hard,
-                   solver=solver)
-        mcs = [bv for bv,c in zip(bvs, soft) if c not in frozenset(hitting_set + mss)]
-        hs_solver += cp.sum(mcs) >= 1
+
+        # else, the hitting set is SAT, now try to extend it without extra solve calls.
+        # Check which other assumptions/constraints are satisfied using its value() function
+        #       sidenote: some vars may not be know to model and are None!
+        # complement of grown subset is a correction subset
+        false_constraints = [s for s in soft if s.value() is False or s.value() is None]
+        corr_subset = [bv for bv,c in zip(bvs, soft) if c in frozenset(false_constraints)]
+        hs_solver += cp.sum(corr_subset) >= 1
+
+        # find more corr subsets, disjoint to this one
+        sat_subset = hitting_set + false_constraints
+        while cp.Model(hard + sat_subset).solve(solver=solver) is True:
+            false_constraints = [s for s in soft if s.value() is False or s.value() is None]
+            corr_subset = [bv for bv, c in zip(bvs, soft) if c in frozenset(false_constraints)]
+            hs_solver += cp.sum(corr_subset) >= 1
+            sat_subset += false_constraints
 
     return hitting_set
 
