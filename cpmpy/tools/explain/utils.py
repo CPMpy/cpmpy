@@ -15,8 +15,7 @@ def make_assump_model(soft, hard=[], name=None):
     assump = cp.boolvar(shape=(len(soft2),), name=name)
 
     # hard + implied soft constraints
-    if isinstance(hard, Expression):
-        hard = [hard]
+    hard = toplevel_list(hard)
     model = cp.Model(hard + [assump.implies(soft2)])  # each assumption variable implies a candidate
 
     return model, soft2, assump
