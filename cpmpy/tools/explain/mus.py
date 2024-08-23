@@ -131,7 +131,7 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
 
 
     model, soft, assump = make_assump_model(soft, hard)
-    dmap = dict(zip(assump, soft))
+    dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
     s = cp.SolverLookup.get(solver, model)
     if hasattr(s, "solution_hint"): # algo is constructive, so favor large subsets
