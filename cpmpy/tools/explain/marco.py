@@ -3,7 +3,7 @@
 """
 
 import cpmpy as cp
-from cpmpy.tools import make_assump_model
+from .utils import make_assump_model
 
 
 
