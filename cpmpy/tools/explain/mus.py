@@ -134,7 +134,10 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
     dmap = dict(zip(assump, soft))
 
     s = cp.SolverLookup.get(solver, model)
-    # s.solution_hint(assump, [1]*len(assump)) # causes weirdness in OR-Tools: https://github.com/google/or-tools/issues/4324
+    if hasattr(s, "solution_hint"): # algo is constructive, so favor large subsets
+        if solver != "ortools": # causes weidness in OR-Tools: https://github.com/google/or-tools/issues/4324
+            s.solution_hint(assump, [1]*len(assump))
+
     assert s.solve(assumptions=assump) is False
 
     # initialize hitting set solver
@@ -157,7 +160,8 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
 
     return [dmap[a] for a in hitting_set]
 
-
+def smus(soft, hard=[], solver="ortools", hs_solver="ortools"):
+    return optimal_mus(soft, hard=hard, weights=None, solver=solver, hs_solver=hs_solver)
 
 
 ## Naive, non-assumption based versions of MUS-algos above
