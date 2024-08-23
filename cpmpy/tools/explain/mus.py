@@ -143,6 +143,7 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
     # initialize hitting set solver
     if weights is None:
         weights = np.ones(len(assump), dtype=int)
+
     hs_solver = cp.SolverLookup.get(hs_solver)
     hs_solver.minimize(cp.sum(assump * np.array(weights)))
 
@@ -151,12 +152,15 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
         if s.solve(assumptions=hitting_set) is False:
             break
 
-        # SAT, use hitting set as start for disjoint MCS enumeration
-        sat_subset = list(hitting_set)  # make new list
+        # SAT, derive correction subset from current hitting set
+        new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
+        hs_solver += cp.sum(new_mcs) >= 1
+        # greedily search for other MCSes disjoint to this one
+        sat_subset = list(hitting_set) + new_mcs
         while s.solve(assumptions=sat_subset) is True:
             new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
-            hs_solver += cp.sum(new_mcs) >= 1
-            sat_subset += new_mcs # extend sat subset with new MCS
+            sat_subset += new_mcs # extend sat subset with new MCS, guarenteed to be disjoint
+            hs_solver += cp.sum(new_mcs) >= 1 # add new mcs to hitting set solver
 
     return [dmap[a] for a in hitting_set]
 
