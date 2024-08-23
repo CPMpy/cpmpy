@@ -361,8 +361,7 @@ class CPM_exact(SolverInterface):
         xcfvars = []
         xrhs = 0
         
-        assert is_num(rhs), "RHS of inequality scpmpy/solvers/exact.py
-hould be numeric after transformations: {}".format(rhs)
+        assert is_num(rhs), "RHS of inequality should be numeric after transformations: {}".format(rhs)
         xrhs += rhs
 
         if is_num(lhs):
