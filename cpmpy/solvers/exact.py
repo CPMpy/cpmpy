@@ -449,8 +449,8 @@ class CPM_exact(SolverInterface):
             if isinstance(cpm_expr, Comparison):
                 lhs, rhs = cpm_expr.args
                 if cpm_expr.name == "==":
-                    # can be wsum or mul
-                    assert isinstance(lhs, Operator) and (lhs.name == "wsum" or lhs.name == "mul")
+                    assert isinstance(lhs, Operator)
+                    # can be sum, wsum or mul
                     if lhs.name == "mul":
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
@@ -460,6 +460,7 @@ class CPM_exact(SolverInterface):
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:
+                        assert lhs.name == "sum" or lhs.name == "wsum"
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
