@@ -74,7 +74,8 @@ from types import GeneratorType
 import numpy as np
 
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
+from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, \
+    _collector
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -122,17 +123,18 @@ class Expression(object):
             out += " -- "+self.__repr__()
         return out
 
-
     def __repr__(self):
-        strargs = []
+        collect = []
+        self._str_collect(collect)
+        return "".join(collect)
+
+    def _str_collect(self, collect):
+        collect.append(f"{self.name}(")
         for arg in self.args:
-            if isinstance(arg, np.ndarray):
-                # flatten
-                strarg = ",".join(map(str, arg.flat))
-                strargs.append(f"[{strarg}]")
-            else:
-                strargs.append(f"{arg}")
-        return "{}({})".format(self.name, ",".join(strargs))
+            _collector(arg, collect)
+            collect.append(",")
+        collect[-1] = ")"
+
 
     def __hash__(self):
         return hash(self.__repr__())
@@ -394,11 +396,17 @@ class Comparison(Expression):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
-    def __repr__(self):
+    def _str_collect(self, collect):
         if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
-        # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+            collect.append("(")
+            _collector(self.args[0], collect) # can shortcut this one...
+            collect.append(f") {self.name} (")
+            _collector(self.args[1], collect)
+            collect.append(")")
+        else:
+            _collector(self.args[0], collect)
+            collect.append(f") {self.name} (")
+            _collector(self.args[1], collect)
 
     # return the value of the expression
     # optional, default: None
@@ -503,31 +511,43 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
     
-    def __repr__(self):
+    def _str_collect(self, collect):
         printname = self.name
         if printname in Operator.printmap:
             printname = Operator.printmap[printname]
 
         # special cases
         if self.name == '-': # unary -
-            return "-({})".format(self.args[0])
+            collect.append("-(")
+            _collector(self.args[0], collect)
+            collect.append(")")
 
         # weighted sum
-        if self.name == 'wsum':
-            return f"sum({self.args[0]} * {self.args[1]})"
+        elif self.name == 'wsum':
+            collect.append(f"sum({self.args[0]} * ")
+            _collector(self.args[1], collect)
+            collect.append(")")
 
         # infix printing of two arguments
-        if len(self.args) == 2:
+        elif len(self.args) == 2:
             # bracketed printing of non-constants
-            def wrap_bracket(arg):
-                if isinstance(arg, Expression):
-                    return f"({arg})"
-                return arg
-            return "{} {} {}".format(wrap_bracket(self.args[0]),
-                                     printname,
-                                     wrap_bracket(self.args[1]))
 
-        return "{}({})".format(self.name, self.args)
+            def wrap_bracket(arg, collect):
+                if isinstance(arg, Expression):
+                    collect.append("(")
+                    _collector(arg, collect)
+                    collect.append(")")
+                else:
+                    collect.append(str(arg))
+
+            wrap_bracket(self.args[0], collect)
+            collect.append(f" {printname} ")
+            wrap_bracket(self.args[1], collect)
+
+        else:
+            collect.append(f"{self.name} (")
+            _collector(self.args, collect)
+            collect.append(")")
 
     def value(self):
 

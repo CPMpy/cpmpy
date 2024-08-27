@@ -62,7 +62,7 @@ from functools import reduce
 
 import numpy as np
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, _collector
 
 
 def BoolVar(shape=1, name=None):
@@ -283,8 +283,8 @@ class _NumVarImpl(Expression):
         """
         self._value = None
 
-    def __repr__(self):
-        return self.name
+    def _str_collect(self, collect):
+        collect.append(self.name)
 
     # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
@@ -420,16 +420,22 @@ class NDVarArray(np.ndarray, Expression):
         for e in self.flat:
             e.clear()
 
-    def __repr__(self):
-        """
-            some ways in which np creates this object does not call
-            the constructor, so the Expression does not have 'args'
-            set..
-        """
-        if not hasattr(self, "args"):
-            self.name = "NDVarArray"
-            self.args = self
-        return super().__repr__()
+    # def __repr__(self):
+    #     """
+    #         some ways in which np creates this object does not call
+    #         the constructor, so the Expression does not have 'args'
+    #         set..
+    #     """
+    #     if not hasattr(self, "args"):
+    #         self.name = "NDVarArray"
+    #         self.args = self
+    #     return super().__repr__()
+
+
+    def _str_collect(self, collect):
+        self.name = "NDVarArray"
+        self.args = self
+        super()._str_collect(collect)
 
     def __getitem__(self, index):
         from .globalfunctions import Element # here to avoid circular

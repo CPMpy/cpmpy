@@ -195,3 +195,22 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+
+def _collector(arg, collect):
+    if hasattr(arg, "_str_collect"):
+        arg._str_collect(collect)  # put directly into list
+    elif isinstance(arg, np.ndarray):
+        collect.append("NDVarArray([")
+        for a in arg.flat:
+            _collector(a, collect)
+            collect.append(",")
+        collect[-1] = "])"
+    elif isinstance(arg, list):
+        collect.append("[")
+        for a in arg:
+            _collector(a, collect)
+            collect.append(",")
+        collect[-1] = "]"
+    else:
+        collect.append(f"{arg}")
