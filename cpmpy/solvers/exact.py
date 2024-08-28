@@ -11,7 +11,7 @@
     propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
 
     The solver's git repository:
-    https://gitlab.com/JoD/exact
+    https://gitlab.com/nonfiction-software/exact
 
     ===============
     List of classes
@@ -59,9 +59,6 @@ class CPM_exact(SolverInterface):
     Creates the following attributes (see parent constructor for more):
         - xct_solver: the Exact instance used in solve() and solveAll()
         - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
-    to recover which expressions were in the core
-        - objective_: the objective function given to Exact, initially None
-    as Exact can only minimize
     """
 
     @staticmethod
@@ -75,7 +72,7 @@ class CPM_exact(SolverInterface):
         except ModuleNotFoundError as e:
             return False 
         except VersionConflict:
-            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version {pkg_resources.get_distribution('exact').version}")
+            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version {pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
             return False
         except Exception as e:
             raise e
@@ -92,8 +89,8 @@ class CPM_exact(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: None
 
-        Additional keyword arguments:
-        The Exact solver parameters are defined by https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp#L207
+        Exact takes options at initialization instead of solving.
+        The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
         Note some parameters use "-" which cannot be used in a keyword argument.
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
@@ -211,8 +208,7 @@ class CPM_exact(SolverInterface):
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
-            Compute all solutions and optionallycpmpy/solvers/exact.py
- display the solutions.
+            Compute all solutions and optionally, display the solutions.
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
