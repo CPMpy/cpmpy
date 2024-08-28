@@ -105,6 +105,6 @@ class TransSimplify(unittest.TestCase):
         bv = cp.boolvar(name="bv")
         x = cp.intvar(0, 3, name="x")
         cons = (x == 2) == (bv == 4)
-        self.assertEquals(str(self.transform(cons)), "[x != 2]")
+        self.assertEqual(str(self.transform(cons)), "[x != 2]")
         self.assertTrue(cp.Model(cons).solve())
 
