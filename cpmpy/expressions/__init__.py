@@ -29,3 +29,4 @@ from .globalconstraints import alldifferent, allequal, circuit # Old, to be depr
 from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept, Among
 from .core import BoolVal
 from .python_builtins import all, any, max, min, sum
+from builtins import abs
