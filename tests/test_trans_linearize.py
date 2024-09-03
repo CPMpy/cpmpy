@@ -176,6 +176,30 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons)[0]
         self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
 
+    def test_mod(self):
+
+        x,y = cp.intvar(1,5, name="x"), cp.intvar(1,5,name="y")
+        rhs = cp.intvar(-5,5, name="rhs")
+
+        cons = (x % y) <= rhs
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value(), rhs.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value(), rhs.value())))
+        self.assertSetEqual(sols, linsols)
+        # what about reified?
+        bv = cp.boolvar(name="bv")
+        cons = bv.implies((x % y) <= rhs)
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value(), rhs.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value(), rhs.value())))
+        self.assertSetEqual(sols, linsols)
+
     def test_others(self):
 
         a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
