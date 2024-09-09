@@ -36,5 +36,3 @@ class TestBuiltin(unittest.TestCase):
         model = cp.Model(cp.abs(iv[0]).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(cp.abs(iv[0].value())), '4')
-
-        self.assertRaises(CPMpyException)

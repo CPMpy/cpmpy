@@ -22,7 +22,7 @@
 import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst, is_any_list
-from .variables import NDVarArray
+from .variables import NDVarArray, cpm_array
 from .core import Expression, Operator
 from .globalfunctions import Minimum, Maximum, Abs
 from ..exceptions import CPMpyException
@@ -136,7 +136,10 @@ def abs(element):
         if the element given is not a CPMpy expression, the built-in is called
         else an Absolute functional global constraint is constructed.
     """
-    if is_any_list(element) or not isinstance(element, Expression):
+    if is_any_list(element):
+        return cpm_array([abs(elem) for elem in element])
+
+    if isinstance(element, Expression):
         return builtins.abs(element)
 
     return Abs(element)
