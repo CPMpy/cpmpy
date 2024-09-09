@@ -136,9 +136,7 @@ def abs(element):
         if the element given is not a CPMpy expression, the built-in is called
         else an Absolute functional global constraint is constructed.
     """
-    if is_any_list(element):
-        raise CPMpyException('abs does not accept iterables')
-    if not isinstance(element, Expression):
+    if is_any_list(element) or not isinstance(element, Expression):
         return builtins.abs(element)
 
     return Abs(element)
