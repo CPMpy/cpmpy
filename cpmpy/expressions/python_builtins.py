@@ -17,13 +17,14 @@
         max
         min
         sum
+        abs
 """
 import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst
 from .variables import NDVarArray
 from .core import Expression, Operator
-from .globalfunctions import Minimum, Maximum
+from .globalfunctions import Minimum, Maximum, Abs
 
 
 # Overwriting all/any python built-ins
@@ -125,3 +126,20 @@ def sum(*iterable, **kwargs):
 
     assert len(kwargs)==0, "sum over decision variables does not support keyword arguments"
     return Operator("sum", iterable)
+
+
+def abs(*iterable, **kwargs):
+    """
+        abs() overwrites the python built-in to support decision variables.
+
+        if iterable does not contain CPMpy expressions, the built-in is called
+        else an Absolute functional global constraint is constructed; no keyword
+          arguments are supported in that case
+    """
+    if len(iterable) == 1:
+        iterable = tuple(iterable[0])
+    if not builtins.any(isinstance(elem, Expression) for elem in iterable):
+        return builtins.abs(*iterable, **kwargs)
+
+    assert len(kwargs)==0, "abs over decision variables does not support keyword arguments"
+    return Abs(iterable)

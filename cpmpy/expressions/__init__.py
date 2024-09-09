@@ -28,5 +28,4 @@ from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentEx
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
 from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept, Among
 from .core import BoolVal
-from .python_builtins import all, any, max, min, sum
-from builtins import abs
+from .python_builtins import all, any, max, min, sum, abs
