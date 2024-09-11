@@ -159,10 +159,10 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
         hs_solver += cp.sum(new_corr_subset) >= 1
 
         # greedily search for other corr subsets disjoint to this one
-        sat_subset = list(hitting_set) + new_corr_subset
+        sat_subset = list(new_corr_subset)
         while s.solve(assumptions=sat_subset) is True:
             new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
-            sat_subset += new_corr_subset # extend sat subset with new corr subset, guarenteed to be disjoint
+            sat_subset += new_corr_subset # extend sat subset with new corr subset, guaranteed to be disjoint
             hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
 
     return [dmap[a] for a in hitting_set]
