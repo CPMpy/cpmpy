@@ -7,7 +7,7 @@ from .utils import make_assump_model
 
 
 
-def marco(soft, hard=[], solver="ortools", map_solver="ortools"):
+def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True, return_mcs=True):
     """
         Enumerates all MUSes in the unsatisfiable problem
         Iteratively generates a subset of constraints (the seed) and checks whether it is SAT.
@@ -32,15 +32,29 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools"):
 
         seed = [a for a in assump if a.value()]
 
-        if s.solve(assumptions=seed) is True: # SAT subset, find corr subsets
-            sat_subset = seed
-            new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
-            map_solver += cp.any(new_mcs)
-            sat_subset += new_mcs
-            while s.solve(assumptions=sat_subset) is True:
-                new_mcs = [a for a, c in zip(assump, soft) if a.value() is False and c.value() is False]
-                sat_subset += new_mcs  # extend sat subset with new MCS
-                map_solver += cp.any(new_mcs)
+        if s.solve(assumptions=seed) is True: # SAT subset, find MCSes subset(s)
+
+            if return_mcs:
+                mss = [a for a,c in zip(assump, soft) if a.value() or c.value()]
+                # grow to full MSS
+                for to_add in set(assump) - set(mss):
+                    if s.solve(assumptions=mss + [to_add]) is True:
+                        mss.append(to_add)
+                mcs = [a for a in assump if a not in set(mss)]
+                map_solver += cp.any(mcs)
+                yield "MCS", [dmap[a] for a in mcs]
+
+            else:
+                # find more MCSes, disjoint from this one, similar to "optimal_mus" in mus.py
+                # can only be done when MCSes do not have to be returned as there is no guarantee
+                # the MCSes encountered during enumeration are "new" MCSes
+                sat_subset = [a for a,c in zip(assump, soft) if not (a.value() or c.value())]
+                map_solver += cp.any(sat_subset)
+                while s.solve(assumptions=sat_subset) is True:
+                    mss = [a for a, c in zip(assump, soft) if a.value() or c.value()]
+                    new_mcs = [a for a in assump if a not in set(mss)]  # just take the complement
+                    map_solver += cp.any(new_mcs)
+                    sat_subset += new_mcs # extend sat subset with this MCS
 
         else: # UNSAT, shrink to MUS, re-use MUSX
             core = s.get_core()
@@ -50,6 +64,8 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools"):
                 if s.solve(assumptions=subassump):
                     mus.append(core[i])
 
-            yield [dmap[a] for a in mus]
+            if return_mus:
+                yield "MUS", [dmap[a] for a in mus]
+
             # block in map solver
             map_solver += ~cp.all(mus)
