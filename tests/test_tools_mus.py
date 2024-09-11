@@ -149,8 +149,11 @@ class MARCOMUSTests(MusTests):
         model += cp.cpm_array(x.sum(axis=0)) >= 1
         model += cp.cpm_array(x.sum(axis=1)) <= 1
 
-        musses = list(marco(soft=model.constraints))
+        musses = list(marco(soft=model.constraints, return_mcs=False))
         self.assertEqual(len(musses), 5)
+
+        mcses = list(marco(soft=model.constraints, return_mus=False))
+        self.assertEqual(len(mcses), 13) # any combination of 3 pigeon constraints + 3 mcses with the hole constraints
 
 
 class MSSTests(unittest.TestCase):
