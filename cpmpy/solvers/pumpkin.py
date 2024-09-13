@@ -158,7 +158,7 @@ class CPM_pumpkin(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return pumpkin_py.negate(self.solver_var(cpm_var._bv))
+            return self.solver_var(cpm_var._bv).negate()
 
         # create if it does not exist
         if cpm_var not in self._varmap:
