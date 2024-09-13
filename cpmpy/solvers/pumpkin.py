@@ -290,9 +290,30 @@ class CPM_pumpkin(SolverInterface):
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
                 return [constraints.Clause([self.solver_var(cpm_expr)])]
+
             elif isinstance(cpm_expr, Operator):
                 if cpm_expr.name == "or":
                     return [constraints.Clause(self.solver_vars(cpm_expr.args))]
+
+                raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
+
+            elif isinstance(cpm_expr, Comparison):
+                if cpm_expr.name == "==":
+                    [lhs, rhs] = cpm_expr.args
+                    solver_lhs = self.solver_var(lhs)
+                    solver_rhs = self.solver_var(rhs)
+
+                    if isinstance(lhs, _BoolVarImpl):
+                        assert isinstance(rhs, _BoolVarImpl), "Pumpkin: can only compare boolean with other boolean"
+                        return [
+                            constraints.Clause([solver_lhs.negate(), solver_rhs]),
+                            constraints.Clause([solver_rhs.negate(), solver_lhs]),
+                        ]
+
+                    raise NotImplementedError("Pumpkin: equality not (yet) supported", cpm_expr)
+
+                raise NotImplementedError("Pumpkin: comparison not (yet) supported", cpm_expr)
+
             else:
                 raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
 
