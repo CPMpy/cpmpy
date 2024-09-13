@@ -286,76 +286,98 @@ class CPM_pumpkin(SolverInterface):
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
-        # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-
+        def to_solver_constraints(cpm_expr):
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
-                self.pum_solver.post(constraints.Clause([self.solver_var(cpm_expr)]), tag=None)
-
+                return [constraints.Clause([self.solver_var(cpm_expr)])]
             elif isinstance(cpm_expr, Operator):
                 if cpm_expr.name == "or":
-                    self.pum_solver.post(constraints.Clause(self.solver_vars(cpm_expr.args)), tag=None)
-
-                elif cpm_expr.name == "->": # half-reification
-                    bv, subexpr = cpm_expr.args
-                    # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
-                    if isinstance(subexpr, Comparison):
-                        lhs, rhs = subexpr.args
-                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                            TPL_lhs = self._make_numexpr(lhs)
-                            self.pum_solver.add_half_reified_comparison(self.solver_var(bv),
-                                                                        TPL_lhs, subexpr.name, self.solver_var(rhs))
-                        else:
-                            raise NotImplementedError("Pumpkin: no support for half-reified comparison:", subexpr)
-                    else:
-                        raise NotImplementedError("Pumpkin: no support for half-reified constraint:", subexpr)
-
-            elif isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-
-                # [GUIDELINE] == is used for both double reification and numerical comparisons
-                #       need case by case analysis here. Note that if your solver does not support full-reification,
-                #       you can rely on the transformation only_implies to convert all reifications to half-reification
-                #       for more information, please reach out on github!
-                if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
-                    bv, subexpr = lhs, rhs
-                    assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
-
-                    if isinstance(subexpr, Comparison):
-                        lhs, rhs = subexpr.args
-                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                            TPL_lhs = self._make_numexpr(lhs)
-                            self.pum_solver.add_reified_comparison(self.solver_var(bv),
-                                                                   TPL_lhs, subexpr.name, self.solver_var(rhs))
-                        else:
-                            raise NotImplementedError("Pumpkin: no support for reified comparison:", subexpr)
-                    else:
-                        raise NotImplementedError("Pumpkin: no support for reified constraint:", subexpr)
-
-                # otherwise, numerical comparisons
-                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                    TPL_lhs = self._make_numexpr(lhs)
-                    self.pum_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
-                # global functions
-                elif cpm_expr.name == "==":
-                    TPL_rhs = self.solver_var(rhs)
-                    if lhs.name == "max":
-                        self.pum_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
-                    elif lhs.name == "element":
-                        TPL_arr, TPL_idx = self.solver_vars(lhs.args)
-                        self.pum_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
-                    # elif...
-                    else:
-                        raise NotImplementedError("Pumpkin: unknown equality constraint:", cpm_expr)
-                else:
-                    raise NotImplementedError("Pumpkin: unknown comparison constraint", cpm_expr)
-
-            # global constraints
-            elif cpm_expr.name == "alldifferent":
-                self.pum_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
+                    return [constraints.Clause(self.solver_vars(cpm_expr.args))]
             else:
                 raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
+
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+                bv, subexpr = cpm_expr.args
+
+                solver_constraints = to_solver_constraints(subexpr)
+
+                for cons in solver_constraints:
+                    self.pum_solver.imply(cons, self.solver_var(bv), tag=None)
+            else:
+                solver_constraints = to_solver_constraints(cpm_expr)
+
+                for cons in solver_constraints:
+                    self.pum_solver.post(cons, tag=None)
+
+            #if isinstance(cpm_expr, _BoolVarImpl):
+            #    # base case, just var or ~var
+            #    self.pum_solver.post(constraints.Clause([self.solver_var(cpm_expr)]), tag=None)
+
+            #elif isinstance(cpm_expr, Operator):
+            #    if cpm_expr.name == "or":
+            #        self.pum_solver.post(constraints.Clause(self.solver_vars(cpm_expr.args)), tag=None)
+
+            #    elif cpm_expr.name == "->": # half-reification
+            #        bv, subexpr = cpm_expr.args
+            #        # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
+            #        if isinstance(subexpr, Comparison):
+            #            lhs, rhs = subexpr.args
+            #            if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+            #                TPL_lhs = self._make_numexpr(lhs)
+            #                self.pum_solver.add_half_reified_comparison(self.solver_var(bv),
+            #                                                            TPL_lhs, subexpr.name, self.solver_var(rhs))
+            #            else:
+            #                raise NotImplementedError("Pumpkin: no support for half-reified comparison:", subexpr)
+            #        else:
+            #            raise NotImplementedError("Pumpkin: no support for half-reified constraint:", subexpr)
+
+            #elif isinstance(cpm_expr, Comparison):
+            #    lhs, rhs = cpm_expr.args
+
+            #    # [GUIDELINE] == is used for both double reification and numerical comparisons
+            #    #       need case by case analysis here. Note that if your solver does not support full-reification,
+            #    #       you can rely on the transformation only_implies to convert all reifications to half-reification
+            #    #       for more information, please reach out on github!
+            #    if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
+            #        bv, subexpr = lhs, rhs
+            #        assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
+
+            #        if isinstance(subexpr, Comparison):
+            #            lhs, rhs = subexpr.args
+            #            if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+            #                TPL_lhs = self._make_numexpr(lhs)
+            #                self.pum_solver.add_reified_comparison(self.solver_var(bv),
+            #                                                       TPL_lhs, subexpr.name, self.solver_var(rhs))
+            #            else:
+            #                raise NotImplementedError("Pumpkin: no support for reified comparison:", subexpr)
+            #        else:
+            #            raise NotImplementedError("Pumpkin: no support for reified constraint:", subexpr)
+
+            #    # otherwise, numerical comparisons
+            #    if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+            #        TPL_lhs = self._make_numexpr(lhs)
+            #        self.pum_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
+            #    # global functions
+            #    elif cpm_expr.name == "==":
+            #        TPL_rhs = self.solver_var(rhs)
+            #        if lhs.name == "max":
+            #            self.pum_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
+            #        elif lhs.name == "element":
+            #            TPL_arr, TPL_idx = self.solver_vars(lhs.args)
+            #            self.pum_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
+            #        # elif...
+            #        else:
+            #            raise NotImplementedError("Pumpkin: unknown equality constraint:", cpm_expr)
+            #    else:
+            #        raise NotImplementedError("Pumpkin: unknown comparison constraint", cpm_expr)
+
+            ## global constraints
+            #elif cpm_expr.name == "alldifferent":
+            #    self.pum_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
+            #else:
+            #    raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
 
         return self
 
