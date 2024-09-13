@@ -295,7 +295,7 @@ class CPM_pumpkin(SolverInterface):
 
             elif isinstance(cpm_expr, Operator):
                 if cpm_expr.name == "or":
-                    self.pum_solver.post(pumpkin_py.constraints.Clause(self.solver_vars(cpm_expr.args)), tag=None)
+                    self.pum_solver.post(constraints.Clause(self.solver_vars(cpm_expr.args)), tag=None)
 
                 elif cpm_expr.name == "->": # half-reification
                     bv, subexpr = cpm_expr.args
