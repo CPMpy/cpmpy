@@ -69,9 +69,10 @@ class CPM_pumpkin(SolverInterface):
         assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
-        #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.pum_solver = pumpkin_py.Solver() 
+
+        # a dictionary for constant variables, so they can be re-used
+        self._constantvars = dict()
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
@@ -97,7 +98,11 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_py import Boolean as PumpkinBool, Variable as PumpkinInt, SatisfactionResult
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        try:
+            self.solver_vars(list(self.user_vars))
+        except InconsistentSolverError:
+            # Do nothing, the inconsistent state will be identified later.
+            pass
 
         if time_limit is not None:
             self.pum_solver.set_timelimit_seconds(time_limit)
@@ -118,7 +123,6 @@ class CPM_pumpkin(SolverInterface):
         match result:
             case SatisfactionResult.Satisfiable(solution):
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-
 
                 # fill in variable values
                 for cpm_var in self.user_vars:
@@ -149,11 +153,16 @@ class CPM_pumpkin(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
-            return cpm_var
 
-        # [GUIDELINE] some solver interfaces explicitely create variables on a solver object
-        #       then use self.pum_solver.NewBoolVar(...) instead of pumpkin_py.NewBoolVar(...)
+        # When Pumpkin is in an inconsistent state, variables cannot be created anymore.
+        if not self.pum_solver.is_consistent():
+            raise InconsistentSolverError()
+
+        if is_num(cpm_var):
+            if not cpm_var in self._constantvars:
+                self._constantvars[cpm_var] = self.pum_solver.new_variable(cpm_var, cpm_var, name=str(cpm_var))
+
+            return self._constantvars[cpm_var]
 
         # special case, negative-bool-view
         # work directly on var inside the view
@@ -300,15 +309,21 @@ class CPM_pumpkin(SolverInterface):
             elif isinstance(cpm_expr, Comparison):
                 if cpm_expr.name == "==":
                     [lhs, rhs] = cpm_expr.args
-                    solver_lhs = self.solver_var(lhs)
-                    solver_rhs = self.solver_var(rhs)
 
                     if isinstance(lhs, _BoolVarImpl):
                         assert isinstance(rhs, _BoolVarImpl), "Pumpkin: can only compare boolean with other boolean"
+                        solver_lhs = self.solver_var(lhs)
+                        solver_rhs = self.solver_var(rhs)
                         return [
                             constraints.Clause([solver_lhs.negate(), solver_rhs]),
                             constraints.Clause([solver_rhs.negate(), solver_lhs]),
                         ]
+
+                    if isinstance(lhs, _IntVarImpl) and is_num(rhs):
+                        return [constraints.BinaryEquals(
+                            self.solver_var(lhs),
+                            self.solver_var(rhs),
+                        )]
 
                     raise NotImplementedError("Pumpkin: equality not (yet) supported", cpm_expr)
 
@@ -319,88 +334,24 @@ class CPM_pumpkin(SolverInterface):
 
             raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
 
-        # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-                bv, subexpr = cpm_expr.args
+        try:
+            # transform and post the constraints
+            for cpm_expr in self.transform(cpm_expr_orig):
+                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+                    bv, subexpr = cpm_expr.args
 
-                solver_constraints = to_solver_constraints(subexpr)
+                    solver_constraints = to_solver_constraints(subexpr)
 
-                for cons in solver_constraints:
-                    self.pum_solver.imply(cons, self.solver_var(bv), tag=None)
-            else:
-                solver_constraints = to_solver_constraints(cpm_expr)
+                    for cons in solver_constraints:
+                        self.pum_solver.imply(cons, self.solver_var(bv), tag=None)
+                else:
+                    solver_constraints = to_solver_constraints(cpm_expr)
 
-                for cons in solver_constraints:
-                    self.pum_solver.post(cons, tag=None)
-
-            #if isinstance(cpm_expr, _BoolVarImpl):
-            #    # base case, just var or ~var
-            #    self.pum_solver.post(constraints.Clause([self.solver_var(cpm_expr)]), tag=None)
-
-            #elif isinstance(cpm_expr, Operator):
-            #    if cpm_expr.name == "or":
-            #        self.pum_solver.post(constraints.Clause(self.solver_vars(cpm_expr.args)), tag=None)
-
-            #    elif cpm_expr.name == "->": # half-reification
-            #        bv, subexpr = cpm_expr.args
-            #        # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
-            #        if isinstance(subexpr, Comparison):
-            #            lhs, rhs = subexpr.args
-            #            if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-            #                TPL_lhs = self._make_numexpr(lhs)
-            #                self.pum_solver.add_half_reified_comparison(self.solver_var(bv),
-            #                                                            TPL_lhs, subexpr.name, self.solver_var(rhs))
-            #            else:
-            #                raise NotImplementedError("Pumpkin: no support for half-reified comparison:", subexpr)
-            #        else:
-            #            raise NotImplementedError("Pumpkin: no support for half-reified constraint:", subexpr)
-
-            #elif isinstance(cpm_expr, Comparison):
-            #    lhs, rhs = cpm_expr.args
-
-            #    # [GUIDELINE] == is used for both double reification and numerical comparisons
-            #    #       need case by case analysis here. Note that if your solver does not support full-reification,
-            #    #       you can rely on the transformation only_implies to convert all reifications to half-reification
-            #    #       for more information, please reach out on github!
-            #    if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
-            #        bv, subexpr = lhs, rhs
-            #        assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
-
-            #        if isinstance(subexpr, Comparison):
-            #            lhs, rhs = subexpr.args
-            #            if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-            #                TPL_lhs = self._make_numexpr(lhs)
-            #                self.pum_solver.add_reified_comparison(self.solver_var(bv),
-            #                                                       TPL_lhs, subexpr.name, self.solver_var(rhs))
-            #            else:
-            #                raise NotImplementedError("Pumpkin: no support for reified comparison:", subexpr)
-            #        else:
-            #            raise NotImplementedError("Pumpkin: no support for reified constraint:", subexpr)
-
-            #    # otherwise, numerical comparisons
-            #    if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-            #        TPL_lhs = self._make_numexpr(lhs)
-            #        self.pum_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
-            #    # global functions
-            #    elif cpm_expr.name == "==":
-            #        TPL_rhs = self.solver_var(rhs)
-            #        if lhs.name == "max":
-            #            self.pum_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
-            #        elif lhs.name == "element":
-            #            TPL_arr, TPL_idx = self.solver_vars(lhs.args)
-            #            self.pum_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
-            #        # elif...
-            #        else:
-            #            raise NotImplementedError("Pumpkin: unknown equality constraint:", cpm_expr)
-            #    else:
-            #        raise NotImplementedError("Pumpkin: unknown comparison constraint", cpm_expr)
-
-            ## global constraints
-            #elif cpm_expr.name == "alldifferent":
-            #    self.pum_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
-            #else:
-            #    raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
+                    for cons in solver_constraints:
+                        self.pum_solver.post(cons, tag=None)
+        except InconsistentSolverError:
+            # Do nothing: adding constraints when the solver is already inconsistent makes no difference.
+            pass
 
         return self
 
@@ -455,3 +406,6 @@ class CPM_pumpkin(SolverInterface):
                     display()  # callback
 
         return solution_count
+
+class InconsistentSolverError(Exception):
+    pass
