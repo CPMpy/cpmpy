@@ -165,7 +165,7 @@ class CPM_pumpkin(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.pum_solver.new_boolean(name=str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = pumpkin_py.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.pum_solver.new_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -314,8 +314,10 @@ class CPM_pumpkin(SolverInterface):
 
                 raise NotImplementedError("Pumpkin: comparison not (yet) supported", cpm_expr)
 
-            else:
-                raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
+            elif cpm_expr.name == "alldifferent":
+                return [constraints.AllDifferent(self.solver_vars(cpm_expr.args))]
+
+            raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
