@@ -40,6 +40,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _Int
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.safening import safen
 
 
 class CPM_z3(SolverInterface):
@@ -272,6 +273,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
+        cpm_cons = safen(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr):
