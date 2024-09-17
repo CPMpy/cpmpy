@@ -367,7 +367,7 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == "mul":
                     return lhs * rhs
                 elif cpm_con.name == "div":
-                    return lhs / rhs
+                    return z3.ToReal(lhs) / z3.ToReal(rhs)
                 elif cpm_con.name == "pow":
                     return lhs ** rhs
                 elif cpm_con.name == "mod":
