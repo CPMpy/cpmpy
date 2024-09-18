@@ -342,8 +342,8 @@ class CPM_gcs(SolverInterface):
             'inverse', 
             'circuit', 
             'xor'}
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints

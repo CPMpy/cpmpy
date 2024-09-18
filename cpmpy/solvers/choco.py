@@ -340,8 +340,8 @@ class CPM_choco(SolverInterface):
 
         # for when choco new release comes, fixing the bug on increasing and decreasing
         #supported_reified = supported
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"})  # constraints that support reification
