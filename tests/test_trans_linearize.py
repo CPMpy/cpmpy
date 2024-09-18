@@ -178,26 +178,34 @@ class TestVarsLhs(unittest.TestCase):
 
     def test_mod(self):
 
-        x,y = cp.intvar(1,5, name="x"), cp.intvar(1,5,name="y")
-        rhs = cp.intvar(-5,5, name="rhs")
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
 
-        cons = (x % y) <= rhs
+        cons = (x % y) <= 2
         sols = set()
-        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value(), rhs.value())))
-        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
 
         linsols = set()
-        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value(), rhs.value())))
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
         self.assertSetEqual(sols, linsols)
+
+        # check special cases of supported sets
+        self.assertRaises(NotImplementedError,
+                          lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
+                          )
+
+        same_cons = linearize_constraint([cons], supported={"mod"})
+        self.assertEqual(str(same_cons[0]), str(cons))
+
         # what about reified?
         bv = cp.boolvar(name="bv")
-        cons = bv.implies((x % y) <= rhs)
+        cons = bv.implies((x % y) <= 2)
         sols = set()
-        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value(), rhs.value())))
+        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
 
         linsols = set()
-        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value(), rhs.value())))
+        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value())))
         self.assertSetEqual(sols, linsols)
 
     def test_others(self):
