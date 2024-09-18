@@ -7,8 +7,20 @@ from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
 
-def no_partial_functions(lst_of_expr, _toplevel=None, nbc=None):
 def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
+    """
+        Recursively rewrites the following partial functions int total ones:
+            - div (exclude 0)
+            - mod (exclude 0)
+            - Element (idx within array range)
+
+        Follows the relational semantics, where undefinedness of a numerical expression
+            propagates to `False` at the neirest Boolean parent node.
+
+        :param: list_of_expr: list of CPMpy expressions
+        :param: _toplevel: list of new expressions to put toplevel (used internally)
+        :param: _nbc: list of new expressions to put in neirst Boolean context (used internally)
+    """
 
     if _toplevel is None:
         toplevel_call = True
@@ -75,13 +87,13 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
 
         elif cpm_expr.is_bool(): # reached Boolean (sub)expression
             new_exprs = []
-            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=new_exprs)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, _nbc=new_exprs)
             cpm_expr = copy(cpm_expr)
             cpm_expr.args = safe_args
             new_lst.append(cpm_expr & cpm_all(new_exprs))
 
         else: # numerical subexpression or toplevel, just recurse
-            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=nbc)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, _nbc=_nbc)
             cpm_expr = copy(cpm_expr)
             cpm_expr.args = safe_args
             new_lst.append(cpm_expr)
@@ -95,6 +107,18 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
 
 
 def _safen_range(cpm_expr, safe_range, idx_to_safen):
+    """
+        Safen expression where only a continuous of values is considered safe.
+        An example is `Element` where the index should be within the array's range.
+
+        Constructs an equivalent expression with safe values,
+            and asserts the new expression to be equal to the original one when defined.
+
+        :param cpm_expr: The numerical expression to safen
+        :param safe_range: The range of safe values
+        :param idx_to_safen: The index of unsafe argument in the expression
+
+    """
     lb, ub = safe_range
     safe_expr = copy(cpm_expr)
     unsafe_arg = safe_expr.args[idx_to_safen]
@@ -109,6 +133,18 @@ def _safen_range(cpm_expr, safe_range, idx_to_safen):
     return is_safe, safe_expr, toplevel
 
 def _safen_hole(cpm_expr, exclude, idx_to_safen):
+    """
+        Safen expression where a single value of an argument can cause undefinedness.
+        Examples include `div` where 0 has to be removed from the denominator
+
+
+        Constructs an expression for each interval of safe values, and
+            introduces a new `result` variable (essentially does flattening)
+
+        :param cpm_expr: The numerical expression to safen
+        :param exclude: The domain value to exclude
+        :param idx_to_safen: The index of unsafe argument in the expression
+    """
     result = intvar(*get_bounds(cpm_expr))
 
     unsafe_arg = cpm_expr.args[idx_to_safen]
