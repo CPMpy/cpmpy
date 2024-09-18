@@ -42,7 +42,7 @@ from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
-from ..transformations.safening import safen
+from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
 from ..exceptions import NotSupportedError
 from ..expressions.utils import flatlist, argvals
@@ -426,7 +426,7 @@ class CPM_exact(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialzed MIP decomp
-        cpm_cons = safen(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=

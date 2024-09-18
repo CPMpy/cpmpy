@@ -27,7 +27,7 @@ from ..expressions.utils import is_num, is_any_list, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
-from ..transformations.safening import safen
+from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
 
@@ -343,7 +343,7 @@ class CPM_gcs(SolverInterface):
             'circuit', 
             'xor'}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = safen(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints

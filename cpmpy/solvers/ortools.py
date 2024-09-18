@@ -48,7 +48,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.safening import safen
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_ortools(SolverInterface):
@@ -349,7 +349,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = safen(cpm_cons) # after decompose, assumes total decomposition for partial functions
+        cpm_cons = no_partial_functions(cpm_cons) # after decompose, assumes total decomposition for partial functions
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=

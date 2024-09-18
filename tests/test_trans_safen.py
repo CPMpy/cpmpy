@@ -2,7 +2,7 @@ import unittest
 
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
-from cpmpy.transformations.safening import safen
+from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
 
 
@@ -13,11 +13,11 @@ class TestTransLinearize(unittest.TestCase):
         b = cp.intvar(0, 10, name="b")
         expr = (a // b) == 3
 
-        safe_expr = safen([expr])
+        safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
-        safened = safen([expr | ~expr])
+        safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 110)
 
@@ -26,11 +26,11 @@ class TestTransLinearize(unittest.TestCase):
         b = cp.intvar(-1, 10, name="b")
         expr = (a // b) == 3
 
-        safe_expr = safen([expr])
+        safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
-        safened = safen([expr | ~expr])
+        safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 120)
 
@@ -40,11 +40,11 @@ class TestTransLinearize(unittest.TestCase):
         idx = cp.intvar(-1, 4, name="i")
         expr = arr[idx] == 2
 
-        safe_expr = safen([expr])
+        safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
-        safened = safen([expr | ~expr])
+        safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 162)
     
@@ -56,11 +56,11 @@ class TestTransLinearize(unittest.TestCase):
 
         expr = (a / b + arr[idx]) == 2
 
-        safe_expr = safen([expr])
+        safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
-        safened = safen([expr | ~expr])
+        safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 15*162)
 
@@ -71,11 +71,11 @@ class TestTransLinearize(unittest.TestCase):
 
         expr = (a / arr[idx]) == 2
 
-        safe_expr = safen([expr])
+        safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
-        safened = safen([expr | ~expr])
+        safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 10*(4**3)*6)
 

@@ -45,7 +45,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.reification import only_bv_reifies, reify_rewrite
-from ..transformations.safening import safen
+from ..transformations.safening import no_partial_functions
 from ..exceptions import ChocoBoundsException, ChocoTypeException, NotSupportedError
 
 
@@ -341,7 +341,7 @@ class CPM_choco(SolverInterface):
         # for when choco new release comes, fixing the bug on increasing and decreasing
         #supported_reified = supported
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
-        cpm_cons = safen(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
         cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"})  # constraints that support reification

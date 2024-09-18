@@ -7,7 +7,7 @@ from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
 
-def safen(lst_of_expr, _toplevel=None, nbc=None):
+def no_partial_functions(lst_of_expr, _toplevel=None, nbc=None):
 
     if _toplevel is None:
         toplevel_call = True
@@ -23,15 +23,15 @@ def safen(lst_of_expr, _toplevel=None, nbc=None):
             new_lst.append(cpm_expr)
 
         elif isinstance(cpm_expr, list):
-            new_lst.append(safen(cpm_expr, _toplevel, nbc))
+            new_lst.append(no_partial_functions(cpm_expr, _toplevel, nbc))
 
         elif isinstance(cpm_expr, NDVarArray):
-            safened = safen(cpm_expr.tolist(), _toplevel, nbc)
+            safened = no_partial_functions(cpm_expr.tolist(), _toplevel, nbc)
             new_lst.append(safened)
 
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "div":
-            safe_args = safen(cpm_expr.args, _toplevel, nbc=nbc)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=nbc)
             x, y = safe_args
             lb, ub = get_bounds(y)
 
@@ -69,7 +69,7 @@ def safen(lst_of_expr, _toplevel=None, nbc=None):
 
 
         elif isinstance(cpm_expr, GlobalFunction) and cpm_expr.name == "element":
-            safe_args = safen(cpm_expr.args, _toplevel, nbc=nbc)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=nbc)
             arr, idx = safe_args
             lb, ub = get_bounds(idx)
             if lb < 0 or ub >= len(arr): # index can be out of bounds
@@ -89,13 +89,13 @@ def safen(lst_of_expr, _toplevel=None, nbc=None):
 
         elif cpm_expr.is_bool(): # reached Boolean (sub)expression
             new_exprs = []
-            safe_args = safen(cpm_expr.args, _toplevel,  nbc=new_exprs)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=new_exprs)
             cpm_expr = copy(cpm_expr)
             cpm_expr.args = safe_args
             new_lst.append(cpm_expr & cpm_all(new_exprs))
 
         else: # numerical subexpression or toplevel, just recurse
-            safe_args = safen(cpm_expr.args, _toplevel, nbc=nbc)
+            safe_args = no_partial_functions(cpm_expr.args, _toplevel, nbc=nbc)
             cpm_expr = copy(cpm_expr)
             cpm_expr.args = safe_args
             new_lst.append(cpm_expr)
