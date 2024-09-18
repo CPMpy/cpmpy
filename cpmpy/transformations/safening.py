@@ -1,6 +1,6 @@
 from copy import copy
 
-from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray
+from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
 from ..expressions.core import Operator, BoolVal
 from ..expressions.utils import get_bounds, is_num
 from ..expressions.globalfunctions import GlobalFunction, Element
@@ -26,8 +26,8 @@ def no_partial_functions(lst_of_expr, _toplevel=None, nbc=None):
             new_lst.append(no_partial_functions(cpm_expr, _toplevel, nbc))
 
         elif isinstance(cpm_expr, NDVarArray):
-            safened = no_partial_functions(cpm_expr.tolist(), _toplevel, nbc)
-            new_lst.append(safened)
+            safened = no_partial_functions(cpm_expr, _toplevel, nbc)
+            new_lst.append(cpm_array(safened))
 
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "div":
