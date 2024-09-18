@@ -131,6 +131,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     k = intvar(*get_bounds((x - rhs) // y))
                     mult_res, newcons = get_or_make_var(k * y)
                     newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+                elif lhs.name == "mod" and "mod" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize modulo withtout multiplication")
 
 
                     cpm_expr = eval_comparison(cpm_expr.name, mult_res + rhs, x)
