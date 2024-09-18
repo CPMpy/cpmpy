@@ -21,10 +21,19 @@ class TestTransLinearize(unittest.TestCase):
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 110)
 
+        # check with reification
+        bv = cp.boolvar(name="bv")
+        reif_expr = bv == expr
+        def check():
+            self.assertTrue(reif_expr.value())
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        self.assertEqual(solcount, 110)
+
+
     def test_division_by_zero_proper_hole(self):
         a = cp.intvar(1, 10, name="a")
         b = cp.intvar(-1, 10, name="b")
-        expr = (a // b) == 3
+        expr = (a // b) <= 3
 
         safe_expr = no_partial_functions([expr])
         self.assertTrue(cp.Model(safe_expr).solve())
@@ -32,6 +41,13 @@ class TestTransLinearize(unittest.TestCase):
 
         safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
+        self.assertEqual(solcount, 120)
+
+        bv = cp.boolvar(name="bv")
+        reif_expr = bv == expr
+        def check():
+            self.assertTrue(reif_expr.value())
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 120)
 
 
@@ -46,6 +62,13 @@ class TestTransLinearize(unittest.TestCase):
 
         safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
+        self.assertEqual(solcount, 162)
+
+        bv = cp.boolvar(name="bv")
+        reif_expr = bv == expr
+        def check():
+            self.assertTrue(reif_expr.value())
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 162)
     
     def test_multiple_partial_functions(self):
@@ -64,6 +87,13 @@ class TestTransLinearize(unittest.TestCase):
         solcount = cp.Model(safened).solveAll()
         self.assertEqual(solcount, 15*162)
 
+        bv = cp.boolvar(name="bv")
+        reif_expr = bv == expr
+        def check():
+            self.assertTrue(reif_expr.value())
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        self.assertEqual(solcount, 15*162)
+
     def test_nested_partial_functions(self):
         a = cp.intvar(1, 10)
         arr = cp.intvar(0,3, shape=3, name="x")
@@ -77,6 +107,13 @@ class TestTransLinearize(unittest.TestCase):
 
         safened = no_partial_functions([expr | ~expr])
         solcount = cp.Model(safened).solveAll()
+        self.assertEqual(solcount, 10*(4**3)*6)
+
+        bv = cp.boolvar(name="bv")
+        reif_expr = bv == expr
+        def check():
+            self.assertTrue(reif_expr.value())
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 10*(4**3)*6)
 
 
