@@ -38,7 +38,7 @@ class TestBuiltin(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
 
-        constraints = [cp.abs([iv[0], iv[2], iv[1]]) <= 8, iv < 0]
+        constraints = [cp.abs([iv[0], iv[2], iv[1], -8]) <= 8, iv < 0]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
 
