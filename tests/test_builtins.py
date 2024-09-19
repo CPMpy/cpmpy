@@ -33,6 +33,15 @@ class TestBuiltin(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertFalse(model.solve())
 
+        #with list
+        constraints = [cp.abs(iv+2) <= 8, iv < 0]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        constraints = [cp.abs([iv[0], iv[2], iv[1]]) <= 8, iv < 0]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
         model = cp.Model(cp.abs(iv[0]).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(cp.abs(iv[0].value())), '4')
