@@ -359,7 +359,7 @@ class ShortTable(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
-        super().__init__("shorttable", [array, table])
+        super().__init__("short_table", [array, table])
 
     def decompose(self):
         from .python_builtins import any, all

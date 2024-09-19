@@ -21,6 +21,7 @@ Internal utilities for expression handling.
         argval
         eval_comparison
 """
+import copy
 
 import numpy as np
 import math
@@ -167,6 +168,17 @@ def eval_comparison(str_op, lhs, rhs):
         return lhs <= rhs
     else:
         raise Exception("Not a known comparison:", str_op)
+
+
+def replace_stars(table, star):
+    """ replace the string '*' with a given integer value in a table (used for short tables)"""
+    new_table = copy.deepcopy(table)
+    for (i, x) in enumerate(new_table):
+        if x == '*':
+            new_table[i] = star
+        elif is_any_list(x):
+            new_table[i] = replace_stars(x, star)
+    return new_table
 
 
 def get_bounds(expr):

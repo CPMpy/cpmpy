@@ -300,10 +300,10 @@ def __is_flat_var(arg):
     return is_num(arg) or isinstance(arg, _NumVarImpl)
 
 def __is_flat_var_or_list(arg):
-    """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
-        or a list of __is_flat_var_or_list
+    """ True if the argument is a star (wildcard in table constraint), is a numeric constant,
+        or a _NumVarImpl (incl subclasses) or a list of __is_flat_var_or_list
     """
-    return is_num(arg) or isinstance(arg, _NumVarImpl) or \
+    return arg == '*' or is_num(arg) or isinstance(arg, _NumVarImpl) or \
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
 
 
