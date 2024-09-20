@@ -355,6 +355,10 @@ class Expression(object):
     def __pos__(self):
         return self
 
+    def __abs__(self):
+        from .globalfunctions import Abs
+        return Abs(self)
+
     def __invert__(self):
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
