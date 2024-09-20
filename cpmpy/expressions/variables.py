@@ -309,12 +309,6 @@ class _IntVarImpl(_NumVarImpl):
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
-    # special casing for intvars (and boolvars)
-    def __abs__(self):
-        if self.lb >= 0:
-            # no-op
-            return self
-        return super().__abs__()
 
 
 class _BoolVarImpl(_IntVarImpl):
@@ -342,8 +336,6 @@ class _BoolVarImpl(_IntVarImpl):
     def __invert__(self):
         return NegBoolView(self)
 
-    def __abs__(self):
-        return self
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
@@ -652,8 +644,6 @@ class NDVarArray(np.ndarray, Expression):
     # VECTORIZED math operators
     # only 'abs' 'neg' and binary ones
     # '~' not needed, gets translated to ==0 and that is already handled
-    def __abs__(self):
-        return cpm_array([abs(s) for s in self])
 
     def __neg__(self):
         return cpm_array([-s for s in self])

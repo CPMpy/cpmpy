@@ -139,7 +139,7 @@ def abs(element):
     if is_any_list(element):
         return cpm_array([abs(elem) for elem in element])
 
-    if isinstance(element, Expression):
+    if not isinstance(element, Expression):
         return builtins.abs(element)
 
     return Abs(element)
