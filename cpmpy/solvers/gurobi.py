@@ -43,6 +43,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from ..transformations.safening import no_partial_functions
 
 try:
     import gurobipy as gp
@@ -285,6 +286,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons)
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form

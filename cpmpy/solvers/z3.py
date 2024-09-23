@@ -40,6 +40,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _Int
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_z3(SolverInterface):
@@ -270,6 +271,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons)
         supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
@@ -365,7 +367,7 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == "mul":
                     return lhs * rhs
                 elif cpm_con.name == "div":
-                    return lhs / rhs
+                    return z3.ToReal(lhs) / z3.ToReal(rhs)
                 elif cpm_con.name == "pow":
                     return lhs ** rhs
                 elif cpm_con.name == "mod":
