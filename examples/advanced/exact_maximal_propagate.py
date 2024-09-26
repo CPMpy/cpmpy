@@ -36,22 +36,23 @@ class PropagationSolver(CPM_exact):
             :param: assumptions: list of Boolean variables (or their negation) assumed to be True
             :param: vars: list of variables to propagate
         """
-        if self.solver_is_initialized is False:
-            self.solve() # this initializes solver and necessary datastructures
-
         self.xct_solver.clearAssumptions() # clear any old assumptions
 
         assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
         assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
         for var, val in zip(assump_vars, assump_vals):
-            self.xct_solver.setAssumption(var, [val])
+            self.xct_solver.setAssumptions([(var, val)])
 
         if vars is None:
             vars = flatlist(self.user_vars)
 
-        domains = self.xct_solver.pruneDomains(flatlist(self.solver_vars(vars)))
-
-        return {var : {int(v) for v in dom} for var, dom in zip(vars, domains)}
+        status, domains = self.xct_solver.pruneDomains(flatlist(self.solver_vars(vars)))
+        if status == "SAT":
+            return {var : {int(v) for v in dom} for var, dom in zip(vars, domains)}
+        elif status == "INCONSISTENT":
+            return {var: set() for var in vars}
+        else:
+            raise ValueError("Unexpected status", status)
 
 
 
@@ -71,11 +72,11 @@ if __name__ == "__main__":
 
     print(f"Propagating constraints {c1} and {c2}:")
     possible_vals = propsolver.maximal_propagate(assumptions=assump[:2])
-    for var, values in possible_vals.items():
+    for var, values in sorted(possible_vals.items(), key=lambda x: str(x[0])):
         print(f"{var}: {sorted(values)}")
 
     print("\n\n")
     print(f"Propagating constraints {c1}, {c2} and {c3}:")
     possible_vals = propsolver.maximal_propagate(assumptions=assump)
-    for var, values in possible_vals.items():
+    for var, values in sorted(possible_vals.items(), key=lambda x: str(x[0])):
         print(f"{var}: {sorted(values)}")
