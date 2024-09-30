@@ -43,22 +43,20 @@ def mus(soft, hard=[], solver="ortools"):
 
     # setting all assump vars to true should be UNSAT
     assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
-    core = s.get_core()  # start from solver's UNSAT core
-
-    # order so that constraints with many variables are tried and removed first
-    core = sorted(core, key=lambda c: -len(get_variables(dmap[c])))
+    core = set(s.get_core())  # start from solver's UNSAT core
 
     # deletion-based MUS
-    mus = []
-    for i in range(len(core)):
-        subassump = mus + core[i + 1:]  # all but the 'i'th constraint
+    # order so that constraints with many variables are tried and removed first
+    for c in sorted(core, key=lambda c : -len(get_variables(dmap[c]))):
+        if c not in core:
+            continue # already removed
+        core.remove(c)
+        if s.solve(assumptions=list(core)) is True:
+            core.add(c)
+        else: # UNSAT, use new solver core (clause set refinement)
+            core = s.get_core()
 
-        if s.solve(assumptions=subassump):
-            # removing 'i' makes the problem SAT, must keep for UNSAT
-            mus.append(core[i])
-        # else: still UNSAT so don't need this candidate, not in mus
-
-    return [dmap[avar] for avar in mus]
+    return [dmap[avar] for avar in core]
 
 
 def quickxplain(soft, hard=[], solver="ortools"):
