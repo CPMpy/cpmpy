@@ -117,7 +117,7 @@ class TestGlobal(unittest.TestCase):
         # and some more
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,2)]).solve())
-        self.assertTrue(cp.AllDifferentExceptN(iv,4).value())
+        self.assertTrue(cp.AllDifferentExceptN(iv,2).value())
         self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,7), iv == [7, 7, 1]]).solve())
         self.assertTrue(cp.AllDifferentExceptN(iv,7).value())
 

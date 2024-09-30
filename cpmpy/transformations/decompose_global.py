@@ -1,3 +1,7 @@
+"""
+    Decompose any global constraint not supported by the solver.
+"""
+
 import copy
 import warnings  # for deprecation warning
 

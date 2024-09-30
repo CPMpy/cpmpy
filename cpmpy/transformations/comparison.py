@@ -1,10 +1,3 @@
-import copy
-
-from .flatten_model import get_or_make_var
-from ..expressions.core import Comparison, Operator
-from ..expressions.utils import is_boolexpr
-from ..expressions.variables import _NumVarImpl, _BoolVarImpl
-
 """
   Transformations regarding Comparison constraints (originally).
   Now, it is regarding numeric expressions in general, including nested ones.
@@ -21,6 +14,12 @@ from ..expressions.variables import _NumVarImpl, _BoolVarImpl
   This file implements:
     - only_numexpr_equality():    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
 """
+
+import copy
+from .flatten_model import get_or_make_var
+from ..expressions.core import Comparison, Operator
+from ..expressions.utils import is_boolexpr
+from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 def only_numexpr_equality(constraints, supported=frozenset()):
     """

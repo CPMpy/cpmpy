@@ -312,9 +312,22 @@ class TestArrayExpressions(unittest.TestCase):
         res = np.array([all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
+
+    def test_multidim(self):
+
+        functions = ["all", "any", "max", "min", "sum", "prod"]
+        bv = cp.boolvar(shape=(5,4,3,2)) # high dimensional tensor
+        arr = np.zeros(shape=bv.shape) # numpy "ground truth"
+
+        for axis in range(len(bv.shape)):
+            np_res = arr.sum(axis=axis)
+            for func in functions:
+                cpm_res = getattr(bv, func)(axis=axis)
+                self.assertIsInstance(cpm_res, NDVarArray)
+                self.assertEqual(cpm_res.shape, np_res.shape)
         
 def inclusive_range(lb,ub):
-        return range(lb,ub+1)
+    return range(lb,ub+1)
 
 class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
@@ -518,8 +531,26 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(str(cons), "either a or b should be true, but not both -- (a) or (b)")
 
 
+class TestBuildIns(unittest.TestCase):
 
+    def setUp(self):
+        self.x = cp.intvar(0,10,shape=3)
 
+    def test_sum(self):
+        gt = Operator("sum", list(self.x))
+
+        self.assertEqual(str(gt), str(cp.sum(self.x)))
+        self.assertEqual(str(gt), str(cp.sum(list(self.x))))
+        self.assertEqual(str(gt), str(cp.sum(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.sum(self.x[0], self.x[1], self.x[2])))
+
+    def test_max(self):
+        gt = Maximum(self.x)
+
+        self.assertEqual(str(gt), str(cp.max(self.x)))
+        self.assertEqual(str(gt), str(cp.max(list(self.x))))
+        self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
 if __name__ == '__main__':
     unittest.main()
