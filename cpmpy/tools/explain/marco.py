@@ -28,10 +28,10 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
     map_solver = cp.SolverLookup.get(map_solver)
     map_solver += cp.any(assump)
-    map_solver.solution_hint(assump, [1]*len(assump)) # we want large subsets, more likely to be a MUS
     hint = [1] *len(assump)
     map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
 
+    deletion_order = {a : -len(get_variables(dmap[a])) for a in assump} # avoid recomputing
 
     while map_solver.solve():
 
@@ -63,7 +63,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
         else: # UNSAT, shrink to MUS, re-use MUSX
             core = set(s.get_core())
-            for c in sorted(core, key=lambda a : len(get_variables(dmap[a]))):
+            for c in sorted(core, key=deletion_order.get):
                 if c not in core: # already removed
                     continue
                 core.remove(c)
