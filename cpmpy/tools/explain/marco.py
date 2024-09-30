@@ -3,6 +3,8 @@
 """
 
 import cpmpy as cp
+from cpmpy.transformations.get_variables import get_variables
+
 from .utils import make_assump_model
 
 
@@ -57,15 +59,18 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
                     sat_subset += new_mcs # extend sat subset with this MCS
 
         else: # UNSAT, shrink to MUS, re-use MUSX
-            core = s.get_core()
-            mus = []
-            for i in range(len(core)):
-                subassump = mus + core[i + 1:]  # all but the 'i'th constraint
-                if s.solve(assumptions=subassump):
-                    mus.append(core[i])
+            core = set(s.get_core())
+            for c in sorted(core, key=lambda a : len(get_variables(dmap[a]))):
+                if c not in core: # already removed
+                    continue
+                core.remove(c)
+                if s.solve(assumptions=list(core)):
+                    core.add(c)
+                else: # UNSAT, shrink to new solver core (clause set refinement)
+                    core = set(s.get_core())
 
             if return_mus:
-                yield "MUS", [dmap[a] for a in mus]
+                yield "MUS", [dmap[a] for a in core]
 
             # block in map solver
-            map_solver += ~cp.all(mus)
+            map_solver += ~cp.all(core)
