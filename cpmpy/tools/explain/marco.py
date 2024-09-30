@@ -29,6 +29,9 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
     map_solver = cp.SolverLookup.get(map_solver)
     map_solver += cp.any(assump)
     map_solver.solution_hint(assump, [1]*len(assump)) # we want large subsets, more likely to be a MUS
+    hint = [1] *len(assump)
+    map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
+
 
     while map_solver.solve():
 
@@ -50,7 +53,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
                 # find more MCSes, disjoint from this one, similar to "optimal_mus" in mus.py
                 # can only be done when MCSes do not have to be returned as there is no guarantee
                 # the MCSes encountered during enumeration are "new" MCSes
-                sat_subset = [a for a,c in zip(assump, soft) if not (a.value() or c.value())]
+                sat_subset = [a for a,c in zip(assump, soft) if not (a.value() or c.value())] # start from corr_subset
                 map_solver += cp.any(sat_subset)
                 while s.solve(assumptions=sat_subset) is True:
                     mss = [a for a, c in zip(assump, soft) if a.value() or c.value()]
@@ -74,3 +77,5 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
             # block in map solver
             map_solver += ~cp.all(core)
+        # ensure solution hint is still active
+        map_solver.solution_hint(assump, hint)
