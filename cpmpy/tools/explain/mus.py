@@ -54,7 +54,7 @@ def mus(soft, hard=[], solver="ortools"):
         if s.solve(assumptions=list(core)) is True:
             core.add(c)
         else: # UNSAT, use new solver core (clause set refinement)
-            core = s.get_core()
+            core = set(s.get_core())
 
     return [dmap[avar] for avar in core]
 
