@@ -713,7 +713,7 @@ class TestSolvers(unittest.TestCase):
     def test_incremental(self):
 
         x = cp.intvar(0,10,shape=3)
-        for solver in cp.Solverlookup.base_solvers():
+        for solver, cls in cp.SolverLookup.base_solvers():
             if solver == "choco":
                 """
                 Choco does not support first optimizing and then adding a constraint.
@@ -721,6 +721,8 @@ class TestSolvers(unittest.TestCase):
                 which removes feasible solutions.
                 No straightforward way to resolve this for now.
                 """
+                continue
+            if cls.supported() is False:
                 continue
             s = cp.SolverLookup.get(solver)
             try:
