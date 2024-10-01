@@ -709,8 +709,23 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
 
-
     def test_incremental(self):
+
+        x,y,z = cp.boolvar(shape=3, name="x")
+        for solver, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False:
+                continue
+            s = cp.SolverLookup.get(solver)
+            s += [x]
+            s += [y | z]
+            self.assertTrue(s.solve())
+            self.assertTrue(x.value(), (y | z).value())
+            s += ~y | ~z
+            self.assertTrue(s.solve())
+            self.assertTrue(x.value())
+            self.assertEqual(y.value() + z.value(), 1)
+
+    def test_incremental_objective(self):
 
         x = cp.intvar(0,10,shape=3)
         for solver, cls in cp.SolverLookup.base_solvers():
@@ -737,6 +752,7 @@ class TestSolvers(unittest.TestCase):
             s.maximize(cp.sum(x))
             self.assertTrue(s.solve())
             self.assertEqual(s.objective_value(), 25)
+
 
 
 
