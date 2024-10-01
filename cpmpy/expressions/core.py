@@ -541,7 +541,7 @@ class Operator(Expression):
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
+        elif self.name == "wsum": return int(sum(arg_vals[0]*np.array(arg_vals[1])))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
