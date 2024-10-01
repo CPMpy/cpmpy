@@ -329,10 +329,11 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if other == 0:
-            return 1
-        elif other == 1:
-            return self
+        if is_num(other):
+            if other == 0:
+                return 1
+            if other == 1:
+                return self
         return Operator("pow", [self, other])
 
     def __rpow__(self, other, modulo=None):
