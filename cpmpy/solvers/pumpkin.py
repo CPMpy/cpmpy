@@ -64,12 +64,12 @@ class CPM_pumpkin(SolverInterface):
         if not self.supported():
             raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_py'")
 
-        import pumpkin_py
+        from pumpkin_py import Model
 
         assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        self.pum_solver = pumpkin_py.Solver() 
+        self.pum_model = Model() 
 
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
@@ -80,12 +80,13 @@ class CPM_pumpkin(SolverInterface):
         super().__init__(name="Pumpkin", cpm_model=cpm_model)
 
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, proof=None, **kwargs):
         """
             Call the Pumpkin solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - proof:       path to a proof file
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -95,17 +96,10 @@ class CPM_pumpkin(SolverInterface):
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
-        from pumpkin_py import Boolean as PumpkinBool, Variable as PumpkinInt, SatisfactionResult
+        from pumpkin_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt, SatisfactionResult
 
         # ensure all vars are known to solver
-        try:
-            self.solver_vars(list(self.user_vars))
-        except InconsistentSolverError:
-            # Do nothing, the inconsistent state will be identified later.
-            pass
-
-        if time_limit is not None:
-            self.pum_solver.set_timelimit_seconds(time_limit)
+        self.solver_vars(list(self.user_vars))
 
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
@@ -113,7 +107,7 @@ class CPM_pumpkin(SolverInterface):
 
         # call the solver, with parameters
         start_time = time.time() # when did solving start
-        result = self.pum_solver.satisfy(**kwargs)
+        result = self.pum_model.satisfy(proof=proof, **kwargs)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -154,13 +148,9 @@ class CPM_pumpkin(SolverInterface):
             or returns from cache if previously created
         """
 
-        # When Pumpkin is in an inconsistent state, variables cannot be created anymore.
-        if not self.pum_solver.is_consistent():
-            raise InconsistentSolverError()
-
         if is_num(cpm_var):
             if not cpm_var in self._constantvars:
-                self._constantvars[cpm_var] = self.pum_solver.new_variable(cpm_var, cpm_var, name=str(cpm_var))
+                self._constantvars[cpm_var] = self.pum_model.new_integer_variable(cpm_var, cpm_var, name=str(cpm_var))
 
             return self._constantvars[cpm_var]
 
@@ -172,9 +162,9 @@ class CPM_pumpkin(SolverInterface):
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.pum_solver.new_boolean(name=str(cpm_var))
+                revar = self.pum_model.new_boolean_variable(name=str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.pum_solver.new_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
+                revar = self.pum_model.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -334,24 +324,20 @@ class CPM_pumpkin(SolverInterface):
 
             raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
 
-        try:
-            # transform and post the constraints
-            for cpm_expr in self.transform(cpm_expr_orig):
-                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-                    bv, subexpr = cpm_expr.args
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+                bv, subexpr = cpm_expr.args
 
-                    solver_constraints = to_solver_constraints(subexpr)
+                solver_constraints = to_solver_constraints(subexpr)
 
-                    for cons in solver_constraints:
-                        self.pum_solver.imply(cons, self.solver_var(bv), tag=None)
-                else:
-                    solver_constraints = to_solver_constraints(cpm_expr)
+                for cons in solver_constraints:
+                    self.pum_model.add_implication(cons, self.solver_var(bv), tag=None)
+            else:
+                solver_constraints = to_solver_constraints(cpm_expr)
 
-                    for cons in solver_constraints:
-                        self.pum_solver.post(cons, tag=None)
-        except InconsistentSolverError:
-            # Do nothing: adding constraints when the solver is already inconsistent makes no difference.
-            pass
+                for cons in solver_constraints:
+                    self.pum_model.add_constraint(cons, tag=None)
 
         return self
 
@@ -406,6 +392,3 @@ class CPM_pumpkin(SolverInterface):
                     display()  # callback
 
         return solution_count
-
-class InconsistentSolverError(Exception):
-    pass
