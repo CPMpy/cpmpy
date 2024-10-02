@@ -213,6 +213,33 @@ class CPM_gurobi(SolverInterface):
         return self._varmap[cpm_var]
 
 
+    def lex_solve(self, objectives, minimize=True):
+        """
+            Post the given set of objectives to the solver as objective to lex minimize/maximize
+
+            'objective()' can be called multiple times, only the last one is stored
+
+            (technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver)
+        """
+        from gurobipy import GRB
+        if minimize:
+            self.grb_model.ModelSense = GRB.MINIMIZE
+        else:
+            self.grb_model.ModelSense = GRB.MAXIMIZE
+        for index in range(len(objectives)):
+            # make objective function non-nested
+            (flat_obj, flat_cons) = (flatten_objective(objectives[index]))
+            self += flat_cons
+            get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
+            # make objective function or variable and post
+            obj = self._make_numexpr(flat_obj)
+            if minimize:
+                self.grb_model.setObjectiveN(obj,index,len(objectives)-index-1)
+            else:
+                self.grb_model.setObjective(obj,index,len(objectives)-index-1)
+
+
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize
