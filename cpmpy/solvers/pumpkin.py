@@ -5,11 +5,12 @@ from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
+from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.reification import reify_rewrite, only_bv_reifies
+from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 
 import time
 
@@ -257,7 +258,9 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent", "cumulative"})
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
