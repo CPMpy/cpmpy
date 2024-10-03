@@ -36,7 +36,7 @@ class TestDirectExact(unittest.TestCase):
         model = SolverLookup.get("exact")
         print(model)
         # add x -> y>=1
-        model += DirectConstraint("addRightReification", (x, [1], [y], 1), novar=[1,3])
+        model += DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
         print(model)
         self.assertEqual(model.solveAll(), 3)
 
