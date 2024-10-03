@@ -136,10 +136,13 @@ def abs(element):
         if the element given is not a CPMpy expression, the built-in is called
         else an Absolute functional global constraint is constructed.
     """
-    if is_any_list(element):
+    if is_any_list(element):  # compat: not allowed by builtins.abs(), but allowed by numpy.abs()
         return cpm_array([abs(elem) for elem in element])
 
-    if not isinstance(element, Expression):
-        return builtins.abs(element)
+    if isinstance(element, Expression):
+        # create global
+        return Abs(element)
+    
+    return builtins.abs(element)
 
-    return Abs(element)
+    
