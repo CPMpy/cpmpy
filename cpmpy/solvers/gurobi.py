@@ -180,7 +180,11 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if self.has_objective():
-                self.objective_value_ = grb_objective.getValue()
+                grb_obj_val = grb_objective.getValue()
+                if grb_obj_val != int(grb_obj_val):
+                    self.objective_value_ =  grb_obj_val # can happen with DirectVar using floats
+                else:
+                    self.objective_value_ = int(grb_obj_val)
 
         return has_sol
 
