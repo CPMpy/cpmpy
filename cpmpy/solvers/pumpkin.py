@@ -2,6 +2,7 @@
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
@@ -70,7 +71,7 @@ class CPM_pumpkin(SolverInterface):
         assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
         # initialise the native solver object
-        self.pum_model = Model() 
+        self.pum_solver = Model() 
 
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
@@ -108,7 +109,7 @@ class CPM_pumpkin(SolverInterface):
 
         # call the solver, with parameters
         start_time = time.time() # when did solving start
-        result = self.pum_model.satisfy(proof=proof, **kwargs)
+        result = self.pum_solver.satisfy(proof=proof, **kwargs)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -151,7 +152,7 @@ class CPM_pumpkin(SolverInterface):
 
         if is_num(cpm_var):
             if not cpm_var in self._constantvars:
-                self._constantvars[cpm_var] = self.pum_model.new_integer_variable(cpm_var, cpm_var, name=str(cpm_var))
+                self._constantvars[cpm_var] = self.pum_solver.new_integer_variable(cpm_var, cpm_var, name=str(cpm_var))
 
             return self._constantvars[cpm_var]
 
@@ -163,9 +164,9 @@ class CPM_pumpkin(SolverInterface):
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.pum_model.new_boolean_variable(name=str(cpm_var))
+                revar = self.pum_solver.new_boolean_variable(name=str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.pum_model.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
+                revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -263,6 +264,99 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
 
+    def _sum_args(self, expr, negate=False):
+        if isinstance(expr, Operator) and expr.name == "sum":
+            return [self.solver_var(v).scaled(-1 if negate else 1) for v in expr.args]
+        if isinstance(expr, Operator) and expr.name == "wsum":
+            return [self.solver_var(v).scaled(-w if negate else w) for w,v in zip(*expr.args) if w != 0]
+        if isinstance(expr, Operator) and expr.name == "sub":
+            x,y = expr.args
+            return [
+                self.solver_var(x).scaled(-1 if negate else 1),
+                self.solver_var(y).scaled(1 if negate else -1)
+            ]
+        raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
+
+    def _get_constraint(self, cpm_expr):
+
+        from pumpkin_py import constraints
+
+        if isinstance(cpm_expr, _BoolVarImpl):
+            # base case, just var or ~var
+            return [constraints.Clause([self.solver_var(cpm_expr)])]
+
+        elif isinstance(cpm_expr, Operator):
+            if cpm_expr.name == "or":
+                return [constraints.Clause(self.solver_vars(cpm_expr.args))]
+
+            raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
+
+        elif isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
+            assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
+            pum_rhs = self.solver_var(rhs)
+
+            if cpm_expr.name == "==":
+                if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == "==":
+                    assert isinstance(rhs, _BoolVarImpl), "Pumpkin: can only compare boolean with other boolean"
+                    plhs, prhs = self.solver_vars(cpm_expr.args)
+                    return [
+                        constraints.Clause([plhs.negate(), prhs]),
+                        constraints.Clause([plhs, prhs.negate()]),
+                    ]
+
+                if "sum" in lhs.name or lhs.name == "sub":
+                    return [constraints.Equals(self._sum_args(lhs), rhs)]
+                if lhs.name == "div":
+                    return [constraints.Division(*self.solver_vars(lhs.args), pum_rhs)]
+                if lhs.name == "mul":
+                    return [constraints.Times(*self.solver_vars(lhs.args), pum_rhs)]
+                if lhs.name == "abs":
+                    return [constraints.Absolute(self.solver_var(lhs), pum_rhs)]
+                elif lhs.name == "minimum":
+                    return [constraints.Minimum(self.solver_vars(lhs.args), pum_rhs)]
+                elif lhs.name == "maximum":
+                    return [constraints.Maximum(self.solver_vars(lhs.args), pum_rhs)]
+                elif lhs.name == "element":
+                    return [constraints.Element(*self.solver_vars(lhs.args), pum_rhs)]
+
+                raise NotImplementedError("Unknown lhs of comparison", cpm_expr)
+
+            elif cpm_expr.name == "<=":
+                return [constraints.LessThanOrEquals(self._sum_args(lhs), rhs)]
+
+            elif cpm_expr.name == "<":
+                return [constraints.LessThanOrEquals(self._sum_args(lhs), rhs-1)]
+
+            elif cpm_expr.name == ">=":
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs)]
+
+            elif cpm_expr.name == ">":
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs+1)]
+
+            elif cpm_expr.name == "!=":
+                return [constraints.NotEquals(self._sum_args(lhs), rhs)]
+
+            elif cpm_expr.name == ">=":
+                if isinstance(lhs, _NumVarImpl):
+                    return [constraints.BinaryLessThanEqual(pum_rhs, self.solver_var(lhs))]
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), rhs)]
+
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name == "alldifferent":
+                return [constraints.AllDifferent(self.solver_vars(cpm_expr.args))]
+            elif cpm_expr.name == "cumulative":
+                start, dur, end, demand, cap = cpm_expr.args
+                assert all(is_num(d) for d in dur), "Pumpkin only accepts Cumulative with fixed durations"
+                assert all(is_num(d) for d in demand), "Pumpkin only accepts Cumulative with fixed demand"
+                assert is_num(cap), "Pumpkin only accepts Cumulative with fixed capacity"
+
+                return [constraints.Cumulative(self.solver_vars(start),dur, demand, cap)] + \
+                        [self._get_constraint(c)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
+            else:
+                raise NotImplementedError(f"Unknown global constraint {cpm_expr}")
+
+
     def __add__(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
@@ -282,65 +376,21 @@ class CPM_pumpkin(SolverInterface):
         :return: self
         """
 
-        # I have no idea why this is necessary, but it apparently is.
-        from pumpkin_py import constraints
-
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
-        def to_solver_constraints(cpm_expr):
-            if isinstance(cpm_expr, _BoolVarImpl):
-                # base case, just var or ~var
-                return [constraints.Clause([self.solver_var(cpm_expr)])]
-
-            elif isinstance(cpm_expr, Operator):
-                if cpm_expr.name == "or":
-                    return [constraints.Clause(self.solver_vars(cpm_expr.args))]
-
-                raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
-
-            elif isinstance(cpm_expr, Comparison):
-                if cpm_expr.name == "==":
-                    [lhs, rhs] = cpm_expr.args
-
-                    if isinstance(lhs, _BoolVarImpl):
-                        assert isinstance(rhs, _BoolVarImpl), "Pumpkin: can only compare boolean with other boolean"
-                        solver_lhs = self.solver_var(lhs)
-                        solver_rhs = self.solver_var(rhs)
-                        return [
-                            constraints.Clause([solver_lhs.negate(), solver_rhs]),
-                            constraints.Clause([solver_rhs.negate(), solver_lhs]),
-                        ]
-
-                    if isinstance(lhs, _IntVarImpl) and is_num(rhs):
-                        return [constraints.BinaryEquals(
-                            self.solver_var(lhs),
-                            self.solver_var(rhs),
-                        )]
-
-                    raise NotImplementedError("Pumpkin: equality not (yet) supported", cpm_expr)
-
-                raise NotImplementedError("Pumpkin: comparison not (yet) supported", cpm_expr)
-
-            elif cpm_expr.name == "alldifferent":
-                return [constraints.AllDifferent(self.solver_vars(cpm_expr.args))]
-
-            raise NotImplementedError("Pumpkin: constraint not (yet) supported", cpm_expr)
-
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-                bv, subexpr = cpm_expr.args
+        for tag, orig_expr in enumerate(toplevel_list(cpm_expr_orig, merge_and=True)):
+            for cpm_expr in self.transform(orig_expr):
 
-                solver_constraints = to_solver_constraints(subexpr)
-
-                for cons in solver_constraints:
-                    self.pum_model.add_implication(cons, self.solver_var(bv), tag=None)
-            else:
-                solver_constraints = to_solver_constraints(cpm_expr)
-
-                for cons in solver_constraints:
-                    self.pum_model.add_constraint(cons, tag=None)
+                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
+                    bv, subexpr = cpm_expr.args
+                    for cons in self._get_constraint(subexpr):
+                        self.pum_solver.add_implication(cons, self.solver_var(bv), tag=None)
+                else:
+                    solver_constraints = self._get_constraint(cpm_expr)
+                    for cons in solver_constraints:
+                        self.pum_solver.add_constraint(cons, tag=None)
 
         return self
 
