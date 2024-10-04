@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## gurobi.py
+##
 """
     Interface to the python 'gurobi' package
 
@@ -6,11 +10,12 @@
 
         $ pip install gurobipy
     
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
     
     In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
 
     ===============
     List of classes
@@ -28,6 +33,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -36,7 +42,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_bv_implies, reify_rewrite
+from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 
 try:
     import gurobipy as gp
@@ -56,7 +62,7 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-    - grb_model: object, TEMPLATE's model object
+        - grb_model: object, TEMPLATE's model object
 
     The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
@@ -82,6 +88,7 @@ class CPM_gurobi(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception(
@@ -95,6 +102,13 @@ class CPM_gurobi(SolverInterface):
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.grb_model
 
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
@@ -115,6 +129,9 @@ class CPM_gurobi(SolverInterface):
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -164,7 +181,11 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if self.has_objective():
-                self.objective_value_ = grb_objective.getValue()
+                grb_obj_val = grb_objective.getValue()
+                if grb_obj_val != int(grb_obj_val):
+                    self.objective_value_ =  grb_obj_val # can happen with DirectVar using floats
+                else:
+                    self.objective_value_ = int(grb_obj_val)
 
         return has_sol
 
@@ -274,7 +295,8 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow","div"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
@@ -469,9 +491,9 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

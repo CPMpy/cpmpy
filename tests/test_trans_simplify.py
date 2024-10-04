@@ -100,3 +100,11 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(expr)), '[(iv[0]) == (iv[1])]')
 
 
+    def test_nested_boolval(self):
+
+        bv = cp.boolvar(name="bv")
+        x = cp.intvar(0, 3, name="x")
+        cons = (x == 2) == (bv == 4)
+        self.assertEqual(str(self.transform(cons)), "[x != 2]")
+        self.assertTrue(cp.Model(cons).solve())
+

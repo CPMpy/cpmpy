@@ -3,7 +3,7 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.linearize import linearize_constraint
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -176,6 +176,38 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons)[0]
         self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
 
+    def test_mod(self):
+
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+
+        cons = (x % y) <= 2
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+        self.assertSetEqual(sols, linsols)
+
+        # check special cases of supported sets
+        self.assertRaises(NotImplementedError,
+                          lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
+                          )
+
+        same_cons = linearize_constraint([cons], supported={"mod"})
+        self.assertEqual(str(same_cons[0]), str(cons))
+
+        # what about reified?
+        bv = cp.boolvar(name="bv")
+        cons = bv.implies((x % y) <= 2)
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value())))
+        self.assertSetEqual(sols, linsols)
+
     def test_others(self):
 
         a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
@@ -189,4 +221,62 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
+class testCanonical_comparison(unittest.TestCase):
+    def test_sum(self):
+        a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
+        rhs = 5
+
+        cons = canonical_comparison([cp.sum([a,b,c,10]) <= rhs])[0]
+        self.assertEqual("sum([a, b, c]) <= -5", str(cons))
+
+        rhs = cp.sum([b,c])
+        cons = canonical_comparison([cp.sum([a, b]) <= rhs])[0]
+        self.assertEqual("sum([1, 1, -1, -1] * [a, b, b, c]) <= 0", str(cons))
+
+    def test_div(self):
+        a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
+        rhs = 5
+
+        cons = canonical_comparison([ a / b <= rhs])[0]
+        self.assertEqual("(a) // (b) <= 5", str(cons))
+
+        #when adding division
+        #cons = canonical_comparison([a / b <= c / rhs])[0]
+        #cons = canonical_comparison([a + b <= c/rhs])[0]
+
+
+    def test_wsum(self):
+        a, b, c = [cp.intvar(0, 10,name=n) for n in "abc"]
+        rhs = 5
+
+        cons = [Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs]
+        cons = canonical_comparison(cons)[0]
+        self.assertEqual("sum([1, 2, 3] * [a, b, c]) <= 15", str(cons))
+
+    def test_impl(self):
+        a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
+        rhs = 5
+        cond = cp.boolvar(name="bv")
+
+        cons = [cond.implies(Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs)]
+        cons = canonical_comparison(cons)[0]
+        self.assertEqual("(bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
+
+
+        cons = [(~cond).implies(Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs)]
+        cons = canonical_comparison(cons)[0]
+        self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
+
+    def test_others(self):
+
+        a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
+        rhs = intvar(0, 10, name="r")
+
+        cons = [cp.max([a,b,c,5]) <= rhs]
+        cons = canonical_comparison(cons)[0]
+        self.assertEqual("(max(a,b,c,5)) <= (r)", str(cons))
+
+        cons = [cp.AllDifferent([a, b, c])]
+        cons = canonical_comparison(cons)[0]
+        self.assertEqual("alldifferent(a,b,c)", str(cons))
 

@@ -6,6 +6,10 @@
 """
     Interface to PySAT's API
 
+    Requires that the 'python-sat' python package is installed:
+
+        $ pip install python-sat[aiger,approxmc,cryptosat,pblib]
+
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
     interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
     to a variety of cardinality and pseudo-Boolean encodings.
@@ -28,18 +32,23 @@
         :nosignatures:
 
         CPM_pysat
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_int
+from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
-from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_bv_implies
+from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.reification import only_implies, only_bv_reifies
+
 
 class CPM_pysat(SolverInterface):
     """
@@ -49,11 +58,11 @@ class CPM_pysat(SolverInterface):
     $ pip install python-sat
 
     See detailed installation instructions at:
-    https://pysathq.github.io/installation.html
+    https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
-    pysat_vpool: a pysat.formula.IDPool for the variable mapping
-    pysat_solver: a pysat.solver.Solver() (default: glucose4)
+        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
+        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
     The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
@@ -80,7 +89,8 @@ class CPM_pysat(SolverInterface):
         from pysat.solvers import SolverNames
         names = []
         for name, attr in vars(SolverNames).items():
-            if not name.startswith('__') and isinstance(attr, tuple):
+            # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
+            if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
                 if name not in attr:
                     name = attr[-1]
                 names.append(name)
@@ -123,6 +133,13 @@ class CPM_pysat(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysat_solver
+
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -136,6 +153,10 @@ class CPM_pysat(SolverInterface):
                            For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
@@ -184,9 +205,8 @@ class CPM_pysat(SolverInterface):
                     cpm_var._value = True
                 elif -lit in sol:
                     cpm_var._value = False
-                else:
-                    # not specified...
-                    cpm_var._value = None
+                else: # not specified, dummy val
+                    cpm_var._value = True
 
         return has_sol
 
@@ -229,8 +249,10 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)
-        cpm_cons = only_bv_implies(cpm_cons)
+        cpm_cons = only_bv_reifies(cpm_cons)
+        cpm_cons = only_implies(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
@@ -258,7 +280,7 @@ class CPM_pysat(SolverInterface):
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
-        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_implies
+        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
             a0,a1 = cpm_expr.args
 
             # BoolVar() -> BoolVar()
@@ -314,6 +336,11 @@ class CPM_pysat(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
             lit = self.solver_var(cpm_var)

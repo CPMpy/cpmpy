@@ -6,6 +6,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Operator, Expression
+from cpmpy.expressions.utils import get_bounds, argval
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -311,9 +312,22 @@ class TestArrayExpressions(unittest.TestCase):
         res = np.array([all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
+
+    def test_multidim(self):
+
+        functions = ["all", "any", "max", "min", "sum", "prod"]
+        bv = cp.boolvar(shape=(5,4,3,2)) # high dimensional tensor
+        arr = np.zeros(shape=bv.shape) # numpy "ground truth"
+
+        for axis in range(len(bv.shape)):
+            np_res = arr.sum(axis=axis)
+            for func in functions:
+                cpm_res = getattr(bv, func)(axis=axis)
+                self.assertIsInstance(cpm_res, NDVarArray)
+                self.assertEqual(cpm_res.shape, np_res.shape)
         
 def inclusive_range(lb,ub):
-        return range(lb,ub+1)
+    return range(lb,ub+1)
 
 class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
@@ -436,6 +450,7 @@ class TestBounds(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
             self.assertRaises(IncompleteFunctionError, cons.value)
+            self.assertFalse(argval(cons))
 
         # mayhem
         cons = (arr[10 // (a - b)] == 1).implies(p)
@@ -443,6 +458,27 @@ class TestBounds(unittest.TestCase):
         if cp.SolverLookup.lookup("z3").supported():
             self.assertTrue(m.solve(solver="z3"))
             self.assertTrue(cons.value())
+
+
+    def test_list(self):
+
+        # cpm_array
+        iv = cp.intvar(0,10,shape=3)
+        lbs, ubs = iv.get_bounds()
+        self.assertListEqual([0,0,0], lbs.tolist())
+        self.assertListEqual([10,10,10], ubs.tolist())
+        # list
+        iv = [cp.intvar(0,10) for _ in range(3)]
+        lbs, ubs = get_bounds(iv)
+        self.assertListEqual([0, 0, 0], lbs)
+        self.assertListEqual([10, 10, 10], ubs)
+        # nested list
+        exprs = [intvar(0,1), [intvar(2,3), intvar(4,5)], [intvar(5,6)]]
+        lbs, ubs = get_bounds(exprs)
+        self.assertListEqual([0,[2,4],[5]], lbs)
+        self.assertListEqual([1,[3,5],[6]], ubs)
+
+
 
     def test_not_operator(self):
         p = boolvar()
@@ -466,10 +502,10 @@ class TestBounds(unittest.TestCase):
     def test_description(self):
 
         a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both")
 
-        self.assertEqual(repr(cons), "a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
         self.assertEqual(str(cons), "either a or b should be true, but not both")
 
         # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
@@ -480,23 +516,70 @@ class TestBounds(unittest.TestCase):
             self.assertTrue(cp.Model(cons).solve(solver=solver))
 
         ## test extra attributes of set_description
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both",
                              override_print=False)
 
-        self.assertEqual(repr(cons), "a xor b")
-        self.assertEqual(str(cons), "a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
+        self.assertEqual(str(cons), "(a) or (b)")
 
-        cons = a ^ b
+        cons = a | b
         cons.set_description("either a or b should be true, but not both",
                              full_print=True)
 
-        self.assertEqual(repr(cons), "a xor b")
-        self.assertEqual(str(cons), "either a or b should be true, but not both -- a xor b")
+        self.assertEqual(repr(cons), "(a) or (b)")
+        self.assertEqual(str(cons), "either a or b should be true, but not both -- (a) or (b)")
+
+
+    def test_dtype(self):
+
+        x = cp.intvar(1,10,shape=(3,3), name="x")
+        self.assertTrue(cp.Model(cp.sum(x) >= 10).solve())
+        self.assertIsNotNone(x.value())
+        print(x.value())
+        # test all types of expressions
+        self.assertEqual(int, type(x[0,0].value())) # just the var
+        for v in x[0]:
+            self.assertEqual(int, type(v.value())) # array of var
+        self.assertEqual(int, type(cp.sum(x[0]).value()))
+        self.assertEqual(int, type(cp.sum(x).value()))
+        self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
+        self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
+        a,b = x[0,[0,1]]
+        self.assertEqual(int, type((-a).value()))
+        self.assertEqual(int, type((a - b).value()))
+        self.assertEqual(int, type((a * b).value()))
+        self.assertEqual(int, type((a // b).value()))
+        self.assertEqual(int, type((a ** b).value()))
+        self.assertEqual(int, type((a % b).value()))
 
 
 
 
+
+
+
+
+class TestBuildIns(unittest.TestCase):
+
+    def setUp(self):
+        self.x = cp.intvar(0,10,shape=3)
+
+    def test_sum(self):
+        gt = Operator("sum", list(self.x))
+
+        self.assertEqual(str(gt), str(cp.sum(self.x)))
+        self.assertEqual(str(gt), str(cp.sum(list(self.x))))
+        self.assertEqual(str(gt), str(cp.sum(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.sum(self.x[0], self.x[1], self.x[2])))
+
+    def test_max(self):
+        gt = Maximum(self.x)
+
+        self.assertEqual(str(gt), str(cp.max(self.x)))
+        self.assertEqual(str(gt), str(cp.max(list(self.x))))
+        self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
+        self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
 if __name__ == '__main__':
     unittest.main()
