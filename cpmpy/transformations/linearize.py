@@ -561,9 +561,10 @@ def canonical_comparison(lst_of_expr):
             if isinstance(lhs, Comparison) and (is_bool(rhs) or isinstance(rhs, Expression) and rhs.is_bool()):
                 assert cpm_expr.name == "==", "Expected a reification of a comparison here, but got {}".format(cpm_expr.name)
                 lhs = canonical_comparison(lhs)[0]
-            elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                # Bring all vars from rhs to lhs
-                # 1) collect the variables to bring over
+            elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum", "sub"}):
+                if lhs.name == "sub":
+                    lhs = Operator("wsum", [[1,-1],lhs.args])
+                # bring all vars to lhs
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
