@@ -265,18 +265,45 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
 
+    def _ivars(self, cpm_var):
+        if is_any_list(cpm_var):
+            return [self._ivars(v) for v in cpm_var]
+        elif isinstance(cpm_var, _BoolVarImpl):
+            return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var))
+        else:
+            return self.solver_var(cpm_var)
+
     def _sum_args(self, expr, negate=False):
+        """
+            Helper function to convert CPMpy sum-like operators into pumpkin-compatible arguments.
+            expr is expected to be a `sum`, `wsum` or `sub` operator.
+
+            :return: Returns a list of Pumpkin integer expressions
+        """
+        args = []
         if isinstance(expr, Operator) and expr.name == "sum":
-            return [self.solver_var(v).scaled(-1 if negate else 1) for v in expr.args]
-        if isinstance(expr, Operator) and expr.name == "wsum":
-            return [self.solver_var(v).scaled(-w if negate else w) for w,v in zip(*expr.args) if w != 0]
-        if isinstance(expr, Operator) and expr.name == "sub":
-            x,y = expr.args
-            return [
-                self.solver_var(x).scaled(-1 if negate else 1),
-                self.solver_var(y).scaled(1 if negate else -1)
-            ]
-        raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
+            for cpm_var in expr.args:
+                pum_var = self.solver_var(cpm_var)
+                if cpm_var.is_bool(): # have convert to integer
+                    pum_var = self.pum_solver.boolean_as_integer(pum_var)
+                args.append(pum_var.scaled(-1 if negate else 1))
+        elif isinstance(expr, Operator) and expr.name == "wsum":
+            for w, cpm_var in zip(*expr.args):
+                if w == 0: continue # exclude
+                pum_var = self.solver_var(cpm_var)
+                if cpm_var.is_bool(): # have convert to integer
+                    pum_var = self.pum_solver.boolean_as_integer(pum_var)
+                args.append(pum_var.scaled(-w if negate else w))
+        elif isinstance(Operator, expr) and expr.name == "sub":
+            x, y = self.solver_vars(expr.args)
+            if expr.args[0].is_bool():
+                x = self.pum_solver.boolean_as_integer(x)
+            if expr.args[1].is_bool():
+                y = self.pum_solver.boolean_as_integer(y)
+            args = [x.scaled(-1 if negate else 1), y.scaled(1 if negate else -1)]
+        else:
+            raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
+        return args
 
     def _get_constraint(self, cpm_expr):
 
@@ -296,16 +323,10 @@ class CPM_pumpkin(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
             pum_rhs = self.solver_var(rhs)
+            if isinstance(rhs, _BoolVarImpl):
+                pum_rhs = self.pum_solver.boolean_as_integer(pum_rhs)
 
             if cpm_expr.name == "==":
-                if isinstance(lhs, _BoolVarImpl) and cpm_expr.name == "==":
-                    assert isinstance(rhs, _BoolVarImpl), "Pumpkin: can only compare boolean with other boolean"
-                    plhs, prhs = self.solver_vars(cpm_expr.args)
-                    return [
-                        constraints.Clause([plhs.negate(), prhs]),
-                        constraints.Clause([plhs, prhs.negate()]),
-                    ]
-
                 if "sum" in lhs.name or lhs.name == "sub":
                     return [constraints.Equals(self._sum_args(lhs), rhs)]
                 if lhs.name == "div":
@@ -333,15 +354,11 @@ class CPM_pumpkin(SolverInterface):
                 return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs)]
 
             elif cpm_expr.name == ">":
-                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs+1)]
-
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs-1)]
             elif cpm_expr.name == "!=":
                 return [constraints.NotEquals(self._sum_args(lhs), rhs)]
 
-            elif cpm_expr.name == ">=":
-                if isinstance(lhs, _NumVarImpl):
-                    return [constraints.BinaryLessThanEqual(pum_rhs, self.solver_var(lhs))]
-                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), rhs)]
+            raise ValueError("Unknown comparison", cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
