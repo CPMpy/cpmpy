@@ -11,7 +11,8 @@ from .utils import make_assump_model
 
 def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True, return_mcs=True):
     """
-        Enumerates all MUSes in the unsatisfiable problem
+        Enumerating minimal unsatisfiable subsets (MUSes) and minimal correction sets (MCSes)
+         of unsatisfiable constraints.
         Iteratively generates a subset of constraints (the seed) and checks whether it is SAT.
         When the seed is SAT, it is grown to an MSS to derive an MCS.
         This MCS is then added to the Map solver as a set to hit
@@ -31,7 +32,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
     map_solver += cp.any(assump)
     hint = [1] *len(assump)
     map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
-    
+
     deletion_order = {a : -len(get_variables(dmap[a])) for a in assump} # avoid recomputing
 
     while map_solver.solve():
@@ -40,6 +41,8 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
         if s.solve(assumptions=seed) is True:
             # SAT, grow, to full MSS
+            # Assumptions encode indicator constraints a -> c, find all true assumptions
+            #    and those that could just as well be made true given the current solution
             mss = [a for a,c in zip(assump, soft) if a.value() or c.value()]
             for to_add in set(assump) - set(mss):
                 if s.solve(assumptions=mss + [to_add]) is True:
