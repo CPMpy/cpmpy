@@ -176,34 +176,35 @@ class CPM_pumpkin(SolverInterface):
 
 
     # [GUIDELINE] if Pumpkin does not support objective functions, you can delete this function definition
-    def objective(self, expr, minimize=True):
-        """
-            Post the given expression to the solver as objective to minimize/maximize
+    # def objective(self, expr, minimize=True):
+    #     """
+    #         Post the given expression to the solver as objective to minimize/maximize
+    #
+    #         'objective()' can be called multiple times, only the last one is stored
+    #
+    #         (technical side note: any constraints created during conversion of the objective
+    #
+    #         are permanently posted to the solver)
+    #     """
+    #     # make objective function non-nested
+    #     (flat_obj, flat_cons) = flatten_objective(expr)
+    #     self += flat_cons # add potentially created constraints
+    #     self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
+    #
+    #     # make objective function or variable and post
+    #     obj = self._make_numexpr(flat_obj)
+    #     # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
+    #     #         _make_numexpr may be removed and an objective can be posted as:
+    #     #           self.pum_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
+    #
+    #     if minimize:
+    #         self.pum_solver.Minimize(obj)
+    #     else:
+    #         self.pum_solver.Maximize(obj)
 
-            'objective()' can be called multiple times, only the last one is stored
-
-            (technical side note: any constraints created during conversion of the objective
-
-            are permanently posted to the solver)
-        """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
-
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
-        # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
-        #         _make_numexpr may be removed and an objective can be posted as:
-        #           self.pum_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
-
-        if minimize:
-            self.pum_solver.Minimize(obj)
-        else:
-            self.pum_solver.Maximize(obj)
-
-    def has_objective(self):
-        return self.pum_solver.hasObjective()
+    # def has_objective(self):
+    #     return False # TODO
+    #     return self.pum_solver.hasObjective()
 
     def _make_numexpr(self, cpm_expr):
         """
