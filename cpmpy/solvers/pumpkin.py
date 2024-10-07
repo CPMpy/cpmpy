@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
@@ -373,6 +373,16 @@ class CPM_pumpkin(SolverInterface):
                         [self._get_constraint(c)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}")
+
+        elif isinstance(cpm_expr, BoolVal): # unlikely base case
+            if cpm_expr.value() is True:
+                a = self.solver_var(boolvar()) # dummy variable
+                return [constraints.Clause([a])]
+            else:
+                return [constraints.Clause([])]
+
+        else:
+            raise ValueError("Unexpected constraint:", cpm_expr)
 
 
     def __add__(self, cpm_expr_orig):
