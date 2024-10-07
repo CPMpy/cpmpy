@@ -397,51 +397,51 @@ class CPM_pumpkin(SolverInterface):
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
-        """
-            A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
-
-            If the problem is an optimization problem, returns only optimal solutions.
-
-           Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
-
-            Returns: number of solutions found
-        """
-
-        # check if objective function
-        if self.has_objective():
-            raise NotSupportedError("Pumpkin does not support finding all optimal solutions")
-
-        # A. Example code if solver supports callbacks
-        if is_any_list(display):
-            callback = lambda : print([var.value() for var in display])
-        else:
-            callback = display
-
-        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
-        return self.pum_solver.SolutionCount()
-
-        # B. Example code if solver does not support callbacks
-        self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
-        solution_count = 0
-        for solution in self.pum_solver.GetAllSolutions():
-            solution_count += 1
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                cpm_var._value = solution.value(solver_var)
-
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
-                else:
-                    display()  # callback
-
-        return solution_count
+    # def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    #     """
+    #         A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
+    #
+    #         If the problem is an optimization problem, returns only optimal solutions.
+    #
+    #        Arguments:
+    #             - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+    #                     default/None: nothing displayed
+    #             - time_limit: stop after this many seconds (default: None)
+    #             - solution_limit: stop after this many solutions (default: None)
+    #             - call_from_model: whether the method is called from a CPMpy Model instance or not
+    #             - any other keyword argument
+    #
+    #         Returns: number of solutions found
+    #     """
+    #
+    #     # check if objective function
+    #     if self.has_objective():
+    #         raise NotSupportedError("Pumpkin does not support finding all optimal solutions")
+    #
+    #     # A. Example code if solver supports callbacks
+    #     if is_any_list(display):
+    #         callback = lambda : print([var.value() for var in display])
+    #     else:
+    #         callback = display
+    #
+    #     self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+    #     return self.pum_solver.SolutionCount()
+    #
+    #     # B. Example code if solver does not support callbacks
+    #     self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
+    #     solution_count = 0
+    #     for solution in self.pum_solver.GetAllSolutions():
+    #         solution_count += 1
+    #         # Translate solution to variables
+    #         for cpm_var in self.user_vars:
+    #             cpm_var._value = solution.value(solver_var)
+    #
+    #         if display is not None:
+    #             if isinstance(display, Expression):
+    #                 print(display.value())
+    #             elif isinstance(display, list):
+    #                 print([v.value() for v in display])
+    #             else:
+    #                 display()  # callback
+    #
+    #     return solution_count
