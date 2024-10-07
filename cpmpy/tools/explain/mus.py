@@ -10,7 +10,6 @@ import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
 
-from .mss import mss_grow_naive
 from .utils import make_assump_model
 from ...expressions.utils import is_num
 
@@ -151,6 +150,8 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
         # else, the hitting set is SAT, now try to extend it without extra solve calls.
         # Check which other assumptions/constraints are satisfied (using c.value())
         # complement of grown subset is a correction subset
+        # Assumptions encode indicator constraints a -> c, find all false assumptions
+        #   that really have to be false given the current solution.
         new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
         hs_solver += cp.sum(new_corr_subset) >= 1
 
