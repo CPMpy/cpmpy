@@ -17,7 +17,6 @@
 """
 
 import cpmpy as cp
-from cpmpy.expressions.core import Expression
 from cpmpy.transformations.normalize import toplevel_list
 
 def make_assump_model(soft, hard=[], name=None):
