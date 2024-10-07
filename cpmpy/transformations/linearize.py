@@ -276,7 +276,9 @@ def canonical_comparison(lst_of_expr):
             lhs, rhs = cpm_expr.args
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
-            elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
+            elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum", "sub"}):
+                if lhs.name == "sub":
+                    lhs = Operator("wsum", [[1,-1],lhs.args])
                 # bring all vars to lhs
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
