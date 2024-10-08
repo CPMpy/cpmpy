@@ -76,6 +76,9 @@ class CPM_pumpkin(SolverInterface):
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
 
+        # dictionary of tags to user constraints
+        self.user_cons = dict()
+
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
         #           internally, the constructor relies on __add__ which uses the above solver native object(s)
@@ -409,16 +412,22 @@ class CPM_pumpkin(SolverInterface):
 
         # transform and post the constraints
         for tag, orig_expr in enumerate(toplevel_list(cpm_expr_orig, merge_and=True)):
+            if orig_expr in set(self.user_cons.values()):
+                continue
+            else:
+                tag = len(self.user_cons)+1
+                self.user_cons[tag] = orig_expr
+
             for cpm_expr in self.transform(orig_expr):
 
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
                     bv, subexpr = cpm_expr.args
                     for cons in self._get_constraint(subexpr):
-                        self.pum_solver.add_implication(cons, self.solver_var(bv), tag=None)
+                        self.pum_solver.add_implication(cons, self.solver_var(bv), tag=tag)
                 else:
                     solver_constraints = self._get_constraint(cpm_expr)
                     for cons in solver_constraints:
-                        self.pum_solver.add_constraint(cons, tag=None)
+                        self.pum_solver.add_constraint(cons,tag=tag)
 
         return self
 
