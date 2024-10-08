@@ -94,6 +94,51 @@ class TestTransLinearize(unittest.TestCase):
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
+    def test_linearize_modulo(self):
+        x, y, z = cp.intvar(0, 5, shape=3, name=['x', 'y', 'z'])
+        a, b, c = cp.intvar(-5, 0, shape=3, name=['a', 'b', 'c'])
+        g, h, i = cp.intvar(-5, 5, shape=3, name=['g', 'h', 'i'])
+        s_pos = cp.intvar(1, 5, name='s_pos')
+        s_neg = cp.intvar(-5, -1, name='s_neg')
+
+        constraint = [g % s_pos == i]
+        lin = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        cons_models = cp.Model(constraint).solveAll(display=lambda: all_sols.add(tuple([x.value() for x in [g, s_pos, i]])))
+        lin_models = cp.Model(lin).solveAll(display=lambda: lin_all_sols.add(tuple([x.value() for x in [g, s_pos, i]])))
+        self.assertEqual(cons_models,lin_models)
+
+        # ortools only accepts strictly positive modulo argument.
+
+    def test_linearize_division(self):
+        x, y, z = cp.intvar(0, 5, shape=3, name=['x', 'y', 'z'])
+        a, b, c = cp.intvar(-5, 0, shape=3, name=['a', 'b', 'c'])
+        g, h, i = cp.intvar(-5, 5, shape=3, name=['g', 'h', 'i'])
+        s_pos = cp.intvar(1, 5, name='s_pos')
+        s_neg = cp.intvar(-5, -1, name='s_neg')
+
+        constraint = [g / s_pos == i]
+        lin = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        cons_models = cp.Model(constraint).solveAll(display=lambda: all_sols.add(tuple([x.value() for x in [g, s_pos, i]])))
+        lin_models = cp.Model(lin).solveAll(display=lambda: lin_all_sols.add(tuple([x.value() for x in [g, s_pos, i]])))
+        self.assertEqual(cons_models,lin_models)
+
+        # Duplicate test with s_neg instead of s_pos
+        constraint_neg = [g / s_neg == i]
+        lin_neg = linearize_constraint(constraint_neg, supported={'sum', 'wsum', 'mul'})
+
+        all_sols_neg = set()
+        lin_all_sols_neg = set()
+        cons_models_neg = cp.Model(constraint_neg).solveAll(display=lambda: all_sols_neg.add(tuple([x.value() for x in [g, s_neg, i]])))
+        lin_models_neg = cp.Model(lin_neg).solveAll(display=lambda: lin_all_sols_neg.add(tuple([x.value() for x in [g, s_neg, i]])))
+        self.assertEqual(cons_models_neg,lin_models_neg)
+
+
 class TestConstRhs(unittest.TestCase):
 
     def  test_numvar(self):
