@@ -167,7 +167,7 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, reified=
                             f"Can't divide by a domain containing 0, safen the expression first")
                     r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1)) # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
                     cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
-                    cond = [Abs(r) < Abs(b), Abs(b * rhs) < Abs(a)]
+                    cond = [Abs(r) < Abs(b), Abs(b * rhs) <= Abs(a)]
                     decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
                     cpm_exprs = toplevel_list(decomp + cpm_expr)
                     exprs = linearize_constraint(flatten_constraint(cpm_exprs), supported=supported)
