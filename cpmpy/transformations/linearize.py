@@ -127,6 +127,30 @@ def _linearize_constraint_helper(lst_of_expr, supported={"sum","wsum"}, reified=
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
+                elif lhs.name == "mod" and "mod" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize modulo withtout multiplication")
+
+                    if cpm_expr.name != "==":
+                        new_rhs, newcons = get_or_make_var(lhs)
+                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        continue
+                    else:
+                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                        #   -> acts differently for negative numbers
+                        # "mod" is a partial function
+                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        x, y = lhs.args
+                        lby, uby = get_bounds(y)
+                        if lby <= 0 <= uby:
+                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                        k = intvar(*get_bounds((x - rhs) // y))
+                        mult_res, newcons = get_or_make_var(k * y)
+                        newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+
+                        cpm_expr = (mult_res + rhs) == x
                 elif lhs.name == 'div':
                     a, b = lhs.args
                     # if division is total, b is either strictly negative or strictly positive!
