@@ -213,7 +213,6 @@ class CPM_gurobi(SolverInterface):
         # return from cache
         return self._varmap[cpm_var]
 
-
     def lex_solve(self, objectives, minimize=True):
         """
             Post the given set of objectives to the solver as objective to lex minimize/maximize
