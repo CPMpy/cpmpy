@@ -417,6 +417,7 @@ class CPM_pumpkin(SolverInterface):
             else:
                 tag = len(self.user_cons)+1
                 self.user_cons[tag] = orig_expr
+            tag = None # needed for clauses, TODO: do proper check and remove
 
             for cpm_expr in self.transform(orig_expr):
 
