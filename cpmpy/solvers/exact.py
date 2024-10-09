@@ -112,6 +112,7 @@ class CPM_exact(SolverInterface):
         # for solving with assumption variables,
         self.assumption_dict = None
         self.objective_ = None
+        self.objective_is_min_ = True
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
@@ -122,7 +123,7 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillObjAndVars(self):
+    def _fillVars(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             for cpm_var in self.user_vars:
@@ -134,9 +135,6 @@ class CPM_exact(SolverInterface):
         exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
-
-        # translate objective
-        self.objective_value_ = self.xct_solver.getBestSoFar() # last upper bound to the objective
 
     def solve(self, time_limit=None, assumptions=None, **kwargs):
         """
@@ -177,8 +175,8 @@ class CPM_exact(SolverInterface):
 
         # call the solver, with parameters
         start = time.time()
-        my_status = self.xct_solver.runFull(optimize=self.has_objective(),
-                                            timeout=time_limit if time_limit is not None else 0)
+        my_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
+        #                                     timeout=time_limit if time_limit is not None else 0)
         end = time.time()
 
         # new status, translate runtime
@@ -201,7 +199,13 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillObjAndVars()
+        self._fillVars()
+        if self.has_objective():
+            if self.objective_is_min_:
+                self.objective_value_ = obj_val
+            else: # maximize, so actually negative value
+                self.objective_value_ = -obj_val
+
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
@@ -237,7 +241,7 @@ class CPM_exact(SolverInterface):
 
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
-                self._fillObjAndVars() # erases the solution
+                self._fillVars() # erases the solution
                 return 0
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
@@ -253,14 +257,14 @@ class CPM_exact(SolverInterface):
             my_status = self.xct_solver.runFull(optimize=False, timeout=timelim)
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability
-                self._fillObjAndVars() # erases the solution
+                self._fillVars() # erases the solution
                 return solsfound
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
-                    self._fillObjAndVars()
+                    self._fillVars()
                     if isinstance(display, Expression):
                         print(argval(display))
                     elif isinstance(display, list):
@@ -322,6 +326,7 @@ class CPM_exact(SolverInterface):
 
         """
         self.objective_ = expr
+        self.objective_is_min_ = minimize
 
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)

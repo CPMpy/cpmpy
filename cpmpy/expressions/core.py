@@ -329,10 +329,11 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if other == 0:
-            return 1
-        elif other == 1:
-            return self
+        if is_num(other):
+            if other == 0:
+                return 1
+            if other == 1:
+                return self
         return Operator("pow", [self, other])
 
     def __rpow__(self, other, modulo=None):
@@ -541,7 +542,7 @@ class Operator(Expression):
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
+        elif self.name == "wsum": return int(sum(arg_vals[0]*np.array(arg_vals[1])))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]
