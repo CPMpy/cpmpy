@@ -530,7 +530,7 @@ class Cumulative(GlobalConstraint):
             cons += [start[t] + duration[t] == end[t]]
 
         # demand doesn't exceed capacity
-        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
         for t in range(lb,ub+1):
             demand_at_t = 0
             for job in range(len(start)):
