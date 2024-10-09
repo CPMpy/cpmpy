@@ -301,7 +301,7 @@ class CPM_exact(SolverInterface):
             return self._varmap[cpm_var]
 
         # create if it does not exist
-        revar = str(cpm_var)
+        revar = str(cpm_var) + str(cpm_var.id)
         if isinstance(cpm_var, _BoolVarImpl):
             self.xct_solver.addVariable(revar)
         elif isinstance(cpm_var, _IntVarImpl):

@@ -56,6 +56,7 @@
     ==============
 """
 import math
+import uuid
 from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
@@ -261,6 +262,7 @@ class _NumVarImpl(Expression):
         self.lb = lb
         self.ub = ub
         self.name = name
+        self.id = uuid.uuid4()
         self._value = None
 
     def is_bool(self):
@@ -286,9 +288,12 @@ class _NumVarImpl(Expression):
     def __repr__(self):
         return self.name
 
-    # for sets/dicts. Because names are unique, so is the str repr
+    # for sets/dicts. Use the unique ID
     def __hash__(self):
-        return hash(self.name)
+        # for backwards compatability
+        if not hasattr(self, 'id'):
+            self.id = uuid.uuid4()
+        return hash(self.id)
 
 
 class _IntVarImpl(_NumVarImpl):
@@ -365,7 +370,8 @@ class NegBoolView(_BoolVarImpl):
         # as it is always created using the ~ operator (only available for _BoolVarImpl)
         # it already comply with the asserts of the __init__ of _BoolVarImpl and can use 
         # __init__ from _IntVarImpl
-        _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
+        _IntVarImpl.__init__(self, 1 - bv.ub, 1 - bv.lb, name=str(self))
+        self.id = bv.id
 
     def value(self):
         """ the negation of the value obtained in the last solve call by the viewed variable

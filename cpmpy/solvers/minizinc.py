@@ -393,15 +393,13 @@ class CPM_minizinc(SolverInterface):
 
         if cpm_var not in self._varmap:
             # clean the varname
-            varname = cpm_var.name
-            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+            varname = cpm_var.name + str(cpm_var.id)
+            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '').replace('-','_')
 
             # test if the name is a valid minizinc identifier
             if not self.mzn_name_pattern.search(mzn_var):
                 raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores. "
-                                "First character must be an alphabetic character")
-            if mzn_var in self.keywords:
-                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+                                "First character must be an alphabetic character" + mzn_var)
 
             if isinstance(cpm_var, _BoolVarImpl):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
