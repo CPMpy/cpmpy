@@ -39,6 +39,8 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+from cpmpy.transformations.get_variables import get_variables
+
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 from cpmpy.transformations.normalize import toplevel_list
