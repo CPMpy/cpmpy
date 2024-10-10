@@ -9,31 +9,37 @@ from ..expressions.python_builtins import all as cpm_all
 
 def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
     """
-        A Partial function is function whose output is not defined for all possible inputs.
+        A partial function is a function whose output is not defined for all possible inputs.
 
         In CPMpy, this is the case for the following 3 numeric functions:
             - (Integer) division 'x // y': undefined when y=0
             - Modulo 'x mod y': undefined when y=0
             - Element 'Arr[idx]': undefined when idx is not in the range of Arr
 
-        This transformation will transform such partial functions into total functions following
-        the relational semantics as presented in:
+        A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
+        value(s) away. However CPMpy allows arbitrary nesting and reification of constraints, so an
+        expression like `b <-> (Arr[idx] == 5)` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
+        Should idx be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
+
+        This transformation will transform a partial function (e.g. Arr[idx]) into a total function
+        following the **relational semantics** as discussed in:
             Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
             constraint languages." International Conference on Principles and Practice of Constraint
              Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
 
-        Under the relational semantic, an 'undefined' output for a numerical expression should
-        propagate to `False` in the nearest Boolean parent expression.
+        Under the relational semantic, an 'undefined' output for a (numerical) expression should
+        propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
+        be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
 
-        Hence, we can add a Boolean 'guard' to the nearest Boolean parent that represents whether
+        To enable this, we can add a Boolean 'guard' to the nearest Boolean parent that represents whether
         the input is 'safe' (has a defined output). We can then use a standard (total function) constraint
-        to compute the output for ranges of safe inputs, and state that if the guard is true, the output
-        should match the output of the total function (if not, the output is an arbitrary value).
+        to compute the output for safe ranges of inputs, and state that if the guard is true, the output
+        should match the output of the total function (if not, the output can take an arbitrary value).
 
         A key observation of the implementation below is that for the above 3 expressions, the 'safe'
         domain of a potentially unsafe argument (y or idx) is either one 'trimmed' continuous domain
         (for idx and in case y = [0..n] or [-n..0]), or two 'trimmed' continuous domains (for y=[-n..m]).
-        Furthemore, the reformulation for these two cases can be done generically, without needing
+        Furthermore, the reformulation for these two cases can be done generically, without needing
         to know the specifics of the partial function being made total.
 
 
