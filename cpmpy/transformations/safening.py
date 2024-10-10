@@ -9,17 +9,37 @@ from ..expressions.python_builtins import all as cpm_all
 
 def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
     """
-        Recursively rewrites the following partial functions int total ones:
-            - div (exclude 0)
-            - mod (exclude 0)
-            - Element (idx within array range)
+        A Partial function is function whose output is not defined for all possible inputs.
 
-        Follows the relational semantics, where undefinedness of a numerical expression
-            propagates to `False` at the neirest Boolean parent node.
+        In CPMpy, this is the case for the following 3 numeric functions:
+            - (Integer) division 'x // y': undefined when y=0
+            - Modulo 'x mod y': undefined when y=0
+            - Element 'Arr[idx]': undefined when idx is not in the range of Arr
+
+        This transformation will transform such partial functions into total functions following
+        the relational semantics as presented in:
+            Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
+            constraint languages." International Conference on Principles and Practice of Constraint
+             Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
+
+        Under the relational semantic, an 'undefined' output for a numerical expression should
+        propagate to `False` in the nearest Boolean parent expression.
+
+        Hence, we can add a Boolean 'guard' to the nearest Boolean parent that represents whether
+        the input is 'safe' (has a defined output). We can then use a standard (total function) constraint
+        to compute the output for ranges of safe inputs, and state that if the guard is true, the output
+        should match the output of the total function (if not, the output is an arbitrary value).
+
+        A key observation of the implementation below is that for the above 3 expressions, the 'safe'
+        domain of a potentially unsafe argument (y or idx) is either one 'trimmed' continuous domain
+        (for idx and in case y = [0..n] or [-n..0]), or two 'trimmed' continuous domains (for y=[-n..m]).
+        Furthemore, the reformulation for these two cases can be done generically, without needing
+        to know the specifics of the partial function being made total.
+
 
         :param: list_of_expr: list of CPMpy expressions
         :param: _toplevel: list of new expressions to put toplevel (used internally)
-        :param: _nbc: list of new expressions to put in neirst Boolean context (used internally)
+        :param: _nbc: list of new expressions to put in nearest Boolean context (used internally)
     """
 
     if _toplevel is None:
