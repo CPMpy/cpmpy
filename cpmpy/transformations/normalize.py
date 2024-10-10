@@ -44,6 +44,112 @@ def toplevel_list(cpm_expr, merge_and=True):
     return newlist
 
 
+def reel_to_int(lst_of_expr):
+    '''
+    run toplevel list first
+    removes reel constants from linear expressions by multiplying both sides with an integer.
+    '''
+    newlist = []
+    for expr in lst_of_expr:
+        if isinstance(expr, Operator):
+            expr.args = reel_to_int(expr.args)
+        if isinstance(expr, Comparison):
+            lhs, rhs = expr.args
+
+            # Function to find a multiplier for floats to convert them to int
+            def find_factor(value):
+                for i in range(1, 101):
+                    if round((i * value), 2).is_integer():
+                        return i
+                return 1
+
+            # Handle lhs if it's a float directly
+            if isinstance(lhs, float):
+                factor = find_factor(lhs)
+                lhs = int(lhs * factor)
+                rhs *= factor
+
+            # Handle rhs if it's a float directly
+            if isinstance(rhs, float):
+                factor = find_factor(rhs)
+                rhs = int(rhs * factor)
+                lhs *= factor
+
+            # Set the modified arguments back to the expression
+            expr.args = (lhs, rhs)
+
+            if isinstance(lhs,Expression) and lhs.name == 'wsum':
+                coeffs, vars = lhs.args
+                factor = 1
+                for c in coeffs:
+                    if isinstance(c, float):
+                        factor *= find_factor(c)
+                newcoeffs = []
+                for c in coeffs:
+                    newcoeffs.append(int(c*factor))
+                lhs.args[0] = newcoeffs
+                if isinstance(rhs, Expression) and rhs.name == 'wsum':
+                    coeffs, vars = rhs.args
+                    newcoeffs2 = [coeff * factor for coeff in coeffs]
+                    rhs.args[0] = newcoeffs2
+                    expr.args = lhs, rhs
+                elif isinstance(rhs,Expression) and rhs.name == 'mul':
+                    rhs.args[0] = factor * rhs.args[0]
+                else:
+                    expr.args = lhs, (factor * rhs)
+            elif isinstance(lhs,Expression) and lhs.name == 'mul':
+                c, e = left_extract_reel_from_mul(lhs)
+                if c is not None:
+                    for i in range(1, 101):
+                        r = i * c
+                        if r.is_integer():
+                            break
+                    expr.args = int(r) * e, i * rhs
+
+            lhs, rhs = expr.args
+            if isinstance(rhs, Expression) and rhs.name == 'wsum':
+                coeffs, vars = rhs.args
+                factor = 1
+                for c in coeffs:
+                    if isinstance(c, float):
+                        factor *= find_factor(c)
+                newcoeffs = []
+                for c in coeffs:
+                    newcoeffs.append(int(c * factor))
+                rhs.args[0] = newcoeffs
+                expr.args = (factor * lhs), rhs
+            elif isinstance(rhs,Expression) and rhs.name == 'mul':
+                c, e = left_extract_reel_from_mul(rhs)
+                if c is not None:
+                    for i in range(1, 101):
+                        r = i * c
+                        if r.is_integer():
+                            break
+                    expr.args = i * lhs, int(r) * e
+        newlist.append(expr)
+    return newlist
+
+
+def left_extract_reel_from_mul(expr):
+    reel = None
+    if isinstance(expr, Expression):
+        if expr.name == 'mul':
+            lhs, rhs = expr.args
+            if isinstance(lhs, float):
+                #lhs is the float
+                return lhs, rhs
+            elif isinstance(lhs, Expression) and lhs.name == 'mul':
+                #nested multiplications
+                real, lhsexpr = left_extract_reel_from_mul(lhs)
+                return real, lhsexpr * rhs
+
+        elif expr.name == 'wsum':
+            return None, None
+    else:
+        assert False, 'must be an expression'
+    return None, None
+
+
 def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
