@@ -61,7 +61,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
         if is_num(cpm_expr) or isinstance(cpm_expr, _NumVarImpl):
             new_lst.append(cpm_expr)
 
-        elif isinstance(cpm_expr, list):
+        elif isinstance(cpm_expr, (list,tuple)):
             new_lst.append(no_partial_functions(cpm_expr, _toplevel, _nbc))
 
         elif isinstance(cpm_expr, NDVarArray):
