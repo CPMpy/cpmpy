@@ -155,7 +155,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     a, b = lhs.args
                     # if division is total, b is either strictly negative or strictly positive!
                     lb, ub = get_bounds(b)
-                    if not ((lb < 0 and ub < 0) or (lb > 0 and ub > 0)):
+                    if lb <= 0 <= ub:
                         raise TypeError(
                             f"Can't divide by a domain containing 0, safen the expression first")
                     r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1)) # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
