@@ -613,7 +613,8 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("% by domain containing 0 is not supported")
+                # x mod y is always smaller than y. Make sure to not exclude 0 from domain.
+                return min(lb2 + 1, 0), max(ub2 - 1, 0)
             elif ub2 < 0:
                 return lb2 + 1, 0
             elif lb2 > 0:
