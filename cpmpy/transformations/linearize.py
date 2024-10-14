@@ -158,9 +158,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     if lb <= 0 <= ub:
                         raise TypeError(
                             f"Can't divide by a domain containing 0, safen the expression first")
-                    r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1)) # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
+                    # div(a,b) = rhs  -->  a = b * rhs + r with r the remainder
+                    # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
+                    # abs(r) < abs(b), otherwise it wouldn't be a remainder.
+                    # we need abs here because one or both of these can be negative.
+                    r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1))
                     cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
-                    cond = [Abs(r) < Abs(b), Abs(b * rhs) <= Abs(a)]
+                    # b * rhs <= a, otherwise we can both overshoot and undershoot the division, with r having positive and negative options.
+                    cond = [Abs(r) < Abs(b), b * rhs <= a]
                     decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
                     cpm_exprs = toplevel_list(decomp + cpm_expr)
                     exprs = linearize_constraint(flatten_constraint(cpm_exprs), supported=supported)
