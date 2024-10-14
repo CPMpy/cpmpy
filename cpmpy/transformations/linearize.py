@@ -350,8 +350,7 @@ def canonical_comparison(lst_of_expr):
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
-                    if len(lhs2) != 0:
-                        lhs, rhs = lhs + lhs2, rhs
+                    lhs = lhs + lhs2
                 else:
                     raise ValueError(
                         f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
