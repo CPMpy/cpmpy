@@ -31,12 +31,21 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
         propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
         be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
 
-        To enable this, we can add a Boolean 'guard' to the nearest Boolean parent that represents whether
-        the input is 'safe' (has a defined output). We can then use a standard (total function) constraint
-        to compute the output for safe ranges of inputs, and state that if the guard is true, the output
-        should match the output of the total function (if not, the output can take an arbitrary value).
+        To enable this, we want to rewrite an expression like `b <-> (partial == 5)` to something like
+        `b <-> (is_defined & (total == 5))`. The key idea is to create a copy of the potentially unsafe
+        argument, that can only take 'safe' values. Using this new argument in the original expression results
+        in a total function. We now have the original argument variable, which is decoupled from the expression,
+        and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
+        purposes: it represents whether the original argument has a safe value; and if it is true the new
+        argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
+        argument remains decoupled (can take any value, as will the expression's output).
 
-        A key observation of the implementation below is that for the above 3 expressions, the 'safe'
+        WARNING! Under the relational semantics, `b <-> ~(partial==5)` and `b <-> (partial!=5) mean
+        different things! The second is `b <-> (is_defined & (total!=5))` the first is
+        `b <-> (~is_defined | (total!=5)).
+
+
+        A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
         domain of a potentially unsafe argument (y or idx) is either one 'trimmed' continuous domain
         (for idx and in case y = [0..n] or [-n..0]), or two 'trimmed' continuous domains (for y=[-n..m]).
         Furthermore, the reformulation for these two cases can be done generically, without needing
@@ -51,9 +60,11 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
     if _toplevel is None:
         toplevel_call = True
         _toplevel = []
+        _nbc = []
     else:
         toplevel_call = False
         assert isinstance(_toplevel, list), f"_toplevel argument must be of type list but got {type(_toplevel)}"
+        assert isinstance(_nbc, list), f"_nbc argument must be of type list but got {type(_nbc)}"
 
     new_lst = []
     for cpm_expr in lst_of_expr:
@@ -125,38 +136,45 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
             new_lst.append(cpm_expr)
 
     if toplevel_call is True:
+        if len(_nbc) != 0:  # partials at toplevel
+            new_lst.append(cpm_all(_nbc))
         return new_lst + _toplevel
     else:
         return new_lst
 
 
 
-def _safen_range(cpm_expr, safe_range, idx_to_safen):
+def _safen_range(partial_expr, safe_range, idx_to_safen):
     """
-        Safen expression where only a continuous of values is considered safe.
+        Replace partial function `cpm_expr` that has potentially unsafe argument at `idx_to_safen`,
+        by a total function using a safe argument with domain `safe_range`. Also returns
+        a Boolean flag indicating whether the original argument's value is in the safe range
+        (for use in the nearest Boolean context), and a list of toplevel constraints that help
+        define the new total function.
+
         An example is `Element` where the index should be within the array's range.
 
-        Constructs an equivalent expression with safe values,
-            and asserts the new expression to be equal to the original one when defined.
-
-        :param cpm_expr: The numerical expression to safen
-        :param safe_range: The range of safe values
-        :param idx_to_safen: The index of unsafe argument in the expression
+        :param partial_expr: The partial function expression to make total
+        :param safe_range: The range of safe argument values
+        :param idx_to_safen: The index of the potentially unsafe argument in the expression
 
     """
-    lb, ub = safe_range
-    is_safe, safe_arg = boolvar(), intvar(lb, ub)
+    safe_lb, safe_ub = safe_range
 
-    unsafe_arg = cpm_expr.args[idx_to_safen]
-    safe_expr = copy(cpm_expr)
-    safe_expr.args = [safe_arg if i == idx_to_safen else a for i,a in enumerate(safe_expr.args)]
+    orig_arg = partial_expr.args[idx_to_safen]
+    new_arg = intvar(safe_lb, safe_ub)  # values for which the partial function is defined
 
-    toplevel = [((unsafe_arg >= lb) & (unsafe_arg <= ub)).implies(is_safe),
-                 (is_safe == (safe_arg == unsafe_arg)),
-                 # avoid additional solutions when new var is unconstrained (should always work because newly defined?)
-                 (~is_safe).implies(safe_arg == lb)]
+    total_expr = copy(partial_expr)  # the new total function, with the new arg
+    total_expr.args = [new_arg if i == idx_to_safen else a for i,a in enumerate(partial_expr.args)]
 
-    return is_safe, safe_expr, toplevel
+    is_defined = boolvar()
+    toplevel = [is_defined == ((safe_lb <= orig_arg) & (orig_arg <= safe_ub)),
+                is_defined.implies(new_arg == orig_arg),
+                # Extra: avoid additional solutions when new var is unconstrained
+                # (should always work in reified context because total_expr is newly defined?)
+                (~is_defined).implies(new_arg == safe_lb)]
+
+    return is_defined, total_expr, toplevel
 
 
 def _safen_hole(cpm_expr, exclude, idx_to_safen):
@@ -165,37 +183,46 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
         Examples include `div` where 0 has to be removed from the denominator
 
         Constructs an expression for each interval of safe values, and
-            introduces a new `output_expr` variable
+            introduces a new `output_var` variable
 
         :param cpm_expr: The numerical expression to safen
         :param exclude: The domain value to exclude
         :param idx_to_safen: The index of unsafe argument in the expression
     """
-    unsafe_arg = cpm_expr.args[idx_to_safen]
-    unsafe_lb, unsafe_ub = get_bounds(unsafe_arg)
+    orig_arg = cpm_expr.args[idx_to_safen]
+    orig_lb, orig_ub = get_bounds(orig_arg)
 
-    # output when arg in [unsafe_lb..exclude-1]
-    safe_arg_lower = intvar(unsafe_lb, exclude-1)
-    output_expr_lower = copy(cpm_expr)
-    output_expr_lower.args = [safe_arg_lower if i == idx_to_safen else a for i,a in enumerate(cpm_expr.args)]
-    # output when arg in [exclude+1..unsafe_ub]
-    safe_arg_upper = intvar(exclude+1, unsafe_ub)
-    output_expr_upper = copy(cpm_expr)
-    output_expr_upper.args = [safe_arg_upper if i == idx_to_safen else a for i, a in enumerate(cpm_expr.args)]
+    # expr when arg in [orig_lb..exclude-1]
+    new_arg_lower = intvar(orig_lb, exclude-1)
+    total_expr_lower = copy(cpm_expr)
+    total_expr_lower.args = [new_arg_lower if i == idx_to_safen else a for i,a in enumerate(cpm_expr.args)]
+    # expr when arg in [exclude+1..orig_ub]
+    new_arg_upper = intvar(exclude+1, orig_ub)
+    total_expr_upper = copy(cpm_expr)
+    total_expr_upper.args = [new_arg_upper if i == idx_to_safen else a for i, a in enumerate(cpm_expr.args)]
 
-    is_safe = boolvar()
-    output_expr = intvar(*get_bounds(cpm_expr))
+    is_defined = boolvar()
+    is_defined_lower = boolvar()
+    is_defined_upper = boolvar()
+    output_var = intvar(*get_bounds(cpm_expr))
 
-    toplevel  =[
-        (unsafe_arg < exclude).implies(output_expr_lower == output_expr),
-        (unsafe_arg > exclude).implies(output_expr_upper == output_expr),
-        is_safe == ((unsafe_arg == safe_arg_lower) | (unsafe_arg == safe_arg_upper)),
-        # avoid additional solutions when new vars are unconstrained (should always work because newly defined?)
-        (unsafe_arg >= exclude).implies(safe_arg_lower == exclude-1),
-        (unsafe_arg <= exclude).implies(safe_arg_upper == exclude+1),
-        (~is_safe).implies(output_expr == output_expr.lb)
+    toplevel = [
+        is_defined_lower == (orig_arg < exclude),
+        is_defined_upper == (orig_arg > exclude),
+        is_defined == (is_defined_lower | is_defined_upper),
+
+        is_defined_lower.implies(orig_arg == new_arg_lower),
+        is_defined_lower.implies(output_var == total_expr_lower),
+        is_defined_upper.implies(orig_arg == new_arg_upper),
+        is_defined_upper.implies(output_var == total_expr_upper),
+
+        # Extra: avoid additional solutions when new vars are unconstrained
+        # (should always work in reified context because total_expr's are newly defined?)
+        (~is_defined_lower).implies(new_arg_lower == exclude-1),
+        (~is_defined_upper).implies(new_arg_upper == exclude+1),
+        (~is_defined).implies(output_var == output_var.lb)
     ]
 
-    return is_safe, output_expr, toplevel
+    return is_defined, output_var, toplevel
 
 
