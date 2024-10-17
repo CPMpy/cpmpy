@@ -545,12 +545,12 @@ class Operator(Expression):
         elif self.name == "wsum": return int(sum(arg_vals[0]*np.array(arg_vals[1])))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
+        elif self.name == "mod": return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])  # modulo defined with integer division
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "div":
             try:
-                return arg_vals[0] // arg_vals[1]
+                return int(arg_vals[0] / arg_vals[1])  # integer division
             except ZeroDivisionError:
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                               + "\n Use argval(expr) to get the value of expr with relational semantics.")
@@ -598,17 +598,19 @@ class Operator(Expression):
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+            bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("% by domain containing 0 is not supported")
-            elif ub2 < 0:
-                return lb2 + 1, 0
-            elif lb2 > 0:
-                return 0, ub2 - 1
+            #the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
+            lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
+            ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
+            if lb1 >= 0:  # result will be positive if first argument is positive
+                return 0, max(-lb, ub, 0) #lb = 0
+            elif ub1 <= 0:  # result will be negative if first argument is negative
+                return min(-ub, lb, 0), 0 #ub = 0
+            return min(-ub, lb, 0), max(-lb, ub, 0)
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
