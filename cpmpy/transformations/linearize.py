@@ -162,7 +162,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
                     # abs(r) < abs(b), otherwise it wouldn't be a remainder.
                     # we need abs here because one or both of these can be negative.
-                    r = intvar(-(max(abs(lb) - 1, abs(ub) - 1)), max(abs(lb) - 1, abs(ub) - 1))
+                    r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
                     cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
                     # b * rhs <= a, otherwise we can both overshoot and undershoot the division, with r having positive and negative options.
                     cond = [Abs(r) < Abs(b), b * rhs <= a]
