@@ -603,14 +603,14 @@ class Operator(Expression):
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
-            #the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
+            # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
             lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
             ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
             if lb1 >= 0:  # result will be positive if first argument is positive
-                return 0, max(-lb, ub, 0) #lb = 0
+                return 0, max(-lb, ub, 0)  # lb = 0
             elif ub1 <= 0:  # result will be negative if first argument is negative
-                return min(-ub, lb, 0), 0 #ub = 0
-            return min(-ub, lb, 0), max(-lb, ub, 0)
+                return min(-ub, lb, 0), 0  # ub = 0
+            return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
