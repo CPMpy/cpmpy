@@ -9,7 +9,7 @@ from .utils import make_assump_model
 
 
 
-def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True, return_mcs=True):
+def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True, return_mcs=True, do_solution_hint=True):
     """
         Enumerating minimal unsatisfiable subsets (MUSes) and minimal correction sets (MCSes)
          of unsatisfiable constraints.
@@ -22,16 +22,20 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
         Based on:
             Liffiton, Mark H., et al. "Fast, flexible MUS enumeration." Constraints 21 (2016): 223-250.
     """
-
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft))
     s = cp.SolverLookup.get(solver, model)
 
     # map solver for computing hitting sets
     map_solver = cp.SolverLookup.get(map_solver)
+    if do_solution_hint and not 'solution_hint' in map_solver.__dict__:
+        # subclass does not overwite solution hinting...
+        do_solution_hint = False
+
     map_solver += cp.any(assump)
-    hint = [1] *len(assump)
-    map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
+    if do_solution_hint:
+        hint = [1]*len(assump)
+        map_solver.solution_hint(assump, hint) # we want large subsets, more likely to be a MUS
 
     deletion_order = {a : -len(get_variables(dmap[a])) for a in assump} # avoid recomputing
 
@@ -72,6 +76,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
 
         # ensure solution hint is still active
-        map_solver.solution_hint(assump, hint)
+        if do_solution_hint:
+            map_solver.solution_hint(assump, hint)
 
 

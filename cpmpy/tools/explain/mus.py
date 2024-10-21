@@ -107,7 +107,7 @@ def quickxplain(soft, hard=[], solver="ortools"):
     return [dmap[a] for a in core]
 
 
-def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
+def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools", do_solution_hint=True):
     """
         Find an optimal MUS according to a linear objective function.
         By not providing a weightvector, this function will return the smallest mus.
@@ -129,7 +129,8 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
     s = cp.SolverLookup.get(solver, model)
-    if hasattr(s, "solution_hint"): # algo is constructive, so favor large subsets
+    if do_solution_hint and 'solution_hint' in s.__dict__:
+        # algo is constructive, so favor large subsets
         if solver != "ortools": # causes weidness in OR-Tools: https://github.com/google/or-tools/issues/4324
             s.solution_hint(assump, [1]*len(assump))
 
