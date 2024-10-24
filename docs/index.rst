@@ -21,11 +21,11 @@ Supported solvers
 
 CPMpy can translate to many different solvers, and even provides direct access to them.
 
-| **Solver** | **Technology** | **Installation** | **Assumption variables?** | **Notes**|
-|------------|----------------|------------------|---------------------------|----------|
+| **Solver** | **Technology** | **Installation** | **Assumption variables** | **Notes**|
+|------------|----------------|------------------|--------------------------|----------|
 | **Or-Tools** | CP-SAT       | pip              | Yes                | Assumptions NOT incremental! Every solve starts from scratch |
 | **Choco**  | CP             | pip              | No                        |          |
-| **GCS**    | CP             | pip              | No                        | Supports proof logging
+| **GCS**    | CP             | local compile    | No                        | Supports proof logging
 | **MiniZinc** | CP           | pip + local install | No                     | Communicates through textfiles |
 | **Z3**     | SMT            | pip              | Yes                       |          |
 | **Gurobi** | ILP            | pip + (aca.) license | No                    |          |
