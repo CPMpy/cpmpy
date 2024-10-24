@@ -152,6 +152,10 @@ class CPM_template(SolverInterface):
             if self.has_objective():
                 self.objective_value_ = self.TPL_solver.ObjectiveValue()
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
         return has_sol
 
 
