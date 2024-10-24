@@ -457,6 +457,12 @@ class CPM_gurobi(SolverInterface):
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
 
+        # clear user vars if no solution found
+        if solution_count == 0:
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var.clear()
+
         for i in range(solution_count):
             # Specify which solution to query
             self.grb_model.setParam("SolutionNumber", i)

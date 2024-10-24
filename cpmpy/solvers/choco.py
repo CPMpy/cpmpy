@@ -215,6 +215,11 @@ class CPM_choco(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
 
+        # if no solutions, clear values of variables
+        if len(sols) == 0:
+            for var in self.user_vars:
+                var.clear()
+
         # display if needed
         if display is not None:
             for sol in sols:

@@ -374,6 +374,12 @@ class CPM_minizinc(SolverInterface):
             # add nogood on the user variables
             self += any([v != v.value() for v in self.user_vars])
 
+        if solution_count == 0:
+            # clear user vars if no solution found
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var.clear()
+
         # status handling
         self._post_solve(mzn_result)
 

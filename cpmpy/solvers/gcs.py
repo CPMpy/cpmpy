@@ -261,6 +261,11 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = gcs_stats["solve_time"]
 
+        # clear user vars if no solution found
+        if self._solve_return(self.cpm_status, self.objective_value_) is False:
+            for var in self.user_vars:
+                var.clear()
+
         # Verify proof, if requested
         if verify:
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 

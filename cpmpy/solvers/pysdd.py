@@ -164,6 +164,9 @@ class CPM_pysdd(SolverInterface):
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
         if self.pysdd_root is None:
+            # clear user vars if no solution found
+            for var in self.user_vars:
+                var.clear()
             return 0
 
         sddmodels = [x for x in self.pysdd_root.models()]
