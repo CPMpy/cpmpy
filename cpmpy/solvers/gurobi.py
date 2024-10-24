@@ -186,6 +186,10 @@ class CPM_gurobi(SolverInterface):
                 else:
                     self.objective_value_ = int(grb_obj_val)
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
         return has_sol
 
 

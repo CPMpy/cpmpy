@@ -221,6 +221,10 @@ class CPM_ortools(SolverInterface):
                 assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
                 self.objective_value_ = int(ort_obj_val) # ensure it is an integer
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):

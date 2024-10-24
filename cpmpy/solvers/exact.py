@@ -127,7 +127,7 @@ class CPM_exact(SolverInterface):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             for cpm_var in self.user_vars:
-                cpm_var._value = None
+                cpm_var.clear()
             return
 
         # fill in variable values
@@ -205,7 +205,6 @@ class CPM_exact(SolverInterface):
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
-
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
