@@ -208,6 +208,11 @@ class CPM_pysat(SolverInterface):
                 else: # not specified, dummy val
                     cpm_var._value = True
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
+
         return has_sol
 
 

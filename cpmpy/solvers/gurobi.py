@@ -186,6 +186,10 @@ class CPM_gurobi(SolverInterface):
                 else:
                     self.objective_value_ = int(grb_obj_val)
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
         return has_sol
 
 
@@ -452,6 +456,12 @@ class CPM_gurobi(SolverInterface):
         optimal_val = None
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var.clear()
 
         for i in range(solution_count):
             # Specify which solution to query
