@@ -389,14 +389,6 @@ class CPM_choco(SolverInterface):
 
             elif cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args
-                if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl): # bv -> bv
-                    chc_cond, chc_subexpr = self.solver_vars([cond, subexpr])
-                elif isinstance(cond, _BoolVarImpl): # bv -> expr
-                    chc_cond = self.solver_var(cond)
-                    chc_subexpr = self._get_constraint(subexpr).reify()
-                elif isinstance(subexpr, _BoolVarImpl): # expr -> bv
-                    chc_cond = self._get_constraint(cond).reify()
-                    chc_subexpr = self.solver_var(subexpr)
                 if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
                     return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
                 elif isinstance(cond, _BoolVarImpl):
