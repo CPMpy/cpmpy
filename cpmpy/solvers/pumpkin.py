@@ -119,27 +119,28 @@ class CPM_pumpkin(SolverInterface):
         self.cpm_status.runtime = time.time() - start_time
 
         # translate solver exit status to CPMpy exit status
-        match result:
-            case SatisfactionResult.Satisfiable(solution):
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        if isinstance(result, SatisfactionResult.Satisfiable):
+            solution = result.solution
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
+            # fill in variable values
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
 
-                    if isinstance(sol_var, PumpkinInt):
-                        cpm_var._value = solution.int_value(sol_var)
-                    elif isinstance(sol_var, PumpkinBool):
-                        cpm_var._value = solution.bool_value(sol_var)
-                    else:
-                        raise NotSupportedError("Only boolean and integer variables are supported.")
+                if isinstance(sol_var, PumpkinInt):
+                    cpm_var._value = solution.int_value(sol_var)
+                elif isinstance(sol_var, PumpkinBool):
+                    cpm_var._value = solution.bool_value(sol_var)
+                else:
+                    raise NotSupportedError("Only boolean and integer variables are supported.")
 
+        elif isinstance(result, SatisfactionResult.Unsatisfiable):
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
 
-            case SatisfactionResult.Unsatisfiable():
-                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-
-            case SatisfactionResult.Unknown():
-                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        elif isinstance(result, SatisfactionResult.Unknown):
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        else:
+            raise ValueError(f"Unknown Pumpkin-result: {result} of type {type(result)}, please report on github...")
 
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
