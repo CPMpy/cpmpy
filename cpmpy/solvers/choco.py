@@ -70,6 +70,15 @@ class CPM_choco(SolverInterface):
         # try to import the package
         try:
             import pychoco as chc
+            # check it's the correct version
+            # CPMPy uses features only available from 0.2.1
+            from importlib.metadata import version as get_version
+            from packaging import version
+            pychoco_version = get_version("pychoco")
+            if version.parse(pychoco_version) < version.parse("0.2.1"):
+                import warnings
+                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, but you have version {pychoco_version}")
+                return False
             return True
         except ImportError:
             return False
