@@ -184,7 +184,7 @@ class Maximum(GlobalFunction):
 
 class Abs(GlobalFunction):
     """
-        Computes the maximum value of the arguments
+        Computes the absolute value of the argument
     """
 
     def __init__(self, expr):
