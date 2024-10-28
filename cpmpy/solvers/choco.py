@@ -387,18 +387,7 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args))
 
-            # elif cpm_expr.name == "->": # prepared for if pychoco releases if_then addition
-            #     cond, subexpr = cpm_expr.args
-            #     if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
-            #         return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
-            #     elif isinstance(cond, _BoolVarImpl):
-            #         return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
-            #     elif isinstance(subexpr, _BoolVarImpl):
-            #         return self._get_constraint(cond).implies(self.solver_var(subexpr))
-            #     else:
-            #         ValueError(f"Unexpected implication: {cpm_expr}")
-
-            elif cpm_expr.name == '->':
+            elif cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args
                 if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl): # bv -> bv
                     chc_cond, chc_subexpr = self.solver_vars([cond, subexpr])
@@ -408,10 +397,14 @@ class CPM_choco(SolverInterface):
                 elif isinstance(subexpr, _BoolVarImpl): # expr -> bv
                     chc_cond = self._get_constraint(cond).reify()
                     chc_subexpr = self.solver_var(subexpr)
+                if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
+                    return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
+                elif isinstance(cond, _BoolVarImpl):
+                    return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
+                elif isinstance(subexpr, _BoolVarImpl):
+                    return self._get_constraint(cond).implies(self.solver_var(subexpr))
                 else:
-                    raise ValueError(f"Unexpected implication {cpm_expr}")
-
-                return self.chc_model.or_([self.chc_model.bool_not_view(chc_cond), chc_subexpr])
+                    ValueError(f"Unexpected implication: {cpm_expr}")
 
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
@@ -421,30 +414,16 @@ class CPM_choco(SolverInterface):
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            op = cpm_expr.name if cpm_expr.name != "==" else "="
-
+            op = "=" if cpm_expr.name == "==" else cpm_expr.name
             if is_boolexpr(lhs) and is_boolexpr(rhs): #boolean equality -- Reification
-                # # prepared for if pychoco releases reify_with addition
-                # if isinstance(lhs, _BoolVarImpl) and isinstance(lhs, _BoolVarImpl):
-                #     return self.chc_model.all_equal(self.solver_vars([lhs, rhs]))
-                # elif isinstance(lhs, _BoolVarImpl):
-                #     return self._get_constraint(rhs).reify_with(self.solver_var(lhs))
-                # elif isinstance(rhs, _BoolVarImpl):
-                #     return self._get_constraint(lhs).reify_with(self.solver_var(rhs))
-                # else:
-                #     raise ValueError(f"Unexpected reification {cpm_expr}")
-
                 if isinstance(lhs, _BoolVarImpl) and isinstance(lhs, _BoolVarImpl):
-                    chc_var, bv = self.solver_vars([lhs, rhs])
+                    return self.chc_model.all_equal(self.solver_vars([lhs, rhs]))
                 elif isinstance(lhs, _BoolVarImpl):
-                    bv = self._get_constraint(rhs).reify()
-                    chc_var = self.solver_var(lhs)
+                    return self._get_constraint(rhs).reify_with(self.solver_var(lhs))
                 elif isinstance(rhs, _BoolVarImpl):
-                    bv = self._get_constraint(lhs).reify()
-                    chc_var = self.solver_var(rhs)
+                    return self._get_constraint(lhs).reify_with(self.solver_var(rhs))
                 else:
                     raise ValueError(f"Unexpected reification {cpm_expr}")
-                return self.chc_model.all_equal([chc_var, bv])
 
             elif isinstance(lhs, _NumVarImpl):
                 return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
