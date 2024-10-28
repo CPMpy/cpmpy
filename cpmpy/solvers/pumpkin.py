@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import warnings
+
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -412,15 +414,19 @@ class CPM_pumpkin(SolverInterface):
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
         # transform and post the constraints
-        for tag, orig_expr in enumerate(toplevel_list(cpm_expr_orig, merge_and=True)):
+        for orig_expr in toplevel_list(cpm_expr_orig, merge_and=True):
             if orig_expr in set(self.user_cons.values()):
                 continue
             else:
-                tag = len(self.user_cons)+1
-                self.user_cons[tag] = orig_expr
-            tag = None # needed for clauses, TODO: do proper check and remove
+                constraint_tag = len(self.user_cons)+1
+                self.user_cons[constraint_tag] = orig_expr
 
             for cpm_expr in self.transform(orig_expr):
+                tag = constraint_tag
+                if isinstance(cpm_expr, Operator) and cpm_expr.name == "or":
+                    # clause, tagging not supported
+                    tag = None
+                    warnings.warn(f"Not tagging constraint {cpm_expr} as it a clause")
 
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
                     bv, subexpr = cpm_expr.args
