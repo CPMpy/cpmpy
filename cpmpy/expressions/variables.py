@@ -215,7 +215,7 @@ def directvar(directname, arguments, novar=None, shape=1, name=None, insert_name
 
         Parameters:
             directname: name of the solver function that you wish to call
-            arguments: tuple of arguments to pass to the solver function with name 'name', see vectorized arguments below
+            arguments: **tuple** of arguments to pass to the solver function with name 'name', see vectorized arguments below
             novar: list of indices (offset 0, of supplied `arguments`) of arguments that contain no variables,
                    that can be passed 'as is' without scanning for variables
             shape: the shape of the n-dimensional array of variables (int, default: 1)
