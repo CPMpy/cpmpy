@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## utils.py
+##
+"""
+    Utilities for explanation techniques
+
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        make_assump_model
+"""
+
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 
@@ -14,6 +32,7 @@ def make_assump_model(soft, hard=[], name=None):
     assump = cp.boolvar(shape=(len(soft2),), name=name)
 
     # hard + implied soft constraints
+    hard = toplevel_list(hard)
     model = cp.Model(hard + [assump.implies(soft2)])  # each assumption variable implies a candidate
 
     return model, soft2, assump

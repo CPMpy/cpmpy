@@ -5,7 +5,7 @@ from cpmpy.transformations.normalize import toplevel_list
 def mcs(soft, hard=[], solver="ortools"):
     """
         Compute Minimal Correction Subset of unsatisfiable model.
-        Remvoving these contraints will result in a satisfiable model.
+        Removing these contraints will result in a satisfiable model.
         Computes a subset of constraints which minimizes the total number of constraints to be removed
     """
     return mcs_opt(soft, hard, 1, solver)

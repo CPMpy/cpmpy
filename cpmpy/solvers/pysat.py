@@ -6,6 +6,10 @@
 """
     Interface to PySAT's API
 
+    Requires that the 'python-sat' python package is installed:
+
+        $ pip install python-sat[aiger,approxmc,cryptosat,pblib]
+
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
     interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
     to a variety of cardinality and pseudo-Boolean encodings.
@@ -28,6 +32,10 @@
         :nosignatures:
 
         CPM_pysat
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -50,7 +58,7 @@ class CPM_pysat(SolverInterface):
     $ pip install python-sat
 
     See detailed installation instructions at:
-    https://pysathq.github.io/installation.html
+    https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
         - pysat_vpool: a pysat.formula.IDPool for the variable mapping
@@ -81,7 +89,8 @@ class CPM_pysat(SolverInterface):
         from pysat.solvers import SolverNames
         names = []
         for name, attr in vars(SolverNames).items():
-            if not name.startswith('__') and isinstance(attr, tuple):
+            # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
+            if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
                 if name not in attr:
                     name = attr[-1]
                 names.append(name)
@@ -123,6 +132,13 @@ class CPM_pysat(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysat_solver
 
 
     def solve(self, time_limit=None, assumptions=None):

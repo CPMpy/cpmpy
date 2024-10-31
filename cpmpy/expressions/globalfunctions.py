@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#-*- coding:utf-8 -*-
 ##
 ## globalfunctions.py
 ##
 """
+    Global functions conveniently express numerical global constraints.
 
     Using global functions
     ------------------------
@@ -183,7 +184,7 @@ class Maximum(GlobalFunction):
 
 class Abs(GlobalFunction):
     """
-        Computes the maximum value of the arguments
+        Computes the absolute value of the argument
     """
 
     def __init__(self, expr):

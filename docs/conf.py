@@ -24,7 +24,7 @@ copyright = '2024, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.20'
+release = '0.9.23'
 
 # variables to be accessed from html
 html_context = {
@@ -42,10 +42,26 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'm2r2',
+    'myst_parser',
     'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver'
+]
+
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
 ]
 
 numpydoc_show_class_members = False

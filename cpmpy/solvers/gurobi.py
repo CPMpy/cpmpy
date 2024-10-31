@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## gurobi.py
+##
 """
     Interface to the python 'gurobi' package
 
@@ -6,11 +10,12 @@
 
         $ pip install gurobipy
     
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
     
     In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
 
     ===============
     List of classes
@@ -83,6 +88,7 @@ class CPM_gurobi(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception(
@@ -95,6 +101,13 @@ class CPM_gurobi(SolverInterface):
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.grb_model
 
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
@@ -167,7 +180,11 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if self.has_objective():
-                self.objective_value_ = grb_objective.getValue()
+                grb_obj_val = grb_objective.getValue()
+                if grb_obj_val != int(grb_obj_val):
+                    self.objective_value_ =  grb_obj_val # can happen with DirectVar using floats
+                else:
+                    self.objective_value_ = int(grb_obj_val)
 
         return has_sol
 

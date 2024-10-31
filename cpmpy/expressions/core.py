@@ -11,7 +11,7 @@
 
     Here is a list of standard python operators and what object (with what expr.name) it creates:
 
-    Comparisons:
+    **Comparisons**:
 
     - x == y        Comparison("==", x, y)
     - x != y        Comparison("!=", x, y)
@@ -20,9 +20,9 @@
     - x > y         Comparison(">", x, y)
     - x >= y        Comparison(">=", x, y)
 
-    Mathematical operators:
+    **Mathematical operators**:
 
-    - -x            Operator("-", [x])
+    - −x            Operator("-", [x])
     - x + y         Operator("sum", [x,y])
     - sum([x,y,z])  Operator("sum", [x,y,z])
     - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
@@ -32,7 +32,7 @@
     - x % y         Operator("mod", [x,y])
     - x ** y        Operator("pow", [x,y])
 
-    Logical operators:
+    **Logical operators**:
 
     - x & y         Operator("and", [x,y])
     - x | y         Operator("or", [x,y])
@@ -47,14 +47,16 @@
 
     Apart from operator overloading, expressions implement two important functions:
 
-    - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
-                    If it does, the expression can be used as top-level constraint
-                    or in logical operators.
+    - `is_bool()`   
+        which returns whether the return type of the expression is Boolean.
+        If it does, the expression can be used as top-level constraint
+        or in logical operators.
 
-    - `value()`     computes the value of this expression, by calling .value() on its
-                    subexpressions and doing the appropriate computation
-                    this is used to conveniently print variable values, objective values
-                    and any other expression value (e.g. during debugging).
+    - `value()`     
+        computes the value of this expression, by calling .value() on its
+        subexpressions and doing the appropriate computation
+        this is used to conveniently print variable values, objective values
+        and any other expression value (e.g. during debugging).
     
     ===============
     List of classes
@@ -327,10 +329,11 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if other == 0:
-            return 1
-        elif other == 1:
-            return self
+        if is_num(other):
+            if other == 0:
+                return 1
+            if other == 1:
+                return self
         return Operator("pow", [self, other])
 
     def __rpow__(self, other, modulo=None):
@@ -547,7 +550,7 @@ class Operator(Expression):
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
+        elif self.name == "wsum": return int(sum(arg_vals[0]*np.array(arg_vals[1])))
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "mod": return arg_vals[0] % arg_vals[1]

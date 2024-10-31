@@ -1,8 +1,18 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## minizinc.py
+##
 """
     Interface to MiniZinc's Python API
 
-    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+    Requires that the 'minizinc' python package is installed:
+
+        $ pip install minizinc
+
+    as well as the Minizinc bundled binary packages, downloadable from:
+    https://github.com/MiniZinc/MiniZincIDE/releases
+
 
     MiniZinc is a free and open-source constraint modeling language.
     MiniZinc is used to model constraint satisfaction and optimization problems in
@@ -14,6 +24,8 @@
     Documentation of the solver's own Python API:
     https://minizinc-python.readthedocs.io/
 
+    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+
     ===============
     List of classes
     ===============
@@ -22,6 +34,10 @@
         :nosignatures:
 
         CPM_minizinc
+
+    ==============
+    Module details
+    ==============
 """
 import re
 import warnings
@@ -39,6 +55,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
+from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 
 
@@ -172,6 +189,14 @@ class CPM_minizinc(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.mzn_model
+
 
     def _pre_solve(self, time_limit=None, **kwargs):
         """ shared by solve() and solveAll() """
@@ -367,8 +392,6 @@ class CPM_minizinc(SolverInterface):
             return str(cpm_var)
 
         if cpm_var not in self._varmap:
-            # we assume all variables are user variables (because no transforms)
-            self.user_vars.add(cpm_var)
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
@@ -448,8 +471,7 @@ class CPM_minizinc(SolverInterface):
 
         :return: self
         """
-        # all variables are user variables, handled in `solver_var()`
-
+        get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
             # Get text expression, add to the solver
@@ -668,7 +690,7 @@ class CPM_minizinc(SolverInterface):
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                - kwargs:      any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
             Returns: number of solutions found
         """
@@ -699,3 +721,19 @@ class CPM_minizinc(SolverInterface):
             finally:
                 asyncio.events.set_event_loop(None)
                 loop.close()
+
+    def minizinc_string(self) -> str:
+        """
+            Returns the model as represented in the Minizinc language.
+        """
+        return "".join(self._pre_solve()[1]._code_fragments)
+
+    def flatzinc_string(self, **kwargs) -> str:
+        """
+            Returns the model as represented in the Flatzinc language.
+        """
+        with self._pre_solve()[1].flat(**kwargs) as (fzn, ozn, statistics):
+            with open(fzn.name) as f:
+                f.seek(0)
+                contents = f.readlines()
+        return "".join(contents)

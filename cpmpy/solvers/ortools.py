@@ -4,7 +4,12 @@
 ## ortools.py
 ##
 """
-    Interface to ortools' CP-SAT Python API
+    Interface to OR-Tools' CP-SAT Python API. 
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can be installed through `pip`:
+
+        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
@@ -22,6 +27,10 @@
         :nosignatures:
 
         CPM_ortools
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import numpy as np
@@ -42,7 +51,7 @@ from ..transformations.comparison import only_numexpr_equality
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the python 'ortools' CP-SAT API
+    Interface to the Python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
@@ -79,7 +88,7 @@ class CPM_ortools(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception("Install the python 'ortools' package to use this solver interface")
@@ -98,6 +107,12 @@ class CPM_ortools(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.ort_model
 
 
     def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
@@ -202,7 +217,9 @@ class CPM_ortools(SolverInterface):
 
             # translate objective
             if self.has_objective():
-                self.objective_value_ = self.ort_solver.ObjectiveValue()
+                ort_obj_val = self.ort_solver.ObjectiveValue()
+                assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
+                self.objective_value_ = int(ort_obj_val) # ensure it is an integer
 
         return has_sol
 
@@ -332,7 +349,7 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse", "no_overlap"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -468,6 +485,10 @@ class CPM_ortools(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr.args)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]

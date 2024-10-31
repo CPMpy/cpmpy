@@ -1,3 +1,6 @@
+"""
+    Transformations dealing with negations.
+"""
 import copy
 import warnings  # for deprecation warning
 import numpy as np
