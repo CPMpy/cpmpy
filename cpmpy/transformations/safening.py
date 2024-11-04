@@ -17,7 +17,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
             - Element 'Arr[idx]': undefined when idx is not in the range of Arr
 
         A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
-        value(s) away. However CPMpy allows arbitrary nesting and reification of constraints, so an
+        value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
         expression like `b <-> (Arr[idx] == 5)` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
         Should idx be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
 
@@ -38,7 +38,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
         and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
         purposes: it represents whether the original argument has a safe value; and if it is true the new
         argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
-        argument remains decoupled (can take any value, as will the expression's output).
+        argument remains decoupled (can take any value, as will the function's output).
 
         WARNING! Under the relational semantics, `b <-> ~(partial==5)` and `b <-> (partial!=5) mean
         different things! The second is `b <-> (is_defined & (total!=5))` the first is
