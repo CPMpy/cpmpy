@@ -87,15 +87,17 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
 
     to_check = list(soft)
     sat_subset = []
-    solver = cp.SolverLookup.get(solver, cp.Model(hard))
+    s = cp.SolverLookup.get(solver)
+    s += hard
 
     while len(to_check):
         c = to_check.pop()
-        solver += c
-        if solver.solve() is True:
+        s += c
+        if s.solve() is True:
             sat_subset.append(c)
         else:
             # UNSAT, cannot add to sat subset, reset solver to just sat subset
-            solver = cp.SolverLookup.get(solver, cp.Model(hard + sat_subset))
+            s = cp.SolverLookup.get(solver)
+            s += hard
 
     return sat_subset
