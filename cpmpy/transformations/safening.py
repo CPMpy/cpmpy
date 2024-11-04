@@ -60,6 +60,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
     """
 
     if _toplevel is None:
+        assert _nbc is None, f"_nbc is an internal argument, should not be filled by caller but got {_nbc}"
         toplevel_call = True
         _toplevel = []
         _nbc = _toplevel # at the toplevel of the contraint model, the neirest Boolean context is just toplevel
