@@ -32,6 +32,7 @@
 """
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -351,7 +352,8 @@ class CPM_gurobi(SolverInterface):
                     self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
-                    assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
