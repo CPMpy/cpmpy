@@ -7,9 +7,9 @@
 """
 import numpy as np
 import cpmpy as cp
+from time import time
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
-
 from .utils import make_assump_model
 from ...expressions.utils import is_num
 
@@ -107,7 +107,7 @@ def quickxplain(soft, hard=[], solver="ortools"):
     return [dmap[a] for a in core]
 
 
-def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
+def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools",top_k=1):
     """
         Find an optimal MUS according to a linear objective function.
         By not providing a weightvector, this function will return the smallest mus.
@@ -124,7 +124,8 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
 
     """
 
-
+    time_limit = 300
+    start_time = time()
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
@@ -141,28 +142,29 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
 
     hs_solver = cp.SolverLookup.get(hs_solver)
     hs_solver.minimize(cp.sum(assump * np.array(weights)))
-
-    while hs_solver.solve() is True:
-        hitting_set = [a for a in assump if a.value()]
-        if s.solve(assumptions=hitting_set) is False:
-            break
-
-        # else, the hitting set is SAT, now try to extend it without extra solve calls.
-        # Check which other assumptions/constraints are satisfied (using c.value())
-        # complement of grown subset is a correction subset
-        # Assumptions encode indicator constraints a -> c, find all false assumptions
-        #   that really have to be false given the current solution.
-        new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
-        hs_solver += cp.sum(new_corr_subset) >= 1
-
-        # greedily search for other corr subsets disjoint to this one
-        sat_subset = list(new_corr_subset)
-        while s.solve(assumptions=sat_subset) is True:
+    i = 0
+    while i < top_k:
+        i+=1
+        while hs_solver.solve() is True:
+            hitting_set = [a for a in assump if a.value()]
+            if s.solve(assumptions=hitting_set) is False:
+                break
+            # else, the hitting set is SAT, now try to extend it without extra solve calls.
+            # Check which other assumptions/constraints are satisfied (using c.value())
+            # complement of grown subset is a correction subset
+            # Assumptions encode indicator constraints a -> c, find all false assumptions
+            #   that really have to be false given the current solution.
             new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
-            sat_subset += new_corr_subset # extend sat subset with new corr subset, guaranteed to be disjoint
-            hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
+            hs_solver += cp.sum(new_corr_subset) >= 1
 
-    return [dmap[a] for a in hitting_set]
+            # greedily search for other corr subsets disjoint to this one
+            sat_subset = list(new_corr_subset)
+            while s.solve(assumptions=sat_subset) is True:
+                new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
+                sat_subset += new_corr_subset # extend sat subset with new corr subset, guaranteed to be disjoint
+                hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
+        hs_solver += ~cp.all(hitting_set)
+        yield [[dmap[a] for a in hitting_set],  time() - start_time]
 
 def smus(soft, hard=[], solver="ortools", hs_solver="ortools"):
     return optimal_mus(soft, hard=hard, weights=None, solver=solver, hs_solver=hs_solver)
