@@ -7,7 +7,7 @@ from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
 
-def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
+def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=frozenset()):
     """
         A partial function is a function whose output is not defined for all possible inputs.
 
@@ -55,12 +55,14 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
         :param: list_of_expr: list of CPMpy expressions
         :param: _toplevel: list of new expressions to put toplevel (used internally)
         :param: _nbc: list of new expressions to put in nearest Boolean context (used internally)
+        :param: safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
+                                 a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
     """
 
     if _toplevel is None:
         toplevel_call = True
         _toplevel = []
-        _nbc = []
+        _nbc = _toplevel # at the toplevel of the contraint model, the neirest Boolean context is just toplevel
     else:
         toplevel_call = False
         assert isinstance(_toplevel, list), f"_toplevel argument must be of type list but got {type(_toplevel)}"
@@ -73,11 +75,11 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
             new_lst.append(cpm_expr)
 
         elif isinstance(cpm_expr, (list,tuple)):
-            new_lst.append(no_partial_functions(cpm_expr, _toplevel, _nbc))
+            new_lst.append(no_partial_functions(cpm_expr, _toplevel, _nbc, safen_toplevel))
 
         elif isinstance(cpm_expr, NDVarArray):  # TODO efficiency: and cpm_expr.has_subexpr()
             # efficiency: flatten into single iterator, then reshape to n-dimensional again
-            new_cpm_expr = cpm_array(no_partial_functions(cpm_expr.flat, _toplevel, _nbc)).reshape(cpm_expr.shape)
+            new_cpm_expr = cpm_array(no_partial_functions(cpm_expr.flat, _toplevel, _nbc, safen_toplevel)).reshape(cpm_expr.shape)
             new_lst.append(new_cpm_expr)
 
         elif isinstance(cpm_expr, DirectConstraint):  # do not recurse into args
@@ -87,23 +89,28 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
             assert isinstance(cpm_expr, Expression), f"each `cpm_expr` should be an Expression at this point, not {type(cpm_expr)}"
             args = cpm_expr.args
 
-            if cpm_expr.is_bool():  # a Boolean context, create a new _nbc
+            if cpm_expr.is_bool() and toplevel_call is False:  # a Boolean context, create a new _nbc
+                # if we are currently toplevel, no need to create a new nbc, will append to toplevel anyway
                 _nbc = []
 
             # recurse over the arguments of the expression
             # TODO efficiency: if cpm_expr.has_subexpr()
-            new_args = no_partial_functions(args, _toplevel, _nbc=_nbc)
+            new_args = no_partial_functions(args, _toplevel, _nbc, safen_toplevel=safen_toplevel)
             if any((a1 is not a2) for a1,a2 in zip(new_args,args)):  # efficiency (hopefully): only copy if an arg changed
                 cpm_expr = copy(cpm_expr)
                 cpm_expr.args = new_args
                 args = new_args
 
-            if cpm_expr.is_bool() and len(_nbc) != 0:
-                # a Boolean context, conjoin my Boolean expression with _nbc
+            if cpm_expr.is_bool() and len(_nbc) != 0 and toplevel_call is False:
+                # a nested Boolean context, conjoin my Boolean expression with _nbc
                 # in `b <-> (Arr[idx] == 5)`, this would trigger for cpm_expr (Arr[idx] == 5)
                 cpm_expr = cpm_all(_nbc) & cpm_expr
 
             elif isinstance(cpm_expr, GlobalFunction) and cpm_expr.name == "element":
+                if _nbc is _toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
+                    new_lst.append(cpm_expr)
+                    continue
+
                 arr, idx = args
                 lb, ub = get_bounds(idx)
 
@@ -115,6 +122,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
 
             elif cpm_expr.name == "div" or cpm_expr.name == "mod":
+                if _nbc is _toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
+                    new_lst.append(cpm_expr)
+                    continue
+
                 idx_to_safen = 1
                 lb, ub = get_bounds(args[idx_to_safen])
 
@@ -136,8 +147,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None):
             new_lst.append(cpm_expr)
 
     if toplevel_call is True:
-        if len(_nbc) != 0:  # partials at toplevel
-            new_lst.append(cpm_all(_nbc))
+        assert _nbc is _toplevel # should point to the same list here
         return new_lst + _toplevel
     else:
         return new_lst
