@@ -13,7 +13,7 @@ class TestTransLinearize(unittest.TestCase):
         b = cp.intvar(0, 10, name="b")
         expr = (a // b) == 3
 
-        safe_expr = no_partial_functions([expr])
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
@@ -35,7 +35,7 @@ class TestTransLinearize(unittest.TestCase):
         b = cp.intvar(-1, 10, name="b")
         expr = (a // b) <= 3
 
-        safe_expr = no_partial_functions([expr])
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
@@ -79,7 +79,7 @@ class TestTransLinearize(unittest.TestCase):
 
         expr = (a / b + arr[idx]) == 2
 
-        safe_expr = no_partial_functions([expr])
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
@@ -101,7 +101,7 @@ class TestTransLinearize(unittest.TestCase):
 
         expr = (a / arr[idx]) == 2
 
-        safe_expr = no_partial_functions([expr])
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model(safe_expr).solve())
         self.assertTrue(argval(safe_expr))
 
