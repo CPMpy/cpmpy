@@ -40,6 +40,10 @@ def mss_grow(soft, hard=[], solver="ortools"):
         Computes a subset-maximal set of constraints by greedily adding contraints.
         Relies on solving under assumptions, so using an incremental solver is adviced
         No guarantees on optimality, but can be faster in some cases
+
+        Exploits the solution found to add more constraints at once, cfr:
+        Mencía, Carlos, and Joao Marques-Silva. "Efficient relaxations of over-constrained CSPs."
+        2014 IEEE 26th International Conference on Tools with Artificial Intelligence. IEEE, 2014.
     """
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
@@ -53,11 +57,12 @@ def mss_grow(soft, hard=[], solver="ortools"):
     else:
         sat_subset = []
 
-    to_check = list(set(assump) - set(sat_subset))
+    to_check = set(assump) - set(sat_subset)
     while len(to_check):
         a = to_check.pop()
         if s.solve(assumptions=sat_subset + [a]) is True:
-            sat_subset.append(a)
+            sat_subset = [a for a, c in zip(assump, soft) if a.value() or c.value()]
+            to_check -= set(sat_subset)
         else:
             # UNSAT, cannot add
             pass
