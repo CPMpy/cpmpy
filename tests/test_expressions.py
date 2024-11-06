@@ -536,7 +536,6 @@ class TestBounds(unittest.TestCase):
         x = cp.intvar(1,10,shape=(3,3), name="x")
         self.assertTrue(cp.Model(cp.sum(x) >= 10).solve())
         self.assertIsNotNone(x.value())
-        print(x.value())
         # test all types of expressions
         self.assertEqual(int, type(x[0,0].value())) # just the var
         for v in x[0]:
