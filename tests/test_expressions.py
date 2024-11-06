@@ -544,6 +544,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type(cp.sum(x[0]).value()))
         self.assertEqual(int, type(cp.sum(x).value()))
         self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
+        self.assertEqual(float, type(cp.sum([0.1,0.2,0.3] * x[0]).value()))
         self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
         a,b = x[0,[0,1]]
         self.assertEqual(int, type((-a).value()))
