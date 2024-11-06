@@ -321,14 +321,14 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
+                return ort.LinearExpr.sum(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "sub":
                 a,b = self.solver_vars(cpm_expr.args)
                 return a - b
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
+                return ort.LinearExpr.weighted_sum(x,w)
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
