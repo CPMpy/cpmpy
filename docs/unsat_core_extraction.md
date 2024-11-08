@@ -2,7 +2,7 @@
 
 When a model is unsatisfiable, it can be desirable to get a better idea of which Boolean variables make it unsatisfiable. Commonly, these Boolean variables are 'switches' that turn constraints on, hence such Boolean variables can be used to get a better idea of which _constraints_ make the model unsatisfiable.
 
-In the SATisfiability literature, the Boolean variables of interests are called _assumption_ variables and the solver will assume they are true. The subset of these variables that, when true, make the model unsatisfiable is called an unsatisfiable _core_.
+In the satisfiability literature, the Boolean variables of interests are called _assumption variables_ and the solver will assume they are true. The subset of these variables that, when true, makes the model unsatisfiable is called an unsatisfiable _core_.
 
 Lazy Clause Generation solvers, like OR-Tools, are built on SAT solvers and hence can inherit the ability to define assumption variables and extract an unsatisfiable core.
 
@@ -31,7 +31,7 @@ print(bv.value())
 
 This opens the door to more advanced use cases, such as Minimal Unsatisfiable Subsets (MUS) and QuickXplain-like tools to help debugging.
 
-In our tools we implemented a simple MUS deletion based algorithm, using assumption variables.
+In our tools, we implemented a simple MUS deletion based algorithm, using assumption variables.
 
 ```python
 from cpmpy.tools import mus
@@ -39,10 +39,10 @@ from cpmpy.tools import mus
 print(mus(m.constraints))
 ```
 
-We welcome any additional examples that use CPMpy in this way!! Here is one example: the [MARCO algorithm for enumerating all MUS/MSSes](http://github.com/tias/cppy/tree/master/examples/advanced/marco_musmss_enumeration.py). Here is another: a [stepwise explanation algorithm](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py) for SAT problems (implicit hitting-set based).
+We welcome any additional examples that use CPMpy in this way! Here is one example: the [MARCO algorithm for enumerating all MUS/MSSes](http://github.com/tias/cppy/tree/master/examples/advanced/marco_musmss_enumeration.py). Here is another: a [stepwise explanation algorithm](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py) for SAT problems (implicit hitting-set based).
 
 More information on how to use these tools can be found in [the tools API documentation](./api/tools.rst)
 
-One OR-Tools specific caveat is that this particular (default) solver its Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!!
+One OR-Tools specific caveat is that this particular (default) solver's Python interface is by design _stateless_. That means that, unlike in PySAT, calling `s.solve(assumptions=bv)` twice for a different `bv` array does NOT REUSE anything from the previous run: no warm-starting, no learnt clauses that are kept, no incrementality, so there will be some pre-processing overhead. If you know of another CP solver with a (Python) assumption interface that is incremental, let us know!
 
 A final-final note is that you can manually warm-start OR-Tools with a previously found solution through `s.solution_hint()`; see also the MARCO code linked above.

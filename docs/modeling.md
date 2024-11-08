@@ -47,7 +47,7 @@ If you want a **sparse domain**, containing only a few values, you can either de
 
 Decision variables have a **unique name**. You can set it yourself, otherwise a unique name will automatically be assigned. If you print decision variables (`print(b)` or `print(x)`), it will display the name. Did we already say the name <u>must be unique</u>? Many solvers use the name as unique identifier, and it is near-impossible to debug with non-uniquely named decision variables.
 
-A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable across multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. Before solving, this value will be `None`. After solving it has either taken a boolean or integer value, or it is still None. For example when the solver didn't find any solution or when the decision variable was never used in the model, i.e. never appeared in a constraint or the objective function (a stale decision variable).
+A solver will set the **value** of the decision variables for which it solved, if it can find a solution. You can retrieve it with `v.value()`. Variables are not tied to a solver, so you can use the same variable across multiple models and solvers. When a solve call finishes, it will overwrite the value of all its decision variables. Before solving, this value will be `None`. After solving it has either taken a boolean or integer value, or it is still None. For example when the solver didn't find any solution or when the decision variable was never used in the model, i.e. a "stale" decision variable which never appeared in a constraint or the objective function.
 
 Finally, by providing a **shape** you automatically create a **numpy n-dimensional array** of decision variables. These variables automatically get their index appended to their name (the name is provided on the array-level) as to ensure its uniqueness:
 
@@ -300,7 +300,7 @@ cp.Model(
     cp.Xor(b, cp.AllDifferent(x)),  # etc...
 )
 ```
-`decompose()` returns two arguments, one that represents the constraints and another that defines any newly created decision variables during the decomposition process. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](./api/expressions/globalconstraints.rst).
+`decompose()` returns two values, one that represents the constraints and another that defines any newly created decision variables during the decomposition process. This is technical, but important to make negation work, if you want to know more check the [the API documentation on global constraints](./api/expressions/globalconstraints.rst).
 
 #### Global functions
 
@@ -537,8 +537,8 @@ On a technical note, remark that a solver object does not modify the Model objec
 
 ## Setting solver parameters
 
-Now lets use our solver-specific powers. 
-For example, with `m` a CPMpy Model(), you can do the following to make OR-Tools use 8 parallel cores and print search progress:
+Now lets use our solver-specific powers.
+For example, with `m` a CPMpy `Model()`, you can do the following to make OR-Tools use 8 parallel cores and print search progress:
 
 ```python
 import cpmpy as cp
@@ -575,7 +575,7 @@ print(s.ort_solver.NumBranches())
 
 Other solvers, like Minizinc, might have other native objects stored.
 You can see which solver native objects are initialized for each solver in [the API documentation](./api/solvers.rst) of the solver.
-We can access the solver statistics from the mzn_result object like this:
+We can access the solver statistics from the `mzn_result` object like this:
 
 ```python
 import cpmpy as cp
@@ -608,7 +608,7 @@ s += sum(ivar) == 3
 s.solve()
 ```
  
-_Technical note_: OR-Tools its model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
+_Technical note_: OR-Tools' model representation is incremental but its solving itself is not (yet?). Gurobi and the PySAT solvers are fully incremental, as is Z3. The text-based MiniZinc language is not incremental.
 
 ### Assumption-based solving
 SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
@@ -661,10 +661,10 @@ See [the API documentation of the solvers](./api/solvers.rst) to learn about the
 
 
 ## Direct solver access
-Some solvers implement more constraints then available in CPMpy. But CPMpy offers direct access to the underlying solver, so there are two ways to post such solver-specific constraints.
+Some solvers implement more constraints than available in CPMpy. But CPMpy offers direct access to the underlying solver, so there are two ways to post such solver-specific constraints.
 
 ### DirectConstraint
-The `DirectConstraint` will directly call a function of the underlying solver, when the constraint is added to a CPMpy solver. 
+The `DirectConstraint` will directly call a function of the underlying solver  when the constraint is added to a CPMpy solver. 
 
 You provide the DirectConstraint with the name of the function you want to call, as well as the arguments:
 
