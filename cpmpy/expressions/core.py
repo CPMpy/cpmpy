@@ -107,7 +107,29 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
+
+
+    @property
+    def args(self):
+        return self._args
+
+    @property
+    def vars(self):
+        return self._args
+
+    @args.setter
+    def args(self, args):
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
+
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        self._args = args
+        # Reset cached "_has_subexpr"
+        if hasattr(self, "_has_subexpr"):
+            del self._has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -137,11 +159,43 @@ class Expression(object):
     def __hash__(self):
         return hash(self.__repr__())
 
+    def has_subexpr(self):
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+            Results are cached for future calls and reset when the expression changes
+            (in-place argument update).
+        """
+
+        def recursive_has_subexpr(lst) -> bool:
+            """ Recursive implementation to handle nested lists of expressions.
+            """
+            for el in lst:
+                if isinstance(el, Expression):
+                    if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too (allows early-exit for decision var arrays)
+                        return True
+                elif is_any_list(el) and recursive_has_subexpr(el): # recursively call on list-like
+                    return True
+            return False
+
+        # If not an Expression (e.g. list-like) or _has_subexpr has not been computed before / has been reset
+        if not hasattr(self, '_has_subexpr'):
+            # args can have lists of lists... -> need for recursive implementation
+            self._has_subexpr = recursive_has_subexpr(self.args)
+
+        return self._has_subexpr
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
+
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+            Default: no
+        """
+        return False
 
     def value(self):
         return None # default
@@ -329,11 +383,10 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if is_num(other):
-            if other == 0:
-                return 1
-            if other == 1:
-                return self
+        if other == 0:
+            return 1
+        elif other == 1:
+            return self
         return Operator("pow", [self, other])
 
     def __rpow__(self, other, modulo=None):
@@ -384,6 +437,18 @@ class BoolVal(Expression):
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
+
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+        """
+        return True
+
+    def has_subexpr(self) -> bool:
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+        """
+        return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
 
 class Comparison(Expression):
@@ -503,7 +568,7 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
-    
+
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:

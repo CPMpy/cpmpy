@@ -134,7 +134,9 @@ def boolvar(shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 
 def IntVar(lb, ub, shape=1, name=None):
@@ -200,8 +202,9 @@ def intvar(lb, ub, shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 def cparray(arr):
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
@@ -263,10 +266,22 @@ class _NumVarImpl(Expression):
         self.name = name
         self._value = None
 
+    def has_subexpr(self):
+        """Does it contains nested Expressions?
+           Is of importance when deciding whether transformation/decomposition is needed.
+        """
+        return False
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return False
+
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+            This is only the case for decision variables (and constants).
+        """
+        return True
 
     def value(self):
         """ the value obtained in the last solve call
@@ -403,10 +418,25 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
+    @property
+    def args(self):
+        """ The constructor for NDVarArray never gets called, so _args is never initialised
+        """
+        return self # we can just return self
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
         return False
+
+    def is_leaf(self):
+        """ Is it the leaf of an expression tree?
+        """
+        # In the case of a NDVarArray, the array is its own args. So, has_subexpr() returns
+        # whether there are any non-leaf Expressions (so not the _NumVarImpl and its variants)
+        # inside the array. If there are no non-leaf Expressions, then this array is a "leaf"
+        # in the expression tree.
+        return not self.has_subexpr()
 
     def value(self):
         """ the values, for each of the stored variables, obtained in the last solve call
@@ -426,9 +456,9 @@ class NDVarArray(np.ndarray, Expression):
             the constructor, so the Expression does not have 'args'
             set..
         """
-        if not hasattr(self, "args"):
+        if not hasattr(self, "_args"):
             self.name = "NDVarArray"
-            self.args = self
+            self.update_args(self)
         return super().__repr__()
 
     def __getitem__(self, index):
