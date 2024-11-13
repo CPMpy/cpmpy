@@ -4,7 +4,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
@@ -19,7 +21,6 @@ jobs:
           pip install exact
           pip install pysdd
           pip install pychoco
-          git submodule update --init --recursive
           pip install ./submodules/pindakaas/crates/pyndakaas
           sudo snap install minizinc --classic
           pip install minizinc
