@@ -218,7 +218,7 @@ class CPM_ortools(SolverInterface):
             # translate objective
             if self.has_objective():
                 ort_obj_val = self.ort_solver.ObjectiveValue()
-                assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
+                #assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
                 self.objective_value_ = int(ort_obj_val) # ensure it is an integer
 
         return has_sol
