@@ -738,13 +738,23 @@ class Regular(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
-        if not all(is_transition(transition) for transition in transitions):
-            raise TypeError("The second argument of a regular constraint should be a collection of transitions")
         if not isinstance(start, (str, int)):
             raise TypeError("The third argument of a regular constraint should be a nodeID")
-        if not (isinstance(ends, list) and all(isinstance(e, (str, int))for e in ends)):
+        node_type = type(start) # all nodes must be of the same type
+        if not all(is_transition(transition, type=node_type) for transition in transitions):
+            raise TypeError("The second argument of a regular constraint should be a collection of transitions")
+        if not (isinstance(ends, list) and all(isinstance(e, node_type)for e in ends)):
             raise TypeError("The fourth argument of a regular constraint should be a list of nodeID")
+
+        nodes = set(arg[0] for arg in transitions) | set(arg[2] for arg in transitions)
+        if node_type == str: # map strings to integers
+            node_map = dict(zip(sorted(nodes), range(len(nodes))))  # map nodes to integers
+            transitions = [(node_map[s1], v, node_map[s2]) for s1,v,s2 in transitions]
+            start = node_map[start]
+            ends = [node_map[e] for e in ends]
+
         super().__init__("regular", [array, transitions, start, ends])
+
         self.mapping = {}
         for s, v, e in transitions:
             self.mapping[(s, v)] = e
