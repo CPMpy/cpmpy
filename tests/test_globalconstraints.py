@@ -600,6 +600,62 @@ class TestGlobal(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
+    def test_mdd(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 2, shape=3)
+        transitions = [
+            ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"),
+            ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+            ("n4", 0, "t"), ("n5", 0, "t")]
+
+        constraints = [cp.MDD(x, transitions)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        solutions = [[0, 2, 0], [1, 2, 0], [2, 0, 0]]
+
+        for i in range(4):
+            for j in range(4):
+                for k in range(4):
+                    candidate = [i, j, k]
+                    constraints = [cp.MDD(x, transitions), x == candidate]
+                    model = cp.Model(constraints)
+                    if candidate in solutions:
+                        self.assertTrue(model.solve())
+                        self.assertEqual([a.value() for a in x], candidate)
+                    else:
+                        self.assertFalse(model.solve())
+
+    def test_regular(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 1, shape=7)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 0, "d"), ("d", 0, "d"), ("d", 1, "e"),
+                       ("e", 0, "e")]
+        start = "a"
+        ends = ["e"]
+
+        constraints = [cp.Regular(x, transitions, start, ends)]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+
+        solutions = [[0,0,0,1,1,0,1],[0,0,1,1,0,0,1],[0,0,1,1,0,1,0],[0,1,1,0,0,0,1],[0,1,1,0,0,1,0],
+                     [0,1,1,0,1,0,0],[1,1,0,0,0,0,1],[1,1,0,0,0,1,0],[1,1,0,0,1,0,0],[1,1,0,1,0,0,0]]
+
+        def enum_candidate(n, candidate):
+            if n == 0:
+                constraints = [cp.Regular(x, transitions, start, ends), x == candidate]
+                model = cp.Model(constraints)
+                if candidate in solutions:
+                    self.assertTrue(model.solve())
+                    self.assertEqual([a.value() for a in x], candidate)
+                else:
+                    self.assertFalse(model.solve())
+            else:
+                enum_candidate(n-1, candidate+[0])
+                enum_candidate(n-1, candidate+[1])
+        enum_candidate(7, [])
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]

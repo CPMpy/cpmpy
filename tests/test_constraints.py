@@ -18,7 +18,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "Circuit", "SubCircuit", "SubCircuitWithStart",
-    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict","Regular", "MDD",
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
@@ -193,6 +193,11 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "NegativeTable":
             expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
+        elif name == "MDD":
+            expr = MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+        ("n4", 0, "t"), ("n5", 1, "t")])
+        elif name == "Regular":
+            expr = Regular(NUM_ARGS, [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
