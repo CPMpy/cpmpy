@@ -51,7 +51,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalconstraints import DirectConstraint, Table
 from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -456,11 +456,13 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit","subcircuit", "gcc", "increasing", "decreasing",
+                     "inverse", "ite" "xor", "table", "regular", "negative_table" , "cumulative", "circuit","subcircuit", "gcc", "increasing", "decreasing",
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence", "subcircuit"})
+
+        unsupported_nested = {"circuit", "precedence", "subcircuit", "regular"}
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - unsupported_nested)
 
     def __add__(self, cpm_expr):
         """
@@ -527,6 +529,19 @@ class CPM_minizinc(SolverInterface):
                 str_tbl += ",".join(map(str, row)) + " |"  # rows
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
+
+        elif expr.name == "negative_table":
+            vars, vals = expr.args
+            return "not " + self._convert_expression(Table(vars, vals))
+
+        elif expr.name == "regular":
+            array, transitions, start, ends = expr.args
+            str_vars = self._convert_expression(array)
+            str_transition = "[|"
+            for (s1, v), s2 in expr.mapping.items():
+                str_transition += f"{node_map[s1]},{v},{node_map[s2]}|"
+            str_transition += "]"
+            return f"regular({str_vars}, {str_transition}, {node_map[start]}, {set(map(node_map.get, ends))})"
 
         # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
         if expr.name == "inverse":
