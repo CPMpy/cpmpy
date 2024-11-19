@@ -99,11 +99,19 @@ def is_any_list(arg):
     return isinstance(arg, (list, tuple, np.ndarray))
 
 
-def is_transition(arg):
+def is_transition(arg, type=None):
     """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
-    a transition value and an ending node"""
-    return len(arg) == 3 and \
-        isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+        a transition value and an ending node
+
+        :param arg: the argument to test
+        :param type: optional, the type of the nodes int or str
+    """
+    if len(arg) != 3: return False
+    s1, v, s2 = arg
+    if type is not None:
+        return isinstance(s1,type) and is_int(v) and isinstance(s2,type)
+    # TODO: this is probably slow...
+    return is_transition(arg, int) or is_transition(arg, str)
 
 def flatlist(args):
     """ recursively flatten arguments into one single list
