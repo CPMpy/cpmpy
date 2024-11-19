@@ -338,7 +338,7 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", "regular", 'negative_table', "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
@@ -530,6 +530,19 @@ class CPM_choco(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table, False)
+            elif cpm_expr.name == "regular":
+                from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
+                vars, transitions, start, ends = cpm_expr.args
+                automaton = FiniteAutomaton()
+                nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+                for _ in nodes: automaton.add_state()
+                for s1, v, s2 in transitions:
+                    automaton.add_transition(s1, s2, v)
+
+                automaton.set_initial_state(start)
+                automaton.set_final(*ends)
+                return self.chc_model.regular(self.solver_vars(vars),automaton)
+
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
