@@ -23,7 +23,7 @@
         :nosignatures:
 
         CPM_choco
-    
+
     ==============
     Module details
     ==============
@@ -338,9 +338,9 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-                     
+
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -493,7 +493,7 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "subcircuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
@@ -543,6 +543,12 @@ class CPM_choco(SolverInterface):
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "subcircuit":
+                # Successor variables
+                succ = self.solver_vars(cpm_expr.args)
+                # Add an unused variable for the subcircuit length.
+                subcircuit_length = self.solver_var(intvar(0, len(succ)))
+                return self.chc_model.sub_circuit(succ, 0, subcircuit_length)
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":

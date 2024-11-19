@@ -113,6 +113,15 @@ class CPM_minizinc(SolverInterface):
         return True
 
     @staticmethod
+    def executable_installed():
+        # check if MiniZinc executable is installed
+        from minizinc import default_driver
+        if default_driver is None:
+            warnings.warn("MiniZinc Python is installed, but the MiniZinc executable is missing in path.")
+            return False
+        return True
+
+    @staticmethod
     def outdated():
         from minizinc import default_driver
         if default_driver.parsed_version >= CPM_minizinc.required_version:
@@ -447,11 +456,11 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
+                     "inverse", "ite" "xor", "table", "cumulative", "circuit","subcircuit", "gcc", "increasing", "decreasing",
                      "precedence", "no_overlap",
-                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
+                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence", "subcircuit"})
 
     def __add__(self, cpm_expr):
         """
@@ -614,9 +623,15 @@ class CPM_minizinc(SolverInterface):
             return txt
 
         # rest: global constraints
-        elif expr.name.endswith('circuit'):  # circuit, subcircuit
+        elif expr.name == 'circuit':
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
+
+        elif expr.name == 'subcircuit':
+            # minizinc is offset 1, which can be problematic here...
+            args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
+            return "{}([{}])".format(expr.name, ",".join(args_str))
 
         elif expr.name == "cumulative":
             start, dur, end, _, _ = expr.args
