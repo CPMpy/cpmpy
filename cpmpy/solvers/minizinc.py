@@ -52,7 +52,7 @@ from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint, Table
-from ..expressions.utils import is_num, is_any_list, argvals, argval
+from ..expressions.utils import is_num, is_any_list, argvals, argval, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -537,11 +537,20 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "regular":
             array, transitions, start, ends = expr.args
             str_vars = self._convert_expression(array)
-            str_transition = "[|"
-            for (s1, v), s2 in expr.mapping.items():
-                str_transition += f"{node_map[s1]},{v},{node_map[s2]}|"
-            str_transition += "]"
-            return f"regular({str_vars}, {str_transition}, {node_map[start]}, {set(map(node_map.get, ends))})"
+            lbs, ubs = get_bounds(array)
+            lb, ub  = min(lbs), max(ubs)
+            vals = list(range(lb, ub+1))
+            nodes = sorted(set([s1 for s1, v, s2 in transitions]) | set([s2 for s1, v, s2 in transitions]))
+            nodes = [n + 1 for n in nodes] # minizinc does not like 0-indexed
+
+            matrix = [["<>"] * len(vals) for s in nodes]
+            for s1, v, s2 in transitions:
+                matrix[nodes.index(s1+1)][vals.index(v)] = str(s2+1)
+            str_transition = "|".join([f"{n}:" + ",".join(row) for n, row in zip(nodes, matrix)])
+            str_transition = "[|" + " ".join(f"{v}:" for v in vals) +"|" + str_transition
+            str_transition += "|]"
+
+            return f"regular({str_vars}, {str_transition}, {start+1}, {set(map(lambda x : x+1, ends))})"
 
         # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
         if expr.name == "inverse":
