@@ -442,9 +442,18 @@ class NDVarArray(np.ndarray, Expression):
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
             # find dimension of expression in index
-            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
-            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
-            index = index[expr_dim:]
+            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
+            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
+                # TODO can we do the same for more than one Expression? Not sure...
+                index  = list(index)
+                index += [index.pop(expr_dim[0])]
+
+                arr = np.moveaxis(self, expr_dim[0], -1)
+                return Element(arr[index[:-1]], index[-1])
+
+
+            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
+            index = index[expr_dim[0]:]
 
             # calculate index for flat array
             flat_index = index[-1]
