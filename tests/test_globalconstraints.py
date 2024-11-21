@@ -718,8 +718,8 @@ class TestGlobal(unittest.TestCase):
 
     def test_element(self):
         # test 1-D
-        iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, 3, name="iv")
+        idx = cp.intvar(-8, 8, name="idx")
         # test directly the constraint
         cons = cp.Element(iv,idx) == 8
         model = cp.Model(cons)
@@ -733,7 +733,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
-        iv = cp.intvar(-8, 8, shape=(3, 3))
+        iv = cp.intvar(-8, 8, shape=(3, 3), name="iv")
         a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
@@ -746,6 +746,13 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(arr[a.value(), b.value()], 1)
+        # test optimization where 1 dim is index
+        cons = iv[2, idx] == 8
+        self.assertEqual(str(cons), "[iv[2,0] iv[2,1] iv[2,2]][idx] == 8")
+        cons = iv[idx, 2] == 8
+        self.assertEqual(str(cons), "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8")
+
+
 
     def test_element_onearg(self):
 
