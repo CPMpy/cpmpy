@@ -441,6 +441,10 @@ class NDVarArray(np.ndarray, Expression):
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
+
+            if len(index) != self.ndim:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+
             # find dimension of expression in index
             expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
             if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
