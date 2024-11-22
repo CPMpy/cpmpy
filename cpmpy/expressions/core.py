@@ -481,15 +481,15 @@ class Operator(Expression):
             while i < len(arg_list):
                 if isinstance(arg_list[i], Operator) and arg_list[i].name == name:
                     # merge args in at this position
-                    l = len(arg_list[i].args)
-                    arg_list[i:i+1] = arg_list[i].args
+                    l = len(arg_list[i]._args)
+                    arg_list[i:i+1] = arg_list[i]._args
                     i += l
                 i += 1
 
         # another cleanup, translate -(v*c) to v*-c
         if hasattr(arg_list[0], 'name'):
-            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args) == 2:
-                mul_args = arg_list[0].args
+            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0]._args) == 2:
+                mul_args = arg_list[0]._args
                 if is_num(mul_args[0]):
                     name = 'mul'
                     arg_list = (-mul_args[0], mul_args[1])
@@ -647,8 +647,8 @@ def _wsum_should(arg):
     """
     return isinstance(arg, Operator) and \
            (arg.name == 'wsum' or \
-            (arg.name == 'mul' and len(arg.args) == 2 and \
-             any(is_num(a) for a in arg.args)
+            (arg.name == 'mul' and len(arg._args) == 2 and \
+             any(is_num(a) for a in arg._args)
             ) )
 
 def _wsum_make(arg):
@@ -658,16 +658,16 @@ def _wsum_make(arg):
     call only if arg is Operator
     """
     if arg.name == 'wsum':
-        return arg.args
+        return arg._args
     elif arg.name == 'sum':
-        return [1]*len(arg.args), arg.args
+        return [1]*len(arg._args), arg._args
     elif arg.name == 'mul':
-        if is_num(arg.args[0]):
-            return [arg.args[0]], [arg.args[1]]
-        elif is_num(arg.args[1]):
-            return [arg.args[1]], [arg.args[0]]
+        if is_num(arg._args[0]):
+            return [arg._args[0]], [arg._args[1]]
+        elif is_num(arg._args[1]):
+            return [arg._args[1]], [arg._args[0]]
         # else falls through to default below
     elif arg.name == '-':
-        return [-1], [arg.args[0]]
+        return [-1], [arg._args[0]]
     # default
     return [1], [arg]
