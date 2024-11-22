@@ -321,13 +321,13 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                return ort.LinearExpr.sum(self.solver_vars(cpm_expr.args))
+                return ort.LinearExpr.sum(self.solver_vars(cpm_expr._args))
             elif cpm_expr.name == "sub":
-                a,b = self.solver_vars(cpm_expr.args)
+                a,b = self.solver_vars(cpm_expr._args)
                 return a - b
             elif cpm_expr.name == 'wsum':
-                w = cpm_expr.args[0]
-                x = self.solver_vars(cpm_expr.args[1])
+                w = cpm_expr._args[0]
+                x = self.solver_vars(cpm_expr._args[1])
                 return ort.LinearExpr.weighted_sum(x,w)
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
@@ -410,20 +410,20 @@ class CPM_ortools(SolverInterface):
         if isinstance(cpm_expr, Operator):
             # 'and'/n, 'or'/n, '->'/2
             if cpm_expr.name == 'and':
-                return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr.args))
+                return self.ort_model.AddBoolAnd(self.solver_vars(cpm_expr._args))
             elif cpm_expr.name == 'or':
-                return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr.args))
+                return self.ort_model.AddBoolOr(self.solver_vars(cpm_expr._args))
             elif cpm_expr.name == '->':
-                assert(isinstance(cpm_expr.args[0], _BoolVarImpl))  # lhs must be boolvar
-                lhs = self.solver_var(cpm_expr.args[0])
-                if isinstance(cpm_expr.args[1], _BoolVarImpl):
+                assert(isinstance(cpm_expr._args[0], _BoolVarImpl))  # lhs must be boolvar
+                lhs = self.solver_var(cpm_expr._args[0])
+                if isinstance(cpm_expr._args[1], _BoolVarImpl):
                     # bv -> bv
-                    return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr.args[1]))
+                    return self.ort_model.AddImplication(lhs, self.solver_var(cpm_expr._args[1]))
                 else:
                     # bv -> boolexpr
                     # the `reify_rewrite()` transformation ensures that only
                     # the natively reifiable 'and', 'or' and 'sum' remain here
-                    return self._post_constraint(cpm_expr.args[1], reifiable=True).OnlyEnforceIf(lhs)
+                    return self._post_constraint(cpm_expr._args[1], reifiable=True).OnlyEnforceIf(lhs)
             else:
                 raise NotImplementedError("Not a known supported ORTools Operator '{}' {}".format(
                         cpm_expr.name, cpm_expr))
@@ -432,8 +432,8 @@ class CPM_ortools(SolverInterface):
         # has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
-            lhs = cpm_expr.args[0]
-            ortrhs = self.solver_var(cpm_expr.args[1])
+            lhs = cpm_expr._args[0]
+            ortrhs = self.solver_var(cpm_expr._args[1])
 
             if isinstance(lhs, _NumVarImpl):
                 # both are variables, do python comparison over ORT variables
@@ -446,31 +446,31 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == '==':
                 # NumExpr == IV, supported by ortools (thanks to `only_numexpr_equality()` transformation)
                 if lhs.name == 'min':
-                    return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs._args))
                 elif lhs.name == 'max':
-                    return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs._args))
                 elif lhs.name == 'abs':
-                    return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs.args[0]))
+                    return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs._args[0]))
                 elif lhs.name == 'mul':
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs.args))
+                    return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs._args))
                 elif lhs.name == 'div':
-                    return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs._args))
                 elif lhs.name == 'element':
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    return self.ort_model.AddElement(self.solver_var(lhs._args[1]),
+                                                     self.solver_vars(lhs._args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
-                    divisor = lhs.args[1]
+                    divisor = lhs._args[1]
                     if not is_num(divisor):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
                                     f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
-                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
+                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs._args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
-                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
-                    b = self.solver_var(lhs.args[0])
+                    assert (lhs._args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
+                    b = self.solver_var(lhs._args[0])
                     return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
             raise NotImplementedError(
                         "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
@@ -479,28 +479,28 @@ class CPM_ortools(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             if cpm_expr.name == 'alldifferent':
-                return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
+                return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr._args))
             elif cpm_expr.name == 'table':
-                assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                assert (len(cpm_expr._args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr._args)
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == 'negative_table':
-                assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                assert (len(cpm_expr._args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr._args)
                 return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
+                start, dur, end, demand, cap = self.solver_vars(cpm_expr._args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "no_overlap":
-                start, dur, end = self.solver_vars(cpm_expr.args)
+                start, dur, end = self.solver_vars(cpm_expr._args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
                 # (see PCTSP-path model in the future)
-                x = cpm_expr.args
+                x = cpm_expr._args
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
@@ -510,11 +510,11 @@ class CPM_ortools(SolverInterface):
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
-                assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
-                fwd, rev = self.solver_vars(cpm_expr.args)
+                assert len(cpm_expr._args) == 2, "inverse() expects two args: fwd, rev"
+                fwd, rev = self.solver_vars(cpm_expr._args)
                 return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
-                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr._args))
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
@@ -524,7 +524,7 @@ class CPM_ortools(SolverInterface):
 
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
-            return self.ort_model.Add(cpm_expr.args[0])
+            return self.ort_model.Add(cpm_expr._args[0])
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
