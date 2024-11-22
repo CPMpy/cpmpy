@@ -63,7 +63,7 @@
                 super().__init__("my_global", args)
 
             def decompose(self):
-                return [self.args[0] != self.args[1]] # your decomposition
+                return [self._args[0] != self._args[1]] # your decomposition
 
     If it is a __numeric global constraint__ meaning that its return type is numeric (see `Minimum` and `Element`)
     then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
@@ -78,7 +78,7 @@
     .. code-block:: python
 
         def my_circuit_decomp(self):
-            return [self.args[0] == 1], [] # does not actually enforce circuit
+            return [self._args[0] == 1], [] # does not actually enforce circuit
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
         vars = intvar(1,9, shape=10)
@@ -178,10 +178,10 @@ class AllDifferent(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
+        return [var1 != var2 for var1, var2 in all_pairs(self._args)], []
 
     def value(self):
-        return len(set(argvals(self.args))) == len(self.args)
+        return len(set(argvals(self._args))) == len(self._args)
 
 class AllDifferentExceptN(GlobalConstraint):
     """
@@ -196,10 +196,10 @@ class AllDifferentExceptN(GlobalConstraint):
     def decompose(self):
         from .python_builtins import any as cpm_any
         # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cpm_any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        return [(var1 == var2).implies(cpm_any(var1 == a for a in self._args[1])) for var1, var2 in all_pairs(self._args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+        vals = [argval(a) for a in self._args[0] if argval(a) not in argvals(self._args[1])]
         return len(set(vals)) == len(vals)
 
 
@@ -227,10 +227,10 @@ class AllEqual(GlobalConstraint):
         """Returns the decomposition
         """
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
-        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
+        return [var1 == var2 for var1, var2 in zip(self._args[:-1], self._args[1:])], []
 
     def value(self):
-        return len(set(argvals(self.args))) == 1
+        return len(set(argvals(self._args))) == 1
 
 
 class AllEqualExceptN(GlobalConstraint):
@@ -246,10 +246,10 @@ class AllEqualExceptN(GlobalConstraint):
 
     def decompose(self):
         from .python_builtins import any as cpm_any
-        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        return [(cpm_any(var1 == a for a in self._args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self._args[1])) for var1, var2 in all_pairs(self._args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+        vals = [argval(a) for a in self._args[0] if argval(a) not in argvals(self._args[1])]
         return len(set(vals)) == 1 or len(set(vals)) == 0
 
 
@@ -277,7 +277,7 @@ class Circuit(GlobalConstraint):
             MiniZinc has slightly different one:
             https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
-        succ = cpm_array(self.args)
+        succ = cpm_array(self._args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
         constraining = []
@@ -294,7 +294,7 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        arr = argvals(self.args)
+        arr = argvals(self._args)
 
         while idx not in visited:
             if idx is None:
@@ -305,7 +305,7 @@ class Circuit(GlobalConstraint):
             pathlen += 1
             idx = arr[idx]
 
-        return pathlen == len(self.args) and idx == 0
+        return pathlen == len(self._args) and idx == 0
 
 
 class Inverse(GlobalConstraint):
@@ -325,13 +325,13 @@ class Inverse(GlobalConstraint):
 
     def decompose(self):
         from .python_builtins import all
-        fwd, rev = self.args
+        fwd, rev = self._args
         rev = cpm_array(rev)
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        fwd = argvals(self.args[0])
-        rev = argvals(self.args[1])
+        fwd = argvals(self._args[0])
+        rev = argvals(self._args[1])
         # args are fine, now evaluate actual inverse cons
         try:
             return all(rev[x] == i for i, x in enumerate(fwd))
@@ -350,11 +350,11 @@ class Table(GlobalConstraint):
 
     def decompose(self):
         from .python_builtins import any, all
-        arr, tab = self.args
+        arr, tab = self._args
         return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
-        arr, tab = self.args
+        arr, tab = self._args
         arrval = argvals(arr)
         return arrval in tab
 
@@ -371,11 +371,11 @@ class NegativeTable(GlobalConstraint):
     def decompose(self):
         from .python_builtins import all as cpm_all
         from .python_builtins import any as cpm_any
-        arr, tab = self.args
+        arr, tab = self._args
         return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
-        arr, tab = self.args
+        arr, tab = self._args
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
@@ -391,7 +391,7 @@ class IfThenElse(GlobalConstraint):
         super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
-        condition, if_true, if_false = self.args
+        condition, if_true, if_false = self._args
         try:
             if argval(condition):
                 return argval(if_true)
@@ -401,11 +401,11 @@ class IfThenElse(GlobalConstraint):
             return False
 
     def decompose(self):
-        condition, if_true, if_false = self.args
+        condition, if_true, if_false = self._args
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
-        condition, if_true, if_false = self.args
+        condition, if_true, if_false = self._args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
@@ -426,7 +426,7 @@ class InDomain(GlobalConstraint):
                they should be enforced toplevel.
         """
         from .python_builtins import any
-        expr, arr = self.args
+        expr, arr = self._args
         lb, ub = expr.get_bounds()
 
         defining = []
@@ -444,10 +444,10 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        return argval(self.args[0]) in argvals(self.args[1])
+        return argval(self._args[0]) in argvals(self._args[1])
 
     def __repr__(self):
-        return "{} in {}".format(self.args[0], self.args[1])
+        return "{} in {}".format(self._args[0], self._args[1])
 
 
 class Xor(GlobalConstraint):
@@ -468,18 +468,18 @@ class Xor(GlobalConstraint):
 
     def decompose(self):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
-        decomp = [sum(self.args[:2]) == 1]
-        if len(self.args) > 2:
-            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+        decomp = [sum(self._args[:2]) == 1]
+        if len(self._args) > 2:
+            decomp = Xor([decomp,self._args[2:]]).decompose()[0]
         return decomp, []
 
     def value(self):
-        return sum(argvals(self.args)) % 2 == 1
+        return sum(argvals(self._args)) % 2 == 1
 
     def __repr__(self):
-        if len(self.args) == 2:
-            return "{} xor {}".format(*self.args)
-        return "xor({})".format(self.args)
+        if len(self._args) == 2:
+            return "{} xor {}".format(*self._args)
+        return "xor({})".format(self._args)
 
 
 class Cumulative(GlobalConstraint):
@@ -520,7 +520,7 @@ class Cumulative(GlobalConstraint):
         """
         from ..expressions.python_builtins import sum
 
-        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self._args)
         start, duration, end, demand, capacity = arr_args
 
         cons = []
@@ -545,7 +545,7 @@ class Cumulative(GlobalConstraint):
 
     def value(self):
         arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
-                   else argval(arg) for arg in self.args]
+                   else argval(arg) for arg in self._args]
 
         if any(a is None for a in arg_vals):
             return None
@@ -586,7 +586,7 @@ class Precedence(GlobalConstraint):
         """
         from .python_builtins import any as cpm_any
 
-        args, precedence = self.args
+        args, precedence = self._args
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
@@ -595,7 +595,7 @@ class Precedence(GlobalConstraint):
 
     def value(self):
 
-        args, precedence = self.args
+        args, precedence = self._args
         vals = np.array(argvals(args))
         for s,t in zip(precedence[:-1], precedence[1:]):
             if vals[0] == t: return False
@@ -620,13 +620,13 @@ class NoOverlap(GlobalConstraint):
         super().__init__("no_overlap", [start, dur, end])
 
     def decompose(self):
-        start, dur, end = self.args
+        start, dur, end = self._args
         cons = [s + d == e for s,d,e in zip(start, dur, end)]
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
     def value(self):
-        start, dur, end = argvals(self.args)
+        start, dur, end = argvals(self._args)
         if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
         for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
@@ -650,7 +650,7 @@ class GlobalCardinalityCount(GlobalConstraint):
 
     def decompose(self):
         from .globalfunctions import Count
-        vars, vals, occ = self.args
+        vars, vals, occ = self._args
         constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
         if self.closed:
             constraints += [InDomain(v, vals) for v in vars]
@@ -676,11 +676,11 @@ class Increasing(GlobalConstraint):
             1) the decomposition of the Increasing constraint
             2) empty list of defining constraints
         """
-        args = self.args
+        args = self._args
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        args = argvals(self.args)
+        args = argvals(self._args)
         return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
@@ -698,11 +698,11 @@ class Decreasing(GlobalConstraint):
             1) the decomposition of the Decreasing constraint
             2) empty list of defining constraints
         """
-        args = self.args
+        args = self._args
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        args = argvals(self.args)
+        args = argvals(self._args)
         return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
@@ -720,11 +720,11 @@ class IncreasingStrict(GlobalConstraint):
             1) the decomposition of the IncreasingStrict constraint
             2) empty list of defining constraints
         """
-        args = self.args
+        args = self._args
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
     def value(self):
-        args = argvals(self.args)
+        args = argvals(self._args)
         return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
@@ -742,11 +742,11 @@ class DecreasingStrict(GlobalConstraint):
             1) the decomposition of the DecreasingStrict constraint
             2) empty list of defining constraints
         """
-        args = self.args
+        args = self._args
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
     def value(self):
-        args = argvals(self.args)
+        args = argvals(self._args)
         return all(args[i] > args[i+1] for i in range(len(args)-1))
 
 
@@ -777,7 +777,7 @@ class LexLess(GlobalConstraint):
         every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
         subsequent positions.
         """
-        X, Y = cpm_array(self.args)
+        X, Y = cpm_array(self._args)
 
         bvar = boolvar(shape=(len(X) + 1))
 
@@ -791,7 +791,7 @@ class LexLess(GlobalConstraint):
         return constraining, defining
 
     def value(self):
-        X, Y = argvals(self.args)
+        X, Y = argvals(self._args)
         return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
 
 
@@ -822,7 +822,7 @@ class LexLessEq(GlobalConstraint):
         every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
         subsequent positions.
         """
-        X, Y = cpm_array(self.args)
+        X, Y = cpm_array(self._args)
 
         bvar = boolvar(shape=(len(X) + 1))
         defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
@@ -832,7 +832,7 @@ class LexLessEq(GlobalConstraint):
         return constraining, defining
 
     def value(self):
-        X, Y = argvals(self.args)
+        X, Y = argvals(self._args)
         return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
 
 
@@ -848,11 +848,11 @@ class LexChainLess(GlobalConstraint):
     def decompose(self):
         """ Decompose to a series of LexLess constraints between subsequent rows
         """
-        X = self.args
+        X = self._args
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
     def value(self):
-        X = argvals(self.args)
+        X = argvals(self._args)
         return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
@@ -868,11 +868,11 @@ class LexChainLessEq(GlobalConstraint):
     def decompose(self):
         """ Decompose to a series of LexLessEq constraints between subsequent rows
         """
-        X = self.args
+        X = self._args
         return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
     def value(self):
-        X = argvals(self.args)
+        X = argvals(self._args)
         return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
@@ -919,7 +919,7 @@ class DirectConstraint(Expression):
         """
         # get the solver function, will raise an AttributeError if it does not exist
         solver_function = getattr(Native_solver, self.name)
-        solver_args = copy.copy(self.args)
+        solver_args = copy.copy(self._args)
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace

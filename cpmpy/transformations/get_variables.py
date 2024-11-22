@@ -48,11 +48,11 @@ def get_variables(expr, collect=None):
                         extract(e.flat, append)
                     # else: all const, skip
                 elif e.name == "wsum":
-                    extract(e.args[1], append)  # skip data in arg0
+                    extract(e._args[1], append)  # skip data in arg0
                 elif e.name == "table":
-                    extract(e.args[0], append)  # skip data in arg1
+                    extract(e._args[0], append)  # skip data in arg1
                 else:
-                    extract(e.args, append)
+                    extract(e._args, append)
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 extract(e, append)
 

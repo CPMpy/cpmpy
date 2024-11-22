@@ -26,7 +26,7 @@ def toplevel_list(cpm_expr, merge_and=True):
                 if isinstance(e, NDVarArray):  # sometimes does not have .name
                     unravel(e.flat, append)
                 elif merge_and and e.name == "and":
-                    unravel(e.args, append)
+                    unravel(e._args, append)
                 else:
                     assert (e.is_bool()), f"Only boolean expressions allowed at toplevel, got {e}"
                     append(e) # presumably the most frequent case
@@ -62,7 +62,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             newlist.append(int(expr.value()) if num_context else expr)
 
         elif isinstance(expr, Operator):
-            args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+            args = simplify_boolean(expr._args, num_context=not expr.is_bool())
 
             if expr.name == "or":
                 if any(is_true_cst(arg) for arg in args):
@@ -107,7 +107,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = simplify_boolean(expr.args, num_context=True)
+            lhs, rhs = simplify_boolean(expr._args, num_context=True)
             name = expr.name
             if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
                 if name == "<": name = ">"
@@ -166,7 +166,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(eval_comparison(name, lhs, rhs))
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
+            expr._args = simplify_boolean(expr._args) # TODO: how to determine boolean or numerical context?
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)

@@ -34,7 +34,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
         elif expr.name == "not":
             # the negative case, negate
-            arg_neg = recurse_negation(expr.args[0])
+            arg_neg = recurse_negation(expr._args[0])
             if toplevel:
                 # make sure there is no toplevel 'and' (could do explicit check for and?)
                 newlist.extend(toplevel_list(arg_neg))
@@ -45,7 +45,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
             # an Expression, we remain in the positive case
             newexpr = copy.copy(expr)
             # TODO, check that an arg changed? otherwise no copy needed here...
-            newexpr.args = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
+            newexpr._args = push_down_negation(expr._args, toplevel=False)  # check if 'not' is present in arguments
             newlist.append(newexpr)
 
     return newlist
@@ -72,7 +72,7 @@ def recurse_negation(expr):
         elif expr.name == '>':  newexpr.name = '<='
         else: raise ValueError(f"Unknown comparison to negate {expr}")
         # args are positive now, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr._args = push_down_negation(expr._args, toplevel=False)
         return newexpr
 
     elif isinstance(expr, Operator):
@@ -80,15 +80,15 @@ def recurse_negation(expr):
 
         if expr.name == "not":
             # negation while in negative context = switch back to positive case
-            neg_args = push_down_negation(expr.args, toplevel=False)
+            neg_args = push_down_negation(expr._args, toplevel=False)
             return neg_args[0]  # not has only 1 argument
 
         elif expr.name == "->":
             # ~(x -> y) :: x & ~y
             # arg0 remains positive, but check its arguments
-            # (must wrap awkwardly in a list, but can make no assumption about expr.args[0] has .args)
-            newarg0_lst = push_down_negation([expr.args[0]], toplevel=False)
-            return newarg0_lst[0] & recurse_negation(expr.args[1])
+            # (must wrap awkwardly in a list, but can make no assumption about expr._args[0] has ._args)
+            newarg0_lst = push_down_negation([expr._args[0]], toplevel=False)
+            return newarg0_lst[0] & recurse_negation(expr._args[1])
 
         else:
             newexpr = copy.copy(expr)
@@ -96,14 +96,14 @@ def recurse_negation(expr):
             elif expr.name == "or": newexpr.name = "and"
             else: raise ValueError(f"Unknown operator to negate {expr}")
             # continue negating the args
-            newexpr.args = [recurse_negation(a) for a in expr.args]
+            newexpr._args = [recurse_negation(a) for a in expr._args]
             return newexpr
 
     # global constraints
     elif hasattr(expr, "decompose"):
         newexpr = copy.copy(expr)
         # args are positive as we will negate the global, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr._args = push_down_negation(expr._args, toplevel=False)
         return ~newexpr
 
     # numvars or direct constraint

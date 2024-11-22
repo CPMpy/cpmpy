@@ -35,7 +35,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
     for i,cpm_expr in enumerate(newcons):
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            cond, subexpr = cpm_expr.args
+            cond, subexpr = cpm_expr._args
             if not isinstance(cond, _BoolVarImpl): # expr -> bv
                 res = only_numexpr_equality([cond], supported)
                 if len(res) > 1:
@@ -52,7 +52,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
 
 
         if isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
+            lhs, rhs = cpm_expr._args
 
             if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification, check recursively
 
@@ -72,12 +72,12 @@ def only_numexpr_equality(constraints, supported=frozenset()):
 
             elif cpm_expr.name != "==":
                 # LHS <op> IV    with <op> one of !=,<,<=,>,>=
-                lhs = cpm_expr.args[0]
+                lhs = cpm_expr._args[0]
                 if not isinstance(lhs, _NumVarImpl) and lhs.name not in supported:
                     # LHS is unsupported for LHS <op> IV, rewrite to `(LHS == A) & (A <op> IV)`
                     (lhsvar, lhscons) = get_or_make_var(lhs)
                     # replace comparison by A <op> IV
-                    newcons[i] = Comparison(cpm_expr.name, lhsvar, cpm_expr.args[1])
+                    newcons[i] = Comparison(cpm_expr.name, lhsvar, cpm_expr._args[1])
                     # add lhscon(s), which will be [(LHS == A)]
                     assert(len(lhscons) == 1), "only_numexpr_eq: lhs surprisingly non-flat"
                     newcons.insert(i, lhscons[0])

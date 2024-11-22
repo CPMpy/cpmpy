@@ -428,7 +428,7 @@ class NDVarArray(np.ndarray, Expression):
         """
         if not hasattr(self, "args"):
             self.name = "NDVarArray"
-            self.args = self
+            self._args = self
         return super().__repr__()
 
     def __getitem__(self, index):

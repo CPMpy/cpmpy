@@ -144,17 +144,17 @@ def flatten_constraint(expr):
                            Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
             """
             # does not type-check that arguments are bool... Could do now with expr.is_bool()!
-            if all(__is_flat_var(arg) for arg in expr.args):
+            if all(__is_flat_var(arg) for arg in expr._args):
                 newlist.append(expr)
                 continue
             elif expr.name == 'or':
                 # rewrites that avoid auxiliary var creation, should go to normalize?
                 # in case of an implication in a disjunction, merge in
-                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr.args):
-                    newargs = list(expr.args)  # take copy
+                if builtins.any(isinstance(a, Operator) and a.name == '->' for a in expr._args):
+                    newargs = list(expr._args)  # take copy
                     for i,a in enumerate(newargs):
                         if isinstance(a, Operator) and a.name == '->':
-                            newargs[i:i+1] = [~a.args[0],a.args[1]]
+                            newargs[i:i+1] = [~a._args[0],a._args[1]]
                     # there could be nested implications
                     newlist.extend(flatten_constraint(Operator('or', newargs)))
                     continue
@@ -164,33 +164,33 @@ def flatten_constraint(expr):
             elif expr.name == '->':
                 # some rewrite rules that avoid creating auxiliary variables
                 # 1) if rhs is 'and', split into individual implications a0->and([a11..a1n]) :: a0->a11,...,a0->a1n
-                if expr.args[1].name == 'and':
-                    a1s = expr.args[1].args
-                    a0 = expr.args[0]
+                if expr._args[1].name == 'and':
+                    a1s = expr._args[1]._args
+                    a0 = expr._args[0]
                     newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s]))
                     continue
                 # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
-                elif expr.args[0].name == 'or':
-                    a0s = expr.args[0].args
-                    a1 = expr.args[1]
+                elif expr._args[0].name == 'or':
+                    a0s = expr._args[0]._args
+                    a1 = expr._args[1]
                     newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s]))
                     continue
                 # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
-                elif expr.args[0].name == '->':
-                    a01,a02 = expr.args[0].args
-                    a1 = expr.args[1]
+                elif expr._args[0].name == '->':
+                    a01,a02 = expr._args[0]._args
+                    a1 = expr._args[1]
                     newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)]))
                     continue
 
                 # ->, allows a boolexpr on one side
-                elif isinstance(expr.args[0], _BoolVarImpl):
+                elif isinstance(expr._args[0], _BoolVarImpl):
                     # LHS is var, ensure RHS is normalized 'Boolexpr'
-                    lhs,lcons = expr.args[0], ()
-                    rhs,rcons = normalized_boolexpr(expr.args[1])
+                    lhs,lcons = expr._args[0], ()
+                    rhs,rcons = normalized_boolexpr(expr._args[1])
                 else:
                     # make LHS normalized 'Boolexpr', RHS must be a var
-                    lhs,lcons = normalized_boolexpr(expr.args[0])
-                    rhs,rcons = get_or_make_var(expr.args[1])
+                    lhs,lcons = normalized_boolexpr(expr._args[0])
+                    rhs,rcons = get_or_make_var(expr._args[1])
 
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
@@ -217,7 +217,7 @@ def flatten_constraint(expr):
     - Reification (double implication): Boolexpr == Var    (CPMpy class 'Comparison')
             """
             exprname = expr.name  # so it can be modified
-            lexpr, rexpr = expr.args
+            lexpr, rexpr = expr._args
             rewritten = False
 
             # rewrite 'Var == Expr' to normalzed 'Expr == Var'
@@ -383,28 +383,28 @@ def normalized_boolexpr(expr):
         # apply De Morgan's transform for "implies"
         if expr.name == '->':
             # TODO, optimisation if args0 is an 'and'?
-            (lhs,lcons) = get_or_make_var(expr.args[0])
+            (lhs,lcons) = get_or_make_var(expr._args[0])
             # TODO, optimisation if args1 is an 'or'?
-            (rhs,rcons) = get_or_make_var(expr.args[1])
+            (rhs,rcons) = get_or_make_var(expr._args[1])
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
-            flatvar, flatcons = get_or_make_var(expr.args[0])
+            flatvar, flatcons = get_or_make_var(expr._args[0])
             return (~flatvar, flatcons)
-        if all(__is_flat_var(arg) for arg in expr.args):
+        if all(__is_flat_var(arg) for arg in expr._args):
             return (expr, [])
         else:
             # one of the arguments is not flat, flatten all
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr._args])
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
     elif isinstance(expr, Comparison):
-        if expr.name != '!=' and all(__is_flat_var(arg) for arg in expr.args):
+        if expr.name != '!=' and all(__is_flat_var(arg) for arg in expr._args):
             return (expr, [])  # shortcut
         else:
             # LHS can be boolexpr, RHS has to be variable
 
-            lexpr, rexpr = expr.args
+            lexpr, rexpr = expr._args
             exprname = expr.name
 
             # ==,!=: can swap if lhs is var and rhs is not
@@ -434,15 +434,15 @@ def normalized_boolexpr(expr):
         - Global constraint (Boolean): global([Var]*)          (CPMpy class 'GlobalConstraint', is_bool())
         """
         # just recursively flatten args, which can be lists
-        if all(__is_flat_var_or_list(arg) for arg in expr.args):
+        if all(__is_flat_var_or_list(arg) for arg in expr._args):
             return (expr, [])
         else:
             # recursively flatten all children
-            flatargs, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
+            flatargs, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr._args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatargs
+            newexpr._args = flatargs
             return (newexpr, [c for con in flatcons for c in con])
 
 
@@ -475,29 +475,29 @@ def normalized_numexpr(expr):
         if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
             return normalized_numexpr(Operator("wsum", _wsum_make(expr)))
 
-        if all(__is_flat_var(arg) for arg in expr.args):
+        if all(__is_flat_var(arg) for arg in expr._args):
             return (expr, [])
 
         # pre-process sum, to fold in nested subtractions and const*Exprs, e.g. x - y + 2*(z+r)
         if expr.name == "sum" and \
-           all(isinstance(a, Expression) for a in expr.args) and \
-           any((a.name == "-" or _wsum_should(a)) for a in expr.args):
-            we = [_wsum_make(a) for a in expr.args]
+           all(isinstance(a, Expression) for a in expr._args) and \
+           any((a.name == "-" or _wsum_should(a)) for a in expr._args):
+            we = [_wsum_make(a) for a in expr._args]
             w = [wi for w,_ in we for wi in w]
             e = [ei for _,e in we for ei in e]
             return normalized_numexpr(Operator("wsum", (w,e)))
 
-        # wsum needs special handling because expr.args is a tuple of which only 2nd one has exprs
+        # wsum needs special handling because expr._args is a tuple of which only 2nd one has exprs
         if expr.name == 'wsum':
-            weights, sub_exprs  = expr.args
+            weights, sub_exprs  = expr._args
             # while here, avoid creation of auxiliary variables for compatible operators -/sum/wsum
             i = 0
             while(i < len(sub_exprs)): # can dynamically change
                 if isinstance(sub_exprs[i], Operator) and \
                     ((sub_exprs[i].name in ['-', 'sum'] and \
-                        all(isinstance(a, Expression) for a in sub_exprs[i].args)) or \
+                        all(isinstance(a, Expression) for a in sub_exprs[i]._args)) or \
                      (sub_exprs[i].name == 'wsum' and \
-                        all(isinstance(a, Expression) for a in sub_exprs[i].args[1]))):  # TODO: avoid constants for now...
+                        all(isinstance(a, Expression) for a in sub_exprs[i]._args[1]))):  # TODO: avoid constants for now...
                     w,e = _wsum_make(sub_exprs[i])
                     # insert in place, and next iteration over same 'i' again
                     weights[i:i+1] = [weights[i]*wj for wj in w]
@@ -512,7 +512,7 @@ def normalized_numexpr(expr):
 
         else: # generic operator
             # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr._args])
 
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
@@ -520,15 +520,15 @@ def normalized_numexpr(expr):
         # Globalfunction (examples: Max,Min,Element)
 
         # just recursively flatten args, which can be lists
-        if all(__is_flat_var_or_list(arg) for arg in expr.args):
+        if all(__is_flat_var_or_list(arg) for arg in expr._args):
             return (expr, [])
         else:
             # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr._args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
-            newexpr.args = flatvars
+            newexpr._args = flatvars
             return (newexpr, [c for con in flatcons for c in con])
 
     raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug

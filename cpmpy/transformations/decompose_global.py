@@ -52,17 +52,17 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             continue
 
         elif isinstance(expr, Operator):
-            if any(isinstance(a,GlobalFunction) for a in expr.args):
+            if any(isinstance(a,GlobalFunction) for a in expr._args):
                 expr, base_con = normalized_numexpr(expr)
                 _toplevel.extend(base_con)  # should be added toplevel
             # recurse into arguments, recreate through constructor (we know it stores no other state)
-            args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            args = decompose_in_tree(expr._args, supported, supported_reified, _toplevel, nested=True)
             newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
             # first create a fresh version and recurse into arguments
             expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+            expr._args = decompose_in_tree(expr._args, supported, supported_reified, _toplevel, nested=True)
 
             is_supported = (expr.name in supported)
             if nested and expr.is_bool():
@@ -104,7 +104,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         elif isinstance(expr, Comparison):
             # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
             # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
-            lhs, rhs = expr.args
+            lhs, rhs = expr._args
             exprname = expr.name  # can change when rhs needs decomp
 
             decomp_lhs = isinstance(lhs, GlobalFunction) and not lhs.name in supported
@@ -114,7 +114,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 if not decomp_rhs:
                     # nothing special, create a fresh version and recurse into arguments
                     expr = copy.copy(expr)
-                    expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
+                    expr._args = decompose_in_tree(expr._args, supported, supported_reified, _toplevel, nested=True)
                     newlist.append(expr)
 
                 else:
@@ -126,7 +126,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             if decomp_lhs:
                 # recurse into lhs args
                 lhs = copy.copy(lhs)
-                lhs.args = decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True)
+                lhs._args = decompose_in_tree(lhs._args, supported, supported_reified, _toplevel, nested=True)
 
                 # decompose comparison of lhs and rhs
                 dec = lhs.decompose_comparison(exprname, rhs)
@@ -186,12 +186,12 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
                 return False
             if not reified and cpm_expr.name not in supported:
                 return False
-        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr.args[0], GlobalFunction):
-            if not cpm_expr.args[0].name in supported:
+        if isinstance(cpm_expr, Comparison) and isinstance(cpm_expr._args[0], GlobalFunction):
+            if not cpm_expr._args[0].name in supported:
                 # reified numerical global constraints can be rewritten to non-reified versions
                 #  so only have to check for 'supported' set
                 return False
-            if reified and not cpm_expr.args[0].is_total() and cpm_expr.args[0].name not in supported_reif:
+            if reified and not cpm_expr._args[0].is_total() and cpm_expr._args[0].name not in supported_reif:
                 # edge case for partial functions as they cannot be rewritten to non-reified versions
                 #  have to decompose to total functions
                 #  ASSUMPTION: the decomposition for partial global functions is total! (for now only Element)
@@ -211,7 +211,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
         if hasattr(cpm_expr, "decompose") and not _is_supported(cpm_expr, reified=False):
             cpm_expr = cpm_expr.decompose() # base boolean global constraints
         elif isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
+            lhs, rhs = cpm_expr._args
             if cpm_expr.name == "==" and not _is_supported(lhs, reified=True): # rhs will always be const/var
                 decomp_idx = 0 # this means it is an unsupported reified boolean global
 
@@ -220,7 +220,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
                 decomp_idx = None
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            lhs, rhs = cpm_expr.args # BV -> Expr or Expr -> BV as flat normal form is required
+            lhs, rhs = cpm_expr._args # BV -> Expr or Expr -> BV as flat normal form is required
             if not _is_supported(rhs, reified=True):
                 decomp_idx = 1 # reified (numerical) global constraint, probably most frequent case
             elif not _is_supported(lhs, reified=True):
@@ -228,7 +228,7 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
 
         if decomp_idx is not None:
             cpm_expr = copy.deepcopy(cpm_expr) # need deepcopy as we are changing args of list inplace
-            cpm_expr.args[decomp_idx] = all(do_decompose(cpm_expr.args[decomp_idx]))
+            cpm_expr._args[decomp_idx] = all(do_decompose(cpm_expr._args[decomp_idx]))
             cpm_expr = [cpm_expr]
 
         if isinstance(cpm_expr, list): # some decomposition happened, have to run again as decomp can contain new global
@@ -248,7 +248,7 @@ def do_decompose(cpm_expr):
         - cpm_expr: Global constraint or comparison containing a global constraint on lhs
     """
     if isinstance(cpm_expr, Comparison):
-        lhs, rhs = cpm_expr.args
+        lhs, rhs = cpm_expr._args
         if lhs.is_bool():
             return [eval_comparison(cpm_expr.name, all(lhs.decompose()), rhs)]
         else:

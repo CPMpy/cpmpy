@@ -60,7 +60,7 @@ def flat2cnf(constraints):
     for expr in constraints:
         # BE -> BE
         if expr.name == '->':
-            a0,a1 = expr.args
+            a0,a1 = expr._args
 
             # BoolVar() -> BoolVar()
             if isinstance(a1, _BoolVarImpl) or \
