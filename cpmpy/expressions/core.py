@@ -80,7 +80,7 @@ from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
     """
-    An Expression represents a symbolic function with a self.name and self.args (arguments)
+    An Expression represents a symbolic function with a self.name and self._args (arguments)
 
     Each Expression is considered to be a function whose value can be used
       in other expressions
@@ -107,7 +107,7 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -125,7 +125,7 @@ class Expression(object):
 
     def __repr__(self):
         strargs = []
-        for arg in self.args:
+        for arg in self._args:
             if isinstance(arg, np.ndarray):
                 # flatten
                 strarg = ",".join(map(str, arg.flat))
@@ -346,11 +346,11 @@ class Expression(object):
     # unary mathematical operators
     def __neg__(self):
         # special case, -(w*x) -> -w*x
-        if self.name == 'mul' and is_num(self.args[0]):
-            return Operator(self.name, [-self.args[0], self.args[1]])
+        if self.name == 'mul' and is_num(self._args[0]):
+            return Operator(self.name, [-self._args[0], self._args[1]])
         elif self.name == 'wsum':
             # negate the constant weights
-            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
+            return Operator(self.name, [[-a for a in self._args[0]], self._args[1]])
         return Operator("-", [self])
 
     def __pos__(self):
@@ -376,14 +376,14 @@ class BoolVal(Expression):
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
-        return self.args[0]
+        return self._args[0]
 
     def __invert__(self):
-        return BoolVal(not self.args[0])
+        return BoolVal(not self._args[0])
 
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
-        return self.args[0]
+        return self._args[0]
 
 
 class Comparison(Expression):
@@ -396,15 +396,15 @@ class Comparison(Expression):
         super().__init__(name, [left, right])
 
     def __repr__(self):
-        if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
+        if all(isinstance(x, Expression) for x in self._args):
+            return "({}) {} ({})".format(self._args[0], self.name, self._args[1])
         # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+        return "{} {} {}".format(self._args[0], self.name, self._args[1])
 
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = argvals(self.args)
+        arg_vals = argvals(self._args)
 
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
@@ -511,32 +511,32 @@ class Operator(Expression):
 
         # special cases
         if self.name == '-': # unary -
-            return "-({})".format(self.args[0])
+            return "-({})".format(self._args[0])
 
         # weighted sum
         if self.name == 'wsum':
-            return f"sum({self.args[0]} * {self.args[1]})"
+            return f"sum({self._args[0]} * {self._args[1]})"
 
         # infix printing of two arguments
-        if len(self.args) == 2:
+        if len(self._args) == 2:
             # bracketed printing of non-constants
             def wrap_bracket(arg):
                 if isinstance(arg, Expression):
                     return f"({arg})"
                 return arg
-            return "{} {} {}".format(wrap_bracket(self.args[0]),
+            return "{} {} {}".format(wrap_bracket(self._args[0]),
                                      printname,
-                                     wrap_bracket(self.args[1]))
+                                     wrap_bracket(self._args[1]))
 
-        return "{}({})".format(self.name, self.args)
+        return "{}({})".format(self.name, self._args)
 
     def value(self):
 
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], argvals(self.args[1])]
+            arg_vals = [self._args[0], argvals(self._args[1])]
         else:
-            arg_vals = argvals(self.args)
+            arg_vals = argvals(self._args)
 
 
         if any(a is None for a in arg_vals): return None
@@ -576,15 +576,15 @@ class Operator(Expression):
         if self.is_bool():
             return 0, 1 #boolean
         elif self.name == 'mul':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self._args[0])
+            lb2, ub2 = get_bounds(self._args[1])
             bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'sum':
-            lbs, ubs = get_bounds(self.args)
+            lbs, ubs = get_bounds(self._args)
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
-            weights, vars = self.args
+            weights, vars = self._args
             bounds = []
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
             for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
@@ -594,19 +594,19 @@ class Operator(Expression):
             lbs, ubs = (zip(*bounds))
             lowerbound, upperbound = sum(lbs), sum(ubs) #this is builtins sum, not numpy sum
         elif self.name == 'sub':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self._args[0])
+            lb2, ub2 = get_bounds(self._args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
         elif self.name == 'div':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self._args[0])
+            lb2, ub2 = get_bounds(self._args[1])
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("division by domain containing 0 is not supported")
             bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self._args[0])
+            lb2, ub2 = get_bounds(self._args[1])
             if lb2 <= 0 <= ub2:
                 raise ZeroDivisionError("% by domain containing 0 is not supported")
             elif ub2 < 0:
@@ -614,8 +614,8 @@ class Operator(Expression):
             elif lb2 > 0:
                 return 0, ub2 - 1
         elif self.name == 'pow':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = get_bounds(self._args[0])
+            lb2, ub2 = get_bounds(self._args[1])
             if lb2 < 0:
                 raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
             bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
@@ -628,7 +628,7 @@ class Operator(Expression):
             lowerbound, upperbound = min(bounds), max(bounds)
 
         elif self.name == '-':
-            lb1, ub1 = get_bounds(self.args[0])
+            lb1, ub1 = get_bounds(self._args[0])
             lowerbound, upperbound = -ub1, -lb1
 
         if lowerbound == None:

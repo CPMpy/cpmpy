@@ -43,7 +43,7 @@
                 super().__init__("my_global", args)
 
             def decompose_comparison(self):
-                return [self.args[0] + self.args[1]] # your decomposition
+                return [self._args[0] + self._args[1]] # your decomposition
 
     Also, implement `.value()` accordingly.
 
@@ -118,7 +118,7 @@ class Minimum(GlobalFunction):
         super().__init__("min", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
+        argvals = [argval(a) for a in self._args]
         if any(val is None for val in argvals):
             return None
         else:
@@ -136,13 +136,13 @@ class Minimum(GlobalFunction):
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
         return [eval_comparison(cpm_op, _min, cpm_rhs)], \
-               [any(x <= _min for x in self.args), all(x >= _min for x in self.args), ]
+               [any(x <= _min for x in self._args), all(x >= _min for x in self._args), ]
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        bnds = [get_bounds(x) for x in self.args]
+        bnds = [get_bounds(x) for x in self._args]
         return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
 
 
@@ -155,7 +155,7 @@ class Maximum(GlobalFunction):
         super().__init__("max", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
+        argvals = [argval(a) for a in self._args]
         if any(val is None for val in argvals):
             return None
         else:
@@ -173,13 +173,13 @@ class Maximum(GlobalFunction):
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
         return [eval_comparison(cpm_op, _max, cpm_rhs)], \
-               [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
+               [any(x >= _max for x in self._args), all(x <= _max for x in self._args)]
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        bnds = [get_bounds(x) for x in self.args]
+        bnds = [get_bounds(x) for x in self._args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
 class Abs(GlobalFunction):
@@ -191,7 +191,7 @@ class Abs(GlobalFunction):
         super().__init__("abs", [expr])
 
     def value(self):
-        return abs(argval(self.args[0]))
+        return abs(argval(self._args[0]))
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -201,7 +201,7 @@ class Abs(GlobalFunction):
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
-        arg = self.args[0]
+        arg = self._args[0]
         return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
 
 
@@ -209,7 +209,7 @@ class Abs(GlobalFunction):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        lb,ub = get_bounds(self.args[0])
+        lb,ub = get_bounds(self._args[0])
         if lb >= 0:
             return lb, ub
         if ub <= 0:
@@ -246,7 +246,7 @@ class Element(GlobalFunction):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
-        arr, idx = self.args
+        arr, idx = self._args
         idxval = argval(idx)
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
@@ -268,18 +268,18 @@ class Element(GlobalFunction):
         """
         from .python_builtins import any
 
-        arr, idx = self.args
+        arr, idx = self._args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)], []
 
     def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
+        return "{}[{}]".format(self._args[0], self._args[1])
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        arr, idx = self.args
+        arr, idx = self._args
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
@@ -298,11 +298,11 @@ class Count(GlobalFunction):
         """
         Count(arr,val) can only be decomposed if it's part of a comparison
         """
-        arr, val = self.args
+        arr, val = self._args
         return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
 
     def value(self):
-        arr, val = self.args
+        arr, val = self._args
         val = argval(val)
         return sum([argval(a) == val for a in arr])
 
@@ -310,7 +310,7 @@ class Count(GlobalFunction):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        arr, val = self.args
+        arr, val = self._args
         return 0, len(arr)
 
 
@@ -332,15 +332,15 @@ class Among(GlobalFunction):
             Among(arr, vals) can only be decomposed if it's part of a comparison'
         """
         from .python_builtins import sum, any
-        arr, values = self.args
+        arr, values = self._args
         count_for_each_val = [Count(arr, val) for val in values]
         return [eval_comparison(cmp_op, sum(count_for_each_val), cmp_rhs)], []
 
     def value(self):
-        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
+        return int(sum(np.isin(argvals(self._args[0]), self._args[1])))
 
     def get_bounds(self):
-        return 0, len(self.args[0])
+        return 0, len(self._args[0])
 
 
 class NValue(GlobalFunction):
@@ -365,7 +365,7 @@ class NValue(GlobalFunction):
         """
         from .python_builtins import sum, any
 
-        lbs, ubs = get_bounds(self.args)
+        lbs, ubs = get_bounds(self._args)
         lb, ub = min(lbs), max(ubs)
 
         constraints = []
@@ -373,7 +373,7 @@ class NValue(GlobalFunction):
         # introduce boolvar for each possible value
         bvars = boolvar(shape=(ub+1-lb))
 
-        args = cpm_array(self.args)
+        args = cpm_array(self._args)
         # bvar is true if the value is taken by any variable
         for bv, val in zip(bvars, range(lb, ub+1)):
             constraints += [any(args == val) == bv]
@@ -381,13 +381,13 @@ class NValue(GlobalFunction):
         return [eval_comparison(cmp_op, sum(bvars), cpm_rhs)], constraints
 
     def value(self):
-        return len(set(argval(a) for a in self.args))
+        return len(set(argval(a) for a in self._args))
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        return 1, len(self.args)
+        return 1, len(self._args)
 
 
 class NValueExcept(GlobalFunction):
@@ -415,7 +415,7 @@ class NValueExcept(GlobalFunction):
         """
         from .python_builtins import sum, any
 
-        arr, n = self.args
+        arr, n = self._args
         arr = cpm_array(arr)
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
@@ -437,10 +437,10 @@ class NValueExcept(GlobalFunction):
         return [eval_comparison(cmp_op, count_of_vals, cpm_rhs)], constraints
 
     def value(self):
-        return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
+        return len(set(argval(a) for a in self._args[0]) - {self._args[1]})
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
         """
-        return 0, len(self.args)
+        return 0, len(self._args)
