@@ -445,26 +445,43 @@ class NDVarArray(np.ndarray, Expression):
             if len(index) != self.ndim:
                 raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
 
-            # find dimension of expression in index
-            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index += [index.pop(expr_dim[0])]
+            # find dimensions with expressions vs constants
+            expr_dims = []
+            const_dims = []
+            for dim, idx in enumerate(index):
+                if isinstance(idx, Expression):
+                    expr_dims.append(dim)
+                else:
+                    const_dims.append((dim, idx))
 
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return Element(arr[index[:-1]], index[-1])
-
-
-            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
-
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return Element(arr.flatten(), flat_index)
+            # If there are constant indices, reshape array to remove those dimensions
+            if const_dims:
+                # Build slice tuple to select constant indices
+                slice_tuple = [slice(None)] * self.ndim
+                for dim, val in const_dims:
+                    slice_tuple[dim] = val
+                
+                # Select array with constant indices
+                arr = self[tuple(slice_tuple)]
+                
+                # Build new index tuple with just the expressions
+                new_index = tuple(index[d] for d in expr_dims)
+                
+                if len(expr_dims) == 1:
+                    # Single expression case
+                    return Element(arr, new_index[0])
+                else:
+                    # Multiple expressions case
+                    flat_index = new_index[-1]
+                    for dim, idx in enumerate(new_index[:-1]):
+                        flat_index += idx * math.prod(arr.shape[dim+1:])
+                    return Element(arr.flatten(), flat_index)
+            else:
+                # No constants case - use original flattening logic
+                flat_index = index[-1]
+                for dim, idx in enumerate(index[:-1]):
+                    flat_index += idx * math.prod(self.shape[dim+1:])
+                return Element(self.flatten(), flat_index)
 
         ret = super().__getitem__(index)
         # this is a bit ugly,
