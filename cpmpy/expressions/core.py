@@ -114,10 +114,6 @@ class Expression(object):
     def args(self):
         return self._args
 
-    @property
-    def vars(self):
-        return self._args
-
     @args.setter
     def args(self, args):
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
