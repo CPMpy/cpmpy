@@ -160,6 +160,24 @@ def get_sat_model(start, goal, horizon, n_piles=None):
                           move[t, 1] != move[t + 1, 1],
                           move[t, 0] != move[t, 1]]))
 
+    # some cubes are locked in end position
+    # locked means the block and all blocks below are at their end position
+    locked = cp.boolvar(shape=(n_cubes, horizon), name="locked")
+    for t in range(horizon):
+        for b in range(1, n_cubes):
+            model += locked[b, t] == ((state[b, t] == goal[b - 1]) & (locked[goal[b - 1], t] if goal[b - 1] != 0 else True))
+
+    # don't move locked blocks
+    for t in range(horizon - 1):
+        for b in range(1, n_cubes):
+            model += locked[b, t].implies(state[b, t + 1] == goal[b - 1])
+            model += locked[b, t].implies(move[t + 1, 0] != b)
+
+    # objective lower bound
+    # we will need at least as many time-steps as non-fixed blocks
+    # seems to mostly help for Choco and Gecode
+    for t in range(horizon):
+        model += cp.sum(~locked[:, t]) + t <= horizon
 
     return model, (state, move)
 
