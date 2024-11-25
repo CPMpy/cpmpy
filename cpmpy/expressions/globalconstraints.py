@@ -358,16 +358,6 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
-    @property
-    def vars(self):
-        return self._args[0]
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'

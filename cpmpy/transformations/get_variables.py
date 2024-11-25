@@ -52,7 +52,7 @@ def get_variables(expr, collect=None):
                 elif e.name == "table":
                     extract(e.args[0], append)  # skip data in arg1
                 else:
-                    extract(e.vars, append)
+                    extract(e.args, append)
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
                 extract(e, append)
 
