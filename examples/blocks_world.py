@@ -18,6 +18,9 @@ def get_model(start, goal, n_piles=None):
     import cpmpy as cp
 
     n = len(start)
+    if n_piles is None:
+        n_piles = n # no limit on number of piles
+
     n_cubes, horizon = n + 1, n * n_piles + 1  # n_cubes includes the dummy cube 0
 
     # state[b,t] shows the block where block b is on at time t
@@ -49,7 +52,7 @@ def get_model(start, goal, n_piles=None):
 
     # computing the number of times a cube occurs in the configuration
     for t in range(horizon):
-        model += cp.GlobalCardinalityCount(state[1:, t], list(range(0, n_cubes)), count[:, t])
+        model += cp.GlobalCardinalityCount(state[1:, t], list(range(0, n_cubes)), count[:, t], closed=True)
 
     # count nb of times a block occurs
     model += count[0, :] >= 1
@@ -91,6 +94,12 @@ def get_model(start, goal, n_piles=None):
             model += locked[b, t].implies(state[b, t + 1] == goal[b-1])
             model += locked[b, t].implies(move[t + 1, 0] != b)
 
+    # objective lower bound
+    # we will need at least as many time-steps as non-fixed blocks
+    # seems to mostly help for Choco and Gecode
+    for t in range(horizon):
+        model += done[t] | (cp.sum(~locked[:, t]) + t <= cp.sum(~done))
+
     return model, (state, move)
 
 
@@ -100,6 +109,9 @@ def get_sat_model(start, goal, horizon, n_piles=None):
     import cpmpy as cp
 
     n = len(start)
+    if n_piles is None:
+        n_piles = n  # no limit on number of piles
+
     n_cubes = n + 1  # n_cubes includes the dummy cube 0
     horizon += 1
 
@@ -126,7 +138,7 @@ def get_sat_model(start, goal, horizon, n_piles=None):
 
     # computing the number of times a cube occurs in the configuration
     for t in range(horizon):
-        model += cp.GlobalCardinalityCount(state[1:, t], list(range(0, n_cubes)), count[:, t])
+        model += cp.GlobalCardinalityCount(state[1:, t], list(range(0, n_cubes)), count[:, t], closed=True)
 
     # count nb of times a block occurs
     model += count[0, :] >= 1
