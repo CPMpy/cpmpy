@@ -23,7 +23,7 @@ When you write a CPMpy model (constraints and an objective), you use Python's op
 
 CPMpy uses Python's operator overloading to build expression trees (see expression.py). From CPMpy's point of view, a constraint programming problem is a list of expression trees (each one representing a constraint) and an expression tree for the objective function. You can write very complex nested expressions (e.g. `(a | b) == ((x + y > 5) -> (c & d))`), the language itself has few restrictions.
 
-CPMpy only does minor modifications to the expressions when building the expression trees, e.g., it removes constants when chaining operators (e.g. `x + 0` :: `x`).
+CPMpy only does minor modifications to the expressions when building the expression trees, e.g. it removes constants when chaining operators (e.g. `x + 0` :: `x`).
 
 So the language offers acces to the high level expressions written by the user.
 

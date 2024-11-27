@@ -40,7 +40,7 @@ Find all solutions, and print the value of `x` for each solution found.
 n = m.solveAll(display=x)
 ```
 
-`display` Can also take lists of arbitrary CPMpy expressions:
+`display` can also take lists of arbitrary CPMpy expressions:
 ```python
 n = m.solveAll(display=[x,sum(x)])
 ```
@@ -130,7 +130,7 @@ while len(store) < 3 and s.solve():
     s.maximize(sum([sum(x != sol) for sol in store]))
 ```
 
-As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is Numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write much less loops while modeling.
+As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is a numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write fewer loops while modeling.
 
 To use the Euclidian distance, only the last line needs to be changed. We again use vectorized operations and obtain succinct models. The creation of intermediate variables (with appropriate domains) is done by CPMpy behind the scenes.
 
@@ -143,7 +143,7 @@ To use the Euclidian distance, only the last line needs to be changed. We again 
 
 CPMpy passes arguments to `solve()` directly to the underlying solver object, so you can actually define your own native callbacks and pass them to the solve call.
 
-The following is an example of that, which is actually how the native `solveAll()` for ortools is implemented. You could give it your own custom implemented callback `cb` too.
+The following is an example of that, which is actually how the native `solveAll()` for OR-Tools is implemented. You could give it your own custom implemented callback `cb` too.
 ```python
 from cpmpy import *
 from cpmpy.solvers import CPM_ortools
