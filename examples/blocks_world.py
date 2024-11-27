@@ -197,7 +197,7 @@ def _get_piles(state):
     return sorted(towers, key=lambda x: x[-1])
 
 def show_solution(states):
-    # Find where the states start repeating by checking from end
+    # Find where the states start repeating by checking from the end
     states = states.T
     last_state = states[-1]
     end_idx = len(states)-1
