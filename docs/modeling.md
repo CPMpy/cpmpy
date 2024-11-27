@@ -705,6 +705,35 @@ The `DirectConstraint` is a very powerful primitive to get the most out of speci
 - [vrp_ortools.py](https://github.com/CPMpy/cpmpy/blob/master/examples/vrp_ortools.py) demonstrating OR-Tools' newly introduced multi-circuit global constraint through DirectConstraint; and 
 - [pctsp_ortools.py](https://github.com/CPMpy/cpmpy/blob/master/examples/pctsp_ortools.py) that uses a DirectConstraint to use OR-Tools circuit to post a sub-circuit constraint as needed for this price-collecting TSP variant.
 
+### DirectVar
+
+Similar to creating solver-native constraints using `DirectConstraint`, you can also create solver-specific variables.
+For example, some solvers such as OR-Tools support creating "interval variables" to define a (varying in size) interval.
+Such intervals can be used in scheduling-specific DirectConstraints such as `Cumulative` or `NoOverlap`.
+
+The example below shows how to create a `DirectVar`
+
+```python
+import cpmpy as cp
+import numpy as np
+
+start = cp.intvar(0,10, shape=3)
+end = cp.intvar(0,10,shape=3)
+dur = np.array([3,4,5]) # ensure it is a ndarray!!
+
+# create 3 interval variables
+intervals = cp.directvar("NewIntervalVar",
+                          arguments=(start, np.array(dur), end), # has to be a tuple
+                          shape=3,
+                          insert_name_at_index=3) # OR-tools's API requests (start, dur, end, name)
+
+s = cp.SolverLookup.get("ortools")
+s += cp.DirectConstraint(name="AddNoOverlap", arguments=intervals)
+```
+
+See the following examples for more elaborate use-case:
+- [schedule-and-allocate.ipynb](https://github.com/CPMpy/cpmpy/tree/master/examples/schedule-and-allocate.ipynb) which uses the "optional interval variables" in OR-tools to allocate tasks to teams, while minimizing the makespan.
+
 ### Directly accessing the underlying solver
 
 The `DirectConstraint("AddAllDifferent", iv)` is equivalent to the following code, which demonstrates that you can mix the use of CPMpy with calling the underlying solver directly: 
