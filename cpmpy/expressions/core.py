@@ -109,6 +109,10 @@ class Expression(object):
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self._args = arg_list
 
+    @property
+    def args(self):
+        return self._args
+
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
         self._override_print = override_print
