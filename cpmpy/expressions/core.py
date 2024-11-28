@@ -162,24 +162,26 @@ class Expression(object):
             Results are cached for future calls and reset when the expression changes
             (in-place argument update).
         """
+        # return cached result
+        if hasattr(self, '_has_subexpr'):
+            return self._has_subexpr
 
-        def recursive_has_subexpr(lst) -> bool:
-            """ Recursive implementation to handle nested lists of expressions.
-            """
-            for el in lst:
-                if isinstance(el, Expression):
-                    if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too (allows early-exit for decision var arrays)
-                        return True
-                elif is_any_list(el) and recursive_has_subexpr(el): # recursively call on list-like
+        # Initialize stack with args
+        stack = list(self.args)
+
+        while stack:
+            el = stack.pop()
+            if isinstance(el, Expression):
+                if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too
+                    self._has_subexpr = True
                     return True
-            return False
+            elif is_any_list(el):
+                # Add list elements to stack for processing
+                stack.extend(el)
 
-        # If not an Expression (e.g. list-like) or _has_subexpr has not been computed before / has been reset
-        if not hasattr(self, '_has_subexpr'):
-            # args can have lists of lists... -> need for recursive implementation
-            self._has_subexpr = recursive_has_subexpr(self.args)
-
-        return self._has_subexpr
+        # No subexpressions found
+        self._has_subexpr = False
+        return False
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
