@@ -1,6 +1,14 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## z3.py
+##
 """
     Interface to z3's API
+
+    Requires that the 'z3-solver' python package is installed:
+    
+        $ pip install z3-solver
 
     Z3 is a highly versatile and effective theorem prover from Microsoft.
     Underneath, it is an SMT solver with a wide scala of theory solvers.
@@ -19,6 +27,10 @@
         :nosignatures:
 
         CPM_z3
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -41,7 +53,7 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-    z3_solver: object, z3's Solver() object
+        - z3_solver: object, z3's Solver() object
 
     The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
@@ -82,6 +94,13 @@ class CPM_z3(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.z3_solver
+
 
     def solve(self, time_limit=None, assumptions=[], **kwargs):
         """
@@ -111,6 +130,9 @@ class CPM_z3(SolverInterface):
             ```
         """
         import z3
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             # z3 expects milliseconds in int

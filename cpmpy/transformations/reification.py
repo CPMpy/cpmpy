@@ -1,13 +1,3 @@
-import copy
-from ..expressions.core import Operator, Comparison, Expression
-from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.globalfunctions import Element
-from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.python_builtins import all
-from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var
-from .negation import recurse_negation
-
 """
   Transformations regarding reification constraints.
 
@@ -23,6 +13,15 @@ from .negation import recurse_negation
     - only_implies():       transforms all reifications to BV -> BE form
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
+import copy
+from ..expressions.core import Operator, Comparison, Expression
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import Element
+from ..expressions.variables import _BoolVarImpl, _NumVarImpl
+from ..expressions.python_builtins import all
+from ..expressions.utils import is_any_list
+from .flatten_model import flatten_constraint, get_or_make_var
+from .negation import recurse_negation
 
 def only_bv_reifies(constraints):
     newcons = []

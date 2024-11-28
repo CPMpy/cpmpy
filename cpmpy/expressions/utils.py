@@ -12,27 +12,35 @@ Internal utilities for expression handling.
     .. autosummary::
         :nosignatures:
 
+        is_bool
         is_int
         is_num
+        is_false_cst
+        is_true_cst
+        is_boolexpr
         is_pure_list
         is_any_list
+        is_transition
         flatlist
         all_pairs
         argval
+        argvals
         eval_comparison
+        get_bounds     
 """
 
 import numpy as np
 import math
-from collections.abc import Iterable # for _flatten
-from itertools import chain, combinations
+from collections.abc import Iterable  # for flatten
+from itertools import combinations
 from cpmpy.exceptions import IncompleteFunctionError
 
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    return isinstance(arg, (bool, np.bool_))
+    from cpmpy import BoolVal
+    return isinstance(arg, (bool, np.bool_, BoolVal))
 
 
 def is_int(arg):
@@ -120,11 +128,21 @@ def argval(a):
         
         We check with hasattr instead of isinstance to avoid circular dependency
     """
-    try:
-        return a.value() if hasattr(a, "value") else a
-    except IncompleteFunctionError as e:
-        if a.is_bool(): return False
-        raise e
+    if hasattr(a, "value"):
+        try:
+            return a.value()
+        except IncompleteFunctionError as e:
+            if a.is_bool():
+                return False
+            else:
+                raise e
+    return a
+
+
+def argvals(arr):
+    if is_any_list(arr):
+        return [argvals(arg) for arg in arr]
+    return argval(arr)
 
 
 def eval_comparison(str_op, lhs, rhs):
@@ -163,9 +181,15 @@ def get_bounds(expr):
     returns appropriately rounded integers
     """
 
+    # import here to avoid circular import
     from cpmpy.expressions.core import Expression
+    from cpmpy.expressions.variables import cpm_array
+
     if isinstance(expr, Expression):
         return expr.get_bounds()
+    elif is_any_list(expr):
+        lbs, ubs = zip(*[get_bounds(e) for e in expr])
+        return list(lbs), list(ubs) # return list as NDVarArray is covered above
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):

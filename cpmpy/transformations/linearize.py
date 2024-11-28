@@ -47,9 +47,10 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool, get_bounds
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
@@ -99,7 +100,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     newlist += [cond.implies(lin) for lin in lin_sub]
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified)
+                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
 
 
         # comparisons
@@ -117,6 +118,31 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
+                elif lhs.name == "mod" and "mod" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize modulo withtout multiplication")
+
+                    if cpm_expr.name != "==":
+                        new_rhs, newcons = get_or_make_var(lhs)
+                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        continue
+                    else:
+                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                        #   -> acts differently for negative numbers
+                        # "mod" is a partial function
+                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        x, y = lhs.args
+                        lby, uby = get_bounds(y)
+                        if lby <= 0 <= uby:
+                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. Please safen the expression first.")
+                        k = intvar(*get_bounds((x - rhs) // y))
+                        mult_res, newcons = get_or_make_var(k * y)
+                        newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+
+                        cpm_expr = (mult_res + rhs) == x
+
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
 
@@ -222,7 +248,7 @@ def only_positive_bv(lst_of_expr):
                 weights, args = lhs.args
                 idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
                 nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-                lhs = Operator("wsum", [nw, na]) # force making wsum, even for arity = 1
+                lhs = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
                 rhs -= sum(weights[i] for i in idxes)
 
             if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
@@ -269,8 +295,10 @@ def canonical_comparison(lst_of_expr):
             elif isinstance(lhs, Comparison):
                 lhs = canonical_comparison(lhs)[0]
                 newlist.append(lhs.implies(rhs))
+            else:
+                newlist.append(cpm_expr)
 
-        if isinstance(cpm_expr, Comparison):
+        elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
@@ -299,24 +327,30 @@ def canonical_comparison(lst_of_expr):
                 assert not is_num(lhs), "lhs cannot be an integer at this point!"
 
                 # bring all const to rhs
-                if lhs.name == "sum":
-                    new_args = []
-                    for i, arg in enumerate(lhs.args):
-                        if is_num(arg):
-                            rhs -= arg
-                        else:
-                            new_args.append(arg)
-                    lhs = Operator("sum", new_args)
+                if isinstance(lhs, Operator):
+                    if lhs.name == "sum":
+                        new_args = []
+                        for i, arg in enumerate(lhs.args):
+                            if is_num(arg):
+                                rhs -= arg
+                            else:
+                                new_args.append(arg)
+                        lhs = Operator("sum", new_args)
 
-                elif lhs.name == "wsum":
-                    new_weights, new_args = [], []
-                    for i, (w, arg) in enumerate(zip(*lhs.args)):
-                        if is_num(arg):
-                            rhs -= w * arg
-                        else:
-                            new_weights.append(w)
-                            new_args.append(arg)
-                    lhs = Operator("wsum", [new_weights, new_args])
+                    elif lhs.name == "wsum":
+                        new_weights, new_args = [], []
+                        for i, (w, arg) in enumerate(zip(*lhs.args)):
+                            if is_num(arg):
+                                rhs -= w * arg
+                            else:
+                                new_weights.append(w)
+                                new_args.append(arg)
+                        lhs = Operator("wsum", [new_weights, new_args])
+                    else:
+                        raise ValueError(f"lhs should be sum or wsum, but got {lhs}")
+                else:
+                    assert isinstance(lhs, _NumVarImpl)
+                    lhs = Operator("sum", [lhs])
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
         else:   # rest of expressions

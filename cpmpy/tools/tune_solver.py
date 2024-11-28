@@ -6,9 +6,9 @@
     Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
     vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
 
-    DOI: https://doi.org/10.1007/978-3-031-08011-1_6
-    Link to paper: https://rdcu.be/cQyWR
-    Link to original code of paper: https://github.com/ML-KULeuven/DeCaprio
+    - DOI: https://doi.org/10.1007/978-3-031-08011-1_6
+    - Link to paper: https://rdcu.be/cQyWR
+    - Link to original code of paper: https://github.com/ML-KULeuven/DeCaprio
 
     This code currently only implements the author's 'Hamming' surrogate function.
     The parameter tuner iteratively finds better hyperparameters close to the current best configuration during the search.
@@ -23,13 +23,15 @@ from ..solvers.utils import SolverLookup, param_combinations
 from ..solvers.solver_interface import ExitStatus
 
 class ParameterTuner:
+    """
+        Parameter tuner based on DeCaprio method [ref_to_decaprio]
+    """
 
     def __init__(self, solvername, model, all_params=None, defaults=None):
-        """
-            Parameter tuner based on DeCaprio method [ref_to_decaprio]
-            :param: solvername: Name of solver to tune
-            :param: model: CPMpy model to tune parameters on
-            :param: all_params: optional, dictionary with parameter names and values to tune. If None, use predefined parameter set.
+        """            
+            :param solvername: Name of solver to tune
+            :param model: CPMpy model to tune parameters on
+            :param all_params: optional, dictionary with parameter names and values to tune. If None, use predefined parameter set.
         """
         self.solvername = solvername
         self.model = model
@@ -44,9 +46,9 @@ class ParameterTuner:
 
     def tune(self, time_limit=None, max_tries=None, fix_params={}):
         """
-            :param: time_limit: Time budget to run tuner in seconds. Solver will be interrupted when time budget is exceeded
-            :param: max_tries: Maximum number of configurations to test
-            :param: fix_params: Non-default parameters to run solvers with.
+            :param time_limit: Time budget to run tuner in seconds. Solver will be interrupted when time budget is exceeded
+            :param max_tries: Maximum number of configurations to test
+            :param fix_params: Non-default parameters to run solvers with.
         """
         if time_limit is not None:
             start_time = time.time()
@@ -81,7 +83,7 @@ class ParameterTuner:
             # Convert numpy array back to dictionary
             params_dict = self._np_to_params(params_np)
             # set fixed params
-            params_dict |= fix_params
+            params_dict.update(fix_params)
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
@@ -98,7 +100,7 @@ class ParameterTuner:
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
-        self.best_params |= fix_params
+        self.best_params.update(fix_params)
         return self.best_params
 
     def _get_score(self, combos):
@@ -150,7 +152,7 @@ class GridSearchTuner(ParameterTuner):
             # Make new solver
             solver = SolverLookup.get(self.solvername, self.model)
             # set fixed params
-            params_dict |= fix_params
+            params_dict.update(fix_params)
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:

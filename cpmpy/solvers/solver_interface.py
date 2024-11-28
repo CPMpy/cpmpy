@@ -88,6 +88,13 @@ class SolverInterface(object):
                 else:
                     self.maximize(cpm_model.objective_)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        raise NotImplementedError("Solver does not support direct solver access. Look at the solver's API for alternative native objects to access directly.")
+
     # instead of overloading minimize/maximize, better just overload 'objective()'
     def minimize(self, expr):
         """

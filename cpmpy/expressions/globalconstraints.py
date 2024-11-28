@@ -98,13 +98,23 @@
 
         AllDifferent
         AllDifferentExcept0
+        AllDifferentExceptN
         AllEqual
+        AllEqualExceptN
         Circuit
         Inverse
         Table
+        NegativeTable
         Xor
         Cumulative
+        IfThenElse
         GlobalCardinalityCount
+        DirectConstraint
+        InDomain
+        Increasing
+        Decreasing
+        IncreasingStrict
+        DecreasingStrict
 
 """
 import copy
@@ -113,7 +123,7 @@ import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -171,23 +181,35 @@ class AllDifferent(GlobalConstraint):
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == len(self.args)
+        return len(set(argvals(self.args))) == len(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
+class AllDifferentExceptN(GlobalConstraint):
     """
-    All nonzero arguments have a distinct value
+        All arguments except those equal to a value in n have a distinct value.
     """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except0", flatlist(args))
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
-        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
+        from .python_builtins import any as cpm_any
+        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
+        return [(var1 == var2).implies(cpm_any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [a.value() for a in self.args if a.value() != 0]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
+
+
+class AllDifferentExcept0(AllDifferentExceptN):
+    """
+        All nonzero arguments have a distinct value
+    """
+    def __init__(self, *arr):
+        flatarr = flatlist(arr)
+        super().__init__(arr, 0)
 
 
 def allequal(args):
@@ -208,7 +230,27 @@ class AllEqual(GlobalConstraint):
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
     def value(self):
-        return len(set(a.value() for a in self.args)) == 1
+        return len(set(argvals(self.args))) == 1
+
+
+class AllEqualExceptN(GlobalConstraint):
+    """
+    All arguments except those equal to a value in n have the same value.
+    """
+
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("allequal_except_n", [flatarr, n])
+
+    def decompose(self):
+        from .python_builtins import any as cpm_any
+        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+
+    def value(self):
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+        return len(set(vals)) == 1 or len(set(vals)) == 0
 
 
 def circuit(args):
@@ -259,7 +301,8 @@ class Circuit(GlobalConstraint):
         pathlen = 0
         idx = 0
         visited = set()
-        arr = [argval(a) for a in self.args]
+        arr = argvals(self.args)
+
         while idx not in visited:
             if idx is None:
                 return False
@@ -294,15 +337,22 @@ class Inverse(GlobalConstraint):
         return [all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
-        fwd = [argval(a) for a in self.args[0]]
-        rev = [argval(a) for a in self.args[1]]
-        return all(rev[x] == i for i, x in enumerate(fwd))
+        fwd = argvals(self.args[0])
+        rev = argvals(self.args[1])
+        # args are fine, now evaluate actual inverse cons
+        try:
+            return all(rev[x] == i for i, x in enumerate(fwd))
+        except IndexError: # partiality of Element constraint
+            return False
 
 
 class Table(GlobalConstraint):
     """The values of the variables in 'array' correspond to a row in 'table'
     """
     def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
         super().__init__("table", [array, table])
 
     def decompose(self):
@@ -312,8 +362,30 @@ class Table(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = argvals(arr)
         return arrval in tab
+
+
+class NegativeTable(GlobalConstraint):
+    """The values of the variables in 'array' do not correspond to any row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("negative_table", [array, table])
+
+    def decompose(self):
+        from .python_builtins import all as cpm_all
+        from .python_builtins import any as cpm_any
+        arr, tab = self.args
+        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = argvals(arr)
+        tabval = argvals(tab)
+        return arrval not in tabval
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
@@ -327,10 +399,13 @@ class IfThenElse(GlobalConstraint):
 
     def value(self):
         condition, if_true, if_false = self.args
-        if argval(condition):
-            return argval(if_true)
-        else:
-            return argval(if_false)
+        try:
+            if argval(condition):
+                return argval(if_true)
+            else:
+                return argval(if_false)
+        except IncompleteFunctionError:
+            return False
 
     def decompose(self):
         condition, if_true, if_false = self.args
@@ -348,8 +423,6 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
-        assert not (is_boolexpr(expr) or any(is_boolexpr(a) for a in arr)), \
-            "The expressions in the InDomain constraint should not be boolean"
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
@@ -378,7 +451,7 @@ class InDomain(GlobalConstraint):
 
 
     def value(self):
-        return argval(self.args[0]) in argval(self.args[1])
+        return argval(self.args[0]) in argvals(self.args[1])
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
@@ -401,19 +474,14 @@ class Xor(GlobalConstraint):
         super().__init__("xor", flatargs)
 
     def decompose(self):
-        # there are multiple decompositions possible
-        # sum(args) mod 2 == 1, for size 2: sum(args) == 1
-        # since Xor is logical constraint, the default is a logic decomposition
-        a0, a1 = self.args[:2]
-        cons = (a0 | a1) & (~a0 | ~a1)  # one true and one false
-
-        # for more than 2 variables, we cascade (decomposed) xors
-        for arg in self.args[2:]:
-            cons = (cons | arg) & (~cons | ~arg)
-        return [cons], []
+        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
+        decomp = [sum(self.args[:2]) == 1]
+        if len(self.args) > 2:
+            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+        return decomp, []
 
     def value(self):
-        return sum(argval(a) for a in self.args) % 2 == 1
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -424,33 +492,30 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures no overlap between tasks and never exceeding the capacity of the resource
+        Ensures that the capacity of the resource is never exceeded
+        Equivalent to noOverlap when demand and capacity are equal to 1
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
-        start = flatlist(start)
         assert is_any_list(duration), "duration should be a list"
-        duration = flatlist(duration)
-        for d in duration:
-            if get_bounds(d)[0]<0:
-                raise TypeError("durations should be non-negative")
         assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
         end = flatlist(end)
-        assert len(start) == len(duration) == len(end), "Lists should be equal length"
+        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
 
         if is_any_list(demand):
             demand = flatlist(demand)
-            assert len(demand) == len(start), "Shape of demand should match start, duration and end"
-            for d in demand:
-                if is_boolexpr(d):
-                    raise TypeError("demands must be non-boolean: {}".format(d))
-        else:
-            if is_boolexpr(demand):
-                raise TypeError("demand must be non-boolean: {}".format(demand))
-        flatargs = flatlist([start, duration, end, demand, capacity])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("All input lists should contain only arithmetic arguments for Cumulative constraints: {}".format(flatargs))
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
@@ -472,7 +537,7 @@ class Cumulative(GlobalConstraint):
             cons += [start[t] + duration[t] == end[t]]
 
         # demand doesn't exceed capacity
-        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
         for t in range(lb,ub+1):
             demand_at_t = 0
             for job in range(len(start)):
@@ -480,19 +545,20 @@ class Cumulative(GlobalConstraint):
                     demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
                 else:
                     demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
-            cons += [capacity >= demand_at_t]
+
+            cons += [demand_at_t <= capacity]
 
         return cons, []
 
     def value(self):
-        argvals = [np.array([argval(a) for a in arg]) if is_any_list(arg)
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
                    else argval(arg) for arg in self.args]
 
-        if any(a is None for a in argvals):
+        if any(a is None for a in arg_vals):
             return None
 
         # start, dur, end are np arrays
-        start, dur, end, demand, capacity = argvals
+        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
@@ -506,27 +572,315 @@ class Cumulative(GlobalConstraint):
         return True
 
 
+class Precedence(GlobalConstraint):
+    """
+        Constraint enforcing some values have precedence over others.
+        Given an array of variables X and a list of precedences P:
+        Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
+    """
+    def __init__(self, vars, precedence):
+        if not is_any_list(vars):
+            raise TypeError("Precedence expects a list of variables, but got", vars)
+        if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
+            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+        super().__init__("precedence", [vars, precedence])
+
+    def decompose(self):
+        """
+        Decomposition based on:
+        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
+        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
+        """
+        from .python_builtins import any as cpm_any
+
+        args, precedence = self.args
+        constraints = []
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            for j in range(len(args)):
+                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+        return constraints, []
+
+    def value(self):
+
+        args, precedence = self.args
+        vals = np.array(argvals(args))
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            if vals[0] == t: return False
+            for j in range(len(args)):
+                if vals[j] == t and sum(vals[:j] == s) == 0:
+                    return False
+        return True
+
+
+class NoOverlap(GlobalConstraint):
+
+    def __init__(self, start, dur, end):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+
+        super().__init__("no_overlap", [start, dur, end])
+
+    def decompose(self):
+        start, dur, end = self.args
+        cons = [s + d == e for s,d,e in zip(start, dur, end)]
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+            cons += [(e1 <= s2) | (e2 <= s1)]
+        return cons, []
+    def value(self):
+        start, dur, end = argvals(self.args)
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if e1 > s2 and e2 > s1:
+                return False
+        return True
+
+
 class GlobalCardinalityCount(GlobalConstraint):
     """
     GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
     must be equal to occ[i].
     """
 
-    def __init__(self, vars, vals, occ):
+    def __init__(self, vars, vals, occ, closed=False):
         flatargs = flatlist([vars, vals, occ])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
         super().__init__("gcc", [vars,vals,occ])
+        self.closed = closed
 
     def decompose(self):
         from .globalfunctions import Count
         vars, vals, occ = self.args
-        return [Count(vars, i) == v for i, v in zip(vals, occ)], []
+        constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+        if self.closed:
+            constraints += [InDomain(v, vals) for v in vars]
+        return constraints, []
 
     def value(self):
         from .python_builtins import all
         decomposed, _ = self.decompose()
         return all(decomposed).value()
+
+
+class Increasing(GlobalConstraint):
+    """
+        The "Increasing" constraint, the expressions will have increasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("increasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Increasing constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] <= args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        args = argvals(self.args)
+        return all(args[i] <= args[i+1] for i in range(len(args)-1))
+
+
+class Decreasing(GlobalConstraint):
+    """
+        The "Decreasing" constraint, the expressions will have decreasing (not strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("decreasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the Decreasing constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] >= args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        args = argvals(self.args)
+        return all(args[i] >= args[i+1] for i in range(len(args)-1))
+
+
+class IncreasingStrict(GlobalConstraint):
+    """
+        The "IncreasingStrict" constraint, the expressions will have increasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("strictly_increasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the IncreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [args[i] < args[i+1] for i in range(len(args)-1)], []
+
+    def value(self):
+        args = argvals(self.args)
+        return all(args[i] < args[i+1] for i in range(len(args)-1))
+
+
+class DecreasingStrict(GlobalConstraint):
+    """
+        The "DecreasingStrict" constraint, the expressions will have decreasing (strictly) values
+    """
+
+    def __init__(self, *args):
+        super().__init__("strictly_decreasing", flatlist(args))
+
+    def decompose(self):
+        """
+        Returns two lists of constraints:
+            1) the decomposition of the DecreasingStrict constraint
+            2) empty list of defining constraints
+        """
+        args = self.args
+        return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
+
+    def value(self):
+        args = argvals(self.args)
+        return all(args[i] > args[i+1] for i in range(len(args)-1))
+
+
+class LexLess(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_less", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal. It needs to be strictly less in at least one index.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+
+        # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
+        # until a strict inequality is encountered.
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
+        defining.append(bvar[-1] == (X[-1] < Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
+
+
+class LexLessEq(GlobalConstraint):
+    """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
+    """
+    def __init__(self, list1, list2):
+        X = flatlist(list1)
+        Y = flatlist(list2)
+        if len(X) != len(Y):
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+        super().__init__("lex_lesseq", [X, Y])
+
+    def decompose(self):
+        """
+        Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
+
+        The decomposition creates auxiliary Boolean variables and constraints that
+        collectively ensure X is lexicographically less than Y
+        The auxiliary boolean vars are defined to represent if the given lists are lexicographically ordered
+        (less or equal) up to the given index.
+        Decomposition enforces through the constraining part that the first boolean variable needs to be true, and thus
+        through the defining part it is enforced that if it is not strictly lexicographically less in a given index,
+        then next index must be lexicographically less or equal.
+
+        The use of auxiliary Boolean variables bvar ensures that the constraints propagate immediately,
+        maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
+        every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
+        subsequent positions.
+        """
+        X, Y = cpm_array(self.args)
+
+        bvar = boolvar(shape=(len(X) + 1))
+        defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
+        defining.append(bvar[-1] == (X[-1] <= Y[-1]))
+        constraining = [bvar[0]]
+
+        return constraining, defining
+
+    def value(self):
+        X, Y = argvals(self.args)
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
+
+
+class LexChainLess(GlobalConstraint):
+    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_less", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLess constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+
+
+class LexChainLessEq(GlobalConstraint):
+    """ Given a matrix X, LexChainLessEq enforces that all rows are lexicographically ordered.
+    """
+    def __init__(self, X):
+        # Ensure the numpy array is 2D
+        X = cpm_array(X)
+        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+        super().__init__("lex_chain_lesseq", X.tolist())
+
+    def decompose(self):
+        """ Decompose to a series of LexLessEq constraints between subsequent rows
+        """
+        X = self.args
+        return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
+
+    def value(self):
+        X = argvals(self.args)
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
