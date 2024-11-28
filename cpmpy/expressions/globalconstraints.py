@@ -242,11 +242,12 @@ class Circuit(GlobalConstraint):
         constraining += [AllDifferent(succ)] # different successors
         constraining += [AllDifferent(order)] # different orders
         constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
-        a = boolvar(name='a')
+        a = boolvar(name='a') # true iff the values in succ are within bounds.
+        # Otherwise they lose meaning (it means nothing to come after the 9th element of a list with only 7 elements)
 
         defining = [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
         for i in range(n):
-            defining += [(~a).implies(order[i] == 0)] #make order be totally defined
+            defining += [(~a).implies(order[i] == 0)] # assign arbitrary value, no ordering exists if ~a
             if i == 0:
                 defining += [a.implies(order[0] == succ[0])]
             else:
