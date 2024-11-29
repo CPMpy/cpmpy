@@ -23,7 +23,7 @@ import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
-from .core import Expression, Operator
+from .core import Expression, Operator, BoolVal
 from .globalfunctions import Minimum, Maximum, Abs
 from ..exceptions import CPMpyException
 
@@ -40,7 +40,7 @@ def all(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if is_false_cst(elem):
-            return False  # no need to create constraint
+            return BoolVal(False)  # no need to create constraint
         elif is_true_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
@@ -65,7 +65,7 @@ def any(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if is_true_cst(elem):
-            return True # no need to create constraint
+            return BoolVal(True) # no need to create constraint
         elif is_false_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
