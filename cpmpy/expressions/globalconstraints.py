@@ -289,9 +289,10 @@ class Circuit(GlobalConstraint):
         # We define the auxiliary order variables to represent the order we visit all the nodes.
         # `order[i] == succ[order[i - 1]]`
         # These constraints need to be in the defining part, since they define our auxiliary vars
-        # However, this would make it impossible for ~circuit to be satisfied in some case,
+        # However, this would make it impossible for ~circuit to be satisfied in some cases,
         # because there does not always exist a valid ordering
-        # (i.e. when the variables in succ don't take values in the domain of 'order')
+        # This happens when the variables in succ don't take values in the domain of 'order',
+        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
         # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
 
         lbs, ubs = get_bounds(succ)
