@@ -90,7 +90,7 @@ def max(*iterable, **kwargs):
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.max(*iterable, **kwargs)
+        return builtins.max(iterable, **kwargs)
 
     assert len(kwargs)==0, "max over decision variables does not support keyword arguments"
     return Maximum(iterable)
@@ -107,7 +107,7 @@ def min(*iterable, **kwargs):
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.min(*iterable, **kwargs)
+        return builtins.min(iterable, **kwargs)
 
     assert len(kwargs)==0, "min over decision variables does not support keyword arguments"
     return Minimum(iterable)
