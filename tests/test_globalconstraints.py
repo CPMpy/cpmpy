@@ -176,11 +176,8 @@ class TestGlobal(unittest.TestCase):
         x = cp.intvar(lb=-1, ub=5, shape=4)
         circuit = cp.Circuit(x)
 
-        x = [cp.intvar(0,1), cp.intvar(2,3), cp.intvar(0,1), cp.intvar(0,1)]
-        circuit = cp.Circuit(x)
         model = cp.Model([~circuit, x == [1,2,3,0]])
         self.assertFalse(model.solve())
-
         model = cp.Model([~circuit])
         self.assertTrue(model.solve())
         self.assertFalse(circuit.value())
