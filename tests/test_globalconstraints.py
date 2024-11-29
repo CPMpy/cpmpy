@@ -159,13 +159,47 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
+        # Test with domain (0,5)
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
-
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        # Test with domain (-2,7)
+        x = cp.intvar(-2, 7, 6)
+        circuit = cp.Circuit(x)
+        model = cp.Model([circuit])
+        self.assertTrue(model.solve())
+        self.assertTrue(circuit.value())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
+
+        # Test decomposition with domain (-2,7)
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        # Test with smaller domain (1,5)
+        x = cp.intvar(1, 5, 5)
+        circuit = cp.Circuit(x)
+        model = cp.Model([circuit])
+        self.assertFalse(model.solve())
+        self.assertFalse(circuit.value())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
+
+        # Test decomposition with domain (1,5)
         constraints = [cp.Circuit(x).decompose()]
         model = cp.Model(constraints)
         self.assertTrue(model.solve())
@@ -176,8 +210,12 @@ class TestGlobal(unittest.TestCase):
         x = cp.intvar(lb=-1, ub=5, shape=4)
         circuit = cp.Circuit(x)
 
+        x = cp.cpm_array([3, cp.intvar(3,3), 3, 3])
+        circuit = cp.Circuit(x)
         model = cp.Model([~circuit, x == [1,2,3,0]])
+
         self.assertFalse(model.solve())
+        print([x.value() for x in x])
         model = cp.Model([~circuit])
         self.assertTrue(model.solve())
         self.assertFalse(circuit.value())
