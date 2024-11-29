@@ -8,7 +8,7 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, is_bool_cst
 
 def push_down_negation(lst_of_expr, toplevel=True):
     """
@@ -106,6 +106,9 @@ def recurse_negation(expr):
         newexpr.args = push_down_negation(expr.args, toplevel=False)
         return ~newexpr
 
+    elif is_bool(expr): # unlikely case with non-CPMpy True or False
+        return ~BoolVal(expr)
+        
     # numvars or direct constraint
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
