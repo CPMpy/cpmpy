@@ -121,7 +121,7 @@ import copy
 import warnings # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
+from .core import Expression, Operator, Comparison, BoolVal
 from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
 from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 from .globalfunctions import * # XXX make this file backwards compatible
@@ -280,21 +280,26 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n, name='order')
+        defining = []
         constraining = []
         constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)] # different orders
-        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
-        a = boolvar(name='a') # true iff the values in succ are within bounds.
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n-1] == 0]  # symmetry breaking, last one is '0'
+        a = boolvar(name='a')  # true iff the values in succ are within bounds.
         # Otherwise they lose meaning (it means nothing to come after the 9th element of a list with only 7 elements)
+        # if all bounds are tight, we can just set a = true
+        lb, ub = get_bounds(succ)
+        if min(lb) >= 0 and max(ub) < n:
+            a = BoolVal(True)
+        else:
+            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
+            for i in range(n):
+                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
 
-        defining = [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
-        for i in range(n):
-            defining += [(~a).implies(order[i] == 0)] # assign arbitrary value, no ordering exists if ~a
-            if i == 0:
-                defining += [a.implies(order[0] == succ[0])]
-            else:
-                defining += [a.implies(
-                    order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
+        defining += [a.implies(order[0] == succ[0])]
+        for i in range(1, n):
+            defining += [a.implies(
+                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
         return constraining, defining
 
     def value(self):
