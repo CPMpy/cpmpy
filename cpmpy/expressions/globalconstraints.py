@@ -285,13 +285,25 @@ class Circuit(GlobalConstraint):
         constraining += [AllDifferent(succ)] # different successors
         constraining += [AllDifferent(order)]  # different orders
         constraining += [order[n-1] == 0]  # symmetry breaking, last one is '0'
-        a = boolvar(name='a')  # true iff the values in succ are within bounds.
-        # Otherwise they lose meaning (it means nothing to come after the 9th element of a list with only 7 elements)
-        # if all bounds are tight, we can just set a = true
-        lb, ub = get_bounds(succ)
-        if min(lb) >= 0 and max(ub) < n:
+
+        # We define the auxiliary order variables to represent the order we visit all the nodes.
+        # `order[i] == succ[order[i - 1]]`
+        # These constraints need to be in the defining part, since they define our auxiliary vars
+        # However, this would make it impossible for ~circuit to be satisfied in some case,
+        # because there does not always exist a valid ordering
+        # (i.e. when the variables in succ don't take values in the domain of 'order')
+        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
+
+        lbs, ubs = get_bounds(succ)
+        if min(lbs) > 0 or max(ubs) < n - 1:
+            # no way this can be a circuit
+            return [BoolVal(False)], []
+        elif min(lbs) >= 0 and max(ubs) < n:
+            # there always exists a valid ordering, since our bounds are tight
             a = BoolVal(True)
         else:
+            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
+            a = boolvar()
             defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
             for i in range(n):
                 defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
