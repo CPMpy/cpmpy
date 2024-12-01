@@ -209,17 +209,12 @@ class TestGlobal(unittest.TestCase):
     def test_not_circuit(self):
         x = cp.intvar(lb=-1, ub=5, shape=4)
         circuit = cp.Circuit(x)
-
-        x = cp.cpm_array([3, cp.intvar(3,3), 3, 3])
-        circuit = cp.Circuit(x)
         model = cp.Model([~circuit, x == [1,2,3,0]])
-
         self.assertFalse(model.solve())
-        print([x.value() for x in x])
+
         model = cp.Model([~circuit])
         self.assertTrue(model.solve())
         self.assertFalse(circuit.value())
-
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
         all_sols = set()
