@@ -40,7 +40,7 @@ def all(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if is_false_cst(elem):
-            return BoolVal(False)  # no need to create constraint
+            return False  # no need to create constraint
         elif is_true_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
@@ -65,7 +65,7 @@ def any(iterable):
     collect = [] # logical expressions
     for elem in iterable:
         if is_true_cst(elem):
-            return BoolVal(True) # no need to create constraint
+            return True # no need to create constraint
         elif is_false_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
