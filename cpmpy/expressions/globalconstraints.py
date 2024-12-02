@@ -806,8 +806,10 @@ class Regular(GlobalConstraint):
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
-        if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
-            raise TypeError("only boolean expression allowed in IfThenElse")
+        if not is_boolexpr(condition):
+            raise TypeError("only Boolean expression allowed as condition")
+        if not is_boolexpr(if_true) or not is_boolexpr(if_false):
+            raise TypeError("only Boolean expressions allowed as result, use cpmpy.expressions.globalfunctions.IfThenElseNum instead")
         super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
