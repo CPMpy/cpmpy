@@ -282,9 +282,6 @@ class Circuit(GlobalConstraint):
         order = intvar(0,n-1, shape=n)
         defining = []
         constraining = []
-        constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)]  # different orders
-        constraining += [order[n-1] == 0]  # symmetry breaking, last one is '0'
 
         # We define the auxiliary order variables to represent the order we visit all the nodes.
         # `order[i] == succ[order[i - 1]]`
@@ -309,6 +306,9 @@ class Circuit(GlobalConstraint):
             for i in range(n):
                 defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
 
+        constraining += [AllDifferent(succ)]  # different successors
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
         defining += [a.implies(order[0] == succ[0])]
         for i in range(1, n):
             defining += [a.implies(
