@@ -279,7 +279,7 @@ class Circuit(GlobalConstraint):
         """
         succ = cpm_array(self.args)
         n = len(succ)
-        order = intvar(0,n-1, shape=n, name='order')
+        order = intvar(0,n-1, shape=n)
         defining = []
         constraining = []
         constraining += [AllDifferent(succ)] # different successors
