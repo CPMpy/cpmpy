@@ -53,6 +53,10 @@ def push_down_negation(lst_of_expr, toplevel=True):
 
         else:
             # an Expression, we remain in the positive case
+            if not expr.has_subexpr():  # Only recurse if there are nested expressions
+                newlist.append(expr)
+                continue
+
             newexpr = copy.copy(expr)
             # TODO, check that an arg changed? otherwise no copy needed here...
             newexpr.update_args(push_down_negation(expr.args, toplevel=False))  # check if 'not' is present in arguments

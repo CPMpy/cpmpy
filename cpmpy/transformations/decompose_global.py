@@ -124,6 +124,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     newlist.append(aux)  # replace original expression by aux
 
         elif isinstance(expr, Comparison):
+            if not expr.has_subexpr(): # Only recurse if there are nested expressions
+                newlist.append(expr)
+                continue
+
             # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
             # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
             lhs, rhs = expr.args
