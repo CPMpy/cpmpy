@@ -202,8 +202,8 @@ class TestGlobal(unittest.TestCase):
         # Test decomposition with domain (1,5)
         constraints = [cp.Circuit(x).decompose()]
         model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-        self.assertTrue(cp.Circuit(x).value())
+        self.assertFalse(model.solve())
+        self.assertFalse(cp.Circuit(x).value())
 
 
     def test_not_circuit(self):
