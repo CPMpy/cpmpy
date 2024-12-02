@@ -277,12 +277,6 @@ class _NumVarImpl(Expression):
         """
         return False
 
-    def is_leaf(self):
-        """ Is it the leaf of an expression tree?
-            This is only the case for decision variables (and constants).
-        """
-        return True
-
     def value(self):
         """ the value obtained in the last solve call
             (or 'None')
@@ -428,15 +422,6 @@ class NDVarArray(np.ndarray, Expression):
         """ is it a Boolean (return type) Operator?
         """
         return False
-
-    def is_leaf(self):
-        """ Is it the leaf of an expression tree?
-        """
-        # In the case of a NDVarArray, the array is its own args. So, has_subexpr() returns
-        # whether there are any non-leaf Expressions (so not the _NumVarImpl and its variants)
-        # inside the array. If there are no non-leaf Expressions, then this array is a "leaf"
-        # in the expression tree.
-        return not self.has_subexpr()
 
     def value(self):
         """ the values, for each of the stored variables, obtained in the last solve call

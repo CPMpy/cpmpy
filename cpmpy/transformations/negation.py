@@ -29,7 +29,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
 
-        elif not isinstance(expr, Expression) or expr.is_leaf():
+        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal)):
             # nothing to do
             newlist.append(expr)
 

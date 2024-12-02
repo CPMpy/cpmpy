@@ -75,6 +75,7 @@ import numpy as np
 
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
+from .variables import NDVarArray, _NumVarImpl
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -172,7 +173,11 @@ class Expression(object):
         while stack:
             el = stack.pop()
             if isinstance(el, Expression):
-                if not el.is_leaf():  # NDVarArrays are Expr and any_list, so they are covered too
+                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
+                if isinstance(el, NDVarArray) and el.has_subexpr():
+                    self._has_subexpr = True
+                    return True
+                elif not isinstance(el, (_NumVarImpl, BoolVal)):
                     self._has_subexpr = True
                     return True
             elif is_any_list(el):
@@ -189,11 +194,6 @@ class Expression(object):
         """
         return True
 
-    def is_leaf(self):
-        """ Is it the leaf of an expression tree?
-            Default: no
-        """
-        return False
 
     def value(self):
         return None # default
@@ -437,10 +437,6 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
-    def is_leaf(self):
-        """ Is it the leaf of an expression tree?
-        """
-        return True
 
     def has_subexpr(self) -> bool:
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
