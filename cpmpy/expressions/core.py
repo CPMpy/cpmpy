@@ -72,10 +72,10 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
-
+import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
-from .variables import NDVarArray, _NumVarImpl
+
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -174,10 +174,10 @@ class Expression(object):
             el = stack.pop()
             if isinstance(el, Expression):
                 # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, NDVarArray) and el.has_subexpr():
+                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
                     self._has_subexpr = True
                     return True
-                elif not isinstance(el, (_NumVarImpl, BoolVal)):
+                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
                     self._has_subexpr = True
                     return True
             elif is_any_list(el):
