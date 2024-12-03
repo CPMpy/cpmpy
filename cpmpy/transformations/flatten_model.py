@@ -165,7 +165,7 @@ def flatten_constraint(expr):
                 if expr.args[1].name == 'and':
                     a1s = expr.args[1].args
                     a0 = expr.args[0]
-                    lst_of_expr.extend([a0.implies(a1) for a1 in a1s])
+                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s]))
                     continue
                 # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
                 elif expr.args[0].name == 'or':
