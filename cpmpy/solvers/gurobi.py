@@ -200,7 +200,8 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
+            raise Exception("Negative literals should not be part of any equation. "
+                            "See /transformations/linearize for more details")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -441,7 +442,8 @@ class CPM_gurobi(SolverInterface):
 
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
+                "Gurobi does not support searching for all solutions. If you really need all solutions, "
+                "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
         sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}

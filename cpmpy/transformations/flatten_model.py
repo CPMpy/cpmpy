@@ -77,17 +77,15 @@ commutative expressions (and, or, sum, wsum, ...) but such optimisations should 
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
-import copy
 import math
 import builtins
-import numpy as np
 
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
-from .negation import recurse_negation, push_down_negation
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
+from ..expressions.utils import is_num, is_any_list
+from .negation import push_down_negation
 
 
 def flatten_model(orig_model):
@@ -282,7 +280,7 @@ def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
     # lets be very explicit here
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
-        raise Exception(f"Objective expects a single variable/expression, not a list of expressions")
+        raise Exception(f"Objective expects a single variable/expression, not a list of expressions: {expr}")
 
     expr = simplify_boolean([expr])[0]
     (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
@@ -336,8 +334,9 @@ def get_or_make_var(expr):
 
         lb, ub = flatexpr.get_bounds()
         if not(isinstance(lb,int) and isinstance(ub,int)):
-            warnings.warn("CPMPy only uses integer variables, non-integer expression detected that will be reified "
-                          "into an intvar with rounded bounds. \n Your constraints will stay the same.", UserWarning)
+            warnings.warn(f"CPMPy only uses integer variables, non-integer expression detected ({expr}) and it will be "
+                          f"reified into an intvar with rounded bounds. \n Your constraints will stay the same.",
+                          UserWarning)
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
         return ivar, [flatexpr == ivar] + flatcons
@@ -494,10 +493,10 @@ def normalized_numexpr(expr):
             i = 0
             while(i < len(sub_exprs)): # can dynamically change
                 if isinstance(sub_exprs[i], Operator) and \
-                    ((sub_exprs[i].name in ['-', 'sum'] and \
-                        all(isinstance(a, Expression) for a in sub_exprs[i].args)) or \
-                     (sub_exprs[i].name == 'wsum' and \
-                        all(isinstance(a, Expression) for a in sub_exprs[i].args[1]))):  # TODO: avoid constants for now...
+                    ((sub_exprs[i].name in ['-', 'sum'] and
+                      all(isinstance(a, Expression) for a in sub_exprs[i].args)) or
+                     (sub_exprs[i].name == 'wsum' and
+                      all(isinstance(a, Expression) for a in sub_exprs[i].args[1]))):  # TODO: avoid constants for now...
                     w,e = _wsum_make(sub_exprs[i])
                     # insert in place, and next iteration over same 'i' again
                     weights[i:i+1] = [weights[i]*wj for wj in w]
@@ -530,6 +529,3 @@ def normalized_numexpr(expr):
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
             newexpr.args = flatvars
             return (newexpr, [c for con in flatcons for c in con])
-
-    raise Exception("Operator '{}' not allowed as numexpr".format(expr)) # or bug
-

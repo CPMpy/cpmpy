@@ -91,6 +91,7 @@ class CPM_minizinc(SolverInterface):
 
     @staticmethod
     def supported():
+        return False
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
@@ -398,7 +399,8 @@ class CPM_minizinc(SolverInterface):
 
             # test if the name is a valid minizinc identifier
             if not self.mzn_name_pattern.search(mzn_var):
-                raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores. "
+                raise MinizincNameException("Minizinc only accept names with alphabetic characters, "
+                                            "digits and underscores. "
                                 "First character must be an alphabetic character")
             if mzn_var in self.keywords:
                 raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
@@ -407,7 +409,8 @@ class CPM_minizinc(SolverInterface):
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
             elif isinstance(cpm_var, _IntVarImpl):
                 if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside of range (-2147483646..2147483646)")
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
+                                                  "of range (-2147483646..2147483646)")
                 self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
             self._varmap[cpm_var] = mzn_var
 
@@ -563,7 +566,8 @@ class CPM_minizinc(SolverInterface):
             op_str = expr.name
             expr_bounds = expr.get_bounds()
             if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
-                raise MinizincBoundsException("minizinc does not accept expressions with bounds outside of range (-2147483646..2147483646)")
+                raise MinizincBoundsException("minizinc does not accept expressions with bounds outside of "
+                                              "range (-2147483646..2147483646)")
             if op_str in printmap:
                 op_str = printmap[op_str]
 
