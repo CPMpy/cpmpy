@@ -59,19 +59,18 @@ def only_implies(constraints):
         AFTER `flatten()` and 'only_bv_reifies()'.
     """
     newcons = []
+    retransform = []
 
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if cpm_expr.name == '->':
+        if cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
             a0,a1 = cpm_expr.args
-            if isinstance(a1, Comparison) and \
-                    a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
+            if a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
                 bv2,bv3 = a1.args
-                newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
-                newcons.extend(only_implies(flatten_constraint(newexpr)))
+                retransform.extend(( a0.implies(~bv2|bv3), a0.implies(~bv3|bv2) ))
             else:
                 newcons.append(cpm_expr)
 
@@ -88,15 +87,14 @@ def only_implies(constraints):
                 newcons.append(cpm_expr)
             else:
                 # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a0).implies(recurse_negation(a1)), a0.implies(a1))
-                if isinstance(a1, GlobalConstraint):
-                    newcons.extend(newexprs)
-                else:
-                    newcons.extend(only_implies(only_bv_reifies(flatten_constraint(newexprs))))
+                retransform.extend(( (~a0).implies(recurse_negation(a1)), a0.implies(a1) ))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
     
+    if len(retransform) != 0:
+        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform))))
+
     return newcons
 
 
