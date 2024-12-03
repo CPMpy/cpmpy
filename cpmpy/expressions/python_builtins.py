@@ -23,7 +23,7 @@ import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
-from .core import Expression, Operator
+from .core import Expression, Operator, BoolVal
 from .globalfunctions import Minimum, Maximum, Abs
 from ..exceptions import CPMpyException
 
@@ -34,24 +34,35 @@ def all(iterable):
     """
         all() overwrites python built-in,
         if iterable contains an `Expression`, then returns an Operator("and", iterable)
-        otherwise returns whether all of the arguments is true
+        otherwise returns whether all the arguments is true
     """
-    if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
-    collect = [] # logical expressions
+    if isinstance(iterable, NDVarArray):
+        iterable=iterable.flat # 1D iterator
+
+    collect = []
+    has_expression = False
+    has_false = False
+
     for elem in iterable:
         if is_false_cst(elem):
-            return False  # no need to create constraint
+            has_false = True
         elif is_true_cst(elem):
             pass
         elif isinstance(elem, Expression) and elem.is_bool():
             collect.append(elem)
+            has_expression = True
         else:
-            raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
-    if len(collect) == 1:
-        return collect[0]
-    if len(collect) >= 2:
-        return Operator("and", collect)
-    return True
+            raise Exception(f"Non-Boolean argument '{elem}' to 'all'")
+
+    if has_expression:
+        if has_false:
+            return BoolVal(False)
+        if len(collect) == 1:
+            return collect[0]
+        if len(collect) >= 2:
+            return Operator("and", collect)
+
+    return not has_false
 
 
 # any: listwise 'or'
