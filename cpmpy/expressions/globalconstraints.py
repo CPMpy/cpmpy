@@ -344,6 +344,8 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
         super().__init__("table", [array, table])
