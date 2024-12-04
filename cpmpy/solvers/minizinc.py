@@ -282,7 +282,7 @@ class CPM_minizinc(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                cpm_var._value = None
 
         return has_sol
 
@@ -378,7 +378,7 @@ class CPM_minizinc(SolverInterface):
             # clear user vars if no solution found
             self.objective_value_ = None
             for var in self.user_vars:
-                var.clear()
+                var._value = None
 
         # status handling
         self._post_solve(mzn_result)

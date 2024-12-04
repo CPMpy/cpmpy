@@ -127,7 +127,7 @@ class CPM_exact(SolverInterface):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                cpm_var._value = None
             return
 
         # fill in variable values

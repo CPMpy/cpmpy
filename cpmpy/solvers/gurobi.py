@@ -188,7 +188,7 @@ class CPM_gurobi(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                var._value = None
 
         return has_sol
 
@@ -461,7 +461,7 @@ class CPM_gurobi(SolverInterface):
         if solution_count == 0:
             self.objective_value_ = None
             for var in self.user_vars:
-                var.clear()
+                var._value = None
 
         for i in range(solution_count):
             # Specify which solution to query

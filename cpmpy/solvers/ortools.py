@@ -223,7 +223,7 @@ class CPM_ortools(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                cpm_var._value = None
 
         return has_sol
 

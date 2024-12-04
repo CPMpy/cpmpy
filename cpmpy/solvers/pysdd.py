@@ -125,7 +125,7 @@ class CPM_pysdd(SolverInterface):
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                cpm_var._value = None
 
         # get solution values (of user specified variables only)
         if has_sol and self.pysdd_root is not None:
@@ -166,7 +166,7 @@ class CPM_pysdd(SolverInterface):
         if self.pysdd_root is None:
             # clear user vars if no solution found
             for var in self.user_vars:
-                var.clear()
+                var._value = None
             return 0
 
         sddmodels = [x for x in self.pysdd_root.models()]

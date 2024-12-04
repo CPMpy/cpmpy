@@ -175,7 +175,7 @@ class CPM_gcs(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var.clear()
+                cpm_var._value = None
 
         # Verify proof, if requested
         if verify:
@@ -264,7 +264,7 @@ class CPM_gcs(SolverInterface):
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
-                var.clear()
+                var._value = None
 
         # Verify proof, if requested
         if verify:
