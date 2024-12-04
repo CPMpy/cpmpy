@@ -74,8 +74,7 @@ from types import GeneratorType
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
-
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -194,10 +193,8 @@ class Expression(object):
         """
         return True
 
-
     def value(self):
         return None # default
-
 
     def get_bounds(self):
         if self.is_bool():
@@ -255,7 +252,8 @@ class Expression(object):
             return BoolVal(False)
         # catch beginner mistake
         if is_num(other):
-            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
+            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forget to put brackets? "
+                            f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
     def __rand__(self, other):
@@ -266,7 +264,8 @@ class Expression(object):
             return BoolVal(False)
         # catch beginner mistake
         if is_num(other):
-            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
@@ -277,7 +276,8 @@ class Expression(object):
             return self
         # catch beginner mistake
         if is_num(other):
-            raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
+            raise TypeError(f"{self}|{other} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
     def __ror__(self, other):
@@ -288,7 +288,8 @@ class Expression(object):
             return self
         # catch beginner mistake
         if is_num(other):
-            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
     def __xor__(self, other):
@@ -617,7 +618,8 @@ class Operator(Expression):
                 return arg_vals[0] // arg_vals[1]
             except ZeroDivisionError:
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use argval(expr) to get the value of expr with relational semantics.")
+                                              + "\n Use argval(expr) to get the value of expr with relational "
+                                                "semantics.")
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -677,7 +679,7 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 < 0:
-                raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
+                raise NotImplementedError(f"Power operator: For integer values, exponent must be non-negative: {self}")
             bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
             if lb1 < 0 and 0 < ub2:  
                 # The lower and upper bounds depend on either the largest or the second largest exponent 
@@ -695,7 +697,7 @@ class Operator(Expression):
             raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         if lowerbound > upperbound:
             #overflow happened
-            raise OverflowError('Overflow when calculating bounds, your expression exceeds integer bounds.')
+            raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum

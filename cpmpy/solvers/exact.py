@@ -36,7 +36,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.linearize import linearize_constraint, only_positive_bv
@@ -72,7 +72,9 @@ class CPM_exact(SolverInterface):
         except ModuleNotFoundError as e:
             return False 
         except VersionConflict:
-            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version {pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
+                          f"{pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires "
+                          f"Python 3.10 or higher.")
             return False
         except Exception as e:
             raise e
@@ -183,6 +185,7 @@ class CPM_exact(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
 
+        self.objective_value_ = None
         # translate exit status
         if my_status == "UNSAT": # found unsatisfiability
             if self.has_objective() and self.xct_solver.hasSolution():
@@ -205,7 +208,6 @@ class CPM_exact(SolverInterface):
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
-
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
@@ -453,11 +455,13 @@ class CPM_exact(SolverInterface):
                     assert isinstance(lhs, Operator)
                     # can be sum, wsum or mul
                     if lhs.name == "mul":
-                        assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} only supported by Exact version 2.1.0 and above"
+                        assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
+                                                                      f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
                             rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
-                        assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be rewritten by linearize"
+                        assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
+                                                                                  "rewritten by linearize"
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:

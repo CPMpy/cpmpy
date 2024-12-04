@@ -18,8 +18,8 @@
   - BE -> BV
   - BV -> BE
 """
-from ..expressions.core import Operator, Comparison
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.core import Operator
+from ..expressions.variables import _BoolVarImpl
 from .reification import only_implies
 from .flatten_model import flatten_constraint
 

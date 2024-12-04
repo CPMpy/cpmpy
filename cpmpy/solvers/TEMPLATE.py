@@ -152,6 +152,10 @@ class CPM_template(SolverInterface):
             if self.has_objective():
                 self.objective_value_ = self.TPL_solver.ObjectiveValue()
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
         return has_sol
 
 
@@ -400,6 +404,10 @@ class CPM_template(SolverInterface):
             callback = display
 
         self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        # clear user vars if no solution found
+        if self.TPL_solver.SolutionCount() == 0:
+            for var in self.user_vars:
+                var.clear()
         return self.TPL_solver.SolutionCount()
 
         # B. Example code if solver does not support callbacks
@@ -418,5 +426,10 @@ class CPM_template(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            for var in self.user_vars:
+                var.clear()
 
         return solution_count

@@ -67,7 +67,7 @@ Since the arrays of decision variables are based on numpy, you can do **vectoriz
 
 See [the API documentation on variables](./api/expressions/variables.rst) for more detailed information.
 
-Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last succesful solve call.
+Note that decision variables are not tied to a model. You can use the same variable in different models; its value() will be the one of the last solve call. Hence, when the last solve call was unsatisfiable, it's value will again be `None`.
 
 ## Creating a model
 
