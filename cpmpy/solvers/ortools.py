@@ -218,13 +218,13 @@ class CPM_ortools(SolverInterface):
             # translate objective
             if self.has_objective():
                 ort_obj_val = self.ort_solver.ObjectiveValue()
-                assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
-                self.objective_value_ = int(ort_obj_val) # ensure it is an integer
-
+                if round(ort_obj_val) == ort_obj_val: # it is an integer?
+                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
+                else: # can happen when using floats as coeff in objective
+                    self.objective_value_ = float(ort_obj_val)
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
-
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
@@ -324,14 +324,14 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
+                return ort.LinearExpr.sum(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "sub":
                 a,b = self.solver_vars(cpm_expr.args)
                 return a - b
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
+                return ort.LinearExpr.weighted_sum(x,w)
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
