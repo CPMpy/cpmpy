@@ -61,6 +61,7 @@ import warnings # for deprecation warning
 from functools import reduce
 
 import numpy as np
+import cpmpy as cp  # to avoid circular import
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
@@ -432,12 +433,11 @@ class NDVarArray(np.ndarray, Expression):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return Element(self, index)
+            return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
@@ -451,7 +451,7 @@ class NDVarArray(np.ndarray, Expression):
             for dim, idx in enumerate(index[:-1]):
                 flat_index += idx * math.prod(arr.shape[dim+1:])
             # using index expression as single var for flat array
-            return Element(arr.flatten(), flat_index)
+            return cp.Element(arr.flatten(), flat_index)
 
         ret = super().__getitem__(index)
         # this is a bit ugly,
