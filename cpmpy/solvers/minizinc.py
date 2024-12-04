@@ -279,7 +279,11 @@ class CPM_minizinc(SolverInterface):
 
             # translate objective, for optimisation problems only (otherwise None)
             self.objective_value_ = self.mzn_result.objective
-        
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
         return has_sol
 
     def _post_solve(self, mzn_result):
@@ -369,6 +373,12 @@ class CPM_minizinc(SolverInterface):
 
             # add nogood on the user variables
             self += any([v != v.value() for v in self.user_vars])
+
+        if solution_count == 0:
+            # clear user vars if no solution found
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var._value = None
 
         # status handling
         self._post_solve(mzn_result)

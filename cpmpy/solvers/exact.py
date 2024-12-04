@@ -185,6 +185,7 @@ class CPM_exact(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
 
+        self.objective_value_ = None
         # translate exit status
         if my_status == "UNSAT": # found unsatisfiability
             if self.has_objective() and self.xct_solver.hasSolution():
@@ -207,7 +208,6 @@ class CPM_exact(SolverInterface):
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
-
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)

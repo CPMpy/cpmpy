@@ -124,6 +124,8 @@ class CPM_pysdd(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         # get solution values (of user specified variables only)
         if has_sol and self.pysdd_root is not None:
@@ -162,6 +164,9 @@ class CPM_pysdd(SolverInterface):
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
         if self.pysdd_root is None:
+            # clear user vars if no solution found
+            for var in self.user_vars:
+                var._value = None
             return 0
 
         sddmodels = [x for x in self.pysdd_root.models()]

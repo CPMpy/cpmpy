@@ -190,9 +190,9 @@ class CPM_z3(SolverInterface):
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
 
-        else:
+        else:  # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var._value = None # XXX, maybe all solvers should do this...
+                cpm_var._value = None
 
         return has_sol
 

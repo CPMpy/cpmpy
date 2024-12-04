@@ -223,6 +223,9 @@ class CPM_ortools(SolverInterface):
                     self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
                     self.objective_value_ = float(ort_obj_val)
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):

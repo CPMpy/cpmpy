@@ -172,7 +172,11 @@ class CPM_gcs(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 self.objective_value_ = self.gcs.get_solution_value(self.solver_var(self.objective_var))
-        
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
         # Verify proof, if requested
         if verify:
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
@@ -256,6 +260,11 @@ class CPM_gcs(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = gcs_stats["solve_time"]
+
+        # clear user vars if no solution found
+        if self._solve_return(self.cpm_status, self.objective_value_) is False:
+            for var in self.user_vars:
+                var._value = None
 
         # Verify proof, if requested
         if verify:
