@@ -302,6 +302,18 @@ class TestSolvers(unittest.TestCase):
 
         self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
+    def test_ortools_real_coeff(self):
+
+        m = cp.Model()
+        # this works in OR-Tools
+        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
+        assert m.solve()
+        assert m.objective_value() == 1.4
+        # this does not
+        m += 0.7 * x + 0.8 * y >= 1
+        self.assertRaises(TypeError, m.solve)
+
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
     def test_pysat(self):
