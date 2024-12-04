@@ -36,10 +36,10 @@
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.core import Expression, BoolVal
+from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_bool, argval, argvals
+from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean

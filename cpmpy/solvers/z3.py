@@ -39,7 +39,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_z3(SolverInterface):
@@ -302,7 +302,7 @@ class CPM_z3(SolverInterface):
 
         return self
 
-    def _z3_expr(self, cpm_con, reify=False):
+    def _z3_expr(self, cpm_con):
         """
             Z3 supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -339,7 +339,7 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'or':
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
+                return z3.Implies(*self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'not':
                 return z3.Not(self._z3_expr(cpm_con.args[0]))
 
@@ -378,7 +378,8 @@ class CPM_z3(SolverInterface):
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
-                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, "
+                                          f"please report on github if you need it")
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
