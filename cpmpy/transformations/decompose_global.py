@@ -71,13 +71,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
-            # first create a fresh version and recurse into arguments
-            expr = copy.copy(expr)
-            expr.args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True)
-
-            # NOTE an early-exit here would not check if constaint in itself is even supported
-
-            # Check if the global constraint is supported by the solver
+            # Can't early-exit here, need to check if constraint in itself is even supported
             if nested and expr.is_bool():
                 # special case: reified (Boolean) global
                 is_supported = (expr.name in supported_reified)
