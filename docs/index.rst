@@ -21,17 +21,59 @@ Supported solvers
 
 CPMpy can translate to many different solvers, and even provides direct access to them.
 
-| **Solver** | **Technology** | **Installation** | **Assumption variables?** | **Notes**|
-|------------|----------------|------------------|---------------------------|----------|
-| **Or-Tools** | CP-SAT       | pip              | Yes                | Assumptions NOT incremental! Every solve starts from scratch |
-| **Choco**  | CP             | pip              | No                        |          |
-| **GCS**    | CP             | pip              | No                        | Supports proof logging
-| **MiniZinc** | CP           | pip + local install | No                     | Communicates through textfiles |
-| **Z3**     | SMT            | pip              | Yes                       |          |
-| **Gurobi** | ILP            | pip + (aca.) license | No                    |          |
-| **Exact**  | Pseudo-Boolean | pip (only Linux, Win(py>3.10))   | Yes      | Manual installation on Mac possible |
-| **PySAT**  | SAT            | pip              | Yes                       | Only Boolean variables (CPMpy transformation incomplete)
-| **PySDD**  | SAT Counter    | pip              | Yes                       | Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
+.. list-table::
+   :header-rows: 1
+
+   * - **Solver**
+     - **Technology**
+     - **Installation**
+     - **Assumption variables?**
+     - **Notes**
+   * - **Or-Tools**
+     - CP-SAT
+     - pip
+     - Yes
+     - Assumptions NOT incremental! Every solve starts from scratch
+   * - **Choco**
+     - CP
+     - pip
+     - No
+     - 
+   * - **GCS**
+     - CP
+     - pip
+     - No
+     - Supports proof logging
+   * - **MiniZinc**
+     - CP
+     - pip + local install
+     - No
+     - Communicates through textfiles
+   * - **Z3**
+     - SMT
+     - pip
+     - Yes
+     - 
+   * - **Gurobi**
+     - ILP
+     - pip + (aca.) license
+     - No
+     - 
+   * - **Exact**
+     - Pseudo-Boolean
+     - pip (only Linux, Win(py>3.10))
+     - Yes
+     - Manual installation on Mac possible
+   * - **PySAT**
+     - SAT
+     - pip
+     - Yes
+     - Only Boolean variables (CPMpy transformation incomplete)
+   * - **PySDD**
+     - SAT Counter
+     - pip
+     - Yes
+     - Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
 
 Different solvers excell at different problems. Try multiple!
 
