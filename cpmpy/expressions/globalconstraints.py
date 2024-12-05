@@ -118,12 +118,9 @@
 
 """
 import copy
-import warnings # for deprecation warning
-import numpy as np
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+
+from .utils import all_pairs
+from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -165,7 +162,8 @@ class GlobalConstraint(Expression):
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
-    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
+                  "stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
 
 
@@ -213,7 +211,8 @@ class AllDifferentExcept0(AllDifferentExceptN):
 
 
 def allequal(args):
-    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
 
 
@@ -246,7 +245,8 @@ class AllEqualExceptN(GlobalConstraint):
 
     def decompose(self):
         from .python_builtins import any as cpm_any
-        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1]))
+                for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -254,7 +254,8 @@ class AllEqualExceptN(GlobalConstraint):
 
 
 def circuit(args):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
 
 
@@ -344,8 +345,11 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
         super().__init__("table", [array, table])
 
     def decompose(self):
@@ -365,7 +369,8 @@ class NegativeTable(GlobalConstraint):
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
@@ -387,7 +392,8 @@ class NegativeTable(GlobalConstraint):
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
-            raise TypeError("only boolean expression allowed in IfThenElse")
+            raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
+                            f"{condition, if_true, if_false}")
         super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
@@ -615,7 +621,8 @@ class NoOverlap(GlobalConstraint):
         start = flatlist(start)
         dur = flatlist(dur)
         end = flatlist(end)
-        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length " \
+                                                   "in NoOverlap constraint"
 
         super().__init__("no_overlap", [start, dur, end])
 
@@ -757,7 +764,8 @@ class LexLess(GlobalConstraint):
         X = flatlist(list1)
         Y = flatlist(list2)
         if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} "
+                                 f"and Y length is {len(Y)}")
         super().__init__("lex_less", [X, Y])
 
     def decompose(self):
@@ -802,7 +810,8 @@ class LexLessEq(GlobalConstraint):
         X = flatlist(list1)
         Y = flatlist(list2)
         if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is "
+                                 f"{len(X)} and Y length is {len(Y)}")
         super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):

@@ -41,7 +41,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals
+from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -213,7 +213,8 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - "
+                                     f"please report on github...")
 
             # translate objective
             if self.has_objective():
@@ -222,6 +223,9 @@ class CPM_ortools(SolverInterface):
                     self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
                     self.objective_value_ = float(ort_obj_val)
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
@@ -465,7 +469,10 @@ class CPM_ortools(SolverInterface):
                     if not is_num(divisor):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
-                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is "
+                                    f"in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). "
+                                    f"Even if you add a constraint that it can not be '0'. You MUST use a variable "
+                                    f"that is defined to be higher or lower than '0'.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
@@ -482,11 +489,14 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == 'negative_table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
                 return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
@@ -516,7 +526,8 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             else:
-                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
+                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
+                                          f"If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
