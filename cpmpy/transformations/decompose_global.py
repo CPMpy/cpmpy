@@ -6,10 +6,10 @@ import copy
 import warnings  # for deprecation warning
 
 from .normalize import toplevel_list
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, intvar, boolvar, _NumVarImpl, cpm_array, NDVarArray
+from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.variables import intvar, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
@@ -43,9 +43,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
     for expr in lst_of_expr:
 
         if is_any_list(expr):
-            assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run cpmpy.transformations.normalize.toplevel_list first."
-
-            if isinstance(expr, NDVarArray): # NDVarArray is also an expression, so we can call has_subexpr on it for a possible early-exit
+            assert nested is True, "Cannot have nested lists without passing trough an expression, make sure to run " \
+                                   "cpmpy.transformations.normalize.toplevel_list first. "
+            if isinstance(expr, NDVarArray):  # NDVarArray is also an expression,
+                                              # so we can call has_subexpr on it for a possible early-exit
                 if expr.has_subexpr():
                     newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True)
                     newlist.append(cpm_array(newexpr))
@@ -70,10 +71,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, GlobalConstraint) or isinstance(expr, GlobalFunction):
-
-            # NOTE an early-exit here would not check if constaint in itself is even supported
-
-            # Check if the global constraint is supported by the solver
+            # Can't early-exit here, need to check if constraint in itself is even supported
             if nested and expr.is_bool():
                 # special case: reified (Boolean) global
                 is_supported = (expr.name in supported_reified)
@@ -97,7 +95,9 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     # boolean global constraints
                     dec = expr.decompose()
                     if not isinstance(dec, tuple):
-                        warnings.warn("Decomposing an old-style global that does not return a tuple, which is deprecated. Support for old-style globals will be removed in stable version", DeprecationWarning)
+                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
+                                      "deprecated. Support for old-style globals will be removed in stable version",
+                                      DeprecationWarning)
                         dec = (dec, [])
                     decomposed, define = dec
 
@@ -116,7 +116,9 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
                     dec = expr.decompose_comparison("==", aux)
                     if not isinstance(dec, tuple):
-                        warnings.warn("Decomposing an old-style global that does not return a tuple, which is deprecated. Support for old-style globals will be removed in stable version", DeprecationWarning)
+                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
+                                      "deprecated. Support for old-style globals will be removed in stable version",
+                                      DeprecationWarning)
                         dec = (dec, [])
                     auxdef, otherdef = dec
 
@@ -158,7 +160,9 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 # decompose comparison of lhs and rhs
                 dec = lhs.decompose_comparison(exprname, rhs)
                 if not isinstance(dec, tuple):
-                    warnings.warn("Decomposing an old-style global that does not return a tuple, which is deprecated. Support for old-style globals will be removed in stable version", DeprecationWarning)
+                    warnings.warn(f"Decomposing an old-style global ({lhs}) that does not return a tuple, which is "
+                                  f"deprecated. Support for old-style globals will be removed in stable version",
+                                  DeprecationWarning)
                     dec = (dec, [])
                 decomposed, define = dec
 
@@ -268,7 +272,8 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
     return newlist
 
 def do_decompose(cpm_expr):
-    warnings.warn("Deprecated, never meant to be used outside this transformation; will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, never meant to be used outside this transformation; will be removed in stable version",
+                  DeprecationWarning)
     """
         DEPRECATED
         Helper function for decomposing global constraints

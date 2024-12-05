@@ -120,7 +120,8 @@ def reify_rewrite(constraints, supported=frozenset()):
 
     newcons = []
     for cpm_expr in constraints:
-        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, run transformations.normalize.make_cpm_expr first!"
+        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, " \
+                                                 f"run transformations.normalize.make_cpm_expr first!"
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
         if cpm_expr.name == '->':
@@ -151,7 +152,9 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition transformation from `cpmpy.transformations.decompose_global` to decompose unsupported global constraints")
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition "
+                                     f"transformation from `cpmpy.transformations.decompose_global` to decompose "
+                                     f"unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op, (lhs, rhs) = boolexpr.name, boolexpr.args

@@ -63,13 +63,12 @@
         Abs
 
 """
-import copy
 import warnings  # for deprecation warning
 import numpy as np
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .variables import boolvar, intvar, cpm_array
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
