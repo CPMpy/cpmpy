@@ -72,7 +72,7 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
-
+import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
@@ -107,7 +107,25 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
+
+
+    @property
+    def args(self):
+        return self._args
+
+    @args.setter
+    def args(self, args):
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
+
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        self._args = args
+        # Reset cached "_has_subexpr"
+        if hasattr(self, "_has_subexpr"):
+            del self._has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -137,6 +155,38 @@ class Expression(object):
     def __hash__(self):
         return hash(self.__repr__())
 
+    def has_subexpr(self):
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+            Results are cached for future calls and reset when the expression changes
+            (in-place argument update).
+        """
+        # return cached result
+        if hasattr(self, '_has_subexpr'):
+            return self._has_subexpr
+
+        # Initialize stack with args
+        stack = list(self.args)
+
+        while stack:
+            el = stack.pop()
+            if isinstance(el, Expression):
+                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
+                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
+                    self._has_subexpr = True
+                    return True
+                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                    self._has_subexpr = True
+                    return True
+            elif is_any_list(el):
+                # Add list elements to stack for processing
+                stack.extend(el)
+
+        # No subexpressions found
+        self._has_subexpr = False
+        return False
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
             Default: yes
@@ -145,7 +195,6 @@ class Expression(object):
 
     def value(self):
         return None # default
-
 
     def get_bounds(self):
         if self.is_bool():
@@ -390,6 +439,14 @@ class BoolVal(Expression):
         return self.args[0]
 
 
+    def has_subexpr(self) -> bool:
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+        """
+        return False # BoolVal is a wrapper for a python or numpy constant boolean.
+
+
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
     """
@@ -507,7 +564,7 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
-    
+
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:
