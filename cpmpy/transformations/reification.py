@@ -77,7 +77,7 @@ def only_implies(constraints):
         # Comparisons: transform bV == BE
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
             a0,a1 = cpm_expr.args
-            if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
+            if isinstance(a1, _BoolVarImpl):
                 # BVar0 == BVar1 special case, no need to re-transform
                 newcons.append(a0.implies(a1))
                 newcons.append(a1.implies(a0))
