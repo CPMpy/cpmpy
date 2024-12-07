@@ -188,7 +188,7 @@ class CPM_gurobi(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                var._value = None
+                cpm_var._value = None
 
         return has_sol
 
