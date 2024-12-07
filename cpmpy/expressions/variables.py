@@ -405,6 +405,12 @@ class NDVarArray(np.ndarray, Expression):
     Do not create this object directly, use one of the functions in this module
     """
     def __init__(self, shape, **kwargs):
+        # bit ugly, but np.int and np.bool do not play well with > overloading
+        if np.issubdtype(self.dtype, np.integer):
+            self.astype(int)
+        elif np.issubdtype(self.dtype, np.bool_):
+            self.astype(bool)
+
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
         Expression.__init__(self, "NDVarArray", self)
@@ -468,14 +474,7 @@ class NDVarArray(np.ndarray, Expression):
             # using index expression as single var for flat array
             return Element(arr.flatten(), flat_index)
 
-        ret = super().__getitem__(index)
-        # this is a bit ugly,
-        # but np.int and np.bool do not play well with > overloading
-        if isinstance(ret, np.integer):
-            return int(ret)
-        elif isinstance(ret, np.bool_):
-            return bool(ret)
-        return ret
+        return super().__getitem__(index)
 
     """
     make the given array the first dimension in the returned array
