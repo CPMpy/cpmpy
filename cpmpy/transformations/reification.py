@@ -1,13 +1,3 @@
-import copy
-from ..expressions.core import Operator, Comparison, Expression
-from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.globalfunctions import Element
-from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.python_builtins import all
-from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var
-from .negation import recurse_negation
-
 """
   Transformations regarding reification constraints.
 
@@ -23,6 +13,15 @@ from .negation import recurse_negation
     - only_implies():       transforms all reifications to BV -> BE form
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
+import copy
+from ..expressions.core import Operator, Comparison, Expression
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import Element
+from ..expressions.variables import _BoolVarImpl, _NumVarImpl
+from ..expressions.python_builtins import all
+from ..expressions.utils import is_any_list
+from .flatten_model import flatten_constraint, get_or_make_var
+from .negation import recurse_negation
 
 def only_bv_reifies(constraints):
     newcons = []
@@ -123,7 +122,8 @@ def reify_rewrite(constraints, supported=frozenset()):
 
     newcons = []
     for cpm_expr in constraints:
-        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, run transformations.normalize.make_cpm_expr first!"
+        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, " \
+                                                 f"run transformations.normalize.make_cpm_expr first!"
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
         if cpm_expr.name == '->':
@@ -154,7 +154,9 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition transformation from `cpmpy.transformations.decompose_global` to decompose unsupported global constraints")
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition "
+                                     f"transformation from `cpmpy.transformations.decompose_global` to decompose "
+                                     f"unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op, (lhs, rhs) = boolexpr.name, boolexpr.args

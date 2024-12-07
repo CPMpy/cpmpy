@@ -15,9 +15,9 @@
 
     See the examples for basic usage, which involves:
 
-    - creation, e.g. m = Model(cons, minimize=obj)
-    - solving, e.g. m.solve()
-    - optionally, checking status/runtime, e.g. m.status()
+    - creation, e.g. `m = Model(cons, minimize=obj)` 
+    - solving, e.g. `m.solve()` 
+    - optionally, checking status/runtime, e.g. `m.status()` 
 
     ===============
     List of classes
@@ -136,7 +136,7 @@ class Model(object):
         self.objective(expr, minimize=False)
 
     # solver: name of supported solver or any SolverInterface object
-    def solve(self, solver=None, time_limit=None):
+    def solve(self, solver=None, time_limit=None, **kwargs):
         """ Send the model to a solver and get the result
 
         :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
@@ -156,7 +156,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solve(time_limit=time_limit)
+        ret = s.solve(time_limit=time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
@@ -266,7 +266,7 @@ class Model(object):
     def copy(self):
         """
             Makes a shallow copy of the model.
-            Constraints and variables are shared among the original and copied model.
+            Constraints and variables are shared among the original and copied model (references to the same Expression objects). The /list/ of constraints itself is different, so adding or removing constraints from one model does not affect the other.
         """
         if self.objective_is_min:
             return Model(self.constraints, minimize=self.objective_)

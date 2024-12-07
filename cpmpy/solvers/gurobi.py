@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## gurobi.py
+##
 """
     Interface to the python 'gurobi' package
 
@@ -6,11 +10,12 @@
 
         $ pip install gurobipy
     
-    as well as the Gurobi bundled binary packages, downloadable from:
-    https://www.gurobi.com/
     
     In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
     You can read more about available licences at https://www.gurobi.com/downloads/
+
+    Documentation of the solver's own Python API:
+    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
 
     ===============
     List of classes
@@ -28,6 +33,7 @@
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
+from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -56,7 +62,7 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-    - grb_model: object, TEMPLATE's model object
+        - grb_model: object, TEMPLATE's model object
 
     The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     """
@@ -82,6 +88,7 @@ class CPM_gurobi(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None, not used
         """
         if not self.supported():
             raise Exception(
@@ -94,6 +101,13 @@ class CPM_gurobi(SolverInterface):
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement __add__() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.grb_model
 
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
@@ -114,6 +128,9 @@ class CPM_gurobi(SolverInterface):
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -163,7 +180,15 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = int(solver_val)
             # set _objective_value
             if self.has_objective():
-                self.objective_value_ = grb_objective.getValue()
+                grb_obj_val = grb_objective.getValue()
+                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
+                    self.objective_value_ = int(grb_obj_val)
+                else: #  can happen with DirectVar or when using floats as coefficients
+                    self.objective_value_ =  float(grb_obj_val)
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         return has_sol
 
@@ -179,7 +204,8 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
+            raise Exception("Negative literals should not be part of any equation. "
+                            "See /transformations/linearize for more details")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -420,7 +446,8 @@ class CPM_gurobi(SolverInterface):
 
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
+                "Gurobi does not support searching for all solutions. If you really need all solutions, "
+                "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
         sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
@@ -431,6 +458,12 @@ class CPM_gurobi(SolverInterface):
         optimal_val = None
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var._value = None
 
         for i in range(solution_count):
             # Specify which solution to query
@@ -458,9 +491,9 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
 

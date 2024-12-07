@@ -1,6 +1,14 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## z3.py
+##
 """
     Interface to z3's API
+
+    Requires that the 'z3-solver' python package is installed:
+    
+        $ pip install z3-solver
 
     Z3 is a highly versatile and effective theorem prover from Microsoft.
     Underneath, it is an SMT solver with a wide scala of theory solvers.
@@ -19,6 +27,10 @@
         :nosignatures:
 
         CPM_z3
+
+    ==============
+    Module details
+    ==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -27,7 +39,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.normalize import toplevel_list
 
 
 class CPM_z3(SolverInterface):
@@ -41,7 +53,7 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-    z3_solver: object, z3's Solver() object
+        - z3_solver: object, z3's Solver() object
 
     The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     """
@@ -82,6 +94,13 @@ class CPM_z3(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.z3_solver
+
 
     def solve(self, time_limit=None, assumptions=[], **kwargs):
         """
@@ -111,6 +130,9 @@ class CPM_z3(SolverInterface):
             ```
         """
         import z3
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         if time_limit is not None:
             # z3 expects milliseconds in int
@@ -168,9 +190,9 @@ class CPM_z3(SolverInterface):
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
 
-        else:
+        else:  # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var._value = None # XXX, maybe all solvers should do this...
+                cpm_var._value = None
 
         return has_sol
 
@@ -280,7 +302,7 @@ class CPM_z3(SolverInterface):
 
         return self
 
-    def _z3_expr(self, cpm_con, reify=False):
+    def _z3_expr(self, cpm_con):
         """
             Z3 supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -317,7 +339,7 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'or':
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
+                return z3.Implies(*self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'not':
                 return z3.Not(self._z3_expr(cpm_con.args[0]))
 
@@ -356,7 +378,8 @@ class CPM_z3(SolverInterface):
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
-                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, "
+                                          f"please report on github if you need it")
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):

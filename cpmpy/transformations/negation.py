@@ -1,3 +1,6 @@
+"""
+    Transformations dealing with negations.
+"""
 import copy
 import warnings  # for deprecation warning
 import numpy as np
@@ -5,7 +8,8 @@ import numpy as np
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, is_bool, is_boolexpr
+
 
 def push_down_negation(lst_of_expr, toplevel=True):
     """
@@ -38,11 +42,24 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(arg_neg)
 
+        # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+        elif expr.name == '!=':
+            lexpr, rexpr = expr.args
+            if is_boolexpr(lexpr) and is_boolexpr(rexpr):
+                newexpr = (lexpr == recurse_negation(rexpr))
+                newlist.append(newexpr)
+            else:
+                newlist.append(expr)
+
         else:
             # an Expression, we remain in the positive case
+            if not expr.has_subexpr():  # Only recurse if there are nested expressions
+                newlist.append(expr)
+                continue
+
             newexpr = copy.copy(expr)
             # TODO, check that an arg changed? otherwise no copy needed here...
-            newexpr.args = push_down_negation(expr.args, toplevel=False)  # check if 'not' is present in arguments
+            newexpr.update_args(push_down_negation(expr.args, toplevel=False))  # check if 'not' is present in arguments
             newlist.append(newexpr)
 
     return newlist
@@ -59,6 +76,8 @@ def recurse_negation(expr):
     if isinstance(expr, (_BoolVarImpl,BoolVal)):
         return ~expr
 
+    elif is_bool(expr):
+        return not expr
     elif isinstance(expr, Comparison):
         newexpr = copy.copy(expr)
         if   expr.name == '==': newexpr.name = '!='
@@ -69,7 +88,7 @@ def recurse_negation(expr):
         elif expr.name == '>':  newexpr.name = '<='
         else: raise ValueError(f"Unknown comparison to negate {expr}")
         # args are positive now, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return newexpr
 
     elif isinstance(expr, Operator):
@@ -93,14 +112,14 @@ def recurse_negation(expr):
             elif expr.name == "or": newexpr.name = "and"
             else: raise ValueError(f"Unknown operator to negate {expr}")
             # continue negating the args
-            newexpr.args = [recurse_negation(a) for a in expr.args]
+            newexpr.update_args([recurse_negation(a) for a in expr.args])
             return newexpr
 
     # global constraints
     elif hasattr(expr, "decompose"):
         newexpr = copy.copy(expr)
         # args are positive as we will negate the global, still check if no 'not' in its arguments
-        newexpr.args = push_down_negation(expr.args, toplevel=False)
+        newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return ~newexpr
 
     # numvars or direct constraint
@@ -109,5 +128,7 @@ def recurse_negation(expr):
 
 
 def negated_normal(expr):
-    warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in the expression (or use `push_down_negation` on the full expression tree); will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in "
+                  "the expression (or use `push_down_negation` on the full expression tree); will be removed in "
+                  "stable version", DeprecationWarning)
     return recurse_negation(expr)

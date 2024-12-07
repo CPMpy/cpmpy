@@ -27,8 +27,9 @@ from enum import Enum
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
 from ..transformations.get_variables import get_variables
-from ..expressions.utils import is_num, is_any_list
-from ..expressions.python_builtins import any,all
+from ..expressions.utils import is_any_list
+from ..expressions.python_builtins import any
+from ..transformations.normalize import toplevel_list
 
 
 class SolverInterface(object):
@@ -87,6 +88,14 @@ class SolverInterface(object):
                     self.minimize(cpm_model.objective_)
                 else:
                     self.maximize(cpm_model.objective_)
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        raise NotImplementedError("Solver does not support direct solver access. Look at the solver's API for "
+                                  "alternative native objects to access directly.")
 
     # instead of overloading minimize/maximize, better just overload 'objective()'
     def minimize(self, expr):
@@ -235,7 +244,8 @@ class SolverInterface(object):
             raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
 
         if not call_from_model:
-            warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
+            warnings.warn("Adding constraints to solver object to find all solutions, "
+                          "solver state will be invalid after this call!")
 
         solution_count = 0
         while self.solve(time_limit=time_limit, **kwargs):

@@ -1,5 +1,14 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## pysdd.py
+##
 """
     Interface to PySDD's API
+
+    Requires that the 'PySDD' python package is installed:
+
+        $ pip install PySDD
 
     PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
     https://pysdd.readthedocs.io/en/latest/
@@ -19,14 +28,18 @@
         :nosignatures:
 
         CPM_pysdd
+
+    ==============
+    Module details
+    ==============
 """
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.core import Expression, BoolVal
+from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_any_list, is_bool
+from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -42,9 +55,9 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
     Creates the following attributes (see parent constructor for more):
-    pysdd_vtree: a pysdd.sdd.Vtree
-    pysdd_manager: a pysdd.sdd.SddManager
-    pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
+        - pysdd_vtree: a pysdd.sdd.Vtree
+        - pysdd_manager: a pysdd.sdd.SddManager
+        - pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
 
     The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
     """
@@ -94,6 +107,10 @@ class CPM_pysdd(SolverInterface):
                 - building it is the (computationally) hard part
                 - checking for a solution is trivial after that
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
@@ -107,6 +124,8 @@ class CPM_pysdd(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         # get solution values (of user specified variables only)
         if has_sol and self.pysdd_root is not None:
@@ -117,7 +136,8 @@ class CPM_pysdd(SolverInterface):
                 if lit in sol:
                     cpm_var._value = bool(sol[lit])
                 else:
-                    cpm_var._value = None  # not specified...
+                    cpm_var._value = cpm_var.get_bounds()[0] # dummy value - TODO: ensure Pysdd assigns an actual value
+                    # cpm_var._value = None  # not specified...
 
         return has_sol
 
@@ -135,35 +155,50 @@ class CPM_pysdd(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
         if self.pysdd_root is None:
+            # clear user vars if no solution found
+            for var in self.user_vars:
+                var._value = None
             return 0
 
+        sddmodels = [x for x in self.pysdd_root.models()]
+        if len(sddmodels) != self.pysdd_root.model_count:
+            #pysdd doesn't always have correct solution count..
+            projected_sols = set()
+            for sol in sddmodels:
+                projectedsol = []
+                for cpm_var in self.user_vars:
+                    lit = self.solver_var(cpm_var).literal
+                    projectedsol.append(bool(sol[lit]))
+                projected_sols.add(tuple(projectedsol))
+        else:
+            projected_sols = set(sddmodels)
         if display is None:
             # the desired, fast computation
-            return self.pysdd_root.model_count()
+            return len(projected_sols)
+
         else:
             # manually walking over the tree, much slower...
             solution_count = 0
-            for sol in self.pysdd_root.models():
+            for sol in projected_sols:
                 solution_count += 1
                 # fill in variable values
-                for cpm_var in self.user_vars:
-                    lit = self.solver_var(cpm_var).literal
-                    if lit in sol:
-                        cpm_var._value = bool(sol[lit])
-                    else:
-                        cpm_var._value = None
+                for i, cpm_var in enumerate(self.user_vars):
+                    cpm_var._value = sol[i]
 
                 # display is not None:
                 if isinstance(display, Expression):
-                    print(display.value())
+                    print(argval(display))
                 elif isinstance(display, list):
-                    print([v.value() for v in display])
+                    print(argvals(display))
                 else:
                     display()  # callback
             return solution_count
