@@ -43,15 +43,6 @@ class TestCardinality(unittest.TestCase):
         # all must be true
         self.assertEqual(sum(self.bvs.value()), 3)
 
-    def test_pysat_atleast_edge_case(self):
-
-        atmost = cp.Model(
-            sum(self.bvs) < 0
-        )
-
-        with self.assertRaises(ValueError):
-            ps = CPM_pysat(atmost)
-
 
     def test_pysat_equals(self):
         equals = cp.Model(

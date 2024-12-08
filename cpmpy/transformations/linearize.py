@@ -164,6 +164,18 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
 
+            # check trivially true/false (not allowed by PySAT Card/PB)
+            if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
+                lb,ub = lhs.get_bounds()
+                t_lb = eval_comparison(cpm_expr.name, lb, rhs)
+                t_ub = eval_comparison(cpm_expr.name, ub, rhs)
+                if t_lb and t_ub:
+                    newlist.append(BoolVal(True)) # always true
+                    continue
+                elif not t_lb and not t_ub:
+                    newlist.append(BoolVal(False)) # always false
+                    continue
+
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
                 new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
