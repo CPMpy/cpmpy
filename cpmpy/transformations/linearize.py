@@ -68,16 +68,19 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
         # boolvar
         if isinstance(cpm_expr, _BoolVarImpl):
-            newlist.append(sum([cpm_expr]) >= 1)
+            if "bv" in supported:
+                newlist.append(cpm_expr)
+            else:
+                newlist.append(sum([cpm_expr]) >= 1)
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
-            if cpm_expr.name == "and":
+            if cpm_expr.name == "and" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
-            elif cpm_expr.name == "or":
+            elif cpm_expr.name == "or" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= 1)
 
             # xor
@@ -103,6 +106,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
+
+            else: # supported operator
+                newlist.append(cpm_expr)
 
 
         # comparisons
@@ -157,6 +163,18 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
+
+            # check trivially true/false (not allowed by PySAT Card/PB)
+            if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
+                lb,ub = lhs.get_bounds()
+                t_lb = eval_comparison(cpm_expr.name, lb, rhs)
+                t_ub = eval_comparison(cpm_expr.name, ub, rhs)
+                if t_lb and t_ub:
+                    newlist.append(BoolVal(True)) # always true
+                    continue
+                elif not t_lb and not t_ub:
+                    newlist.append(BoolVal(False)) # always false
+                    continue
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
