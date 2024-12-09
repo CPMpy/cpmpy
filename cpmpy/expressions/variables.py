@@ -61,8 +61,8 @@ import warnings # for deprecation warning
 from functools import reduce
 
 import numpy as np
-from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .core import Expression
+from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 
 def BoolVar(shape=1, name=None):
@@ -134,7 +134,9 @@ def boolvar(shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 
 def IntVar(lb, ub, shape=1, name=None):
@@ -200,8 +202,9 @@ def intvar(lb, ub, shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 def cparray(arr):
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
@@ -262,6 +265,12 @@ class _NumVarImpl(Expression):
         self.ub = ub
         self.name = name
         self._value = None
+
+    def has_subexpr(self):
+        """Does it contains nested Expressions?
+           Is of importance when deciding whether transformation/decomposition is needed.
+        """
+        return False
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -403,6 +412,12 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
+    @property
+    def args(self):
+        """ The constructor for NDVarArray never gets called, so _args is never initialised
+        """
+        return self # we can just return self
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
@@ -426,9 +441,9 @@ class NDVarArray(np.ndarray, Expression):
             the constructor, so the Expression does not have 'args'
             set..
         """
-        if not hasattr(self, "args"):
+        if not hasattr(self, "_args"):
             self.name = "NDVarArray"
-            self.args = self
+            self.update_args(self)
         return super().__repr__()
 
     def __getitem__(self, index):
@@ -491,132 +506,92 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.sum(NDVarArray) as people might use it
         """
+        from .python_builtins import sum as cpm_sum
+
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the sum over the whole array
-            arr = self.flatten()
-            return Operator("sum", arr)
+            return cpm_sum(self)
 
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(Operator("sum", arr[i, ...]))
-
-        # return the NDVarArray that contains the sum constraints
-        return out
+        return cpm_array(np.apply_along_axis(cpm_sum, axis=axis, arr=self))
 
 
     def prod(self, axis=None, out=None):
         """
             overwrite np.prod(NDVarArray) as people might use it
         """
+
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the product over the whole array
-            arr = self.flatten()
-            return reduce(lambda a, b: a * b, arr)
+        if axis is None:  # simple case where we want the product over the whole array
+            return reduce(lambda a, b: a * b, self.flatten())
 
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(reduce(lambda a, b: a * b, arr[i, ...]))
-
-        # return the NDVarArray that contains the sum constraints
-        return out
+        # TODO: is there a better way? This does pairwise multiplication still
+        return cpm_array(np.multiply.reduce(self, axis=axis))
 
     def max(self, axis=None, out=None):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .globalfunctions import Maximum
+        from .python_builtins import max as cpm_max
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the maximum over the whole array
-            arr = self.flatten()
-            return Maximum(arr)
+            return cpm_max(self)
 
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(Maximum(arr[i, ...]))
-
-        # return the NDVarArray that contains the Maximum global constraints
-        return out
+        return cpm_array(np.apply_along_axis(cpm_max, axis=axis, arr=self))
 
     def min(self, axis=None, out=None):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .globalfunctions import Minimum
+        from .python_builtins import min as cpm_min
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the Minimum over the whole array
-            arr = self.flatten()
-            return Minimum(arr)
+        if axis is None:    # simple case where we want the minimum over the whole array
+            return cpm_min(self)
 
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(Minimum(arr[i, ...]))
-
-        # return the NDVarArray that contains the Minimum global constraints
-        return out
+        return cpm_array(np.apply_along_axis(cpm_min, axis=axis, arr=self))
 
     def any(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
-        from .python_builtins import any
+        from .python_builtins import any as cpm_any
 
-        if any(not is_boolexpr(x) for x in self.flatten()):
+        if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the .any() over the whole array
-            arr = self.flatten()
-            return any(arr)
+        if axis is None:    # simple case where we want a disjunction over the whole array
+            return cpm_any(self)
 
-        arr = self.__axis(axis=axis)
+        return cpm_array(np.apply_along_axis(cpm_any, axis=axis, arr=self))
 
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(any(arr[i, ...]))
-
-        # return the NDVarArray that contains the any() constraints
-        return out
 
     def all(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
 
-        from .python_builtins import all
+        from .python_builtins import all as cpm_all
+
+        if any(not is_boolexpr(x) for x in self.flat):
+            raise TypeError("Cannot call .any() in an array not consisting only of bools")
+
         if out is not None:
             raise NotImplementedError()
 
-        if axis is None:    # simple case where we want the .all() over the whole array
-            arr = self.flatten()
-            return all(arr)
+        if axis is None:  # simple case where we want a conjunction over the whole array
+            return cpm_all(self)
 
-        arr = self.__axis(axis=axis)
-
-        out = []
-        for i in range(0, arr.shape[0]):
-            out.append(all(arr[i, ...]))
-
-        # return the NDVarArray that contains the all() constraints
-        return out
-
+        return cpm_array(np.apply_along_axis(cpm_all, axis=axis, arr=self))
 
     def get_bounds(self):
         lbs, ubs = zip(*[get_bounds(e) for e in self])

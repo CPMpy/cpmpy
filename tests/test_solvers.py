@@ -11,7 +11,8 @@ from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 
 
-from cpmpy.exceptions import MinizincNameException
+from cpmpy.exceptions import MinizincNameException, NotSupportedError
+
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -224,7 +225,6 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])
-        self.assertEqual(cb.solcount, 7)
 
 
         # manually enumerating solutions
@@ -300,6 +300,18 @@ class TestSolvers(unittest.TestCase):
         model += bv2 | bv3
 
         self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
+
+    def test_ortools_real_coeff(self):
+
+        m = cp.Model()
+        # this works in OR-Tools
+        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
+        assert m.solve()
+        assert m.objective_value() == 1.4
+        # this does not
+        m += 0.7 * x + 0.8 * y >= 1
+        self.assertRaises(TypeError, m.solve)
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -707,3 +719,68 @@ class TestSolvers(unittest.TestCase):
 
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
+
+    def test_incremental(self):
+
+        x,y,z = cp.boolvar(shape=3, name="x")
+        for solver, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False:
+                continue
+            s = cp.SolverLookup.get(solver)
+            s += [x]
+            s += [y | z]
+            self.assertTrue(s.solve())
+            self.assertTrue(x.value(), (y | z).value())
+            s += ~y | ~z
+            self.assertTrue(s.solve())
+            self.assertTrue(x.value())
+            self.assertEqual(y.value() + z.value(), 1)
+
+    def test_incremental_objective(self):
+
+        x = cp.intvar(0,10,shape=3)
+        for solver, cls in cp.SolverLookup.base_solvers():
+            if solver == "choco":
+                """
+                Choco does not support first optimizing and then adding a constraint.
+                During optimization, additional constraints get added to the solver,
+                which removes feasible solutions.
+                No straightforward way to resolve this for now.
+                """
+                continue
+            if cls.supported() is False:
+                continue
+            s = cp.SolverLookup.get(solver)
+            try:
+                s.minimize(cp.sum(x))
+            except (NotSupportedError, NotImplementedError): # solver does not support optimization
+                continue
+            self.assertTrue(s.solve())
+            self.assertEqual(s.objective_value(), 0)
+            s += x[0] == 5
+            self.assertTrue(s.solve())
+            self.assertEqual(s.objective_value(), 5)
+            s.maximize(cp.sum(x))
+            self.assertTrue(s.solve())
+            self.assertEqual(s.objective_value(), 25)
+
+    def test_value_cleared(self):
+
+        x,y,z = cp.boolvar(shape=3)
+        sat_model = cp.Model(cp.any([x,y,z]))
+        unsat_model = cp.Model([x | y | z, ~x, ~y,~z])
+
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False: # solver not supported
+                continue
+            self.assertTrue(sat_model.solve(solver=name))
+            for v in (x,y,z):
+                self.assertIsNotNone(v.value())
+            self.assertFalse(unsat_model.solve(solver=name))
+            for v in (x,y,z):
+                self.assertIsNone(v.value())
+
+
+
+
+

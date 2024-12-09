@@ -117,7 +117,7 @@ class TestGlobal(unittest.TestCase):
         # and some more
         iv = cp.intvar(-8, 8, shape=3)
         self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,2)]).solve())
-        self.assertTrue(cp.AllDifferentExceptN(iv,4).value())
+        self.assertTrue(cp.AllDifferentExceptN(iv,2).value())
         self.assertTrue(cp.Model([cp.AllDifferentExceptN(iv,7), iv == [7, 7, 1]]).solve())
         self.assertTrue(cp.AllDifferentExceptN(iv,7).value())
 
@@ -624,6 +624,20 @@ class TestGlobal(unittest.TestCase):
         start = cp.intvar(0, 10, 4, "start")
         duration = [1, 2, 2, 1]
         end = cp.intvar(0, 10, shape=4, name="end")
+        demand = 10 # tasks cannot be scheduled
+        capacity = np.int64(5) # bug only happened with numpy ints
+        cons = cp.Cumulative(start, duration, end, demand, capacity)
+        self.assertFalse(cp.Model(cons).solve()) # this worked fine
+        # also test decomposition
+        self.assertFalse(cp.Model(cons.decompose()).solve()) # capacity was not taken into account and this failed
+
+    def test_cumulative_nested_expressions(self):
+        import numpy as np
+
+        # before merging #435 there was an issue with capacity constraint
+        start = cp.intvar(0, 10, 4, "start")
+        duration = [1, 2, 2, 1]
+        end = start + duration
         demand = 10 # tasks cannot be scheduled
         capacity = np.int64(5) # bug only happened with numpy ints
         cons = cp.Cumulative(start, duration, end, demand, capacity)

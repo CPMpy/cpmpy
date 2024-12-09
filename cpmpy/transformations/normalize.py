@@ -166,7 +166,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(eval_comparison(name, lhs, rhs))
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
+            expr.update_args(simplify_boolean(expr.args)) # TODO: how to determine boolean or numerical context? also i this even needed?
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)
