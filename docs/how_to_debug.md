@@ -30,7 +30,7 @@ Either you have the same output, and it is not the solver's fault, or you have a
 You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar instances of what you wish to express.
 
 Here are a few quirks in Python/CPMpy:
-  - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter wont work, because Python will unfortunately think you meant `x == (1 & (y == 0))`.
+  - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter won't work, because Python will unfortunately think you meant `x == (1 & y) == 0`.
   - you can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
   - only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
   - when providing names for decision variables, make shure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
@@ -53,9 +53,9 @@ for c in model.constraints:
     Model(c).solve()
 ```
 
-The last constraint printed before the exception is the curlpit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub Issues page.
+The last constraint printed before the exception is the culprit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub Issues page.
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on GitHub and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on GitHub, and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 

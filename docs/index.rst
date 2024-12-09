@@ -21,6 +21,66 @@ Supported solvers
 
 CPMpy can translate to many different solvers, and even provides direct access to them.
 
+.. list-table::
+   :header-rows: 1
+
+   * - **Solver**
+     - **Technology**
+     - **Installation**
+     - **Assumption variables?**
+     - **Notes**
+   * - **Or-Tools**
+     - CP-SAT
+     - pip
+     - Yes
+     - Assumptions NOT incremental! Every solve starts from scratch
+   * - **Choco**
+     - CP
+     - pip
+     - No
+     - 
+   * - **GCS**
+     - CP
+     - pip
+     - No
+     - Supports proof logging
+   * - **MiniZinc**
+     - CP
+     - pip + local install
+     - No
+     - Communicates through textfiles
+   * - **Z3**
+     - SMT
+     - pip
+     - Yes
+     - 
+   * - **Gurobi**
+     - ILP
+     - pip + (aca.) license
+     - No
+     - 
+   * - **Exact**
+     - Pseudo-Boolean
+     - pip (only Linux, Win(py>3.10))
+     - Yes
+     - Manual installation on Mac possible
+   * - **PySAT**
+     - SAT
+     - pip
+     - Yes
+     - Only Boolean variables (CPMpy transformation incomplete)
+   * - **PySDD**
+     - SAT Counter
+     - pip
+     - Yes
+     - Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
+
+Different solvers excell at different problems. Try multiple!
+
+* Our rule-of-thumb ordering when *solving* a problem: OrTools > Gurobi > Exact > Others
+* Our rule-of-thumb ordering when *explaining* a problem: Exact > Z3 > OrTools > Others
+
+
 To make clear how well supported and tested these solvers are, we work with a tiered classification:
 
 * Tier 1 solvers: passes all internal tests, passes our bigtest suit, will be fuzztested in the near future
@@ -33,9 +93,11 @@ To make clear how well supported and tested these solvers are, we work with a ti
     - "gurobi" the MIP solver
     - "PySDD" a Boolean knowledge compiler
     - "exact" the Exact integer linear programming solver
+    - "choco" the Choco constraint solver
+    - "gcs" the Glasgow Constraint Solver
 
 * Tier 3 solvers: they are work in progress and live in a pull request
-    - "gcs" the Glasgow Constraint Solver
+    - "scip" the SCIP Optimisation Suite (open source MIP solver)
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 

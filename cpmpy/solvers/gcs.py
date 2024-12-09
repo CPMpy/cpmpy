@@ -17,13 +17,13 @@
         GlasgowConstraintSolver
 """
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
+from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, argval, argvals
+from ..expressions.utils import is_num, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -173,7 +173,11 @@ class CPM_gcs(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 self.objective_value_ = self.gcs.get_solution_value(self.solver_var(self.objective_var))
-        
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
         # Verify proof, if requested
         if verify:
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
@@ -257,6 +261,11 @@ class CPM_gcs(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = gcs_stats["solve_time"]
+
+        # clear user vars if no solution found
+        if self._solve_return(self.cpm_status, self.objective_value_) is False:
+            for var in self.user_vars:
+                var._value = None
 
         # Verify proof, if requested
         if verify:
