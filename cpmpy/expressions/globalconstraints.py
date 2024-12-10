@@ -119,6 +119,8 @@
 """
 import copy
 
+import cpmpy as cp
+
 from .utils import all_pairs
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
@@ -192,9 +194,8 @@ class AllDifferentExceptN(GlobalConstraint):
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        from .python_builtins import any as cpm_any
         # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cpm_any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -244,8 +245,7 @@ class AllEqualExceptN(GlobalConstraint):
         super().__init__("allequal_except_n", [flatarr, n])
 
     def decompose(self):
-        from .python_builtins import any as cpm_any
-        return [(cpm_any(var1 == a for a in self.args[1]) | (var1 == var2) | cpm_any(var2 == a for a in self.args[1]))
+        return [(cp.any(var1 == a for a in self.args[1]) | (var1 == var2) | cp.any(var2 == a for a in self.args[1]))
                 for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
@@ -325,10 +325,9 @@ class Inverse(GlobalConstraint):
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
-        from .python_builtins import all
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [all(rev[x] == i for i, x in enumerate(fwd))], []
+        return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
         fwd = argvals(self.args[0])
@@ -353,9 +352,8 @@ class Table(GlobalConstraint):
         super().__init__("table", [array, table])
 
     def decompose(self):
-        from .python_builtins import any, all
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
@@ -374,10 +372,8 @@ class NegativeTable(GlobalConstraint):
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
-        from .python_builtins import all as cpm_all
-        from .python_builtins import any as cpm_any
         arr, tab = self.args
-        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
@@ -431,7 +427,6 @@ class InDomain(GlobalConstraint):
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
-        from .python_builtins import any
         expr, arr = self.args
         lb, ub = expr.get_bounds()
 
@@ -444,7 +439,7 @@ class InDomain(GlobalConstraint):
 
         expressions = any(isinstance(a, Expression) for a in arr)
         if expressions:
-            return [any(expr == a for a in arr)], defining
+            return [cp.any(expr == a for a in arr)], defining
         else:
             return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
 
@@ -524,7 +519,6 @@ class Cumulative(GlobalConstraint):
             Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         """
-        from ..expressions.python_builtins import sum
 
         arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
         start, duration, end, demand, capacity = arr_args
@@ -590,13 +584,12 @@ class Precedence(GlobalConstraint):
         Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
         Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
         """
-        from .python_builtins import any as cpm_any
 
         args, precedence = self.args
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
@@ -656,7 +649,6 @@ class GlobalCardinalityCount(GlobalConstraint):
         self.closed = closed
 
     def decompose(self):
-        from .globalfunctions import Count
         vars, vals, occ = self.args
         constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
         if self.closed:
@@ -664,9 +656,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         return constraints, []
 
     def value(self):
-        from .python_builtins import all
         decomposed, _ = self.decompose()
-        return all(decomposed).value()
+        return cp.all(decomposed).value()
 
 
 class Increasing(GlobalConstraint):
