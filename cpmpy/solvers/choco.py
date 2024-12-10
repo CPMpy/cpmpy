@@ -32,6 +32,7 @@ import time
 
 import numpy as np
 
+from ..expressions.globalconstraints import Cumulative
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -400,6 +401,8 @@ class CPM_choco(SolverInterface):
                 cond, subexpr = cpm_expr.args
                 if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
                     return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
+                elif isinstance(cond, _BoolVarImpl) and isinstance(subexpr, Cumulative): # do custom stuff
+                    return self.chc_model.cumulative_impl(self.solver_var(cond), *self._to_vars(subexpr.args))
                 elif isinstance(cond, _BoolVarImpl):
                     return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
                 elif isinstance(subexpr, _BoolVarImpl):
