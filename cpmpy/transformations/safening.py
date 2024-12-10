@@ -99,7 +99,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
             new_args = no_partial_functions(args, _toplevel, _nbc, safen_toplevel=safen_toplevel)
             if any((a1 is not a2) for a1,a2 in zip(new_args,args)):  # efficiency (hopefully): only copy if an arg changed
                 cpm_expr = copy(cpm_expr)
-                cpm_expr.args = new_args
+                cpm_expr.update_args(new_args)
                 args = new_args
 
             if cpm_expr.is_bool() and len(_nbc) != 0 and toplevel_call is False:
@@ -176,7 +176,7 @@ def _safen_range(partial_expr, safe_range, idx_to_safen):
     new_arg = intvar(safe_lb, safe_ub)  # values for which the partial function is defined
 
     total_expr = copy(partial_expr)  # the new total function, with the new arg
-    total_expr.args = [new_arg if i == idx_to_safen else a for i,a in enumerate(partial_expr.args)]
+    total_expr.update_args([new_arg if i == idx_to_safen else a for i,a in enumerate(partial_expr.args)])
 
     is_defined = boolvar()
     toplevel = [is_defined == ((safe_lb <= orig_arg) & (orig_arg <= safe_ub)),
@@ -206,11 +206,11 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
     # expr when arg in [orig_lb..exclude-1]
     new_arg_lower = intvar(orig_lb, exclude-1)
     total_expr_lower = copy(cpm_expr)
-    total_expr_lower.args = [new_arg_lower if i == idx_to_safen else a for i,a in enumerate(cpm_expr.args)]
+    total_expr_lower.update_args([new_arg_lower if i == idx_to_safen else a for i,a in enumerate(cpm_expr.args)])
     # expr when arg in [exclude+1..orig_ub]
     new_arg_upper = intvar(exclude+1, orig_ub)
     total_expr_upper = copy(cpm_expr)
-    total_expr_upper.args = [new_arg_upper if i == idx_to_safen else a for i, a in enumerate(cpm_expr.args)]
+    total_expr_upper.update_args([new_arg_upper if i == idx_to_safen else a for i, a in enumerate(cpm_expr.args)])
 
     is_defined = boolvar()
     is_defined_lower = boolvar()
