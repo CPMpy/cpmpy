@@ -298,9 +298,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([self, other])
+        return cp.Xor([self, other])
 
     def __rxor__(self, other):
         # some simple constant removal
@@ -308,9 +306,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([other, self])
+        return cp.Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -410,8 +406,7 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        from .globalfunctions import Abs
-        return Abs(self)
+        return cp.Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):

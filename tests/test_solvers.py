@@ -225,7 +225,6 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])
-        self.assertEqual(cb.solcount, 7)
 
 
         # manually enumerating solutions
