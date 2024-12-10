@@ -76,7 +76,9 @@ def numexprs(solver):
     for name, arity in names:
         if name == "wsum":
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
-        elif name == "div" or name == "pow":
+        elif name == "pow":
+            operator_args = [NN_VAR,2]
+        elif name == "div" and solver == "gurobi": # supports only division by constants
             operator_args = [NN_VAR,2]
         elif name == "mod":
             operator_args = [NN_VAR,POS_VAR]
