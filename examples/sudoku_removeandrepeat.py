@@ -46,13 +46,12 @@ def duplicate(array, doppel):
     all_triplets = flatten(all_triplets)
     # any vars in a pair cannot be equal to a third var
     # pairs implying a decision var blocks multiple pairs from existing
+    # we know there will be at least one duplicate because of the removal constraints
     return cp.all([(var1 == var2).implies(cp.all([var1==doppel, var1 != var3])) for var1, var2, var3 in all_triplets])
 
 def missing(array, removed):
-    # every row and column is missing one digit
-    x = cp.intvar(1,6)
-    return (removed != x).implies(x in array)
-
+    # every row and column has one missing digit
+    return cp.all([removed != elm for elm in array])
 
 print(cells)
 print(duplicate_rs)
@@ -62,7 +61,7 @@ print(removals_cs)
 
 m = cp.Model(
     # zipper lines
-    zipper(np.concatenate((cells[:,1], [cells[5,0]]))), # long purple line
+    zipper(np.concatenate((cells[:,1], [cells[5,0]]))),
     zipper(cells[1,3:]),
     # kropki dots
     black_kropki(cells[0,0], cells[1,0]),
@@ -90,8 +89,8 @@ m = cp.Model(
     cp.all(duplicate(cells[i, :], duplicate_rs[i]) for i in range(duplicate_rs.shape[0])),
     cp.all(duplicate(cells[:,i], duplicate_cs[i]) for i in range(duplicate_cs.shape[0])),
     # one removed from each row and column
-    cp.all(cp.all(removals_rs[i] != elm for elm in cells[i, :]) for i in range(removals_rs.shape[0])),
-    cp.all(cp.all(removals_cs[i] != elm for elm in cells[:,i]) for i in range(removals_cs.shape[0])),
+    cp.all(missing(cells[i,:], removals_rs[i]) for i in range(removals_rs.shape[0])),
+    cp.all(missing(cells[:,i], removals_cs[i]) for i in range(removals_cs.shape[0])),
     # all removals and repeats should be unique for each row and column
     cp.AllDifferent(duplicate_rs),
     cp.AllDifferent(duplicate_cs),
