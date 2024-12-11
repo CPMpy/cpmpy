@@ -121,7 +121,7 @@ class TestTransLinearize(unittest.TestCase):
         arr = cp.intvar(0,3, shape=3, name="x")
         idx = cp.intvar(-1, 4, name="i")
 
-        expr = (a / arr[idx]) == 0
+        expr = (a * arr[idx]) == 0
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model([safe_expr, idx == 4]).solve())
