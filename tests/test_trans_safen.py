@@ -116,7 +116,15 @@ class TestTransLinearize(unittest.TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 10*(4**3)*6)
 
+    def test_nested_partial_functions2(self):
+        a = cp.intvar(1, 10)
+        arr = cp.intvar(0,3, shape=3, name="x")
+        idx = cp.intvar(-1, 4, name="i")
 
+        expr = (a / arr[idx]) == 0
+
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
+        self.assertTrue(cp.Model([safe_expr, idx == 4]).solve())
     # def test_division_by_constant_zero(self):
     #     a = cp.intvar(1, 10)
     #     expr = (a / cp.intvar(0,0)) == 2
