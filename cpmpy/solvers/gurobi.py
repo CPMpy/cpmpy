@@ -186,6 +186,10 @@ class CPM_gurobi(SolverInterface):
                 else: #  can happen with DirectVar or when using floats as coefficients
                     self.objective_value_ =  float(grb_obj_val)
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
         return has_sol
 
 
@@ -200,7 +204,8 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
+            raise Exception("Negative literals should not be part of any equation. "
+                            "See /transformations/linearize for more details")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -441,7 +446,8 @@ class CPM_gurobi(SolverInterface):
 
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
+                "Gurobi does not support searching for all solutions. If you really need all solutions, "
+                "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
         sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
@@ -452,6 +458,12 @@ class CPM_gurobi(SolverInterface):
         optimal_val = None
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var._value = None
 
         for i in range(solution_count):
             # Specify which solution to query
