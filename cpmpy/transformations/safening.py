@@ -78,16 +78,20 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         elif isinstance(cpm_expr, (list,tuple)):
             new_lst.append(no_partial_functions(cpm_expr, _toplevel, _nbc, safen_toplevel))
 
-        elif isinstance(cpm_expr, NDVarArray):  # TODO efficiency: and cpm_expr.has_subexpr()
-            # efficiency: flatten into single iterator, then reshape to n-dimensional again
-            new_cpm_expr = cpm_array(no_partial_functions(cpm_expr.flat, _toplevel, _nbc, safen_toplevel)).reshape(cpm_expr.shape)
-            new_lst.append(new_cpm_expr)
+        elif isinstance(cpm_expr, NDVarArray):
+            if cpm_expr.has_subexpr():
+                # efficiency: flatten into single iterator, then reshape to n-dimensional again
+                new_cpm_expr = cpm_array(no_partial_functions(cpm_expr.flat, _toplevel, _nbc, safen_toplevel)).reshape(cpm_expr.shape)
+                new_lst.append(new_cpm_expr)
+            else:
+                new_lst.append(cpm_expr)
 
         elif isinstance(cpm_expr, DirectConstraint):  # do not recurse into args
             new_lst.append(cpm_expr)
 
         else:
             assert isinstance(cpm_expr, Expression), f"each `cpm_expr` should be an Expression at this point, not {type(cpm_expr)}"
+
             args = cpm_expr.args
 
             if cpm_expr.is_bool() and toplevel_call is False:  # a Boolean context, create a new _nbc
@@ -95,12 +99,12 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
                 _nbc = []
 
             # recurse over the arguments of the expression
-            # TODO efficiency: if cpm_expr.has_subexpr()
-            new_args = no_partial_functions(args, _toplevel, _nbc, safen_toplevel=safen_toplevel)
-            if any((a1 is not a2) for a1,a2 in zip(new_args,args)):  # efficiency (hopefully): only copy if an arg changed
-                cpm_expr = copy(cpm_expr)
-                cpm_expr.update_args(new_args)
-                args = new_args
+            if cpm_expr.has_subexpr():
+                new_args = no_partial_functions(args, _toplevel, _nbc, safen_toplevel=safen_toplevel)
+                if any((a1 is not a2) for a1,a2 in zip(new_args,args)):  # efficiency (hopefully): only copy if an arg changed
+                    cpm_expr = copy(cpm_expr)
+                    cpm_expr.update_args(new_args)
+                    args = new_args
 
             if cpm_expr.is_bool() and len(_nbc) != 0 and toplevel_call is False:
                 # a nested Boolean context, conjoin my Boolean expression with _nbc
