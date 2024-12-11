@@ -88,9 +88,6 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
 
         else:
             assert isinstance(cpm_expr, Expression), f"each `cpm_expr` should be an Expression at this point, not {type(cpm_expr)}"
-            if (not cpm_expr.has_subexpr()) and (not cpm_expr.name == 'div') and (not cpm_expr.name == 'mod'):
-                new_lst.append(cpm_expr)
-                continue
             args = cpm_expr.args
 
             if cpm_expr.is_bool() and toplevel_call is False:  # a Boolean context, create a new _nbc
