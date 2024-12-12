@@ -135,9 +135,11 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
                 lb, ub = get_bounds(args[idx_to_safen])
 
                 if lb <= 0 <= ub:
-                    assert lb != 0 or ub != 0, "domain of divisor contains only 0" # TODO, I guess we can fix this by making nbc = False?
-
-                    if lb == 0:
+                    if lb == ub == 0:
+                        guard = BoolVal(False)  # domain of divisor contains only 0
+                        output_expr = boolvar()  # arbitrary, but we need something? #todo can we delete the whole thing where the partial occurs at the level of nbc, and only keep the false?
+                        extra_cons = []
+                    elif lb == 0:
                         guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(1, ub), idx_to_safen=idx_to_safen)
                     elif ub == 0:
                         guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(lb, -1), idx_to_safen=idx_to_safen)
