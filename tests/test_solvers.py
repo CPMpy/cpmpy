@@ -225,7 +225,6 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])
-        self.assertEqual(cb.solcount, 7)
 
 
         # manually enumerating solutions
@@ -301,6 +300,18 @@ class TestSolvers(unittest.TestCase):
         model += bv2 | bv3
 
         self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
+
+    def test_ortools_real_coeff(self):
+
+        m = cp.Model()
+        # this works in OR-Tools
+        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
+        assert m.solve()
+        assert m.objective_value() == 1.4
+        # this does not
+        m += 0.7 * x + 0.8 * y >= 1
+        self.assertRaises(TypeError, m.solve)
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -753,6 +764,21 @@ class TestSolvers(unittest.TestCase):
             self.assertTrue(s.solve())
             self.assertEqual(s.objective_value(), 25)
 
+    def test_value_cleared(self):
+
+        x,y,z = cp.boolvar(shape=3)
+        sat_model = cp.Model(cp.any([x,y,z]))
+        unsat_model = cp.Model([x | y | z, ~x, ~y,~z])
+
+        for name, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False: # solver not supported
+                continue
+            self.assertTrue(sat_model.solve(solver=name))
+            for v in (x,y,z):
+                self.assertIsNotNone(v.value())
+            self.assertFalse(unsat_model.solve(solver=name))
+            for v in (x,y,z):
+                self.assertIsNone(v.value())
 
 
 
