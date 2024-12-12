@@ -27,7 +27,7 @@ CPMpy can translate to many different solvers, and even provides direct access t
    * - **Solver**
      - **Technology**
      - **Installation**
-     - **Assumption variables?**
+     - **Assumption interface?**
      - **Notes**
    * - **Or-Tools**
      - CP-SAT

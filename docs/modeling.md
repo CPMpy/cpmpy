@@ -612,7 +612,7 @@ _Technical note_: OR-Tools' model representation is incremental but its solving 
 
 ### Assumption-based solving
 SAT and CP-SAT solvers oftentimes support solving under assumptions, which is also supported by their CPMpy interface.
-Assumption variables are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
+Assumptions are usefull for incremental solving when you want to activate/deactivate different subsets of constraints without copying (parts of) the model or removing constraints and re-solving.
 By relying on the solver interface directly as in the previous section, the state of the solver is kept in between solve-calls.
 Many explanation-generation algorithms ([see](./api/tools/explain.rst) `cpmpy.tools.explain`) make use of this feature to speed up the solving.
 
@@ -655,7 +655,7 @@ s.solve()
 print(x.value())
 ```
 
-`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](./unsat_core_extraction.md).
+`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumptions were used. See the documentation on [Unsat core extraction](./unsat_core_extraction.md).
 
 See [the API documentation of the solvers](./api/solvers.rst) to learn about their special functions.
 

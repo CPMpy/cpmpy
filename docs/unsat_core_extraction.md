@@ -2,7 +2,7 @@
 
 When a model is unsatisfiable, it can be desirable to get a better idea of which Boolean variables make it unsatisfiable. Commonly, these Boolean variables are 'switches' that turn constraints on or off, hence such Boolean variables can be used to get a better idea of which _constraints_ make the model unsatisfiable.
 
-In the satisfiability literature, the Boolean variables of interests are called _assumption literals_ and the solver will assume they are true. The subset of these assumptions that, when true, makes the model unsatisfiable is called an unsatisfiable _core_.
+In the satisfiability literature, the Boolean variables of interests are called _assumption literals_ and the solver will assume they are true. Any subset of these assumptions that, when true, makes the model unsatisfiable is called an unsatisfiable _core_.
 
 Lazy Clause Generation solvers, like OR-Tools, are built on SAT solvers and hence can inherit the ability to define assumptions and extract an unsatisfiable core.
 
