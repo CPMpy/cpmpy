@@ -237,7 +237,8 @@ def cpm_array(arr):
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
-    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr)
+    order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
+    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 
 
 class NullShapeError(Exception):
