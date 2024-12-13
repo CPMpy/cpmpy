@@ -39,6 +39,7 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -207,19 +208,38 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 Introduces n^2 new boolean variables
             """
             # TODO check performance of implementation
-            # Boolean variables
-            lb, ub = min(arg.lb for arg in cpm_expr.args), max(arg.ub for arg in cpm_expr.args)
+            
             # Linear decomposition of alldifferent using bipartite matching
-            sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
+            
+            # Split in decision variables and constants
+            non_constant_filter = np.array([isinstance(arg, cp.expressions.core.Expression) for arg in cpm_expr.args])
+            non_constant_args = np.array(cpm_expr.args)[non_constant_filter]
+            constant_args = np.array(cpm_expr.args)[~non_constant_filter]
+            
+            # Get bounds
+            non_constants_lb = [arg.lb for arg in non_constant_args]
+            non_constants_ub = [arg.ub for arg in non_constant_args]
+            lb, ub = min(non_constants_lb), max(non_constants_ub)
+            
+            # Boolean variables
+            sigma = boolvar(shape=(len(non_constants_lb), 1 + ub - lb))
 
+            # Consistency constraints
             constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
-            constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
+            # "AllDifferent" constraints
+            # 1) between decision variables
+            constraints += [sum(col) <= 1 for i,col in enumerate(sigma.T) if not ((i+lb) in constant_args)]  # Each value is assigned to at most 1 variable
+            # 2) between constants and decision variables
+            for arg in constant_args:
+                if arg >= lb and arg <= ub:
+                    constraints += [sum(sigma[:,arg-lb]) == 0]
 
-            for arg, row in zip(cpm_expr.args, sigma):
+            # Link int and bool representations
+            for arg, row in zip(non_constant_args, sigma):
                 constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
 
             newlist += constraints
-
+        
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
