@@ -215,7 +215,7 @@ class CPM_minizinc(SolverInterface):
         kwargs['output-time'] = True  # required for time getting
         return (kwargs, mzn_inst)
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, display=None, **kwargs):
         """
             Call the MiniZinc solver
             
@@ -223,6 +223,8 @@ class CPM_minizinc(SolverInterface):
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                             called with the variables after value-mapping; default/None: nothing displayed
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -240,7 +242,10 @@ class CPM_minizinc(SolverInterface):
 
         # make mzn_inst
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
-        
+
+        if display is not None:
+            raise NotImplementedError("TODO: implement MiniZinc callbacks -- requires new async mehthod (similar to solveAll())")
+
         # call the solver, with parameters
         import minizinc.error
         try:

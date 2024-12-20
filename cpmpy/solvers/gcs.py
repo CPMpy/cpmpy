@@ -100,12 +100,14 @@ class CPM_gcs(SolverInterface):
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
+    def solve(self, time_limit=None, display=None, prove=False, proof_name=None, proof_location=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
             Arguments:
             - time_limit:        maximum solve time in seconds (float, optional).
+            - display:           either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
             - prove:             whether to produce a VeriPB proof (.opb model file and .pbp proof file).
             - proof_name:        name for the the proof files.
             - proof_location:    location for the proof files (default to current working directory).
@@ -119,7 +121,10 @@ class CPM_gcs(SolverInterface):
         """
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
-        
+
+        if display is not None:
+            raise NotImplementedError("GCS does support callbacks, but seems unstable for now")
+
         # If we're verifying we must be proving
         prove |= verify
         # Set default proof name to name of file containing __main__
