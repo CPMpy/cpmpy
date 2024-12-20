@@ -36,7 +36,8 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
@@ -247,6 +248,12 @@ class CPM_z3(SolverInterface):
         # objective can be a nested expression for z3
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
+
+        if isinstance(expr, GlobalFunction): # not supported by Z3
+            obj_var = intvar(*expr.get_bounds())
+            self += expr == obj_var
+            expr = obj_var
+
         obj = self._z3_expr(expr)
         if minimize:
             self.z3_solver.minimize(obj)
