@@ -244,7 +244,7 @@ class CPM_minizinc(SolverInterface):
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
 
         if display is not None:
-            raise NotImplementedError("TODO: implement MiniZinc callbacks -- requires new async mehthod (similar to solveAll())")
+            raise NotImplementedError("TODO: implement MiniZinc callbacks -- requires new async methhod (similar to solveAll())")
 
         # call the solver, with parameters
         import minizinc.error
