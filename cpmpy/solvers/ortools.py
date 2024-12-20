@@ -181,7 +181,7 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.log_callback = print
 
         if display is not None:
-            assert solution_callback is None, "Cannot have both generic CPMpy callback and specialized gurobi solution callback"
+            assert solution_callback is None, "Cannot have both generic CPMpy callback and specialized ortools solution callback"
             solution_callback = OrtSolutionPrinter(self, display)
 
         # call the solver, with parameters
