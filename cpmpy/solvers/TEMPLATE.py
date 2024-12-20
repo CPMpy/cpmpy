@@ -16,7 +16,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, argvals
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -92,12 +92,14 @@ class CPM_template(SolverInterface):
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, display=None, **kwargs):
         """
             Call the TEMPLATE solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display: display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -115,6 +117,26 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
         #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
+
+        # [GUIDELINE] if your solver supports callbacks when a solution is found (during optimization), convert callback here
+        if display is not None:
+            _cpm_vars = get_variables(display) if isinstance(display, Expression) or is_any_list(display) else list(self.user_vars)
+            _tpl_vars = self.solver_vars(_cpm_vars)
+
+            def callback():
+                # first update values of current solution
+                for cpm_var, tpl_var in zip(_cpm_vars, _tpl_vars):
+                    cpm_var._value = self.TPL_solver.value(tpl_var)
+                    raise NotImplementedError("TEMPLATE: back-translating the solution values")
+
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif is_any_list(display):
+                    print(argvals(display))
+                else:
+                    display()
+
+            self.TPL_solver.set_solution_callback(callback)
 
         # call the solver, with parameters
         my_status = self.TPL_solver.solve(**kwargs)
