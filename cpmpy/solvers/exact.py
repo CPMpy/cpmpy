@@ -125,7 +125,7 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillVars(self):
+    def _fillVars(self, lst_vars=None):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             for cpm_var in self.user_vars:
@@ -133,12 +133,13 @@ class CPM_exact(SolverInterface):
             return
 
         # fill in variable values
-        lst_vars = list(self.user_vars)
+        if lst_vars is None:
+            lst_vars = list(self.user_vars)
         exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit=None, assumptions=None, **kwargs):
+    def solve(self, time_limit=None, assumptions=None, display=None, **kwargs):
         """
             Call Exact
 
@@ -148,6 +149,8 @@ class CPM_exact(SolverInterface):
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
             :type assumptions: list of CPMpy Boolean variables
+            display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed. Only used when optimizing
 
             :param time_limit: optional, time limit in seconds
             :type time_limit: int or float
@@ -175,11 +178,38 @@ class CPM_exact(SolverInterface):
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
-        # call the solver, with parameters
-        start = time.time()
-        my_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
-        #                                     timeout=time_limit if time_limit is not None else 0)
-        end = time.time()
+        if display is not None and self.has_objective():
+            # this is a bit of a hack, but Exact does not support callbacks...
+            # have to manually interleave search instead
+            warnings.warn("Solver object will be invalid after this solve-call as objective-bounding constraints are posted to Exact.")
+            if isinstance(display, Expression) or is_any_list(display):
+                _cpm_vars = get_variables(display)
+            else:
+                _cpm_vars = None
+
+            start = time.time()
+            while 1:
+                time_left = time_limit - (time.time() - start) if time_limit is not None else 0
+                xct_status = self.xct_solver.runOnce(timeout=time_left)
+                if xct_status == "UNSAT" or xct_status == "TIMEOUT":
+                    break
+                else:
+                    self.xct_solver.boundObjByLastSol()  # ensure next one is improving
+                    self._fillVars(_cpm_vars)
+                    if isinstance(display, Expression):
+                        print(display.value())
+                    elif is_any_list(display):
+                        print(argvals(display))
+                    else:  # function
+                        display()
+            obj_val = self.xct_solver.getBestSoFar()
+            end = time.time()
+
+        else:
+            # call the solver, with parameters
+            start = time.time()
+            xct_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
+            end = time.time()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -187,20 +217,20 @@ class CPM_exact(SolverInterface):
 
         self.objective_value_ = None
         # translate exit status
-        if my_status == "UNSAT": # found unsatisfiability
+        if xct_status == "UNSAT": # found unsatisfiability
             if self.has_objective() and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status == "SAT": # found solution, but not optimality proven
+        elif xct_status == "SAT": # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status == "INCONSISTENT": # found inconsistency over assumptions
+        elif xct_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status == "TIMEOUT": # found timeout
+        elif xct_status == "TIMEOUT": # found timeout
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
-            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
+            raise NotImplementedError(xct_status)  # a new status type was introduced, please report on github
         
         self._fillVars()
         if self.has_objective():
