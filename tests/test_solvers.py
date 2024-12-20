@@ -483,13 +483,9 @@ class TestSolvers(unittest.TestCase):
         iv = cp.intvar(0, 10, shape=2)
         m = cp.Model(iv >= 1, iv <= 5)
         for solver, cls in cp.SolverLookup.base_solvers():
-            print(solver)
             if cls.supported() is False:
                 continue
             if solver == "z3": solver += ":opt"
-            if solver == "gcs":
-                continue # optimization is buggy for gcs, see issue #559
-
             try:
                 m.maximize(sum(iv))
                 self.assertTrue( m.solve(solver=solver))
