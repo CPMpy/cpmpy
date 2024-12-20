@@ -37,8 +37,9 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison, argvals
 from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 
 
@@ -102,12 +103,14 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit=None, assumptions=[], **kwargs):
+    def solve(self, time_limit=None, display=None, assumptions=[], **kwargs):
         """
             Call the z3 solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                called with the variables after value-mapping; default/None: nothing displayed
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
@@ -138,6 +141,25 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
+        if display is not None and self.has_objective():
+            _cpm_vars = get_variables(display) if isinstance(display, Expression) or is_any_list(display) else list(self.user_vars)
+            _z3_vars = self.solver_vars(_cpm_vars)
+
+            def callback(sol):
+                # first update values of current solution
+                for cpm_var, sol_var in zip(_cpm_vars, _z3_vars):
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(sol[sol_var])
+                    elif isinstance(cpm_var, _NumVarImpl):
+                        cpm_var._value = sol[sol_var].as_long()
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif is_any_list(display):
+                    print(argvals(display))
+                else:
+                    display()
+
+            self.z3_solver.set_on_model(callback)
 
         z3_assum_vars = self.solver_vars(assumptions)
         self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
