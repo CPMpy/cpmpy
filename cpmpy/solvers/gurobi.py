@@ -30,11 +30,11 @@
     Module details
     ==============
 """
-
+from examples.csplib.prob050_diamond_free import diamond_free
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.utils import argvals
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.utils import argvals, argval
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
@@ -110,12 +110,31 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def _fill_obj_and_vars(self, grb_objective):
+        # fill in variable values
+        for cpm_var in self.user_vars:
+            solver_val = self.solver_var(cpm_var).X
+            if cpm_var.is_bool():
+                cpm_var._value = solver_val >= 0.5
+            else:
+                cpm_var._value = int(solver_val)
+        # set _objective_value
+        if self.has_objective():
+            grb_obj_val = grb_objective.getValue()
+            if round(grb_obj_val) == grb_obj_val:  # it is an integer?:
+                self.objective_value_ = int(grb_obj_val)
+            else:  # can happen with DirectVar or when using floats as coefficients
+                self.objective_value_ = float(grb_obj_val)
+
+
+    def solve(self, time_limit=None, display=None, solution_callback=None, **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                called with the variables after value-mapping; default/None: nothing displayed
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -139,8 +158,31 @@ class CPM_gurobi(SolverInterface):
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
-        _ = self.grb_model.optimize(callback=solution_callback)
         grb_objective = self.grb_model.getObjective()
+
+        # handle callbacking
+        if display is not None:
+            assert solution_callback is None, "Cannot have both generic CPMpy callback and specialized gurobi solution callback"
+            if isinstance(display, Expression) or is_any_list(display):
+                _cpm_vars = get_variables(display)
+            else:
+                _cpm_vars = list(self.user_vars)
+            # avoid re-lookup
+            grb_vars = self.solver_vars(_cpm_vars)
+            def solution_callback(model, state, **kwargs):
+                if state == GRB.Callback.MIPSOL: # found new solution
+                    grb_sol = model.cbGetSolution(grb_vars)
+                    for cpm_var, val in zip(_cpm_vars, grb_sol):
+                        cpm_var._value = val
+
+                    if isinstance(display, Expression):
+                        print(argval(display))
+                    elif is_any_list(display):
+                        print(argvals(display))
+                    else:
+                        display()
+
+        _ = self.grb_model.optimize(callback=solution_callback)
 
         grb_status = self.grb_model.Status
 
@@ -171,20 +213,7 @@ class CPM_gurobi(SolverInterface):
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
         if has_sol:
-            # fill in variable values
-            for cpm_var in self.user_vars:
-                solver_val = self.solver_var(cpm_var).X
-                if cpm_var.is_bool():
-                    cpm_var._value = solver_val >= 0.5
-                else:
-                    cpm_var._value = int(solver_val)
-            # set _objective_value
-            if self.has_objective():
-                grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
-                    self.objective_value_ = int(grb_obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ =  float(grb_obj_val)
+            self._fill_obj_and_vars(grb_objective)
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
