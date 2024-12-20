@@ -2,6 +2,7 @@ import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
@@ -780,6 +781,36 @@ class TestSolvers(unittest.TestCase):
             for v in (x,y,z):
                 self.assertIsNone(v.value())
 
+
+    def test_solution_callback(self):
+        import random
+        random.seed(0)
+
+        n = 5
+        vars = cp.intvar(0,n, shape=n)
+        obj = cp.sum([(1 if random.random() >= 0.5 else 2) * (a - b) for a in vars for b in vars])
+        model = cp.Model(cp.AllDifferent(vars), maximize=obj)
+        for solver, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False: continue
+            if solver == "z3": solver += ":opt"
+            try:
+                self.assertTrue(model.solve(solver=solver, display=vars))
+            except (NotImplementedError, NotSupportedError):
+                continue # not all solvers support callbacks
+
+            # collect solutions using callback
+            collector = list()
+            self.assertTrue(model.solve(solver=solver, display=lambda :  collector.append(argvals(vars))))
+            self.assertGreaterEqual(len(collector), 1)
+
+            # print some more information using callback
+            from time import time
+            def display():
+                print("Time elapsed:", time() - t0, "Obj:", obj.value(),  "Sol:", argvals(vars))
+
+            solver = cp.SolverLookup.get(solver, model)
+            t0 = time()
+            self.assertTrue(solver.solve(display=display))
 
 
 
