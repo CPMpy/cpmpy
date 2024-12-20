@@ -30,7 +30,6 @@
     Module details
     ==============
 """
-from examples.csplib.prob050_diamond_free import diamond_free
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
 from ..expressions.utils import argvals, argval
