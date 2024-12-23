@@ -136,9 +136,9 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
 
                 if lb <= 0 <= ub:
                     if lb == ub == 0:
-                        guard = BoolVal(False)  # domain of divisor contains only 0
-                        output_expr = boolvar()  # arbitrary, but we need something? #todo can we delete the whole thing where the partial occurs at the level of nbc, and only keep the false?
-                        extra_cons = []
+                        # (unlikely) edge case, neirest Boolean context should propagate to False.
+                        # introduce dummy numerical integer expression
+                        guard, output_expr, extra_cons = BoolVal(False), intvar(0,1), []
                     elif lb == 0:
                         guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(1, ub), idx_to_safen=idx_to_safen)
                     elif ub == 0:
