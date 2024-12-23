@@ -8,7 +8,7 @@ CPMpy is a Constraint Programming and Modeling library in Python, based on numpy
 * Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
 * Solver-independent: transparently translating to CP, MIP, SMT and SAT solvers
 * Incremental solving and direct access to the underlying solvers
-* and much more...
+* And much more...
 
 .. toctree::
    :maxdepth: 1
@@ -27,7 +27,7 @@ CPMpy can translate to many different solvers, and even provides direct access t
    * - **Solver**
      - **Technology**
      - **Installation**
-     - **Assumption variables?**
+     - **Assumption interface?**
      - **Notes**
    * - **Or-Tools**
      - CP-SAT
