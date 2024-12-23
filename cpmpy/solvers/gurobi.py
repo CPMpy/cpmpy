@@ -371,7 +371,6 @@ class CPM_gurobi(SolverInterface):
                         self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                         self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
