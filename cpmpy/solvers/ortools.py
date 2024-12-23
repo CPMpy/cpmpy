@@ -44,7 +44,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
@@ -469,9 +469,18 @@ class CPM_ortools(SolverInterface):
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
-                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
-                    b = self.solver_var(lhs.args[0])
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    if lhs.args[1]  == 2:
+                        b = self.solver_var(lhs.args[0])
+                        return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    else: # need to create intermediate vars, post (((b * b) * b) * ...) * b == IV
+                        b, n = lhs.args
+                        new_lhs = 1
+                        for exp in range(n):
+                            new_lhs, new_cons = get_or_make_var(b * new_lhs)
+                            self += new_cons
+                        return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
+
+
             raise NotImplementedError(
                         "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
