@@ -29,7 +29,6 @@ class TestTransLinearize(unittest.TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 110)
 
-
     def test_division_by_zero_proper_hole(self):
         a = cp.intvar(1, 10, name="a")
         b = cp.intvar(-1, 10, name="b")
@@ -50,6 +49,16 @@ class TestTransLinearize(unittest.TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
         self.assertEqual(solcount, 120)
 
+    def test_division_by_constant_zero(self):
+        a = cp.intvar(1, 10, name="a")
+        b = cp.intvar(0, 0, name="b")
+        expr = (a // b) <= 3
+
+        safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
+        self.assertFalse(cp.Model(safe_expr).solve())
+
+        safened = no_partial_functions([~expr])
+        self.assertEqual(str(safened[0]), "not([boolval(False)])")
 
     def test_element_out_of_bounds(self):
         arr = cp.intvar(1,3, shape=3, name="x")
@@ -125,10 +134,3 @@ class TestTransLinearize(unittest.TestCase):
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         self.assertTrue(cp.Model([safe_expr, idx == 4]).solve())
-    # def test_division_by_constant_zero(self):
-    #     a = cp.intvar(1, 10)
-    #     expr = (a / cp.intvar(0,0)) == 2
-    #     safened = safen([expr | ~expr])
-    #     solcount = cp.Model(safened).solveAll()
-    #     self.assertEqual(solcount, 10)
-    
