@@ -185,8 +185,7 @@ class TestVarsLhs(unittest.TestCase):
 
         self.assertEqual(lin_cons[0], "((a) * (a)) == (IV0)")
         self.assertEqual(lin_cons[1], "((a) * (IV0)) == (IV1)")
-        self.assertEqual(lin_cons[2], "((a) * (IV1)) == (IV2)")
-        self.assertEqual(lin_cons[3], "sum([1, -1] * [IV2, b]) == 0")
+        self.assertEqual(lin_cons[2], "sum([1, -1] * [IV1, b]) == 0")
 
 
 
