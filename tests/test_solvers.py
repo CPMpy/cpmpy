@@ -800,6 +800,3 @@ class TestSolvers(unittest.TestCase):
 
 
 
-
-
-
