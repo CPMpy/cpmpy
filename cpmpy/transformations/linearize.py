@@ -124,7 +124,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         raise NotImplementedError("Cannot linearize power without multiplication")
                     # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
                     x, n = lhs.args
-                    new_lhs = x
+                    new_lhs = 1
                     for exp in range(n):
                         new_lhs, new_cons = get_or_make_var(x * new_lhs)
                         newlist.extend(new_cons) # TODO: when reified, this will make again new vars - should post directly toplevel instead
