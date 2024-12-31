@@ -354,22 +354,22 @@ class CPM_z3(SolverInterface):
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
             elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
-                lhs, rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs, 1, 0)
-                if isinstance(rhs, z3.BoolRef):
-                    rhs = z3.If(rhs, 1, 0)
+                x, y = self._z3_expr(cpm_con.args)
+                if isinstance(x, z3.BoolRef):
+                    x = z3.If(x, 1, 0)
+                if isinstance(y, z3.BoolRef):
+                    y = z3.If(y, 1, 0)
 
                 if cpm_con.name == 'sub':
-                    return lhs - rhs
+                    return x - y
                 elif cpm_con.name == "mul":
-                    return lhs * rhs
+                    return x * y
                 elif cpm_con.name == "div":
-                    return lhs / rhs
+                    return x / y
                 elif cpm_con.name == "pow":
-                    return lhs ** rhs
+                    return x ** y
                 elif cpm_con.name == "mod":
-                    return lhs % rhs
+                    return x % y
 
             # '-'/1
             elif cpm_con.name == "-":
