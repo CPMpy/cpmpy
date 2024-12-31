@@ -181,8 +181,8 @@ class CPM_gurobi(SolverInterface):
                     else:
                         display()
 
-        _ = self.grb_model.optimize(callback=solution_callback)
-
+        # call the gurobi solver with callback
+        self.grb_model.optimize(callback=solution_callback)
         grb_status = self.grb_model.Status
 
         # new status, translate runtime
