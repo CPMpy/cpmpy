@@ -125,8 +125,9 @@ class CPM_ortools(SolverInterface):
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
-            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
-                                called with the variables after value-mapping; default/None: nothing displayed
+            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function which
+                                gets called after the variable-value mapping of the intermediate solution.
+                                default/None: nothing is displayed
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
             Additional keyword arguments:
@@ -698,8 +699,9 @@ try:
 
             Arguments:
                 - verbose: whether to print info on every solution found (bool, default: False)
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                            default/None: nothing displayed
+                - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function which
+                                gets called after the variable-value mapping of the intermediate solution.
+                                default/None: nothing is displayed
                 - solution_limit: stop after this many solutions (default: None)
         """
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
