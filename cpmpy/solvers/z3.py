@@ -367,12 +367,12 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == "div":
                     return x / y
                 elif cpm_con.name == "pow":
-                    if not is_num(y):
+                    if not is_num(cpm_con.args[1]):
                         # tricky in Z3 not all power constraints are decidable
                         # solver will return 'unknown', even if theory is satisfiable.
                         # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
                         # raise error to be consistent with other solvers
-                        raise NotSupportedError("Z3 only supports power constraint with constant exponent")
+                        raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
                     return x ** y
                 elif cpm_con.name == "mod":
                     return x % y
