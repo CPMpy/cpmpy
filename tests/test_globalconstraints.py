@@ -159,10 +159,10 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
+        # Test with domain (0,5)
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
-
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
@@ -171,18 +171,50 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
-
-    def test_not_circuit(self):
-        x = cp.intvar(lb=0, ub=2, shape=3)
+        # Test with domain (-2,7)
+        x = cp.intvar(-2, 7, 6)
         circuit = cp.Circuit(x)
-
-        model = cp.Model([~circuit, x == [1,2,0]])
-        self.assertFalse(model.solve())
+        model = cp.Model([circuit])
+        self.assertTrue(model.solve())
+        self.assertTrue(circuit.value())
 
         model = cp.Model([~circuit])
         self.assertTrue(model.solve())
         self.assertFalse(circuit.value())
 
+        # Test decomposition with domain (-2,7)
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        # Test with smaller domain (1,5)
+        x = cp.intvar(1, 5, 5)
+        circuit = cp.Circuit(x)
+        model = cp.Model([circuit])
+        self.assertFalse(model.solve())
+        self.assertFalse(circuit.value())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
+
+        # Test decomposition with domain (1,5)
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+        self.assertFalse(cp.Circuit(x).value())
+
+
+    def test_not_circuit(self):
+        x = cp.intvar(lb=-1, ub=5, shape=4)
+        circuit = cp.Circuit(x)
+        model = cp.Model([~circuit, x == [1,2,3,0]])
+        self.assertFalse(model.solve())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
         all_sols = set()
@@ -515,8 +547,8 @@ class TestGlobal(unittest.TestCase):
 
     def test_element(self):
         # test 1-D
-        iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, 3, name="iv")
+        idx = cp.intvar(-8, 8, name="idx")
         # test directly the constraint
         cons = cp.Element(iv,idx) == 8
         model = cp.Model(cons)
@@ -530,7 +562,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
-        iv = cp.intvar(-8, 8, shape=(3, 3))
+        iv = cp.intvar(-8, 8, shape=(3, 3), name="iv")
         a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
@@ -543,6 +575,13 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(arr[a.value(), b.value()], 1)
+        # test optimization where 1 dim is index
+        cons = iv[2, idx] == 8
+        self.assertEqual(str(cons), "[iv[2,0] iv[2,1] iv[2,2]][idx] == 8")
+        cons = iv[idx, 2] == 8
+        self.assertEqual(str(cons), "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8")
+
+
 
     def test_element_onearg(self):
 

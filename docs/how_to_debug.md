@@ -3,9 +3,10 @@
 You get an error, or no error, but also no (correct) solution... Annoying, you have a bug.
 
 The bug can be situated in one of three layers:
-- your problem specification
-- the CPMpy library
-- the solver
+
+- Your problem specification
+- The CPMpy library
+- The solver
 
 Coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
 
@@ -30,14 +31,14 @@ Either you have the same output, and it is not the solver's fault, or you have a
 You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar instances of what you wish to express.
 
 Here are a few quirks in Python/CPMpy:
-  - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter won't work, because Python will unfortunately think you meant `x == (1 & y) == 0`.
-  - you can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
-  - only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
-  - when providing names for decision variables, make shure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
+  - When using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter won't work, because Python will unfortunately think you meant `x == (1 & y) == 0`.
+  - You can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
+  - Only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
+  - When providing names for decision variables, make sure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 
-If you don't find it, report it on the CPMpy GitHub Issues page and we'll help you (and maybe even extend the above list of quirks).
+If you don't find it, report it on the CPMpy [GitHub issue tracker](https://github.com/CPMpy/cpmpy/issues) and we'll help you (and maybe even extend the above list of quirks).
 
 ## Debugging a `solve()` error
 
@@ -53,9 +54,9 @@ for c in model.constraints:
     Model(c).solve()
 ```
 
-The last constraint printed before the exception is the culprit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub Issues page.
+The last constraint printed before the exception is the culprit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub issue tracker.
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on GitHub, and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+Or maybe, you got one of CPMpy's `NotImplementedErrors`. Share your use case with us on GitHub, and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 
@@ -118,7 +119,7 @@ With this smaller set of constraints, repeat the visual inspection steps above.
 
 ### Correcting an UNSAT program
 
-As many MUSes (=conflicts) may exist in the problem, resolving one of them does not necessarily make the model satisfiable.
+As many MUSes (i.e. conflicts) may exist in the problem, resolving one of them does not necessarily make the model satisfiable.
 
 In order to find which constraints are to be corrected, you can use the `tools.mcs` tool which computes a 'Minimal Correction Subset' (MCS).
 By removing these contraints (or altering them), the model will become satisfiable.
@@ -145,7 +146,7 @@ cons_to_remove = (mcs(model.constraints)) # x[0]
 
 More information about these tools can be found in [their API documentation](./api/tools/explain.rst).
 
-## Debugging a satisfiable model, that does not contain an expected solution
+## Debugging a satisfiable model which does not contain an expected solution
 
 We will ignore the (possible) objective function here and focus on the feasibility part. 
 Actually, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
@@ -155,7 +156,7 @@ Add the solution that you know should be a feasible solution as a constraint:
 
 You now have an UNSAT program! That means you can follow the steps above to better understand and correct it.
 
-## Debugging a satisfiable model, which returns an impossible solution
+## Debugging a satisfiable model which returns an impossible solution
 
 This one is most annoying... Double check the printing of the model for oddities, also visually inspect the flat model. Try enumerating all solutions and look for an unwanted pattern in the solutions. Try a different solver. 
 

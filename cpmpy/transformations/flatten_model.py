@@ -79,6 +79,7 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 """
 import math
 import builtins
+import cpmpy as cp
 
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
@@ -92,21 +93,20 @@ def flatten_model(orig_model):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
-    from ..model import Model  # otherwise circular dependency...
 
     # the top-level constraints
     basecons = flatten_constraint(orig_model.constraints)
 
     # the objective
     if orig_model.objective_ is None:
-        return Model(*basecons)  # no objective, satisfaction problem
+        return cp.Model(*basecons)  # no objective, satisfaction problem
     else:
         (newobj, newcons) = flatten_objective(orig_model.objective_)
         basecons += newcons
         if orig_model.objective_is_min:
-            return Model(*basecons, minimize=newobj)
+            return cp.Model(*basecons, minimize=newobj)
         else:
-            return Model(*basecons, maximize=newobj)
+            return cp.Model(*basecons, maximize=newobj)
 
 
 def flatten_constraint(expr):
@@ -120,7 +120,6 @@ def flatten_constraint(expr):
         TODO, what built-in python error is best?
         RE TODO: we now have custom NotImpl/NotSupported
     """
-    from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
 
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
@@ -248,7 +247,7 @@ def flatten_constraint(expr):
             newlist.extend(lcons)
             newlist.extend(rcons)
 
-        elif isinstance(expr, GlobalConstraint):
+        elif isinstance(expr, cp.expressions.globalconstraints.GlobalConstraint):
             """
     - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """

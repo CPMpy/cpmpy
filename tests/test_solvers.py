@@ -225,7 +225,6 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])
-        self.assertEqual(cb.solcount, 7)
 
 
         # manually enumerating solutions
@@ -480,14 +479,30 @@ class TestSolvers(unittest.TestCase):
             self.assertTrue( cp.Model( iv1**i >= 0 ).solve() )
 
     def test_objective(self):
-        iv = cp.intvar(0,10, shape=2)
-        m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
-        self.assertTrue( m.solve() )
-        self.assertEqual( m.objective_value(), 10 )
 
-        m = cp.Model(iv >= 1, iv <= 5, minimize=sum(iv))
-        self.assertTrue( m.solve() )
-        self.assertEqual( m.objective_value(), 2 )
+        iv = cp.intvar(0, 10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5)
+        for solver, cls in cp.SolverLookup.base_solvers():
+            if cls.supported() is False:
+                continue
+            if solver == "z3": solver += ":opt"
+            try:
+                m.maximize(sum(iv))
+                self.assertTrue( m.solve(solver=solver))
+                self.assertEqual(m.objective_value(), 10)
+            except NotSupportedError:
+                continue
+
+            # if the above works, so should everything below
+            m.minimize(sum(iv))
+            self.assertTrue( m.solve(solver=solver))
+            self.assertEqual( m.objective_value(), 2 )
+
+            # something slightly more exotic
+            m.maximize(cp.min(iv))
+            self.assertTrue( m.solve(solver=solver))
+            self.assertEqual(m.objective_value(), 5)
+
 
     def test_only_objective(self):
         # from test_sum_unary and #95

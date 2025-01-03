@@ -44,6 +44,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
+from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException
 
@@ -348,7 +349,8 @@ class CPM_choco(SolverInterface):
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-                     
+
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
