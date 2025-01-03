@@ -307,7 +307,10 @@ class CPM_minizinc(SolverInterface):
         # translate exit status
         mzn_status = mzn_result.status
         if mzn_status == minizinc.result.Status.SATISFIED:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if self.has_objective(): # sub-optimal solution or not proven
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else: # optimal solution
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:

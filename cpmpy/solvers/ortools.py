@@ -191,10 +191,7 @@ class CPM_ortools(SolverInterface):
         if self.ort_status == ort.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.OPTIMAL:
-            if self.has_objective():
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else:
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif self.ort_status == ort.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
