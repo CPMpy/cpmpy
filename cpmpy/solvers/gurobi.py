@@ -71,8 +71,19 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
-        try:
+        return CPM_gurobi.installed() & CPM_gurobi.license_ok()
+
+    @staticmethod
+    def installed():
+        try: 
+            import gurobipy as gp
+            return True
+        except ImportError:
+            return False
+        
+    @staticmethod
+    def license_ok():
+        try: 
             import gurobipy as gp
             global GRB_ENV
             if GRB_ENV is None:
@@ -81,7 +92,8 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except:
+        except Exception as e:
+            warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -92,9 +104,10 @@ class CPM_gurobi(SolverInterface):
         - cpm_model: a CPMpy Model()
         - subsolver: None, not used
         """
-        if not self.supported():
-            raise Exception(
-                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+        if not self.installed():
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy'")
+        elif not self.license_ok():
+            raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
