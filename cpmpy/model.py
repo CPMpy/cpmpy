@@ -119,6 +119,9 @@ class Model(object):
         self.objective_ = expr
         self.objective_is_min = minimize
 
+    def has_objective(self):
+        return self.objective_ is not None
+
     def minimize(self, expr):
         """
             Minimize the given objective function
