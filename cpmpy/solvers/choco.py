@@ -207,10 +207,13 @@ class CPM_choco(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # create solver object
+        self.chc_solver = self.chc_model.get_solver()
+
+        # set time limit (if given)
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
 
-        self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
