@@ -34,7 +34,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals
+from ..expressions.utils import argval, argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -151,9 +151,7 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and self.has_objective():
+        if grb_status == GRB.OPTIMAL:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -503,5 +501,13 @@ class CPM_gurobi(SolverInterface):
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
+
+        if opt_sol_count:
+            if opt_sol_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE            
+            elif self.cpm_status.exitstatus == ExitStatus.OPTIMAL:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
         return opt_sol_count
