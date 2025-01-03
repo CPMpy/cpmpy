@@ -502,4 +502,12 @@ class CPM_gurobi(SolverInterface):
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
 
+        if opt_sol_count:
+            if opt_sol_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE            
+            elif self.cpm_status.exitstatus == ExitStatus.OPTIMAL:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+
         return opt_sol_count

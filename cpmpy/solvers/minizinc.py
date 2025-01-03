@@ -386,6 +386,23 @@ class CPM_minizinc(SolverInterface):
         # status handling
         self._post_solve(mzn_result)
 
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif mzn_result.solution is None: # last iteration didn't find a solution
+                # below states are from the second-last iteration
+                if self.cpm_status.exitstatus == ExitStatus.OPTIMAL: # timeout
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                elif self.cpm_status.exitstatus == ExitStatus.FEASIBLE: # found all solutions
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else:
+                    raise()
+
+            elif time_limit is None or self.cpm_status.runtime < time_limit: # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+
         return solution_count
 
     def solver_var(self, cpm_var) -> str:
