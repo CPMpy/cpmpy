@@ -84,7 +84,10 @@ class CPM_z3(SolverInterface):
         import z3
 
         if subsolver is None:
-            subsolver = "sat"
+            if cpm_model and cpm_model.has_objective():
+                subsolver = "opt"
+            else:
+                subsolver = "sat"
         assert "sat" in subsolver or "opt" in subsolver, "Z3 only has a satisfaction or optimization sub-solver."
 
         # initialise the native solver object
