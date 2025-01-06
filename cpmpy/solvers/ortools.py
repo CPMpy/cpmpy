@@ -469,7 +469,7 @@ class CPM_ortools(SolverInterface):
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
-                    if lhs.args[1]  == 2:
+                    if lhs.args[1] == 2:
                         b = self.solver_var(lhs.args[0])
                         return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
                     else: # need to create intermediate vars, post (((b * b) * b) * ...) * b == IV
