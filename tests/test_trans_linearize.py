@@ -187,7 +187,10 @@ class TestVarsLhs(unittest.TestCase):
         self.assertEqual(lin_cons[1], "((a) * (IV0)) == (IV1)")
         self.assertEqual(lin_cons[2], "sum([1, -1] * [IV1, b]) == 0")
 
-
+        # this is not supported
+        cons = a ** b == 3
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
 
     def test_mod(self):
 

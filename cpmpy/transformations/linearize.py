@@ -122,6 +122,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 elif lhs.name == "pow" and "pow" not in supported:
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize power without multiplication")
+                    if not is_num(lhs.args[1]):
+                        raise NotImplementedError("Cannot linearize power with ")
                     # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
                     x, n = lhs.args
                     new_lhs = 1
