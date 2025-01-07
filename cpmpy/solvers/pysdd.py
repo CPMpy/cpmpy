@@ -88,7 +88,7 @@ class CPM_pysdd(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
+            raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 

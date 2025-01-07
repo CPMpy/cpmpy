@@ -83,7 +83,7 @@ class CPM_gcs(SolverInterface):
         - subsolver: None (not supported)
         """
         if not self.supported():
-            raise Exception("Glasgow Constraint Solver: Install the python package 'gcspy'")
+            raise Exception("CPM_gcs: Install the python package 'gcspy' to use this solver interface.")
 
         import gcspy
 
