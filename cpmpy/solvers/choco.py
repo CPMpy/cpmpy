@@ -78,7 +78,7 @@ class CPM_choco(SolverInterface):
             import pychoco as chc
             # check it's the correct version
             # CPMPy uses features only available from 0.2.1
-            pkg_resources.require("pychoco>=2.1.0")
+            pkg_resources.require("pychoco>=0.2.1")
             return True
         except ModuleNotFoundError:
             return False
