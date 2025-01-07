@@ -13,6 +13,10 @@
     To ensure that, include it inside supported() and other functions that need it...
 """
 
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -61,9 +65,17 @@ class CPM_template(SolverInterface):
         # try to import the package
         try:
             import TEMPLATEpy as gp
+            # optionally enforce a specific version
+            pkg_resources.require("TEMPLATEpy>=2.1.0")
             return True
-        except ImportError:
+        except ModuleNotFoundError: # if solver's Python package is not installed
             return False
+        except VersionConflict: # unsupported version of TEMPLATEpy (optional)
+            warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('TEMPLATEpy').version}.")
+            return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
