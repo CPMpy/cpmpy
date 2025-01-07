@@ -98,8 +98,9 @@ class CPM_template(SolverInterface):
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
-            - display: display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
+            - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                called during optimization when a feasible solution is found;
+                                called with the variables after value-mapping; default/None: nothing displayed
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
