@@ -71,7 +71,7 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def supported():
-        return CPM_gurobi.installed() & CPM_gurobi.license_ok()
+        return CPM_gurobi.installed() and CPM_gurobi.license_ok()
 
     @staticmethod
     def installed():
