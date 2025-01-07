@@ -485,7 +485,6 @@ class TestSolvers(unittest.TestCase):
         for solver, cls in cp.SolverLookup.base_solvers():
             if cls.supported() is False:
                 continue
-            if solver == "z3": solver += ":opt"
             try:
                 m.maximize(sum(iv))
                 self.assertTrue( m.solve(solver=solver))
