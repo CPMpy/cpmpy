@@ -106,8 +106,9 @@ class CPM_gcs(SolverInterface):
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
             Arguments:
             - time_limit:        maximum solve time in seconds (float, optional).
-            - display:           either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                                    default/None: nothing displayed
+            - display:           generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                    called during optimization when a feasible solution is found;
+                                    called with the variables after value-mapping; default/None: nothing displayed
             - prove:             whether to produce a VeriPB proof (.opb model file and .pbp proof file).
             - proof_name:        name for the the proof files.
             - proof_location:    location for the proof files (default to current working directory).
@@ -123,7 +124,23 @@ class CPM_gcs(SolverInterface):
         self.solver_vars(list(self.user_vars))
 
         if display is not None:
-            raise NotImplementedError("GCS does support callbacks, but seems unstable for now")
+            if isinstance(display, (Expression, list)):
+                cb_vars = get_variables(display)
+            else:
+                cb_vars = self.user_vars
+
+            def callback(sol):
+                # set values for variables
+                for cpm_var in cb_vars:
+                    cpm_var._value = sol[self.solver_var(cpm_var)]
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif isinstance(display, list):
+                    print(argvals(display))
+                else:
+                    display()
+        else:
+            callback = None
 
         # If we're verifying we must be proving
         prove |= verify
@@ -141,7 +158,7 @@ class CPM_gcs(SolverInterface):
         gcs_stats = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
-            callback=None,
+            callback=callback,
             prove=prove,
             proof_name=self.proof_name,
             proof_location=proof_location,
