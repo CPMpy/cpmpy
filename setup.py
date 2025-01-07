@@ -38,6 +38,16 @@ setup(
     #extra dependency, only needed if minizinc is to be used.
     extras_require={
         "FULL":  ["minizinc"],
+        "test": ["pytest"],
+        "ortools": ["ortools"],
+        "z3": ["z3-solver"],
+        "choco": ["pychoco>=0.2.1"],
+        "exact": ["exact>=2.1.0"],
+        "minizinc": ["minizinc"],
+        "pysat": ["python-sat"],
+        "gurobi": ["gurobipy"],
+        "pysdd": ["pysdd"],
+        "xcsp3": ["pycsp3"]
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
