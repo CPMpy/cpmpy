@@ -110,7 +110,7 @@ class CPM_gurobi(SolverInterface):
         - subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_gurobi: Install the python package 'gurobipy'")
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
         elif not self.license_ok():
             raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
