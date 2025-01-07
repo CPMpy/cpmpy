@@ -126,6 +126,7 @@ class CPM_ortools(SolverInterface):
                            get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
             - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                called during optimization when a feasible solution is found;
                                 called with the variables after value-mapping; default/None: nothing displayed
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 

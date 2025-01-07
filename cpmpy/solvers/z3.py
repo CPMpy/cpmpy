@@ -110,6 +110,7 @@ class CPM_z3(SolverInterface):
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
             - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function,
+                                called during optimization when a feasible solution is found;
                                 called with the variables after value-mapping; default/None: nothing displayed
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
