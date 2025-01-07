@@ -25,7 +25,6 @@ jobs:
           pip install pychoco
           sudo snap install minizinc --classic
           pip install minizinc
-          pip install gcspy
       - name: Test with pytest
         run: |
           python -m pytest tests/
