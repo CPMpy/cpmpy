@@ -32,6 +32,10 @@ import time
 
 import numpy as np
 
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -70,19 +74,20 @@ class CPM_choco(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if pychoco is installed
             import pychoco as chc
             # check it's the correct version
             # CPMPy uses features only available from 0.2.1
-            from importlib.metadata import version as get_version
-            from packaging import version
-            pychoco_version = get_version("pychoco")
-            if version.parse(pychoco_version) < version.parse("0.2.1"):
-                import warnings
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, but you have version {pychoco_version}")
-                return False
+            pkg_resources.require("pychoco>=2.1.0")
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except VersionConflict: # unsupported version of pychoco
+            warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('exact').version}.")
+            return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

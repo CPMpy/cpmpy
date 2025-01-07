@@ -100,8 +100,10 @@ class CPM_minizinc(SolverInterface):
             #  check if MiniZinc Python is installed
             import minizinc
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @staticmethod
     def executable_installed():

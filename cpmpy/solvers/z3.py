@@ -66,8 +66,10 @@ class CPM_z3(SolverInterface):
         try:
             import z3
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver="sat"):

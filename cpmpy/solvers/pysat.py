@@ -77,8 +77,10 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import IDPool
             from pysat.solvers import Solver
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     @staticmethod

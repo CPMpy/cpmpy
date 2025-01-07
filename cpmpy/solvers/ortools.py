@@ -74,8 +74,10 @@ class CPM_ortools(SolverInterface):
         try:
             import ortools
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):

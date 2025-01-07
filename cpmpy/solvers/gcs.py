@@ -70,8 +70,10 @@ class CPM_gcs(SolverInterface):
         try:
             import gcspy
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
