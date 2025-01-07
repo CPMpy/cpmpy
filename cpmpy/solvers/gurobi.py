@@ -83,6 +83,9 @@ class CPM_gurobi(SolverInterface):
         
     @staticmethod
     def license_ok():
+        if not CPM_gurobi.installed():
+            warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
+            return False
         try: 
             import gurobipy as gp
             global GRB_ENV
