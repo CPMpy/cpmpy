@@ -161,8 +161,6 @@ class CPM_gurobi(SolverInterface):
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
-        grb_objective = self.grb_model.getObjective()
-
         # handle callbacking
         if display is not None:
             assert solution_callback is None, "Cannot have both generic CPMpy callback and specialized gurobi solution callback"
@@ -188,6 +186,7 @@ class CPM_gurobi(SolverInterface):
         # call the gurobi solver with callback
         self.grb_model.optimize(callback=solution_callback)
         grb_status = self.grb_model.Status
+        grb_objective = self.grb_model.getObjective()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
