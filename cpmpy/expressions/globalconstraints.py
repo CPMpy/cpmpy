@@ -119,8 +119,10 @@
 """
 import copy
 
+
 import cpmpy as cp
 
+from .core import BoolVal
 from .utils import all_pairs
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
@@ -281,14 +283,39 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
+        defining = []
         constraining = []
-        constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)] # different orders
-        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
 
-        defining = [order[0] == succ[0]]
-        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+        # We define the auxiliary order variables to represent the order we visit all the nodes.
+        # `order[i] == succ[order[i - 1]]`
+        # These constraints need to be in the defining part, since they define our auxiliary vars
+        # However, this would make it impossible for ~circuit to be satisfied in some cases,
+        # because there does not always exist a valid ordering
+        # This happens when the variables in succ don't take values in the domain of 'order',
+        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
+        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
 
+        lbs, ubs = get_bounds(succ)
+        if min(lbs) > 0 or max(ubs) < n - 1:
+            # no way this can be a circuit
+            return [BoolVal(False)], []
+        elif min(lbs) >= 0 and max(ubs) < n:
+            # there always exists a valid ordering, since our bounds are tight
+            a = BoolVal(True)
+        else:
+            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
+            a = boolvar()
+            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
+            for i in range(n):
+                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
+
+        constraining += [AllDifferent(succ)]  # different successors
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
+        defining += [a.implies(order[0] == succ[0])]
+        for i in range(1, n):
+            defining += [a.implies(
+                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
         return constraining, defining
 
     def value(self):

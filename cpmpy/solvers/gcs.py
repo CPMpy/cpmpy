@@ -27,6 +27,7 @@ from ..expressions.utils import is_num, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
 
@@ -156,7 +157,7 @@ class CPM_gcs(SolverInterface):
         self.proof_location = proof_location
      
         # call the solver, with parameters    
-        gcs_stats = self.gcs.solve(
+        self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
             callback=callback,
@@ -167,12 +168,12 @@ class CPM_gcs(SolverInterface):
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = gcs_stats["solve_time"]
+        self.cpm_status.runtime = self.gcs_result["solve_time"]
 
         # translate exit status
-        if gcs_stats['solutions'] != 0:
+        if self.gcs_result['solutions'] != 0:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif not gcs_stats['completed']:
+        elif not self.gcs_result['completed']:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -188,9 +189,9 @@ class CPM_gcs(SolverInterface):
                 sol_var = self.solver_var(cpm_var)
                 if isinstance(cpm_var, _BoolVarImpl):
                     # Convert back to bool
-                    cpm_var._value = bool(self.gcs.get_solution_value(sol_var))
+                    cpm_var._value = bool(self.gcs.get_solution_value(sol_var, self.gcs_result['solutions']-1))
                 else:
-                    cpm_var._value = self.gcs.get_solution_value(sol_var)
+                    cpm_var._value = self.gcs.get_solution_value(sol_var, self.gcs_result['solutions']-1)
 
             # translate objective, for optimisation problems only
             if self.has_objective():
@@ -271,7 +272,7 @@ class CPM_gcs(SolverInterface):
         if display:
             sol_callback=display_callback
 
-        gcs_stats = self.gcs.solve(
+        self.gcs_result = self.gcs.solve(
             all_solutions=True, 
             timeout=time_limit, 
             solution_limit=solution_limit, 
@@ -282,7 +283,7 @@ class CPM_gcs(SolverInterface):
 
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = gcs_stats["solve_time"]
+        self.cpm_status.runtime = self.gcs_result["solve_time"]
 
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
@@ -294,7 +295,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return gcs_stats["solutions"]
+        return self.gcs_result["solutions"]
 
     def solver_var(self, cpm_var):
         """
@@ -373,6 +374,7 @@ class CPM_gcs(SolverInterface):
             'inverse', 
             'circuit', 
             'xor'}
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
 
