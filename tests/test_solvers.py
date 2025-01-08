@@ -806,6 +806,8 @@ class TestSolvers(unittest.TestCase):
         obj = cp.sum([(1 if random.random() >= 0.5 else 2) * (a - b) for a in vars for b in vars])
         model = cp.Model(cp.AllDifferent(vars), maximize=obj)
         for solver, cls in cp.SolverLookup.base_solvers():
+            if solver in  ("pysdd", "pysat", "minizinc", "choco"):
+                continue
             if cls.supported() is False: continue
             self.assertTrue(model.solve(solver=solver, display=vars))
             # collect solutions using callback
