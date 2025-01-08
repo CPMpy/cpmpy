@@ -225,7 +225,7 @@ def flatten_constraint(expr):
                 if expr.name == '>':
                     expr.name = '<'
                 elif expr.name == '>=':
-                    expr.name = '>='
+                    expr.name = '<='
                 elif expr.name == '<':
                     expr.name = '>'
                 elif expr.name == '<=':
