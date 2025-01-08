@@ -128,6 +128,7 @@ def comp_constraints(solver):
         - Numeric disequality: Numexpr != Var              (CPMpy class 'Comparison')
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
+                                          Var >=< NumExpr  (CPMpy class 'Comparison')
     """
     for comp_name in Comparison.allowed:
 
@@ -142,7 +143,7 @@ def comp_constraints(solver):
                 if comp_name == "<" and lb >= get_bounds(rhs)[0]:
                     continue
                 yield Comparison(comp_name, numexpr, rhs)
-
+                yield Comparison(comp_name, rhs, numexpr)
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
