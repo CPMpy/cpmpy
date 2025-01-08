@@ -222,14 +222,14 @@ def flatten_constraint(expr):
                 rewritten = True
 
                 # flip comparator in case of inequality
-                if expr.name == '>':
-                    expr.name = '<'
-                elif expr.name == '>=':
-                    expr.name = '<='
-                elif expr.name == '<':
-                    expr.name = '>'
-                elif expr.name == '<=':
-                    expr.name = '>='
+                if exprname == '>':
+                    exprname = '<'
+                elif exprname == '>=':
+                    exprname = '<='
+                elif exprname == '<':
+                    exprname = '>'
+                elif exprname == '<=':
+                    exprname = '>='
 
             # already flat?
             if not expr.has_subexpr():
