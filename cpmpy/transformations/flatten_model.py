@@ -215,11 +215,21 @@ def flatten_constraint(expr):
             lexpr, rexpr = expr.args
             rewritten = False
 
-            # rewrite 'Var == Expr' to normalzed 'Expr == Var'
-            if (expr.name == '==' or expr.name == '!=') \
-                    and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+            # rewrite 'Var # Expr' to normalized 'Expr # Var' (where # is any comparator)
+            if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                assert (expr.name in ('==', '!=', '>', '>=', '<', '<='))
                 lexpr, rexpr = rexpr, lexpr
                 rewritten = True
+
+                # flip comparator in case of inequality
+                if expr.name == '>':
+                    expr.name = '<'
+                elif expr.name == '>=':
+                    expr.name = '>='
+                elif expr.name == '<':
+                    expr.name = '>'
+                elif expr.name == '<=':
+                    expr.name = '>='
 
             # already flat?
             if not expr.has_subexpr():

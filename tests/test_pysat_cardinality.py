@@ -139,6 +139,13 @@ class TestCardinality(unittest.TestCase):
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1],[a,b,c]]) > 0])
         self.assertEqual(str([Operator("sum",[a, b, ~c]) > 1]), str(only_pos))
 
+    def test_pysat_aggregate_sum_sub_expressions(self):
+        bvs = cp.boolvar(3)
+        c = bvs[0] > sum(bvs[1:])
+        s = cp.SolverLookup.get("pysat")
+        print(c, "==>", s.transform(c))
+        s += c
+        s.solve()
 
 if __name__ == '__main__':
     unittest.main()
