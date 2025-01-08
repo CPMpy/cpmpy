@@ -2,7 +2,8 @@ import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
-from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.expressions.core import Operator
+from cpmpy.solvers.pysat import CPM_pysat, only_positive_coefficients
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
@@ -124,6 +125,19 @@ class TestCardinality(unittest.TestCase):
         for c in cons:
             cp.Model(c).solve("pysat")
             self.assertTrue(c.value())
+
+    def test_pysat_support_negative_coefficients(self):
+        bvs = cp.boolvar(3)
+        # this is linearized to `a+b-c>0`, which previously wasn't rewritten to the cardinality constraint `a+b+~c>1`
+        c = sum(bvs[1:]) > bvs[0]
+        s = cp.SolverLookup.get("pysat")
+        s += c
+        self.assertTrue(s.solve())
+
+    def test_only_positive_coefficients(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1],[a,b,c]]) > 0])
+        self.assertEqual(str([Operator("sum",[a, b, ~c]) > 1]), str(only_pos))
 
 
 if __name__ == '__main__':
