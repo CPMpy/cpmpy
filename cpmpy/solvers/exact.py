@@ -34,7 +34,7 @@ from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -181,30 +181,42 @@ class CPM_exact(SolverInterface):
 
         if display is not None and self.has_objective():
             # this is a bit of a hack, but Exact does not support callbacks...
-            # have to manually interleave search instead
-            warnings.warn("Solver object will be invalid after this solve-call as objective-bounding constraints are posted to Exact.")
+            # have to manually interleave search instead, and make an assumption var to retract the objective after
+            #   see https://gitlab.com/nonfiction-software/exact/-/issues/23
+            lb, ub = get_bounds(self.objective_)
+            obj_assump = boolvar()
+            M = (ub - lb) + 1
+            self.objective(self.objective_ + M* obj_assump, self.objective_is_min_) # will post constraints obj + M * a < bound
+            self.xct_solver.setAssumptions([(self.solver_var(obj_assump), self.objective_is_min_)])
+
             if isinstance(display, Expression) or is_any_list(display):
                 _cpm_vars = get_variables(display)
             else:
                 _cpm_vars = None
 
             start = time.time()
-            while 1:
+            xct_status = self.xct_solver.runOnce(time_limit if time_limit is not None else 0)
+            while xct_status != "INCONSISTENT":
                 time_left = time_limit - (time.time() - start) if time_limit is not None else 0
+                self.xct_solver.boundObjByLastSol()  # ensure next one is improving
+                self._fillVars(_cpm_vars)
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif is_any_list(display):
+                    print(argvals(display))
+                else:  # function
+                    display()
+                # next solve call
                 xct_status = self.xct_solver.runOnce(timeout=time_left)
-                if xct_status == "UNSAT" or xct_status == "TIMEOUT":
-                    break
-                else:
-                    self.xct_solver.boundObjByLastSol()  # ensure next one is improving
-                    self._fillVars(_cpm_vars)
-                    if isinstance(display, Expression):
-                        print(display.value())
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:  # function
-                        display()
-            obj_val = self.xct_solver.getBestSoFar()
             end = time.time()
+
+            # done, retract obj assumptions
+            if self.objective_is_min_:
+                obj_val = self.xct_solver.getBestSoFar() - M
+            else:
+                obj_val = -self.xct_solver.getBestSoFar()
+            self.xct_solver.setAssumptions([(self.solver_var(obj_assump), not self.objective_is_min_)])
+
 
         else:
             # call the solver, with parameters
@@ -218,7 +230,7 @@ class CPM_exact(SolverInterface):
 
         self.objective_value_ = None
         # translate exit status
-        if xct_status == "UNSAT": # found unsatisfiability
+        if xct_status == "UNSAT" or xct_status == "INCONSISTENT": # found unsatisfiability (potentially over assumptions)
             if self.has_objective() and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
@@ -226,8 +238,6 @@ class CPM_exact(SolverInterface):
         elif xct_status == "SAT": # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif xct_status == "INCONSISTENT": # found inconsistency over assumptions
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif xct_status == "TIMEOUT": # found timeout
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
