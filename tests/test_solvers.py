@@ -806,14 +806,8 @@ class TestSolvers(unittest.TestCase):
         obj = cp.sum([(1 if random.random() >= 0.5 else 2) * (a - b) for a in vars for b in vars])
         model = cp.Model(cp.AllDifferent(vars), maximize=obj)
         for solver, cls in cp.SolverLookup.base_solvers():
-            if solver != "gcs": continue
             if cls.supported() is False: continue
-            if solver == "z3": solver += ":opt"
-            # try:
             self.assertTrue(model.solve(solver=solver, display=vars))
-            # except (NotImplementedError, NotSupportedError):
-                # continue # not all solvers support callbacks
-
             # collect solutions using callback
             collector = list()
             self.assertTrue(model.solve(solver=solver, display=lambda :  collector.append(argvals(vars))))
@@ -827,6 +821,12 @@ class TestSolvers(unittest.TestCase):
             solver = cp.SolverLookup.get(solver, model)
             t0 = time()
             self.assertTrue(solver.solve(display=display))
+            self.assertEqual(solver.objective_value(), 16)
+
+            solver.minimize(obj)
+            self.assertTrue(solver.solve(display=display))
+            self.assertEqual(solver.objective_value(), -16)
+
 
 
 
