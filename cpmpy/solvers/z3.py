@@ -96,7 +96,7 @@ class CPM_z3(SolverInterface):
             self.z3_solver = z3.Solver()
         if "opt" in subsolver:
             self.z3_solver = z3.Optimize()
-
+            self.objective_is_min_ = True
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
 
@@ -218,6 +218,8 @@ class CPM_z3(SolverInterface):
             if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
+                if not self.objective_is_min_:
+                    self.objective_value_ = -self.objective_value_
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -283,6 +285,7 @@ class CPM_z3(SolverInterface):
             expr = obj_var
 
         obj = self._z3_expr(expr)
+        self.objective_is_min_ = minimize
         if minimize:
             self.z3_solver.minimize(obj)
         else:
