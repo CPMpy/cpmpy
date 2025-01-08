@@ -273,7 +273,7 @@ def verify(cons):
 
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
-def test_bool_constaints(solver, constraint):
+def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """
