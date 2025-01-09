@@ -143,6 +143,17 @@ def comp_constraints(solver):
                 if comp_name == "<" and lb >= get_bounds(rhs)[0]:
                     continue
                 yield Comparison(comp_name, numexpr, rhs)
+
+                # Add test for Var >=< NumExpr, with comparator flipped for inequality
+                if comp_name == '>':
+                    comp_name = '<'
+                elif comp_name == '>=':
+                    comp_name = '<='
+                elif comp_name == '<':
+                    comp_name = '>'
+                elif comp_name == '<=':
+                    comp_name = '>='
+
                 yield Comparison(comp_name, rhs, numexpr)
 
 # Generate all possible boolean expressions
