@@ -365,3 +365,52 @@ def canonical_comparison(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+def only_positive_coefficients(lst_of_expr):
+    """
+        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
+        This can simplify a wsum into sum.
+        cpm_expr is expected to be a canonical comparison.
+        Only apply after applying canonical_comparison(cpm_expr)
+
+        Resulting expression is linear.
+    """
+    newlist = []
+    for cpm_expr in lst_of_expr:
+        if isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
+            new_cons = []
+
+            #    ... -c*b + ... <= k
+            # :: ... -c*(1 - ~b) + ... <= k
+            # :: ... -c + c* ~b + ... <= k
+            # :: ... + c*~b + ... <= k+c
+            if lhs.name == "wsum":
+                weights, args = lhs.args
+                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
+                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
+                rhs += sum(-weights[i] for i in idxes)
+
+                # Simplify wsum to sum if all weights are 1
+                if all(w == 1 for w in nw):
+                    lhs = Operator("sum", [list(na)])
+                else:
+                    lhs = Operator("wsum", [list(nw), list(na)])
+
+            newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
+            newlist += new_cons
+
+        # reification
+        elif cpm_expr.name == "->":
+            cond, subexpr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
+                                                   f"`linearize_constraint` before calling `only_positive_bv` "
+            if isinstance(cond, _BoolVarImpl): # BV -> Expr
+                subexpr = only_positive_coefficients([subexpr])
+                newlist += [cond.implies(expr) for expr in subexpr]
+
+        else:
+            newlist.append(cpm_expr)
+
+    return newlist
+

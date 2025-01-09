@@ -42,66 +42,13 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import canonical_comparison
+from ..transformations.linearize import canonical_comparison, only_positive_coefficients
 from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
-from ..expressions.utils import eval_comparison
-
-
-# TODO [?] where should we put this transformation function?
-# TODO [?] are zero coefficients removed in linearize? Probably better to do here than there (right now this is actually `only_non_negative_terms`).
-def only_positive_coefficients(lst_of_expr):
-    """
-        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
-        This can simplify a wsum into sum.
-        cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
-
-        Resulting expression is linear.
-    """
-    newlist = []
-    for cpm_expr in lst_of_expr:
-        print(f"{cpm_expr=}")
-
-        if isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
-            new_cons = []
-
-            #    ... -c*b + ... <= k
-            # :: ... -c*(1 - ~b) + ... <= k
-            # :: ... -c + c* ~b + ... <= k
-            # :: ... + c*~b + ... <= k+c
-            if lhs.name == "wsum":
-                weights, args = lhs.args
-                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
-                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
-                rhs += sum(-weights[i] for i in idxes)
-
-                # Simplify wsum to sum if all weights are 1
-                if all(w == 1 for w in nw):
-                    lhs = Operator("sum", [list(na)])
-                else:
-                    lhs = Operator("wsum", [list(nw), list(na)])
-
-            newlist.append(eval_comparison(cpm_expr.name, lhs, rhs)) # TODO [?] why eval_comparison?
-            newlist += new_cons # TODO [?] only_positive_bv linearizes again?
-
-        # reification
-        elif cpm_expr.name == "->":
-            cond, subexpr = cpm_expr.args
-            assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
-                                                   f"`linearize_constraint` before calling `only_positive_bv` "
-            if isinstance(cond, _BoolVarImpl): # BV -> Expr
-                subexpr = only_positive_coefficients([subexpr])
-                newlist += [cond.implies(expr) for expr in subexpr]
-
-        else:
-            newlist.append(cpm_expr)
-
-    return newlist
 
 
 class CPM_pysat(SolverInterface):
