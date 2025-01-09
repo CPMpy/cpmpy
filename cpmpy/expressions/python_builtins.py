@@ -23,9 +23,8 @@ import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
-from .core import Expression, Operator
+from .core import Expression, Operator, BoolVal
 from .globalfunctions import Minimum, Maximum, Abs
-from ..exceptions import CPMpyException
 
 
 # Overwriting all/any python built-ins

@@ -34,19 +34,19 @@ python -m pytest tests/test_solvers.py
 
 ## Code structure
 
-  * _tests/_ : contains the tests
-  * _docs/_ : contains the docs. Any change there is automatically updated, with some delay, on [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)
-  * _examples/_ : our examples, always happy to include more
-  * _cpmpy/_ : the python module that you install when doing `pip install cpmpy`
+  * `tests/` contains the tests
+  * `docs/` contains the documentation. Any change there is automatically updated, with some delay, on [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)
+  * `examples/` our examples, we are always happy to include more
+  * `cpmpy/` the python module that you install by running `pip install cpmpy`
 
 The module is structured as such:
 
-  * _model.py_ : contains the omnipresent `Model()` container
-  * _exceptions.py_ : contains a collection of CPMpy specific exceptions
-  * _expressions/_ : Classes and functions that represent and create expressions (constraints and objectives)
-  * _solvers/_ : CPMpy interfaces to (the Python API interface of) solvers
-  * _transformations/_ : Methods to transform CPMpy expressions into other CPMpy expressions
-  * _tools/_ : Set of independent tools that users might appreciate.
+  * `model.py` contains the omnipresent `Model()` container
+  * `exceptions.py` contains a collection of CPMpy specific exceptions
+  * `expressions/` contains classes and functions that represent and create expressions (constraints and objectives)
+  * `solvers/` contains CPMpy interfaces to (the Python API interface of) solvers
+  * `transformations/` contains methods to transform CPMpy expressions into other CPMpy expressions
+  * `tools/` contains a set of independent tools that users might appreciate.
 
 The typical flow in which these submodules are used when programming with CPMpy is: the user creates _expressions_ which they put into a _model_ object. This is then given to a _solver_ object to solve, which will first _transform_ the original expressions into expressions that it supports, which it then posts to the Python API interface of that particular solver.
 
