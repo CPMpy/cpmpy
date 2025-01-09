@@ -3,7 +3,8 @@ import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
 from cpmpy.expressions.core import Operator
-from cpmpy.solvers.pysat import CPM_pysat, only_positive_coefficients
+from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.transformations.linearize import only_positive_coefficients
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
