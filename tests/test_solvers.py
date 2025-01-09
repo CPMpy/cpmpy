@@ -9,10 +9,8 @@ from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
-
-
+from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
-
 
 class TestSolvers(unittest.TestCase):
     def test_installed_solvers(self):
@@ -478,30 +476,6 @@ class TestSolvers(unittest.TestCase):
         for i in [0,1,2]:
             self.assertTrue( cp.Model( iv1**i >= 0 ).solve() )
 
-    def test_objective(self):
-
-        iv = cp.intvar(0, 10, shape=2)
-        m = cp.Model(iv >= 1, iv <= 5)
-        for solver, cls in cp.SolverLookup.base_solvers():
-            if cls.supported() is False:
-                continue
-            try:
-                m.maximize(sum(iv))
-                self.assertTrue( m.solve(solver=solver))
-                self.assertEqual(m.objective_value(), 10)
-            except NotSupportedError:
-                continue
-
-            # if the above works, so should everything below
-            m.minimize(sum(iv))
-            self.assertTrue( m.solve(solver=solver))
-            self.assertEqual( m.objective_value(), 2 )
-
-            # something slightly more exotic
-            m.maximize(cp.min(iv))
-            self.assertTrue( m.solve(solver=solver))
-            self.assertEqual(m.objective_value(), 5)
-
 
     def test_only_objective(self):
         # from test_sum_unary and #95
@@ -796,6 +770,25 @@ class TestSolvers(unittest.TestCase):
                 self.assertIsNone(v.value())
 
 
+@pytest.mark.parametrize("solver", [name for name, solver in SolverLookup.base_solvers() if solver.supported()])
+class TestSupportedSolvers:
+    def test_objective(self, solver):
+        iv = cp.intvar(0, 10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5)
 
+        try:
+            m.maximize(sum(iv))
+            assert m.solve(solver=solver)
+            assert m.objective_value() == 10
+        except NotSupportedError:
+            return None
 
+        # if the above works, so should everything below
+        m.minimize(sum(iv))
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 2
 
+        # something slightly more exotic
+        m.maximize(cp.min(iv))
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 5
