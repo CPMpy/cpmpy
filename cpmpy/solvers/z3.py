@@ -377,7 +377,7 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == "mul":
                     return x * y
                 elif cpm_con.name == "div":
-                    return z3.ToReal(x) / z3.ToReal(y)
+                    return x / y
                 elif cpm_con.name == "pow":
                     if not is_num(cpm_con.args[1]):
                         # tricky in Z3 not all power constraints are decidable
