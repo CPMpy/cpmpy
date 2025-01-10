@@ -479,6 +479,10 @@ class TestBounds(unittest.TestCase):
         self.assertListEqual([1,[3,5],[6]], ubs)
 
 
+    def test_array(self):
+        m = intvar(-3,3, shape = (3,2), name= [['a','b'],['c','d'],['e','f']])
+        self.assertEqual(str(cpm_array(m)), '[[a b]\n [c d]\n [e f]]')
+        self.assertEqual(str(cpm_array(m.T)), '[[a c e]\n [b d f]]')
 
     def test_not_operator(self):
         p = boolvar()

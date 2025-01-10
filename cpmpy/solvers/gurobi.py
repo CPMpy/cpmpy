@@ -32,6 +32,7 @@
 """
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.utils import argvals
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -43,6 +44,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from ..transformations.safening import no_partial_functions
 
 try:
     import gurobipy as gp
@@ -69,8 +71,22 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
-        try:
+        return CPM_gurobi.installed() and CPM_gurobi.license_ok()
+
+    @staticmethod
+    def installed():
+        try: 
+            import gurobipy as gp
+            return True
+        except ImportError:
+            return False
+        
+    @staticmethod
+    def license_ok():
+        if not CPM_gurobi.installed():
+            warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
+            return False
+        try: 
             import gurobipy as gp
             global GRB_ENV
             if GRB_ENV is None:
@@ -79,7 +95,8 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except:
+        except Exception as e:
+            warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -90,9 +107,10 @@ class CPM_gurobi(SolverInterface):
         - cpm_model: a CPMpy Model()
         - subsolver: None, not used
         """
-        if not self.supported():
-            raise Exception(
-                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+        if not self.installed():
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy'")
+        elif not self.license_ok():
+            raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
@@ -186,6 +204,10 @@ class CPM_gurobi(SolverInterface):
                 else: #  can happen with DirectVar or when using floats as coefficients
                     self.objective_value_ =  float(grb_obj_val)
 
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
         return has_sol
 
 
@@ -200,7 +222,8 @@ class CPM_gurobi(SolverInterface):
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. See /transformations/linearize for more details")
+            raise Exception("Negative literals should not be part of any equation. "
+                            "See /transformations/linearize for more details")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -289,6 +312,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons)
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -353,7 +377,8 @@ class CPM_gurobi(SolverInterface):
                     self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
-                    assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
@@ -371,7 +396,6 @@ class CPM_gurobi(SolverInterface):
                         self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                         self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
@@ -441,7 +465,8 @@ class CPM_gurobi(SolverInterface):
 
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, try setting solution limit to a large number")
+                "Gurobi does not support searching for all solutions. If you really need all solutions, "
+                "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
         sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
@@ -452,6 +477,12 @@ class CPM_gurobi(SolverInterface):
         optimal_val = None
         solution_count = self.grb_model.SolCount
         opt_sol_count = 0
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            self.objective_value_ = None
+            for var in self.user_vars:
+                var._value = None
 
         for i in range(solution_count):
             # Specify which solution to query

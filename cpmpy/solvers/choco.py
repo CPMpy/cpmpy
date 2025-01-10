@@ -41,11 +41,12 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.reification import only_bv_reifies, reify_rewrite
-from ..exceptions import ChocoBoundsException, ChocoTypeException, NotSupportedError
+from ..transformations.safening import no_partial_functions
+from ..transformations.reification import reify_rewrite
+from ..exceptions import ChocoBoundsException
 
 
 class CPM_choco(SolverInterface):
@@ -184,6 +185,9 @@ class CPM_choco(SolverInterface):
             # translate objective
             if self.has_objective():
                 self.objective_value_ = sol.get_int_val(self.solver_var(self.obj))
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         return has_sol
 
@@ -220,6 +224,11 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        # if no solutions, clear values of variables
+        if len(sols) == 0:
+            for var in self.user_vars:
+                var._value = None
 
         # display if needed
         if display is not None:
@@ -340,7 +349,8 @@ class CPM_choco(SolverInterface):
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-                     
+
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
