@@ -166,26 +166,21 @@ class Expression(object):
         if hasattr(self, '_has_subexpr'):
             return self._has_subexpr
 
-        # Initialize stack with args
-        stack = list(self.args)
-
-        while stack:
-            el = stack.pop()
-            if isinstance(el, Expression):
-                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                    self._has_subexpr = True
+        # recursive variant
+        def rec_subexpr(lst):
+            for el in lst:
+                if is_any_list(el) and rec_subexpr(el):
                     return True
-                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                    self._has_subexpr = True
-                    return True
-            elif is_any_list(el):
-                # Add list elements to stack for processing
-                stack.extend(el)
+                if isinstance(el, Expression):
+                    if isinstance(el, (cp.variables._NumVarImpl, BoolVal)) or \
+                       isinstance(el, cp.variables.NDVarArray) and not el.has_subexpr():
+                        pass  # check the rest
+                    else:
+                        return True
+            return False
 
-        # No subexpressions found
-        self._has_subexpr = False
-        return False
+        self._has_subexpr = rec_subexpr(self.args)
+        return self._has_subexpr
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
