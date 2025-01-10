@@ -75,20 +75,20 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def installed():
-        try: 
+        try:
             import gurobipy as gp
             return True
-        except ModuleNotFoundError:
+            except ModuleNotFoundError:
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def license_ok():
         if not CPM_gurobi.installed():
             warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
             return False
-        try: 
+        try:
             import gurobipy as gp
             global GRB_ENV
             if GRB_ENV is None:
@@ -398,7 +398,6 @@ class CPM_gurobi(SolverInterface):
                         self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                         self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
