@@ -127,7 +127,7 @@ def comp_constraints(solver):
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
     """
-    for comp_name in Comparison.allowed:
+    for comp_name in sorted(Comparison.allowed):
 
         for numexpr in numexprs(solver):
             # numeric vs bool/num var/val (incl global func)
