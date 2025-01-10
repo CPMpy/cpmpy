@@ -78,7 +78,7 @@ class CPM_gurobi(SolverInterface):
         try:
             import gurobipy as gp
             return True
-            except ModuleNotFoundError:
+        except ModuleNotFoundError:
             return False
         except Exception as e:
             raise e
