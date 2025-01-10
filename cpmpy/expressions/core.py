@@ -169,15 +169,16 @@ class Expression(object):
         # recursive variant
         def rec_subexpr(lst):
             for el in lst:
-                if isinstance(el, (cp.variables._NumVarImpl, BoolVal)) or \
-                   isinstance(el, cp.variables.NDVarArray) and not el.has_subexpr() or \
-                   is_any_list(el) and not rec_subexpr(el):
-                    pass # check the rest
-                else:
-                    return True
+                if isinstance(el, Expression):
+                    if isinstance(el, (cp.variables._NumVarImpl, BoolVal)) or \
+                       isinstance(el, cp.variables.NDVarArray) and not el.has_subexpr() or \
+                       is_any_list(el) and not rec_subexpr(el):
+                        pass # check the rest
+                    else:
+                        return True
             return False
-        self._has_subexpr = rec_subexpr(self.args)
 
+        self._has_subexpr = rec_subexpr(self.args)
         return self._has_subexpr
 
     def is_bool(self):
