@@ -27,5 +27,5 @@ jobs:
           pip install minizinc
       - name: Test with pytest
         run: |
-          python -m pytest -n auto tests/
+          python -m pytest -n 4 tests/
 
