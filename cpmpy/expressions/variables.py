@@ -61,6 +61,7 @@ import warnings # for deprecation warning
 from functools import reduce
 
 import numpy as np
+import cpmpy as cp  # to avoid circular import
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
@@ -134,7 +135,9 @@ def boolvar(shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 
 def IntVar(lb, ub, shape=1, name=None):
@@ -200,8 +203,9 @@ def intvar(lb, ub, shape=1, name=None):
     # create np.array 'data' representation of the decision variables
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
-    return NDVarArray(shape, dtype=object, buffer=data)
-
+    r = NDVarArray(shape, dtype=object, buffer=data)
+    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    return r
 
 def cparray(arr):
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
@@ -233,7 +237,8 @@ def cpm_array(arr):
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
-    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr)
+    order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
+    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 
 
 class NullShapeError(Exception):
@@ -262,6 +267,12 @@ class _NumVarImpl(Expression):
         self.ub = ub
         self.name = name
         self._value = None
+
+    def has_subexpr(self):
+        """Does it contains nested Expressions?
+           Is of importance when deciding whether transformation/decomposition is needed.
+        """
+        return False
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -396,12 +407,24 @@ class NDVarArray(np.ndarray, Expression):
     Do not create this object directly, use one of the functions in this module
     """
     def __init__(self, shape, **kwargs):
+        # bit ugly, but np.int and np.bool do not play well with > overloading
+        if np.issubdtype(self.dtype, np.integer):
+            self.astype(int)
+        elif np.issubdtype(self.dtype, np.bool_):
+            self.astype(bool)
+
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
         Expression.__init__(self, "NDVarArray", self)
         # no need to call ndarray __init__ method as specified in the np.ndarray documentation:
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
+
+    @property
+    def args(self):
+        """ The constructor for NDVarArray never gets called, so _args is never initialised
+        """
+        return self # we can just return self
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -426,41 +449,46 @@ class NDVarArray(np.ndarray, Expression):
             the constructor, so the Expression does not have 'args'
             set..
         """
-        if not hasattr(self, "args"):
+        if not hasattr(self, "_args"):
             self.name = "NDVarArray"
-            self.args = self
+            self.update_args(self)
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return Element(self, index)
+            return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
+
+            if len(index) != self.ndim:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+
             # find dimension of expression in index
-            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
-            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
-            index = index[expr_dim:]
+            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
+            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
+                # TODO can we do the same for more than one Expression? Not sure...
+                index  = list(index)
+                index += [index.pop(expr_dim[0])]
+
+                arr = np.moveaxis(self, expr_dim[0], -1)
+                return cp.Element(arr[index[:-1]], index[-1])
+
+
+            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
+            index = index[expr_dim[0]:]
 
             # calculate index for flat array
             flat_index = index[-1]
             for dim, idx in enumerate(index[:-1]):
                 flat_index += idx * math.prod(arr.shape[dim+1:])
             # using index expression as single var for flat array
-            return Element(arr.flatten(), flat_index)
+            return cp.Element(arr.flatten(), flat_index)
 
-        ret = super().__getitem__(index)
-        # this is a bit ugly,
-        # but np.int and np.bool do not play well with > overloading
-        if isinstance(ret, np.integer):
-            return int(ret)
-        elif isinstance(ret, np.bool_):
-            return bool(ret)
-        return ret
+        return super().__getitem__(index)
 
     """
     make the given array the first dimension in the returned array
@@ -491,15 +519,14 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.sum(NDVarArray) as people might use it
         """
-        from .python_builtins import sum as cpm_sum
 
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the sum over the whole array
-            return cpm_sum(self)
+            return cp.sum(self)
 
-        return cpm_array(np.apply_along_axis(cpm_sum, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.sum, axis=axis, arr=self))
 
 
     def prod(self, axis=None, out=None):
@@ -520,34 +547,30 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .python_builtins import max as cpm_max
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the maximum over the whole array
-            return cpm_max(self)
+            return cp.max(self)
 
-        return cpm_array(np.apply_along_axis(cpm_max, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.max, axis=axis, arr=self))
 
     def min(self, axis=None, out=None):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .python_builtins import min as cpm_min
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the minimum over the whole array
-            return cpm_min(self)
+            return cp.min(self)
 
-        return cpm_array(np.apply_along_axis(cpm_min, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.min, axis=axis, arr=self))
 
     def any(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
-        from .python_builtins import any as cpm_any
-
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
@@ -555,18 +578,15 @@ class NDVarArray(np.ndarray, Expression):
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want a disjunction over the whole array
-            return cpm_any(self)
+            return cp.any(self)
 
-        return cpm_array(np.apply_along_axis(cpm_any, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.any, axis=axis, arr=self))
 
 
     def all(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
-
-        from .python_builtins import all as cpm_all
-
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
@@ -574,9 +594,9 @@ class NDVarArray(np.ndarray, Expression):
             raise NotImplementedError()
 
         if axis is None:  # simple case where we want a conjunction over the whole array
-            return cpm_all(self)
+            return cp.all(self)
 
-        return cpm_array(np.apply_along_axis(cpm_all, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
     def get_bounds(self):
         lbs, ubs = zip(*[get_bounds(e) for e in self])

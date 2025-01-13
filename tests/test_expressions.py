@@ -497,6 +497,10 @@ class TestBounds(unittest.TestCase):
         self.assertListEqual([1,[3,5],[6]], ubs)
 
 
+    def test_array(self):
+        m = intvar(-3,3, shape = (3,2), name= [['a','b'],['c','d'],['e','f']])
+        self.assertEqual(str(cpm_array(m)), '[[a b]\n [c d]\n [e f]]')
+        self.assertEqual(str(cpm_array(m.T)), '[[a c e]\n [b d f]]')
 
     def test_not_operator(self):
         p = boolvar()
@@ -554,7 +558,6 @@ class TestBounds(unittest.TestCase):
         x = cp.intvar(1,10,shape=(3,3), name="x")
         self.assertTrue(cp.Model(cp.sum(x) >= 10).solve())
         self.assertIsNotNone(x.value())
-        print(x.value())
         # test all types of expressions
         self.assertEqual(int, type(x[0,0].value())) # just the var
         for v in x[0]:
@@ -562,6 +565,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type(cp.sum(x[0]).value()))
         self.assertEqual(int, type(cp.sum(x).value()))
         self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
+        self.assertEqual(float, type(cp.sum([0.1,0.2,0.3] * x[0]).value()))
         self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
         a,b = x[0,[0,1]]
         self.assertEqual(int, type((-a).value()))

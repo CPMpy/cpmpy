@@ -36,10 +36,12 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.normalize import toplevel_list
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_z3(SolverInterface):
@@ -82,7 +84,10 @@ class CPM_z3(SolverInterface):
         import z3
 
         if subsolver is None:
-            subsolver = "sat"
+            if cpm_model and cpm_model.has_objective():
+                subsolver = "opt"
+            else:
+                subsolver = "sat"
         assert "sat" in subsolver or "opt" in subsolver, "Z3 only has a satisfaction or optimization sub-solver."
 
         # initialise the native solver object
@@ -190,9 +195,9 @@ class CPM_z3(SolverInterface):
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
 
-        else:
+        else:  # clear values of variables
             for cpm_var in self.user_vars:
-                cpm_var._value = None # XXX, maybe all solvers should do this...
+                cpm_var._value = None
 
         return has_sol
 
@@ -247,6 +252,12 @@ class CPM_z3(SolverInterface):
         # objective can be a nested expression for z3
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
+
+        if isinstance(expr, GlobalFunction): # not supported by Z3
+            obj_var = intvar(*expr.get_bounds())
+            self += expr == obj_var
+            expr = obj_var
+
         obj = self._z3_expr(expr)
         if minimize:
             self.z3_solver.minimize(obj)
@@ -270,6 +281,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
         supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
@@ -302,7 +314,7 @@ class CPM_z3(SolverInterface):
 
         return self
 
-    def _z3_expr(self, cpm_con, reify=False):
+    def _z3_expr(self, cpm_con):
         """
             Z3 supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -339,7 +351,7 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'or':
                 return z3.Or(self._z3_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                return z3.Implies(*self._z3_expr(cpm_con.args, reify=True))
+                return z3.Implies(*self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'not':
                 return z3.Not(self._z3_expr(cpm_con.args[0]))
 
@@ -354,22 +366,28 @@ class CPM_z3(SolverInterface):
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
             elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
-                lhs, rhs = self._z3_expr(cpm_con.args)
-                if isinstance(lhs, z3.BoolRef):
-                    lhs = z3.If(lhs, 1, 0)
-                if isinstance(rhs, z3.BoolRef):
-                    rhs = z3.If(rhs, 1, 0)
+                x, y = self._z3_expr(cpm_con.args)
+                if isinstance(x, z3.BoolRef):
+                    x = z3.If(x, 1, 0)
+                if isinstance(y, z3.BoolRef):
+                    y = z3.If(y, 1, 0)
 
                 if cpm_con.name == 'sub':
-                    return lhs - rhs
+                    return x - y
                 elif cpm_con.name == "mul":
-                    return lhs * rhs
+                    return x * y
                 elif cpm_con.name == "div":
-                    return lhs / rhs
+                    return x / y
                 elif cpm_con.name == "pow":
-                    return lhs ** rhs
+                    if not is_num(cpm_con.args[1]):
+                        # tricky in Z3 not all power constraints are decidable
+                        # solver will return 'unknown', even if theory is satisfiable.
+                        # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
+                        # raise error to be consistent with other solvers
+                        raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
+                    return x ** y
                 elif cpm_con.name == "mod":
-                    return lhs % rhs
+                    return x % y
 
             # '-'/1
             elif cpm_con.name == "-":
@@ -378,7 +396,8 @@ class CPM_z3(SolverInterface):
                 return -self._z3_expr(cpm_con.args[0])
 
             else:
-                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, please report on github if you need it")
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for Z3, "
+                                          f"please report on github if you need it")
 
         # Comparisons (just translate the subexpressions and re-post)
         elif isinstance(cpm_con, Comparison):
