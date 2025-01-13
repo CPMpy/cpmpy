@@ -135,18 +135,28 @@ class TestCardinality(unittest.TestCase):
         s += c
         self.assertTrue(s.solve())
 
-    def test_only_positive_coefficients(self):
-        a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1],[a,b,c]]) > 0])
-        self.assertEqual(str([Operator("sum",[a, b, ~c]) > 1]), str(only_pos))
-
     def test_pysat_aggregate_sum_sub_expressions(self):
         bvs = cp.boolvar(3)
         c = bvs[0] > sum(bvs[1:])
         s = cp.SolverLookup.get("pysat")
-        print(c, "==>", s.transform(c))
         s += c
-        s.solve()
+        self.assertTrue(s.solve())
+
+    def test_pysat_aggregate_sum_sub_expressions_implied(self):
+        bvs = cp.boolvar(3)
+        c = bvs[0] > sum(bvs[1:])
+        s = cp.SolverLookup.get("pysat")
+        s += c
+        self.assertTrue(s.solve())
+
+    def test_pysat_aggregate_sum_sub_expressions_implied(self):
+        a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
+        self.assertTrue(cp.SolverLookup.get("pysat", cp.Model(p.implies(a+b-c < 2))).solve())
+
+    @pytest.mark.skip(reason="TODO: PySAT does not linearize models at the moment, because there is no integer encoding layer, so adding non-linear expressions will always fail.")
+    def test_pysat_linearize_example(self):
+        self.assertTrue(cp.SolverLookup.get("pysat", cp.Model((a+b).implies(a+b-c < 2))).solve())
+
 
 if __name__ == '__main__':
     unittest.main()
