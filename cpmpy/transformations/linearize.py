@@ -271,7 +271,7 @@ def only_positive_bv(lst_of_expr):
             newlist += linearize_constraint(new_cons)
 
         # reification
-        elif cpm_expr.name == "->":
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
                                                    f"`linearize_constraint` before calling `only_positive_bv` "
@@ -379,7 +379,6 @@ def only_positive_coefficients(lst_of_expr):
     for cpm_expr in lst_of_expr:
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            new_cons = []
 
             #    ... -c*b + ... <= k
             # :: ... -c*(1 - ~b) + ... <= k
@@ -398,16 +397,14 @@ def only_positive_coefficients(lst_of_expr):
                     lhs = Operator("wsum", [list(nw), list(na)])
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-            newlist += new_cons
 
         # reification
-        elif cpm_expr.name == "->":
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
-                                                   f"`linearize_constraint` before calling `only_positive_bv` "
-            if isinstance(cond, _BoolVarImpl): # BV -> Expr
-                subexpr = only_positive_coefficients([subexpr])
-                newlist += [cond.implies(expr) for expr in subexpr]
+                                                   f"`linearize_constraint` before calling `only_positive_coefficients` "
+            subexpr = only_positive_coefficients([subexpr])
+            newlist += [cond.implies(expr) for expr in subexpr]
 
         else:
             newlist.append(cpm_expr)
