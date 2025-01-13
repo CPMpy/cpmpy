@@ -129,7 +129,7 @@ class CPM_choco(SolverInterface):
         """
         return self.chc_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, display=None, **kwargs):
         """
             Call the Choco solver
 
@@ -148,6 +148,9 @@ class CPM_choco(SolverInterface):
 
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
+
+        if display is not None:
+            raise NotImplementedError("Choco does not support solution callbacks, (TODO?)")
 
         if self.has_objective():
             sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
