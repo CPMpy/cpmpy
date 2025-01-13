@@ -66,8 +66,10 @@ class CPM_z3(SolverInterface):
         try:
             import z3
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver="sat"):
@@ -79,7 +81,7 @@ class CPM_z3(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_z3: Install the python package 'z3-solver'")
+            raise Exception("CPM_z3: Install the python package 'z3-solver' to use this solver interface.")
 
         import z3
 
