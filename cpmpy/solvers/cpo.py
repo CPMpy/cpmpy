@@ -1,7 +1,11 @@
+import docplex.cp.parameters
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from .. import DirectConstraint
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -14,8 +18,8 @@ from ..transformations.reification import reify_rewrite, only_bv_reifies
 
     <some information on the solver>
 
-    Documentation of the solver's own Python API:
-    <URL to docs or source code>
+    Documentation of the solver's own Python API: (all modeling functions)
+    https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     ===============
     List of classes
@@ -27,7 +31,7 @@ from ..transformations.reification import reify_rewrite, only_bv_reifies
         CPM_template
 """
 
-class CPM_cpoptimizer(SolverInterface):
+class CPM_cpo(SolverInterface):
     """
     Interface to TEMPLATE's API
 
@@ -60,7 +64,7 @@ class CPM_cpoptimizer(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_CPOptimizer: Install the python package 'docplex'")
+            raise Exception("CPM_cpo: Install the python package 'docplex'")
 
         import docplex.cp.model
         assert subsolver is None
@@ -73,7 +77,7 @@ class CPM_cpoptimizer(SolverInterface):
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
         #           internally, the constructor relies on __add__ which uses the above solver native object(s)
-        super().__init__(name="cpoptimizer", cpm_model=cpm_model)
+        super().__init__(name="cpo", cpm_model=cpm_model)
 
 
     def solve(self, time_limit=None, **kwargs):
@@ -91,10 +95,10 @@ class CPM_cpoptimizer(SolverInterface):
         """
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        # self.solver_vars(list(self.user_vars)) don't think this is needed for cpo
 
         if time_limit is not None:
-            self.TPL_solver.set_timelimit_seconds(time_limit)
+            self.cpo_model.set_parameters(docplex.cp.parameters.CpoParameters(TimeLimit=time_limit))
 
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
@@ -111,18 +115,18 @@ class CPM_cpoptimizer(SolverInterface):
         self.cpm_status.runtime = self.cpo_result.get_solve_time() # wallclock time in (float) seconds
 
         # translate solver exit status to CPMpy exit status
-        if self.cpo_status is "Feasible":
+        if self.cpo_status == "Feasible":
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif self.cpo_status is "Infeasible":
+        elif self.cpo_status == "Infeasible":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif self.cpo_status is "Unknown":
+        elif self.cpo_status == "Unknown":
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        elif self.cpo_status is "Optimal":
+        elif self.cpo_status == "Optimal":
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-        elif self.cpo_status is "JobFailed":
+        elif self.cpo_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
-        elif self.cpo_status is "JobAborted":
+        elif self.cpo_status == "JobAborted":
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
         else:  # another?
             raise NotImplementedError(self.cpo_status)  # a new status type was introduced, please report on GitHub
@@ -135,7 +139,13 @@ class CPM_cpoptimizer(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
-                cpm_var._value = self.cpo_result.get_solution.get_var_solution(sol_var)
+                if isinstance(cpm_var,_BoolVarImpl):
+                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
+                    # and then replace a boolvar by x == 1
+                    sol_var = sol_var.children[0]
+                    cpm_var._value = bool(self.cpo_result.get_var_solution(sol_var).get_value())
+                else:
+                    cpm_var._value = self.cpo_result.get_var_solution(sol_var).get_value()
 
             # translate objective, for optimisation problems only
             if self.has_objective():
@@ -156,20 +166,19 @@ class CPM_cpoptimizer(SolverInterface):
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
-        # [GUIDELINE] some solver interfaces explicitely create variables on a solver object
-        #       then use self.TPL_solver.NewBoolVar(...) instead of TEMPLATEpy.NewBoolVar(...)
-
         # special case, negative-bool-view
         # work directly on var inside the view
         if isinstance(cpm_var, NegBoolView):
-            return ~(self.solver_var(cpm_var._bv))
+            return (self.solver_var(cpm_var._bv) == 0)
 
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = docplex.cp.expression.binary_var(str(cpm_var))
+                # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
+                # we should add == 1 to turn it into a boolean expression
+                revar = docplex.cp.expression.binary_var(str(cpm_var)) == 1
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = docplex.cp.expression.binary_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
+                revar = docplex.cp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -257,17 +266,21 @@ class CPM_cpoptimizer(SolverInterface):
         :return: list of Expression
         """
         # apply transformations
-        # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent"})
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        # count is only supported with a constant to be counted, so we decompose
+        supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
+                     "negative_table", "gcc" }
+        supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain',
+                     "negative_table" }
+        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
+        '''cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !='''
         # ...
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def __add__(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -287,83 +300,132 @@ class CPM_cpoptimizer(SolverInterface):
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
-        # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-
-            if isinstance(cpm_expr, _BoolVarImpl):
-                # base case, just var or ~var
-                self.TPL_solver.add_clause([ self.solver_var(cpm_expr) ])
-
-            elif isinstance(cpm_expr, Operator):
-                if cpm_expr.name == "or":
-                    self.TPL_solver.add_clause(self.solver_vars(cpm_expr.args))
-                elif cpm_expr.name == "->": # half-reification
-                    bv, subexpr = cpm_expr.args
-                    # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
-                    if isinstance(subexpr, Comparison):
-                        lhs, rhs = subexpr.args
-                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                            TPL_lhs = self._make_numexpr(lhs)
-                            self.TPL_solver.add_half_reified_comparison(self.solver_var(bv),
-                                                                        TPL_lhs, subexpr.name, self.solver_var(rhs))
-                        else:
-                            raise NotImplementedError("TEMPLATE: no support for half-reified comparison:", subexpr)
-                    else:
-                        raise NotImplementedError("TEMPLATE: no support for half-reified constraint:", subexpr)
-
-            elif isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-
-                # [GUIDELINE] == is used for both double reification and numerical comparisons
-                #       need case by case analysis here. Note that if your solver does not support full-reification,
-                #       you can rely on the transformation only_implies to convert all reifications to half-reification
-                #       for more information, please reach out on github!
-                if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
-                    bv, subexpr = lhs, rhs
-                    assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
-
-                    if isinstance(subexpr, Comparison):
-                        lhs, rhs = subexpr.args
-                        if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                            TPL_lhs = self._make_numexpr(lhs)
-                            self.TPL_solver.add_reified_comparison(self.solver_var(bv),
-                                                                   TPL_lhs, subexpr.name, self.solver_var(rhs))
-                        else:
-                            raise NotImplementedError("TEMPLATE: no support for reified comparison:", subexpr)
-                    else:
-                        raise NotImplementedError("TEMPLATE: no support for reified constraint:", subexpr)
-
-                # otherwise, numerical comparisons
-                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                    TPL_lhs = self._make_numexpr(lhs)
-                    self.TPL_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
-                # global functions
-                elif cpm_expr.name == "==":
-                    TPL_rhs = self.solver_var(rhs)
-                    if lhs.name == "max":
-                        self.TPL_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
-                    elif lhs.name == "element":
-                        TPL_arr, TPL_idx = self.solver_vars(lhs.args)
-                        self.TPL_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
-                    # elif...
-                    else:
-                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", cpm_expr)
-                else:
-                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", cpm_expr)
-
-            # global constraints
-            elif cpm_expr.name == "alldifferent":
-                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
-            else:
-                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
+        for cpm_con in self.transform(cpm_expr):
+            # translate each expression tree, then post straight away
+            cpo_con = self._cpo_expr(cpm_con)
+            self.cpo_model.add(cpo_con)
 
         return self
 
-    # Other functions from SolverInterface that you can overwrite:
-    # solveAll, solution_hint, get_core
+    def _cpo_expr(self, cpm_con):
+        """
+            CP Optimizer supports nested expressions,
+            so we recursively translate our expressions to theirs.
 
+            Accepts single constraints or a list thereof, return type changes accordingly.
+
+        """
+        if is_any_list(cpm_con):
+            # arguments can be lists
+            return [self._cpo_expr(con) for con in cpm_con]
+
+        elif isinstance(cpm_con, BoolVal):
+            return cpm_con.args[0]
+
+        elif is_num(cpm_con):
+            return cpm_con
+
+        elif isinstance(cpm_con, _NumVarImpl):
+            return self.solver_var(cpm_con)
+
+        # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
+        elif isinstance(cpm_con, Operator):
+            arity, _ = Operator.allowed[cpm_con.name]
+            # 'and'/n, 'or'/n, '->'/2
+            if cpm_con.name == 'and':
+                return docplex.cp.modeler.logical_and(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == 'or':
+                return docplex.cp.modeler.logical_or(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == '->':
+                return docplex.cp.modeler.if_then(*self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == 'not':
+                return docplex.cp.modeler.logical_not(self._cpo_expr(cpm_con.args[0]))
+
+            # 'sum'/n, 'wsum'/2
+            elif cpm_con.name == 'sum':
+                return docplex.cp.modeler.sum(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == 'wsum':
+                w = cpm_con.args[0]
+                x = self._cpo_expr(cpm_con.args[1])
+                return docplex.cp.modeler.scal_prod(w,x)
+
+            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
+            elif arity == 2 or cpm_con.name == "mul":
+                assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
+                x, y = self._cpo_expr(cpm_con.args)
+                if cpm_con.name == 'sub':
+                    return x - y
+                elif cpm_con.name == "mul":
+                    return x * y
+                elif cpm_con.name == "div":
+                    return x // y
+                elif cpm_con.name == "pow":
+                    '''if not is_num(cpm_con.args[1]): # TODO is this supported with exponent expression?
+                        raise NotSupportedError(f"CPO only supports power constraint with constant exponent, got {cpm_con}")'''
+                    return x ** y
+                elif cpm_con.name == "mod":
+                    return x % y
+            # '-'/1
+            elif cpm_con.name == "-":
+                return -self._cpo_expr(cpm_con.args[0])
+
+            else:
+                raise NotImplementedError(f"Operator {cpm_con} not (yet) implemented for CP Optimizer, "
+                                          f"please report on github if you need it")
+
+        # Comparisons (just translate the subexpressions and re-post)
+        elif isinstance(cpm_con, Comparison):
+            lhs, rhs = self._cpo_expr(cpm_con.args)
+
+            # post the comparison
+            return eval_comparison(cpm_con.name, lhs, rhs)
+        # rest: base (Boolean) global constraints
+        elif isinstance(cpm_con, GlobalConstraint):
+            # TODO:
+            # table
+
+            if cpm_con.name == 'alldifferent':
+                return docplex.cp.modeler.all_diff(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "gcc":
+                vars, vals, occ = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.distribute(occ, vars, vals)
+            elif cpm_con.name == "inverse":
+                x, y = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.inverse(x, y)
+            elif cpm_con.name == "table":
+                arr, table = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.allowed_assignments(arr, table)
+            elif cpm_con.name == "indomain":
+                expr, arr = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.allowed_assignments(expr, arr)
+            elif cpm_con.name == "negative_table":
+                arr, table = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.forbidden_assignments(arr, table)
+            # a direct constraint, make with cpo (will be posted to it by calling function)
+            elif isinstance(cpm_con, DirectConstraint):
+                return cpm_con.callSolver(self, self.cpo_model)
+
+            else:
+                try:
+                    cpo_global = getattr(docplex.cp.modeler, cpm_con.name)
+                    return cpo_global(self._cpo_expr(cpm_con.args))  # works if our naming is the same
+                except AttributeError:
+                    raise ValueError(f"Global constraint {cpm_con} not known in CP Optimizer, please report on github.")
+
+        elif isinstance(cpm_con, GlobalFunction):
+            if cpm_con.name == "element":
+                return docplex.cp.modeler.element(*self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "count":
+                arr, val = self._cpo_expr(cpm_con.args)
+                return docplex.cp.modeler.count(arr, val)
+            elif cpm_con.name == "nvalue":
+                return docplex.cp.modeler.count_different(self._cpo_expr(cpm_con.args))
+
+
+
+        raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
