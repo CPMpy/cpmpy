@@ -195,9 +195,9 @@ class CPM_exact(SolverInterface):
                 _cpm_vars = None
 
             start = time.time()
-            xct_status = self.xct_solver.runOnce(time_limit if time_limit is not None else 0)
-            while xct_status != "INCONSISTENT":
-                time_left = time_limit - (time.time() - start) if time_limit is not None else 0
+            time_left = time_limit if time_limit is not None else 0
+            xct_status = self.xct_solver.runOnce(timeout=time_left)
+            while xct_status != "INCONSISTENT" and time_left >= 0:
                 self.xct_solver.boundObjByLastSol()  # ensure next one is improving
                 self._fillVars(_cpm_vars)
                 if isinstance(display, Expression):
@@ -207,6 +207,7 @@ class CPM_exact(SolverInterface):
                 else:  # function
                     display()
                 # next solve call
+                time_left = time_limit - (time.time() - start) if time_limit is not None else 0
                 xct_status = self.xct_solver.runOnce(timeout=time_left)
             end = time.time()
 
