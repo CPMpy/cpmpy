@@ -84,7 +84,7 @@ class CPM_choco(SolverInterface):
             return False
         except VersionConflict: # unsupported version of pychoco
             warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
-                          f"but you have version {pkg_resources.get_distribution('exact').version}.")
+                          f"but you have version {pkg_resources.get_distribution('pychoco').version}.")
             return False
         except Exception as e:
             raise e
