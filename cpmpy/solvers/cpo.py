@@ -5,7 +5,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, argval, argvals
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -168,31 +168,44 @@ class CPM_cpo(SolverInterface):
             Returns: number of solutions found
         """
 
-        # check if objective function
-        if self.has_objective():
-            raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
-
-        # A. Example code if solver supports callbacks
-        if is_any_list(display):
-            callback = lambda: print([var.value() for var in display])
-        else:
-            callback = display
-
-        self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, **kwargs)
-        #self.cpo_model.start_search(params=[docplex.cp.parameters.CpoParameters(TimeLimit=time_limit)], **kwargs)
-        # clear user vars if no solution found
-        if self.TPL_solver.SolutionCount() == 0:
-            for var in self.user_vars:
-                var.clear()
-        return self.TPL_solver.SolutionCount()
-
-        # clear user vars if no solution found
-        if solution_count == 0:
-            for var in self.user_vars:
-                var.clear()
-
+        #cpo_solver = self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, LogVerbosity='Quiet', **kwargs)
+        solution_count = 0
+        if solution_limit is None:
+            solution_limit = 99999
+        while solution_count < solution_limit:
+            cpo_result = self.solve(time_limit=time_limit, **kwargs)
+            if not cpo_result:
+                break
+            solution_count += 1
+            '''if cpo_result.is_solution_optimal():
+                print('optimal')
+            if not cpo_result.is_new_solution():
+                break
+            solution_count += 1'''
+            if self.has_objective():
+                # only find all optimal solutions
+                self.cpo_model.add(self.cpo_model.get_objective_expression().children[0] == self.objective_value_)
+            solvars = []
+            vals = []
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                cpm_value = cpm_var._value
+                if isinstance(cpm_var, _BoolVarImpl):
+                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
+                    # and then replace a boolvar by x == 1
+                    sol_var = sol_var.children[0]
+                    cpm_value = int(cpm_value)
+                solvars.append(sol_var)
+                vals.append(cpm_value)
+            self.cpo_model.add(docplex.cp.modeler.forbidden_assignments(solvars, [vals]))
+            if display is not None:
+                if isinstance(display, Expression):
+                    print(argval(display))
+                elif isinstance(display, list):
+                    print(argvals(display))
+                else:
+                    display()  # callback
         return solution_count
-
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
