@@ -37,7 +37,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar _DirectVarImpl
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar,_DirectVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
