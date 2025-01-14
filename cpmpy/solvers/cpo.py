@@ -94,18 +94,12 @@ class CPM_cpo(SolverInterface):
             # [GUIDELINE] Add link to documentation of all solver parameters
         """
 
-        # ensure all vars are known to solver
-        # self.solver_vars(list(self.user_vars)) don't think this is needed for cpo
-
-        if time_limit is not None:
-            self.cpo_model.set_parameters(docplex.cp.parameters.CpoParameters(TimeLimit=time_limit))
-
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
         #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
 
         # call the solver, with parameters
-        self.cpo_result = self.cpo_model.solve(**kwargs)
+        self.cpo_result = self.cpo_model.solve(LogVerbosity='Quiet', TimeLimit=time_limit, **kwargs)
         # [GUIDELINE] consider saving the status as self.TPL_status so that advanced CPMpy users can access the status object.
         #       This is mainly useful when more elaborate information about the solve-call is saved into the status
 
@@ -157,6 +151,47 @@ class CPM_cpo(SolverInterface):
 
         return has_sol
 
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+        """
+            A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
+
+            If the problem is an optimization problem, returns only optimal solutions.
+
+           Arguments:
+                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                - time_limit: stop after this many seconds (default: None)
+                - solution_limit: stop after this many solutions (default: None)
+                - call_from_model: whether the method is called from a CPMpy Model instance or not
+                - any other keyword argument
+
+            Returns: number of solutions found
+        """
+
+        # check if objective function
+        if self.has_objective():
+            raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
+
+        # A. Example code if solver supports callbacks
+        if is_any_list(display):
+            callback = lambda: print([var.value() for var in display])
+        else:
+            callback = display
+
+        self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, **kwargs)
+        #self.cpo_model.start_search(params=[docplex.cp.parameters.CpoParameters(TimeLimit=time_limit)], **kwargs)
+        # clear user vars if no solution found
+        if self.TPL_solver.SolutionCount() == 0:
+            for var in self.user_vars:
+                var.clear()
+        return self.TPL_solver.SolutionCount()
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            for var in self.user_vars:
+                var.clear()
+
+        return solution_count
 
     def solver_var(self, cpm_var):
         """
@@ -197,21 +232,13 @@ class CPM_cpo(SolverInterface):
 
             are permanently posted to the solver)
         """
-        # make objective function non-nested
-        #(flat_obj, flat_cons) = flatten_objective(expr)
-        #self += flat_cons # add potentially created constraints
-        #self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
-
-        # make objective function or variable and post
-        #obj = self._make_numexpr(flat_obj)
-        # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
-        #         _make_numexpr may be removed and an objective can be posted as:
-        #           self.TPL_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
-
+        if self.has_objective():
+            self.cpo_model.remove(self.cpo_model.get_objective_expression())
+        expr = self._cpo_expr(expr)
         if minimize:
-            self.docplex.cp.modeler.minimize(expr)
+            self.cpo_model.add(docplex.cp.modeler.minimize(expr))
         else:
-            self.docplex.cp.modeler.maximize(expr)
+            self.cpo_model.add(docplex.cp.modeler.maximize(expr))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
@@ -362,8 +389,6 @@ class CPM_cpo(SolverInterface):
                 elif cpm_con.name == "div":
                     return x // y
                 elif cpm_con.name == "pow":
-                    '''if not is_num(cpm_con.args[1]): # TODO is this supported with exponent expression?
-                        raise NotSupportedError(f"CPO only supports power constraint with constant exponent, got {cpm_con}")'''
                     return x ** y
                 elif cpm_con.name == "mod":
                     return x % y
@@ -426,60 +451,3 @@ class CPM_cpo(SolverInterface):
 
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
-        """
-            A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
-
-            If the problem is an optimization problem, returns only optimal solutions.
-
-           Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
-
-            Returns: number of solutions found
-        """
-
-        # check if objective function
-        if self.has_objective():
-            raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
-
-        # A. Example code if solver supports callbacks
-        if is_any_list(display):
-            callback = lambda : print([var.value() for var in display])
-        else:
-            callback = display
-
-        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
-        # clear user vars if no solution found
-        if self.TPL_solver.SolutionCount() == 0:
-            for var in self.user_vars:
-                var.clear()
-        return self.TPL_solver.SolutionCount()
-
-        # B. Example code if solver does not support callbacks
-        self.solve(time_limit, enumerate_all_solutions=True, **kwargs)
-        solution_count = 0
-        for solution in self.TPL_solver.GetAllSolutions():
-            solution_count += 1
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                cpm_var._value = solution.value(solver_var)
-
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
-                else:
-                    display()  # callback
-
-        # clear user vars if no solution found
-        if solution_count == 0:
-            for var in self.user_vars:
-                var.clear()
-
-        return solution_count
