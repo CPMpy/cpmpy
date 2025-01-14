@@ -7,6 +7,7 @@ import numpy as np
 
 from .normalize import toplevel_list
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list, is_bool, is_boolexpr
 
@@ -28,7 +29,7 @@ def push_down_negation(lst_of_expr, toplevel=True):
             # can be a nested list with expressions?
             newlist.append(push_down_negation(expr, toplevel=toplevel))
 
-        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal)):
+        elif not isinstance(expr, Expression) or isinstance(expr, (_NumVarImpl,BoolVal, DirectConstraint)):
             # nothing to do
             newlist.append(expr)
 

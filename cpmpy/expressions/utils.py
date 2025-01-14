@@ -74,6 +74,9 @@ def is_true_cst(arg):
         return arg.value()
     return False
 
+def is_var_or_cst(arg):
+    from cpmpy.expressions.variables import _NumVarImpl, _DirectVarImpl # otherwise circular import
+    return is_num(arg) or isinstance(arg, (_NumVarImpl, _DirectVarImpl))
 
 def is_boolexpr(expr):
     """ is the argument a boolean expression or a boolean value

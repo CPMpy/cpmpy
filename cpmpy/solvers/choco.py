@@ -40,7 +40,7 @@ from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar, _DirectVarImpl
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -150,11 +150,11 @@ class CPM_choco(SolverInterface):
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
-            sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
-                                                        objective=self.solver_var(self.obj),
-                                                        **kwargs)
+            self.chc_sol = self.chc_solver.find_optimal_solution(maximize= not self.minimize_obj,
+                                                                 objective=self.solver_var(self.obj),
+                                                                 **kwargs)
         else:
-            sol = self.chc_solver.find_solution()
+            self.chc_sol = self.chc_solver.find_solution()
         end = time.time()
 
         # new status, get runtime
@@ -162,7 +162,7 @@ class CPM_choco(SolverInterface):
         self.cpm_status.runtime = end - start
 
         # translate exit status
-        if sol is not None:
+        if self.chc_sol is not None:
             if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # solved, but optimality not proven
@@ -174,14 +174,14 @@ class CPM_choco(SolverInterface):
 
 
         # True/False depending on self.chc_status
-        has_sol = sol is not None
+        has_sol = self.chc_sol is not None
 
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                value = sol.get_int_val(self.solver_var(cpm_var))
+                value = self.chc_sol.get_int_val(self.solver_var(cpm_var))
                 if isinstance(cpm_var, _BoolVarImpl):
                     cpm_var._value = bool(value)
                 else:
@@ -282,6 +282,9 @@ class CPM_choco(SolverInterface):
                     raise ChocoBoundsException(
                         "Choco does not accept variables with bounds outside of range (-2147483646..2147483646)")
                 revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
+            elif isinstance(cpm_var, _DirectVarImpl):
+                revar = cpm_var.callSolver(self, self.chc_model)
+
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar

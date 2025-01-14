@@ -6,8 +6,8 @@
 """
     Interface to Exact
 
-    Exact solves decision and optimization problems formulated as integer linear programs. 
-    Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
+    Exact solves decision and optimization problems formulated as integer linear programs.
+    Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient
     propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.
 
     The solver's git repository:
@@ -34,7 +34,7 @@ from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, _DirectVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -315,6 +315,8 @@ class CPM_exact(SolverInterface):
             else:
                 encoding = self.encoding # can also force it
             self.xct_solver.addVariable(revar, lb, ub, encoding)
+        elif isinstance(cpm_var, _DirectVarImpl):
+            revar = cpm_var.callSolver(self, self.xct_solver)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
         self._varmap[cpm_var] = revar

@@ -925,6 +925,15 @@ class DirectConstraint(Expression):
         """
         if not isinstance(arguments, tuple):
             arguments = (arguments,)  # force tuple
+
+        def valid_arg(expr):
+            if is_any_list(expr):
+                return all(valid_arg(e) for e in expr)
+            return is_var_or_cst(expr)
+
+        if not valid_arg(arguments):
+            raise TypeError(f"DirectConstraint only accepts (collections of) variables or constants, but got {arguments}")
+
         super().__init__(name, arguments)
         self.novar = novar
 

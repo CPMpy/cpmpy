@@ -39,7 +39,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import boolvar, _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, _DirectVarImpl
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -273,6 +273,8 @@ class CPM_ortools(SolverInterface):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+            elif isinstance(cpm_var, _DirectVarImpl):
+                revar = cpm_var.callSolver(self, self.ort_model)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -556,6 +558,12 @@ class CPM_ortools(SolverInterface):
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
             return cpm_expr.callSolver(self, self.ort_model)
+
+        # a direct variable, activate
+        elif isinstance(cpm_expr, _DirectVarImpl):
+            # some variables are also constraints so it should be possible to add them,
+            # even if not used in a traditional constraint
+            return self.solver_var(cpm_expr)
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github

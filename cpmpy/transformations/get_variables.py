@@ -8,7 +8,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
+from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray, _DirectVarImpl
 from ..expressions.utils import is_any_list
 
 def get_variables_model(model):
@@ -29,9 +29,9 @@ def get_variables_model(model):
 def vars_expr(expr):
     warnings.warn("Deprecated, use get_variables() instead, will be removed in stable version", DeprecationWarning)
     return get_variables(expr)
-def get_variables(expr, collect=None):
+def get_variables(expr, collect=None, return_direct=False):
     """
-        Get variables of an expression
+        Get variables of an expression, does not include direct variables
 
         - expr: Expression or list of expressions
         - collect: optional set, variables will be added to this set of given
@@ -52,6 +52,14 @@ def get_variables(expr, collect=None):
                     extract(e.args[1], append)  # skip data in arg0
                 elif e.name == "table":
                     extract(e.args[0], append)  # skip data in arg1
+                elif isinstance(e, _DirectVarImpl):
+                    # custom variables, skip novar arguments
+                    if return_direct:
+                        append(e)
+                    if e.novar is None:
+                        extract(e.args, append)
+                    else:
+                        extract([a for i,a in enumerate(e.args) if i not in e.novar], append)
                 else:
                     extract(e.args, append)
             elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
