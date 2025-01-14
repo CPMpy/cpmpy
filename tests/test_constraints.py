@@ -126,21 +126,27 @@ def comp_constraints(solver):
         - Numeric disequality: Numexpr != Var              (CPMpy class 'Comparison')
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
+                                          Var >=< NumExpr  (CPMpy class 'Comparison')
     """
     for comp_name in sorted(Comparison.allowed):
 
         for numexpr in numexprs(solver):
             # numeric vs bool/num var/val (incl global func)
-            lb, ub = get_bounds(numexpr)
             for rhs in [NUM_VAR, BOOL_VAR, BoolVal(True), 1]:
                 if solver in SAT_SOLVERS and not is_num(rhs):
                     continue
-                if comp_name == ">" and ub <= get_bounds(rhs)[1]:
-                    continue
-                if comp_name == "<" and lb >= get_bounds(rhs)[0]:
-                    continue
-                yield Comparison(comp_name, numexpr, rhs)
-
+                for x,y in [(numexpr,rhs), (rhs,numexpr)]:
+                    # check if the constraint we are trying to construct is always UNSAT
+                    impossible = True
+                    for xb in get_bounds(x):
+                        for yb in get_bounds(y):
+                            if eval_comparison(comp_name,xb,yb):
+                                impossible = False
+                                break
+                        else:
+                            break
+                    if impossible is False:
+                        yield Comparison(comp_name, x,y)
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
@@ -271,7 +277,7 @@ def verify(cons):
 
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
-def test_bool_constaints(solver, constraint):
+def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """
