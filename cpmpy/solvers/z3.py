@@ -37,9 +37,10 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar,_DirectVarImpl
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar, _DirectVarImpl
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison, argvals
 from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 
@@ -97,7 +98,7 @@ class CPM_z3(SolverInterface):
             self.z3_solver = z3.Solver()
         if "opt" in subsolver:
             self.z3_solver = z3.Optimize()
-
+            self.objective_is_min_ = True
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
 
@@ -109,12 +110,16 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit=None, assumptions=[], **kwargs):
+    def solve(self, time_limit=None, display=None, assumptions=[], **kwargs):
         """
             Call the z3 solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - display:     generic solution callback for use during optimization.
+                            either a list of CPMpy expressions, OR a callback function which
+                            gets called after the variable-value mapping of the intermediate solution.
+                            default/None: nothing is displayed
             - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
@@ -145,6 +150,25 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
+        if display is not None and self.has_objective():
+            _cpm_vars = get_variables(display) if isinstance(display, Expression) or is_any_list(display) else list(self.user_vars)
+            _z3_vars = self.solver_vars(_cpm_vars)
+
+            def callback(sol):
+                # first update values of current solution
+                for cpm_var, sol_var in zip(_cpm_vars, _z3_vars):
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        cpm_var._value = bool(sol[sol_var])
+                    elif isinstance(cpm_var, _NumVarImpl):
+                        cpm_var._value = sol[sol_var].as_long()
+                if isinstance(display, Expression):
+                    print(display.value())
+                elif is_any_list(display):
+                    print(argvals(display))
+                else:
+                    display()
+
+            self.z3_solver.set_on_model(callback)
 
         z3_assum_vars = self.solver_vars(assumptions)
         self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
@@ -196,6 +220,8 @@ class CPM_z3(SolverInterface):
             if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
                 self.objective_value_ = sol.evaluate(obj).as_long()
+                if not self.objective_is_min_:
+                    self.objective_value_ = -self.objective_value_
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -263,6 +289,7 @@ class CPM_z3(SolverInterface):
             expr = obj_var
 
         obj = self._z3_expr(expr)
+        self.objective_is_min_ = minimize
         if minimize:
             self.z3_solver.minimize(obj)
         else:
