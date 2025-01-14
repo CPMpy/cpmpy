@@ -123,7 +123,7 @@ import copy
 import cpmpy as cp
 
 from .core import BoolVal
-from .utils import all_pairs
+from .utils import all_pairs, is_var_or_cst
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 

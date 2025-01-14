@@ -25,6 +25,7 @@ NUM_GLOBAL = {
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
 
+
 # Solvers not supporting arithmetic constraints
 SAT_SOLVERS = {"pysat", "pysdd"}
 
