@@ -269,9 +269,9 @@ class CPM_cpo(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc" }
-        supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table" }
+                     "negative_table", "gcc", 'max', 'min', 'abs'}
+        supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain', 'max', 'min',
+                     "negative_table", 'abs'}
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
         '''cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -383,9 +383,6 @@ class CPM_cpo(SolverInterface):
             return eval_comparison(cpm_con.name, lhs, rhs)
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
-            # TODO:
-            # table
-
             if cpm_con.name == 'alldifferent':
                 return docplex.cp.modeler.all_diff(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "gcc":
@@ -417,9 +414,12 @@ class CPM_cpo(SolverInterface):
         elif isinstance(cpm_con, GlobalFunction):
             if cpm_con.name == "element":
                 return docplex.cp.modeler.element(*self._cpo_expr(cpm_con.args))
-            elif cpm_con.name == "count":
-                arr, val = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.count(arr, val)
+            elif cpm_con.name == "min":
+                return docplex.cp.modeler.min(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "max":
+                return docplex.cp.modeler.max(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "abs":
+                return docplex.cp.modeler.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return docplex.cp.modeler.count_different(self._cpo_expr(cpm_con.args))
 
