@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 import warnings
+import re
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, flip_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
+from ..transformations.negation import push_down_negation
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
@@ -74,6 +77,7 @@ class CPM_pumpkin(SolverInterface):
 
         # initialise the native solver object
         self.pum_solver = Model() 
+        self.prefix = None
 
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
@@ -114,6 +118,11 @@ class CPM_pumpkin(SolverInterface):
 
         # call the solver, with parameters
         start_time = time.time() # when did solving start
+        import pickle
+
+        if proof is not None:
+            self.prefix = proof
+
         result = self.pum_solver.satisfy(proof=proof, **kwargs)
 
         # new status, translate runtime
@@ -122,7 +131,7 @@ class CPM_pumpkin(SolverInterface):
 
         # translate solver exit status to CPMpy exit status
         if isinstance(result, SatisfactionResult.Satisfiable):
-            solution = result.solution
+            solution = result._0
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
             # fill in variable values
@@ -157,6 +166,7 @@ class CPM_pumpkin(SolverInterface):
         """
 
         if is_num(cpm_var):
+            return cpm_var
             if not cpm_var in self._constantvars:
                 self._constantvars[cpm_var] = self.pum_solver.new_integer_variable(cpm_var, cpm_var, name=str(cpm_var))
 
@@ -314,6 +324,7 @@ class CPM_pumpkin(SolverInterface):
     def _get_constraint(self, cpm_expr):
 
         from pumpkin_py import constraints
+        from pumpkin_py import Comparator
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -332,14 +343,25 @@ class CPM_pumpkin(SolverInterface):
             if isinstance(rhs, _BoolVarImpl):
                 pum_rhs = self.pum_solver.boolean_as_integer(pum_rhs)
 
+            if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+                # just a literal
+                if cpm_expr.name == "==": comp = Comparator.Equal
+                if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
+                if cpm_expr.name == ">=": comp = Comparator.GreaterThanOrEqual
+                if cpm_expr.name == "!=": comp = Comparator.NotEqual
+                if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
+                if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
+                var = self.solver_var(lhs.args[0])
+                return [constraints.Clause([self.pum_solver.predicate_as_boolean(var, comp, pum_rhs)])]
+
             if cpm_expr.name == "==":
                 if "sum" in lhs.name or lhs.name == "sub":
                     return [constraints.Equals(self._sum_args(lhs), rhs)]
-                if lhs.name == "div":
+                elif lhs.name == "div":
                     return [constraints.Division(*self.solver_vars(lhs.args), pum_rhs)]
-                if lhs.name == "mul":
+                elif lhs.name == "mul":
                     return [constraints.Times(*self.solver_vars(lhs.args), pum_rhs)]
-                if lhs.name == "abs":
+                elif lhs.name == "abs":
                     return [constraints.Absolute(self.solver_var(lhs), pum_rhs)]
                 elif lhs.name == "minimum":
                     return [constraints.Minimum(self.solver_vars(lhs.args), pum_rhs)]
@@ -409,6 +431,7 @@ class CPM_pumpkin(SolverInterface):
 
         :return: self
         """
+        from pumpkin_py import constraints
 
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
@@ -423,18 +446,24 @@ class CPM_pumpkin(SolverInterface):
 
             for cpm_expr in self.transform(orig_expr):
                 tag = constraint_tag
-                if isinstance(cpm_expr, Operator) and cpm_expr.name == "or":
-                    # clause, tagging not supported
-                    tag = None
-                    warnings.warn(f"Not tagging constraint {cpm_expr} as it a clause")
-
+                tag = None
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
+
                     bv, subexpr = cpm_expr.args
                     for cons in self._get_constraint(subexpr):
+                        print("Adding constraint:", cpm_expr, cons)
+                        print(type(cons))
+                        if isinstance(cons, constraints.Clause):
+                            tag = None
                         self.pum_solver.add_implication(cons, self.solver_var(bv), tag=tag)
                 else:
                     solver_constraints = self._get_constraint(cpm_expr)
+
                     for cons in solver_constraints:
+                        print("Adding constraint:", cpm_expr, cons)
+                        print(type(cons))
+                        if isinstance(cons, constraints.Clause):
+                            tag = None
                         self.pum_solver.add_constraint(cons,tag=tag)
 
         return self
@@ -490,3 +519,156 @@ class CPM_pumpkin(SolverInterface):
     #                 display()  # callback
     #
     #     return solution_count
+
+    def read_proof_tree(self, prefix=None):
+        """
+            Parses the proof-log into memory.
+            Returns a list of inference steps encoded as a 3-tuple:
+                (input_literals, constraint, output literals)
+        """
+
+        if prefix is None:
+            prefix = self.prefix
+        assert prefix is not None, "solver has to be ran with proof-logging enabled, or prefix has to be user-supplied"
+
+        # regexes required for parsing
+        # format: i <step_id> <premises> [0 <propagated>] [c:<constraint tag>] [l:<filtering algorithm>]
+        RE_PROP = (r"^i\s+(?P<id>[1-9]\d*)\s+"
+                   r"(?P<premises>(?:-?[1-9]\d*\s*)+)"
+                   r"(?:0\s+(?P<propagated>-?[1-9]\d*))?\s*"
+                   r"(?:c:(?P<tag>-?[1-9]\d*))?\s*"
+                   r"(?:l:(?P<filtering_algorithm>-?[1-9]\d*))?$")
+
+        PROP_REQUIRED = ['id', 'premises', 'tag']
+
+        # format: n <step_id> <atomic constraint ids> [0 <propagation hint>]
+        RE_NOGOOD = re.compile(r"^n\s+(?P<id>-?\d+)\s+"
+                               r"(?P<lit_ids>(-?\d+\s*)*?)\s+"
+                               r"0\s+(?P<hint>(-?\d+\s*)*)")
+
+        literals = self.parse_proof_literals()
+        prop_cache = dict()
+        nogood_cache = dict()
+
+        with open(prefix, "r") as f:
+            for line_nb, line in enumerate(f.readlines()):
+                if line[0] == "i":  # found inference
+                    match = re.match(RE_PROP, line).groupdict()
+                    lit_ids = [int(id) for id in match['premises'].split()]
+                    cpm_lits = map(lambda id: literals[abs(id)], lit_ids)
+                    cons = self.user_cons[int(match['tag'])]
+                    for k in PROP_REQUIRED:
+                        if match[k] is None:
+                            raise ValueError(f"Line {line_nb+1} does not contain '{k}':", line)
+
+                    if match['propagated'] is None: # found an inference no-good
+                        # Basically, the propagator of the constraint does not allow the conjunction of premises
+                        nogood = [lit if id < 0 else ~lit for id, lit in zip(lit_ids, cpm_lits) if isinstance(lit, Comparison)]
+                        nogood = push_down_negation(nogood)
+                        yield ("n", [], cons, cpm_any(nogood))
+                    else:
+                        premises = [lit if id > 0 else ~lit for id, lit in zip(lit_ids, cpm_lits) if isinstance(lit, Comparison)]
+                        premises = push_down_negation(premises)
+                        propagated = int(match['propagated'])
+                        if propagated > 0:
+                            propagated = literals[propagated]
+                        else:
+                            propagated = flip_comparison(literals[abs(propagated)])
+
+                        yield ("i", premises, cons, propagated)
+
+                    prop_cache[int(match['id'])] = cons
+
+                elif line[0] == "n":  # found nogood
+                    print(line)
+                    match = re.match(RE_NOGOOD, line).groupdict()
+
+                    lit_ids = map(int, match['lit_ids'].strip().split())
+                    nogood = [literals[i] if i > 0 else flip_comparison(literals[abs(i)]) for i in lit_ids]
+                    nogood = cpm_any(nogood)
+
+                    input_lits = [nogood_cache[int(i)] for i in match['hint'].split() if int(i) in nogood_cache]
+                    input_cons = [prop_cache[int(i)] for i in match['hint'].split() if int(i) in prop_cache]
+
+                    assert len(input_lits) + len(input_cons) == len(match['hint'].split()), "Not all required steps where found"
+
+                    yield ("n", input_lits, input_cons, nogood)
+
+                    # yield ("n", input_lits, input_cons, nogood)
+                    nogood_cache[int(match['id'])] = nogood
+
+                elif line[0] == "c":  # conclusion
+                    return
+
+    def parse_proof_literals(self, prefix=None):
+        """
+            Parse literals in .lits file to CPMPy comparisons.
+            Each line in the .lits file is structured as
+                <literal_id:int> [var <comp> val]
+
+            :returns: a dictionary mapping literal_ids to CPMpy comparisons
+        """
+        if prefix is None:
+            prefix = self.prefix
+        assert prefix is not None, "solver has to be ran with proof-logging enabled, or prefix has to be user-supplied"
+
+        RE_LIT = re.compile(r'(\[.*?(==|!=|<=|>=|true).*?]( )?)+')
+
+        literals = dict()
+        with open(prefix+".lits") as f:
+            for line in f.readlines():
+                first_space = line.index(" ")
+                lit_id = line[:first_space]
+                assert int(lit_id) not in literals
+
+                remain = line[first_space + 1:]
+                if "] [" in line:
+                    print("Uhm, not sure what to do here... take strongest one?")
+                    # multiple literals, take the strongest one
+                    expr_lits = [self.parse_one_lit(s) for s in remain[1:-1].split("] [")]
+                    if any(map(lambda lit : lit is False, expr_lits)):
+                        lit = BoolVal(False)
+                    elif any(map(lambda lit : lit is True, expr_lits)):
+                        lit = BoolVal(True)
+                    else:
+                        order = ["==", "<=", ">=", "!="]
+                        lit = min(expr_lits, key=lambda expr: order.index(expr.name))
+                else:
+                    str_lit = re.search(RE_LIT, remain).group()
+                    lit = self.parse_one_lit(str_lit)
+
+                if lit is not None:
+                    literals[int(lit_id)] = lit
+
+        return literals
+
+    def parse_one_lit(self, str):
+        """
+            Parse one literal in .lits file.
+            A literal is a comparison of a variable with an integer.
+            Allowed comparisons are "==", "!=", "<=", ">="
+
+        """
+        str = str.strip(" []")
+        if "true" in str: return True
+
+        # find out which comparison
+        for comp in ("!=", "<=", ">=", "=="):
+            if comp in str: break
+        else:
+            raise ValueError(f"Expected comparison but got {str}")
+        lhs, rhs = str.split(comp)
+        lhs, rhs = lhs.strip(), int(rhs.strip())
+        # find variable
+        for var in self._varmap:
+            if var.name == lhs:
+                return Comparison(comp, var, rhs)
+
+        # unlikely case
+        try:
+            lhs = int(lhs)
+            return eval_comparison(comp,lhs,rhs)
+        except ValueError:
+            raise ValueError(f"Unknown lhs of comparison in literal {str}")
+
+
