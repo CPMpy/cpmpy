@@ -7,7 +7,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, flip_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
@@ -17,6 +17,7 @@ from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
+from ..transformations.safening import no_partial_functions
 
 import time
 
@@ -273,7 +274,13 @@ class CPM_pumpkin(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent", "cumulative"})
+        supported = {"alldifferent", "cumulative", 
+                     "min", "max", "element"}
+
+        cpm_cons = decompose_in_tree(cpm_cons, supported=supported)
+        # safening after decompose here, need to safen toplevel elements too
+        #   which come from decomposition of other global constraints...
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"})
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
@@ -286,8 +293,11 @@ class CPM_pumpkin(SolverInterface):
             return [self._ivars(v) for v in cpm_var]
         elif isinstance(cpm_var, _BoolVarImpl):
             return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var))
+        elif is_num(cpm_var):
+            return self.solver_var(intvar(cpm_var, cpm_var))
         else:
             return self.solver_var(cpm_var)
+
 
     def _sum_args(self, expr, negate=False):
         """
@@ -339,9 +349,6 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
-            pum_rhs = self.solver_var(rhs)
-            if isinstance(rhs, _BoolVarImpl):
-                pum_rhs = self.pum_solver.boolean_as_integer(pum_rhs)
 
             if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
                 # just a literal
@@ -352,23 +359,26 @@ class CPM_pumpkin(SolverInterface):
                 if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
                 if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
                 var = self.solver_var(lhs.args[0])
-                return [constraints.Clause([self.pum_solver.predicate_as_boolean(var, comp, pum_rhs)])]
+                return [constraints.Clause([self.pum_solver.predicate_as_boolean(var, comp, rhs)])]
 
             if cpm_expr.name == "==":
                 if "sum" in lhs.name or lhs.name == "sub":
                     return [constraints.Equals(self._sum_args(lhs), rhs)]
-                elif lhs.name == "div":
-                    return [constraints.Division(*self.solver_vars(lhs.args), pum_rhs)]
+               
+                pum_rhs = self._ivars(rhs) # other operators require IntExpression
+                if lhs.name == "div":
+                    return [constraints.Division(*self._ivars(lhs.args), pum_rhs)]
                 elif lhs.name == "mul":
-                    return [constraints.Times(*self.solver_vars(lhs.args), pum_rhs)]
+                    return [constraints.Times(*self._ivars(lhs.args), pum_rhs)]
                 elif lhs.name == "abs":
                     return [constraints.Absolute(self.solver_var(lhs), pum_rhs)]
-                elif lhs.name == "minimum":
-                    return [constraints.Minimum(self.solver_vars(lhs.args), pum_rhs)]
-                elif lhs.name == "maximum":
-                    return [constraints.Maximum(self.solver_vars(lhs.args), pum_rhs)]
+                elif lhs.name == "min":
+                    return [constraints.Minimum(self._ivars(lhs.args), pum_rhs)]
+                elif lhs.name == "max":
+                    return [constraints.Maximum(self._ivars(lhs.args), pum_rhs)]
                 elif lhs.name == "element":
-                    return [constraints.Element(*self.solver_vars(lhs.args), pum_rhs)]
+                    arr, idx = lhs.args
+                    return [constraints.Element(self._ivars(idx), self._ivars(arr), pum_rhs)]
 
                 raise NotImplementedError("Unknown lhs of comparison", cpm_expr)
 
@@ -438,21 +448,21 @@ class CPM_pumpkin(SolverInterface):
 
         # transform and post the constraints
         for orig_expr in toplevel_list(cpm_expr_orig, merge_and=True):
+            print("Adding", orig_expr)
             if orig_expr in set(self.user_cons.values()):
                 continue
             else:
                 constraint_tag = len(self.user_cons)+1
                 self.user_cons[constraint_tag] = orig_expr
-
+            print("\tTransormed to:")
             for cpm_expr in self.transform(orig_expr):
+                print("\t-", cpm_expr)
                 tag = constraint_tag
                 tag = None
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
 
                     bv, subexpr = cpm_expr.args
                     for cons in self._get_constraint(subexpr):
-                        print("Adding constraint:", cpm_expr, cons)
-                        print(type(cons))
                         if isinstance(cons, constraints.Clause):
                             tag = None
                         self.pum_solver.add_implication(cons, self.solver_var(bv), tag=tag)
@@ -460,8 +470,6 @@ class CPM_pumpkin(SolverInterface):
                     solver_constraints = self._get_constraint(cpm_expr)
 
                     for cons in solver_constraints:
-                        print("Adding constraint:", cpm_expr, cons)
-                        print(type(cons))
                         if isinstance(cons, constraints.Clause):
                             tag = None
                         self.pum_solver.add_constraint(cons,tag=tag)
