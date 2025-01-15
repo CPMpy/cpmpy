@@ -49,7 +49,6 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         cur_params = dict()
 
     cur_key = remaining_keys[0]
-    myresults = [] # (runtime, cur_params)
     for cur_value in all_params[cur_key]:
         cur_params[cur_key] = cur_value
         if len(remaining_keys) == 1:

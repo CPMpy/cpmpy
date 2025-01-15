@@ -41,13 +41,15 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist, argval, argvals
+from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
+from ..transformations.safening import no_partial_functions
+
 
 class CPM_ortools(SolverInterface):
     """
@@ -72,8 +74,10 @@ class CPM_ortools(SolverInterface):
         try:
             import ortools
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -91,7 +95,7 @@ class CPM_ortools(SolverInterface):
         - subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("Install the python 'ortools' package to use this solver interface")
+            raise Exception("CPM_ortools: Install the python package 'ortools' to use this solver interface.")
 
         from ortools.sat.python import cp_model as ort
 
@@ -213,14 +217,19 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - please report on github...")
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - "
+                                     f"please report on github...")
 
             # translate objective
             if self.has_objective():
                 ort_obj_val = self.ort_solver.ObjectiveValue()
-                assert int(ort_obj_val) == ort_obj_val, "Objective value should be integer, please report on github"
-                self.objective_value_ = int(ort_obj_val) # ensure it is an integer
-
+                if round(ort_obj_val) == ort_obj_val: # it is an integer?
+                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
+                else: # can happen when using floats as coeff in objective
+                    self.objective_value_ = float(ort_obj_val)
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
@@ -320,14 +329,14 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
+                return ort.LinearExpr.sum(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "sub":
                 a,b = self.solver_vars(cpm_expr.args)
                 return a - b
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
+                return ort.LinearExpr.weighted_sum(x,w)
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
@@ -348,6 +357,7 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -464,13 +474,27 @@ class CPM_ortools(SolverInterface):
                     if not is_num(divisor):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
-                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is "
+                                    f"in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). "
+                                    f"Even if you add a constraint that it can not be '0'. You MUST use a variable "
+                                    f"that is defined to be higher or lower than '0'.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
-                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
-                    b = self.solver_var(lhs.args[0])
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"OR-Tools does not support power constraints with variable as exponent, got {lhs}")
+                    if lhs.args[1] == 2:
+                        b = self.solver_var(lhs.args[0])
+                        return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    else: # need to create intermediate vars, post (((b * b) * b) * ...) * b == IV
+                        b, n = lhs.args
+                        new_lhs = 1
+                        for exp in range(n):
+                            new_lhs, new_cons = get_or_make_var(b * new_lhs)
+                            self += new_cons
+                        return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
+
+
             raise NotImplementedError(
                         "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -481,11 +505,14 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
             elif cpm_expr.name == 'negative_table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
                 return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
@@ -515,7 +542,8 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             else:
-                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
+                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
+                                          f"If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
