@@ -197,7 +197,7 @@ class CPM_exact(SolverInterface):
             start = time.time()
             time_left = time_limit if time_limit is not None else 0
             xct_status = self.xct_solver.runOnce(timeout=time_left)
-            while xct_status != "INCONSISTENT" and time_left >= 0:
+            while xct_status not in {"INCONSISTENT", "TIMEOUT"}:
                 self.xct_solver.boundObjByLastSol()  # ensure next one is improving
                 self._fillVars(_cpm_vars)
                 if isinstance(display, Expression):
