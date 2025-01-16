@@ -223,23 +223,22 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             
             # Boolean variables
             sigma = boolvar(shape=(len(non_constants_lb), 1 + ub - lb))
+            lbs, ubs = get_bounds(cpm_expr.args)
+            lb, ub = min(lbs), max(ubs)
+            n_vals = (ub-lb) + 1
 
-            # Consistency constraints
-            constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
-            # "AllDifferent" constraints
-            # 1) between decision variables
-            constraints += [sum(col) <= 1 for i,col in enumerate(sigma.T) if not ((i+lb) in constant_args)]  # Each value is assigned to at most 1 variable
-            # 2) between constants and decision variables
-            for arg in constant_args:
-                if arg >= lb and arg <= ub:
-                    constraints += [sum(sigma[:,arg-lb]) == 0]
+            x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
-            # Link int and bool representations
-            for arg, row in zip(non_constant_args, sigma):
-                constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
+            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
+            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
 
-            newlist += constraints
-        
+            # link Boolean matrix and integer variable
+            for arg, row in zip(cpm_expr.args, x):
+                if is_num(arg): # constant, fix directly
+                    newlist.append(row[arg-lb] == 1)
+                else: # ensure result is canonical
+                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
+
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
