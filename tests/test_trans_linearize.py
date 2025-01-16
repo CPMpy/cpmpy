@@ -202,6 +202,22 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons)[0]
         self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
 
+    def test_pow(self):
+
+        a,b = cp.intvar(0,10, name=tuple("ab"), shape=2)
+
+        cons = a ** 3 == b
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+
+        self.assertEqual(lin_cons[0], "((a) * (a)) == (IV0)")
+        self.assertEqual(lin_cons[1], "((a) * (IV0)) == (IV1)")
+        self.assertEqual(lin_cons[2], "sum([1, -1] * [IV1, b]) == 0")
+
+        # this is not supported
+        cons = a ** b == 3
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+
     def test_mod(self):
 
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")

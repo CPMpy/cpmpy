@@ -122,6 +122,20 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
+                elif lhs.name == "pow" and "pow" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize power without multiplication")
+                    if not is_num(lhs.args[1]):
+                        raise NotImplementedError("Cannot linearize power with ")
+                    # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
+                    x, n = lhs.args
+                    new_lhs = 1
+                    for exp in range(n):
+                        new_lhs, new_cons = get_or_make_var(x * new_lhs)
+                        newlist.extend(new_cons)
+                    cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
+
+
                 elif lhs.name == "mod" and "mod" not in supported:
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize modulo without multiplication")

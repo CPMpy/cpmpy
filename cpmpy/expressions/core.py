@@ -298,9 +298,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([self, other])
+        return cp.Xor([self, other])
 
     def __rxor__(self, other):
         # some simple constant removal
@@ -308,9 +306,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([other, self])
+        return cp.Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -410,8 +406,7 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        from .globalfunctions import Abs
-        return Abs(self)
+        return cp.Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):
@@ -663,14 +658,27 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+                if lb2 == ub2:
+                    raise ZeroDivisionError(f"Domain of {self.args[1]} only contains 0")
+                if lb2 == 0:
+                    lb2 = 1
+                if ub2 == 0:
+                    ub2 = -1
+                bounds = [
+                    lb1 // lb2, lb1 // -1, lb1 // 1, lb1 // ub2,
+                    ub1 // lb2, ub1 // -1, ub1 // 1, ub1 // ub2
+                ]
+            else:
+                bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("% by domain containing 0 is not supported")
+                if lb2 == ub2:
+                    raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
+                # x mod y is always smaller than y. Make sure to not exclude 0 from domain.
+                return min(lb2 + 1, 0), max(ub2 - 1, 0)
             elif ub2 < 0:
                 return lb2 + 1, 0
             elif lb2 > 0:

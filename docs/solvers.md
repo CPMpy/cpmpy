@@ -86,7 +86,7 @@ s.solve()
 print(x.value())
 ```
 
-`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
+`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumptions were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
 
 See [the API documentation of the solvers](api/solvers.html) to learn about their special functions.
 
