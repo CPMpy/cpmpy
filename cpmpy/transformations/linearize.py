@@ -204,8 +204,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             """
                 More efficient implementations possible
                 http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                This method avoids bounds computation
                 Introduces n^2 new boolean variables
+                Decomposes through bi-partite matching
             """
             # TODO check performance of implementation
             if reified is True:
