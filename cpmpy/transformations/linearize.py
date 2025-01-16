@@ -208,21 +208,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 Introduces n^2 new boolean variables
             """
             # TODO check performance of implementation
-            
-            # Linear decomposition of alldifferent using bipartite matching
-            
-            # Split in decision variables and constants
-            non_constant_filter = np.array([isinstance(arg, cp.expressions.core.Expression) for arg in cpm_expr.args])
-            non_constant_args = np.array(cpm_expr.args)[non_constant_filter]
-            constant_args = np.array(cpm_expr.args)[~non_constant_filter]
-            
-            # Get bounds
-            non_constants_lb = [arg.lb for arg in non_constant_args]
-            non_constants_ub = [arg.ub for arg in non_constant_args]
-            lb, ub = min(non_constants_lb), max(non_constants_ub)
-            
-            # Boolean variables
-            sigma = boolvar(shape=(len(non_constants_lb), 1 + ub - lb))
+            if reified is True:
+                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
+                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
+
             lbs, ubs = get_bounds(cpm_expr.args)
             lb, ub = min(lbs), max(ubs)
             n_vals = (ub-lb) + 1
