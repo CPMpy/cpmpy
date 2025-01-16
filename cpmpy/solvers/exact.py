@@ -259,8 +259,10 @@ class CPM_exact(SolverInterface):
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
+                - display:  generic solution callback for use during optimization.
+                            either a list of CPMpy expressions, OR a callback function which
+                            gets called after the variable-value mapping of the intermediate solution.
+                            default/None: nothing is displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
