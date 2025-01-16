@@ -139,16 +139,10 @@ def comp_constraints(solver):
                     continue
                 for x,y in [(numexpr,rhs), (rhs,numexpr)]:
                     # check if the constraint we are trying to construct is always UNSAT
-                    impossible = True
-                    for xb in get_bounds(x):
-                        for yb in get_bounds(y):
-                            if eval_comparison(comp_name,xb,yb):
-                                impossible = False
-                                break
-                        else:
-                            break
-                    if impossible is False:
-                        yield Comparison(comp_name, x,y)
+                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)):
+                        yield Comparison(comp_name, x, y)
+                    else: # impossible comparison, skip
+                        pass
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
