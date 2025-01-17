@@ -31,16 +31,23 @@ from ..transformations.decompose_global import decompose_in_tree
 
 class CPM_cpo(SolverInterface):
     """
-    Interface to TEMPLATE's API
+    Interface to CP Optimizers API
 
-    Requires that the 'TEMPLATEpy' python package is installed:
-    $ pip install TEMPLATEpy
+    Requires that the 'docplex' python package is installed:
+    $ pip install docplex
+
+    docplex documentation:
+    https://ibmdecisionoptimization.github.io/docplex-doc/
+
+    You will also need to install CPLEX Optimization Studio from IBM's website.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
 
     See detailed installation instructions at:
-    <URL to detailed solver installation instructions, if any>
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
 
     Creates the following attributes (see parent constructor for more):
-    - tpl_model: object, TEMPLATE's model object
+    - cpo_model: object, CP Optimizers model object
     """
 
     def supported():
