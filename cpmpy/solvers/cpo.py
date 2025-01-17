@@ -1,17 +1,13 @@
-import docplex.cp.parameters
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, argval, argvals
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.flatten_model import flatten_constraint
-from ..transformations.comparison import only_numexpr_equality
-from ..transformations.reification import reify_rewrite, only_bv_reifies
 
 """
     Interface to CP Optimizers API
@@ -66,13 +62,13 @@ class CPM_cpo(SolverInterface):
         if not self.supported():
             raise Exception("CPM_cpo: Install the python package 'docplex'")
 
-        import docplex.cp.model
+        import docplex.cp.model as dom
         assert subsolver is None
 
         # initialise the native solver object
         # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
         #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
-        self.cpo_model = docplex.cp.model.CpoModel()
+        self.cpo_model = dom.CpoModel()
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
@@ -168,6 +164,7 @@ class CPM_cpo(SolverInterface):
             Returns: number of solutions found
         """
 
+        import docplex.cp as docp
         #cpo_solver = self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, LogVerbosity='Quiet', **kwargs)
         solution_count = 0
         if solution_limit is None:
@@ -197,7 +194,7 @@ class CPM_cpo(SolverInterface):
                     cpm_value = int(cpm_value)
                 solvars.append(sol_var)
                 vals.append(cpm_value)
-            self.cpo_model.add(docplex.cp.modeler.forbidden_assignments(solvars, [vals]))
+            self.cpo_model.add(docp.modeler.forbidden_assignments(solvars, [vals]))
             if display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
@@ -211,6 +208,7 @@ class CPM_cpo(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
+        import docplex.cp as docp
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
@@ -224,9 +222,9 @@ class CPM_cpo(SolverInterface):
             if isinstance(cpm_var, _BoolVarImpl):
                 # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
                 # we should add == 1 to turn it into a boolean expression
-                revar = docplex.cp.expression.binary_var(str(cpm_var)) == 1
+                revar = docp.expression.binary_var(str(cpm_var)) == 1
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = docplex.cp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
+                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -245,13 +243,14 @@ class CPM_cpo(SolverInterface):
 
             are permanently posted to the solver)
         """
+        import docplex.cp.modeler as dom
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
         expr = self._cpo_expr(expr)
         if minimize:
-            self.cpo_model.add(docplex.cp.modeler.minimize(expr))
+            self.cpo_model.add(dom.minimize(expr))
         else:
-            self.cpo_model.add(docplex.cp.modeler.maximize(expr))
+            self.cpo_model.add(dom.maximize(expr))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
@@ -357,6 +356,7 @@ class CPM_cpo(SolverInterface):
             Accepts single constraints or a list thereof, return type changes accordingly.
 
         """
+        import docplex.cp.modeler as dom
         if is_any_list(cpm_con):
             # arguments can be lists
             return [self._cpo_expr(con) for con in cpm_con]
@@ -375,21 +375,21 @@ class CPM_cpo(SolverInterface):
             arity, _ = Operator.allowed[cpm_con.name]
             # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
-                return docplex.cp.modeler.logical_and(self._cpo_expr(cpm_con.args))
+                return dom.logical_and(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == 'or':
-                return docplex.cp.modeler.logical_or(self._cpo_expr(cpm_con.args))
+                return dom.logical_or(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == '->':
-                return docplex.cp.modeler.if_then(*self._cpo_expr(cpm_con.args))
+                return dom.if_then(*self._cpo_expr(cpm_con.args))
             elif cpm_con.name == 'not':
-                return docplex.cp.modeler.logical_not(self._cpo_expr(cpm_con.args[0]))
+                return dom.logical_not(self._cpo_expr(cpm_con.args[0]))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
-                return docplex.cp.modeler.sum(self._cpo_expr(cpm_con.args))
+                return dom.sum(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == 'wsum':
                 w = cpm_con.args[0]
                 x = self._cpo_expr(cpm_con.args[1])
-                return docplex.cp.modeler.scal_prod(w,x)
+                return dom.scal_prod(w,x)
 
             # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
             elif arity == 2 or cpm_con.name == "mul":
@@ -422,47 +422,47 @@ class CPM_cpo(SolverInterface):
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
             if cpm_con.name == 'alldifferent':
-                return docplex.cp.modeler.all_diff(self._cpo_expr(cpm_con.args))
+                return dom.all_diff(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "gcc":
                 vars, vals, occ = self._cpo_expr(cpm_con.args)
-                cons = [docplex.cp.modeler.distribute(occ, vars, vals)]
+                cons = [dom.distribute(occ, vars, vals)]
                 if cpm_con.closed:  # not supported by cpo, so post separately
-                    cons += [docplex.cp.modeler.allowed_assignments(v, vals) for v in vars]
+                    cons += [dom.allowed_assignments(v, vals) for v in vars]
                 return cons
             elif cpm_con.name == "inverse":
                 x, y = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.inverse(x, y)
+                return dom.inverse(x, y)
             elif cpm_con.name == "table":
                 arr, table = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.allowed_assignments(arr, table)
+                return dom.allowed_assignments(arr, table)
             elif cpm_con.name == "indomain":
                 expr, arr = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.allowed_assignments(expr, arr)
+                return dom.allowed_assignments(expr, arr)
             elif cpm_con.name == "negative_table":
                 arr, table = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.forbidden_assignments(arr, table)
+                return dom.forbidden_assignments(arr, table)
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
 
             else:
                 try:
-                    cpo_global = getattr(docplex.cp.modeler, cpm_con.name)
+                    cpo_global = getattr(dom, cpm_con.name)
                     return cpo_global(self._cpo_expr(cpm_con.args))  # works if our naming is the same
                 except AttributeError:
                     raise ValueError(f"Global constraint {cpm_con} not known in CP Optimizer, please report on github.")
 
         elif isinstance(cpm_con, GlobalFunction):
             if cpm_con.name == "element":
-                return docplex.cp.modeler.element(*self._cpo_expr(cpm_con.args))
+                return dom.element(*self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "min":
-                return docplex.cp.modeler.min(self._cpo_expr(cpm_con.args))
+                return dom.min(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "max":
-                return docplex.cp.modeler.max(self._cpo_expr(cpm_con.args))
+                return dom.max(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "abs":
-                return docplex.cp.modeler.abs(self._cpo_expr(cpm_con.args)[0])
+                return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
-                return docplex.cp.modeler.count_different(self._cpo_expr(cpm_con.args))
+                return dom.count_different(self._cpo_expr(cpm_con.args))
 
 
 
