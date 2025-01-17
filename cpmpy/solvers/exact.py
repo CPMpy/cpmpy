@@ -66,13 +66,14 @@ class CPM_exact(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if exact is installed
             import exact
-            import pkg_resources
+            # check installed version
             pkg_resources.require("exact>=2.1.0")
             return True
-        except ModuleNotFoundError as e:
+        except ModuleNotFoundError: # exact is not installed
             return False
-        except VersionConflict:
+        except VersionConflict: # unsupported version of exact
             warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
                           f"{pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires "
                           f"Python 3.10 or higher.")
@@ -98,7 +99,7 @@ class CPM_exact(SolverInterface):
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
         if not self.supported():
-            raise Exception("Install 'exact' as a Python package to use this solver interface")
+            raise Exception("CPM_exact: Install the python package 'exact' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
 
