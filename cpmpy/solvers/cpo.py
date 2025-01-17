@@ -425,7 +425,10 @@ class CPM_cpo(SolverInterface):
                 return docplex.cp.modeler.all_diff(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "gcc":
                 vars, vals, occ = self._cpo_expr(cpm_con.args)
-                return docplex.cp.modeler.distribute(occ, vars, vals)
+                cons = [docplex.cp.modeler.distribute(occ, vars, vals)]
+                if cpm_con.closed:  # not supported by cpo, so post separately
+                    cons += [docplex.cp.modeler.allowed_assignments(v, vals) for v in vars]
+                return cons
             elif cpm_con.name == "inverse":
                 x, y = self._cpo_expr(cpm_con.args)
                 return docplex.cp.modeler.inverse(x, y)
