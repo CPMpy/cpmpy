@@ -50,6 +50,7 @@ class CPM_cpo(SolverInterface):
     - cpo_model: object, CP Optimizers model object
     """
 
+    @staticmethod
     def supported():
         return CPM_cpo.installed() and CPM_cpo.executable_installed()
 
@@ -77,8 +78,11 @@ class CPM_cpo(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: str, name of a subsolver (optional)
         """
-        if not self.supported():
+        if not self.installed():
             raise Exception("CPM_cpo: Install the python package 'docplex'")
+
+        if not self.executable_installed():
+            raise Exception("You need to install the CPLEX Optimization Studio to use this solver.")
 
         import docplex.cp.model as dom
         assert subsolver is None
