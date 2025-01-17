@@ -1,3 +1,5 @@
+import shutil
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -41,8 +43,11 @@ class CPM_cpo(SolverInterface):
     - tpl_model: object, TEMPLATE's model object
     """
 
-    @staticmethod
     def supported():
+        return CPM_cpo.installed() and CPM_cpo.executable_installed()
+
+    @staticmethod
+    def installed():
         # try to import the package
         try:
             import docplex.cp as docp
@@ -50,6 +55,12 @@ class CPM_cpo(SolverInterface):
         except ModuleNotFoundError:
             return False
 
+    @staticmethod
+    def executable_installed():
+        if shutil.which('cpoptimizer') is None:
+            return False
+        else:
+            return True
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
