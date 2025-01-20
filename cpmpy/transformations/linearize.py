@@ -168,7 +168,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
-                        raise NotImplementedError("Cannot linearize modulo without multiplication")
+                        raise NotImplementedError("Cannot linearize division without multiplication")
                     a, b = lhs.args
                     # if division is total, b is either strictly negative or strictly positive!
                     lb, ub = get_bounds(b)
