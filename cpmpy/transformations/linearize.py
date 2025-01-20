@@ -39,10 +39,15 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+from cpmpy.transformations.get_variables import get_variables
+
+from cpmpy.transformations.reification import only_implies, only_bv_reifies
+
 from cpmpy.transformations.normalize import toplevel_list
+from .decompose_global import decompose_in_tree
 
 from .flatten_model import flatten_constraint, get_or_make_var
-from .get_variables import get_variables
+from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -156,9 +161,33 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                       "Please safen the expression first.")
                         k = intvar(*get_bounds((x - rhs) // y))
                         mult_res, newcons = get_or_make_var(k * y)
-                        newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+                        # (abs of) modulo rhs is smaller than (abs of) the divisor y, but also needs to be of same sign as x.
+                        newlist += linearize_constraint(only_implies(only_bv_reifies(flatten_constraint([Abs(rhs) < Abs(y), (x > 0).implies(rhs >= 0), (x < 0).implies(rhs <= 0)]))) + newcons, supported, reified=reified)
 
                         cpm_expr = (mult_res + rhs) == x
+
+                elif lhs.name == 'div' and 'div' not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize division without multiplication")
+                    a, b = lhs.args
+                    # if division is total, b is either strictly negative or strictly positive!
+                    lb, ub = get_bounds(b)
+                    if lb <= 0 <= ub:
+                        raise TypeError(
+                            f"Can't divide by a domain containing 0, safen the expression first")
+                    # div(a,b) = rhs  -->  a = b * rhs + r with r the remainder
+                    # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
+                    # abs(r) < abs(b), otherwise it wouldn't be a remainder.
+                    # we need abs here because one or both of these can be negative.
+                    r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
+                    cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
+                    # b * rhs <= a, otherwise we can both overshoot and undershoot the division, with r having positive and negative options.
+                    cond = [Abs(r) < Abs(b), b * rhs <= a]
+                    decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
+                    cpm_exprs = toplevel_list(decomp + cpm_expr)
+                    exprs = linearize_constraint(flatten_constraint(cpm_exprs), supported=supported)
+                    newlist.extend(exprs)
+                    continue
 
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
@@ -325,7 +354,8 @@ def canonical_comparison(lst_of_expr):
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                # bring all vars to lhs
+                # Bring all vars from rhs to lhs
+                # 1) collect the variables to bring over
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
@@ -338,10 +368,11 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
+                # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
-                    lhs, rhs = lhs + lhs2, rhs
+                    lhs = lhs + lhs2
                 else:
                     raise ValueError(
                         f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
