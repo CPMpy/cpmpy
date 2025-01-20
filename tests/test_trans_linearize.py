@@ -94,6 +94,32 @@ class TestTransLinearize(unittest.TestCase):
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
+    def test_alldiff(self):
+        # alldiff has a specialized linearization
+
+        x = cp.intvar(1, 5, shape=3, name="x")
+        cons = cp.AllDifferent(x)
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 5 * 4 * 3)
+
+        # should also work with constants in arguments
+        x,y,z = x
+        cons = cp.AllDifferent([x,3,y,True,z])
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
+
+
+
 class TestConstRhs(unittest.TestCase):
 
     def  test_numvar(self):

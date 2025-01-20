@@ -39,6 +39,7 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -217,22 +218,29 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             """
                 More efficient implementations possible
                 http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                This method avoids bounds computation
                 Introduces n^2 new boolean variables
+                Decomposes through bi-partite matching
             """
             # TODO check performance of implementation
-            # Boolean variables
-            lb, ub = min(arg.lb for arg in cpm_expr.args), max(arg.ub for arg in cpm_expr.args)
-            # Linear decomposition of alldifferent using bipartite matching
-            sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
+            if reified is True:
+                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
+                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
 
-            constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
-            constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
+            lbs, ubs = get_bounds(cpm_expr.args)
+            lb, ub = min(lbs), max(ubs)
+            n_vals = (ub-lb) + 1
 
-            for arg, row in zip(cpm_expr.args, sigma):
-                constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
+            x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
-            newlist += constraints
+            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
+            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+
+            # link Boolean matrix and integer variable
+            for arg, row in zip(cpm_expr.args, x):
+                if is_num(arg): # constant, fix directly
+                    newlist.append(row[arg-lb] == 1)
+                else: # ensure result is canonical
+                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
