@@ -34,7 +34,7 @@
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals
+from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -75,18 +75,20 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def installed():
-        try: 
+        try:
             import gurobipy as gp
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
-        
+        except Exception as e:
+            raise e
+
     @staticmethod
     def license_ok():
         if not CPM_gurobi.installed():
             warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
             return False
-        try: 
+        try:
             import gurobipy as gp
             global GRB_ENV
             if GRB_ENV is None:
@@ -108,7 +110,7 @@ class CPM_gurobi(SolverInterface):
         - subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_gurobi: Install the python package 'gurobipy'")
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
         elif not self.license_ok():
             raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
