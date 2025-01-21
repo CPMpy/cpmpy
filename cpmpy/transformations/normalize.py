@@ -77,7 +77,7 @@ def reel_to_int(lst_of_expr):
                 lhs *= factor
 
             # Set the modified arguments back to the expression
-            expr.args = (lhs, rhs)
+            expr.update_args((lhs, rhs))
 
             if isinstance(lhs,Expression) and lhs.name == 'wsum':
                 coeffs, vars = lhs.args
@@ -97,7 +97,7 @@ def reel_to_int(lst_of_expr):
                 elif isinstance(rhs,Expression) and rhs.name == 'mul':
                     rhs.args[0] = factor * rhs.args[0]
                 else:
-                    expr.args = lhs, (factor * rhs)
+                    expr.update_args((lhs, (factor * rhs)))
             elif isinstance(lhs,Expression) and lhs.name == 'mul':
                 c, e = left_extract_reel_from_mul(lhs)
                 if c is not None:
