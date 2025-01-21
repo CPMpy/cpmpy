@@ -39,6 +39,7 @@ General comparisons or expressions
 """
 import copy
 import numpy as np
+import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -47,15 +48,16 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import is_any_list, is_num, eval_comparison, is_bool
+from ..expressions.utils import is_num, eval_comparison, get_bounds
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_bv_implies()'.
+    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
 
     `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
@@ -87,7 +89,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             elif cpm_expr.name == "->":
                 # determine direction of implication
                 cond, sub_expr = cpm_expr.args
-                assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of implication must be boolvar. Apply `only_bv_implies` before calling `linearize_constraint`"
+                assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of " \
+                                                       f"implication must be boolvar. Apply `only_implies` before " \
+                                                       f"calling `linearize_constraint`"
 
                 if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
                     # shortcut for BV -> BV, convert to disjunction and apply linearize on it
@@ -99,7 +103,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     newlist += [cond.implies(lin) for lin in lin_sub]
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], reified=reified)
+                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
 
 
         # comparisons
@@ -117,11 +121,54 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                     cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
+                elif lhs.name == "pow" and "pow" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize power without multiplication")
+                    if not is_num(lhs.args[1]):
+                        raise NotImplementedError("Cannot linearize power with ")
+                    # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
+                    x, n = lhs.args
+                    new_lhs = 1
+                    for exp in range(n):
+                        new_lhs, new_cons = get_or_make_var(x * new_lhs)
+                        newlist.extend(new_cons)
+                    cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
+
+
+                elif lhs.name == "mod" and "mod" not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize modulo without multiplication")
+
+                    if cpm_expr.name != "==":
+                        new_rhs, newcons = get_or_make_var(lhs)
+                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        continue
+                    else:
+                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+                        #   -> acts differently for negative numbers
+                        # "mod" is a partial function
+                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        x, y = lhs.args
+                        lby, uby = get_bounds(y)
+                        if lby <= 0 <= uby:
+                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. "
+                                                      "Please safen the expression first.")
+                        k = intvar(*get_bounds((x - rhs) // y))
+                        mult_res, newcons = get_or_make_var(k * y)
+                        newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+
+                        cpm_expr = (mult_res + rhs) == x
+
                 else:
-                    raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should be any of {supported | set(['sub'])} but is {lhs}. Please report on github")
+                    raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
+                                                            f" be any of {supported | {'sub'} } but is {lhs}. "
+                                                            f"Please report on github")
 
             elif isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
-                raise ValueError("Linearization of `lhs` not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
+                raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
+                                 "`cpmpy.transformations.decompose_global.decompose_global() first")
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
@@ -171,28 +218,36 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             """
                 More efficient implementations possible
                 http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                This method avoids bounds computation
                 Introduces n^2 new boolean variables
+                Decomposes through bi-partite matching
             """
             # TODO check performance of implementation
-            # Boolean variables
-            lb, ub = min(arg.lb for arg in cpm_expr.args), max(arg.ub for arg in cpm_expr.args)
-            # Linear decomposition of alldifferent using bipartite matching
-            sigma = boolvar(shape=(len(cpm_expr.args), 1 + ub - lb))
+            if reified is True:
+                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
+                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
 
-            constraints = [sum(row) == 1 for row in sigma]  # Each var has exactly one value
-            constraints += [sum(col) <= 1 for col in sigma.T]  # Each value is assigned to at most 1 variable
+            lbs, ubs = get_bounds(cpm_expr.args)
+            lb, ub = min(lbs), max(ubs)
+            n_vals = (ub-lb) + 1
 
-            for arg, row in zip(cpm_expr.args, sigma):
-                constraints += [sum(np.arange(lb, ub + 1) * row) + -1*arg == 0]
+            x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
-            newlist += constraints
+            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
+            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+
+            # link Boolean matrix and integer variable
+            for arg, row in zip(cpm_expr.args, x):
+                if is_num(arg): # constant, fix directly
+                    newlist.append(row[arg-lb] == 1)
+                else: # ensure result is canonical
+                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
+            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
 
     return newlist
 
@@ -222,7 +277,7 @@ def only_positive_bv(lst_of_expr):
                 weights, args = lhs.args
                 idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
                 nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-                lhs = Operator("wsum", [nw, na]) # force making wsum, even for arity = 1
+                lhs = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
                 rhs -= sum(weights[i] for i in idxes)
 
             if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
@@ -238,9 +293,10 @@ def only_positive_bv(lst_of_expr):
             newlist += linearize_constraint(new_cons)
 
         # reification
-        elif cpm_expr.name == "->":
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
-            assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply `linearize_constraint` before calling `only_positive_bv`"
+            assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
+                                                   f"`linearize_constraint` before calling `only_positive_bv` "
             if isinstance(cond, _BoolVarImpl): # BV -> Expr
                 subexpr = only_positive_bv([subexpr])
                 newlist += [cond.implies(expr) for expr in subexpr]
@@ -269,8 +325,10 @@ def canonical_comparison(lst_of_expr):
             elif isinstance(lhs, Comparison):
                 lhs = canonical_comparison(lhs)[0]
                 newlist.append(lhs.implies(rhs))
+            else:
+                newlist.append(cpm_expr)
 
-        if isinstance(cpm_expr, Comparison):
+        elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
@@ -294,7 +352,7 @@ def canonical_comparison(lst_of_expr):
                     lhs, rhs = lhs + lhs2, rhs
                 else:
                     raise ValueError(
-                        f"unexpected expression on lhs of expression, should be sum,wsum or intvar but got {lhs}")
+                        f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
                 assert not is_num(lhs), "lhs cannot be an integer at this point!"
 
@@ -329,3 +387,49 @@ def canonical_comparison(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+def only_positive_coefficients(lst_of_expr):
+    """
+        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
+        This can simplify a wsum into sum.
+        cpm_expr is expected to be a canonical comparison.
+        Only apply after applying canonical_comparison(cpm_expr)
+
+        Resulting expression is linear.
+    """
+    newlist = []
+    for cpm_expr in lst_of_expr:
+        if isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
+
+            #    ... -c*b + ... <= k
+            # :: ... -c*(1 - ~b) + ... <= k
+            # :: ... -c + c* ~b + ... <= k
+            # :: ... + c*~b + ... <= k+c
+            if lhs.name == "wsum":
+                weights, args = lhs.args
+                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
+                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
+                rhs += sum(-weights[i] for i in idxes)
+
+                # Simplify wsum to sum if all weights are 1
+                if all(w == 1 for w in nw):
+                    lhs = Operator("sum", [list(na)])
+                else:
+                    lhs = Operator("wsum", [list(nw), list(na)])
+
+            newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
+
+        # reification
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            cond, subexpr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
+                                                   f"`linearize_constraint` before calling `only_positive_coefficients` "
+            subexpr = only_positive_coefficients([subexpr])
+            newlist += [cond.implies(expr) for expr in subexpr]
+
+        else:
+            newlist.append(cpm_expr)
+
+    return newlist
+

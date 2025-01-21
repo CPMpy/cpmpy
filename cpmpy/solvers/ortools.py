@@ -4,7 +4,12 @@
 ## ortools.py
 ##
 """
-    Interface to ortools' CP-SAT Python API
+    Interface to OR-Tools' CP-SAT Python API. 
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can be installed through `pip`:
+
+        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
@@ -22,6 +27,10 @@
         :nosignatures:
 
         CPM_ortools
+
+    ==============
+    Module details
+    ==============
 """
 import sys  # for stdout checking
 import numpy as np
@@ -32,17 +41,19 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list, reel_to_int
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
+from ..transformations.safening import no_partial_functions
+
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the python 'ortools' CP-SAT API
+    Interface to the Python 'ortools' CP-SAT API
 
     Requires that the 'ortools' python package is installed:
     $ pip install ortools
@@ -63,8 +74,10 @@ class CPM_ortools(SolverInterface):
         try:
             import ortools
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -79,10 +92,10 @@ class CPM_ortools(SolverInterface):
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+        - subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("Install the python 'ortools' package to use this solver interface")
+            raise Exception("CPM_ortools: Install the python package 'ortools' to use this solver interface.")
 
         from ortools.sat.python import cp_model as ort
 
@@ -98,6 +111,12 @@ class CPM_ortools(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.ort_model
 
 
     def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
@@ -133,6 +152,8 @@ class CPM_ortools(SolverInterface):
 
         """
         from ortools.sat.python import cp_model as ort
+        # ensure all user vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
         # set time limit?
         if time_limit is not None:
@@ -196,12 +217,19 @@ class CPM_ortools(SolverInterface):
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
-                    cpm_var._value = None  # probably got optimized away by our transformations
+                    raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - "
+                                     f"please report on github...")
 
             # translate objective
             if self.has_objective():
-                self.objective_value_ = self.ort_solver.ObjectiveValue()
-
+                ort_obj_val = self.ort_solver.ObjectiveValue()
+                if round(ort_obj_val) == ort_obj_val: # it is an integer?
+                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
+                else: # can happen when using floats as coeff in objective
+                    self.objective_value_ = float(ort_obj_val)
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
         return has_sol
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
@@ -301,14 +329,14 @@ class CPM_ortools(SolverInterface):
         # sum or weighted sum
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == 'sum':
-                return sum(self.solver_vars(cpm_expr.args))  # OR-Tools supports this
+                return ort.LinearExpr.sum(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == "sub":
                 a,b = self.solver_vars(cpm_expr.args)
                 return a - b
             elif cpm_expr.name == 'wsum':
                 w = cpm_expr.args[0]
                 x = self.solver_vars(cpm_expr.args[1])
-                return sum(wi*xi for wi,xi in zip(w,x))  # XXX is there a more direct way?
+                return ort.LinearExpr.weighted_sum(x,w)
 
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
@@ -328,7 +356,8 @@ class CPM_ortools(SolverInterface):
         :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "cumulative", "circuit", "inverse"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = reel_to_int(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -446,13 +475,27 @@ class CPM_ortools(SolverInterface):
                     if not is_num(divisor):
                         if divisor.lb <= 0 and divisor.ub >= 0:
                             raise Exception(
-                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). Even if you add a constraint that it can not be '0'. You MUST use a variable that is defined to be higher or lower than '0'.")
+                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is "
+                                    f"in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). "
+                                    f"Even if you add a constraint that it can not be '0'. You MUST use a variable "
+                                    f"that is defined to be higher or lower than '0'.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
-                    assert (lhs.args[1] == 2), "Ort: 'pow', only var**2 supported, no other exponents"
-                    b = self.solver_var(lhs.args[0])
-                    return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"OR-Tools does not support power constraints with variable as exponent, got {lhs}")
+                    if lhs.args[1] == 2:
+                        b = self.solver_var(lhs.args[0])
+                        return self.ort_model.AddMultiplicationEquality(ortrhs, [b,b])
+                    else: # need to create intermediate vars, post (((b * b) * b) * ...) * b == IV
+                        b, n = lhs.args
+                        new_lhs = 1
+                        for exp in range(n):
+                            new_lhs, new_cons = get_or_make_var(b * new_lhs)
+                            self += new_cons
+                        return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
+
+
             raise NotImplementedError(
                         "Not a known supported ORTools left-hand-side '{}' {}".format(lhs.name, cpm_expr))
 
@@ -463,12 +506,23 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
-                array, table = self.solver_vars(cpm_expr.args)
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                array = self.solver_vars(array)
+                return self.ort_model.AddForbiddenAssignments(array, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "no_overlap":
+                start, dur, end = self.solver_vars(cpm_expr.args)
+                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
@@ -489,7 +543,8 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
             else:
-                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
+                raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
+                                          f"If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
         elif isinstance(cpm_expr, _BoolVarImpl):
@@ -688,10 +743,10 @@ try:
                         cpm_var._value = self.Value(self._varmap[cpm_var])
 
                 if isinstance(self._display, Expression):
-                    print(self._display.value())
+                    print(argval(self._display))
                 elif isinstance(self._display, list):
                     # explicit list of expressions to display
-                    print([v.value() for v in self._display])
+                    print(argvals(self._display))
                 else: # callable
                     self._display()
 

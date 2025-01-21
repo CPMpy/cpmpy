@@ -6,9 +6,6 @@
 """
     Utilities for handling solvers
 
-    Contains a static variable `builtin_solvers` that lists
-    CPMpy solvers (first one is the default solver by default)
-
     =================
     List of functions
     =================
@@ -26,17 +23,20 @@ from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
 from .z3 import CPM_z3
+from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
+from .choco import CPM_choco
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
         Recursively yield all combinations of param values
 
         For example usage, see `examples/advanced/hyperparameter_search.py`
+        https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/hyperparameter_search.py
 
         - all_params is a dict of {key: list} items, e.g.:
-            {'val': [1,2], 'opt': [True,False]}
+          {'val': [1,2], 'opt': [True,False]}
 
         - output is an generator over all {key:value} combinations
           of the keys and values. For the example above:
@@ -48,7 +48,6 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         cur_params = dict()
 
     cur_key = remaining_keys[0]
-    myresults = [] # (runtime, cur_params)
     for cur_value in all_params[cur_key]:
         cur_params[cur_key] = cur_value
         if len(remaining_keys) == 1:
@@ -72,10 +71,12 @@ class SolverLookup():
         return [("ortools", CPM_ortools),
                 ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
+                ("gcs", CPM_gcs),
                 ("gurobi", CPM_gurobi),
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
+                ("choco", CPM_choco),
                ]
 
     @classmethod
@@ -123,18 +124,16 @@ class SolverLookup():
         if ':' in solvername:
             solvername,_ = solvername.split(':',maxsplit=1)
 
-
         for (basename, CPM_slv) in cls.base_solvers():
             if basename == solvername:
                 # found the right solver
                 return CPM_slv
-
-        return None
+        raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
 # Order matters! first is default, then tries second, etc...
-builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact]
+builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, CPM_choco]
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.

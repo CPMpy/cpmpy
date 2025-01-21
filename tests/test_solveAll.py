@@ -29,8 +29,7 @@ class TestSolveAll(unittest.TestCase):
                 count = solver.solveAll(solution_limit=1000, display=add_sol)
             self.assertEqual(3, count)
             self.assertSetEqual(sols,
-                                {"[True, True]","[True, False]","[False, True]"})
-
+                                {"[True, True]", "[True, False]", "[False, True]"})
 
     def test_solveall_with_obj(self):
 

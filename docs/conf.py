@@ -20,11 +20,11 @@ import cpmpy
 # -- Project information -----------------------------------------------------
 
 project = 'CPMpy'
-copyright = '2024, Tias Guns'
+copyright = '2025, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.19'
+release = '0.9.24'
 
 # variables to be accessed from html
 html_context = {
@@ -42,10 +42,26 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'm2r2',
+    'myst_parser',
     'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver'
+]
+
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
 ]
 
 numpydoc_show_class_members = False

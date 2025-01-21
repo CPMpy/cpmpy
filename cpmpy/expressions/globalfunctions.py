@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#-*- coding:utf-8 -*-
 ##
 ## globalfunctions.py
 ##
 """
+    Global functions conveniently express numerical global constraints.
 
     Using global functions
     ------------------------
@@ -57,17 +58,19 @@
         Maximum
         Element
         Count
+        Among
         NValue
         Abs
 
 """
-import copy
 import warnings  # for deprecation warning
 import numpy as np
+import cpmpy as cp
+
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, _NumVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds
+from .variables import boolvar, intvar, cpm_array
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
 
 
 class GlobalFunction(Expression):
@@ -130,15 +133,10 @@ class Minimum(GlobalFunction):
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
-        from .python_builtins import any, all
-        if cpm_op == "==":  # can avoid creating aux var
-            return [any(x <= cpm_rhs for x in self.args),
-                    all(x >= cpm_rhs for x in self.args)], []
-
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
         return [eval_comparison(cpm_op, _min, cpm_rhs)], \
-               [any(x <= _min for x in self.args), all(x >= _min for x in self.args), ]
+               [cp.any(x <= _min for x in self.args), cp.all(x >= _min for x in self.args), ]
 
     def get_bounds(self):
         """
@@ -171,15 +169,10 @@ class Maximum(GlobalFunction):
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
-        from .python_builtins import any, all
-        if cpm_op == "==":  # can avoid creating aux var here
-            return [any(x >= cpm_rhs for x in self.args),
-                    all(x <= cpm_rhs for x in self.args)], []
-
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
         return [eval_comparison(cpm_op, _max, cpm_rhs)], \
-               [any(x >= _max for x in self.args), all(x <= _max for x in self.args)]
+               [cp.any(x >= _max for x in self.args), cp.all(x <= _max for x in self.args)]
 
     def get_bounds(self):
         """
@@ -190,7 +183,7 @@ class Maximum(GlobalFunction):
 
 class Abs(GlobalFunction):
     """
-        Computes the maximum value of the arguments
+        Computes the absolute value of the argument
     """
 
     def __init__(self, expr):
@@ -257,7 +250,8 @@ class Element(GlobalFunction):
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
                 return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}")
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return None # default
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
@@ -271,8 +265,6 @@ class Element(GlobalFunction):
                    they should be enforced toplevel.
 
         """
-        from .python_builtins import any
-
         arr, idx = self.args
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)], []
@@ -318,6 +310,35 @@ class Count(GlobalFunction):
         arr, val = self.args
         return 0, len(arr)
 
+
+
+class Among(GlobalFunction):
+    """
+        The Among (numerical) global constraint represents the number of variable that take values among the values in arr
+    """
+
+    def __init__(self,arr,vals):
+        if not is_any_list(arr) or not is_any_list(vals):
+            raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+        if any(isinstance(val, Expression) for val in vals):
+            raise TypeError(f"Among takes a set of values as input, not {vals}")
+        super().__init__("among", [arr,vals])
+
+    def decompose_comparison(self, cmp_op, cmp_rhs):
+        """
+            Among(arr, vals) can only be decomposed if it's part of a comparison'
+        """
+        arr, values = self.args
+        count_for_each_val = [Count(arr, val) for val in values]
+        return [eval_comparison(cmp_op, cp.sum(count_for_each_val), cmp_rhs)], []
+
+    def value(self):
+        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
+
+    def get_bounds(self):
+        return 0, len(self.args[0])
+
+
 class NValue(GlobalFunction):
 
     """
@@ -338,7 +359,6 @@ class NValue(GlobalFunction):
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
         """
-        from .python_builtins import sum, any
 
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
@@ -351,9 +371,9 @@ class NValue(GlobalFunction):
         args = cpm_array(self.args)
         # bvar is true if the value is taken by any variable
         for bv, val in zip(bvars, range(lb, ub+1)):
-            constraints += [any(args == val) == bv]
+            constraints += [cp.any(args == val) == bv]
 
-        return [eval_comparison(cmp_op, sum(bvars), cpm_rhs)], constraints
+        return [eval_comparison(cmp_op, cp.sum(bvars), cpm_rhs)], constraints
 
     def value(self):
         return len(set(argval(a) for a in self.args))
@@ -363,3 +383,58 @@ class NValue(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 1, len(self.args)
+
+
+class NValueExcept(GlobalFunction):
+
+    """
+        The NValueExceptN constraint counts the number of distinct values,
+            not including value N, if any argument is assigned to it.
+    """
+
+    def __init__(self, arr, n):
+        if not is_any_list(arr):
+            raise ValueError("NValueExcept takes an array as input")
+        if not is_num(n):
+            raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
+        super().__init__("nvalue_except",[arr, n])
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        """
+        NValue(arr) can only be decomposed if it's part of a comparison
+
+        Based on "simple decomposition" from:
+            Bessiere, Christian, et al. "Decomposition of the NValue constraint."
+            International Conference on Principles and Practice of Constraint Programming.
+            Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+        """
+
+        arr, n = self.args
+        arr = cpm_array(arr)
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+
+        constraints = []
+
+        # introduce boolvar for each possible value
+        bvars = boolvar(shape=(ub + 1 - lb))
+        idx_of_n = n - lb
+        if 0 <= idx_of_n < len(bvars):
+            count_of_vals = cp.sum(bvars[:idx_of_n]) + cp.sum(bvars[idx_of_n+1:])
+        else:
+            count_of_vals = cp.sum(bvars)
+
+        # bvar is true if the value is taken by any variable
+        for bv, val in zip(bvars, range(lb, ub + 1)):
+            constraints += [cp.any(arr == val) == bv]
+
+        return [eval_comparison(cmp_op, count_of_vals, cpm_rhs)], constraints
+
+    def value(self):
+        return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        return 0, len(self.args)
