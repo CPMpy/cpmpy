@@ -3,7 +3,7 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -92,6 +92,32 @@ class TestTransLinearize(unittest.TestCase):
         print(len(cons_vals))
         self.assertTrue(all(cons_vals))
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
+
+
+    def test_alldiff(self):
+        # alldiff has a specialized linearization
+
+        x = cp.intvar(1, 5, shape=3, name="x")
+        cons = cp.AllDifferent(x)
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 5 * 4 * 3)
+
+        # should also work with constants in arguments
+        x,y,z = x
+        cons = cp.AllDifferent([x,3,y,True,z])
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
+
 
 
 class TestConstRhs(unittest.TestCase):
@@ -296,3 +322,17 @@ class testCanonical_comparison(unittest.TestCase):
         cons = canonical_comparison(cons)[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
+    def test_only_positive_coefficients(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1],[a,b,c]]) > 0])
+        self.assertEqual(str([Operator("sum",[a, b, ~c]) > 1]), str(only_pos))
+
+    def test_only_positive_coefficients_implied(self):
+        a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
+        only_pos = only_positive_coefficients([p.implies(Operator("wsum",[[1,1,-1],[a,b,c]]) > 0)])
+        self.assertEqual(str([p.implies(Operator("sum",[a, b, ~c]) > 1)]), str(only_pos))
+
+    def test_only_positive_coefficients_pb_and_int(self):
+        a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
+        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
+        self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
