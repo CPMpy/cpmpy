@@ -116,8 +116,16 @@ class CPM_cpo(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-            # LogVerbosity, prints information about the search.
-            # Choose a value from  [‘Quiet’, ‘Terse’, ‘Normal’, ‘Verbose’]. Default value is ‘Quiet’.
+            # LogVerbosity, this parameter determines the verbosity of the search log
+              Choose a value from  [‘Quiet’, ‘Terse’, ‘Normal’, ‘Verbose’]. Default value is ‘Quiet’.
+            # OptimalityTolerance: This parameter sets an absolute tolerance on the objective value for optimization models.
+            The value is a positive float. Default value is 1e-09.
+            # RelativeOptimalityTolerance This parameter sets a relative tolerance on the objective value for optimization models.
+            The optimality of a solution is proven if either of the two parameters’ criteria is fulfilled.
+            # Presolve: This parameter controls the presolve of the model to produce more compact formulations and to achieve more domain reduction. Possible values for this parameter are On (presolve is activated) and Off (presolve is deactivated).
+            The value is a symbol in [‘On’, ‘Off’]. Default value is ‘On’.
+            # Workers: This parameter sets the number of workers to run in parallel to solve your model.
+            # The value is a positive integer. Default value is Auto. (Auto = use all available CPU cores)
             # all solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
         """
         # call the solver, with parameters
