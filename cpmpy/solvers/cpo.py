@@ -93,19 +93,10 @@ class CPM_cpo(SolverInterface):
         if not self.executable_installed():
             raise Exception("You need to install the CPLEX Optimization Studio to use this solver.")
 
-        dom = self.get_docp().model
+        import docplex.cp.model as dom
         assert subsolver is None
-
-        # initialise the native solver object
-        # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
-        #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.cpo_model = dom.CpoModel()
-
-        # initialise everything else and post the constraints/objective
-        # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
-        #           internally, the constructor relies on __add__ which uses the above solver native object(s)
         super().__init__(name="cpo", cpm_model=cpm_model)
-
 
     def solve(self, time_limit=None, **kwargs):
         """
