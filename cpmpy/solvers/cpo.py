@@ -50,6 +50,15 @@ class CPM_cpo(SolverInterface):
     - cpo_model: object, CP Optimizers model object
     """
 
+    _docp = None  # Static attribute to hold the docplex.cp module
+
+    @classmethod
+    def get_docp(cls):
+        if cls._docp is None:
+            import docplex.cp as docp  # Import only once
+            cls._docp = docp
+        return cls._docp
+
     @staticmethod
     def supported():
         return CPM_cpo.installed() and CPM_cpo.executable_installed()
@@ -84,7 +93,7 @@ class CPM_cpo(SolverInterface):
         if not self.executable_installed():
             raise Exception("You need to install the CPLEX Optimization Studio to use this solver.")
 
-        import docplex.cp.model as dom
+        dom = self.get_docp().model
         assert subsolver is None
 
         # initialise the native solver object
@@ -117,7 +126,9 @@ class CPM_cpo(SolverInterface):
         #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
 
         # call the solver, with parameters
-        self.cpo_result = self.cpo_model.solve(LogVerbosity='Quiet', TimeLimit=time_limit, **kwargs)
+        if 'LogVerbosity' not in kwargs:
+            kwargs['LogVerbosity'] = 'Quiet'
+        self.cpo_result = self.cpo_model.solve(TimeLimit=time_limit, **kwargs)
         # [GUIDELINE] consider saving the status as self.TPL_status so that advanced CPMpy users can access the status object.
         #       This is mainly useful when more elaborate information about the solve-call is saved into the status
 
@@ -186,7 +197,7 @@ class CPM_cpo(SolverInterface):
             Returns: number of solutions found
         """
 
-        import docplex.cp as docp
+        docp = self.get_docp()
         #cpo_solver = self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, LogVerbosity='Quiet', **kwargs)
         solution_count = 0
         if solution_limit is None:
@@ -230,7 +241,7 @@ class CPM_cpo(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        import docplex.cp as docp
+        docp = self.get_docp()
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
@@ -265,7 +276,7 @@ class CPM_cpo(SolverInterface):
 
             are permanently posted to the solver)
         """
-        import docplex.cp.modeler as dom
+        dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
         expr = self._cpo_expr(expr)
@@ -276,40 +287,6 @@ class CPM_cpo(SolverInterface):
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
-
-    def _make_numexpr(self, cpm_expr):
-        """
-            Converts a numeric CPMpy 'flat' expression into a solver-specific numeric expression
-
-            Primarily used for setting objective functions, and optionally in constraint posting
-        """
-
-        # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
-        #       in that case, this function may be removed and a case-by-case analysis of the numerical expression
-        #           used in the constraint at hand is required in __add__
-        #       For an example of such solver interface, check out solvers/choco.py or solvers/exact.py
-
-        if is_num(cpm_expr):
-            return cpm_expr
-
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
-            return self.solver_var(cpm_expr)
-
-        # any solver-native numerical expression
-        if isinstance(cpm_expr, Operator):
-           if cpm_expr.name == 'sum':
-               return self.TPL_solver.sum(self.solver_vars(cpm_expr.args))
-           elif cpm_expr.name == 'wsum':
-               weights, vars = cpm_expr.args
-               return self.TPL_solver.weighted_sum(weights, self.solver_vars(vars))
-           # [GUIDELINE] or more fancy ones such as max
-           #        be aware this is not the Maximum CONSTRAINT, but rather the Maximum NUMERICAL EXPRESSION
-           elif cpm_expr.name == "max":
-               return self.TPL_solver.maximum_of_vars(self.solver_vars(cpm_expr.args))
-           # ...
-        raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
-
 
     # `__add__()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -334,11 +311,7 @@ class CPM_cpo(SolverInterface):
         supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain', 'max', 'min',
                      "negative_table", 'abs'}
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
-        '''cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !='''
-        # ...
+        # no flattening required
         return cpm_cons
 
     def __add__(self, cpm_expr):
@@ -378,7 +351,7 @@ class CPM_cpo(SolverInterface):
             Accepts single constraints or a list thereof, return type changes accordingly.
 
         """
-        import docplex.cp.modeler as dom
+        dom = self.get_docp().modeler
         if is_any_list(cpm_con):
             # arguments can be lists
             return [self._cpo_expr(con) for con in cpm_con]
@@ -485,7 +458,5 @@ class CPM_cpo(SolverInterface):
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return dom.count_different(self._cpo_expr(cpm_con.args))
-
-
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
