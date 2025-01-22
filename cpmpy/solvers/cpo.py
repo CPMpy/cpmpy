@@ -1,4 +1,5 @@
 import shutil
+import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
@@ -61,7 +62,7 @@ class CPM_cpo(SolverInterface):
 
     @staticmethod
     def supported():
-        return CPM_cpo.installed() and CPM_cpo.executable_installed()
+        return CPM_cpo.installed() and CPM_cpo.license_ok()
 
     @staticmethod
     def installed():
@@ -73,11 +74,18 @@ class CPM_cpo(SolverInterface):
             return False
 
     @staticmethod
-    def executable_installed():
-        if shutil.which('cpoptimizer') is None:
+    def license_ok():
+        if not CPM_cpo.installed():
+            warnings.warn(f"License check failed, python package 'docplex' is not installed! Please check 'CPM_cpo.installed()' before attempting to check license.")
             return False
         else:
-            return True
+            try:
+                from docplex.cp.model import CpoModel
+                mdl = CpoModel()
+                mdl.solve()
+                return True
+            except:
+                return False
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -90,7 +98,7 @@ class CPM_cpo(SolverInterface):
         if not self.installed():
             raise Exception("CPM_cpo: Install the python package 'docplex'")
 
-        if not self.executable_installed():
+        if not self.license_ok():
             raise Exception("You need to install the CPLEX Optimization Studio to use this solver.")
 
         import docplex.cp.model as dom
