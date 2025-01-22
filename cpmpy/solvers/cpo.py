@@ -15,7 +15,8 @@ from ..transformations.decompose_global import decompose_in_tree
 """
     Interface to CP Optimizers API
 
-    <some information on the solver>
+    CP Optimizer, also a feature of IBM ILOG Optimization Studio, is a software library of constraint programming tools 
+    supporting constraint propagation, domain reduction, and highly optimized solution search.
 
     Documentation of the solver's own Python API: (all modeling functions)
     https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
@@ -27,7 +28,7 @@ from ..transformations.decompose_global import decompose_in_tree
     .. autosummary::
         :nosignatures:
 
-        CPM_template
+        CPM_cpo
 """
 
 class CPM_cpo(SolverInterface):
@@ -115,21 +116,14 @@ class CPM_cpo(SolverInterface):
             - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-            # [GUIDELINE] Please document key solver arguments that the user might wish to change
-            #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
-            # [GUIDELINE] Add link to documentation of all solver parameters
+            # LogVerbosity, prints information about the search.
+            # Choose a value from  [‘Quiet’, ‘Terse’, ‘Normal’, ‘Verbose’]. Default value is ‘Quiet’.
+            # all solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
         """
-
-        # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
-        #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
-        #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
-
         # call the solver, with parameters
         if 'LogVerbosity' not in kwargs:
             kwargs['LogVerbosity'] = 'Quiet'
         self.cpo_result = self.cpo_model.solve(TimeLimit=time_limit, **kwargs)
-        # [GUIDELINE] consider saving the status as self.TPL_status so that advanced CPMpy users can access the status object.
-        #       This is mainly useful when more elaborate information about the solve-call is saved into the status
 
         # new status, translate runtime
         self.cpo_status = self.cpo_result.get_solve_status()
