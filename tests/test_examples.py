@@ -46,7 +46,7 @@ class TestExamples(unittest.TestCase):
         pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))  # returns
 
     # run again with gurobi, if installed on system
-    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate"]):
+    if any(x in example for x in ["npuzzle","tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
         # exclude those, too slow or solver specific
         return
     gbi_slv = SolverLookup.lookup("gurobi")
@@ -60,7 +60,7 @@ class TestExamples(unittest.TestCase):
             SolverLookup.base_solvers = f
 
     # run again with minizinc, if installed on system
-    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py']:
+    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py', './examples/sudoku_ratrun1.py', './examples/sudoku_chockablock.py']:
         # except for these too slow ones
         return
     mzn_slv = SolverLookup.lookup('minizinc')
