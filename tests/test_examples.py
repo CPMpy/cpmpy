@@ -46,7 +46,7 @@ class TestExamples(unittest.TestCase):
         pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))  # returns
 
     # run again with gurobi, if installed on system
-    if any(x in example for x in ["npuzzle","tst_likevrp","ortools_presolve_propagate", './examples/sudoku_ratrun1.py']):
+    if any(x in example for x in ["npuzzle","tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
         # exclude those, too slow or solver specific
         return
     gbi_slv = SolverLookup.lookup("gurobi")
