@@ -83,8 +83,6 @@ def regroup_to_blocks(grid):
 
     return blocks
 
-print(cells)
-
 m = cp.Model(
 
     # all totals different
@@ -131,19 +129,12 @@ m = cp.Model(
 
 )
 blocks = regroup_to_blocks(cells)
-print(blocks)
-
 
 for i in range(cells.shape[0]):
     m += cp.AllDifferent(cells[i,:])
     m += cp.AllDifferent(cells[:,i])
     m += cp.AllDifferent(blocks[i])
 
-
-print(m)
-print(f"The model contains {len(m.constraints)} constraints")
-
 sol = m.solve()
-print(m.status())
+print("The solution is:")
 print(cells.value())
-print(totals.value())

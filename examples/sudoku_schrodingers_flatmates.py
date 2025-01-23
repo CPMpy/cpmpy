@@ -76,7 +76,7 @@ def regroup_to_blocks(grid):
 
 
 blocks = regroup_to_blocks(cells)
-print(blocks)
+
 schrodinger_blocks = regroup_to_blocks(schrodinger)
 
 for i in range(cells.shape[0]):
@@ -88,13 +88,10 @@ for i in range(cells.shape[0]):
     m += cp.sum(schrodinger[:,i]) != -6
     m += cp.sum(schrodinger_blocks[i]) != -6
 
-print(cells)
-
-print(m)
-print(f"The model contains {len(m.constraints)} constraints")
-
 sol = m.solve()
-print(m.status())
+print("The solution is:")
 print(cells.value())
+print("With these schrödinger cells (-1 if not schrödinger):")
 print(schrodinger.value())
+print("Resulting in these true values:")
 print(values.value())

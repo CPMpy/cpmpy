@@ -53,12 +53,6 @@ def missing(array, removed):
     # every row and column has one missing digit
     return cp.all([removed != elm for elm in array])
 
-print(cells)
-print(duplicate_rs)
-print(duplicate_cs)
-print(removals_rs)
-print(removals_cs)
-
 m = cp.Model(
     # zipper lines
     zipper(np.concatenate((cells[:,1], [cells[5,0]]))),
@@ -99,13 +93,14 @@ m = cp.Model(
 
 )
 
-print(m)
-print(f"The model contains {len(m.constraints)} constraints")
-
 sol = m.solve()
-print(m.status())
+print("The solution is:")
 print(cells.value())
-print(duplicate_cs.value())
+print("The duplicates in rows are:")
 print(duplicate_rs.value())
+print("The duplicates in columns are:")
+print(duplicate_cs.value())
+print("The removed digits in rows are:")
 print(removals_rs.value())
+print("The removed digits in columns are:")
 print(removals_cs.value())
