@@ -60,7 +60,7 @@ class TestExamples(unittest.TestCase):
             SolverLookup.base_solvers = f
 
     # run again with minizinc, if installed on system
-    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py', './examples/sudoku_ratrun1.py']:
+    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py', './examples/sudoku_ratrun1.py', './examples/sudoku_chockablock.py']:
         # except for these too slow ones
         return
     mzn_slv = SolverLookup.lookup('minizinc')
