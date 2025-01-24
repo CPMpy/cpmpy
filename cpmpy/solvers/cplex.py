@@ -308,7 +308,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","abs","pow","div"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -357,32 +357,25 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
                 elif lhs.name == 'div':
-                    if not is_num(lhs.args[1]):
-                        raise NotSupportedError(f"cplex only supports division by constants, but got {lhs.args[1]}")
+                    #TODO should be linearized away since cplex doesn't use integer division
+                    raise NotSupportedError(f"cplex only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
                     self.cplex_model.add_constraint(a / b == cplexrhs)
 
                 else:
                     # General constraints
-                    # cplexrhs should be a variable for gurobi in the subsequent, fake it
-                    if is_num(cplexrhs):
-                        cplexrhs = self.solver_var(intvar(lb=cplexrhs, ub=cplexrhs))
-
                     if lhs.name == 'min':
-                        self.cplex_model.addGenConstrMin(cplexrhs, self.solver_vars(lhs.args))
+                        self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'max':
-                        self.cplex_model.addGenConstrMax(cplexrhs, self.solver_vars(lhs.args))
+                        self.cplex_model.add_constraint(self.cplex_model.max(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'abs':
-                        self.cplex_model.addGenConstrAbs(cplexrhs, self.solver_var(lhs.args[0]))
-                    elif lhs.name == 'pow':
-                        x, a = self.solver_vars(lhs.args)
-                        self.cplex_model.addGenConstrPow(x, cplexrhs, a)
+                        self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
                     else:
                         raise NotImplementedError(
-                        "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
             else:
                 raise NotImplementedError(
-                "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+                "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
 
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             # Indicator constraints
@@ -391,9 +384,9 @@ class CPM_cplex(SolverInterface):
             assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
             if isinstance(cond, NegBoolView):
-                cond, bool_val = self.solver_var(cond._bv), False
+                cond, trigger_val = self.solver_var(cond._bv), 0
             else:
-                cond, bool_val = self.solver_var(cond), True
+                cond, trigger_val = self.solver_var(cond), 1
 
             lhs, rhs = sub_expr.args
             if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
@@ -401,17 +394,17 @@ class CPM_cplex(SolverInterface):
             else:
                 raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             if sub_expr.name == "<=":
-                self.cplex_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
+                self.cplex_model.add_indicator(cond, lin_expr <= self.solver_var(rhs), trigger_val)
             elif sub_expr.name == ">=":
-                self.cplex_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
+                self.cplex_model.add_indicator(cond, lin_expr >= self.solver_var(rhs), trigger_val)
             elif sub_expr.name == "==":
-                self.cplex_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
+                self.cplex_model.add_indicator(cond, lin_expr == self.solver_var(rhs), trigger_val)
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.cplex_model.addConstr(cpm_expr.args[0])
+            self.cplex_model.add_constraint(cpm_expr.args[0])
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
@@ -441,7 +434,7 @@ class CPM_cplex(SolverInterface):
         """
 
         if time_limit is not None:
-            self.cplex_model.setParam("TimeLimit", time_limit)
+            self.cplex_model.set_time_limit(time_limit)
 
         if solution_limit is None:
             raise Exception(
