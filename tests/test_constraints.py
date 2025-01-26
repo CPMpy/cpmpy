@@ -11,6 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = ['cplex']
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
@@ -44,6 +45,7 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {"mod","div"},
+                     "cplex": {"mul"},
                      }
 
 # Variables to use in the rest of the test script

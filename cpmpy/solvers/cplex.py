@@ -140,6 +140,7 @@ class CPM_cplex(SolverInterface):
                 - clean_before_solve (optional) – a boolean (default is False). Solve normally picks up where the previous solve left, but if this flag is set to True, a fresh solve is started, forgetting all about previous solves..
 
             For a full list of parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
+            and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -151,14 +152,13 @@ class CPM_cplex(SolverInterface):
         self.cplex_model.solve(**kwargs)
         # all available solve details:
         # https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
-        cplex_status = self.cplex_model.solve_details.status
-
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.cplex_model.runtime
-
+        self.cpm_status.runtime = self.cplex_model.solve_details.time
         # translate solver exit status to CPMpy exit status
+        cplex_status = self.cplex_model.solve_details.status
+        print(cplex_status)
         if cplex_status == "Feasible":
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif cplex_status == "Infeasible":
@@ -166,7 +166,7 @@ class CPM_cplex(SolverInterface):
         elif cplex_status == "Unknown":
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        elif cplex_status == "Optimal":
+        elif cplex_status == "integer optimal solution":
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
@@ -261,8 +261,6 @@ class CPM_cplex(SolverInterface):
 
             Used especially to post an expression as objective function
         """
-        import gurobipy as gp
-
         if is_num(cpm_expr):
             return cpm_expr
 
@@ -272,13 +270,14 @@ class CPM_cplex(SolverInterface):
 
         # sum
         if cpm_expr.name == "sum":
-            return gp.quicksum(self.solver_vars(cpm_expr.args))
+            return self.cplex_model.sum_vars(self.solver_vars(cpm_expr.args))
         if cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
         # wsum
         if cpm_expr.name == "wsum":
-            return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+            w, t = cpm_expr.args
+            return self.cplex_model.scal_prod(self.solver_vars(t), w)
 
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
@@ -438,7 +437,7 @@ class CPM_cplex(SolverInterface):
 
         if solution_limit is None:
             raise Exception(
-                "Gurobi does not support searching for all solutions. If you really need all solutions, "
+                "CPLEX does not support searching for all solutions. If you really need all solutions, "
                 "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
