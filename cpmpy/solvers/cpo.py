@@ -199,7 +199,6 @@ class CPM_cpo(SolverInterface):
         """
 
         docp = self.get_docp()
-        #cpo_solver = self.cpo_model.start_search(TimeLimit=time_limit, SolutionLimit=solution_limit, LogVerbosity='Quiet', **kwargs)
         solution_count = 0
         while solution_limit is None or solution_count < solution_limit:
             cpo_result = self.solve(time_limit=time_limit, **kwargs)
