@@ -206,11 +206,6 @@ class CPM_cpo(SolverInterface):
             if not cpo_result:
                 break
             solution_count += 1
-            '''if cpo_result.is_solution_optimal():
-                print('optimal')
-            if not cpo_result.is_new_solution():
-                break
-            solution_count += 1'''
             if self.has_objective():
                 # only find all optimal solutions
                 self.cpo_model.add(self.cpo_model.get_objective_expression().children[0] == self.objective_value_)
@@ -235,6 +230,7 @@ class CPM_cpo(SolverInterface):
                 else:
                     display()  # callback
         return solution_count
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
@@ -263,7 +259,6 @@ class CPM_cpo(SolverInterface):
 
         # return from cache
         return self._varmap[cpm_var]
-
 
     def objective(self, expr, minimize=True):
         """
