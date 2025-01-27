@@ -242,9 +242,6 @@ class CPM_cplex(SolverInterface):
         self += flat_cons
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
-        #clear any previously defined objectives:
-        self.cplex_model.clear_multi_objective()
-
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
         if minimize:
@@ -433,49 +430,26 @@ class CPM_cplex(SolverInterface):
         if time_limit is not None:
             self.cplex_model.set_time_limit(time_limit)
 
-        if solution_limit is None:
-            raise Exception(
-                "CPLEX does not support searching for all solutions. If you really need all solutions, "
-                "try setting solution limit to a large number")
-        # Force gurobi to keep searching in the tree for optimal solutions
-
-        # solve the model
-        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
-
-        optimal_val = None
-        solution_count = self.cplex_model.SolCount
-        opt_sol_count = 0
-
-        # clear user vars if no solution found
-        if solution_count == 0:
-            self.objective_value_ = None
-            for var in self.user_vars:
-                var._value = None
-
-        for i in range(solution_count):
-            # Specify which solution to query
-            self.cplex_model.setParam("SolutionNumber", i)
-            sol_obj_val = self.cplex_model.PoolObjVal
-            if optimal_val is None:
-                optimal_val = sol_obj_val
-            if optimal_val is not None:
-                # sub-optimal solutions
-                if sol_obj_val != optimal_val:
-                    break
-            opt_sol_count += 1
-
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                solver_val = self.solver_var(cpm_var).Xn
-                if cpm_var.is_bool():
-                    cpm_var._value = solver_val >= 0.5
-                else:
-                    cpm_var._value = int(solver_val)
-
-            # Translate objective
+        solution_count = 0
+        while solution_limit is None or solution_count < solution_limit:
+            cplex_result = self.solve(time_limit=time_limit, **kwargs)
+            if not cplex_result:
+                break
+            solution_count += 1
             if self.has_objective():
-                self.objective_value_ = self.cplex_model.PoolObjVal
+                # only find all optimal solutions, we know the optimal value now.
+                self.cplex_model.add_constraint(self.cplex_model.get_objective_expr() == self.objective_value_)
+                self.cplex_model.remove_objective()  # it's a hard constraint now in stead.
 
+            solvars = []
+            vals = []
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                cpm_value = cpm_var._value
+                solvars.append(sol_var)
+                vals.append(cpm_value)
+            # exclude previous solution
+            self += cp.NegativeTable(self.user_vars, [[x._value for x in self.user_vars]])
             if display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
@@ -483,8 +457,5 @@ class CPM_cplex(SolverInterface):
                     print(argvals(display))
                 else:
                     display()  # callback
+        return solution_count
 
-        # Reset pool search mode to default
-        self.cplex_model.setParam("PoolSearchMode", 0)
-
-        return opt_sol_count
