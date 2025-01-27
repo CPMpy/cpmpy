@@ -161,12 +161,12 @@ class CPM_cplex(SolverInterface):
         print(cplex_status)
         if cplex_status == "Feasible":
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif cplex_status == "Infeasible":
+        elif "infeasible" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif cplex_status == "Unknown":
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        elif cplex_status == "integer optimal solution":
+        elif "optimal" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
@@ -237,19 +237,20 @@ class CPM_cplex(SolverInterface):
             (technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver)
         """
-        from gurobipy import GRB
-
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
         self += flat_cons
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
+        #clear any previously defined objectives:
+        self.cplex_model.clear_multi_objective()
+
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
         if minimize:
-            self.cplex_model.setObjective(obj, sense=GRB.MINIMIZE)
+            self.cplex_model.set_objective('min',obj)
         else:
-            self.cplex_model.setObjective(obj, sense=GRB.MAXIMIZE)
+            self.cplex_model.set_objective('max', obj)
 
     def has_objective(self):
         return self.cplex_model.is_optimized()
@@ -279,7 +280,7 @@ class CPM_cplex(SolverInterface):
             w, t = cpm_expr.args
             return self.cplex_model.scal_prod(self.solver_vars(t), w)
 
-        raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
+        raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
     def transform(self, cpm_expr):
@@ -418,9 +419,6 @@ class CPM_cplex(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            This is the generic implementation, solvers can overwrite this with
-            a more efficient native implementation
-
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
@@ -439,9 +437,7 @@ class CPM_cplex(SolverInterface):
             raise Exception(
                 "CPLEX does not support searching for all solutions. If you really need all solutions, "
                 "try setting solution limit to a large number")
-
         # Force gurobi to keep searching in the tree for optimal solutions
-        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
 
         # solve the model
         self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
