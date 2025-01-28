@@ -239,12 +239,13 @@ class CPM_cplex(SolverInterface):
                 are premanently posted to the solver)
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
+        #(flat_obj, flat_cons) = (flatten_objective(expr))
+        #self += flat_cons
+        #get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        #obj = self._make_numexpr(flat_obj)
+        obj = self._make_numexpr(expr)
         if minimize:
             self.cplex_model.set_objective('min',obj)
         else:
@@ -260,6 +261,8 @@ class CPM_cplex(SolverInterface):
 
             Used especially to post an expression as objective function
         """
+        if is_any_list(cpm_expr):
+            return [self._make_numexpr(x) for x in cpm_expr]
         if is_num(cpm_expr):
             return cpm_expr
 
@@ -269,7 +272,7 @@ class CPM_cplex(SolverInterface):
 
         # sum
         if cpm_expr.name == "sum":
-            return self.cplex_model.sum_vars(self.solver_vars(cpm_expr.args))
+            return self.cplex_model.sum(self._make_numexpr(cpm_expr.args))
         if cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
@@ -282,6 +285,10 @@ class CPM_cplex(SolverInterface):
             a, b = self.solver_vars(cpm_expr.args)
             assert b == 2, f"only quadratic expressions are allowed, {cpm_expr} not supported"
             return a**2
+
+        #Unary '-'
+        if cpm_expr.name == '-':
+            return -self._make_numexpr(cpm_expr.args[0])
 
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
