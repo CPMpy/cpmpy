@@ -4,6 +4,7 @@ import numpy as np
 import cpmpy as cp
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -768,5 +769,74 @@ class TestSupportedSolvers:
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
+
+
+    def test_status(self, solver):
+
+        bv = cp.boolvar(shape=3, name="bv")
+        if solver == "z3": solver += ":opt"
+        s = cp.SolverLookup.get(solver)
+        s += cp.any(bv)
+
+        assert s.status().exitstatus == ExitStatus.NOT_RUN
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL # optimal, even without obj function!
+        # now try optimization, not support for all solvers
+        try:
+            s.maximize(cp.sum(bv))
+        except NotSupportedError:
+            return
+
+        assert s.solve()
+        assert s.status().exitstatus == ExitStatus.OPTIMAL
+
+        # now making a tricky problem to solve
+        np.random.seed(0)
+        start = cp.intvar(0,100, shape=50)
+        dur = np.random.randint(1,5, size=50)
+        end = cp.intvar(0,100, shape=50)
+        demand  = np.random.randint(10,15, size=50)
+
+        s += cp.Cumulative(start, dur, end,demand, 30)
+        s.minimize(cp.max(end))
+        s.solve(time_limit=1)
+        # normally, should not be able to solve within 3s...
+        assert s.status().exitstatus == ExitStatus.FEASIBLE or s.status().exitstatus == ExitStatus.UNKNOWN
+
+        # now trivally unsat
+        s += cp.sum(bv) <= 0
+
+
+    def test_status_solveall(self, solver):
+
+        bv = cp.boolvar(shape=3, name="bv")
+        m = cp.Model(cp.any(bv))
+
+        num_sols = m.solveAll(solver=solver, solution_limit=10)
+        assert num_sols == 7
+        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
+
+        # adding a bunch of variables
+        x = cp.boolvar(shape=32, name="x")
+        m = cp.Model(cp.any(x))
+        num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=100000000)
+        assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+        num_sols = m.solveAll(solver=solver, solution_limit=10)
+        assert num_sols == 10
+        assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+        # making the problem unsat
+        m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
+        num_sols = m.solveAll()
+        assert num_sols == 0
+        assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
+
+
+
+
+
+
+
 
 
