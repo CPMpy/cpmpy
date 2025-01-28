@@ -83,7 +83,7 @@ class CPM_cpo(SolverInterface):
             try:
                 from docplex.cp.model import CpoModel
                 mdl = CpoModel()
-                mdl.solve()
+                mdl.solve(LogVerbosity='Quiet')
                 return True
             except:
                 return False
