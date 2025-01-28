@@ -241,7 +241,10 @@ class CPM_exact(SolverInterface):
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif xct_status == "TIMEOUT": # found timeout
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            if self.xct_solver.hasSolution():
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError(xct_status)  # a new status type was introduced, please report on github
         
