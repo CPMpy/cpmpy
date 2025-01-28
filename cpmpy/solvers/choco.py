@@ -215,10 +215,13 @@ class CPM_choco(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # create solver object
+        self.chc_solver = self.chc_model.get_solver()
+
+        # set time limit (if given)
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
 
-        self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
@@ -232,6 +235,19 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        if len(sols): # solutions found
+            if (len(sols) == solution_limit): # matched the set limit (if given)
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # reached timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # no solutions found
+            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # if no solutions, clear values of variables
         if len(sols) == 0:

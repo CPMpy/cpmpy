@@ -44,7 +44,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals
+from ..expressions.utils import argval, flatlist, argvals
 
 import numpy as np
 import numbers
@@ -232,6 +232,8 @@ class CPM_exact(SolverInterface):
 
         self.objective_value_ = None
         # translate exit status
+        #   see 'toOptimum' documentation:
+        #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Exact.hpp?ref_type=heads#L369
         if xct_status == "UNSAT" or xct_status == "INCONSISTENT": # found unsatisfiability (potentially over assumptions)
             if self.has_objective() and self.xct_solver.hasSolution():
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
@@ -239,11 +241,13 @@ class CPM_exact(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif xct_status == "SAT": # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif xct_status == "TIMEOUT": # found timeout
-            if self.xct_solver.hasSolution():
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL # found solution (CSP)
+        elif my_status == "INCONSISTENT": # found inconsistency over assumptions
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif my_status == "TIMEOUT": # found timeout
+            if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            else:
+            else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError(xct_status)  # a new status type was introduced, please report on github
@@ -257,6 +261,15 @@ class CPM_exact(SolverInterface):
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
+
+    def _update_time(self, timelim, start, end):
+        """
+            Internal helper function to keep track of remaining time.
+        """
+        if timelim != 0:
+            timelim -= (end - start)
+            if timelim == 0: timelim = -1
+        return timelim
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -285,30 +298,52 @@ class CPM_exact(SolverInterface):
 
         timelim = time_limit if time_limit is not None else 0
 
+        total_start = time.time()
+
         if self.has_objective():
+            start = time.time()
             if not call_from_model:
                 warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
 
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
+                total_end = time.time()
                 self._fillVars() # erases the solution
+                # update exit status
+                self.cpm_status = SolverStatus(self.name)
+                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                # early exit
                 return 0
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
+                total_end = time.time()
+                # update exit status
+                self.cpm_status = SolverStatus(self.name)
+                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                # early exit
                 return 0
             else:
                 assert my_status == "SAT", "Unexpected status from Exact"
             self += self.objective_ == objval # fix obj val
+            end = time.time()
+            timelim = self._update_time(timelim, start, end) # update remaining time
+
 
         solsfound = 0
-        while solution_limit is None or solsfound < solution_limit:
+        while timelim >= 0 and (solution_limit is None or solsfound < solution_limit):
             # call the solver, with parameters
+            start = time.time()
             my_status = self.xct_solver.runFull(optimize=False, timeout=timelim)
+            end = time.time()
+            timelim = self._update_time(timelim, start, end) # update remaining time
+
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability
                 self._fillVars() # erases the solution
-                return solsfound
+                break
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
@@ -324,7 +359,27 @@ class CPM_exact(SolverInterface):
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
-                return solsfound
+                break
+        total_end = time.time()
+
+        # new status, translate runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = total_end - total_start
+
+        if solsfound: # found some solutions
+            if solsfound == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif my_status == "UNSAT": # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else:
+            if my_status == "UNSAT": # unsat problem
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif my_status == "TIMEOUT": # timeout
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise NotImplementedError(my_status) # please report on GitHub
 
         return solsfound
 

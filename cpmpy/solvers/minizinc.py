@@ -316,7 +316,10 @@ class CPM_minizinc(SolverInterface):
         # translate exit status
         mzn_status = mzn_result.status
         if mzn_status == minizinc.result.Status.SATISFIED:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if self.has_objective(): # sub-optimal solution or not proven
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else: # optimal solution
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
@@ -391,6 +394,23 @@ class CPM_minizinc(SolverInterface):
 
         # status handling
         self._post_solve(mzn_result)
+
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif mzn_result.solution is None: # last iteration didn't find a solution
+                # below states are from the second-last iteration
+                if self.cpm_status.exitstatus == ExitStatus.OPTIMAL: # timeout
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                elif self.cpm_status.exitstatus == ExitStatus.FEASIBLE: # found all solutions
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else:
+                    raise()
+
+            elif time_limit is None or self.cpm_status.runtime < time_limit: # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
         return solution_count
 
