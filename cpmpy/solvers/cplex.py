@@ -159,7 +159,6 @@ class CPM_cplex(SolverInterface):
         self.cpm_status.runtime = self.cplex_model.solve_details.time
         # translate solver exit status to CPMpy exit status
         cplex_status = self.cplex_model.solve_details.status
-        print(cplex_status)
         if cplex_status == "Feasible":
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif "infeasible" in cplex_status:
@@ -278,11 +277,6 @@ class CPM_cplex(SolverInterface):
             w, t = cpm_expr.args
             return self.cplex_model.scal_prod(self.solver_vars(t), w)
 
-        if cpm_expr.name == 'pow':
-            a, b = self.solver_vars(cpm_expr.args)
-            assert b == 2, f"only quadratic expressions are allowed, {cpm_expr} not supported"
-            return a**2
-
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
@@ -311,7 +305,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs", "pow"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -354,8 +348,7 @@ class CPM_cplex(SolverInterface):
                 self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"
-                                                           or lhs.name == "pow")):
+                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
