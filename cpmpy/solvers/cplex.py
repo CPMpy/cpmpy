@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## gurobi.py
+## cplex.py
 ##
 """
-    Interface to the python 'gurobi' package
+    Interface to the python 'docplex.mp' package
 
     Requires that the 'docplex' python package is installed:
 
         $ pip install docplex
     
-    
-    In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
-    You can read more about available licences at https://www.gurobi.com/downloads/
+    CPLEX, standing as an acronym for ‘Complex Linear Programming Expert’,
+    is a high-performance mathematical programming solver specializing in linear programming (LP),
+    mixed integer programming (MIP), and quadratic programming (QP).
 
     Documentation of the solver's own Python API:
-    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
+    https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
 
     ===============
     List of classes
@@ -48,18 +48,19 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_cplex(SolverInterface):
     """
-    Interface to Gurobi's API
+    Interface to the CPLEX solver.
+    Requires that the 'docplex' python package is installed:
+    $ pip install docplex
 
-    Requires that the 'gurobipy' python package is installed:
-    $ pip install gurobipy
-
+    docplex documentation:
+    https://ibmdecisionoptimization.github.io/docplex-doc/
+    You will also need to install CPLEX Optimization Studio from IBM's website.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
     See detailed installation instructions at:
-    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
-
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     Creates the following attributes (see parent constructor for more):
-        - cplex_model: object, TEMPLATE's model object
-
-    The `DirectConstraint`, when used, calls a function on the `cplex_model` object.
+    - cplex_model: object, CPLEX model object
     """
 
     _domp = None  # Static attribute to hold the docplex.cp module
@@ -277,6 +278,11 @@ class CPM_cplex(SolverInterface):
             w, t = cpm_expr.args
             return self.cplex_model.scal_prod(self.solver_vars(t), w)
 
+        if cpm_expr.name == 'pow':
+            a, b = self.solver_vars(cpm_expr.args)
+            assert b == 2, f"only quadratic expressions are allowed, {cpm_expr} not supported"
+            return a**2
+
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
@@ -305,7 +311,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs", "pow"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -348,7 +354,8 @@ class CPM_cplex(SolverInterface):
                 self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
+                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub"
+                                                           or lhs.name == "pow")):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
@@ -429,6 +436,9 @@ class CPM_cplex(SolverInterface):
 
         if time_limit is not None:
             self.cplex_model.set_time_limit(time_limit)
+        if not call_from_model:
+            warnings.warn("Adding constraints to solver object to find all solutions, "
+                          "solver state will be invalid after this call!")
 
         solution_count = 0
         while solution_limit is None or solution_count < solution_limit:
@@ -449,7 +459,7 @@ class CPM_cplex(SolverInterface):
                 solvars.append(sol_var)
                 vals.append(cpm_value)
             # exclude previous solution
-            self += cp.NegativeTable(self.user_vars, [[x._value for x in self.user_vars]])
+            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
             if display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
