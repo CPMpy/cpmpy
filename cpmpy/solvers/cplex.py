@@ -24,7 +24,7 @@
     .. autosummary::
         :nosignatures:
 
-        CPM_gurobi
+        CPM_cplex
 
     ==============
     Module details
@@ -127,7 +127,7 @@ class CPM_cplex(SolverInterface):
 
     def solve(self, time_limit=None, **kwargs):
         """
-            Call the gurobi solver
+            Call the cplex solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
