@@ -242,9 +242,9 @@ class CPM_exact(SolverInterface):
         elif xct_status == "SAT": # found solution, but not optimality proven
             assert self.xct_solver.hasSolution()
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL # found solution (CSP)
-        elif my_status == "INCONSISTENT": # found inconsistency over assumptions
+        elif xct_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status == "TIMEOUT": # found timeout
+        elif xct_status == "TIMEOUT": # found timeout
             if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
