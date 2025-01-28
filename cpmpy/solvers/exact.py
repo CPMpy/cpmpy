@@ -198,7 +198,7 @@ class CPM_exact(SolverInterface):
             start = time.time()
             time_left = time_limit if time_limit is not None else 0
             xct_status = self.xct_solver.runOnce(timeout=time_left)
-            while xct_status != "INCONSISTENT" and time_left >= 0:
+            while xct_status not in {"INCONSISTENT", "TIMEOUT"}:
                 self.xct_solver.boundObjByLastSol()  # ensure next one is improving
                 self._fillVars(_cpm_vars)
                 if isinstance(display, Expression):
@@ -260,8 +260,10 @@ class CPM_exact(SolverInterface):
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
+                - display:  generic solution callback for use during optimization.
+                            either a list of CPMpy expressions, OR a callback function which
+                            gets called after the variable-value mapping of the intermediate solution.
+                            default/None: nothing is displayed
                 - time_limit: stop after this many seconds (default: None)
                 - solution_limit: stop after this many solutions (default: None)
                 - call_from_model: whether the method is called from a CPMpy Model instance or not

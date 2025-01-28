@@ -775,7 +775,7 @@ class TestSupportedSolvers:
         model = cp.Model(cp.AllDifferent(vars), maximize=obj)
 
         if solver in  ("pysdd", "pysat", "minizinc", "choco"):
-            return
+            return # these solvers do not support callbacking/optimization
 
         assert model.solve(solver=solver, display=vars)
         # collect solutions using callback
