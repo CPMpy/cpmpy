@@ -187,15 +187,16 @@ class CPM_cpo(SolverInterface):
 
             If the problem is an optimization problem, returns only optimal solutions.
 
-           Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+           Args:
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
+                         Default is None, meaning nothing is displayed.
+                time_limit: Stop after this many seconds. Default is None.
+                solution_limit: Stop after this many solutions. Default is None.
+                call_from_model: Whether the method is called from a CPMpy Model instance or not.
+                **kwargs: Any other keyword arguments.
 
-            Returns: number of solutions found
+            Returns:
+                int: Number of solutions found.
         """
 
         docp = self.get_docp()
