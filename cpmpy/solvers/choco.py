@@ -33,6 +33,10 @@ import time
 import numpy as np
 
 from ..expressions.globalconstraints import Cumulative
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -42,11 +46,12 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.reification import only_bv_reifies, reify_rewrite
-from ..exceptions import ChocoBoundsException, ChocoTypeException, NotSupportedError
+from ..transformations.safening import no_partial_functions
+from ..transformations.reification import reify_rewrite
+from ..exceptions import ChocoBoundsException
 
 
 class CPM_choco(SolverInterface):
@@ -70,19 +75,20 @@ class CPM_choco(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if pychoco is installed
             import pychoco as chc
             # check it's the correct version
             # CPMPy uses features only available from 0.2.1
-            from importlib.metadata import version as get_version
-            from packaging import version
-            pychoco_version = get_version("pychoco")
-            if version.parse(pychoco_version) < version.parse("0.2.1"):
-                import warnings
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, but you have version {pychoco_version}")
-                return False
+            pkg_resources.require("pychoco>=0.2.1")
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except VersionConflict: # unsupported version of pychoco
+            warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('pychoco').version}.")
+            return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -99,7 +105,7 @@ class CPM_choco(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'pychoco' package to use this solver interface")
+            raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
 
         import pychoco as chc
 
@@ -185,6 +191,9 @@ class CPM_choco(SolverInterface):
             # translate objective
             if self.has_objective():
                 self.objective_value_ = sol.get_int_val(self.solver_var(self.obj))
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         return has_sol
 
@@ -221,6 +230,11 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        # if no solutions, clear values of variables
+        if len(sols) == 0:
+            for var in self.user_vars:
+                var._value = None
 
         # display if needed
         if display is not None:
@@ -342,6 +356,7 @@ class CPM_choco(SolverInterface):
                      "table", "regular", 'negative_table', "InDomain", "cumulative", "circuit", "subcircuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)

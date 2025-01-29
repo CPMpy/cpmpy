@@ -29,6 +29,7 @@ Internal utilities for expression handling.
         get_bounds     
 """
 
+import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
@@ -39,29 +40,27 @@ from cpmpy.exceptions import IncompleteFunctionError
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    from cpmpy import BoolVal
-    return isinstance(arg, (bool, np.bool_, BoolVal))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal))
 
 
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
     """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is False or arg is np.False_:
         return True
-    elif isinstance(arg, BoolVal):
+    elif isinstance(arg, cp.BoolVal):
         return not arg.value()
     return False
 
@@ -69,10 +68,9 @@ def is_false_cst(arg):
 def is_true_cst(arg):
     """ is the argument the constant True (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is True or arg is np.True_:
         return True
-    elif isinstance(arg, BoolVal):
+    elif isinstance(arg, cp.BoolVal):
         return arg.value()
     return False
 
@@ -196,10 +194,10 @@ def get_bounds(expr):
     """
 
     # import here to avoid circular import
-    from cpmpy.expressions.core import Expression
-    from cpmpy.expressions.variables import cpm_array
+    # from cpmpy.expressions.core import Expression
+    # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, Expression):
+    if isinstance(expr, cp.expressions.core.Expression):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])

@@ -13,6 +13,10 @@
     To ensure that, include it inside supported() and other functions that need it...
 """
 
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -61,9 +65,17 @@ class CPM_template(SolverInterface):
         # try to import the package
         try:
             import TEMPLATEpy as gp
+            # optionally enforce a specific version
+            pkg_resources.require("TEMPLATEpy>=2.1.0")
             return True
-        except ImportError:
+        except ModuleNotFoundError: # if solver's Python package is not installed
             return False
+        except VersionConflict: # unsupported version of TEMPLATEpy (optional)
+            warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('TEMPLATEpy').version}.")
+            return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -75,7 +87,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy'")
+            raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy' to use this solver interface.")
 
         import TEMPLATEpy
 
@@ -151,6 +163,10 @@ class CPM_template(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 self.objective_value_ = self.TPL_solver.ObjectiveValue()
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
 
         return has_sol
 
@@ -400,6 +416,10 @@ class CPM_template(SolverInterface):
             callback = display
 
         self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        # clear user vars if no solution found
+        if self.TPL_solver.SolutionCount() == 0:
+            for var in self.user_vars:
+                var.clear()
         return self.TPL_solver.SolutionCount()
 
         # B. Example code if solver does not support callbacks
@@ -418,5 +438,10 @@ class CPM_template(SolverInterface):
                     print([v.value() for v in display])
                 else:
                     display()  # callback
+
+        # clear user vars if no solution found
+        if solution_count == 0:
+            for var in self.user_vars:
+                var.clear()
 
         return solution_count
