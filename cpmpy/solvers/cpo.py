@@ -441,8 +441,10 @@ class CPM_cpo(SolverInterface):
                 for s,d,e,h in zip(start, dur, end, height):
                     cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s,d,e,h])
                     task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
+                    task_height = dom.pulse(task, get_bounds(h))
                     cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
-                    total_usage += [dom.pulse(task, self.solver_var(h))]
+                    cons += [cpo_h == dom.height_at_start(task, task_height)]
+                    total_usage.append(task_height)
                 cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
                 return cons
             else:
