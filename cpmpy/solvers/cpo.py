@@ -7,7 +7,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -301,7 +301,7 @@ class CPM_cpo(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs'}
+                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative'}
         supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain', 'max', 'min',
                      "negative_table", 'abs'}
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
@@ -433,7 +433,18 @@ class CPM_cpo(SolverInterface):
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
-
+            elif cpm_con.name == "cumulative":
+                start, dur, end, height, capacity = cpm_con.args
+                docp = self.get_docp()
+                total_usage = []
+                cons = []
+                for s,d,e,h in zip(start, dur, end, height):
+                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s,d,e,h])
+                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
+                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+                    total_usage += [dom.pulse(task, self.solver_var(h))]
+                cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
+                return cons
             else:
                 try:
                     cpo_global = getattr(dom, cpm_con.name)
