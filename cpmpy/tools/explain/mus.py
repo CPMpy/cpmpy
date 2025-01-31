@@ -9,12 +9,14 @@ import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
+import time
+from cpmpy.solvers.solver_interface import ExitStatus
 
 from .utils import make_assump_model
 from ...expressions.utils import is_num
 
 
-def mus(soft, hard=[], solver="ortools"):
+def mus(soft, hard=[], solver="ortools", time_limit=None):
     """
         A CP deletion-based MUS algorithm using assumption variables
         and unsat core extraction
@@ -32,7 +34,11 @@ def mus(soft, hard=[], solver="ortools"):
         :param: hard: hard constraints, optional, list of expressions
         :param: solver: name of a solver, see SolverLookup.solvernames()
             "z3" and "gurobi" are incremental, "ortools" restarts the solver
+        :param: time_limit: optional time limit in seconds
+        :return: list of constraints forming MUS, or empty list if time limit reached
     """
+    start_time = time.time()
+    
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
@@ -41,24 +47,40 @@ def mus(soft, hard=[], solver="ortools"):
     dmap = dict(zip(assump, soft))
 
     # setting all assump vars to true should be UNSAT
-    assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
-    core = set(s.get_core())  # start from solver's UNSAT core
+    solve_args = {"assumptions": assump}
+    if time_limit is not None:
+        solve_args["time_limit"] = time_limit
+        
+    if not s.solve(**solve_args):
+        if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+            return []
+        core = set(s.get_core())  # start from solver's UNSAT core
+    else:
+        assert False, "MUS: model must be UNSAT"
 
     # deletion-based MUS
     # order so that constraints with many variables are tried and removed first
     for c in sorted(core, key=lambda c : -len(get_variables(dmap[c]))):
+        if time_limit and (time.time() - start_time) > time_limit:
+            return []
         if c not in core:
             continue # already removed
         core.remove(c)
-        if s.solve(assumptions=list(core)) is True:
+        solve_args = {"assumptions": list(core)}
+        if time_limit is not None:
+            solve_args["time_limit"] = time_limit
+        s.solve(**solve_args)
+        if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+            return []
+        if s.cpm_status.exitstatus == ExitStatus.OPTIMAL or s.cpm_status.exitstatus == ExitStatus.FEASIBLE:
             core.add(c)
-        else: # UNSAT, use new solver core (clause set refinement)
+        else:
             core = set(s.get_core())
 
     return [dmap[avar] for avar in core]
 
 
-def quickxplain(soft, hard=[], solver="ortools"):
+def quickxplain(soft, hard=[], solver="ortools", time_limit=None):
     """
         Find a preferred minimal unsatisfiable subset of constraints, based on the ordering of constraints.
 
@@ -71,21 +93,41 @@ def quickxplain(soft, hard=[], solver="ortools"):
         CPMpy implementation of the QuickXplain algorithm by Junker:
             Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
+
+        :param: soft: soft constraints, list of expressions
+        :param: hard: hard constraints, optional, list of expressions
+        :param: solver: name of a solver
+        :param: time_limit: optional time limit in seconds
+        :return: list of constraints, or empty list if time limit reached
     """
+    start_time = time.time()
 
     model, soft, assump = make_assump_model(soft, hard)
     s = cp.SolverLookup.get(solver, model)
 
-    assert s.solve(assumptions=assump) is False, "The model should be UNSAT!"
+    solve_args = {"assumptions": assump}
+    if time_limit is not None:
+        solve_args["time_limit"] = time_limit
+    s.solve(**solve_args)
+    if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        return []
+    assert s.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE, "The model should be UNSAT!"
     dmap = dict(zip(assump, soft))
 
     # the recursive call
     def do_recursion(soft, hard, delta):
+        if time_limit and (time.time() - start_time) > time_limit:
+            return None
 
-        if len(delta) != 0 and s.solve(assumptions=hard) is False:
-            # conflict is in hard constraints, no need to recurse
-            return []
-
+        if len(delta) != 0:
+            solve_args = {"assumptions": hard}
+            if time_limit is not None:
+                solve_args["time_limit"] = time_limit
+            s.solve(**solve_args)
+            if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+                return None
+            if s.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                return []
         if len(soft) == 1:
             # conflict is not in hard constraints, but only 1 soft constraint
             return list(soft)  # base case of recursion
@@ -95,8 +137,12 @@ def quickxplain(soft, hard=[], solver="ortools"):
 
         # treat more preferred part as hard and find extra constants from less preferred
         delta2 = do_recursion(less_preferred, hard + more_preferred, more_preferred)
+        if delta2 is None:
+            return None
         # find which preferred constraints exactly
         delta1 = do_recursion(more_preferred, hard + delta2, delta2)
+        if delta1 is None:
+            return None
         return delta1 + delta2
 
     # optimization: find max index of solver core
@@ -104,10 +150,12 @@ def quickxplain(soft, hard=[], solver="ortools"):
     max_idx = max(i for i, a in enumerate(assump) if a in solver_core)
 
     core = do_recursion(list(assump)[:max_idx + 1], [], [])
+    if core is None:
+        return []
     return [dmap[a] for a in core]
 
 
-def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
+def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools", time_limit=None):
     """
         Find an optimal MUS according to a linear objective function.
         By not providing a weightvector, this function will return the smallest mus.
@@ -122,8 +170,15 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
             Gamba, Emilio, Bart Bogaerts, and Tias Guns. "Efficiently explaining CSPs with unsatisfiable subset optimization."
             Journal of Artificial Intelligence Research 78 (2023): 709-746.
 
+        :param: soft: soft constraints, list of expressions
+        :param: hard: hard constraints, optional, list of expressions
+        :param: weights: optional weights for optimization
+        :param: solver: name of a solver
+        :param: hs_solver: solver for hitting set problem
+        :param: time_limit: optional time limit in seconds
+        :return: list of constraints forming optimal MUS, or empty list if time limit reached
     """
-
+    start_time = time.time()
 
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
@@ -133,7 +188,13 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
         if solver != "ortools": # causes weidness in OR-Tools: https://github.com/google/or-tools/issues/4324
             s.solution_hint(assump, [1]*len(assump))
 
-    assert s.solve(assumptions=assump) is False
+    solve_args = {"assumptions": assump}
+    if time_limit is not None:
+        solve_args["time_limit"] = time_limit
+    s.solve(**solve_args)
+    if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        return []
+    assert s.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE
 
     # initialize hitting set solver
     if weights is None:
@@ -142,9 +203,20 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
     hs_solver = cp.SolverLookup.get(hs_solver)
     hs_solver.minimize(cp.sum(assump * np.array(weights)))
 
-    while hs_solver.solve() is True:
+    while hs_solver.solve(time_limit=time_limit):
+        if hs_solver.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+            return []
+        if time_limit and (time.time() - start_time) > time_limit:
+            return []
+            
         hitting_set = [a for a in assump if a.value()]
-        if s.solve(assumptions=hitting_set) is False:
+        solve_args = {"assumptions": hitting_set}
+        if time_limit is not None:
+            solve_args["time_limit"] = time_limit
+        s.solve(**solve_args)
+        if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+            return []
+        if s.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
             break
 
         # else, the hitting set is SAT, now try to extend it without extra solve calls.
@@ -157,7 +229,17 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
 
         # greedily search for other corr subsets disjoint to this one
         sat_subset = list(new_corr_subset)
-        while s.solve(assumptions=sat_subset) is True:
+        while True:
+            solve_args = {"assumptions": sat_subset}
+            if time_limit is not None:
+                solve_args["time_limit"] = time_limit
+            s.solve(**solve_args)
+            if s.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+                return []
+            if s.cpm_status.exitstatus != ExitStatus.OPTIMAL:
+                break
+            if time_limit and (time.time() - start_time) > time_limit:
+                return []
             new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
             sat_subset += new_corr_subset # extend sat subset with new corr subset, guaranteed to be disjoint
             hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
