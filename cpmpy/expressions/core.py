@@ -153,7 +153,7 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash((self.name, tuple(hash(arg) for arg in self.args)))
 
     def has_subexpr(self):
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
@@ -744,3 +744,76 @@ def _wsum_make(arg):
         return [-1], [arg.args[0]]
     # default
     return [1], [arg]
+
+class cpm_dict:
+    def __init__(self):
+        # Maps hash values to lists of (key, value) pairs with that hash
+        self._hash_groups = {}
+
+    def same(self, key1, key2):
+        """
+        Custom key comparison logic (override this as needed).
+        Example: Compare keys as strings to allow "1" and 1 to coexist.
+        """
+        print("same")
+        return str(key1) == str(key2)
+
+    def _get_hash_group(self, key):
+        """Returns the list of (key, value) pairs for a given hash."""
+        h = hash(key)
+        if h not in self._hash_groups:
+            self._hash_groups[h] = []
+        return self._hash_groups[h]
+
+    def __setitem__(self, key, value):
+        hash_group = self._get_hash_group(key)
+        # Check for existing key using `same`
+        for i, (existing_key, _) in enumerate(hash_group):
+            if self.same(existing_key, key):
+                hash_group[i] = (key, value)  # Update existing entry
+                return
+        # Add new key-value pair if no collision
+        hash_group.append((key, value))
+
+    def __getitem__(self, key):
+        hash_group = self._get_hash_group(key)
+        for existing_key, value in hash_group:
+            if self.same(existing_key, key):
+                return value
+        raise KeyError(f"Key {key} not found")
+
+    def __delitem__(self, key):
+        hash_group = self._get_hash_group(key)
+        for i, (existing_key, _) in enumerate(hash_group):
+            if self.same(existing_key, key):
+                del hash_group[i]
+                # Clean up empty hash groups
+                if not hash_group:
+                    del self._hash_groups[hash(key)]
+                return
+        raise KeyError(f"Key {key} not found")
+
+    def __contains__(self, key):
+        hash_group = self._get_hash_group(key)
+        return any(self.same(existing_key, key) for existing_key, _ in hash_group)
+
+    def __len__(self):
+        return sum(len(group) for group in self._hash_groups.values())
+
+    def __iter__(self):
+        for group in self._hash_groups.values():
+            for key, _ in group:
+                yield key
+
+    def items(self):
+        return [(k, v) for group in self._hash_groups.values() for k, v in group]
+
+    def keys(self):
+        return [k for group in self._hash_groups.values() for k, _ in group]
+
+    def values(self):
+        return [v for group in self._hash_groups.values() for _, v in group]
+
+    def __repr__(self):
+        items = ", ".join(f"{repr(key)}: {repr(value)}" for key, value in self.items())
+        return f"{{{items}}}"
