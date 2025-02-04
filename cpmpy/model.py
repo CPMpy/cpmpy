@@ -154,7 +154,7 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
-        if kwargs is not None and solver is None:
+        if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
         if isinstance(solver, SolverInterface):
@@ -182,7 +182,7 @@ class Model(object):
 
             Returns: number of solutions found
         """
-        if kwargs is not None and solver is None:
+        if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
         if isinstance(solver, SolverInterface):
