@@ -157,7 +157,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                       "Please safen the expression first.")
                         k = intvar(*get_bounds((x - rhs) // y))
                         mult_res, newcons = get_or_make_var(k * y)
-                        newlist += linearize_constraint([rhs < abs(y)]+newcons, supported, reified=reified)
+                        remainder = rhs < abs(y)
+                        if remainder is True or remainder is False:
+                            remainder = BoolVal(remainder)
+                        newcons.append(remainder)
+                        newlist += linearize_constraint(newcons, supported, reified=reified)
 
                         cpm_expr = (mult_res + rhs) == x
 
