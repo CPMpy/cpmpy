@@ -355,9 +355,8 @@ class CPM_cplex(SolverInterface):
 
                 elif lhs.name == 'div':
                     #TODO should be linearized away since cplex doesn't use integer division
+                    # also only supported for constants. We have to add this to linearize first because mul is not suported in cplex.
                     raise NotSupportedError(f"cplex only supports division by constants, but got {lhs.args[1]}")
-                    a, b = self.solver_vars(lhs.args)
-                    self.cplex_model.add_constraint(a / b == cplexrhs)
 
                 else:
                     # General constraints
@@ -452,7 +451,7 @@ class CPM_cplex(SolverInterface):
                 solvars.append(sol_var)
                 vals.append(cpm_value)
             # exclude previous solution
-            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+            self += cp.any([v != v.value() for v in self.user_vars if v.value() is not None])
             if display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
