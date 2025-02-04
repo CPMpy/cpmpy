@@ -11,6 +11,7 @@ from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, ar
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.safening import no_partial_functions
 
 """
     Interface to CP Optimizers API
@@ -41,7 +42,8 @@ class CPM_cpo(SolverInterface):
     docplex documentation:
     https://ibmdecisionoptimization.github.io/docplex-doc/
 
-    You will also need to install CPLEX Optimization Studio from IBM's website.
+    You will also need to install CPLEX Optimization Studio from IBM's website,
+    and add the location of the CP Optimizer binary to your path.
     There is a free community version available.
     https://www.ibm.com/products/ilog-cplex-optimization-studio
 
@@ -100,11 +102,12 @@ class CPM_cpo(SolverInterface):
             raise Exception("CPM_cpo: Install the python package 'docplex'")
 
         if not self.license_ok():
-            raise Exception("You need to install the CPLEX Optimization Studio to use this solver.")
+            raise Exception("You need to install the CPLEX Optimization Studio to use this solver. "
+                            "Also make sure that the binary is in your path")
 
-        import docplex.cp.model as dom
+        docp = self.get_docp()
         assert subsolver is None
-        self.cpo_model = dom.CpoModel()
+        self.cpo_model = docp.model.CpoModel()
         super().__init__(name="cpo", cpm_model=cpm_model)
 
     def solve(self, time_limit=None, **kwargs):
@@ -299,6 +302,7 @@ class CPM_cpo(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
                      "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative'}
