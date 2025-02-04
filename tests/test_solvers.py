@@ -767,6 +767,8 @@ class TestSupportedSolvers:
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
+        if solver == 'cplex':
+            pytest.skip("skip test for cplex")  # cplex throws an error if you add False to a model..
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
 

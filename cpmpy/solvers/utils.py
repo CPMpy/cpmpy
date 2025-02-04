@@ -27,6 +27,7 @@ from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
 from .choco import CPM_choco
+from .cplex import CPM_cplex
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -77,6 +78,7 @@ class SolverLookup():
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
                 ("choco", CPM_choco),
+                ("cplex", CPM_cplex),
                ]
 
     @classmethod
