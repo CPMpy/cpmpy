@@ -31,6 +31,8 @@ import copy
 import warnings
 
 import numpy as np
+
+from .exceptions import NotSupportedError
 from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
@@ -152,6 +154,9 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
+        if kwargs is not None and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -177,6 +182,9 @@ class Model(object):
 
             Returns: number of solutions found
         """
+        if kwargs is not None and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
