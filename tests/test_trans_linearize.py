@@ -336,3 +336,8 @@ class testCanonical_comparison(unittest.TestCase):
         a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
         self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
+
+    def test_issue_580(self):
+        x = cp.intvar(1, 5, name='x')
+        lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[sum([2, -1] * [IV0, IV1]) == 0, boolval(True), sum([1, -1] * [IV1, x]) == 0]')
