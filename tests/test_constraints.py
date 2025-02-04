@@ -45,6 +45,7 @@ EXCLUDE_OPERATORS = {"gurobi": {"mod"},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {"mod","div"},
+                     "pumpkin": {"pow", "mod"},
                      }
 
 # Variables to use in the rest of the test script
