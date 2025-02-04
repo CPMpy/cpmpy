@@ -49,3 +49,9 @@ class TestSolveAll(unittest.TestCase):
 
             except NotSupportedError as e:
                 pass # solver does not support finding all optimal solutions
+
+    def test_solveAll_keywords(self):
+        a, b = cp.boolvar(shape=2)
+        m = cp.Model(a | b)
+
+        self.assertEqual(3, m.solveAll('ortools', log_search_progress=True))
