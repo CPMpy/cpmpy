@@ -39,9 +39,10 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
+from ..transformations.linearize import canonical_comparison, only_positive_coefficients
 from ..expressions.utils import is_int, flatlist
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
@@ -79,8 +80,10 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import IDPool
             from pysat.solvers import Solver
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @staticmethod
     def pb_supported():
@@ -123,7 +126,7 @@ class CPM_pysat(SolverInterface):
             see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
-            raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface "
+            raise Exception("CPM_pysat: Install the python package 'python-sat' to use this solver interface "
                             "(NOT the 'pysat' package!)")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysat: only satisfaction, does not support an objective function")
@@ -249,7 +252,6 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -275,7 +277,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
         # the next only needed if the model contains cardinality/pseudo-boolean constraints
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or", "bv"}))  # the core of the MIP-linearization
-
+        cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):

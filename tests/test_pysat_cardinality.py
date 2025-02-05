@@ -2,7 +2,9 @@ import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
+from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.transformations.linearize import only_positive_coefficients
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
@@ -149,6 +151,36 @@ class TestCardinality(unittest.TestCase):
         for c in cons:
             cp.Model(c).solve("pysat")
             self.assertTrue(c.value())
+
+    def test_pysat_support_negative_coefficients(self):
+        bvs = cp.boolvar(3)
+        # this is linearized to `a+b-c>0`, which previously wasn't rewritten to the cardinality constraint `a+b+~c>1`
+        c = sum(bvs[1:]) > bvs[0]
+        s = cp.SolverLookup.get("pysat")
+        s += c
+        self.assertTrue(s.solve())
+
+    def test_pysat_aggregate_sum_sub_expressions(self):
+        bvs = cp.boolvar(3)
+        c = bvs[0] > sum(bvs[1:])
+        s = cp.SolverLookup.get("pysat")
+        s += c
+        self.assertTrue(s.solve())
+
+    def test_pysat_aggregate_sum_sub_expressions_implied(self):
+        bvs = cp.boolvar(3)
+        c = bvs[0] > sum(bvs[1:])
+        s = cp.SolverLookup.get("pysat")
+        s += c
+        self.assertTrue(s.solve())
+
+    def test_pysat_aggregate_sum_sub_expressions_implied(self):
+        a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
+        self.assertTrue(cp.SolverLookup.get("pysat", cp.Model(p.implies(a+b-c < 2))).solve())
+
+    @pytest.mark.skip(reason="TODO: PySAT does not linearize models at the moment, because there is no integer encoding layer, so adding non-linear expressions will always fail.")
+    def test_pysat_linearize_example(self):
+        self.assertTrue(cp.SolverLookup.get("pysat", cp.Model((a+b).implies(a+b-c < 2))).solve())
 
 
 if __name__ == '__main__':
