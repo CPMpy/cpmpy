@@ -322,8 +322,11 @@ def only_positive_bv(lst_of_expr):
 
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
-        elif isinstance(cpm_expr, NegBoolView):
-            newlist.append((~cpm_expr) <= 0)
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            if isinstance(cpm_expr, NegBoolView):
+                newlist.append((~cpm_expr) <= 0)
+            else:
+                newlist.append(cpm_expr >= 1)
 
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
