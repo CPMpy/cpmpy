@@ -3,7 +3,7 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients, only_positive_bv
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -351,3 +351,9 @@ class testCanonical_comparison(unittest.TestCase):
         a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
         self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
+
+    def test_only_positive_bv_implied_by_negated_literal(self):
+        a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
+        lins = linearize_constraint([p.implies(a+b+c < -10)])
+        only_pos = only_positive_bv(lins)
+        self.assertEqual(str([p <= 0]), str(only_pos))
