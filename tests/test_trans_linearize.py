@@ -3,7 +3,7 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients, only_positive_bv
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -56,7 +56,8 @@ class TestTransLinearize(unittest.TestCase):
         # test implies
         self.assertEqual(str(linearize_constraint([a.implies(b)])), "[sum([1, -1] * [a, b]) <= 0]")
         self.assertEqual(str(linearize_constraint([a.implies(~b)])), "[sum([1, -1] * [a, ~b]) <= 0]")
-        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), "[(a) -> (sum([x, y, z]) >= 0)]")
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), str([cp.BoolVal(True)]))
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 2)])), "[(a) -> (sum([x, y, z]) >= 2)]")
         self.assertEqual(str(linearize_constraint([a.implies(x+y+z > 0)])), "[(a) -> (sum([x, y, z]) >= 1)]")
         # test sub
         self.assertEqual(str(linearize_constraint([Operator("sub",[x,y]) >= z])), "[sum([1, -1, -1] * [x, y, z]) >= 0]")
@@ -174,12 +175,20 @@ class TestConstRhs(unittest.TestCase):
 
 class TestVarsLhs(unittest.TestCase):
 
-    def test_sum(self):
+    def test_trivial_unsat_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
 
+        # trivial UNSAT
         cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
-        self.assertEqual("sum([a, b, c]) <= -5", str(cons))
+        self.assertEqual(str(cp.BoolVal(False)), str(cons))
+
+    def test_sum(self):
+        a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
+        rhs = 15
+
+        cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
+        self.assertEqual(str(cp.sum([a,b,c]) <= 5), str(cons))
 
     def test_wsum(self):
         a, b, c = [cp.intvar(0, 10,name=n) for n in "abc"]
@@ -218,11 +227,17 @@ class TestVarsLhs(unittest.TestCase):
         self.assertRaises(NotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
 
+    def test_mod_triv(self):
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+        # x mod y <= 2 is trivially true for x,y in 1..3
+        self.assertEqual(str([cp.BoolVal(True)]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
+
     def test_mod(self):
 
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
 
-        cons = (x % y) <= 2
+        # disallows 2 mod 3 = 2
+        cons = (x % y) <= 1
         sols = set()
         cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
@@ -239,9 +254,9 @@ class TestVarsLhs(unittest.TestCase):
         same_cons = linearize_constraint([cons], supported={"mod"})
         self.assertEqual(str(same_cons[0]), str(cons))
 
-        # what about reified?
+        # what about half-reified?
         bv = cp.boolvar(name="bv")
-        cons = bv.implies((x % y) <= 2)
+        cons = bv.implies((x % y) <= 1)
         sols = set()
         cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
@@ -336,3 +351,11 @@ class testCanonical_comparison(unittest.TestCase):
         a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
         self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
+
+    def test_only_positive_bv_implied_by_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(only_positive_bv([p])))
+
+    def test_only_positive_bv_implied_by_negated_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p <= 0]), str(only_positive_bv([~p])))
