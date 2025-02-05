@@ -417,15 +417,12 @@ class CPM_pumpkin(SolverInterface):
 
         # transform and post the constraints
         for orig_expr in toplevel_list(cpm_expr_orig, merge_and=True):
-            print("Adding", orig_expr)
             if orig_expr in set(self.user_cons.values()):
                 continue
             else:
                 constraint_tag = len(self.user_cons)+1
                 self.user_cons[constraint_tag] = orig_expr
-            print("\tTransormed to:")
             for cpm_expr in self.transform(orig_expr):
-                print("\t-", cpm_expr)
                 tag = constraint_tag
                 tag = None
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
