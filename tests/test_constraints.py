@@ -127,6 +127,7 @@ def comp_constraints(solver):
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
                                           Var >=< NumExpr  (CPMpy class 'Comparison')
+        Returns the constraint along with whether it is feasible or not as `(constraint, feasible)`.
     """
     for comp_name in sorted(Comparison.allowed):
 
@@ -136,11 +137,9 @@ def comp_constraints(solver):
                 if solver in SAT_SOLVERS and not is_num(rhs):
                     continue
                 for x,y in [(numexpr,rhs), (rhs,numexpr)]:
-                    # check if the constraint we are trying to construct is always UNSAT
-                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)):
-                        yield Comparison(comp_name, x, y)
-                    else: # impossible comparison, skip
-                        pass
+                    feasible = any(eval_comparison(comp_name,xb,yb) for xb in get_bounds(x) for yb in get_bounds(y))
+                    yield (Comparison(comp_name, x, y), feasible)
+                            
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
@@ -258,7 +257,7 @@ def reify_imply_exprs(solver):
         yield BOOL_VAR.implies(bool_expr)
         yield bool_expr == BOOL_VAR
 
-    for comp_expr in comp_constraints(solver):
+    for (comp_expr, feasible) in comp_constraints(solver):
         lhs, rhs = comp_expr.args
         yield comp_expr.implies(BOOL_VAR)
         yield BOOL_VAR.implies(comp_expr)
@@ -269,44 +268,29 @@ def verify(cons):
     assert argval(cons)
     assert cons.value()
 
-
-@pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
-def test_bool_constraints(solver, constraint):
+def solve_and_verify(solver, constraint, feasible=True):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """
     if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
-        assert n_sols >= 1
-    else:
-        assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert argval(constraint)
-        assert constraint.value()
-
-
-@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
-def test_comparison_constraints(solver, constraint):
-    """
-        Tests comparison constraint by posting it to the solver and checking the value after solve.
-    """
-    if ALL_SOLS:
         n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display= lambda: verify(constraint))
-        assert n_sols >= 1
+        assert n_sols >= 1 if feasible else n_sols == 0
     else:
-        assert SolverLookup.get(solver,Model(constraint)).solve()
-        assert argval(constraint)
-        assert constraint.value()
+        assert SolverLookup.get(solver,Model(constraint)).solve() == feasible
+        if feasible:
+            assert argval(constraint)
+            assert constraint.value()
 
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(bool_exprs)), ids=str)
+def test_bool_constraints(solver, constraint):
+    solve_and_verify(solver, constraint)
 
-@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)), ids=str)
+def test_comparison_constraints(solver, constraint):
+    constraint, feasible = constraint
+    solve_and_verify(solver, constraint, feasible)
+
+@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)), ids=str)
 def test_reify_imply_constraints(solver, constraint):
-    """
-        Tests boolean expression by posting it to solver and checking the value after solve.
-    """
-    if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
-        assert n_sols >= 1
-    else:
-        assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert argval(constraint)
-        assert constraint.value()
+    solve_and_verify(solver, constraint)
+
