@@ -226,11 +226,17 @@ class TestVarsLhs(unittest.TestCase):
         self.assertRaises(NotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
 
+    def test_mod_triv(self):
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+        # x mod y <= 2 is trivially true for x,y in 1..3
+        self.assertEqual(str([cp.BoolVal(True)]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
+
     def test_mod(self):
 
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
 
-        cons = (x % y) <= 2
+        # disallows 2 mod 3 = 2
+        cons = (x % y) <= 1
         sols = set()
         cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
@@ -247,9 +253,9 @@ class TestVarsLhs(unittest.TestCase):
         same_cons = linearize_constraint([cons], supported={"mod"})
         self.assertEqual(str(same_cons[0]), str(cons))
 
-        # what about reified?
+        # what about half-reified?
         bv = cp.boolvar(name="bv")
-        cons = bv.implies((x % y) <= 2)
+        cons = bv.implies((x % y) <= 1)
         sols = set()
         cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
