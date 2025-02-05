@@ -223,39 +223,6 @@ class CPM_pumpkin(SolverInterface):
     #     return False # TODO
     #     return self.pum_solver.hasObjective()
 
-    def _make_numexpr(self, cpm_expr):
-        """
-            Converts a numeric CPMpy 'flat' expression into a solver-specific numeric expression
-
-            Primarily used for setting objective functions, and optionally in constraint posting
-        """
-
-        # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
-        #       in that case, this function may be removed and a case-by-case analysis of the numerical expression
-        #           used in the constraint at hand is required in __add__
-        #       For an example of such solver interface, check out solvers/choco.py or solvers/exact.py
-
-        if is_num(cpm_expr):
-            return cpm_expr
-
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
-            return self.solver_var(cpm_expr)
-
-        # any solver-native numerical expression
-        if isinstance(cpm_expr, Operator):
-           if cpm_expr.name == 'sum':
-               return self.pum_solver.sum(self.solver_vars(cpm_expr.args))
-           elif cpm_expr.name == 'wsum':
-               weights, vars = cpm_expr.args
-               return self.pum_solver.weighted_sum(weights, self.solver_vars(vars))
-           # [GUIDELINE] or more fancy ones such as max
-           #        be aware this is not the Maximum CONSTRAINT, but rather the Maximum NUMERICAL EXPRESSION
-           elif cpm_expr.name == "max":
-               return self.pum_solver.maximum_of_vars(self.solver_vars(cpm_expr.args))
-           # ...
-        raise NotImplementedError("Pumpkin: Not a known supported numexpr {}".format(cpm_expr))
-
 
     # `__add__()` first calls `transform()`
     def transform(self, cpm_expr):
