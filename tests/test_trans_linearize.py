@@ -174,12 +174,20 @@ class TestConstRhs(unittest.TestCase):
 
 class TestVarsLhs(unittest.TestCase):
 
-    def test_sum(self):
+    def test_trivial_unsat_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
 
+        # trivial UNSAT
         cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
-        self.assertEqual("sum([a, b, c]) <= -5", str(cons))
+        self.assertEqual(str(cp.BoolVal(False)), str(cons))
+
+    def test_sum(self):
+        a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
+        rhs = 15
+
+        cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
+        self.assertEqual(str(cp.sum([a,b,c]) <= 5), str(cons))
 
     def test_wsum(self):
         a, b, c = [cp.intvar(0, 10,name=n) for n in "abc"]
