@@ -20,7 +20,7 @@
     ==========================  =================================================================
 """
 import copy
-from ..expressions.core import Operator, Comparison, Expression
+from ..expressions.core import Operator, Comparison, Expression, cpm_dict
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
@@ -29,7 +29,11 @@ from ..expressions.utils import is_any_list
 from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
-def only_bv_reifies(constraints):
+
+def only_bv_reifies(constraints, expr_dict=None):
+    if expr_dict is None:
+        expr_dict = cpm_dict()
+
     newcons = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
@@ -39,11 +43,11 @@ def only_bv_reifies(constraints):
                 # BE -> BV :: ~BV -> ~BE
                 if cpm_expr.name == '->':
                     newexpr = (~a1).implies(recurse_negation(a0))
-                    newexpr = only_bv_reifies(flatten_constraint(newexpr))
+                    newexpr = only_bv_reifies(flatten_constraint(newexpr, expr_dict=expr_dict), expr_dict=expr_dict)
                 else:
                     newexpr = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        newexpr = flatten_constraint(newexpr)
+                        newexpr = flatten_constraint(newexpr, expr_dict=expr_dict)
                 newcons.extend(newexpr)
             else:
                 newcons.append(cpm_expr)
@@ -51,7 +55,7 @@ def only_bv_reifies(constraints):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints):
+def only_implies(constraints, expr_dict=None):
     """
         Transforms all reifications to ``BV -> BE`` form
 
@@ -67,6 +71,9 @@ def only_implies(constraints):
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
         AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
+    if expr_dict is None:
+        expr_dict = cpm_dict()
+
     newcons = []
     retransform = []
 
@@ -103,12 +110,12 @@ def only_implies(constraints):
             newcons.append(cpm_expr)
     
     if len(retransform) != 0:
-        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform))))
+        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform, expr_dict=expr_dict), expr_dict=expr_dict), expr_dict=expr_dict))
 
     return newcons
 
 
-def reify_rewrite(constraints, supported=frozenset()):
+def reify_rewrite(constraints, supported=frozenset(), expr_dict=None):
     """
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
@@ -124,6 +131,9 @@ def reify_rewrite(constraints, supported=frozenset()):
         :param supported: a (frozen)set of expression names that support reification in the solver, including
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
+    if expr_dict is None:
+        expr_dict = cpm_dict()
+
     if not is_any_list(constraints):
         # assume list, so make list
         constraints = [constraints]
@@ -176,7 +186,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                     #     introduce aux var and bring function to toplevel
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
-                    (auxvar, cons) = get_or_make_var(lhs)
+                    (auxvar, cons) = get_or_make_var(lhs, expr_dict=expr_dict)
                     newcons += cons
                     reifexpr = copy.copy(cpm_expr)
                     reifexpr.args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)
