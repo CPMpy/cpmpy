@@ -769,4 +769,38 @@ class TestSupportedSolvers:
     def test_false(self, solver):
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
+    def test_partial_modulo(self, solver):
+        if solver == 'pysdd' or solver == 'pysat':
+            return
+        r = cp.intvar(0, 2, shape=3, name='r')
+        x = cp.intvar(0, 4, name='x')
+        y = cp.intvar(-5, 5, name='y')
+        m = cp.Model()
 
+        # modulo toplevel
+        m += x % y == 2
+        assert m.solve(solver=solver)
+
+    def test_partial_division(self, solver):
+        if solver == 'pysdd' or solver == 'pysat':
+            return
+        r = cp.intvar(0, 2, shape=3, name='r')
+        x = cp.intvar(0, 4, name='x')
+        y = cp.intvar(-5, 5, name='y')
+        m = cp.Model()
+
+        # modulo toplevel
+        m += x / y == 2
+        assert m.solve(solver=solver)
+
+    def test_partial_division(self, solver):
+        if solver == 'pysdd' or solver == 'pysat':
+            return
+        r = cp.intvar(0, 2, shape=3, name='r')
+        x = cp.intvar(0, 4, name='x')
+        y = cp.intvar(-5, 5, name='y')
+        m = cp.Model()
+
+        # modulo toplevel
+        m += x / y == 2
+        assert m.solve(solver=solver)
