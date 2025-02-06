@@ -40,10 +40,10 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {"mod"},
+EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {"mod","div"},
+                     "exact": {},
                      }
 
 # Variables to use in the rest of the test script
