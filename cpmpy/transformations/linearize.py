@@ -48,7 +48,7 @@ from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.utils import is_num, eval_comparison, get_bounds
+from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
@@ -158,8 +158,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         k = intvar(*get_bounds((x - rhs) // y))
                         mult_res, newcons = get_or_make_var(k * y)
                         remainder = rhs < abs(y)
-                        if remainder is True or remainder is False:
-                            remainder = BoolVal(remainder)
+                        if is_true_cst(remainder):
+                            remainder = BoolVal(True)
+                        elif is_false_cst(remainder):
+                            remainder = BoolVal(False)
                         newcons.append(remainder)
                         newlist += linearize_constraint(newcons, supported, reified=reified)
 

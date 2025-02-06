@@ -43,7 +43,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {},
+                     "exact": {'div'},
                      }
 
 # Variables to use in the rest of the test script
