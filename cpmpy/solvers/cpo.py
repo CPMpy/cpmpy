@@ -305,9 +305,8 @@ class CPM_cpo(SolverInterface):
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative'}
-        supported_reified = {"alldifferent", 'nvalue', 'element', 'table', 'indomain', 'max', 'min',
-                     "negative_table", 'abs'}
+                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'nooverlap'}
+        supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
         # no flattening required
         return cpm_cons
