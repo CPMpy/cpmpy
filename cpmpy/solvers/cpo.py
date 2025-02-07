@@ -305,7 +305,7 @@ class CPM_cpo(SolverInterface):
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'nooverlap'}
+                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
         supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified)
         # no flattening required
@@ -447,6 +447,17 @@ class CPM_cpo(SolverInterface):
                     total_usage.append(task_height)
                 cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
                 return cons
+            elif cpm_con.name == "no_overlap":
+                start, dur, end  = cpm_con.args
+                docp = self.get_docp()
+                cons = []
+                tasks = []
+                for s, d, e in zip(start, dur, end):
+                    cpo_s, cpo_d, cpo_e = self.solver_vars([s, d, e])
+                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
+                    tasks.append(task)
+                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+                return cons + [dom.no_overlap(tasks)]
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
