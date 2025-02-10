@@ -817,6 +817,10 @@ class cpm_dict:
         items = ", ".join(f"{repr(key)}: {repr(value)}" for key, value in self.items())
         return f"{{{items}}}"
 
+# Custom dictonary and set classes for CPMpy expressions.
+# These do not inherit from python dict or set, because python abstracts from the underlying hash table.
+# Meaning we cannot access it ourselves.
+# This makes you rely on super.add, which is what we are trying to avoid..
 class cpm_dict:
     def __init__(self):
         # Maps hash values to lists of (key, value) pairs with that hash
