@@ -119,7 +119,7 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit=None, assumptions=None, display=None, solution_callback=None, **kwargs):
         """
             Call the CP-SAT solver
 
@@ -129,6 +129,10 @@ class CPM_ortools(SolverInterface):
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
                            Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+            - display:     generic solution callback for use during optimization.
+                            either a list of CPMpy expressions, OR a callback function which
+                            gets called after the variable-value mapping of the intermediate solution.
+                            default/None: nothing is displayed
             - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
 
             Additional keyword arguments:
@@ -181,6 +185,10 @@ class CPM_ortools(SolverInterface):
             # but only if a nonstandard stdout, otherwise duplicate output
             # see https://github.com/CPMpy/cpmpy/issues/84
             self.ort_solver.log_callback = print
+
+        if display is not None:
+            assert solution_callback is None, "Cannot have both generic CPMpy callback and specialized ortools solution callback"
+            solution_callback = OrtSolutionPrinter(self, display)
 
         # call the solver, with parameters
         self.ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
@@ -708,8 +716,9 @@ try:
 
             Arguments:
                 - verbose: whether to print info on every solution found (bool, default: False)
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                            default/None: nothing displayed
+                - display:     generic solution callback: either a list of CPMpy expressions, OR a callback function which
+                                gets called after the variable-value mapping of the intermediate solution.
+                                default/None: nothing is displayed
                 - solution_limit: stop after this many solutions (default: None)
         """
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
