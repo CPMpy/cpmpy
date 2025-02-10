@@ -305,7 +305,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # Don't support div, since cplex is not doing integer division.
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -352,11 +352,6 @@ class CPM_cplex(SolverInterface):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
-
-                elif lhs.name == 'div':
-                    #TODO should be linearized away since cplex doesn't use integer division
-                    # also only supported for constants. We have to add this to linearize first because mul is not suported in cplex.
-                    raise NotSupportedError(f"cplex only supports division by constants, but got {lhs.args[1]}")
 
                 else:
                     # General constraints
