@@ -23,6 +23,15 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         ps = CPM_pysat(atmost)
         ps.solve()
 
+
+    def test_pysat_wsum_triv_sat(self):
+        ls = cp.Model(
+            2 * self.bv[0] + 3 * self.bv[1] <= 10,
+        )
+        ps = CPM_pysat(ls)
+        solved = ps.solve()
+        self.assertTrue(solved)
+
     def test_pysat_unsat(self):
         ls = cp.Model(
             2 * self.bv[0] + 3 * self.bv[1] <= 3,
