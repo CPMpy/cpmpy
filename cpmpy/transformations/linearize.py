@@ -337,20 +337,20 @@ def _linearize_abs(expr):
         Linearize abs(lhs) == rhs
         Takes as input an absolute value comparison, and returns a list of equivalent constraints
     """
-    assert isinstance(expr, Comparison)
+    assert isinstance(expr, Comparison) and expr.name == "=="
     lhs, rhs = expr.args
     assert isinstance(lhs, GlobalFunction) and lhs.name == "abs", f"Expected abs expr but got {lhs}"
 
-    lb, ub = get_bounds(lhs)
+    x = lhs.args[0]
+    lb,ub = get_bounds(x)
     if lb >= 0: # always positive
-        return [lhs == rhs]
+        return [x == rhs]
     if ub <= 0: # always negative
-        return [lhs == -rhs]
+        return [-x == rhs]
 
     lhs_is_pos = cp.boolvar()
-    return [lhs_is_pos.implies(lhs >= 0), (~lhs_is_pos).implies(lhs < 0),
-            lhs_is_pos.implies(lhs == rhs),
-            lhs_is_pos.implies(lhs == -rhs)]
+    return [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x < 0),
+            lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(-x == rhs)]
 
 def only_positive_bv(lst_of_expr):
     """

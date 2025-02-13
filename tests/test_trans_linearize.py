@@ -4,7 +4,8 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients, \
+    _linearize_abs
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -127,6 +128,20 @@ class TestTransLinearize(unittest.TestCase):
 
         self.assertSetEqual(all_sols, lin_all_sols)  # same on decision vars
         self.assertEqual(count, lin_count)  # same on all vars
+
+    def test_abs(self):
+
+        pos = cp.intvar(0,5,name="pos")
+        neg = cp.intvar(-5,0,name="neg")
+        x = cp.intvar(-5,5,name="x")
+        y = cp.intvar(-5,5)
+
+        for lhs in (pos,neg,x):
+            cons = cp.Abs(lhs) == y
+            cnt = cp.Model(cons).solveAll()
+            lcnt = cp.Model(_linearize_abs(cons)).solveAll(display=self.assertTrue(cons.value()))
+            self.assertEqual(cnt, lcnt)
+
 
     def test_alldiff(self):
         # alldiff has a specialized linearization
