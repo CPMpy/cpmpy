@@ -41,7 +41,6 @@ General comparisons or expressions
 import copy
 import numpy as np
 import cpmpy as cp
-import typing
 from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -336,7 +335,7 @@ def only_positive_bv(lst_of_expr):
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
         elif isinstance(cpm_expr, _BoolVarImpl):
-            typing.assert_never(f"Unexpected _BoolVarImpl, perhaps linearize was not called before only_positive_bv on: {cpm_expr}")
+            raise ValueError(f"Unexpected `_BoolVarImpl` in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
