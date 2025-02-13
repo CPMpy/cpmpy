@@ -125,7 +125,7 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(lin_mod), '[sum([2, -1] * [IV5, IV6]) == 0, boolval(True), sum([1, -1] * [IV6, x]) == 0]')
 
         lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
-        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([IV7]) <= 1, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
+        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, boolval(True), sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
 
         lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
         self.assertEqual(str(lin_mod), '[sum([2, -1] * [IV10, IV11]) == 0, boolval(True), sum([1, -1] * [IV11, x]) == -1]')
