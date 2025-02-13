@@ -195,25 +195,45 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize division without multiplication")
-                    a, b = lhs.args
-                    # if division is total, b is either strictly negative or strictly positive!
-                    lb, ub = get_bounds(b)
-                    if lb <= 0 <= ub:
-                        raise TypeError(
-                            f"Can't divide by a domain containing 0, safen the expression first")
-                    # div(a,b) = rhs  -->  a = b * rhs + r with r the remainder
-                    # remainder can be both positive and negative (round towards 0, so negative r if a and b are both negative)
-                    # abs(r) < abs(b), otherwise it wouldn't be a remainder.
-                    # we need abs here because one or both of these can be negative.
-                    r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
-                    cpm_expr = [eval_comparison(cpm_expr.name, a, b * rhs + r)]
-                    # b * rhs <= a, otherwise we can both overshoot and undershoot the division, with r having positive and negative options.
-                    cond = [Abs(r) < Abs(b), b * rhs <= a]
-                    decomp = toplevel_list(decompose_in_tree(cond))  # decompose abs
-                    cpm_exprs = toplevel_list(decomp + cpm_expr)
-                    exprs = linearize_constraint(flatten_constraint(cpm_exprs), supported=supported)
-                    newlist.extend(exprs)
-                    continue
+
+                    if cpm_expr.name != "==":
+                        new_rhs, newcons = get_or_make_var(lhs)
+                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        continue
+
+                    else:
+                        # integer division, rounding towards zero
+                        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
+                        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
+                        a, b = lhs.args
+                        lb, ub = get_bounds(b)
+                        if lb <= 0 <= ub:
+                            raise ValueError("Attempting linerarization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
+
+                        r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
+                        mult_res, side_cons = get_or_make_var(b * rhs)
+                        cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
+
+                        # need absolute values of variables later
+                        abs_of_a = intvar(*get_bounds(abs(a)))
+                        abs_of_b = intvar(*get_bounds(abs(b)))
+                        abs_of_rhs = intvar(*get_bounds(abs(rhs)))
+                        abs_of_r = intvar(*get_bounds(abs(r)))
+                        if "abs" in supported:
+                            side_cons += [abs(a) == abs_of_a, abs(b) == abs_of_b, abs(rhs) == abs_of_rhs, abs(r) == abs_of_r]
+                        else: # need to linearize abs
+                            side_cons += _linearize_abs(cp.Abs(a) == abs_of_a) +\
+                                         _linearize_abs(cp.Abs(b) == abs_of_b) + \
+                                         _linearize_abs(cp.Abs(rhs) == abs_of_rhs) +\
+                                         _linearize_abs(cp.Abs(r) == abs_of_r)
+
+                        # |r| < |b|
+                        side_cons.append(abs_of_r < abs_of_b)
+
+                        # ensure we round towards zero
+                        side_cons.append(abs_of_b * abs_of_rhs <= abs_of_a)
+                        newlist += linearize_constraint(side_cons, supported=supported, reified=reified)
 
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
