@@ -470,8 +470,8 @@ class CPM_ortools(SolverInterface):
                                                      self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
-                    if lhs.args[0].lb <= 0 or lhs.args[1].lb <= 0:
-                        raise NotSupportedError("Both arguments of a modulo Operator must be positive.")
+                    if lhs.args[1].lb <= 0:
+                        raise NotSupportedError("First argument of a modulo Operator must be positive.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
