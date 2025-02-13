@@ -784,8 +784,7 @@ class TestSupportedSolvers:
         m += x / y == d
         m += x % y == r
         sols = set()
-        solution_limit = 20 if solver == 'gurobi' else None
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             # print(xv,yv,dv,rv)
