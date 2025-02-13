@@ -393,6 +393,8 @@ def canonical_comparison(lst_of_expr):
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
+                elif isinstance(rhs, Operator) and rhs.name == "-":
+                    lhs2, rhs = [rhs.args[0]], 0
                 elif isinstance(rhs, Operator) and rhs.name == "sum":
                     lhs2, rhs = [-1 * b if isinstance(b, _NumVarImpl) else 1 * b.args[0] for b in rhs.args
                                  if isinstance(b, _NumVarImpl) or isinstance(b, Operator)], \
