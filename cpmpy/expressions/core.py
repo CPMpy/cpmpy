@@ -153,8 +153,8 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash(self.__repr__())
-
+        args = flatlist(self.args)
+        return hash((self.name, tuple(args)))
     def has_subexpr(self):
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
