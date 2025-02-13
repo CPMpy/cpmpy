@@ -185,10 +185,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         elif ubx <= 0:
                             side_cons.append(rhs <= 0)
                         else: # x can be pos or neg
-                            x_is_pos, x_is_neg = cp.boolvar(), cp.boolvar()
-                            side_cons += [(~x_is_pos).implies(x <= 0), (~x_is_neg).implies(x >= 0),
-                                           x_is_pos.implies(rhs >= 0), (~x_is_pos).implies(rhs < 0),
-                                           x_is_neg.implies(rhs <= 0), (~x_is_neg).implies(rhs > 0)]
+                            x_is_pos = cp.boolvar()
+                            x_is_neg = ~x_is_pos
+                            side_cons += [
+                                x_is_pos.implies(x >= 0), x_is_neg.implies(x < 0),
+                                x_is_pos.implies(rhs >= 0), x_is_neg.implies(rhs <= 0)
+                            ]
 
                         side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
                         newlist += linearize_constraint(side_cons, supported, reified=reified)
