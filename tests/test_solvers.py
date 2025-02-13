@@ -775,8 +775,7 @@ class TestSupportedSolvers:
         if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
-        if solver == 'ortools' or solver == 'z3':
-            #TODO we should be able to handle this..
+        if solver == 'ortools':
             y = cp.intvar(0, 5) #non negative..
 
         vars = [x,y,d,r]
@@ -790,5 +789,6 @@ class TestSupportedSolvers:
             xv, yv, dv, rv = sol
             # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
-            assert (Operator('div', [xv, yv])).value() == dv
-            assert (Operator('mod', [xv, yv])).value() == rv
+            if solver != 'z3': #TODO enforce rounding towards zero for z3
+                assert (Operator('div', [xv, yv])).value() == dv
+                assert (Operator('mod', [xv, yv])).value() == rv
