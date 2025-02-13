@@ -364,8 +364,8 @@ class testCanonical_comparison(unittest.TestCase):
 
     def test_only_positive_bv_implied_by_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str([p >= 1]), str(only_positive_bv([p])))
+        self.assertEqual(str([p >= 1]), str(only_positive_bv(linearize_constraint([p]))))
 
     def test_only_positive_bv_implied_by_negated_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str([p <= 0]), str(only_positive_bv([~p])))
+        self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))

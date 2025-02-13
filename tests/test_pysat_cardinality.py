@@ -100,26 +100,24 @@ class TestCardinality(unittest.TestCase):
         for expression in expressions:
             cp.Model(expression).solve("pysat")
 
-    def test_pysat_oob(self):
+    def test_encode_pb_oob(self):
+        self.assertTrue(len(self.bvs) == 3)
+        # test out of bounds (meaningless) thresholds
+        expressions = [
+            sum(self.bvs) <= 5,  # true
+            sum(self.bvs) <= 3,  # true
+            sum(self.bvs) <= -2,  # false
+            sum(self.bvs) <= 0,  # undecided
 
-        def test_encode_pb_oob(self):
-            self.assertTrue(len(self.bv) == 3)
-            # test out of bounds (meaningless) thresholds
-            expressions = [
-                sum(self.bv) <= 5,  # true
-                sum(self.bv) <= 3,  # true
-                sum(self.bv) <= -2,  # false
-                sum(self.bv) <= 0,  # undecided
+            sum(self.bvs) >= -2,  # true
+            sum(self.bvs) >= 0,  # true
+            sum(self.bvs) >= 5,  # false
+            sum(self.bvs) >= 3,  # undecided
+        ]
 
-                sum(self.bv) >= -2,  # true
-                sum(self.bv) >= 0,  # true
-                sum(self.bv) >= 5,  # false
-                sum(self.bv) >= 3,  # undecided
-            ]
-
-            ## check all types of linear constraints are handled
-            for expression in expressions:
-                cp.Model(expression).solve("pysat")
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            cp.Model(expression).solve("pysat")
 
     def test_pysat_different(self):
         

@@ -12,6 +12,7 @@ Linear comparison:
 
     LinExpr can be any of:
         - NumVar
+        - _BoolVarImpl
         - sum
         - wsum
 
@@ -40,6 +41,7 @@ General comparisons or expressions
 import copy
 import numpy as np
 import cpmpy as cp
+import typing
 from cpmpy.transformations.normalize import toplevel_list
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -52,15 +54,18 @@ from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
     Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
 
+    Arguments:
+    - `supported`: which constraint and variable types are supported, i.e. `sum`, `sum`, `alldifferent`, 'bv'
     `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+    If `bv` is not supported, Boolean terms will be transformed to integer terms.
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
+    - `reified`: whether the constraint is fully reified
 
     """
 
@@ -71,7 +76,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
         if isinstance(cpm_expr, _BoolVarImpl):
             if "bv" in supported:
                 newlist.append(cpm_expr)
-            else:
+            elif isinstance(cpm_expr, NegBoolView):
+                newlist.append(sum([~cpm_expr]) <= 0)
+            else: # positive literal
                 newlist.append(sum([cpm_expr]) >= 1)
 
         # Boolean operators
@@ -329,11 +336,7 @@ def only_positive_bv(lst_of_expr):
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
         elif isinstance(cpm_expr, _BoolVarImpl):
-            if isinstance(cpm_expr, NegBoolView):
-                newlist.append((~cpm_expr) <= 0)
-            else:
-                newlist.append(cpm_expr >= 1)
-
+            typing.assert_never(f"Unexpected _BoolVarImpl, perhaps linearize was not called before only_positive_bv on: {cpm_expr}")
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 

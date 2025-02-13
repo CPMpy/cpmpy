@@ -319,7 +319,7 @@ class TestSolvers(unittest.TestCase):
         cons = [sum(x) > 3, sum(x) <= 2, sum(x) == 4, (sum(x) <= 1) & (sum(x) != 2),
                 b.implies(sum(x) > 3), b == (sum(x) != 2), (sum(x) >= 3).implies(b)]
         for c in cons:
-            cp.Model(c).solve("pysat")
+            self.assertTrue(cp.Model(c).solve("pysat"))
             self.assertTrue(c.value())
 
 
