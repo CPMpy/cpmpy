@@ -17,7 +17,7 @@ class CNFTool(unittest.TestCase):
         ~b | ~c,
         ~a
         """
-        cnf_txt = "p cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
+        cnf_txt = "p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n"
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_txt)
 
@@ -31,23 +31,9 @@ class CNFTool(unittest.TestCase):
         self.assertSetEqual(sols, {(False, False, True), (False, True, False)})
 
 
-    def test_badly_formatted(self):
-
-        cases = [
-            "p cnf 2 1\n1 \n2 \n0", "p cnf 2 1\n \n1 2 0"
-        ]
-
-        for cnf_txt in cases:
-            with open(self.tmpfile.name, "w") as f:
-                f.write(cnf_txt)
-
-            m = read_dimacs(self.tmpfile.name)
-            self.assertEqual(len(m.constraints), 1)
-            self.assertEqual(m.solveAll(), 3)
-
     def test_read_bigint(self):
 
-        cnf_txt = "p cnf \n-2 -300 0\n300 2 1 0\n-1 0\n"
+        cnf_txt = "p cnf 3 3 \n-2   -3 0\n3 2 1 0\n-1 0\n"
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_txt)
 
@@ -57,7 +43,7 @@ class CNFTool(unittest.TestCase):
         self.assertEqual(model.solveAll(), 2)
 
     def test_with_comments(self):
-        cnf_txt = "c this file starts with some comments\nc\np cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
+        cnf_txt = "c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n"
 
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_txt)

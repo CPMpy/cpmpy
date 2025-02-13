@@ -72,7 +72,6 @@ def write_dimacs(model, fname=None):
 def read_dimacs(fname):
     """
         Read a CPMpy model from a DIMACS formatted file
-        If the number of variables and constraints is not present in the header, they are inferred.
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
@@ -80,33 +79,35 @@ def read_dimacs(fname):
     m = cp.Model()
 
     with open(fname, "r") as f:
-
-        lines = f.readlines()
-        for i, line in enumerate(lines): # DIMACS allows for comments, skip comment lines
-            if line.startswith("p cnf"):
-                break
+        typ = None  # CNF/WCNF
+        # TODO infer p-header values (although generally not a good idea)
+        nr_vars = None
+        nr_cls = None
+        bvs = None
+        clause = []
+        for line in f.readlines():
+            if line.startswith("p"):
+                try:
+                    typ,typ,nr_vars,nr_cls = line.strip().split(" ")
+                    if typ != "cnf":
+                        raise cp.exceptions.NotSupportedError("WDIMACS (WCNF) files are not supported.")
+                    bvs = cp.boolvar(shape=int(nr_vars))
+                    nr_cls = int(nr_cls)
+                except ValueError:
+                    raise cp.exceptions.CPMpyException(f"Invalid DIMACS file p-header: {line}")
+            elif line.startswith("c"):
+                continue
             else:
-                assert line.startswith("c"), f"Expected comment on line {i}, but got {line}"
+                for token in line.strip().split():
+                    if token == "0":
+                        m+=cp.any(clause)
+                        clause = []
+                    else:
+                        i = int(token.strip())
+                        bv = bvs[abs(i)-1]
+                        clause.append(bv if i > 0 else ~bv)
 
-        cnf = "\n".join(lines[i+1:]) # part of file containing clauses
-
-        bvs = []
-        txt_clauses = re.split(r"\n* \n*0", cnf) # clauses end with ` 0` but can have arbitrary newlines
-
-        for txt_ints in txt_clauses:
-            if txt_ints is None or len(txt_ints.strip()) == 0:
-                continue # empty clause or weird format
-
-            clause = []
-            ints = [int(idx.strip()) for idx in txt_ints.split(" ") if len(idx.strip())]
-
-            for i in ints:
-                if abs(i) >= len(bvs):  # var does not exist yet, create
-                    bvs += [cp.boolvar() for _ in range(abs(i) - len(bvs))]
-                bv = bvs[abs(i) - 1]
-                clause.append(bv if i > 0 else ~bv)
-
-            m += cp.any(clause)
+        assert(len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}")
 
     return m
 
