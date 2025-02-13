@@ -44,7 +44,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals
+from ..expressions.utils import flatlist, argvals, argval
 
 import numpy as np
 import numbers
