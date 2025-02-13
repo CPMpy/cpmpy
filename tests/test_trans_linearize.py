@@ -113,7 +113,6 @@ class TestTransLinearize(unittest.TestCase):
 
         self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
         self.assertEqual(count,lin_count) # same on all vars
-        # ortools only accepts strictly positive modulo argument.
 
     def test_linearize_division(self):
         x, y, z = cp.intvar(0, 5, shape=3, name=['x', 'y', 'z'])
@@ -398,4 +397,3 @@ class testCanonical_comparison(unittest.TestCase):
         a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
         self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
-
