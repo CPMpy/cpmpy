@@ -119,11 +119,21 @@ class TestTransLinearize(unittest.TestCase):
         n_sols = cp.Model(lincons).solveAll(display=cb)
         self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
+    def test_issue_580(self):
+        x = cp.intvar(1, 5, name='x')
+        lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[sum([2, -1] * [IV5, IV6]) == 0, boolval(True), sum([1, -1] * [IV6, x]) == 0]')
+
+        lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([IV7]) <= 1, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
+
+        lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[sum([2, -1] * [IV10, IV11]) == 0, boolval(True), sum([1, -1] * [IV11, x]) == -1]')
 
 
 class TestConstRhs(unittest.TestCase):
 
-    def  test_numvar(self):
+    def test_numvar(self):
         a, b = [cp.intvar(0, 10, name=n) for n in "ab"]
 
         cons = linearize_constraint([a <= b])[0]
