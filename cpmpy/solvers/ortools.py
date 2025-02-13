@@ -41,7 +41,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
+from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -470,7 +470,7 @@ class CPM_ortools(SolverInterface):
                                                      self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
-                    if lhs.args[1].lb <= 0:
+                    if get_bounds(lhs.args[1])[0] <= 0:
                         raise NotSupportedError("First argument of a modulo Operator must be positive.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
