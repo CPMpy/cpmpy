@@ -173,6 +173,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         else: # need to linearize abs
                             side_cons += _linearize_abs(cp.Abs(rhs) == abs_of_z)
                         # TODO: do the following in constructor of abs instead?
+                        # we know y is strictly positive or negative due to safening.
                         if lby >= 0:
                             side_cons.append(abs_of_z < y)
                         if uby <= 0:
