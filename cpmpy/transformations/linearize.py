@@ -122,8 +122,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
+            if lhs.name == "-":
+                lhs = Operator("wsum", [[-1], [lhs.args[0]]])
+                cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
             # linearize unsupported operators
-            elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
+            elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add pow?
 
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
