@@ -470,14 +470,6 @@ class CPM_ortools(SolverInterface):
                                                      self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
-                    divisor = lhs.args[1]
-                    if not is_num(divisor):
-                        if divisor.lb <= 0 and divisor.ub >= 0:
-                            raise Exception(
-                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is "
-                                    f"in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). "
-                                    f"Even if you add a constraint that it can not be '0'. You MUST use a variable "
-                                    f"that is defined to be higher or lower than '0'.")
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
