@@ -793,14 +793,21 @@ class TestSupportedSolvers:
         m += x / y == 2
         assert m.solve(solver=solver)
 
-    def test_partial_division(self, solver):
+    def test_partial_div_mod(self, solver):
         if solver == 'pysdd' or solver == 'pysat':
             return
-        r = cp.intvar(0, 2, shape=3, name='r')
         x = cp.intvar(0, 4, name='x')
         y = cp.intvar(-5, 5, name='y')
+        d = cp.intvar(-5, 5, name='d')
+        r = cp.intvar(-5, 5, name='r')
         m = cp.Model()
 
         # modulo toplevel
-        m += x / y == 2
-        assert m.solve(solver=solver)
+        m += x / y == d
+        m += x % y == r
+        sols = set()
+        solution_limit = 20 if solver == 'gurobi' else None
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in [x,y,d,r]])))
+        for sol in sols:
+            xv, yv, dv, rv = sol
+            assert dv * yv + rv == xv
