@@ -81,7 +81,6 @@ def read_dimacs(fname):
     with open(fname, "r") as f:
         typ = None  # CNF/WCNF
         # TODO infer p-header values (although generally not a good idea)
-        nr_vars = None
         nr_cls = None
         bvs = None
         clause = []
@@ -91,7 +90,9 @@ def read_dimacs(fname):
                     typ,typ,nr_vars,nr_cls = line.strip().split(" ")
                     if typ != "cnf":
                         raise cp.exceptions.NotSupportedError("WDIMACS (WCNF) files are not supported.")
-                    bvs = cp.boolvar(shape=int(nr_vars))
+                    nr_vars = int(nr_vars)
+                    if nr_vars>0:
+                        bvs = cp.boolvar(shape=nr_vars)
                     nr_cls = int(nr_cls)
                 except ValueError:
                     raise cp.exceptions.CPMpyException(f"Invalid DIMACS file p-header: {line}")
