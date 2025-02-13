@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 import cpmpy as cp
 from cpmpy.expressions.core import Operator
+from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
@@ -773,22 +774,20 @@ class TestSupportedSolvers:
     def test_partial_div_mod(self, solver):
         if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
             return
-        x = cp.intvar(-5, 5, name='x')
-        y = cp.intvar(-5, 5, name='y')
-        d = cp.intvar(-5, 5, name='d')
-        r = cp.intvar(-5, 5, name='r')
-        m = cp.Model()
-
+        x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         if solver == 'ortools':
             y = cp.intvar(0, 5) #non negative..
 
+        vars = [x,y,d,r]
+        m = cp.Model()
         # modulo toplevel
         m += x / y == d
         m += x % y == r
         sols = set()
-        m.solveAll(solver=solver, display=lambda: sols.add(tuple([x.value() for x in [x,y,d,r]])))
+        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
+            # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
-            assert (Operator('div', [xv,yv])).value() == dv
+            assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv
