@@ -171,9 +171,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         mult_res, side_cons = get_or_make_var(k * y)
                         cpm_expr = (mult_res + rhs) == x
                         # |z| < |y|
-                        abs_of_z = cp.intvar(*get_bounds(cp.Abs(rhs)))
+                        abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
                         if "abs" in supported:
-                            side_cons.append(cp.Abs(rhs) == abs_of_z)
+                            side_cons.append(abs(rhs) == abs_of_z)
                         else: # need to linearize abs
                             side_cons += _linearize_abs(cp.Abs(rhs) == abs_of_z)
                         # TODO: do the following in constructor of abs instead?
