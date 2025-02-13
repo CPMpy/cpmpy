@@ -608,7 +608,6 @@ class Operator(Expression):
             return val # can be a float
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "mod": return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])  # modulo defined with integer division
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "div":
@@ -618,6 +617,14 @@ class Operator(Expression):
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                               + "\n Use argval(expr) to get the value of expr with relational "
                                                 "semantics.")
+        elif self.name == "mod":
+            try:# modulo defined with integer division
+                return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational "
+                                                "semantics.")
+
 
         # boolean
         elif self.name == "and": return all(arg_vals)
