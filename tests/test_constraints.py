@@ -78,6 +78,8 @@ def numexprs(solver):
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,3]
+        elif solver == "ortools" and name == "mod":
+            operator_args = [POS_VAR, NN_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
