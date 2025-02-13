@@ -45,10 +45,10 @@ from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 
-from .transformations.normalize import toplevel_list
 from .decompose_global import decompose_in_tree
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
@@ -152,28 +152,34 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         newlist += linearize_constraint(newcons, supported=supported, reified=reified)
                         continue
                     else:
-                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
-                        #   -> acts differently for negative numbers
-                        # "mod" is a partial function
-                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        # mod != remainder after division because defined on integer div (rounding towards 0)
+                        #   e.g., 7 % -5 = 2 and -7 % 5 = -2
+                        # implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
+                        # https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
                         x, y = lhs.args
                         lby, uby = get_bounds(y)
                         if lby <= 0 <= uby:
-                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. "
-                                                      "Please safen the expression first.")
-                        k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, newcons = get_or_make_var(k * y)
-                        remainder = rhs < abs(y)
-                        if is_true_cst(remainder):
-                            remainder = BoolVal(True)
-                        elif is_false_cst(remainder):
-                            remainder = BoolVal(False)
-                        newcons.append(remainder)
-                        newlist += linearize_constraint(newcons, supported, reified=reified)
-                        # (abs of) modulo rhs is smaller than (abs of) the divisor y, but also needs to be of same sign as x.
-                        #newlist += linearize_constraint(only_implies(only_bv_reifies(flatten_constraint([Abs(rhs) < Abs(y), (x > 0).implies(rhs >= 0), (x < 0).implies(rhs <= 0)]))) + newcons, supported, reified=reified)
+                            raise ValueError("Attempting linerarization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
 
+                        # k * y + z == x
+                        k = intvar(*get_bounds((x - rhs) // y))
+                        mult_res, side_cons = get_or_make_var(k * y)
                         cpm_expr = (mult_res + rhs) == x
+                        # |z| < |y|
+                        side_cons.append(abs(rhs) < abs(y))
+                        lbx,ubx = get_bounds(x)
+                        if lbx >= 0:
+                            side_cons.append(rhs >= 0)
+                        elif ubx <= 0:
+                            side_cons.append(rhs <= 0)
+                        else: # x can be pos or neg
+                            x_is_pos, x_is_neg = cp.boolvar(), cp.boolvar()
+                            side_cons += [(~x_is_pos).implies(x <= 0), (~x_is_neg).implies(x >= 0),
+                                           x_is_pos.implies(rhs >= 0), (~x_is_pos).implies(rhs < 0),
+                                           x_is_neg.implies(rhs <= 0), (~x_is_neg).implies(rhs > 0)]
+
+                        side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
+                        newlist += linearize_constraint(side_cons, supported, reified=reified)
 
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
