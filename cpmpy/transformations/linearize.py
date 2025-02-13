@@ -174,6 +174,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                             side_cons += [z_is_pos.implies(rhs >= 0), (~z_is_pos).implies(rhs < 0)]
                             side_cons += [z_is_pos.implies(abs_of_z == rhs), (~z_is_pos).implies(abs_of_z == -rhs)]
                         # TODO: do the following in constructor of abs instead?
+                        # we know y is strictly positive or negative due to safening.
                         if lby >= 0:
                             side_cons.append(abs_of_z < y)
                         if uby <= 0:
