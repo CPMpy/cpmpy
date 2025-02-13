@@ -239,7 +239,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         side_cons.append(abs_of_r < abs_of_b)
 
                         # ensure we round towards zero
-                        side_cons.append(abs_of_b * abs_of_rhs <= abs_of_a)
+                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs)
+                        side_cons += extra_cons + [mul_abs <= abs_of_a]
                         newlist += linearize_constraint(side_cons, supported=supported, reified=reified)
 
                 else:
