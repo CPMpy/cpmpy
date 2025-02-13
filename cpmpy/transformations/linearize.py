@@ -349,7 +349,7 @@ def _linearize_abs(expr):
         return [-x == rhs]
 
     lhs_is_pos = cp.boolvar()
-    return [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x < 0),
+    return [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
             lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(-x == rhs)]
 
 def only_positive_bv(lst_of_expr):
