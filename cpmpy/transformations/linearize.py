@@ -40,14 +40,21 @@ General comparisons or expressions
 import copy
 import numpy as np
 import cpmpy as cp
-from cpmpy.transformations.normalize import toplevel_list
+from cpmpy.transformations.get_variables import get_variables
+
+from cpmpy.transformations.reification import only_implies, only_bv_reifies
+
+
+from .decompose_global import decompose_in_tree
 
 from .flatten_model import flatten_constraint, get_or_make_var
-from .get_variables import get_variables
+from .normalize import toplevel_list
+from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
@@ -115,8 +122,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
+            if lhs.name == "-":
+                lhs = Operator("wsum", [[-1], [lhs.args[0]]])
+                cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+
             # linearize unsupported operators
-            elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add mul, (abs?), (mod?), (pow?)
+            elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add pow?
 
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
@@ -146,33 +157,108 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         newlist += linearize_constraint(newcons, supported=supported, reified=reified)
                         continue
                     else:
-                        # "mod" != remainder after division: https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
-                        #   -> acts differently for negative numbers
-                        # "mod" is a partial function
-                        #   -> x % 0 = x (unless x == 0, then undefined)
+                        # mod != remainder after division because defined on integer div (rounding towards 0)
+                        #   e.g., 7 % -5 = 2 and -7 % 5 = -2
+                        # implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
+                        # https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
                         x, y = lhs.args
                         lby, uby = get_bounds(y)
                         if lby <= 0 <= uby:
-                            raise NotImplementedError("Modulo with a divisor domain containing 0 is not supported. "
-                                                      "Please safen the expression first.")
-                        k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, newcons = get_or_make_var(k * y)
-                        remainder = rhs < abs(y)
-                        if is_true_cst(remainder):
-                            remainder = BoolVal(True)
-                        elif is_false_cst(remainder):
-                            remainder = BoolVal(False)
-                        newcons.append(remainder)
-                        newlist += linearize_constraint(newcons, supported, reified=reified)
+                            raise ValueError("Attempting linerarization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
 
+                        # k * y + z == x
+                        k = intvar(*get_bounds((x - rhs) // y))
+                        mult_res, side_cons = get_or_make_var(k * y)
                         cpm_expr = (mult_res + rhs) == x
+                        # |z| < |y|
+                        abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
+                        side_cons.append(abs(rhs) == abs_of_z)
+                        # TODO: do the following in constructor of abs instead?
+                        # we know y is strictly positive or negative due to safening.
+                        if lby >= 0:
+                            side_cons.append(abs_of_z < y)
+                        if uby <= 0:
+                            side_cons.append(abs_of_z < -y)
+                        # sign(x) = sign(z)
+                        lbx, ubx = get_bounds(x)
+                        if lbx >= 0:
+                            side_cons.append(rhs >= 0)
+                        elif ubx <= 0:
+                            side_cons.append(rhs <= 0)
+                        else: # x can be pos or neg
+                            x_is_pos = cp.boolvar()
+                            x_is_neg = ~x_is_pos
+                            side_cons += [
+                                x_is_pos.implies(x >= 0), x_is_neg.implies(x < 0),
+                                x_is_pos.implies(rhs >= 0), x_is_neg.implies(rhs <= 0)
+                            ]
+
+                        side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
+                        newlist += linearize_constraint(side_cons, supported, reified=reified)
+
+                elif lhs.name == 'div' and 'div' not in supported:
+                    if "mul" not in supported:
+                        raise NotImplementedError("Cannot linearize division without multiplication")
+
+                    if cpm_expr.name != "==":
+                        new_rhs, newcons = get_or_make_var(lhs)
+                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        continue
+
+                    else:
+                        # integer division, rounding towards zero
+                        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
+                        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
+                        a, b = lhs.args
+                        lb, ub = get_bounds(b)
+                        if lb <= 0 <= ub:
+                            raise ValueError("Attempting linerarization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
+
+                        r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
+                        mult_res, side_cons = get_or_make_var(b * rhs)
+                        cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
+
+                        # need absolute values of variables later
+                        abs_of_a = intvar(*get_bounds(abs(a)))
+                        abs_of_b = intvar(*get_bounds(abs(b)))
+                        abs_of_rhs = intvar(*get_bounds(abs(rhs)))
+                        abs_of_r = intvar(*get_bounds(abs(r)))
+                        side_cons += [abs(a) == abs_of_a, abs(b) == abs_of_b, abs(rhs) == abs_of_rhs, abs(r) == abs_of_r]
+                        # |r| < |b|
+                        side_cons.append(abs_of_r < abs_of_b)
+
+                        # ensure we round towards zero
+                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs)
+                        side_cons += extra_cons + [mul_abs <= abs_of_a]
+                        newlist += linearize_constraint(side_cons, supported=supported, reified=reified)
 
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+                if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
+                    newvar = intvar(*get_bounds(lhs))
+                    newlist += linearize_constraint([lhs == newvar])
+                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
+                else:
+                    x = lhs.args[0]
+                    lb, ub = get_bounds(x)
+                    if lb >= 0:  # always positive
+                        newlist.append(x == rhs)
+                    elif ub <= 0:  # always negative
+                        newlist.append(x + rhs == 0)
+                    else:
+                        lhs_is_pos = cp.boolvar()
+                        newcons = [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
+                                   lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(x + rhs == 0)]
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                    continue # all should be linear now
+
+
+            elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
                                  "`cpmpy.transformations.decompose_global.decompose_global() first")
 
@@ -257,7 +343,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
     return newlist
 
-
 def only_positive_bv(lst_of_expr):
     """
         Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
@@ -339,10 +424,13 @@ def canonical_comparison(lst_of_expr):
             if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
                 lhs = canonical_comparison(lhs)[0]
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
-                # bring all vars to lhs
+                # Bring all vars from rhs to lhs
+                # 1) collect the variables to bring over
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
+                elif isinstance(rhs, Operator) and rhs.name == "-":
+                    lhs2, rhs = [rhs.args[0]], 0
                 elif isinstance(rhs, Operator) and rhs.name == "sum":
                     lhs2, rhs = [-1 * b if isinstance(b, _NumVarImpl) else 1 * b.args[0] for b in rhs.args
                                  if isinstance(b, _NumVarImpl) or isinstance(b, Operator)], \
@@ -352,10 +440,11 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
+                # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
-                    lhs, rhs = lhs + lhs2, rhs
+                    lhs = lhs + lhs2
                 else:
                     raise ValueError(
                         f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
