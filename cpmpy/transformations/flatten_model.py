@@ -317,9 +317,11 @@ def get_or_make_var(expr, expr_dict=None):
         return (expr, [])
 
     if expr_dict is None:
-        expr_dict = cpm_dict()
-    if expr in expr_dict:
-        return expr_dict[expr], []
+        expr_dict_getrmake_var = cpm_dict()
+    else:
+        expr_dict_getrmake_var = expr_dict
+    if expr in expr_dict_getrmake_var:
+        return expr_dict_getrmake_var[expr], []
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
@@ -333,10 +335,10 @@ def get_or_make_var(expr, expr_dict=None):
             return flatexpr,flatcons
 
         bvar = _BoolVarImpl()
-        if flatexpr in expr_dict:
-            return expr_dict[flatexpr], []
+        if flatexpr in expr_dict_getrmake_var:
+            return expr_dict_getrmake_var[flatexpr], []
         else:
-            expr_dict[flatexpr] = bvar
+            expr_dict_getrmake_var[flatexpr] = bvar
         return bvar, [flatexpr == bvar] + flatcons
 
     else:
@@ -351,10 +353,10 @@ def get_or_make_var(expr, expr_dict=None):
                           UserWarning)
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
-        if flatexpr in expr_dict:
-            return expr_dict[flatexpr], []
+        if flatexpr in expr_dict_getrmake_var:
+            return expr_dict_getrmake_var[flatexpr], []
         else:
-            expr_dict[flatexpr] = ivar
+            expr_dict_getrmake_var[flatexpr] = ivar
         return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, expr_dict=None):
