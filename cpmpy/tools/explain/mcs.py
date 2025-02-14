@@ -1,4 +1,3 @@
-from cpmpy.expressions.core import cpm_dict
 from cpmpy.tools.explain.mss import *
 from cpmpy.transformations.normalize import toplevel_list
 
