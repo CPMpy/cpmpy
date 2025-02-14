@@ -207,7 +207,7 @@ class CPM_pumpkin(SolverInterface):
 
             # translate solution values
             if self.has_objective():
-                self.objective_value_ = solution.int_value(self.solver_var(self.objective_))
+                self.objective_value_ = solution.int_value(self.solver_var(self._objective))
 
         else: # wipe results
             for cpm_var in self.user_vars:
@@ -326,7 +326,7 @@ class CPM_pumpkin(SolverInterface):
         if cpm_expr.name == "!=": comp = Comparator.NotEqual
         if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
         if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
-        var = self.solver_var(lhs)
+        var = self._ivars(lhs)
         return Predicate(var, comp, rhs)
 
 
