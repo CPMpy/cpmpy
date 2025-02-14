@@ -12,7 +12,6 @@ Linear comparison:
 
     LinExpr can be any of:
         - NumVar
-        - _BoolVarImpl
         - sum
         - wsum
 
@@ -60,9 +59,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
 
     Arguments:
-    - `supported`: which constraint and variable types are supported, i.e. `sum`, `sum`, `alldifferent`, 'bv'
+    - `supported`: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
     `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    If `bv` is not supported, Boolean terms will be transformed to integer terms.
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
     - `reified`: whether the constraint is fully reified
 
@@ -70,12 +68,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
     newlist = []
     for cpm_expr in lst_of_expr:
-
-        # boolvar
+        # Boolean literal are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
-            if "bv" in supported:
-                newlist.append(cpm_expr)
+            if "or" in supported:
+                newlist.append(cp.any([cpm_expr]))
             elif isinstance(cpm_expr, NegBoolView):
+                # might as well remove the negation
                 newlist.append(sum([~cpm_expr]) <= 0)
             else: # positive literal
                 newlist.append(sum([cpm_expr]) >= 1)
@@ -109,7 +107,16 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
-                    newlist += [cond.implies(lin) for lin in lin_sub]
+                    for lin in lin_sub:
+                        # linearize might return True/False for trivial constraints
+                        if is_true_cst(lin):
+                            continue
+                        elif is_false_cst(lin):
+                            newlist+=linearize_constraint([~cond], supported=supported)
+                            break
+                        else:
+                            newlist.append(cond.implies(lin))
+
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
@@ -331,11 +338,10 @@ def only_positive_bv(lst_of_expr):
                 subexpr = only_positive_bv([subexpr])
                 newlist += [cond.implies(expr) for expr in subexpr]
 
-
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
-        elif isinstance(cpm_expr, _BoolVarImpl):
-            raise ValueError(f"Unexpected `_BoolVarImpl` in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 

@@ -56,7 +56,7 @@ class TestTransLinearize(unittest.TestCase):
         # test implies
         self.assertEqual(str(linearize_constraint([a.implies(b)])), "[sum([1, -1] * [a, b]) <= 0]")
         self.assertEqual(str(linearize_constraint([a.implies(~b)])), "[sum([1, -1] * [a, ~b]) <= 0]")
-        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), str([cp.BoolVal(True)]))
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), str([]))
         self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 2)])), "[(a) -> (sum([x, y, z]) >= 2)]")
         self.assertEqual(str(linearize_constraint([a.implies(x+y+z > 0)])), "[(a) -> (sum([x, y, z]) >= 1)]")
         # test sub
