@@ -76,7 +76,7 @@ import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
-
+import inspect
 
 class Expression(object):
     """
@@ -153,8 +153,8 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash(self.__repr__())
-
+        args = flatlist(self.args)
+        return hash((self.name, tuple(args)))
     def has_subexpr(self):
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
@@ -219,6 +219,11 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
+        stack = inspect.stack()
+        caller_frame = stack[1]  # Index 1 is the immediate caller
+        caller_name = caller_frame.code_context
+        if 'expr_dict_getrmake_var' in str(caller_name):
+            return (str(self) == str(other))
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
             if other is True or other == 1:
@@ -744,3 +749,6 @@ def _wsum_make(arg):
         return [-1], [arg.args[0]]
     # default
     return [1], [arg]
+
+class cpm_dict(dict):
+    pass
