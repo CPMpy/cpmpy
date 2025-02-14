@@ -172,10 +172,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         cpm_expr = (mult_res + rhs) == x
                         # |z| < |y|
                         abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
-                        if "abs" in supported:
-                            side_cons.append(abs(rhs) == abs_of_z)
-                        else: # need to linearize abs
-                            side_cons += _linearize_abs(cp.Abs(rhs) == abs_of_z)
+                        side_cons.append(abs(rhs) == abs_of_z)
                         # TODO: do the following in constructor of abs instead?
                         # we know y is strictly positive or negative due to safening.
                         if lby >= 0:
@@ -227,14 +224,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         abs_of_b = intvar(*get_bounds(abs(b)))
                         abs_of_rhs = intvar(*get_bounds(abs(rhs)))
                         abs_of_r = intvar(*get_bounds(abs(r)))
-                        if "abs" in supported:
-                            side_cons += [abs(a) == abs_of_a, abs(b) == abs_of_b, abs(rhs) == abs_of_rhs, abs(r) == abs_of_r]
-                        else: # need to linearize abs
-                            side_cons += _linearize_abs(cp.Abs(a) == abs_of_a) +\
-                                         _linearize_abs(cp.Abs(b) == abs_of_b) + \
-                                         _linearize_abs(cp.Abs(rhs) == abs_of_rhs) +\
-                                         _linearize_abs(cp.Abs(r) == abs_of_r)
-
+                        side_cons += [abs(a) == abs_of_a, abs(b) == abs_of_b, abs(rhs) == abs_of_rhs, abs(r) == abs_of_r]
                         # |r| < |b|
                         side_cons.append(abs_of_r < abs_of_b)
 
@@ -248,7 +238,27 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalConstraint) and lhs.name not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+                if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
+                    newvar = intvar(*get_bounds(lhs))
+                    newlist += linearize_constraint([lhs == newvar])
+                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
+                else:
+                    x = lhs.args[0]
+                    lb, ub = get_bounds(x)
+                    if lb >= 0:  # always positive
+                        newlist.append(x == rhs)
+                    elif ub <= 0:  # always negative
+                        newlist.append(x + rhs == 0)
+                    else:
+                        lhs_is_pos = cp.boolvar()
+                        newcons = [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
+                                   lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(x + rhs == 0)]
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                    continue # all should be linear now
+
+
+            elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
                                  "`cpmpy.transformations.decompose_global.decompose_global() first")
 
@@ -332,26 +342,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                              f"`cpmpy.transformations.decompose_global.decompose_global() first")
 
     return newlist
-
-def _linearize_abs(expr):
-    """
-        Linearize abs(lhs) == rhs
-        Takes as input an absolute value comparison, and returns a list of equivalent constraints
-    """
-    assert isinstance(expr, Comparison) and expr.name == "=="
-    lhs, rhs = expr.args
-    assert isinstance(lhs, GlobalFunction) and lhs.name == "abs", f"Expected abs expr but got {lhs}"
-
-    x = lhs.args[0]
-    lb,ub = get_bounds(x)
-    if lb >= 0: # always positive
-        return [x == rhs]
-    if ub <= 0: # always negative
-        return [-x == rhs]
-
-    lhs_is_pos = cp.boolvar()
-    return [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
-            lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(-x == rhs)]
 
 def only_positive_bv(lst_of_expr):
     """
