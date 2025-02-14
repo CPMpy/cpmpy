@@ -789,6 +789,5 @@ class TestSupportedSolvers:
             xv, yv, dv, rv = sol
             # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
-            if solver != 'z3': #TODO enforce rounding towards zero for z3
-                assert (Operator('div', [xv, yv])).value() == dv
-                assert (Operator('mod', [xv, yv])).value() == rv
+            assert (Operator('div', [xv, yv])).value() == dv
+            assert (Operator('mod', [xv, yv])).value() == rv
