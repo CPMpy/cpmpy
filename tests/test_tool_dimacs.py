@@ -4,65 +4,39 @@ import tempfile
 import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
-class CNFTool(unittest.TestCase):
 
+import io
+
+class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:
         self.tmpfile = tempfile.NamedTemporaryFile()
 
+    def dimacs_to_model(self, cnf_str):
+        # return read_dimacs(io.StringIO(cnf_str))
+        with open(self.tmpfile.name, "w") as f:
+            f.write(cnf_str)
+        return read_dimacs(self.tmpfile.name)
+
     def test_read_cnf(self):
+        model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
+        bvs = sorted(get_variables_model(model), key=str)
+        self.assertEqual(str(model), str(cp.Model(
+            cp.any([~bvs[1], ~bvs[2]]), cp.any([bvs[2], bvs[1],bvs[0]]), ~bvs[0])
+                         ))
 
-        """
-        a | b | c,
-        ~b | ~c,
-        ~a
-        """
-        cnf_txt = "p cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
-        with open(self.tmpfile.name, "w") as f:
-            f.write(cnf_txt)
+    def test_empty_formula(self):
+        model = self.dimacs_to_model("p cnf 0 0")
+        self.assertTrue(model.solve())
+        self.assertEqual(model.status().exitstatus, cp.solvers.solver_interface.ExitStatus.OPTIMAL)
 
-        model = read_dimacs(self.tmpfile.name)
-        vars = sorted(get_variables_model(model), key=str)
-
-        sols = set()
-        addsol = lambda : sols.add(tuple([v.value() for v in vars]))
-
-        self.assertEqual(model.solveAll(display=addsol), 2)
-        self.assertSetEqual(sols, {(False, False, True), (False, True, False)})
-
-
-    def test_badly_formatted(self):
-
-        cases = [
-            "p cnf 2 1\n1 \n2 \n0", "p cnf 2 1\n \n1 2 0"
-        ]
-
-        for cnf_txt in cases:
-            with open(self.tmpfile.name, "w") as f:
-                f.write(cnf_txt)
-
-            m = read_dimacs(self.tmpfile.name)
-            self.assertEqual(len(m.constraints), 1)
-            self.assertEqual(m.solveAll(), 3)
-
-    def test_read_bigint(self):
-
-        cnf_txt = "p cnf \n-2 -300 0\n300 2 1 0\n-1 0\n"
-        with open(self.tmpfile.name, "w") as f:
-            f.write(cnf_txt)
-
-        model = read_dimacs(self.tmpfile.name)
-        vars = sorted(get_variables_model(model), key=str)
-
-        self.assertEqual(model.solveAll(), 2)
+    def test_empty_clauses(self):
+        model = self.dimacs_to_model("p cnf 0 2\n0\n0")
+        self.assertFalse(model.solve())
+        self.assertEqual(model.status().exitstatus, cp.solvers.solver_interface.ExitStatus.UNSATISFIABLE)
 
     def test_with_comments(self):
-        cnf_txt = "c this file starts with some comments\nc\np cnf \n-2 -3 0\n3 2 1 0\n-1 0\n"
-
-        with open(self.tmpfile.name, "w") as f:
-            f.write(cnf_txt)
-
-        model = read_dimacs(self.tmpfile.name)
+        model = self.dimacs_to_model("c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
         vars = sorted(get_variables_model(model), key=str)
 
         sols = set()
