@@ -1,4 +1,4 @@
-from cpmpy.expressions.core import cpm_dict, cpm_set
+from cpmpy.expressions.core import cpm_dict
 from cpmpy.tools.explain.mss import *
 from cpmpy.transformations.normalize import toplevel_list
 
@@ -20,7 +20,7 @@ def mcs_opt(soft, hard, weights=1, solver="ortools"):
     """
     soft2 = toplevel_list(soft, merge_and=False)
     mymss = mss_opt(soft2, hard, weights, solver=solver)
-    return list(cpm_set(soft2) - cpm_set(mymss))
+    return list(set(soft2) - set(mymss))
 
 
 def mcs_grow(soft, hard, solver="ortools"):
@@ -31,7 +31,7 @@ def mcs_grow(soft, hard, solver="ortools"):
     """
     soft2 = toplevel_list(soft, merge_and=False)
     mymss = mss_grow(soft2, hard, solver)
-    return list(cpm_set(soft2) - cpm_set(mymss))
+    return list(set(soft2) - set(mymss))
 
 
 def mcs_grow_naive(soft, hard, solver="ortools"):
@@ -43,4 +43,4 @@ def mcs_grow_naive(soft, hard, solver="ortools"):
     """
     soft2 = toplevel_list(soft, merge_and=False)
     mymss = mss_grow_naive(soft2, hard, solver)
-    return list(cpm_set(soft2) - cpm_set(mymss))
+    return list(set(soft2) - set(mymss))
