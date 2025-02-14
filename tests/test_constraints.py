@@ -43,7 +43,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {'div'},
+                     "exact": {},
                      "cplex": {"mul", "div", "mod", "pow"},
                      }
 
@@ -79,8 +79,6 @@ def numexprs(solver):
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,3]
-        elif name == "mod":
-            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
