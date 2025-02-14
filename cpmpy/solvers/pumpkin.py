@@ -113,7 +113,8 @@ class CPM_pumpkin(SolverInterface):
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
-        from pumpkin_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt, SatisfactionResult
+        from pumpkin_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
+        from pumpkin_py import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_py.optimisation import OptimisationResult, Direction
 
         # ensure all vars are known to solver
@@ -130,12 +131,16 @@ class CPM_pumpkin(SolverInterface):
         if proof is not None:
             self.prefix = proof
 
-        result = self.pum_solver.satisfy(proof=proof, **kwargs)
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
             solve_func = self.pum_solver.optimise
             kwargs.update(objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
+
+        elif assumptions is not None:
+            pum_assumptions = [self.to_predicate(a) for a in assumptions]
+            solve_func = self.pum_solver.satisfy_under_assumptions
+            kwargs.update(assumptions=pum_assumptions)
 
         else:
             solve_func = self.pum_solver.satisfy
@@ -147,7 +152,6 @@ class CPM_pumpkin(SolverInterface):
         self.cpm_status.runtime = time.time() - start_time
 
         # translate solver exit status to CPMpy exit status
-        if isinstance(result, SatisfactionResult.Satisfiable):
         if self.has_objective(): # check result after optimisation
             if isinstance(result, OptimisationResult.Optimal):
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
@@ -159,6 +163,18 @@ class CPM_pumpkin(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
                 raise ValueError("Unexpected optimisation result:", result)
+
+        elif assumptions is not None: # check result under assumptions
+            if isinstance(result, SatisfactionUnderAssumptionsResult.Satisfiable):
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            elif isinstance(result, SatisfactionUnderAssumptionsResult.Unsatisfiable):
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif  isinstance(result, SatisfactionUnderAssumptionsResult.UnsatisfiableUnderAssumptions):
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif isinstance(result, SatisfactionUnderAssumptionsResult.Unknown):
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise ValueError("Unexpected result:", result)
 
         else: # satisfaction result without assumptions
             if isinstance(result, SatisfactionResult.Satisfiable):
@@ -359,15 +375,8 @@ class CPM_pumpkin(SolverInterface):
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
 
             if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
-                # just a literal
-                if cpm_expr.name == "==": comp = Comparator.Equal
-                if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
-                if cpm_expr.name == ">=": comp = Comparator.GreaterThanOrEqual
-                if cpm_expr.name == "!=": comp = Comparator.NotEqual
-                if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
-                if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
-                var = self.solver_var(lhs.args[0])
-                return [constraints.Clause([self.pum_solver.predicate_as_boolean(var, comp, rhs)])]
+                # a predicate
+                return [constraints.Clause([self.pum_solver.predicate_as_boolean(self.to_predicate(cpm_expr))])]
 
             if cpm_expr.name == "==":
                 if "sum" in lhs.name or lhs.name == "sub":
