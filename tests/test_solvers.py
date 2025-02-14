@@ -775,8 +775,6 @@ class TestSupportedSolvers:
         if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
-        if solver == 'ortools':
-            y = cp.intvar(0, 5) #non negative..
 
         vars = [x,y,d,r]
         m = cp.Model()
