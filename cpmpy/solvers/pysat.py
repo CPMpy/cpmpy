@@ -316,21 +316,21 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Comparison) and a1.args[0].name == "sum":
                 # implied sum comparison (a0->sum(bvs)<>val)
-                # convert sum to clauses
-                sum_clauses = self._pysat_cardinality(a1)
+                # convert sum to cnf
+                cnf = self._pysat_cardinality(a1, reified=True)
                 # implication of conjunction is conjunction of individual implications
                 nimplvar = [self.solver_var(~a0)]
-                clauses = [nimplvar+c for c in sum_clauses]
-                self.pysat_solver.append_formula(clauses)
+                cnf = [nimplvar+c for c in cnf]
+                self.pysat_solver.append_formula(cnf)
 
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
-                # convert wsum to clauses
-                wsum_clauses = self._pysat_pseudoboolean(a1)
+                # convert wsum to cnf
+                cnf = self._pysat_pseudoboolean(a1)
                 # implication of conjunction is conjunction of individual implications
                 nimplvar = [self.solver_var(~a0)]
-                clauses = [nimplvar+c for c in wsum_clauses]
-                self.pysat_solver.append_formula(clauses)
+                cnf = [nimplvar+c for c in cnf]
+                self.pysat_solver.append_formula(cnf)
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
@@ -339,13 +339,13 @@ class CPM_pysat(SolverInterface):
             # check if comparison of cardinality/pseudo-boolean constraint
             if isinstance(cpm_expr.args[0], Operator):
                 if cpm_expr.args[0].name == "sum":
-                    # convert to clauses and post
-                    clauses = self._pysat_cardinality(cpm_expr)
-                    self.pysat_solver.append_formula(clauses)
+                    # convert to cnf and post
+                    cnf = self._pysat_cardinality(cpm_expr)
+                    self.pysat_solver.append_formula(cnf)
                 elif cpm_expr.args[0].name == "wsum":
-                    # convert to clauses and post
-                    clauses = self._pysat_pseudoboolean(cpm_expr)
-                    self.pysat_solver.append_formula(clauses)
+                    # convert to cnf and post
+                    cnf = self._pysat_pseudoboolean(cpm_expr)
+                    self.pysat_solver.append_formula(cnf)
                 else:
                     raise NotImplementedError(f"Operator constraint {cpm_expr} not supported by CPM_pysat")
             else:
@@ -413,13 +413,13 @@ class CPM_pysat(SolverInterface):
         return [v for v in self.assumption_vars if self.solver_var(v) in assum_idx]
 
 
-    def _pysat_cardinality(self, cpm_expr):
-        """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
+    def _pysat_cardinality(self, cpm_expr, reified=False):
+        """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT a CNF[Plus] object """
         assert_normalized_bool_lin(cpm_expr)
         if not CPM_pysat.pb_supported():
             raise ImportError("Please install PyPBLib: pip install pypblib")
 
-        from pysat.card import CardEnc
+        from pysat.card import CardEnc, EncType
 
         # unpack and transform to PySAT argument
         lhs, rhs = cpm_expr.args
@@ -431,15 +431,19 @@ class CPM_pysat(SolverInterface):
         lits = self.solver_vars(lhs.args)
         pysat_args = { "lits": lits, "bound": rhs, "vpool": self.pysat_vpool }
 
+        # Some subsolvers (e.g. MiniCard) support native root context cardinality constraints
+        if not reified and self.pysat_solver.supports_atmost():
+            pysat_args["encoding"] = EncType.native
+
         if cpm_expr.name == "<=":
-            return CardEnc.atmost(**pysat_args).clauses
+            return CardEnc.atmost(**pysat_args)
         elif cpm_expr.name == ">=":
-            return CardEnc.atleast(**pysat_args).clauses
+            return CardEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return CardEnc.equals(**pysat_args).clauses
+            return CardEnc.equals(**pysat_args)
 
     def _pysat_pseudoboolean(self, cpm_expr):
-        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
+        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT a CNF object """
         assert_normalized_bool_lin(cpm_expr)
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
@@ -454,14 +458,19 @@ class CPM_pysat(SolverInterface):
         # unpack and transform to PySAT arguments
         lhs, rhs = cpm_expr.args
         lits = self.solver_vars(lhs.args[1])
-        pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
+        pysat_args = {
+                "weights": lhs.args[0],
+                "lits": lits,
+                "bound": rhs,
+                "vpool":self.pysat_vpool,
+                }
 
         if cpm_expr.name == "<=":
-            return PBEnc.atmost(**pysat_args).clauses
+            return PBEnc.atmost(**pysat_args)
         elif cpm_expr.name == ">=":
-            return PBEnc.atleast(**pysat_args).clauses
+            return PBEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return PBEnc.equals(**pysat_args).clauses
+            return PBEnc.equals(**pysat_args)
 
 def assert_normalized_bool_lin(cpm_expr):
     # we assume transformations are applied such that the below is true
