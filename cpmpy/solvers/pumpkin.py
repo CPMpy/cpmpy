@@ -129,7 +129,6 @@ class CPM_pumpkin(SolverInterface):
 
         # call the solver, with parameters
         start_time = time.time() # when did solving start
-        import pickle
 
         if proof is not None:
             self.prefix = proof
@@ -137,18 +136,23 @@ class CPM_pumpkin(SolverInterface):
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
             solve_func = self.pum_solver.optimise
-            kwargs.update(objective=self.solver_var(self._objective),
+            kwargs.update(proof=proof,
+                          objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
 
         elif assumptions is not None:
+            assert proof is None, "Proof-logging under assumptions is not supported"
             pum_assumptions = [self.to_predicate(a) for a in assumptions]
+            self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
             kwargs.update(assumptions=pum_assumptions)
 
         else:
             solve_func = self.pum_solver.satisfy
+            kwargs.update(proof[proof])
 
-        result = solve_func(proof=proof, **kwargs)
+        self._pum_core = None
+        result = solve_func(**kwargs)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -174,6 +178,7 @@ class CPM_pumpkin(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             elif  isinstance(result, SatisfactionUnderAssumptionsResult.UnsatisfiableUnderAssumptions):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                self._pum_core = result._0
             elif isinstance(result, SatisfactionUnderAssumptionsResult.Unknown):
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
@@ -308,24 +313,35 @@ class CPM_pumpkin(SolverInterface):
         """
         from pumpkin_py import Comparator, Predicate
 
-        assert isinstance(cpm_expr, Comparison), "Can only convert comparison expresions to predicates"
-        lhs, rhs = cpm_expr.args
-        assert is_num(rhs), "rhs of comparison must be a constant to be a predicate"
-
-        if isinstance(lhs, Operator): # can be sum with single arg
-            if lhs.name == "sum" and len(lhs.args) == 1:
-                lhs = lhs.args[0]
+        if isinstance(cpm_expr, _BoolVarImpl):
+            if isinstance(cpm_expr, NegBoolView):
+                lhs, comp, rhs = cpm_expr._bv, Comparator.LessThanOrEqual, 0
             else:
-                raise ValueError("Lhs of predicate should be a sum with 1 argument") # TODO: also wsum with 1 arg/mul with const?
+                lhs, comp, rhs = cpm_expr, Comparator.GreaterThanOrEqual, 1
 
-        assert isinstance(lhs, _NumVarImpl), "lhs should be variable"
+        elif isinstance(cpm_expr, Comparison):
 
-        if cpm_expr.name == "==": comp = Comparator.Equal
-        if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
-        if cpm_expr.name == ">=": comp = Comparator.GreaterThanOrEqual
-        if cpm_expr.name == "!=": comp = Comparator.NotEqual
-        if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
-        if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
+            lhs, rhs = cpm_expr.args
+            assert is_num(rhs), "rhs of comparison must be a constant to be a predicate"
+
+            if isinstance(lhs, Operator): # can be sum with single arg
+                if lhs.name == "sum" and len(lhs.args) == 1:
+                    lhs = lhs.args[0]
+                else:
+                    raise ValueError("Lhs of predicate should be a sum with 1 argument") # TODO: also wsum with 1 arg/mul with const?
+
+            assert isinstance(lhs, _NumVarImpl), "lhs should be variable"
+
+            if cpm_expr.name == "==": comp = Comparator.Equal
+            if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
+            if cpm_expr.name == ">=": comp = Comparator.GreaterThanOrEqual
+            if cpm_expr.name == "!=": comp = Comparator.NotEqual
+            if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
+            if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
+
+        else:
+            raise ValueError(f"Cannot convert CPMpy expression {cpm_expr} to a predicate")
+
         var = self._ivars(lhs)
         return Predicate(var, comp, rhs)
 
@@ -509,6 +525,18 @@ class CPM_pumpkin(SolverInterface):
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
+
+    def get_core(self):
+        """
+           For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+
+           CPMpy will return only those variables that are False (in the UNSAT core)
+
+           Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+        """
+
+        assert self._pum_core is not None, "Can only get core if the last solve-call was unsatisfiable under assumptions"
+        return [self.assump_map[pred] for pred in self._pum_core]
 
     # def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
     #     """
