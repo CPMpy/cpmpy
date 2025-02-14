@@ -394,7 +394,8 @@ class CPM_z3(SolverInterface):
                         raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
                     return x ** y
                 elif cpm_con.name == "mod":
-                    return x % y
+                    # minimic modulo with integer division (round towards o)
+                    return z3.If(z3.And(x >= 0), x % y,-(-x % y))
 
             # '-'/1
             elif cpm_con.name == "-":
