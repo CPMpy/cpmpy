@@ -76,7 +76,7 @@ import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
-
+import inspect
 
 class Expression(object):
     """
@@ -219,6 +219,13 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
+        stack = inspect.stack()
+        caller_frame = stack[1]  # Index 1 is the immediate caller
+        caller_name = caller_frame.code_context
+        #print(f"I was called by: {caller_name}", self)
+        if 'expr_dict' in str(caller_name):
+            print('other:', other)
+            return (str(self) == str(other))
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
             if other is True or other == 1:
@@ -821,189 +828,5 @@ class cpm_dict:
 # These do not inherit from python dict or set, because python abstracts from the underlying hash table.
 # Meaning we cannot access it ourselves.
 # This makes you rely on super.add, which is what we are trying to avoid..
-class cpm_dict:
-    def __init__(self):
-        # Maps hash values to lists of (key, value) pairs with that hash
-        self._hash_groups = {}
-
-    def same(self, key1, key2):
-        """
-        Custom key comparison logic (override this as needed).
-        Example: Compare keys as strings to allow "1" and 1 to coexist.
-        """
-        return str(key1) == str(key2)
-
-    def _get_hash_group(self, key):
-        """Returns the list of (key, value) pairs for a given hash."""
-        h = hash(key)
-        if h not in self._hash_groups:
-            self._hash_groups[h] = []
-        return self._hash_groups[h]
-
-    def __setitem__(self, key, value):
-        hash_group = self._get_hash_group(key)
-        # Check for existing key using `same`
-        for i, (existing_key, _) in enumerate(hash_group):
-            if self.same(existing_key, key):
-                hash_group[i] = (key, value)  # Update existing entry
-                return
-        # Add new key-value pair if no collision
-        hash_group.append((key, value))
-
-    def __getitem__(self, key):
-        hash_group = self._get_hash_group(key)
-        for existing_key, value in hash_group:
-            if self.same(existing_key, key):
-                return value
-        raise KeyError(f"Key {key} not found")
-
-    def __delitem__(self, key):
-        hash_group = self._get_hash_group(key)
-        for i, (existing_key, _) in enumerate(hash_group):
-            if self.same(existing_key, key):
-                del hash_group[i]
-                # Clean up empty hash groups
-                if not hash_group:
-                    del self._hash_groups[hash(key)]
-                return
-        raise KeyError(f"Key {key} not found")
-
-    def __contains__(self, key):
-        hash_group = self._get_hash_group(key)
-        return any(self.same(existing_key, key) for existing_key, _ in hash_group)
-
-    def __len__(self):
-        return sum(len(group) for group in self._hash_groups.values())
-
-    def __iter__(self):
-        for group in self._hash_groups.values():
-            for key, _ in group:
-                yield key
-
-    def items(self):
-        return [(k, v) for group in self._hash_groups.values() for k, v in group]
-
-    def keys(self):
-        return [k for group in self._hash_groups.values() for k, _ in group]
-
-    def values(self):
-        return [v for group in self._hash_groups.values() for _, v in group]
-
-    def __repr__(self):
-        items = ", ".join(f"{repr(key)}: {repr(value)}" for key, value in self.items())
-        return f"{{{items}}}"
-
-class cpm_set:
-    def __init__(self, iterable=None):
-        self._hash_groups = {}
-        if iterable is not None:
-            for item in iterable:
-                self.add(item)
-
-    def _get_hash_group(self, key):
-        hash_key = hash(key)
-        if hash_key not in self._hash_groups:
-            self._hash_groups[hash_key] = []
-        return self._hash_groups[hash_key]
-
-    def same(self, key1, key2):
-        return str(key1) == str(key2)
-
-    def add(self, key):
-        hash_group = self._get_hash_group(key)
-        for existing_key in hash_group:
-            if self.same(existing_key, key):
-                return  # Key already exists, do nothing
-        hash_group.append(key)
-
-    def remove(self, key):
-        hash_group = self._get_hash_group(key)
-        for i, existing_key in enumerate(hash_group):
-            if self.same(existing_key, key):
-                del hash_group[i]
-                # Clean up empty hash groups
-                if not hash_group:
-                    del self._hash_groups[hash(key)]
-                return
-        raise KeyError(f"Key {key} not found")
-
-    def __or__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        result = cpm_set(self)
-        for key in other:
-            result.add(key)
-        return result
-
-    def __and__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        result = cpm_set()
-        for key in self:
-            if key in other:
-                result.add(key)
-        return result
-
-    def __sub__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        result = cpm_set(self)
-        for key in other:
-            if key in result:
-                result.remove(key)
-        return result
-
-    def __xor__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        result = cpm_set()
-        for key in self:
-            if key not in other:
-                result.add(key)
-        for key in other:
-            if key not in self:
-                result.add(key)
-        return result
-
-    def __iadd__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        for key in other:
-            self.add(key)
-        return self
-
-    def __isub__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        for key in other:
-            if key in self:
-                self.remove(key)
-        return self
-
-    def __ixor__(self, other):
-        if not isinstance(other, cpm_set):
-            return NotImplemented
-        for key in other:
-            if key in self:
-                self.remove(key)
-            else:
-                self.add(key)
-        return self
-
-    def __contains__(self, key):
-        hash_group = self._get_hash_group(key)
-        return any(self.same(existing_key, key) for existing_key in hash_group)
-
-    def __len__(self):
-        return sum(len(group) for group in self._hash_groups.values())
-
-    def __iter__(self):
-        for group in self._hash_groups.values():
-            for key in group:
-                yield key
-
-    def items(self):
-        return [k for group in self._hash_groups.values() for k in group]
-
-    def __repr__(self):
-        return f"cpm_set({self.items()})"
+class cpm_dict(dict):
+    pass
