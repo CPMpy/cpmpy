@@ -8,7 +8,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
-from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, flip_comparison
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison, flip_comparison, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
@@ -82,6 +82,11 @@ class CPM_pumpkin(SolverInterface):
 
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
+        self._pred_cache = dict() # cache predicates
+
+        # for objective
+        self._objective = None
+        self.objective_is_min = True
 
         # dictionary of tags to user constraints
         self.user_cons = dict()
@@ -109,6 +114,7 @@ class CPM_pumpkin(SolverInterface):
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
         from pumpkin_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt, SatisfactionResult
+        from pumpkin_py.optimisation import OptimisationResult, Direction
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -125,6 +131,16 @@ class CPM_pumpkin(SolverInterface):
             self.prefix = proof
 
         result = self.pum_solver.satisfy(proof=proof, **kwargs)
+        if self.has_objective():
+            assert assumptions is None, "Optimization under assumptions is not supported"
+            solve_func = self.pum_solver.optimise
+            kwargs.update(objective=self.solver_var(self._objective),
+                          direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
+
+        else:
+            solve_func = self.pum_solver.satisfy
+
+        result = solve_func(proof=proof, **kwargs)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -132,13 +148,37 @@ class CPM_pumpkin(SolverInterface):
 
         # translate solver exit status to CPMpy exit status
         if isinstance(result, SatisfactionResult.Satisfiable):
+        if self.has_objective(): # check result after optimisation
+            if isinstance(result, OptimisationResult.Optimal):
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            elif isinstance(result, OptimisationResult.Satisfiable):
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif  isinstance(result, OptimisationResult.Unsatisfiable):
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif isinstance(result, OptimisationResult.Unknown):
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise ValueError("Unexpected optimisation result:", result)
+
+        else: # satisfaction result without assumptions
+            if isinstance(result, SatisfactionResult.Satisfiable):
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            elif isinstance(result, SatisfactionResult.Unsatisfiable):
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif isinstance(result, SatisfactionResult.Unknown):
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise ValueError(f"Unknown Pumpkin-result: {result} of type {type(result)}, please report on github...")
+
+        # translate solution (of user vars only)
+        has_sol = self._solve_return(self.cpm_status)
+        if has_sol:
             solution = result._0
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
 
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
-
                 if isinstance(sol_var, PumpkinInt):
                     cpm_var._value = solution.int_value(sol_var)
                 elif isinstance(sol_var, PumpkinBool):
@@ -146,16 +186,15 @@ class CPM_pumpkin(SolverInterface):
                 else:
                     raise NotSupportedError("Only boolean and integer variables are supported.")
 
-        elif isinstance(result, SatisfactionResult.Unsatisfiable):
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            # translate solution values
+            self.objective_value_ = solution.int_value(self.solver_var(self.objective_))
 
-        elif isinstance(result, SatisfactionResult.Unknown):
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else:
-            raise ValueError(f"Unknown Pumpkin-result: {result} of type {type(result)}, please report on github...")
 
-        # translate solution values (of user specified variables only)
-        self.objective_value_ = None
+        else: # wipe results
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
+
+
 
         return self._solve_return(self.cpm_status)
 
