@@ -82,7 +82,6 @@ class CPM_pumpkin(SolverInterface):
 
         # a dictionary for constant variables, so they can be re-used
         self._constantvars = dict()
-        self._pred_cache = dict() # cache predicates
 
         # for objective
         self._objective = None
@@ -97,14 +96,18 @@ class CPM_pumpkin(SolverInterface):
         super().__init__(name="Pumpkin", cpm_model=cpm_model)
 
 
-    def solve(self, time_limit=None, proof=None, **kwargs):
+    def solve(self, time_limit=None, proof=None, assumptions=None, **kwargs):
         """
             Call the Pumpkin solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
             - proof:       path to a proof file
+            - assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
+                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
+                           get_core() returns a small subset of assumption variables that are unsat together.
             - kwargs:      any keyword argument, sets parameters of solver object
+
 
             Arguments that correspond to solver parameters:
             # [GUIDELINE] Please document key solver arguments that the user might wish to change
@@ -203,16 +206,14 @@ class CPM_pumpkin(SolverInterface):
                     raise NotSupportedError("Only boolean and integer variables are supported.")
 
             # translate solution values
-            self.objective_value_ = solution.int_value(self.solver_var(self.objective_))
-
+            if self.has_objective():
+                self.objective_value_ = solution.int_value(self.solver_var(self.objective_))
 
         else: # wipe results
             for cpm_var in self.user_vars:
                 cpm_var._value = None
 
-
-
-        return self._solve_return(self.cpm_status)
+        return has_sol
 
 
     def solver_var(self, cpm_var):
@@ -246,37 +247,26 @@ class CPM_pumpkin(SolverInterface):
         # return from cache
         return self._varmap[cpm_var]
 
+    def objective(self, expr, minimize=True):
+        """
+            Post the given expression to the solver as objective to minimize/maximize
 
-    # [GUIDELINE] if Pumpkin does not support objective functions, you can delete this function definition
-    # def objective(self, expr, minimize=True):
-    #     """
-    #         Post the given expression to the solver as objective to minimize/maximize
-    #
-    #         'objective()' can be called multiple times, only the last one is stored
-    #
-    #         (technical side note: any constraints created during conversion of the objective
-    #
-    #         are permanently posted to the solver)
-    #     """
-    #     # make objective function non-nested
-    #     (flat_obj, flat_cons) = flatten_objective(expr)
-    #     self += flat_cons # add potentially created constraints
-    #     self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
-    #
-    #     # make objective function or variable and post
-    #     obj = self._make_numexpr(flat_obj)
-    #     # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
-    #     #         _make_numexpr may be removed and an objective can be posted as:
-    #     #           self.pum_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
-    #
-    #     if minimize:
-    #         self.pum_solver.Minimize(obj)
-    #     else:
-    #         self.pum_solver.Maximize(obj)
+            'objective()' can be called multiple times, only the last one is stored
 
-    # def has_objective(self):
-    #     return False # TODO
-    #     return self.pum_solver.hasObjective()
+            (technical side note: any constraints created during conversion of the objective
+
+            are permanently posted to the solver)
+        """
+        # make objective function non-nested
+        obj_var = intvar(*get_bounds(expr))
+        self += expr == obj_var
+
+        # make objective function or variable and post
+        self._objective = obj_var
+        self.objective_is_min = minimize
+
+    def has_objective(self):
+        return self._objective is not None
 
 
     # `__add__()` first calls `transform()`
@@ -311,6 +301,34 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
+
+    def to_predicate(self, cpm_expr):
+        """
+
+        """
+        from pumpkin_py import Comparator, Predicate
+
+        assert isinstance(cpm_expr, Comparison), "Can only convert comparison expresions to predicates"
+        lhs, rhs = cpm_expr.args
+        assert is_num(rhs), "rhs of comparison must be a constant to be a predicate"
+
+        if isinstance(lhs, Operator): # can be sum with single arg
+            if lhs.name == "sum" and len(lhs.args) == 1:
+                lhs = lhs.args[0]
+            else:
+                raise ValueError("Lhs of predicate should be a sum with 1 argument") # TODO: also wsum with 1 arg/mul with const?
+
+        assert isinstance(lhs, _NumVarImpl), "lhs should be variable"
+
+        if cpm_expr.name == "==": comp = Comparator.Equal
+        if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
+        if cpm_expr.name == ">=": comp = Comparator.GreaterThanOrEqual
+        if cpm_expr.name == "!=": comp = Comparator.NotEqual
+        if cpm_expr.name == "<":  comp, rhs = Comparator.LessThanOrEqual, rhs - 1
+        if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
+        var = self.solver_var(lhs)
+        return Predicate(var, comp, rhs)
+
 
     def _ivars(self, cpm_var):
         if is_any_list(cpm_var):
@@ -358,7 +376,6 @@ class CPM_pumpkin(SolverInterface):
     def _get_constraint(self, cpm_expr):
 
         from pumpkin_py import constraints
-        from pumpkin_py import Comparator
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
