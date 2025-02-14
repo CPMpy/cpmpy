@@ -222,9 +222,7 @@ class Expression(object):
         stack = inspect.stack()
         caller_frame = stack[1]  # Index 1 is the immediate caller
         caller_name = caller_frame.code_context
-        #print(f"I was called by: {caller_name}", self)
-        if 'expr_dict' in str(caller_name):
-            print('other:', other)
+        if 'expr_dict_getrmake_var' in str(caller_name):
             return (str(self) == str(other))
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
