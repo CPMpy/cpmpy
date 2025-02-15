@@ -19,6 +19,8 @@ jobs:
           pip install exact
           pip install pysdd
           pip install pychoco
+          git submodule update --init --recursive
+          pip install ./submodules/pindakaas/crates/pyndakaas
           sudo snap install minizinc --classic
           pip install minizinc
       - name: Test with pytest
