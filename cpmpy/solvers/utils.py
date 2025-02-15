@@ -28,6 +28,7 @@ from .pysdd import CPM_pysdd
 from .exact import CPM_exact
 from .choco import CPM_choco
 from .cpo   import CPM_cpo
+from .pindakaas import CPM_pindakaas
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -79,6 +80,7 @@ class SolverLookup():
                 ("exact", CPM_exact),
                 ("choco", CPM_choco),
                 ("cpo", CPM_cpo),
+                ("pindakaas", CPM_pindakaas),
                ]
 
     @classmethod
