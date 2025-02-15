@@ -11,7 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
+ALL_SOLS = False # test whether all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {

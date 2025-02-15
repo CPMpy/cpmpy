@@ -1,0 +1,3 @@
+[submodule "submodules/pindakaas"]
+	path = submodules/pindakaas
+	url = git@github.com:pindakaashq/pindakaas.git
