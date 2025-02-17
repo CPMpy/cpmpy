@@ -100,11 +100,11 @@ def read_dimacs(fname):
             else:
                 assert had_p_line, "Expected p-line before clauses"
                 for token in line.strip().split():
-                    if token == "0":
+                    i = int(token.strip())
+                    if i == 0:
                         m+=cp.any(clause)
                         clause = []
                     else:
-                        i = int(token.strip())
                         try:
                             bv = bvs[abs(i)-1]
                         except IndexError:
