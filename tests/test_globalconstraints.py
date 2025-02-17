@@ -478,6 +478,8 @@ class TestGlobal(unittest.TestCase):
     def test_shorttable(self):
         iv = cp.intvar(-8,8,shape=3, name="x")
 
+        solver = "choco" if cp.SolverLookup.lookup("choco").supported() else "ortools"
+
         cons = cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])
         model = cp.Model(cons)
         self.assertTrue(model.solve())
@@ -487,7 +489,7 @@ class TestGlobal(unittest.TestCase):
 
         short_cons = cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])
         model = cp.Model(short_cons)
-        self.assertTrue(model.solve())
+        self.assertTrue(model.solve(solver=solver))
 
         model = cp.Model(short_cons.decompose())
         self.assertTrue(model.solve())
@@ -498,7 +500,7 @@ class TestGlobal(unittest.TestCase):
 
         short_cons = cp.ShortTable(iv, [[10, 8, STAR], [STAR, 9, 2]])
         model = cp.Model(short_cons)
-        self.assertFalse(model.solve())
+        self.assertFalse(model.solve(solver=solver))
 
         short_cons = cp.ShortTable(iv, [[10, 8, STAR], [5, 9, STAR]])
         model = cp.Model(short_cons.decompose())
@@ -506,8 +508,8 @@ class TestGlobal(unittest.TestCase):
 
         # unconstrained
         true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
-        self.assertTrue(cp.Model(true_cons).solve())
-        self.assertEqual(cp.Model(true_cons).solveAll(), 17 ** 3)
+        self.assertTrue(cp.Model(true_cons).solve(solver=solver))
+        self.assertEqual(cp.Model(true_cons).solveAll(solver=solver), 17 ** 3)
         constraining, defining = true_cons.decompose() # should be True, []
         self.assertTrue(constraining[0])
 
