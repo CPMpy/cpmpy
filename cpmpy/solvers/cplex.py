@@ -30,6 +30,7 @@
     Module details
     ==============
 """
+import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -146,7 +147,7 @@ class CPM_cplex(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        if time_limit is not None:
+        if time_limit is not None and not np.isinf(time_limit):
             self.cplex_model.set_time_limit(time_limit)
 
         cplex_objective = self.cplex_model.get_objective_expr()
@@ -170,7 +171,7 @@ class CPM_cplex(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
-        elif cplex_status == "JobAborted":
+        elif "aborted" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
         else:  # another? This can happen when error during solve. Error message will be in the status.
             raise NotImplementedError(cplex_status)  # if a new status type was introduced, please report on GitHub
@@ -421,7 +422,7 @@ class CPM_cplex(SolverInterface):
             Returns: number of solutions found
         """
 
-        if time_limit is not None:
+        if time_limit is not None and not np.isinf(time_limit):
             self.cplex_model.set_time_limit(time_limit)
         if not call_from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, "
