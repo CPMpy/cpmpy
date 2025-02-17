@@ -7,8 +7,6 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 
-import io
-
 class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:

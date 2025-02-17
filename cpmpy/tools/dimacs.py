@@ -71,7 +71,8 @@ def write_dimacs(model, fname=None):
 
 def read_dimacs(fname):
     """
-        Read a CPMpy model from a DIMACS formatted file striclty following the specification: https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
+        Read a CPMpy model from a DIMACS formatted file striclty following the specification:
+        https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
         Note: the p-line has to denote the correct number of variables and clauses
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
@@ -81,38 +82,36 @@ def read_dimacs(fname):
 
     with open(fname, "r") as f:
         clause = []
-        had_p_line = False
+        nr_vars = None
         for line in f.readlines():
             if line == "" or line.startswith("c"):
                 continue  # skip empty and comment lines
             elif line.startswith("p"):
-                try:
-                    _,typ,nr_vars,nr_cls = line.strip().split(" ")
-                except ValueError:
-                    raise cp.exceptions.CPMpyException(f"Invalid DIMACS file p-header: {line}")
+                params = line.strip().split(" ")
+                assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
+                _,typ,nr_vars,nr_cls = params
                 if typ != "cnf":
                     raise ValueError("Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
                 nr_vars = int(nr_vars)
                 if nr_vars>0:
                     bvs = cp.boolvar(shape=nr_vars)
                 nr_cls = int(nr_cls)
-                had_p_line = True
             else:
-                assert had_p_line, "Expected p-line before clauses"
+                assert nr_vars is not None, "Expected p-line before first clause"
                 for token in line.strip().split():
                     i = int(token.strip())
                     if i == 0:
-                        m+=cp.any(clause)
+                        m += cp.any(clause)
                         clause = []
                     else:
-                        try:
-                            bv = bvs[abs(i)-1]
-                        except IndexError:
-                            raise AssertionError("Expected <={nr_vars} variables (from p-line) but found literal {i} in clause {line}")
+                        var=abs(i)-1
+                        assert var < nr_vars, "Expected at most {nr_vars} variables (from p-line) but found literal {i} in clause {line}"
+                        bv = bvs[var]
 
                         clause.append(bv if i > 0 else ~bv)
 
-        assert not clause, f"Expected last clause to be terminated by 0, but it was not"
+        assert nr_vars is not None, "Expected file to contain p-line, but did not"
+        assert len(clause) == 0, f"Expected last clause to be terminated by 0, but it was not"
         assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
 
     return m
