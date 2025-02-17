@@ -77,6 +77,14 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c3), "sum([1, -1] * [~a, ~BV4]) <= 0")
 
 
+    def test_single_boolvar(self):
+        """ Linearize should convert Boolean literals to constraints (either linear or clause) """
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(linearize_constraint([p])))
+        self.assertEqual(str([p <= 0]), str(linearize_constraint([~p])))
+        self.assertEqual(str([Operator("or", [p])]), str(linearize_constraint([p], supported={"or"})))
+        self.assertEqual(str([Operator("or", [~p])]), str(linearize_constraint([~p], supported={"or"})))
+
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
 
