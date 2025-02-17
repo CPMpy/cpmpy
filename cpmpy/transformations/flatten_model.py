@@ -85,7 +85,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_int
 from .negation import push_down_negation
 
 
@@ -334,7 +334,7 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        if not(isinstance(lb,int) and isinstance(ub,int)):
+        if is_int(lb) and is_int(ub):
             warnings.warn(f"CPMPy only uses integer variables, non-integer expression detected ({expr}) and it will be "
                           f"reified into an intvar with rounded bounds. \n Your constraints will stay the same.",
                           UserWarning)
