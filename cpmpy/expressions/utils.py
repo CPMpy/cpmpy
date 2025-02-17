@@ -194,17 +194,6 @@ def get_bounds(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
-
-def replace_stars(table, star):
-    """ replace the string '*' with a given integer value in a table (used for short tables)"""
-    new_table = copy.deepcopy(table)
-    for (i, x) in enumerate(new_table):
-        if x == '*':
-            new_table[i] = star
-        elif is_any_list(x):
-            new_table[i] = replace_stars(x, star)
-    return new_table
-
 # Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
 STAR = "*" # define constant here
 def is_star(arg):
