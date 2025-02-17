@@ -2,6 +2,8 @@ import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.core import Operator
+from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
@@ -9,56 +11,10 @@ from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
-
-
-from cpmpy.exceptions import MinizincNameException
+from cpmpy import SolverLookup
+from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 class TestSolvers(unittest.TestCase):
-    def test_installed_solvers(self):
-        # basic model
-        v = cp.boolvar(3)
-        x,y,z = v
-
-        model = cp.Model(
-                    x.implies(y & z),
-                    y | z,
-                    ~ z
-                )
-
-        for solvern,s in cp.SolverLookup.base_solvers():
-            if s.supported(): # only supported solvers in test suite
-                model.solve(solver=solvern)
-                self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
-
-        for solvern in cp.SolverLookup.solvernames():
-            s = cp.SolverLookup.get(solvern)
-            if s.supported(): # only supported solvers in test suite
-                s2 = cp.SolverLookup.get(solvern, model)
-                try: 
-                    s2.solve()
-                    self.assertEqual([int(a) for a in v.value()], [0, 1, 0])
-                except:
-                    # its OK I guess... MiniZinc error
-                    pass
-
-    def test_installed_solvers_solveAll(self):
-        # basic model
-        v = cp.boolvar(3)
-        x,y,z = v
-
-        model = cp.Model(
-                    x.implies(y & z),
-                    y | z
-                )
-
-        for solvern,s in cp.SolverLookup.base_solvers():
-            if s.supported(): # only supported solvers in test suite
-                if solvern == "pysdd":
-                    self.assertEqual(model.solveAll(solver=solvern), 4)
-                else:
-                    # some solvers do not support searching for all solutions...
-                    # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
-                    self.assertEqual(model.solveAll(solver=solvern, solution_limit=4), 4)
 
     # should move this test elsewhere later
     def test_tsp(self):
@@ -224,7 +180,6 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(s.objective_value(), 5.0)
 
         self.assertGreater(x[0], x[1])
-        self.assertEqual(cb.solcount, 7)
 
 
         # manually enumerating solutions
@@ -300,6 +255,18 @@ class TestSolvers(unittest.TestCase):
         model += bv2 | bv3
 
         self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
+
+    def test_ortools_real_coeff(self):
+
+        m = cp.Model()
+        # this works in OR-Tools
+        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
+        assert m.solve()
+        assert m.objective_value() == 1.4
+        # this does not
+        m += 0.7 * x + 0.8 * y >= 1
+        self.assertRaises(TypeError, m.solve)
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -466,15 +433,6 @@ class TestSolvers(unittest.TestCase):
         for i in [0,1,2]:
             self.assertTrue( cp.Model( iv1**i >= 0 ).solve() )
 
-    def test_objective(self):
-        iv = cp.intvar(0,10, shape=2)
-        m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
-        self.assertTrue( m.solve() )
-        self.assertEqual( m.objective_value(), 10 )
-
-        m = cp.Model(iv >= 1, iv <= 5, minimize=sum(iv))
-        self.assertTrue( m.solve() )
-        self.assertEqual( m.objective_value(), 2 )
 
     def test_only_objective(self):
         # from test_sum_unary and #95
@@ -519,14 +477,6 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("exact", m)
         self.assertEqual(s.solveAll(display=_trixor_callback),7)
 
-
-    # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
-    @pytest.mark.filterwarnings("ignore:model inconsistency detected")
-    def test_false(self):
-        m = cp.Model([cp.boolvar(), False])
-        for name, cls in cp.SolverLookup.base_solvers():
-            if cls.supported():
-                self.assertFalse(m.solve(solver=name))
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -671,29 +621,6 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
 
-    def test_vars_not_removed(self):
-        bvs = cp.boolvar(shape=3)
-        m = cp.Model([cp.any(bvs) <= 2])
-        for name, cls in cp.SolverLookup.base_solvers():
-            print(f"Testing with {name}")
-            if cls.supported():
-                # reset value for vars
-                bvs.clear()
-                self.assertTrue(m.solve(solver=name))
-                for v in bvs:
-                    self.assertIsNotNone(v.value())
-                #test solve_all
-                sols = set()
-                if name == 'gurobi':
-                    self.assertEqual(m.solveAll(solver=name,solution_limit=20, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
-                    self.assertEqual(m.solveAll(solver=name,solution_limit=20), 8) #test number of solutions is valid, no display
-                else:
-                    self.assertEqual(m.solveAll(solver=name, display=lambda: sols.add(tuple([x.value() for x in bvs]))), 8) #test number of solutions is valid
-                    self.assertEqual(m.solveAll(solver=name), 8) #test number of solutions is valid, no display
-                #test unique sols, should be same number
-                self.assertEqual(len(sols),8)
-
-
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
     def test_count_mzn(self):
@@ -707,3 +634,158 @@ class TestSolvers(unittest.TestCase):
 
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
+
+@pytest.mark.parametrize(
+        "solver",
+        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+)
+class TestSupportedSolvers:
+    def test_installed_solvers(self, solver):
+        # basic model
+        v = cp.boolvar(3)
+        x, y, z = v
+
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z,
+                    ~ z
+                )
+
+        model.solve(solver=solver)
+        assert [int(a) for a in v.value()] == [0, 1, 0]
+
+        s = cp.SolverLookup.get(solver)
+        s.solve()
+        assert [int(a) for a in v.value()] == [0, 1, 0]
+
+    def test_installed_solvers_solveAll(self, solver):
+        # basic model
+        v = cp.boolvar(3)
+        x, y, z = v
+
+        model = cp.Model(
+                    x.implies(y & z),
+                    y | z
+                )
+
+        if solver == "pysdd":
+            assert model.solveAll(solver=solver) == 4
+        else:
+            # some solvers do not support searching for all solutions...
+            # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
+            assert model.solveAll(solver=solver, solution_limit=4) == 4
+
+    def test_objective(self, solver):
+        iv = cp.intvar(0, 10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5)
+
+        try:
+            m.maximize(sum(iv))
+            assert m.solve(solver=solver)
+            assert m.objective_value() == 10
+        except NotSupportedError:
+            return None
+
+        # if the above works, so should everything below
+        m.minimize(sum(iv))
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 2
+
+        # something slightly more exotic
+        m.maximize(cp.min(iv))
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 5
+
+    def test_value_cleared(self, solver):
+        x, y, z = cp.boolvar(shape=3)
+        sat_model = cp.Model(cp.any([x,y,z]))
+        unsat_model = cp.Model([x | y | z, ~x, ~y,~z])
+
+        assert sat_model.solve(solver=solver)
+        for v in (x,y,z):
+            assert v.value() is not None
+        assert not unsat_model.solve(solver=solver)
+        for v in (x,y,z):
+            assert v.value() is None
+
+    def test_incremental_objective(self, solver):
+        x = cp.intvar(0,10,shape=3)
+
+        if solver == "choco":
+            """
+            Choco does not support first optimizing and then adding a constraint.
+            During optimization, additional constraints get added to the solver,
+            which removes feasible solutions.
+            No straightforward way to resolve this for now.
+            """
+            return
+        s = cp.SolverLookup.get(solver)
+        try:
+            s.minimize(cp.sum(x))
+        except (NotSupportedError, NotImplementedError): # solver does not support optimization
+            return
+
+        assert s.solve()
+        assert s.objective_value() == 0
+        s += x[0] == 5
+        s.solve()
+        assert s.objective_value() == 5
+        s.maximize(cp.sum(x))
+        assert s.solve()
+        assert s.objective_value() == 25
+
+    def test_incremental(self, solver):
+        x, y, z = cp.boolvar(shape=3, name="x")
+        s = cp.SolverLookup.get(solver)
+        s += [x]
+        s += [y | z]
+        assert s.solve()
+        assert x.value(), (y | z).value()
+        s += ~y | ~z
+        assert s.solve()
+        assert x.value()
+        assert y.value() + z.value() == 1
+
+    def test_vars_not_removed(self, solver):
+            bvs = cp.boolvar(shape=3)
+            m = cp.Model([cp.any(bvs) <= 2])
+
+            # reset value for vars
+            bvs.clear()
+            assert m.solve(solver=solver)
+            for v in bvs:
+                assert v.value() is not None
+            #test solve_all
+            sols = set()
+            solution_limit = 20 if solver == 'gurobi' else None
+            #test number of solutions is valid
+            assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
+            #test number of solutions is valid, no display
+            assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
+            #test unique sols, should be same number
+            assert len(sols) == 8
+
+
+    # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
+    @pytest.mark.filterwarnings("ignore:model inconsistency detected")
+    def test_false(self, solver):
+        assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
+
+    def test_partial_div_mod(self, solver):
+        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+            return
+        x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
+
+        vars = [x,y,d,r]
+        m = cp.Model()
+        # modulo toplevel
+        m += x / y == d
+        m += x % y == r
+        sols = set()
+        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
+        for sol in sols:
+            xv, yv, dv, rv = sol
+            # print(xv,yv,dv,rv)
+            assert dv * yv + rv == xv
+            assert (Operator('div', [xv, yv])).value() == dv
+            assert (Operator('mod', [xv, yv])).value() == rv

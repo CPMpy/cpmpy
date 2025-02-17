@@ -1,13 +1,3 @@
-import copy
-from ..expressions.core import Operator, Comparison, Expression
-from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.globalfunctions import Element
-from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.python_builtins import all
-from ..expressions.utils import is_any_list
-from .flatten_model import flatten_constraint, get_or_make_var
-from .negation import recurse_negation
-
 """
   Transformations regarding reification constraints.
 
@@ -23,6 +13,15 @@ from .negation import recurse_negation
     - only_implies():       transforms all reifications to BV -> BE form
     - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
 """
+import copy
+from ..expressions.core import Operator, Comparison, Expression
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import Element
+from ..expressions.variables import _BoolVarImpl, _NumVarImpl
+from ..expressions.python_builtins import all
+from ..expressions.utils import is_any_list
+from .flatten_model import flatten_constraint, get_or_make_var
+from .negation import recurse_negation
 
 def only_bv_reifies(constraints):
     newcons = []
@@ -60,26 +59,26 @@ def only_implies(constraints):
         AFTER `flatten()` and 'only_bv_reifies()'.
     """
     newcons = []
+    retransform = []
 
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if cpm_expr.name == '->':
+        if cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
             a0,a1 = cpm_expr.args
-            if isinstance(a1, Comparison) and \
-                    a1.name == '==' and a1.args[0].is_bool() and a1.args[1].is_bool():
+            if a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
                 bv2,bv3 = a1.args
-                newexpr = [a0.implies(~bv2|bv3), a0.implies(~bv3|bv2)]
-                newcons.extend(only_implies(flatten_constraint(newexpr)))
+                retransform.extend(( a0.implies(~bv2|bv3), a0.implies(~bv3|bv2) ))
             else:
                 newcons.append(cpm_expr)
 
         # Comparisons: transform bV == BE
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
+            # a0 is a boolvar, because of previous transformation only_bv_reifies.
             a0,a1 = cpm_expr.args
-            if isinstance(a0, _BoolVarImpl) and isinstance(a1, _BoolVarImpl):
+            if isinstance(a1, _BoolVarImpl):
                 # BVar0 == BVar1 special case, no need to re-transform
                 newcons.append(a0.implies(a1))
                 newcons.append(a1.implies(a0))
@@ -89,15 +88,14 @@ def only_implies(constraints):
                 newcons.append(cpm_expr)
             else:
                 # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                newexprs = ((~a0).implies(recurse_negation(a1)), a0.implies(a1))
-                if isinstance(a1, GlobalConstraint):
-                    newcons.extend(newexprs)
-                else:
-                    newcons.extend(only_implies(only_bv_reifies(flatten_constraint(newexprs))))
+                retransform.extend(( (~a0).implies(recurse_negation(a1)), a0.implies(a1) ))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
     
+    if len(retransform) != 0:
+        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform))))
+
     return newcons
 
 
@@ -123,7 +121,8 @@ def reify_rewrite(constraints, supported=frozenset()):
 
     newcons = []
     for cpm_expr in constraints:
-        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, run transformations.normalize.make_cpm_expr first!"
+        assert isinstance(cpm_expr, Expression), f"Expected CPMpy Expression but got {cpm_expr}, " \
+                                                 f"run transformations.normalize.make_cpm_expr first!"
         # check if reif, get (the index of) the Boolean subexpression BE
         boolexpr_index = None
         if cpm_expr.name == '->':
@@ -154,7 +153,9 @@ def reify_rewrite(constraints, supported=frozenset()):
                 if boolexpr.name in supported:
                     newcons.append(cpm_expr)
                 else:
-                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition transformation from `cpmpy.transformations.decompose_global` to decompose unsupported global constraints")
+                    raise ValueError(f"Unsupported boolexpr {boolexpr} in reification, run a suitable decomposition "
+                                     f"transformation from `cpmpy.transformations.decompose_global` to decompose "
+                                     f"unsupported global constraints")
             elif isinstance(boolexpr, Comparison):
                 # Case 3, BE is Comparison(OP, LHS, RHS)
                 op, (lhs, rhs) = boolexpr.name, boolexpr.args
@@ -162,22 +163,8 @@ def reify_rewrite(constraints, supported=frozenset()):
                 #   at the very least, (iv1 == iv2) == bv has to be supported
                 if isinstance(lhs, _NumVarImpl) or lhs.name in supported:
                     newcons.append(cpm_expr)
-                elif isinstance(lhs, Element) and (lhs.args[1].lb < 0 or lhs.args[1].ub >= len(lhs.args[0])):
-                    # special case: (Element(arr,idx) <OP> RHS) == BV (or -> in some way)
-                    # if the domain of 'idx' is larger than the range of 'arr', then
-                    # this is allowed and BV should be false if it takes a value there
-                    # so we can not use Element (which would restruct the domain of idx)
-                    # and have to work with an element-wise decomposition instead
-                    reifexpr = copy.copy(cpm_expr)
-                    decomp = all(lhs.decompose_comparison(op, rhs)[0])  # decomp() returns list
-                    #print(decomp)
-                    if decomp is False:
-                        # TODO uh... special case, can't insert a constant here with the current transformations...
-                        # use IV < IV.lb which will be false...
-                        decomp = (lhs.args[1] < lhs.args[1].lb)
-                    reifexpr.args[boolexpr_index] = decomp
-                    newcons += flatten_constraint(reifexpr)
-                else:  # other cases (assuming LHS is a total function):
+                else:  # other cases, LHS is a total function
+                    #     introduce aux var and bring function to toplevel
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
                     (auxvar, cons) = get_or_make_var(lhs)

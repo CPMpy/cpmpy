@@ -1,6 +1,11 @@
+"""
+    Normalizing the constraints given to a CPMpy model.
+"""
+
 import copy
 
 import numpy as np
+import cpmpy as cp
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
@@ -46,7 +51,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
     only resulting boolean constant is literal 'false'
     - list_of_expr: list of CPMpy expressions
     """
-    from .negation import recurse_negation # avoid circular import
+
     newlist = []
     for expr in lst_of_expr:
 
@@ -87,7 +92,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 elif is_true_cst(cond):
                     newlist.append(bool_expr)
                 elif is_false_cst(bool_expr):
-                    newlist += simplify_boolean([recurse_negation(cond)])
+                    newlist += simplify_boolean([cp.transformations.negation.recurse_negation(cond)])
                 else:
                     newlist.append(cond.implies(bool_expr))
 
@@ -132,7 +137,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "!=" or name == ">":
                         newlist.append(lhs)
                     if name == "==" or name == "<=":
-                        newlist.append(recurse_negation(lhs))
+                        newlist.append(cp.transformations.negation.recurse_negation(lhs))
                     if name == "<":
                         newlist.append(0 if num_context else BoolVal(False))
                     if name == ">=":
@@ -144,14 +149,14 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "!=":
                         newlist.append(1 if num_context else BoolVal(True))
                     if name == "<" or name == "<=":
-                        newlist.append(recurse_negation(lhs))
+                        newlist.append(cp.transformations.negation.recurse_negation(lhs))
                     if name == ">" or name == ">=":
                         newlist.append(lhs)
                 elif rhs == 1:
                     if name == "==" or name == ">=":
                         newlist.append(lhs)
                     if name == "!=" or name == "<":
-                        newlist.append(recurse_negation(lhs))
+                        newlist.append(cp.transformations.negation.recurse_negation(lhs))
                     if name == ">":
                         newlist.append(0 if num_context else BoolVal(False))
                     if name == "<=":
@@ -162,7 +167,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 newlist.append(eval_comparison(name, lhs, rhs))
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
-            expr.args = simplify_boolean(expr.args) # TODO: how to determine boolean or numerical context?
+            expr.update_args(simplify_boolean(expr.args)) # TODO: how to determine boolean or numerical context? also i this even needed?
             newlist.append(expr)
         else: # variables/constants/direct constraints
             newlist.append(expr)

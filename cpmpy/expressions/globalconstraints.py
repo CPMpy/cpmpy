@@ -98,11 +98,13 @@
 
         AllDifferent
         AllDifferentExcept0
-        AllDifferentLists
+        AllDifferentExceptN
         AllEqual
+        AllEqualExceptN
         Circuit
         Inverse
         Table
+        NegativeTable
         ShortTable
         Xor
         Cumulative
@@ -117,12 +119,13 @@
 
 """
 import copy
-import warnings # for deprecation warning
-import numpy as np
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
-from .variables import boolvar, intvar, cpm_array, _NumVarImpl, _IntVarImpl
-from .utils import flatlist, all_pairs, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+
+
+import cpmpy as cp
+
+from .core import BoolVal
+from .utils import all_pairs
+from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -164,7 +167,8 @@ class GlobalConstraint(Expression):
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
-    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
+                  "stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
 
 
@@ -182,51 +186,37 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
 
-
-class AllDifferentExcept0(GlobalConstraint):
+class AllDifferentExceptN(GlobalConstraint):
     """
-    All nonzero arguments have a distinct value
+        All arguments except those equal to a value in n have a distinct value.
     """
-    def __init__(self, *args):
-        super().__init__("alldifferent_except0", flatlist(args))
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == 0) | (var2 == 0) | (var1 != var2)
-        return [(var1 == var2).implies(var1 == 0) for var1, var2 in all_pairs(self.args)], []
+        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
+        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
 
     def value(self):
-        vals = [argval(a) for a in self.args if argval(a) != 0]
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
 
 
-class AllDifferentLists(GlobalConstraint):
+class AllDifferentExcept0(AllDifferentExceptN):
     """
-        Ensures none of the lists given are exactly the same.
-        Called 'lex_alldifferent' in the global constraint catalog:
-        https://sofdem.github.io/gccat/gccat/Clex_alldifferent.html#uid24923
+        All nonzero arguments have a distinct value
     """
-    def __init__(self, lists):
-        if any(not is_any_list(lst) for lst in lists):
-            raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
-        if any(len(lst) != len(lists[0]) for lst in lists):
-            raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
-        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
+    def __init__(self, *arr):
+        flatarr = flatlist(arr)
+        super().__init__(arr, 0)
 
-    def decompose(self):
-        """Returns the decomposition
-        """
-        from .python_builtins import any as cpm_any
-        constraints = []
-        for lst1, lst2 in all_pairs(self.args):
-            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
-        return constraints, []
-
-    def value(self):
-        lst_vals = [tuple(argvals(a)) for a in self.args]
-        return len(set(lst_vals)) == len(self.args)
 
 def allequal(args):
-    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
 
 
@@ -245,8 +235,30 @@ class AllEqual(GlobalConstraint):
     def value(self):
         return len(set(argvals(self.args))) == 1
 
+
+class AllEqualExceptN(GlobalConstraint):
+    """
+    All arguments except those equal to a value in n have the same value.
+    """
+
+    def __init__(self, arr, n):
+        flatarr = flatlist(arr)
+        if not is_any_list(n):
+            n = [n]
+        super().__init__("allequal_except_n", [flatarr, n])
+
+    def decompose(self):
+        return [(cp.any(var1 == a for a in self.args[1]) | (var1 == var2) | cp.any(var2 == a for a in self.args[1]))
+                for var1, var2 in all_pairs(self.args[0])], []
+
+    def value(self):
+        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+        return len(set(vals)) == 1 or len(set(vals)) == 0
+
+
 def circuit(args):
-    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version", DeprecationWarning)
+    warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
+                  DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
 
 
@@ -272,14 +284,39 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
+        defining = []
         constraining = []
-        constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)] # different orders
-        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
 
-        defining = [order[0] == succ[0]]
-        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+        # We define the auxiliary order variables to represent the order we visit all the nodes.
+        # `order[i] == succ[order[i - 1]]`
+        # These constraints need to be in the defining part, since they define our auxiliary vars
+        # However, this would make it impossible for ~circuit to be satisfied in some cases,
+        # because there does not always exist a valid ordering
+        # This happens when the variables in succ don't take values in the domain of 'order',
+        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
+        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
 
+        lbs, ubs = get_bounds(succ)
+        if min(lbs) > 0 or max(ubs) < n - 1:
+            # no way this can be a circuit
+            return [BoolVal(False)], []
+        elif min(lbs) >= 0 and max(ubs) < n:
+            # there always exists a valid ordering, since our bounds are tight
+            a = BoolVal(True)
+        else:
+            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
+            a = boolvar()
+            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
+            for i in range(n):
+                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
+
+        constraining += [AllDifferent(succ)]  # different successors
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
+        defining += [a.implies(order[0] == succ[0])]
+        for i in range(1, n):
+            defining += [a.implies(
+                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
         return constraining, defining
 
     def value(self):
@@ -316,10 +353,9 @@ class Inverse(GlobalConstraint):
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
-        from .python_builtins import all
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [all(rev[x] == i for i, x in enumerate(fwd))], []
+        return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
         fwd = argvals(self.args[0])
@@ -336,14 +372,16 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
         super().__init__("table", [array, table])
 
     def decompose(self):
-        from .python_builtins import any, all
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
@@ -381,6 +419,26 @@ class ShortTable(GlobalConstraint):
         #didn't find tuple that matches
         return False
 
+class NegativeTable(GlobalConstraint):
+    """The values of the variables in 'array' do not correspond to any row in 'table'
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
+        super().__init__("negative_table", [array, table])
+
+    def decompose(self):
+        arr, tab = self.args
+        return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = argvals(arr)
+        tabval = argvals(tab)
+        return arrval not in tabval
+
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
@@ -388,7 +446,8 @@ class ShortTable(GlobalConstraint):
 class IfThenElse(GlobalConstraint):
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
-            raise TypeError("only boolean expression allowed in IfThenElse")
+            raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
+                            f"{condition, if_true, if_false}")
         super().__init__("ite", [condition, if_true, if_false])
 
     def value(self):
@@ -426,7 +485,6 @@ class InDomain(GlobalConstraint):
             2) constraints that (totally) define new auxiliary variables needed in the decomposition,
                they should be enforced toplevel.
         """
-        from .python_builtins import any
         expr, arr = self.args
         lb, ub = expr.get_bounds()
 
@@ -439,7 +497,7 @@ class InDomain(GlobalConstraint):
 
         expressions = any(isinstance(a, Expression) for a in arr)
         if expressions:
-            return [any(expr == a for a in arr)], defining
+            return [cp.any(expr == a for a in arr)], defining
         else:
             return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
 
@@ -519,7 +577,6 @@ class Cumulative(GlobalConstraint):
             Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         """
-        from ..expressions.python_builtins import sum
 
         arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
         start, duration, end, demand, capacity = arr_args
@@ -531,7 +588,7 @@ class Cumulative(GlobalConstraint):
             cons += [start[t] + duration[t] == end[t]]
 
         # demand doesn't exceed capacity
-        lb, ub = min(s.lb for s in start), max(s.ub for s in end)
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
         for t in range(lb,ub+1):
             demand_at_t = 0
             for job in range(len(start)):
@@ -585,13 +642,12 @@ class Precedence(GlobalConstraint):
         Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
         Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
         """
-        from .python_builtins import any as cpm_any
 
         args, precedence = self.args
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cpm_any(args[:j] == s))]
+                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
@@ -616,7 +672,8 @@ class NoOverlap(GlobalConstraint):
         start = flatlist(start)
         dur = flatlist(dur)
         end = flatlist(end)
-        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length in NoOverlap constraint"
+        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length " \
+                                                   "in NoOverlap constraint"
 
         super().__init__("no_overlap", [start, dur, end])
 
@@ -650,7 +707,6 @@ class GlobalCardinalityCount(GlobalConstraint):
         self.closed = closed
 
     def decompose(self):
-        from .globalfunctions import Count
         vars, vals, occ = self.args
         constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
         if self.closed:
@@ -658,9 +714,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         return constraints, []
 
     def value(self):
-        from .python_builtins import all
         decomposed, _ = self.decompose()
-        return all(decomposed).value()
+        return cp.all(decomposed).value()
 
 
 class Increasing(GlobalConstraint):
@@ -758,7 +813,8 @@ class LexLess(GlobalConstraint):
         X = flatlist(list1)
         Y = flatlist(list2)
         if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} "
+                                 f"and Y length is {len(Y)}")
         super().__init__("lex_less", [X, Y])
 
     def decompose(self):
@@ -803,7 +859,8 @@ class LexLessEq(GlobalConstraint):
         X = flatlist(list1)
         Y = flatlist(list2)
         if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is {len(X)} and Y length is {len(Y)}")
+            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is "
+                                 f"{len(X)} and Y length is {len(Y)}")
         super().__init__("lex_lesseq", [X, Y])
 
     def decompose(self):

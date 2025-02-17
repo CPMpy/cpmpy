@@ -15,8 +15,9 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
-    "AllEqual", "AllDifferent", "AllDifferentLists", "AllDifferentExcept0",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", "ShortTable", "Circuit",
+    "AllEqual", "AllDifferent", "AllDifferentExcept0",
+    "AllDifferentExceptN", "AllEqualExceptN",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "ShortTable", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -33,15 +34,16 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "choco": {"Inverse"},
                   "ortools":{"Inverse"},
                   "exact": {"Inverse"},
-                  "minizinc": {"IncreasingStrict"} # bug #813 reported on libminizinc
+                  "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
+                  "gcs": {}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {"mod"},
+EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {"mod","pow","div","mul"},
+                     "exact": {},
                      }
 
 # Variables to use in the rest of the test script
@@ -75,9 +77,7 @@ def numexprs(solver):
         if name == "wsum":
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
         elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,2]
-        elif name == "mod":
-            operator_args = [NN_VAR,POS_VAR]
+            operator_args = [NN_VAR,3]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
@@ -124,21 +124,21 @@ def comp_constraints(solver):
         - Numeric disequality: Numexpr != Var              (CPMpy class 'Comparison')
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
+                                          Var >=< NumExpr  (CPMpy class 'Comparison')
     """
-    for comp_name in Comparison.allowed:
+    for comp_name in sorted(Comparison.allowed):
 
         for numexpr in numexprs(solver):
             # numeric vs bool/num var/val (incl global func)
-            lb, ub = get_bounds(numexpr)
             for rhs in [NUM_VAR, BOOL_VAR, BoolVal(True), 1]:
                 if solver in SAT_SOLVERS and not is_num(rhs):
                     continue
-                if comp_name == ">" and ub <= get_bounds(rhs)[1]:
-                    continue
-                if comp_name == "<" and lb >= get_bounds(rhs)[0]:
-                    continue
-                yield Comparison(comp_name, numexpr, rhs)
-
+                for x,y in [(numexpr,rhs), (rhs,numexpr)]:
+                    # check if the constraint we are trying to construct is always UNSAT
+                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)):
+                        yield Comparison(comp_name, x, y)
+                    else: # impossible comparison, skip
+                        pass
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
@@ -180,6 +180,8 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
 
         if name == "Xor":
             expr = cls(BOOL_ARGS)
@@ -187,6 +189,8 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+        elif name == "NegativeTable":
+            expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
             expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
         elif name == "IfThenElse":
@@ -200,6 +204,14 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = intvar(0,10,shape=3)
+            expr = cls(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
+        elif name == "AllEqualExceptN":
+            expr = cls(NUM_ARGS, NUM_VAR)
         elif name == "Precedence":
             x = intvar(0,5, shape=3, name="x")
             expr = cls(x, [3,1,0])
@@ -216,22 +228,16 @@ def global_constraints(solver):
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLessEq(X, Y)
-
         elif name == "LexLess":
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
             expr = LexLess(X, Y)
-
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)
-            
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)        
-        elif name == "AllDifferentLists":
-            vars = intvar(0,10, shape=(3,4))
-            expr = cls(vars)
+            expr = LexChainLess(X)
         else: # default constructor, list of numvars
             expr= cls(NUM_ARGS)            
 
@@ -265,7 +271,7 @@ def verify(cons):
 
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
-def test_bool_constaints(solver, constraint):
+def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """

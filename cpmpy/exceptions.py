@@ -32,6 +32,8 @@ class IncompleteFunctionError(CPMpyException):
 class TypeError(CPMpyException):
     pass
 
+class GCSVerificationException(CPMpyException):
+    pass
 
 class TransformationNotImplementedError(CPMpyException):
     pass
