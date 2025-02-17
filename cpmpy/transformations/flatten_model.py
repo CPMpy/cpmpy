@@ -85,7 +85,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_star
 from .negation import push_down_negation
 
 
@@ -299,12 +299,12 @@ def __is_flat_var(arg):
     return is_num(arg) or isinstance(arg, _NumVarImpl)
 
 def __is_flat_var_or_list(arg):
-    """ True if the argument is a star (wildcard in table constraint), is a numeric constant,
-        or a _NumVarImpl (incl subclasses) or a list of __is_flat_var_or_list
+    """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
+        or a list of __is_flat_var_or_list, or it is a wildcard as used in the ShortTable global constraint
     """
-    return arg == '*' or is_num(arg) or isinstance(arg, _NumVarImpl) or \
-           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
-
+    return is_num(arg) or isinstance(arg, _NumVarImpl) or \
+           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
+           is_star(arg)
 
 def get_or_make_var(expr):
     """
