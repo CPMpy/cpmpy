@@ -444,12 +444,6 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other):
-        if self.args[0]:
-            return other
-        else:
-            return other == other  # Always true, but keep variables in the model
-
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
