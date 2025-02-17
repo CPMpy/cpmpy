@@ -84,7 +84,12 @@ class CNFTool(unittest.TestCase):
 
     def test_non_int_literal(self):
         with self.assertRaises(ValueError):
-            self.dimacs_to_model("p cnf 2 1\n1 b 3 0")
+            self.dimacs_to_model("p cnf 2 1\n1 b 2 0")
+
+    def test_non_terminated_final_clause(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 2\n1 2 0\n-1 -2 0\n2")
+
 
     @pytest.mark.skip(reason="We allow fewer variables, because this is technically correct DIMACS")
     def test_too_few_variables(self):

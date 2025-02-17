@@ -112,8 +112,8 @@ def read_dimacs(fname):
 
                         clause.append(bv if i > 0 else ~bv)
 
+        assert not clause, f"Expected last clause to be terminated by 0, but it was not"
         assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
-        assert not clause, f"Expected last clause to be terminated by 0, but was not {clause}"
 
     return m
 
