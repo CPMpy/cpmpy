@@ -71,7 +71,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
         # Boolean literal are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
             if "or" in supported:
-                newlist.append(cp.any([cpm_expr]))
+                # post clause explicitly (don't use cp.any, which will just return the BoolVar)
+                newlist.append(Operator("or", [cpm_expr]))
             elif isinstance(cpm_expr, NegBoolView):
                 # might as well remove the negation
                 newlist.append(sum([~cpm_expr]) <= 0)
