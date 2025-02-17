@@ -389,20 +389,23 @@ class Table(GlobalConstraint):
         return arrval in tab
 
 class ShortTable(GlobalConstraint):
-    """The values of the variables in 'array' correspond to a row in 'table'
-    tuples in 'table' may contain the wildcard character '*' to indicate there are no restrictions for the corresponding
-    variable.
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+         no restrictions for the corresponding variable in that tuple.
     """
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
         super().__init__("short_table", [array, table])
 
     def decompose(self):
-        from .python_builtins import any, all
         arr, tab = self.args
-        return [any(all(ai == ri for ai, ri in zip(arr, row) if ri != '*') for row in tab)], []
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
