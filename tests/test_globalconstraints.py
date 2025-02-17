@@ -6,6 +6,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
+from cpmpy.expressions.utils import STAR
 from cpmpy.solvers import CPM_minizinc
 
 
@@ -475,32 +476,42 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(model.solve())
 
     def test_shorttable(self):
-        iv = cp.intvar(-8,8,3)
+        iv = cp.intvar(-8,8,shape=3, name="x")
 
-        constraints = [cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])]
-        model = cp.Model(constraints)
+        cons = cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])
+        model = cp.Model(cons)
         self.assertTrue(model.solve())
 
-        model = cp.Model(constraints[0].decompose())
+        model = cp.Model(cons.decompose())
         self.assertTrue(model.solve())
 
-        constraints = [cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])]
-        model = cp.Model(constraints)
+        short_cons = cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])
+        model = cp.Model(short_cons)
         self.assertTrue(model.solve())
 
-        model = cp.Model(constraints[0].decompose())
+        model = cp.Model(short_cons.decompose())
         self.assertTrue(model.solve())
 
-        self.assertTrue(cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]]).value())
-        self.assertFalse(cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 3]]).value())
+        self.assertTrue(short_cons.value())
+        self.assertEqual(iv[-1].value(), 2)
+        self.assertFalse(cp.ShortTable(iv, [[10, 8, 2], [STAR, STAR, 3]]).value())
 
-        constraints = [cp.ShortTable(iv, [[10, 8, '*'], ['*', 9, 2]])]
-        model = cp.Model(constraints)
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [STAR, 9, 2]])
+        model = cp.Model(short_cons)
         self.assertFalse(model.solve())
 
-        constraints = [cp.ShortTable(iv, [[10, 8, '*'], [5, 9, '*']])]
-        model = cp.Model(constraints[0].decompose())
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [5, 9, STAR]])
+        model = cp.Model(short_cons.decompose())
         self.assertFalse(model.solve())
+
+        # unconstrained
+        true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
+        self.assertTrue(cp.Model(true_cons).solve())
+        self.assertEqual(cp.Model(true_cons).solveAll(), 17 ** 3)
+        constraining, defining = true_cons.decompose() # should be True, []
+        self.assertTrue(constraining[0])
+
+
 
     def test_table_onearg(self):
 
