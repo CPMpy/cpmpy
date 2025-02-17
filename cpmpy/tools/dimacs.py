@@ -71,7 +71,8 @@ def write_dimacs(model, fname=None):
 
 def read_dimacs(fname):
     """
-        Read a CPMpy model from a DIMACS formatted file
+        Read a CPMpy model from a DIMACS formatted file striclty following the specification: https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
+        Note: the p-line has to denote the correct number of variables and clauses
         :param: fname: the name of the DIMACS file
         :param: sep: optional, separator used in the DIMACS file, will try to infer if None
     """
