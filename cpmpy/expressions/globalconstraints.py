@@ -406,17 +406,13 @@ class ShortTable(GlobalConstraint):
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
-        for tup in tab:
-            thistup = True
-            for aval, tval in zip(arrval, tup):
-                if tval != '*':
-                    if aval != tval:
-                        thistup = False
-            if thistup:
-                #found tuple that matches
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
                 return True
-        #didn't find tuple that matches
         return False
 
 class NegativeTable(GlobalConstraint):
