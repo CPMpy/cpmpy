@@ -25,7 +25,7 @@ import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, cpm_dict
+from ..expressions.core import Expression, cpm_dict, cpm_set
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
@@ -74,8 +74,8 @@ class SolverInterface(object):
         self.objective_value_ = None
 
         # initialise variable handling
-        self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self.user_vars = cpm_set()  # variables in the original (non-transformed) model
+        self._varmap = cpm_dict()  # maps cpmpy variables to native solver variables
         self.expr_dict = cpm_dict()  # maps expressions to cpmpy variables for cse purposes
 
         # rest uses own API
