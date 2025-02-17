@@ -1,9 +1,11 @@
 import unittest
 import tempfile
 
+import pytest
 import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
+from cpmpy.solvers.solver_interface import ExitStatus
 
 import io
 
@@ -28,12 +30,12 @@ class CNFTool(unittest.TestCase):
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
         self.assertTrue(model.solve())
-        self.assertEqual(model.status().exitstatus, cp.solvers.solver_interface.ExitStatus.OPTIMAL)
+        self.assertEqual(model.status().exitstatus, ExitStatus.OPTIMAL)
 
     def test_empty_clauses(self):
         model = self.dimacs_to_model("p cnf 0 2\n0\n0")
         self.assertFalse(model.solve())
-        self.assertEqual(model.status().exitstatus, cp.solvers.solver_interface.ExitStatus.UNSATISFIABLE)
+        self.assertEqual(model.status().exitstatus, ExitStatus.UNSATISFIABLE)
 
     def test_with_comments(self):
         model = self.dimacs_to_model("c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
@@ -58,5 +60,31 @@ class CNFTool(unittest.TestCase):
         gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
 
         self.assertEqual(cnf_txt, gt_cnf)
+
+
+    def test_missing_p_line(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("1 -2 0\np cnf 2 2")
+
+    def test_incorrect_p_line(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 2\n1 2 0")
+
+    def test_too_many_clauses(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 2\n1 2 0\n1 0\n2 0")
+
+    def test_too_few_clauses(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 2\n1 0")
+
+    def test_too_many_variables(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 1\n1 2 3 0")
+
+    @pytest.mark.skip(reason="We allow fewer variables, because this is technically correct DIMACS")
+    def test_too_few_variables(self):
+        with self.assertRaises(AssertionError):
+            self.dimacs_to_model("p cnf 2 1\n1 0")
 
 

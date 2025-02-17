@@ -79,36 +79,40 @@ def read_dimacs(fname):
     m = cp.Model()
 
     with open(fname, "r") as f:
-        typ = None  # CNF/WCNF
-        # TODO infer p-header values (although generally not a good idea)
-        nr_cls = None
-        bvs = None
         clause = []
+        had_p_line = False
         for line in f.readlines():
-            if line.startswith("p"):
+            if line == "" or line.startswith("c"):
+                continue  # skip empty and comment lines
+            elif line.startswith("p"):
                 try:
-                    typ,typ,nr_vars,nr_cls = line.strip().split(" ")
-                    if typ != "cnf":
-                        raise cp.exceptions.NotSupportedError("WDIMACS (WCNF) files are not supported.")
-                    nr_vars = int(nr_vars)
-                    if nr_vars>0:
-                        bvs = cp.boolvar(shape=nr_vars)
-                    nr_cls = int(nr_cls)
+                    _,typ,nr_vars,nr_cls = line.strip().split(" ")
                 except ValueError:
                     raise cp.exceptions.CPMpyException(f"Invalid DIMACS file p-header: {line}")
-            elif line.startswith("c"):
-                continue
+                if typ != "cnf":
+                    raise ValueError("Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
+                nr_vars = int(nr_vars)
+                if nr_vars>0:
+                    bvs = cp.boolvar(shape=nr_vars)
+                nr_cls = int(nr_cls)
+                had_p_line = True
             else:
+                assert had_p_line, "Expected p-line before clauses"
                 for token in line.strip().split():
                     if token == "0":
                         m+=cp.any(clause)
                         clause = []
                     else:
                         i = int(token.strip())
-                        bv = bvs[abs(i)-1]
+                        try:
+                            bv = bvs[abs(i)-1]
+                        except IndexError:
+                            raise AssertionError("Expected <={nr_vars} variables (from p-line) but found literal {i} in clause {line}")
+
                         clause.append(bv if i > 0 else ~bv)
 
-        assert(len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}")
+        assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
+        assert not clause, f"Expected last clause to be terminated by 0, but was not {clause}"
 
     return m
 
