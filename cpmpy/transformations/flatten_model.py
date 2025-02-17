@@ -334,10 +334,9 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        if is_int(lb) and is_int(ub):
-            warnings.warn(f"CPMPy only uses integer variables, non-integer expression detected ({expr}) and it will be "
-                          f"reified into an intvar with rounded bounds. \n Your constraints will stay the same.",
-                          UserWarning)
+        if not is_int(lb) or not is_int(ub):
+            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
+                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
         return ivar, [flatexpr == ivar] + flatcons
