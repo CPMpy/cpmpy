@@ -42,7 +42,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, replace_stars
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
@@ -548,14 +548,14 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'short_table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
-                # take a star value not in the domain of the variables
-                star1 = min([get_bounds(expr)[0] for expr in array]) - 1
-                # star value also cannot be present in the provided table.
-                star2 = min([get_bounds(expr)[0] for tup in table for expr in tup if expr != '*']) - 1
-                star = min(star1, star2)
-                star_table = [replace_stars(table, star)]
-                array, star_table = self.solver_vars([array, star_table])
-                return self.chc_model.table(array, star_table, star)
+                table = np.array(table)
+                table[table == STAR] = np.nan
+                table = table.astype(float) # nan's require float dtype
+                # Choco requires a wildcard value not present in dom of args,
+                # take value lower than anything else
+                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
+                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
