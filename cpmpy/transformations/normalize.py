@@ -8,10 +8,11 @@ import numpy as np
 import cpmpy as cp
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool, is_int
 from ..expressions.variables import NDVarArray
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+
 
 def toplevel_list(cpm_expr, merge_and=True):
     """
@@ -55,35 +56,41 @@ def simplify_boolean(lst_of_expr, num_context=False):
     newlist = []
     for expr in lst_of_expr:
 
-        if isinstance(expr, bool):
-            # not sure if this should happen here or at construction time
-            expr = BoolVal(expr)
-
-        if isinstance(expr, BoolVal):
-            newlist.append(int(expr.value()) if num_context else expr)
-
-        elif isinstance(expr, Operator):
-            args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+        if isinstance(expr, Operator):
+            if expr.has_subexpr():
+                args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+            else:
+                args = list(expr.args)
 
             if expr.name == "or":
-                if any(is_true_cst(arg) for arg in args):
-                    newlist.append(1 if num_context else BoolVal(True))
-                else:
-                    filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
-                    if len(filtered_args):
-                        newlist.append(Operator("or", filtered_args))
-                    else:
+                for i,a in enumerate(list(args)):
+                    if is_true_cst(a):
+                        newlist.append(1 if num_context else BoolVal(True))
+                        break
+                    elif is_false_cst(a):
+                        args.pop(i)
+                else: # did not find True constant, might have removed False
+                    if len(args) == 0:
                         newlist.append(BoolVal(False))
+                    if len(args) != expr.args:
+                        expr.update_args(args)
+                    newlist.append(expr)
+                    continue
 
             elif expr.name == "and":
-                if any(is_false_cst(arg) for arg in args):
-                    newlist.append(0 if num_context else BoolVal(False))
-                else:
-                    filtered_args = [arg for arg in args if not isinstance(arg, BoolVal)]
-                    if len(filtered_args):
-                        newlist.append(Operator("and", filtered_args))
-                    else:
+                for i,a in enumerate(list(args)):
+                    if is_false_cst(a):
+                        newlist.append(0 if num_context else BoolVal(False))
+                        break
+                    elif is_true_cst(a):
+                        args.pop(i)
+                else: # did not find False constant, might have removed True
+                    if len(args) == 0:
                         newlist.append(BoolVal(True))
+                        continue
+                    elif len(args) != expr.args:
+                        expr.update_args(args)
+                    newlist.append(expr)
 
             elif expr.name == "->":
                 cond, bool_expr = args
@@ -105,10 +112,26 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(~args[0])
 
             else: # numerical expressions
+                assert not expr.is_bool()
+                if expr.name == "wsum":
+                    weights, vars = expr.args
+                    vars = [int(v) if is_int(v) else v for v in vars]
+                    args = [weights, vars]
+                else:
+                    args = [int(a) if is_int(a) else a for a in args]
                 newlist.append(Operator(expr.name, args))
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = simplify_boolean(expr.args, num_context=True)
+            lhs, rhs = expr.args
+            if isinstance(lhs, Expression) and lhs.has_subexpr():
+                lhs_args = simplify_boolean(expr.args)
+                expr.update_args(lhs_args) # TODO check if args changed?
+            if isinstance(rhs, Expression) and rhs.has_subexpr():
+                rhs_args = simplify_boolean(expr.args)
+                expr.update_args(rhs_args)
+
+            if is_bool(lhs): lhs = int(lhs)
+            if is_bool(rhs): rhs = int(rhs)
             name = expr.name
             if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
                 if name == "<": name = ">"
@@ -130,7 +153,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             if is_boolexpr(lhs) and is_num(rhs):
                 # direct simplification of boolean comparisons
                 if isinstance(rhs, BoolVal):
-                    rhs = int(rhs.value()) # ensure proper comparisons below
+                    rhs = int(rhs.value())
                 if rhs < 0:
                     newlist.append(BoolVal(name in  {"!=", ">", ">="})) # all other operators evaluate to False
                 elif rhs == 0:
@@ -165,10 +188,16 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
+
         elif isinstance(expr, GlobalConstraint):
             expr = copy.copy(expr)
             expr.update_args(simplify_boolean(expr.args)) # TODO: how to determine boolean or numerical context? also i this even needed?
             newlist.append(expr)
-        else: # variables/constants/direct constraints
+        elif is_bool(expr): # very unlikely base-case
+            newlist.append(int(expr) if num_context else BoolVal(expr))
+        elif isinstance(expr, DirectConstraint):
             newlist.append(expr)
+
+        else:
+            raise ValueError(f"Unexpected expression to normalize: {expr}, please report on github.")
     return newlist
