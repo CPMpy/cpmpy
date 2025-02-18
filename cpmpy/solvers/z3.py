@@ -398,7 +398,12 @@ class CPM_z3(SolverInterface):
                 elif cpm_con.name == "mul":
                     return x * y
                 elif cpm_con.name == "div":
-                    return x / y
+                    # z3 rounds towards negative infinity, need this hack when result is negative
+                    return z3.If(z3.And(x >= 0, y >= 0), x / y,
+                           z3.If(z3.And(x <= 0, y <= 0), -x / -y,
+                           z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
+                           z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
+
                 elif cpm_con.name == "pow":
                     if not is_num(cpm_con.args[1]):
                         # tricky in Z3 not all power constraints are decidable
@@ -408,7 +413,8 @@ class CPM_z3(SolverInterface):
                         raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
                     return x ** y
                 elif cpm_con.name == "mod":
-                    return x % y
+                    # minimic modulo with integer division (round towards o)
+                    return z3.If(z3.And(x >= 0), x % y,-(-x % y))
 
             # '-'/1
             elif cpm_con.name == "-":

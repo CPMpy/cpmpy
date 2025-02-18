@@ -10,7 +10,7 @@ Installation is available through the `pip` Python package manager. This will al
 pip install cpmpy
 ```
 
-CPMpy requires python verion  3.7 or higher.
+CPMpy requires python verion  3.8 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
 
