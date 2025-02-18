@@ -770,7 +770,7 @@ class TestSupportedSolvers:
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
         if solver == 'cplex':
-            pytest.skip("skip test for cplex")  # cplex throws an error if you add False to a model..
+            pytest.skip("skip for cplex, cplex throws an error if you add False to a model..")
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):

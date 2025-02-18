@@ -60,6 +60,8 @@ class CPM_cplex(SolverInterface):
     https://www.ibm.com/products/ilog-cplex-optimization-studio
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
     Creates the following attributes (see parent constructor for more):
     - cplex_model: object, CPLEX model object
     """
@@ -143,6 +145,9 @@ class CPM_cplex(SolverInterface):
 
             For a full list of parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
             and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
+
+            After solving, all solve details can be accessed through self.cplex_model.solve_details:
+            https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -152,12 +157,10 @@ class CPM_cplex(SolverInterface):
 
         cplex_objective = self.cplex_model.get_objective_expr()
         self.cplex_model.solve(**kwargs)
-        # all available solve details:
-        # https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
-
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.cplex_model.solve_details.time
+
         # translate solver exit status to CPMpy exit status
         cplex_status = self.cplex_model.solve_details.status
         if cplex_status == "Feasible":
@@ -270,14 +273,15 @@ class CPM_cplex(SolverInterface):
         # sum
         if cpm_expr.name == "sum":
             return self.cplex_model.sum_vars(self.solver_vars(cpm_expr.args))
-        if cpm_expr.name == "sub":
-            a,b = self.solver_vars(cpm_expr.args)
-            return a - b
+
         # wsum
         if cpm_expr.name == "wsum":
             w, t = cpm_expr.args
             return self.cplex_model.scal_prod(self.solver_vars(t), w)
 
+        if cpm_expr.name == "sub":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a - b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
