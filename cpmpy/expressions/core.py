@@ -433,6 +433,10 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
+    def __int__(self):
+        """Called to implement conversion to numberical"""
+        return int(self.args[0])
+
     def get_bounds(self):
         v = int(self.args[0])
         return (v,v)
