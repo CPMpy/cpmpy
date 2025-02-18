@@ -617,7 +617,7 @@ class Precedence(GlobalConstraint):
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
                 lhs = args[j] == t
-                if is_bool(lhs):
+                if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
                 constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
