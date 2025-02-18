@@ -836,9 +836,11 @@ class TestSupportedSolvers:
         limit = None
         if solver == "gurobi": limit = 100000
 
-        num_sols = m.solveAll(solver=solver)
+        num_sols = m.solveAll(solver=solver, solution_limit=limit)
         assert num_sols == 7
         assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
+
+
 
         # adding a bunch of variables to increase nb of sols
         try:
@@ -850,12 +852,19 @@ class TestSupportedSolvers:
             num_sols = m.solveAll(solver=solver, solution_limit=10)
             assert num_sols == 10
             assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+            # edge-case: nb of solutions is exactly the sol limit
+            m = cp.Model(cp.any(bv))
+            num_sols = m.solveAll(solver=solver, solution_limit=7)
+            assert num_sols ==  7
+            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
+
         except NotImplementedError:
             pass # not all solvers support time/solution limits
 
         # making the problem unsat
         m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-        num_sols = m.solveAll()
+        num_sols = m.solveAll(solver=solver, solution_limit=limit)
         assert num_sols == 0
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
