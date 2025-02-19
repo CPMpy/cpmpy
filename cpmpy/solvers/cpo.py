@@ -49,6 +49,8 @@ class CPM_cpo(SolverInterface):
 
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
 
     Creates the following attributes (see parent constructor for more):
     - cpo_model: object, CP Optimizers model object
