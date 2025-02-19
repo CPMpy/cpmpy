@@ -306,7 +306,7 @@ class CPM_cplex(SolverInterface):
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
@@ -353,7 +353,7 @@ class CPM_cplex(SolverInterface):
                 self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
+                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum')):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
