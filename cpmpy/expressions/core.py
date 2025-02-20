@@ -153,8 +153,7 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        args = flatlist(self.args)
-        return hash((self.name, tuple(args)))
+        return hash((self.name, tuple(self.args)))
     def has_subexpr(self):
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
@@ -710,6 +709,13 @@ class Operator(Expression):
             #overflow happened
             raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
+
+    def __hash__(self):
+        if self.name == 'wsum':
+            return hash(("wsum", tuple(self.args[0]), tuple(self.args[1])))
+        else:
+            return super().__hash__()
+
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
@@ -752,7 +758,7 @@ def _wsum_make(arg):
 # This makes you rely on super.add, which is what we are trying to avoid..
 class cpm_dict:
     def __init__(self):
-        # Maps hash values to lists of (key, value) pairs with that hash
+        # Maps a hash value to a list of (key, value) pairs with that hash
         self._hash_groups = {}
 
     def same(self, key1, key2):
