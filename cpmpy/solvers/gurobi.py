@@ -471,7 +471,7 @@ class CPM_gurobi(SolverInterface):
                 "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
-        sa_kwargs = {"PoolSearchMode":0, "PoolSolutions":solution_limit}
+        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
 
         # solve the model
         self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
