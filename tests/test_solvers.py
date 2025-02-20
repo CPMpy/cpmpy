@@ -772,7 +772,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
 
@@ -782,10 +782,9 @@ class TestSupportedSolvers:
         m += x / y == d
         m += x % y == r
         sols = set()
-        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, solution_limit=120, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
-            # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv
