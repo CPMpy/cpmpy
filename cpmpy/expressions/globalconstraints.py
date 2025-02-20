@@ -124,7 +124,7 @@ import copy
 import cpmpy as cp
 
 from .core import BoolVal
-from .utils import all_pairs, is_int, STAR
+from .utils import all_pairs, is_int, is_bool, STAR
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -633,7 +633,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [vars, precedence])
+        super().__init__("precedence", [cpm_array(vars), precedence])
 
     def decompose(self):
         """
@@ -646,7 +646,10 @@ class Precedence(GlobalConstraint):
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
+                lhs = args[j] == t
+                if is_bool(lhs):  # args[j] and t could both be constants
+                    lhs = BoolVal(lhs)
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
