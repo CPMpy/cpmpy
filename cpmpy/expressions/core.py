@@ -937,3 +937,7 @@ class cpm_set:
 
     def __repr__(self):
         return f"cpm_set({self.items()})"
+
+    def update(self, others):
+        for key in others:
+            self.add(key)
