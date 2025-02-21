@@ -204,12 +204,15 @@ class Abs(GlobalFunction):
         lb, ub = get_bounds(arg)
         # when argument is exclusively on one side of the sign
         if lb >= 0:
-            return [Comparison(cpm_op, arg, cpm_rhs)], []
+            return [eval_comparison(cpm_op, arg, cpm_rhs)], []
         elif ub <= 0:
-            return [Comparison(cpm_op, -arg, cpm_rhs)], []
-        # when domain crosses over 0
-        else:
-            return [Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)], []
+            return [eval_comparison(cpm_op, -arg, cpm_rhs)], []
+        else: # when domain crosses over 0
+            newarg = intvar(*self.get_bounds())
+            is_pos = boolvar()
+            return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
+                    [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
+
 
 
     def get_bounds(self):
