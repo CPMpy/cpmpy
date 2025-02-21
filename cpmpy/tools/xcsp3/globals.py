@@ -1,4 +1,6 @@
 from cpmpy.expressions.globalconstraints import *
+from cpmpy.expressions.variables import _IntVarImpl
+
 
 class AllDifferentListsExceptN(GlobalConstraint):
     """
@@ -550,3 +552,78 @@ class Regular(GlobalConstraint):
             else:
                 return False
         return curr_node in ends
+
+class NotInDomain(GlobalConstraint):
+    """
+        The "NotInDomain" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        super().__init__("NotInDomain", [expr, arr])
+
+    def decompose(self):
+        """
+        This decomp only works in positive context
+        """
+        from cpmpy.expressions.python_builtins import any, all
+        from cpmpy.expressions.variables import boolvar
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        defining = []
+        #if expr is not a var
+        if not isinstance(expr, _IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
+        if not any(isinstance(a, Expression) for a in arr):
+            given = len(set(arr))
+            missing = ub + 1 - lb - given
+            if missing < 2 * given:  # != leads to double the amount of constraints
+                # use == if there is less than twice as many gaps in the domain.
+                row_selected = boolvar(shape=missing)
+                return [any(row_selected)] + [rs.implies(expr == val) for val,rs in zip(range(lb, ub + 1), row_selected) if val not in arr], defining
+        return [all([(expr != a) for a in arr])], defining
+
+
+    def value(self):
+        return argval(self.args[0]) not in argvals(self.args[1])
+
+    def __repr__(self):
+        return "{} not in {}".format(self.args[0], self.args[1])
+
+
+class NoOverlap2d(GlobalConstraint):
+    """
+        2D-version of the NoOverlap constraint.
+        Ensures a set of rectangles is placed on a grid such that they do not overlap.
+    """
+    def __init__(self, start_x, dur_x, end_x,  start_y, dur_y, end_y):
+        assert len(start_x) == len(dur_x) == len(end_x) == len(start_y) == len(dur_y) == len(end_y)
+        super().__init__("no_overlap2d", [start_x, dur_x, end_x,  start_y, dur_y, end_y])
+
+    def decompose(self):
+        from cpmpy.expressions.python_builtins import any as cpm_any
+
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = self.args
+        n = len(start_x)
+        cons =  [s + d == e for s,d,e in zip(start_x, dur_x, end_x)]
+        cons += [s + d == e for s,d,e in zip(start_y, dur_y, end_y)]
+
+        for i,j in all_pairs(list(range(n))):
+            cons += [cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
+                              end_y[i] <= start_y[j], end_y[j] <= start_y[i]])]
+        return cons,[]
+    def value(self):
+        start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
+        n = len(start_x)
+        if any(s + d != e for s, d, e in zip(start_x, dur_x, end_x)):
+            return False
+        if any(s + d != e for s, d, e in zip(start_y, dur_y, end_y)):
+            return False
+        for i,j in all_pairs(list(range(n))):
+            if  end_x[i] > start_x[j] and end_x[j] > start_x[i] and \
+                 end_y[i] > start_y[j] and end_y[j] > start_y[i]:
+                return False
+        return True

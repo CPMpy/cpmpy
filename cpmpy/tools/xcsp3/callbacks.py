@@ -85,7 +85,7 @@ class CallbacksCPMPy(Callbacks):
         "ne": (2, lambda x, y: x != y),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
-        'in': (2, lambda x, y: cp.InDomainNested(x, y)),
+        'in': (2, lambda x, y: cp.InDomain(x, y)),
         'set': (0, lambda x: list(set(x))),
         # TODO 'notin' is the only other set operator (negative indomain)
         # Logic
@@ -243,13 +243,13 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += cp.InDomain(self.get_cpm_var(x), self.unroll(values))
+                self.cpm_model += xglobals.InDomain(self.get_cpm_var(x), self.unroll(values))
         else:
             # negative, so not in domain
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) != values[0]
             else:
-                self.cpm_model += cp.NotInDomain(self.get_cpm_var(x), self.unroll(values))
+                self.cpm_model += xglobals.NotInDomain(self.get_cpm_var(x), self.unroll(values))
 
     def ctr_extension(self, scope: list[Variable], tuples: list, positive: bool, flags: set[str]):
         def strwildcard(x):
@@ -547,7 +547,7 @@ class CallbacksCPMPy(Callbacks):
             end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
             end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
 
-            self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+            self.cpm_model += xglobals.NoOverlap2d(start_x, dur_x, end_x,
                                              start_y, dur_y, end_y)
 
         else:  # n-dimensional, post decomposition directly
@@ -570,7 +570,7 @@ class CallbacksCPMPy(Callbacks):
         end_x = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_x, dur_x)]
         end_y = [cp.intvar(*get_bounds(s + d)) for s, d in zip(start_y, dur_y)]
 
-        self.cpm_model += cp.NoOverlap2d(start_x, dur_x, end_x,
+        self.cpm_model += xglobals.NoOverlap2d(start_x, dur_x, end_x,
                                          start_y, dur_y, end_y)
 
     def ctr_cumulative(self, origins: list[Variable], lengths: list[int] | list[Variable],
