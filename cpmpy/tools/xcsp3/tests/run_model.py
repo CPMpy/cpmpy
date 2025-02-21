@@ -31,7 +31,7 @@ def run_model(lock, solver, xmodel, df_path):
     """
     Runs one XCSP3 instance
     """
-    print("\nrunning model"+xmodel, flush=True, end="\n\n")
+    print("\nrunning model"+xmodel)
     parser = ParserXCSP3(xmodel)
     callbacks = CallbacksCPMPy()
     callbacks.force_exit = True
@@ -45,18 +45,14 @@ def run_model(lock, solver, xmodel, df_path):
     start_time = time.time()
     s = SolverLookup.get(solver, cb.cpm_model)
     end_time = time.time()
-    print(f"Solver lookup took {end_time - start_time} seconds")
+    #print(f"Solver lookup took {end_time - start_time} seconds")
     t_transform = end_time - start_time
     try:
         solve_start_time = time.time()
         res = s.solve()
         solve_end_time = time.time()
-        print(f"Solving took {solve_end_time - solve_start_time} seconds")
+        #print(f"Solving took {solve_end_time - solve_start_time} seconds")
         t_solve = solve_end_time - solve_start_time
-        if res:
-            print('sat')
-        else:
-            print('unsat')
         write_to_dataframe(lock, xmodel, t_solve, t_transform, df_path)
     except Exception as e:
         print('error solving:')
@@ -98,10 +94,10 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", help="The path to the output csv", required=False, type=str,
                         default="output.csv")
     parser.add_argument("-d", "--download", help="download xcsp3 competition instances (0 = false, 1 = true)", required=False, type=int,
-                        default=1)
+                        default=0)
     parser.add_argument("-p", "--amount-of-processes",
                         help="The amount of processes that will be used to run the tests", required=False,
-                        default=cpu_count() - 3, type=check_positive)  # the -1 is for the main process
+                        default=cpu_count() - 1, type=check_positive)  # the -1 is for the main process
     args = parser.parse_args()
     start_time = time.time()
     df_path = args.output
@@ -110,15 +106,10 @@ if __name__ == '__main__':
         pd.DataFrame(columns=["model_name", "t_solve", "t_transform"]).to_csv(df_path, index=False)
 
     if args.download:
-        print("downloading competition instances from 2022 and 2023..")
         install_xcsp3_instances_22()
         install_xcsp3_instances_23()
 
-
-    # creating the vars for the multiprocessing
-    set_start_method("spawn")  # TODO fork might be better here?
     lock = Lock()
-
     xmodels = []
     for root, dirs, files in os.walk(args.models):
         for file in files:
