@@ -127,21 +127,21 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, nb_threads=1, **kwargs):
         """
             Call the cplex solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
+            - nb_threads - how many threads to use during solve.
 
             Examples of supported arguments include:
-                - context (optional) – An instance of context to be used in instead of the context this model was built with.
-                - cplex_parameters (optional) – A set of CPLEX parameters to use instead of the parameters defined as context.cplex_parameters. Accepts either a RootParameterGroup object (obtained by cloning the model’s parameters), or a dict of path-like names and values.
-                - checker (optional) – a string which controls which type of checking is performed. Possible values are: - ‘std’ (the default) performs type checks on arguments to methods; checks that numerical arguments are numbers, but will not check for NaN or infinity. - ‘numeric’ checks that numerical arguments are valid numbers, neither NaN nor math.infinity - ‘full’ performs all possible checks, the union of ‘std’ and ‘numeric’ checks. - ‘off’ performs no checking at all. Disabling all checks might improve performance, but only when it is safe to do so.
-                - log_output (optional) – if True, solver logs are output to stdout. If this is a stream, solver logs are output to that stream object. Overwrites the context.solver.log_output parameter.
-                - clean_before_solve (optional) – a boolean (default is False). Solve normally picks up where the previous solve left, but if this flag is set to True, a fresh solve is started, forgetting all about previous solves..
+                - context (optional) – context to use during solve
+                - cplex_parameters (optional) – A set of CPLEX parameters to use
+                - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
+                - log_output (optional) – if True, solver logs are output to stdout.
+                - clean_before_solve (optional) – default False (iterative solving)
 
             For a full list of parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
             and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
@@ -151,6 +151,8 @@ class CPM_cplex(SolverInterface):
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+        # set nb of threads
+        self.cplex_model.context.cplex_parameters.threads = nb_threads
 
         if time_limit is not None and not np.isinf(time_limit):
             self.cplex_model.set_time_limit(time_limit)
