@@ -61,6 +61,7 @@
         Among
         NValue
         Abs
+        IfThenElseNum
 
 """
 import warnings  # for deprecation warning
@@ -438,3 +439,32 @@ class NValueExcept(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 0, len(self.args)
+
+
+class IfThenElseNum(GlobalFunction):
+    """
+        Function returning x if b is True and otherwise y
+    """
+    def __init__(self, b, x,y):
+        super().__init__("IfThenElseNum",[b,x,y])
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        b,x,y = self.args
+
+        lbx,ubx = get_bounds(x)
+        lby,uby = get_bounds(y)
+        iv = intvar(min(lbx,lby), max(ubx,uby))
+        defining = [b.implies(x == iv), (~b).implies(y == iv)]
+
+        return [eval_comparison(cmp_op, iv, cpm_rhs)], defining
+
+    def get_bounds(self):
+        b,x,y = self.args
+        lbs,ubs = get_bounds([x,y])
+        return min(lbs), max(ubs)
+    def value(self):
+        b,x,y = self.args
+        if argval(b):
+            return argval(x)
+        else:
+            return argval(y)
