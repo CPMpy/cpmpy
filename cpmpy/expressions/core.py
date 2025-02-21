@@ -763,10 +763,28 @@ class cpm_dict:
 
     def same(self, key1, key2):
         """
-        Custom key comparison logic (override this as needed).
-        Example: Compare keys as strings to allow "1" and 1 to coexist.
+        Custom key comparison logic
+        Assumes keys are cpmpy expressions
         """
-        return str(key1) == str(key2)
+        if key1 is key2:  # same object
+            return True
+        elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+            return False  # vars with different id can't be the same.
+        else:
+            return key1.name == key2.name and self.same_args(key1.args, key2.args)
+
+    def same_args(self, args1, args2):
+        if is_any_list(args1):
+            if is_any_list(args2):
+                if len(args1) != len(args2):
+                    return False  # unequal lengths (zip will throw away uneven items otherwise)
+                return all(self.same_args(el1, el2) for el1, el2 in zip(args1, args2))  # recurse into args
+            else:
+                return False  # one is a list, the other not
+        elif is_any_list(args2):
+            return False  # one is a list, the other not.
+        else:  # no more lists:
+            return self.same(args1, args2)
 
     def _get_hash_group(self, key):
         """Returns the list of (key, value) pairs for a given hash."""
@@ -843,7 +861,29 @@ class cpm_set:
         return self._hash_groups[hash_key]
 
     def same(self, key1, key2):
-        return str(key1) == str(key2)
+        """
+        Custom key comparison logic
+        Assumes keys are cpmpy expressions
+        """
+        if key1 is key2:  # same object
+            return True
+        elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+            return False  # vars with different id can't be the same.
+        else:
+            return key1.name == key2.name and self.same_args(key1.args, key2.args)
+
+    def same_args(self, args1, args2):
+        if is_any_list(args1):
+            if is_any_list(args2):
+                if len(args1) != len(args2):
+                    return False  # unequal lengths (zip will throw away uneven items otherwise)
+                return all(self.same_args(el1, el2) for el1, el2 in zip(args1, args2))  # recurse into args
+            else:
+                return False  # one is a list, the other not
+        elif is_any_list(args2):
+            return False  # one is a list, the other not.
+        else:  # no more lists:
+            return self.same(args1, args2)
 
     def add(self, key):
         hash_group = self._get_hash_group(key)
