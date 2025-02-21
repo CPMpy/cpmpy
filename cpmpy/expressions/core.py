@@ -764,14 +764,22 @@ class cpm_dict:
     def same(self, key1, key2):
         """
         Custom key comparison logic
-        Assumes keys are cpmpy expressions
         """
-        if key1 is key2:  # same object
-            return True
-        elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
-            return False  # vars with different id can't be the same.
+        ex1 = isinstance(key1, cp.expressions.core.Expression)  #key1 is expression
+        ex2 = isinstance(key2, cp.expressions.core.Expression)  #key2 is expression
+        if ex1 and ex2:
+            if key1 is key2:  # same object
+                return True
+            elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+                return False  # vars with different id can't be the same.
+            else:
+                return key1.name == key2.name and self.same_args(key1.args, key2.args)
+        elif ex1:
+            return False  # one expression other not
+        elif ex2:
+            return False  # one expression other not
         else:
-            return key1.name == key2.name and self.same_args(key1.args, key2.args)
+            return key1 == key2  # compare non-expressions
 
     def same_args(self, args1, args2):
         if is_any_list(args1):
@@ -863,14 +871,22 @@ class cpm_set:
     def same(self, key1, key2):
         """
         Custom key comparison logic
-        Assumes keys are cpmpy expressions
         """
-        if key1 is key2:  # same object
-            return True
-        elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
-            return False  # vars with different id can't be the same.
+        ex1 = isinstance(key1, cp.expressions.core.Expression)  #key1 is expression
+        ex2 = isinstance(key2, cp.expressions.core.Expression)  #key2 is expression
+        if ex1 and ex2:
+            if key1 is key2:  # same object
+                return True
+            elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+                return False  # vars with different id can't be the same.
+            else:
+                return key1.name == key2.name and self.same_args(key1.args, key2.args)
+        elif ex1:
+            return False  # one expression other not
+        elif ex2:
+            return False  # one expression other not
         else:
-            return key1.name == key2.name and self.same_args(key1.args, key2.args)
+            return key1 == key2  # compare non-expressions
 
     def same_args(self, args1, args2):
         if is_any_list(args1):
