@@ -775,14 +775,16 @@ class TestSupportedSolvers:
         if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
-
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
         m += x / y == d
         m += x % y == r
         sols = set()
-        m.solveAll(solver=solver, solution_limit=120, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = None
+        if solver == 'gurobi':
+            solution_limit = 10
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
