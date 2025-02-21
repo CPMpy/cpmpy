@@ -1,14 +1,14 @@
+import os
 from os.path import join
 
 import glob
 
 import argparse
 import math
-import os
+import pandas as pd
 import sys
 import traceback
 import time
-from pathlib import Path
 from multiprocessing import Process,Lock, Manager, set_start_method,Pool, cpu_count
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 
@@ -26,7 +26,7 @@ def check_positive(value):
         raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
     return ivalue
 
-def run_model(lock, solver, xmodel):
+def run_model(lock, solver, xmodel, df_path):
     """
     Runs one XCSP3 instance
     """
@@ -41,15 +41,49 @@ def run_model(lock, solver, xmodel):
         print("error parsing:")
         print(e)
     cb = callbacker.cb
+    start_time = time.time()
     s = SolverLookup.get(solver, cb.cpm_model)
+    end_time = time.time()
+    print(f"Solver lookup took {end_time - start_time} seconds")
+    t_transform = end_time - start_time
     try:
-        if s.solve():
+        solve_start_time = time.time()
+        res = s.solve()
+        solve_end_time = time.time()
+        print(f"Solving took {solve_end_time - solve_start_time} seconds")
+        t_solve = solve_end_time - solve_start_time
+        if res:
             print('sat')
         else:
             print('unsat')
+        write_to_dataframe(lock, xmodel, t_solve, t_transform, df_path)
     except Exception as e:
         print('error solving:')
         print(e)
+
+
+
+def write_to_dataframe(lock, model_name, t_solve, t_transform, df_path):
+    """
+    Helper function to write model_name, t_solve, and t_transform to a dataframe.
+    All subprocesses will write to this same dataframe.
+    """
+    lock.acquire()
+    try:
+        # Load existing dataframe or create a new one if it doesn't exist
+        try:
+            df = pd.read_csv(df_path)
+        except FileNotFoundError:
+            df = pd.DataFrame(columns=["model_name", "t_solve", "t_transform"])
+
+        # Append new data
+        new_data = {"model_name": model_name, "t_solve": t_solve, "t_transform": t_transform}
+        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+
+        # Save dataframe back to CSV
+        df.to_csv(df_path, index=False)
+    finally:
+        lock.release()
 
 if __name__ == '__main__':
     # get all the available solvers from cpympy
@@ -60,12 +94,17 @@ if __name__ == '__main__':
                         default=available_solvers[0])
     parser.add_argument("-m", "--models", help="The path to load the models", required=False, type=str,
                         default="models")
+    parser.add_argument("-o", "--output", help="The path to the output csv", required=False, type=str,
+                        default="output.csv")
     parser.add_argument("-p", "--amount-of-processes",
                         help="The amount of processes that will be used to run the tests", required=False,
                         default=cpu_count() - 1, type=check_positive)  # the -1 is for the main process
     args = parser.parse_args()
     start_time = time.time()
-
+    df_path = args.output
+    # Empty the dataframe if it already exists
+    if os.path.exists(df_path):
+        pd.DataFrame(columns=["model_name", "t_solve", "t_transform"]).to_csv(df_path, index=False)
     print("\nUsing solver '"+args.solver+"' with models in '"+args.models+"'." , flush=True, end="\n\n")
     print("Will use "+str(args.amount_of_processes)+" parallel executions, starting...", flush=True, end="\n\n")
 
@@ -87,7 +126,7 @@ if __name__ == '__main__':
         for _ in range(min(args.amount_of_processes, len(xmodels))):
             xmodel = next(xmodel_iter, None)
             if xmodel is not None:
-                process_args = (lock, args.solver, xmodel)
+                process_args = (lock, args.solver, xmodel, df_path)
                 process = Process(target=run_model, args=process_args)
                 processes.append(process)
                 process.start()
@@ -100,7 +139,7 @@ if __name__ == '__main__':
                     process.close()
                     xmodel = next(xmodel_iter, None)
                     if xmodel is not None:
-                        process_args = (lock, args.solver, xmodel)
+                        process_args = (lock, args.solver, xmodel, df_path)
                         new_process = Process(target=run_model, args=process_args)
                         processes.append(new_process)
                         new_process.start()
