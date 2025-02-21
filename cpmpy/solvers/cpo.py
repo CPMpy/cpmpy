@@ -133,6 +133,10 @@ class CPM_cpo(SolverInterface):
             # The value is a positive integer. Default value is Auto. (Auto = use all available CPU cores)
             # all solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         # call the solver, with parameters
         if 'LogVerbosity' not in kwargs:
             kwargs['LogVerbosity'] = 'Quiet'
@@ -261,6 +265,7 @@ class CPM_cpo(SolverInterface):
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
+            self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
 
         # return from cache
         return self._varmap[cpm_var]
