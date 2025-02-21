@@ -553,6 +553,53 @@ class Regular(GlobalConstraint):
                 return False
         return curr_node in ends
 
+
+class InDomain(GlobalConstraint):
+    """
+        The "InDomain" constraint, defining non-interval domains for an expression
+    """
+
+    def __init__(self, expr, arr):
+        super().__init__("InDomain", [expr, arr])
+
+    def decompose(self):
+        """
+        This decomp only works in positive context
+        """
+        from .python_builtins import any, all
+        from .variables import boolvar
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        defining = []
+        #if expr is not a var
+        if not isinstance(expr,_IntVarImpl):
+            aux = intvar(lb, ub)
+            defining.append(aux == expr)
+            expr = aux
+
+        if not any(isinstance(a, Expression) for a in arr):
+            given = len(set(arr))
+            missing = ub + 1 - lb - given
+            if 3 * missing <= given:  # a lot more given in the domain than missing, so we use the opposites.
+                return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+        if len(arr) == 0:
+            row_selected = []
+        elif len(arr) > 1:
+            row_selected = boolvar(shape=len(arr))
+        else:
+            row_selected = [boolvar(shape=len(arr))]
+        return [any(row_selected)] + \
+               [rs.implies(expr == a) for (rs, a) in zip(row_selected, arr)], defining
+
+
+    def value(self):
+        return argval(self.args[0]) in argvals(self.args[1])
+
+    def __repr__(self):
+        return "{} in {}".format(self.args[0], self.args[1])
+
+
 class NotInDomain(GlobalConstraint):
     """
         The "NotInDomain" constraint, defining non-interval domains for an expression
