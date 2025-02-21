@@ -27,7 +27,7 @@ def check_positive(value):
         raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
     return ivalue
 
-def run_model(lock, solver, xmodel, df_path):
+def run_model(lock, solver, xmodel, df_path, solve=True):
     """
     Runs one XCSP3 instance
     """
@@ -48,11 +48,14 @@ def run_model(lock, solver, xmodel, df_path):
     #print(f"Solver lookup took {end_time - start_time} seconds")
     t_transform = end_time - start_time
     try:
-        solve_start_time = time.time()
-        res = s.solve()
-        solve_end_time = time.time()
-        #print(f"Solving took {solve_end_time - solve_start_time} seconds")
-        t_solve = solve_end_time - solve_start_time
+        if solve:
+            solve_start_time = time.time()
+            res = s.solve()
+            solve_end_time = time.time()
+            #print(f"Solving took {solve_end_time - solve_start_time} seconds")
+            t_solve = solve_end_time - solve_start_time
+        else:
+            t_solve = 0
         write_to_dataframe(lock, xmodel, t_solve, t_transform, df_path)
     except Exception as e:
         print('error solving:')
@@ -95,6 +98,9 @@ if __name__ == '__main__':
                         default="output.csv")
     parser.add_argument("-d", "--download", help="download xcsp3 competition instances (0 = false, 1 = true)", required=False, type=int,
                         default=0)
+    parser.add_argument("-ns", "--noSolve", help="only run transform, don't solve models (0 = false, 1 = true)",
+                        required=False, type=int,
+                        default=0)
     parser.add_argument("-p", "--amount-of-processes",
                         help="The amount of processes that will be used to run the tests", required=False,
                         default=cpu_count() - 1, type=check_positive)  # the -1 is for the main process
@@ -108,6 +114,11 @@ if __name__ == '__main__':
     if args.download:
         install_xcsp3_instances_22()
         install_xcsp3_instances_23()
+
+    if args.noSolve:
+        only_transform = True
+    else:
+        only_transform = False
 
     lock = Lock()
     xmodels = []
@@ -131,7 +142,7 @@ if __name__ == '__main__':
         for _ in range(min(args.amount_of_processes, len(xmodels))):
             xmodel = next(xmodel_iter, None)
             if xmodel is not None:
-                process_args = (lock, args.solver, xmodel, df_path)
+                process_args = (lock, args.solver, xmodel, df_path, only_transform)
                 process = Process(target=run_model, args=process_args)
                 processes.append(process)
                 process.start()
@@ -144,7 +155,7 @@ if __name__ == '__main__':
                     process.close()
                     xmodel = next(xmodel_iter, None)
                     if xmodel is not None:
-                        process_args = (lock, args.solver, xmodel, df_path)
+                        process_args = (lock, args.solver, xmodel, df_path, only_transform)
                         new_process = Process(target=run_model, args=process_args)
                         processes.append(new_process)
                         new_process.start()
