@@ -111,12 +111,17 @@ if __name__ == '__main__':
     # creating the vars for the multiprocessing
     set_start_method("spawn")  # TODO fork might be better here?
     lock = Lock()
+
     xmodels = []
-    xmodels.extend(glob.glob(join(args.models, "*.xml")))
+    for root, dirs, files in os.walk(args.models):
+        for file in files:
+            if file.endswith(".xml"):
+                xmodels.append(join(root, file))
 
     if len(xmodels) == 0:
         print(f"no models in folder!")
         sys.exit(0)
+    print(xmodels)
 
     processes = []
     xmodel_iter = iter(xmodels)
