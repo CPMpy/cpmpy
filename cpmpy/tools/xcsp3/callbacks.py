@@ -13,6 +13,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
+import globals as xglobals
 from cpmpy import cpm_array
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
@@ -262,7 +263,7 @@ class CallbacksCPMPy(Callbacks):
             if positive:
                 self.cpm_model += cp.ShortTable(cpm_vars, exttuples)
             else:
-                self.cpm_model += cp.NegativeShortTable(cpm_vars, exttuples)
+                self.cpm_model += xglobals.NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
@@ -271,10 +272,10 @@ class CallbacksCPMPy(Callbacks):
                 self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
+        self.cpm_model += xglobals.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
+        self.cpm_model += xglobals.MDD(self.get_cpm_vars(scope), transitions)
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         cpm_exprs = self.get_cpm_exprs(scope)
@@ -292,7 +293,7 @@ class CallbacksCPMPy(Callbacks):
         if excepting is None:
             self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists])
         else:
-            self.cpm_model += cp.AllDifferentListsExceptN([self.get_cpm_vars(lst) for lst in lists], excepting)
+            self.cpm_model += xglobals.AllDifferentListsExceptN([self.get_cpm_vars(lst) for lst in lists], excepting)
 
     def ctr_all_different_matrix(self, matrix: list[list[Variable]], excepting: None | list[int]):
         import numpy as np
@@ -513,7 +514,7 @@ class CallbacksCPMPy(Callbacks):
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
 
         if lst2 is None:
-            self.cpm_model += cp.InverseOne(self.get_cpm_vars(lst1))
+            self.cpm_model += xglobals.InverseOne(self.get_cpm_vars(lst1))
         else:
             cpm_vars1 = self.get_cpm_vars(lst1)
             cpm_vars2 = self.get_cpm_vars(lst2)
@@ -523,10 +524,10 @@ class CallbacksCPMPy(Callbacks):
             #     cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
             # elif len(cpm_vars1) > len(cpm_vars2):
             #     cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
-            self.cpm_model += cp.Inverse(cpm_vars1, cpm_vars2)
+            self.cpm_model += xglobals.Inverse(cpm_vars1, cpm_vars2)
 
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
-        self.cpm_model += cp.Channel(self.get_cpm_vars(lst), self.get_cpm_var(value))
+        self.cpm_model += xglobals.Channel(self.get_cpm_vars(lst), self.get_cpm_var(value))
 
     def ctr_nooverlap(self, origins: list[Variable], lengths: list[int] | list[Variable],
                       zero_ignored: bool):  # in XCSP3 competitions, no 0 permitted in lengths
@@ -683,7 +684,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(pos, neg)
 
     def ctr_circuit(self, lst: list[Variable], size: None | int | Variable):  # size is None in XCSP3 competitions
-        self.cpm_model += cp.SubCircuitWithStart(self.get_cpm_vars(lst), start_index=0)
+        self.cpm_model += xglobals.SubCircuitWithStart(self.get_cpm_vars(lst), start_index=0)
 
     # # # # # # # # # #
     # All methods about objectives to be implemented
