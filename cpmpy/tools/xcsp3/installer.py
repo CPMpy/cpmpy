@@ -89,5 +89,3 @@ def install_xcsp3_instances_23():
             if target in file:
                 filename = os.path.join(root, file)
                 convert(filename)
-
-install_xcsp3_instances_22()

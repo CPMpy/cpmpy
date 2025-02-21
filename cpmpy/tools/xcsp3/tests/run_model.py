@@ -15,6 +15,7 @@ from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 import cpmpy as cp
 from cpmpy import SolverLookup
 from cpmpy.tools.xcsp3.callbacks import CallbacksCPMPy
+from cpmpy.tools.xcsp3.installer import install_xcsp3_instances_22, install_xcsp3_instances_23
 
 
 def check_positive(value):
@@ -96,17 +97,23 @@ if __name__ == '__main__':
                         default="models")
     parser.add_argument("-o", "--output", help="The path to the output csv", required=False, type=str,
                         default="output.csv")
+    parser.add_argument("-d", "--download", help="download xcsp3 competition instances (0 = false, 1 = true)", required=False, type=int,
+                        default=1)
     parser.add_argument("-p", "--amount-of-processes",
                         help="The amount of processes that will be used to run the tests", required=False,
-                        default=cpu_count() - 1, type=check_positive)  # the -1 is for the main process
+                        default=cpu_count() - 3, type=check_positive)  # the -1 is for the main process
     args = parser.parse_args()
     start_time = time.time()
     df_path = args.output
     # Empty the dataframe if it already exists
     if os.path.exists(df_path):
         pd.DataFrame(columns=["model_name", "t_solve", "t_transform"]).to_csv(df_path, index=False)
-    print("\nUsing solver '"+args.solver+"' with models in '"+args.models+"'." , flush=True, end="\n\n")
-    print("Will use "+str(args.amount_of_processes)+" parallel executions, starting...", flush=True, end="\n\n")
+
+    if args.download:
+        print("downloading competition instances from 2022 and 2023..")
+        install_xcsp3_instances_22()
+        install_xcsp3_instances_23()
+
 
     # creating the vars for the multiprocessing
     set_start_method("spawn")  # TODO fork might be better here?
@@ -121,7 +128,9 @@ if __name__ == '__main__':
     if len(xmodels) == 0:
         print(f"no models in folder!")
         sys.exit(0)
-    print(xmodels)
+
+    print("\nUsing solver '"+args.solver+f" with {len(xmodels)} models in "+args.models+"'." , flush=True, end="\n\n")
+    print("Will use "+str(args.amount_of_processes)+" parallel executions, starting...", flush=True, end="\n\n")
 
     processes = []
     xmodel_iter = iter(xmodels)
