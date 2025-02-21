@@ -68,7 +68,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
     newlist = []
     for cpm_expr in lst_of_expr:
-        # Boolean literal are handled as trivial linears or unit clauses depending on `supported`
+        # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
             if "or" in supported:
                 # post clause explicitly (don't use cp.any, which will just return the BoolVar)
@@ -108,6 +108,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
+                    # TODO check performance for this check.
                     for lin in lin_sub:
                         # linearize might return True/False for trivial constraints
                         if is_true_cst(lin):

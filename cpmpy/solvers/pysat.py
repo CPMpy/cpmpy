@@ -261,12 +261,16 @@ class CPM_pysat(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-            In the case of PySAT, the supported constraints are over Boolean variables: Boolean clauses, cardinality constraint (`sum`) and pseudo-Boolean constraints (`wsum`).
+            In the case of PySAT, the supported constraints are over Boolean variables:
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            - Boolean clauses
+            - Cardinality constraint (`sum`)
+            - Pseudo-Boolean constraints (`wsum`)
 
-        :return: list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
+
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}))
@@ -415,7 +419,6 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
-        assert_normalized_bool_lin(cpm_expr)
         if not CPM_pysat.pb_supported():
             raise ImportError("Please install PyPBLib: pip install pypblib")
 
@@ -437,10 +440,11 @@ class CPM_pysat(SolverInterface):
             return CardEnc.atleast(**pysat_args).clauses
         elif cpm_expr.name == "==":
             return CardEnc.equals(**pysat_args).clauses
+        else:
+            raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
         """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
-        assert_normalized_bool_lin(cpm_expr)
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
                 f"PySAT: Expect {cpm_expr} to be a 'wsum'"
@@ -463,27 +467,19 @@ class CPM_pysat(SolverInterface):
         elif cpm_expr.name == "==":
             return PBEnc.equals(**pysat_args).clauses
 
+"""
+  An assert to test whether cpm_expr is a normalized Boolean linear constraint of the form `LinExpr <=/==/>= Constant`.
+"""
 def assert_normalized_bool_lin(cpm_expr):
     # we assume transformations are applied such that the below is true
     ERR = "PySAT: Expected {cpm_expr} to be a normalized linear constraint (`LinExpr <=/==/>= Constant`) over Boolean literals"
-    if not isinstance(cpm_expr, Comparison):
-        raise NotSupportedError(f"{ERR}, but did not receive a Comparison")
+    assert isinstance(cpm_expr, Comparison), f"{ERR}, but did not receive a Comparison"
     lhs,rhs = cpm_expr.args
-    if not is_int(rhs):
-        raise NotSupportedError(
-                f"{ERR}, but the RHS was not a Constant"
-                )
+    assert is_int(rhs), f"{ERR}, but the RHS was not a Constant"
     if lhs.name == "sum":
         lits = lhs.args
     elif lhs.name == "wsum":
         lits = lhs.args[1]
     else:
-        raise NotSupportedError(
-                f"{ERR}, but the LHS was not a `sum` or `wsum`"
-            )
-    for v in lits:
-        if not isinstance(v, _BoolVarImpl):
-            raise NotSupportedError(
-                f"{ERR}, but {v} was not a Boolean literal"
-            )
-
+        assert False, f"{ERR}, but the LHS was not a `sum` or `wsum`"
+    assert all(isinstance(v, _BoolVarImpl) for v in lits), f"{ERR}, but {lits} were not all Boolean literals"
