@@ -17,7 +17,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "ShortTable", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -43,7 +43,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {'div'},
+                     "exact": {},
                      }
 
 # Variables to use in the rest of the test script
@@ -78,8 +78,6 @@ def numexprs(solver):
             operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,3]
-        elif name == "mod":
-            operator_args = [NN_VAR,POS_VAR]
         elif arity != 0:
             operator_args = NUM_ARGS[:arity]
         else:
@@ -193,6 +191,8 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "NegativeTable":
             expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
+        elif name == "ShortTable":
+            expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
@@ -234,7 +234,7 @@ def global_constraints(solver):
             expr = LexLess(X, Y)
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)          
+            expr = LexChainLess(X)
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)
@@ -245,7 +245,7 @@ def global_constraints(solver):
             continue
         else:
             yield expr
-            
+
 
 def reify_imply_exprs(solver):
     """
