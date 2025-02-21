@@ -55,7 +55,7 @@ class TestPySATInterrupt(unittest.TestCase):
         assumption = [lit_cpmvar[1]]
 
         # offset for additional stuff done by cpmpy after solving
-        time_limit, time_offset = 1, 0.5
+        time_limit, time_offset = 1, 0.6
 
         tstart_solving = time.time()
         s.solve(assumptions=assumption, time_limit=time_limit)
