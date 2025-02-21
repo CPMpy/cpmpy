@@ -22,7 +22,7 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "IfThenElseNum"
 }
 
 # Solvers not supporting arithmetic constraints
@@ -106,7 +106,7 @@ def numexprs(solver):
         elif name == "Among":
             expr = cls(NUM_ARGS, [1,2])
         elif name == "IfThenElseNum":
-            expr = cls(BOOL_VAR, NUM_VAR, NUM_VAR)
+            expr = cls(BOOL_VAR, NUM_ARGS[0], NUM_ARGS[1])
         else:
             expr = cls(NUM_ARGS)
 
@@ -295,7 +295,7 @@ def test_comparison_constraints(solver, constraint):
         n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display= lambda: verify(constraint))
         assert n_sols >= 1
     else:
-        assert SolverLookup.get(solver,Model(constraint)).solve()
+        assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
         assert constraint.value()
 
