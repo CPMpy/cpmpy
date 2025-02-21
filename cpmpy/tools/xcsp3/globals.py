@@ -1,4 +1,9 @@
-from cpmpy.expressions.globalconstraints import *
+import numpy as np
+from cpmpy import cpm_array, intvar, boolvar
+from cpmpy.exceptions import CPMpyException
+from cpmpy.expressions.core import Expression
+from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent
+from cpmpy.expressions.utils import is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int
 from cpmpy.expressions.variables import _IntVarImpl
 
 
@@ -268,7 +273,7 @@ class InverseOne(GlobalConstraint):
         super().__init__("inverseOne", [arr])
 
     def decompose(self):
-        from .python_builtins import all
+        from cpmpy.expressions.python_builtins import all
         arr = self.args[0]
         arr = cpm_array(arr)
         return [all(arr[x] == i for i, x in enumerate(arr))], []
@@ -304,6 +309,52 @@ class Channel(GlobalConstraint):
         arr, v = self.args
         return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
+
+class Table(GlobalConstraint):
+    """The values of the variables in 'array' correspond to a row in 'table'
+    """
+
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
+        super().__init__("table", [array, table])
+
+    def decompose(self):
+        """
+            This decomposition is only valid in a non-reified setting.
+        """
+        from cpmpy.expressions.python_builtins import any, all
+        arr, tab = self.args
+        row_selected = boolvar(shape=len(tab))
+        if len(tab) == 1:
+            return [all(t == a for (t, a) in zip(tab[0], arr))], []
+
+        # Decomposition wil fail in negated setting
+        constraining = [any(row_selected)]
+
+        for (row, rs) in zip(tab, row_selected):
+            constraining += [rs.implies(all([t == a for (t, a) in zip(row, arr)]))]
+
+        return constraining, []
+
+    def value(self):
+        arr, tab = self.args
+        arrval = argvals(arr)
+        return arrval in tab
+
+    @property
+    def vars(self):
+        return self._args[0]
+
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'):  # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args  # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
+
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -314,8 +365,8 @@ class NegativeShortTable(GlobalConstraint):
         super().__init__("negative_shorttable", [array, table])
 
     def decompose(self):
-        from .python_builtins import all as cpm_all
-        from .python_builtins import any as cpm_any
+        from cpmpy.expressions.python_builtins import all as cpm_all
+        from cpmpy.expressions.python_builtins import any as cpm_any
         arr, tab = self.args
         return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
 
@@ -566,8 +617,7 @@ class InDomain(GlobalConstraint):
         """
         This decomp only works in positive context
         """
-        from .python_builtins import any, all
-        from .variables import boolvar
+        from cpmpy.expressions.python_builtins import any
         expr, arr = self.args
         lb, ub = expr.get_bounds()
 
@@ -613,7 +663,6 @@ class NotInDomain(GlobalConstraint):
         This decomp only works in positive context
         """
         from cpmpy.expressions.python_builtins import any, all
-        from cpmpy.expressions.variables import boolvar
         expr, arr = self.args
         lb, ub = expr.get_bounds()
 
@@ -674,3 +723,11 @@ class NoOverlap2d(GlobalConstraint):
                  end_y[i] > start_y[j] and end_y[j] > start_y[i]:
                 return False
         return True
+
+
+# helper function
+def is_transition(arg):
+    """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
+    a transition value and an ending node"""
+    return len(arg) == 3 and \
+        isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
