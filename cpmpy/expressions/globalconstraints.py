@@ -163,6 +163,9 @@ class GlobalConstraint(Expression):
         """
         return 0, 1
 
+    def __hash__(self):
+        args = flatlist(self.args)
+        return hash((self.name, tuple(args)))
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
