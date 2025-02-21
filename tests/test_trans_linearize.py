@@ -183,7 +183,7 @@ class TestTransLinearize(unittest.TestCase):
 
 
         lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
-        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, boolval(True), sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
+        self.assertEqual(str(lin_mod), '[IV8 <= 0, sum([2, -1] * [IV9, IV10]) == 0, sum([1, -1] * [IV8, IV11]) == 0, sum([1, 1, -1] * [IV10, IV8, x]) == 0]')
         self.assertTrue(cp.Model(lin_mod).solve())
         self.assertIn(x.value(), {2, 4}) # can never be < 0
 
@@ -301,7 +301,7 @@ class TestVarsLhs(unittest.TestCase):
     def test_mod_triv(self):
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
         # x mod y <= 2 is trivially true for x,y in 1..3
-        self.assertEqual(str([cp.BoolVal(True)]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
+        self.assertEqual(str([]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
 
     def test_mod(self):
 

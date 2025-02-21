@@ -115,16 +115,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
-                    # TODO check performance for this check.
+                    # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
                     for lin in lin_sub:
-                        # linearize might return True/False for trivial constraints
-                        if is_true_cst(lin):
-                            continue
-                        elif is_false_cst(lin):
-                            newlist+=linearize_constraint([~cond], supported=supported)
-                            break
-                        else:
-                            newlist.append(cond.implies(lin))
+                        newlist.append(cond.implies(lin))
 
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
@@ -292,11 +285,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 t_lb = eval_comparison(cpm_expr.name, lb, rhs)
                 t_ub = eval_comparison(cpm_expr.name, ub, rhs)
                 if t_lb and t_ub:
-                    newlist.append(BoolVal(True)) # always true
                     continue
                 elif not t_lb and not t_ub:
-                    newlist.append(BoolVal(False)) # always false
-                    continue
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported) # post the linear version of False
+                    break
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
