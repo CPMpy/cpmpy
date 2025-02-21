@@ -105,6 +105,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, 3)
         elif name == "Among":
             expr = cls(NUM_ARGS, [1,2])
+        elif name == "IfThenElseNum":
+            expr = cls(BOOL_VAR, NUM_VAR, NUM_VAR)
         else:
             expr = cls(NUM_ARGS)
 
