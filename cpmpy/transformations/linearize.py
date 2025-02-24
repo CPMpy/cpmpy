@@ -3,6 +3,9 @@ Transformations regarding linearization of constraints.
 
 Linearized constraints have one of the following forms:
 
+Unsatisfiable:
+------------------
+- BoolVal(False)
 
 Linear comparison:
 ------------------
@@ -116,8 +119,17 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
                     # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
+                    indicator_constraints=[]
                     for lin in lin_sub:
-                        newlist.append(cond.implies(lin))
+                        if is_true_cst(lin):
+                            continue
+                        elif is_false_cst(lin):
+                            indicator_constraints=[] # do not add any constraints
+                            newlist+=linearize_constraint([~cond], supported=supported) # post linear version of unary constraint
+                            break # do not need to add other
+                        else:
+                            indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                    newlist+=indicator_constraints
 
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
