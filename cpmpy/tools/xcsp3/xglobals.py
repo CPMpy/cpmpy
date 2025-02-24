@@ -4,7 +4,7 @@ from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression
 from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent
 from cpmpy.expressions.utils import is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
-    get_bounds
+    get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
 
 
