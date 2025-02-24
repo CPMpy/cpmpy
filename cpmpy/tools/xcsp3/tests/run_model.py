@@ -59,7 +59,7 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
     try:
         if solve:
             solve_start_time = time.time()
-            res = s.solve()
+            res = s.solve(time_limit=1800, num_search_workers=6)
             solve_end_time = time.time()
             #print(f"Solving took {solve_end_time - solve_start_time} seconds")
             t_solve = solve_end_time - solve_start_time
