@@ -8,6 +8,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
@@ -208,19 +209,17 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     if name == "<=":
                         newlist.append(1 if num_context else BoolVal(True))
                 elif rhs > 1:
-                    newlist.append(BoolVal(name in  {"!=", "<", "<="})) # all other operators evaluate to False
+                    newlist.append(BoolVal(name in {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 newlist.append(eval_comparison(name, lhs, rhs))
-
-        elif isinstance(expr, GlobalConstraint):
-            expr = copy.copy(expr)
-            expr.update_args(simplify_boolean(expr.args)) # TODO: how to determine boolean or numerical context? also i this even needed?
+        elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
+            newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
+            if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):
+                expr = copy.copy(expr)
+                expr.update_args(newargs)
             newlist.append(expr)
-        elif is_bool(expr): # very unlikely base-case
+        elif is_bool(expr):  # unlikely base-case (Boolean constant)
             newlist.append(int(expr) if num_context else BoolVal(expr))
-        elif isinstance(expr, DirectConstraint):
+        else:  # variables/constants/direct constraints
             newlist.append(expr)
-
-        else:
-            raise ValueError(f"Unexpected expression to normalize: {expr}, please report on github.")
     return newlist
