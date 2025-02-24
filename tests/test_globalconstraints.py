@@ -6,6 +6,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
+from cpmpy.expressions.utils import STAR
 from cpmpy.solvers import CPM_minizinc
 
 
@@ -474,6 +475,46 @@ class TestGlobal(unittest.TestCase):
         model += constraints[1].decompose()
         self.assertFalse(model.solve())
 
+    def test_shorttable(self):
+        iv = cp.intvar(-8,8,shape=3, name="x")
+
+        solver = "choco" if cp.SolverLookup.lookup("choco").supported() else "ortools"
+
+        cons = cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(cons.decompose())
+        self.assertTrue(model.solve())
+
+        short_cons = cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])
+        model = cp.Model(short_cons)
+        self.assertTrue(model.solve(solver=solver))
+
+        model = cp.Model(short_cons.decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(short_cons.value())
+        self.assertEqual(iv[-1].value(), 2)
+        self.assertFalse(cp.ShortTable(iv, [[10, 8, 2], [STAR, STAR, 3]]).value())
+
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [STAR, 9, 2]])
+        model = cp.Model(short_cons)
+        self.assertFalse(model.solve(solver=solver))
+
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [5, 9, STAR]])
+        model = cp.Model(short_cons.decompose())
+        self.assertFalse(model.solve())
+
+        # unconstrained
+        true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
+        self.assertTrue(cp.Model(true_cons).solve(solver=solver))
+        self.assertEqual(cp.Model(true_cons).solveAll(solver=solver), 17 ** 3)
+        constraining, defining = true_cons.decompose() # should be True, []
+        self.assertTrue(constraining[0])
+
+
+
     def test_table_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -921,6 +962,9 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
         self.assertTrue(cons.value())
         self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
+
+        cons = cp.Precedence([iv[0], iv[1], 4], [0, 1, 2]) # python list in stead of cpm_array
+        self.assertTrue(cp.Model([cons]).solve())
 
 
     def test_no_overlap(self):

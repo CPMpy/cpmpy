@@ -41,7 +41,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals
+from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -470,15 +470,11 @@ class CPM_ortools(SolverInterface):
                                                      self.solver_vars(lhs.args[0]), ortrhs)
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
-                    divisor = lhs.args[1]
-                    if not is_num(divisor):
-                        if divisor.lb <= 0 and divisor.ub >= 0:
-                            raise Exception(
-                                    f"Expression '{lhs}': or-tools does not accept a 'modulo' operation where '0' is "
-                                    f"in the domain of the divisor {divisor}:domain({divisor.lb}, {divisor.ub}). "
-                                    f"Even if you add a constraint that it can not be '0'. You MUST use a variable "
-                                    f"that is defined to be higher or lower than '0'.")
-                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars(lhs.args))
+                    x,y = lhs.args
+                    if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
+                        y, link = get_or_make_var(-lhs.args[1])
+                        self += link
+                    return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
                     if not is_num(lhs.args[1]):

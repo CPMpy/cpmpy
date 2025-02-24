@@ -85,7 +85,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_int, is_star
 from .negation import push_down_negation
 
 
@@ -301,11 +301,11 @@ def __is_flat_var(arg):
 
 def __is_flat_var_or_list(arg):
     """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
-        or a list of __is_flat_var_or_list
+        or a list of __is_flat_var_or_list, or it is a wildcard as used in the ShortTable global constraint
     """
     return is_num(arg) or isinstance(arg, _NumVarImpl) or \
-           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
-
+           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
+           is_star(arg)
 
 def get_or_make_var(expr, expr_dict=None):
     """
@@ -347,10 +347,9 @@ def get_or_make_var(expr, expr_dict=None):
         (flatexpr, flatcons) = normalized_numexpr(expr, expr_dict)
 
         lb, ub = flatexpr.get_bounds()
-        if not(isinstance(lb,int) and isinstance(ub,int)):
-            warnings.warn(f"CPMPy only uses integer variables, non-integer expression detected ({expr}) and it will be "
-                          f"reified into an intvar with rounded bounds. \n Your constraints will stay the same.",
-                          UserWarning)
+        if not is_int(lb) or not is_int(ub):
+            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
+                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
         if flatexpr in expr_dict:

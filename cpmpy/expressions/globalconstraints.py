@@ -105,6 +105,7 @@
         Inverse
         Table
         NegativeTable
+        ShortTable
         Xor
         Cumulative
         IfThenElse
@@ -123,7 +124,7 @@ import copy
 import cpmpy as cp
 
 from .core import BoolVal
-from .utils import all_pairs
+from .utils import all_pairs, is_int, is_bool, STAR
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -390,6 +391,35 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+class ShortTable(GlobalConstraint):
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+         no restrictions for the corresponding variable in that tuple.
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
+        super().__init__("short_table", [array, table])
+
+    def decompose(self):
+        arr, tab = self.args
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
+                return True
+        return False
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
@@ -606,7 +636,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [vars, precedence])
+        super().__init__("precedence", [cpm_array(vars), precedence])
 
     def decompose(self):
         """
@@ -619,7 +649,10 @@ class Precedence(GlobalConstraint):
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
+                lhs = args[j] == t
+                if is_bool(lhs):  # args[j] and t could both be constants
+                    lhs = BoolVal(lhs)
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
