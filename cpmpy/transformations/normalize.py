@@ -8,10 +8,10 @@ import numpy as np
 import cpmpy as cp
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool, is_int
-from ..expressions.variables import NDVarArray
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
+from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalconstraints import GlobalConstraint
 
 
 def toplevel_list(cpm_expr, merge_and=True):
@@ -21,6 +21,7 @@ def toplevel_list(cpm_expr, merge_and=True):
     - cpm_expr: Expression or list of Expressions
     - merge_and: if True then a toplevel 'and' will have its arguments merged at top level
     """
+
     # very efficient version with limited function lookups and list operations
     def unravel(lst, append):
         for e in lst:
@@ -58,86 +59,112 @@ def simplify_boolean(lst_of_expr, num_context=False):
 
         if isinstance(expr, Operator):
             if expr.has_subexpr():
-                args = simplify_boolean(expr.args, num_context=not expr.is_bool())
-            else:
-                args = list(expr.args)
+                newexpr = copy.copy(expr)
+                newexpr.update_args(simplify_boolean(expr.args, num_context=not expr.is_bool()))
+                newlist.append(newexpr)
 
-            if expr.name == "or":
-                for i,a in enumerate(list(args)):
-                    if is_true_cst(a):
+            else:  # no need to recurse, will check constants from here
+                args = expr.args
+                if expr.name == "or":
+                    i = 0
+                    while i < len(args):
+                        a = args[i]
+                        if isinstance(a, _BoolVarImpl):
+                            i += 1 # default path
+                        elif is_true_cst(a):
+                            break
+                        elif is_false_cst(a):
+                            if args is expr.args: # will remove this one, need to copy args...
+                                args = expr.args.copy()
+                            args.pop(i)
+                        else:  # subexpression, should not happen here...
+                            raise ValueError(f"Unexpected argument {a} of expression {expr}, did not expect a subexpr")
+
+                    if i != len(args): # found "True" along the way, early exit
                         newlist.append(1 if num_context else BoolVal(True))
-                        break
-                    elif is_false_cst(a):
-                        args.pop(i)
-                else: # did not find True constant, might have removed False
-                    if len(args) == 0:
-                        newlist.append(BoolVal(False))
-                    if len(args) != expr.args:
-                        expr.update_args(args)
-                    newlist.append(expr)
-                    continue
+                    elif args is not expr.args: # removed something
+                        newexpr = copy.copy(expr)
+                        newexpr.update_args(args)
+                        newlist.append(newexpr)
+                    else: # no changes
+                        newlist.append(expr)
 
-            elif expr.name == "and":
-                for i,a in enumerate(list(args)):
-                    if is_false_cst(a):
+                elif expr.name == "and":
+                    # filter out True/False constants
+                    i = 0
+                    while i < len(args):
+                        a = args[i]
+                        if isinstance(a, _BoolVarImpl):
+                            i += 1 # default path
+                        elif is_false_cst(a):
+                            break
+                        elif is_true_cst(a):
+                            if args is expr.args:  # will remove this one, need to copy args...
+                                args = expr.args.copy()
+                            args.pop(i)
+                        else:  # subexpression, should not happen here...
+                            raise ValueError(f"Unexpected argument {a} of expression {expr}, did not expect a subexpr")
+
+                    if i != len(args): # found "False" along the way, early exit
                         newlist.append(0 if num_context else BoolVal(False))
-                        break
-                    elif is_true_cst(a):
-                        args.pop(i)
-                else: # did not find False constant, might have removed True
-                    if len(args) == 0:
-                        newlist.append(BoolVal(True))
-                        continue
-                    elif len(args) != expr.args:
-                        expr.update_args(args)
-                    newlist.append(expr)
+                    elif args is not expr.args: # removed something
+                        newexpr = copy.copy(expr)
+                        newexpr.update_args(args)
+                        newlist.append(newexpr)
+                    else: # no changes
+                        newlist.append(expr)
 
-            elif expr.name == "->":
-                cond, bool_expr = args
-                if is_false_cst(cond) or is_true_cst(bool_expr):
-                    newlist.append(BoolVal(True))
-                elif is_true_cst(cond):
-                    newlist.append(bool_expr)
-                elif is_false_cst(bool_expr):
-                    newlist += simplify_boolean([cp.transformations.negation.recurse_negation(cond)])
-                else:
-                    newlist.append(cond.implies(bool_expr))
+                elif expr.name == "->":
+                    cond, bool_expr = args
+                    if is_false_cst(cond) or is_true_cst(bool_expr):
+                        newlist.append(1 if num_context else BoolVal(True))
+                    elif is_true_cst(cond):
+                        newlist.append(bool_expr)
+                    elif is_false_cst(bool_expr):
+                        newlist += simplify_boolean([cp.transformations.negation.recurse_negation(cond)])
+                    else:
+                        newlist.append(cond.implies(bool_expr))
 
-            elif expr.name == "not":
-                if is_true_cst(args[0]):
-                    newlist.append(BoolVal(False))
-                elif is_false_cst(args[0]):
-                    newlist.append(BoolVal(True))
-                else:
-                    newlist.append(~args[0])
+                elif expr.name == "not":
+                    if is_true_cst(args[0]):
+                        newlist.append(0 if num_context else BoolVal(False))
+                    elif is_false_cst(args[0]):
+                        newlist.append(1 if num_context else BoolVal(True))
+                    else:
+                        newlist.append(expr)
 
-            else: # numerical expressions
-                assert not expr.is_bool()
-                if expr.name == "wsum":
-                    weights, vars = expr.args
-                    vars = [int(v) if is_int(v) else v for v in vars]
-                    args = [weights, vars]
+                # numerical expressions
+                elif expr.name == "wsum":
+                    weights, vars = args
+                    newvars = [int(v) if is_bool(v) else v for v in vars]
+                    if any(v1 is not v2 for v1,v2 in zip(vars, newvars)):
+                        newexpr = copy.copy(expr)
+                        newexpr.update_args([weights, newvars])
+                        newlist.append(newexpr)
+                    else:
+                        newlist.append(expr)
                 else:
-                    args = [int(a) if is_int(a) else a for a in args]
-                newlist.append(Operator(expr.name, args))
+                    newargs = [int(a) if is_bool(a) else a for a in args]
+                    if any(v1 is not v2 for v1, v2 in zip(args, newargs)):
+                        newexpr = copy.copy(expr)
+                        newexpr.update_args(newargs)
+                        newlist.append(newexpr)
+                    else:
+                        newlist.append(expr)
+
 
         elif isinstance(expr, Comparison):
-            lhs, rhs = expr.args
-            if isinstance(lhs, Expression) and lhs.has_subexpr():
-                lhs_args = simplify_boolean(expr.args)
-                expr.update_args(lhs_args) # TODO check if args changed?
-            if isinstance(rhs, Expression) and rhs.has_subexpr():
-                rhs_args = simplify_boolean(expr.args)
-                expr.update_args(rhs_args)
-
-            if is_bool(lhs): lhs = int(lhs)
-            if is_bool(rhs): rhs = int(rhs)
+            lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
-            if is_num(lhs) and is_boolexpr(rhs): # flip arguments of comparison to reduct nb of cases
-                if name == "<": name = ">"
-                elif name == ">": name=  "<"
-                elif name == "<=" : name = ">="
-                elif name == ">=" : name = "<="
+            if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
+                if name == "<":
+                    name = ">"
+                elif name == ">":
+                    name = "<"
+                elif name == "<=":
+                    name = ">="
+                elif name == ">=":
+                    name = "<="
                 lhs, rhs = rhs, lhs
             """
             Simplify expressions according to this table:
