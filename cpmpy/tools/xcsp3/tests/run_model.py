@@ -119,7 +119,7 @@ if __name__ == '__main__':
     df_path = args.output
     # Empty the dataframe if it already exists
     if os.path.exists(df_path):
-        pd.DataFrame(columns=["model_name", "solver", "t_solve", "t_transform"]).to_csv(df_path, index=False)
+        pd.DataFrame(columns=["model_name", "solver", "t_parse", "t_add", "t_transform", "t_solve"]).to_csv(df_path, index=False)
 
     if args.download:
         install_xcsp3_instances_22()
@@ -152,7 +152,7 @@ if __name__ == '__main__':
         for _ in range(min(args.amount_of_processes, len(xmodels))):
             xmodel = next(xmodel_iter, None)
             if xmodel is not None:
-                process_args = (lock, args.solver, xmodel, df_path, only_transform)
+                process_args = (lock, args.solver, xmodel, df_path, not only_transform)
                 process = Process(target=run_model, args=process_args)
                 processes.append(process)
                 process.start()
@@ -166,7 +166,7 @@ if __name__ == '__main__':
                     gc.collect()  # collect garbage after each instance. (is this overkill?)
                     xmodel = next(xmodel_iter, None)
                     if xmodel is not None:
-                        process_args = (lock, args.solver, xmodel, df_path, only_transform)
+                        process_args = (lock, args.solver, xmodel, df_path, not only_transform)
                         new_process = Process(target=run_model, args=process_args)
                         processes.append(new_process)
                         new_process.start()
