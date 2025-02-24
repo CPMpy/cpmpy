@@ -1,3 +1,5 @@
+import gc
+
 import os
 from os.path import join
 
@@ -86,6 +88,7 @@ def write_to_dataframe(lock, model_name, t_solve, t_transform, df_path):
         lock.release()
 
 if __name__ == '__main__':
+    gc.disable()  # more consistent timing without automatic garbage collection
     # get all the available solvers from cpympy
     available_solvers = cp.SolverLookup.solvernames()
 
@@ -153,6 +156,7 @@ if __name__ == '__main__':
                 if not process.is_alive():
                     processes.remove(process)
                     process.close()
+                    gc.collect()  # collect garbage after each instance. (is this overkill?)
                     xmodel = next(xmodel_iter, None)
                     if xmodel is not None:
                         process_args = (lock, args.solver, xmodel, df_path, only_transform)
@@ -165,6 +169,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"An unexpected error occurred:\n{e} \nstacktrace:\n{traceback.format_exc()}", flush=True, end="\n")
     finally:
+        gc.enable()
         print("\nRan models for " + str(math.floor((time.time() - start_time) / 60)) + " minutes", flush=True,
               end="\n")
         # terminate all the processes
