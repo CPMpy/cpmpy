@@ -157,14 +157,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
             if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
-                if name == "<":
-                    name = ">"
-                elif name == ">":
-                    name = "<"
-                elif name == "<=":
-                    name = ">="
-                elif name == ">=":
-                    name = "<="
+                if name == "<":    name = ">"
+                elif name == ">":  name = "<"
+                elif name == "<=": name = ">="
+                elif name == ">=": name = "<="
                 lhs, rhs = rhs, lhs
             """
             Simplify expressions according to this table:
