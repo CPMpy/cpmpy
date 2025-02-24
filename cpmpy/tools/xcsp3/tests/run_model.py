@@ -39,16 +39,23 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
     callbacks.force_exit = True
     callbacker = CallbackerXCSP3(parser, callbacks)
     try:
+        start_time = time.time()
         callbacker.load_instance()
+        end_time = time.time()
+        t_parse = end_time - start_time
     except Exception as e:
         print("error parsing:")
         print(e)
     cb = callbacker.cb
     start_time = time.time()
+    s_mock = SolverLookup.get(solver, model=None)  # mock solver object, to run transform without posting
+    s_mock.transform(cb.cpm_model.constraints)
+    end_time = time.time()
+    t_transform = end_time - start_time  # only cpmpy transform without posting
+    start_time = time.time()
     s = SolverLookup.get(solver, cb.cpm_model)
     end_time = time.time()
-    #print(f"Solver lookup took {end_time - start_time} seconds")
-    t_transform = end_time - start_time
+    t_add = end_time - start_time  # total transform + native solver interface
     try:
         if solve:
             solve_start_time = time.time()
@@ -58,14 +65,14 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
             t_solve = solve_end_time - solve_start_time
         else:
             t_solve = 0
-        write_to_dataframe(lock, xmodel, solver, t_solve, t_transform, df_path)
+        write_to_dataframe(lock, xmodel, solver, t_parse, t_add, t_transform, t_solve, df_path)
     except Exception as e:
         print('error solving:')
         print(e)
 
 
 
-def write_to_dataframe(lock, model_name, solver, t_solve, t_transform, df_path):
+def write_to_dataframe(lock, model_name, solver, t_parse, t_add, t_transform, t_solve, df_path):
     """
     Helper function to write model_name, t_solve, and t_transform to a dataframe.
     All subprocesses will write to this same dataframe.
@@ -76,10 +83,10 @@ def write_to_dataframe(lock, model_name, solver, t_solve, t_transform, df_path):
         try:
             df = pd.read_csv(df_path)
         except FileNotFoundError:
-            df = pd.DataFrame(columns=["model_name", "solver", "t_solve", "t_transform"])
+            df = pd.DataFrame(columns=["model_name", "solver", "t_parse", "t_add", "t_transform", "t_solve"])
 
         # Append new data
-        new_data = {"model_name": model_name, "solver": solver, "t_solve": t_solve, "t_transform": t_transform}
+        new_data = {"model_name": model_name, "solver": solver, "t_parse": t_parse, "t_add": t_add, "t_transform": t_transform, "t_solve": t_solve}
         df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
         # Save dataframe back to CSV
