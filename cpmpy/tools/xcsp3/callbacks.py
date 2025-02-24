@@ -97,7 +97,7 @@ class CallbacksCPMPy(Callbacks):
         "imp": (2, lambda x, y: x.implies(y)),
         # control
         "if": (3, lambda b, x, y: cp.IfThenElse(b, x, y) if is_boolexpr(x) and is_boolexpr(y)
-        else cp.IfThenElseNum(b, x, y))
+        else xglobals.IfThenElseNum(b, x, y))
     }
 
     def eval_cpm_comp(self, lhs, op: TypeConditionOperator, rhs):

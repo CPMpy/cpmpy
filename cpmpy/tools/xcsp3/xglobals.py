@@ -2,8 +2,9 @@ import numpy as np
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression
-from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent
-from cpmpy.expressions.utils import is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int
+from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent
+from cpmpy.expressions.utils import is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
+    get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
 
 
@@ -723,6 +724,35 @@ class NoOverlap2d(GlobalConstraint):
                  end_y[i] > start_y[j] and end_y[j] > start_y[i]:
                 return False
         return True
+
+
+class IfThenElseNum(GlobalFunction):
+    """
+        Function returning x if b is True and otherwise y
+    """
+    def __init__(self, b, x,y):
+        super().__init__("IfThenElseNum",[b,x,y])
+
+    def decompose_comparison(self, cmp_op, cpm_rhs):
+        b,x,y = self.args
+
+        lbx,ubx = get_bounds(x)
+        lby,uby = get_bounds(y)
+        iv = intvar(min(lbx,lby), max(ubx,uby))
+        defining = [b.implies(x == iv), (~b).implies(y == iv)]
+
+        return [eval_comparison(cmp_op, iv, cpm_rhs)], defining
+
+    def get_bounds(self):
+        b,x,y = self.args
+        lbs,ubs = get_bounds([x,y])
+        return min(lbs), max(ubs)
+    def value(self):
+        b,x,y = self.args
+        if argval(b):
+            return argval(x)
+        else:
+            return argval(y)
 
 
 # helper function
