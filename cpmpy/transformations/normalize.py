@@ -130,7 +130,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             elif expr.name == "not":
                 if isinstance(args[0], _BoolVarImpl): # fast path
                     newlist.append(~args[0])
-                if is_true_cst(args[0]):
+                elif is_true_cst(args[0]):
                     newlist.append(0 if num_context else BoolVal(False))
                 elif is_false_cst(args[0]):
                     newlist.append(1 if num_context else BoolVal(True))
@@ -145,21 +145,21 @@ def simplify_boolean(lst_of_expr, num_context=False):
             elif expr.name == "wsum":
                 weights, vars = args
                 newvars = [int(v) if is_bool(v) else v for v in vars]
-                if any(v1 is not v2 for v1,v2 in zip(vars, newvars)):
+                if args is not expr.args or any(v1 is not v2 for v1,v2 in zip(vars, newvars)):
                     newexpr = copy.copy(expr)
                     newexpr.update_args([weights, newvars])
                     newlist.append(newexpr)
                 else:
                     newlist.append(expr)
-            else:
+
+            else: # default case, check if anything is Bool that should be int
                 newargs = [int(a) if is_bool(a) else a for a in args]
-                if any(v1 is not v2 for v1, v2 in zip(args, newargs)):
+                if expr_args is not expr.args or any(v1 is not v2 for v1, v2 in zip(args, newargs)):
                     newexpr = copy.copy(expr)
                     newexpr.update_args(newargs)
                     newlist.append(newexpr)
                 else:
                     newlist.append(expr)
-
 
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
