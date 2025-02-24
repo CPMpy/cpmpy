@@ -434,7 +434,7 @@ class BoolVal(Expression):
         return self.args[0]
 
     def __int__(self):
-        """Called to implement conversion to numberical"""
+        """Called to implement conversion to numerical"""
         return int(self.args[0])
 
     def get_bounds(self):
