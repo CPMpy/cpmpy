@@ -58,14 +58,14 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
             t_solve = solve_end_time - solve_start_time
         else:
             t_solve = 0
-        write_to_dataframe(lock, xmodel, t_solve, t_transform, df_path)
+        write_to_dataframe(lock, xmodel, solver, t_solve, t_transform, df_path)
     except Exception as e:
         print('error solving:')
         print(e)
 
 
 
-def write_to_dataframe(lock, model_name, t_solve, t_transform, df_path):
+def write_to_dataframe(lock, model_name, solver, t_solve, t_transform, df_path):
     """
     Helper function to write model_name, t_solve, and t_transform to a dataframe.
     All subprocesses will write to this same dataframe.
@@ -76,10 +76,10 @@ def write_to_dataframe(lock, model_name, t_solve, t_transform, df_path):
         try:
             df = pd.read_csv(df_path)
         except FileNotFoundError:
-            df = pd.DataFrame(columns=["model_name", "t_solve", "t_transform"])
+            df = pd.DataFrame(columns=["model_name", "solver", "t_solve", "t_transform"])
 
         # Append new data
-        new_data = {"model_name": model_name, "t_solve": t_solve, "t_transform": t_transform}
+        new_data = {"model_name": model_name, "solver": solver, "t_solve": t_solve, "t_transform": t_transform}
         df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
         # Save dataframe back to CSV
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     df_path = args.output
     # Empty the dataframe if it already exists
     if os.path.exists(df_path):
-        pd.DataFrame(columns=["model_name", "t_solve", "t_transform"]).to_csv(df_path, index=False)
+        pd.DataFrame(columns=["model_name", "solver", "t_solve", "t_transform"]).to_csv(df_path, index=False)
 
     if args.download:
         install_xcsp3_instances_22()
