@@ -68,11 +68,27 @@ class TransSimplify(unittest.TestCase):
 
 
     def test_simplify_expressions(self):
-
+        # global constraints
         expr = cp.AllDifferent(self.ivs) == 0
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
         expr = 0 == cp.AllDifferent(self.ivs)
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
+        # with constant, does not change (surprisingly? but we cannot check what the res type is...)
+        expr = cp.AllDifferent(self.ivs.tolist() + [False]) == 0
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(False))])]')
+        expr = 0 == cp.AllDifferent(self.ivs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(True))])]')
+
+        # global functions
+        expr = cp.max(self.ivs) == 0
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2]) == 0]')
+        expr = 0 == cp.max(self.ivs)
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2]) == 0]')
+        # with constant, does not change (surprisingly? but we cannot check what the res type is...)
+        expr = cp.max(self.ivs.tolist() + [False]) == 0
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(False)) == 0]')
+        expr = 0 == cp.max(self.ivs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(True)) == 0]')
 
         expr = (self.ivs[0] <= self.ivs[1]) == 0
         self.assertEqual(str(self.transform(expr)), '[not([(iv[0]) <= (iv[1])])]')
