@@ -52,6 +52,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
+    Boolean constants are promoted to int if in numerical context,
+    ints are never converted to Bool
     - list_of_expr: list of CPMpy expressions
     """
 
