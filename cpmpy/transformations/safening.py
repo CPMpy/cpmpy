@@ -89,6 +89,9 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         elif isinstance(cpm_expr, DirectConstraint):  # do not recurse into args
             new_lst.append(cpm_expr)
 
+        elif cpm_expr is '*':  # do not recurse into args
+            new_lst.append(cpm_expr)
+
         else:
             assert isinstance(cpm_expr, Expression), f"each `cpm_expr` should be an Expression at this point, not {type(cpm_expr)}"
 

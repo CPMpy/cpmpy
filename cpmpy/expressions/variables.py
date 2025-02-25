@@ -136,7 +136,7 @@ def boolvar(shape=1, name=None):
     data = np.array([_BoolVarImpl(name=n) for n in names])
     # insert into custom ndarray
     r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = True # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 
@@ -204,7 +204,7 @@ def intvar(lb, ub, shape=1, name=None):
     data = np.array([_IntVarImpl(lb, ub, name=n) for n in names]) # repeat new instances
     # insert into custom ndarray
     r = NDVarArray(shape, dtype=object, buffer=data)
-    r._has_subexpr = False # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
+    r._has_subexpr = True # A bit ugly (acces to private field) but otherwise np.ndarray constructor complains if we pass it as an argument to NDVarArray
     return r
 
 def cparray(arr):
@@ -272,7 +272,7 @@ class _NumVarImpl(Expression):
         """Does it contains nested Expressions?
            Is of importance when deciding whether transformation/decomposition is needed.
         """
-        return False
+        return True
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?

@@ -123,9 +123,6 @@ class Expression(object):
             Resets all cached computations which depend on the expression tree.
         """
         self._args = args
-        # Reset cached "_has_subexpr"
-        if hasattr(self, "_has_subexpr"):
-            del self._has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -156,36 +153,13 @@ class Expression(object):
         return hash(self.__repr__())
 
     def has_subexpr(self):
-        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+        """ Does it contain nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
             Results are cached for future calls and reset when the expression changes
             (in-place argument update).
         """
-        # return cached result
-        if hasattr(self, '_has_subexpr'):
-            return self._has_subexpr
-
-        # Initialize stack with args
-        stack = list(self.args)
-
-        while stack:
-            el = stack.pop()
-            if isinstance(el, Expression):
-                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                    self._has_subexpr = True
-                    return True
-                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                    self._has_subexpr = True
-                    return True
-            elif is_any_list(el):
-                # Add list elements to stack for processing
-                stack.extend(el)
-
-        # No subexpressions found
-        self._has_subexpr = False
-        return False
+        return True
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -442,7 +416,7 @@ class BoolVal(Expression):
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
         """
-        return False # BoolVal is a wrapper for a python or numpy constant boolean.
+        return True # BoolVal is a wrapper for a python or numpy constant boolean.
 
     def implies(self, other):
         if self.args[0]:
