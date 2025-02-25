@@ -89,7 +89,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         elif isinstance(cpm_expr, DirectConstraint):  # do not recurse into args
             new_lst.append(cpm_expr)
 
-        elif cpm_expr is '*':  # do not recurse into args
+        elif isinstance(cpm_expr, str) and str(cpm_expr) == "*":  # do not recurse into args
             new_lst.append(cpm_expr)
 
         else:
