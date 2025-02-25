@@ -52,7 +52,7 @@ from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Operator, BoolVal
+from ..expressions.core import Comparison, Operator, BoolVal, cpm_dict
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
@@ -60,7 +60,7 @@ from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, expr_dict=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -70,6 +70,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
 
     """
+    if expr_dict is None:
+        expr_dict = cpm_dict()
 
     newlist = []
     for cpm_expr in lst_of_expr:
@@ -106,11 +108,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
-                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
+                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True, expr_dict=expr_dict)
                     newlist += [cond.implies(lin) for lin in lin_sub]
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
+                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, expr_dict=expr_dict)
 
 
         # comparisons
@@ -142,7 +144,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     x, n = lhs.args
                     new_lhs = 1
                     for exp in range(n):
-                        new_lhs, new_cons = get_or_make_var(x * new_lhs)
+                        new_lhs, new_cons = get_or_make_var(x * new_lhs, expr_dict=expr_dict)
                         newlist.extend(new_cons)
                     cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
 
@@ -152,9 +154,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                         raise NotImplementedError("Cannot linearize modulo without multiplication")
 
                     if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs)
+                        new_rhs, newcons = get_or_make_var(lhs, expr_dict=expr_dict)
                         newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, expr_dict=expr_dict)
                         continue
                     else:
                         # mod != remainder after division because defined on integer div (rounding towards 0)
@@ -168,7 +170,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                         # k * y + z == x
                         k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, side_cons = get_or_make_var(k * y)
+                        mult_res, side_cons = get_or_make_var(k * y, expr_dict=expr_dict)
                         cpm_expr = (mult_res + rhs) == x
                         # |z| < |y|
                         abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
@@ -194,7 +196,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                             ]
 
                         side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
-                        newlist += linearize_constraint(side_cons, supported, reified=reified)
+                        newlist += linearize_constraint(side_cons, supported, reified=reified, expr_dict=expr_dict)
 
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
@@ -241,8 +243,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar = intvar(*get_bounds(lhs))
-                    newlist += linearize_constraint([lhs == newvar])
-                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
+                    newlist += linearize_constraint([lhs == newvar], expr_dict=expr_dict)
+                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs, expr_dict=expr_dict)
                 else:
                     x = lhs.args[0]
                     lb, ub = get_bounds(x)
@@ -267,13 +269,13 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
-                new_rhs, cons = get_or_make_var(rhs - 1) # if rhs is constant, will return new constant
+                new_rhs, cons = get_or_make_var(rhs - 1, expr_dict=expr_dict) # if rhs is constant, will return new constant
                 newlist.append(lhs <= new_rhs)
-                newlist += linearize_constraint(cons)
+                newlist += linearize_constraint(cons, expr_dict=expr_dict)
             elif cpm_expr.name == ">":
-                new_rhs, cons = get_or_make_var(rhs + 1) # if rhs is constant, will return new constant
+                new_rhs, cons = get_or_make_var(rhs + 1, expr_dict=expr_dict) # if rhs is constant, will return new constant
                 newlist.append(lhs >= new_rhs)
-                newlist += linearize_constraint(cons)
+                newlist += linearize_constraint(cons, expr_dict=expr_dict)
             elif cpm_expr.name == "!=":
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
@@ -293,13 +295,13 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                     _, M1 = (lhs - rhs + 1).get_bounds()
                     _, M2 = (rhs - lhs + 1).get_bounds()
                     cons = [lhs + -M1*z <= rhs-1, lhs  + -M2*z >= rhs-M2+1]
-                    newlist += linearize_constraint(flatten_constraint(cons), supported=supported, reified=reified)
+                    newlist += linearize_constraint(flatten_constraint(cons, expr_dict=expr_dict), supported=supported, reified=reified, expr_dict=expr_dict)
 
                 else:
                     # introduce new indicator constraints
                     z = boolvar()
                     constraints = [z.implies(lhs < rhs), (~z).implies(lhs > rhs)]
-                    newlist += linearize_constraint(constraints, supported=supported, reified=reified)
+                    newlist += linearize_constraint(constraints, supported=supported, reified=reified, expr_dict=expr_dict)
             else:
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
@@ -343,13 +345,15 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
     return newlist
 
-def only_positive_bv(lst_of_expr):
+def only_positive_bv(lst_of_expr, expr_dict=None):
     """
         Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
         cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
 
         Resulting expression is linear.
     """
+    if expr_dict is None:
+        expr_dict = cpm_dict()
     newlist = []
     for cpm_expr in lst_of_expr:
 
@@ -376,12 +380,12 @@ def only_positive_bv(lst_of_expr):
                 lhs = copy.copy(lhs)
                 for i,arg in enumerate(list(lhs.args)):
                     if isinstance(arg, NegBoolView):
-                        new_arg, cons = get_or_make_var(1 - arg)
+                        new_arg, cons = get_or_make_var(1 - arg, expr_dict=expr_dict)
                         lhs.args[i] = new_arg
                         new_cons += cons
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-            newlist += linearize_constraint(new_cons)
+            newlist += linearize_constraint(new_cons, expr_dict=expr_dict)
 
         # reification
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -389,7 +393,7 @@ def only_positive_bv(lst_of_expr):
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
                                                    f"`linearize_constraint` before calling `only_positive_bv` "
             if isinstance(cond, _BoolVarImpl): # BV -> Expr
-                subexpr = only_positive_bv([subexpr])
+                subexpr = only_positive_bv([subexpr], expr_dict=expr_dict)
                 newlist += [cond.implies(expr) for expr in subexpr]
 
 

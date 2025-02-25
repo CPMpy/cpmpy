@@ -109,6 +109,10 @@ class GlobalFunction(Expression):
         """
         return True
 
+    def __hash__(self):
+        args = flatlist(self.args)
+        return hash((self.name, tuple(args)))
+
 
 class Minimum(GlobalFunction):
     """
