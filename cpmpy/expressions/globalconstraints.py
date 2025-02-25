@@ -372,7 +372,7 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
-        if isinstance(table, np.ndarray): # Ensure it is a list
+        if isinstance(table, np.ndarray):  # Ensure it is a list
             table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
@@ -388,6 +388,12 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -418,6 +424,13 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -437,6 +450,13 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
