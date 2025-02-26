@@ -50,7 +50,7 @@ setup(
         "gcs": ["gcspy"],
         "cpo": ["docplex"],
         # Tools
-        "xcsp3": ["pycsp3"],
+        # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
         # Other
         "test": ["pytest"],
     },
