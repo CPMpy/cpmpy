@@ -70,8 +70,10 @@ class CPM_gcs(SolverInterface):
         try:
             import gcspy
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -81,7 +83,7 @@ class CPM_gcs(SolverInterface):
         - subsolver: None (not supported)
         """
         if not self.supported():
-            raise Exception("Glasgow Constraint Solver: Install the python package 'gcspy'")
+            raise Exception("CPM_gcs: Install the python package 'gcspy' to use this solver interface.")
 
         import gcspy
 
