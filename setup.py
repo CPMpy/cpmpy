@@ -38,7 +38,7 @@ setup(
     #extra dependency, only needed if minizinc is to be used.
     extras_require={
         "FULL":  ["minizinc"],
-        "test": ["pytest"],
+        # Solvers
         "ortools": ["ortools"],
         "z3": ["z3-solver"],
         "choco": ["pychoco>=0.2.1"],
@@ -47,7 +47,12 @@ setup(
         "pysat": ["python-sat"],
         "gurobi": ["gurobipy"],
         "pysdd": ["pysdd"],
-        "xcsp3": ["pycsp3"]
+        "gcs": ["gcspy"],
+        "cpo": ["docplex"],
+        # Tools
+        "xcsp3": ["pycsp3"],
+        # Other
+        "test": ["pytest"],
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
