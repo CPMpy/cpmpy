@@ -165,7 +165,7 @@ class CPM_pindakaas(SolverInterface):
             return ~self.solver_var(cpm_var._bv)
         elif isinstance(cpm_var, _BoolVarImpl): # positive literal
              # insert if new
-            if cpm_var not in self._varmap:
+            if cpm_var.name not in self._varmap:
                 self._varmap[cpm_var.name] = self.pkl_solver.add_variable()
             return self._varmap[cpm_var.name]
         else:
@@ -258,8 +258,10 @@ class CPM_pindakaas(SolverInterface):
 
     """ Unpack implied literal, clause, sum, or weighted sum """
     def _encode_bool_linear(self, cpm_expr):
+        import pindakaas as pkl
         literals = None
         coefficients = None
+        comparator = None
         k = None
         if isinstance(cpm_expr, _BoolVarImpl):
             literals = [cpm_expr]
@@ -275,10 +277,17 @@ class CPM_pindakaas(SolverInterface):
                 coefficients,literals = lhs.args
             else:
                 raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
+            if cpm_expr.name == "<=":
+                comparator = pkl.Comparator.LessEq
+            elif cpm_expr.name == ">=":
+                comparator = pkl.Comparator.GreaterEq
+            elif cpm_expr.name == "==":
+                comparator = pkl.Comparator.Eq
+            else:
+                raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
         literals = self.solver_vars(literals)
-        import pindakaas as pkl
         cnf = pkl.Cnf(self.pkl_solver.variables())
-        cnf.add_linear(literals, coefficients=coefficients, k=k)
+        cnf.add_linear(literals, coefficients=coefficients, comparator=comparator, k=k)
         # TODO set correct latest var
         print(f"CNF = {cnf}")
         return cnf
