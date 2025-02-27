@@ -149,7 +149,7 @@ class CPM_pumpkin(SolverInterface):
 
         else:
             solve_func = self.pum_solver.satisfy
-            kwargs.update(proof[proof])
+            kwargs.update(proof=proof)
 
         self._pum_core = None
         result = solve_func(**kwargs)
