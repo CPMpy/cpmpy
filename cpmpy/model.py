@@ -31,6 +31,8 @@ import copy
 import warnings
 
 import numpy as np
+
+from .exceptions import NotSupportedError
 from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
@@ -152,6 +154,9 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
+        if kwargs and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -164,7 +169,7 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None):
+    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -177,6 +182,9 @@ class Model(object):
 
             Returns: number of solutions found
         """
+        if kwargs and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -184,7 +192,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
