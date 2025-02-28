@@ -33,7 +33,7 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
     """
     Runs one XCSP3 instance
     """
-    print("\nrunning model"+xmodel)
+    print(f"- running model {xmodel}", flush=True)
     parser = ParserXCSP3(xmodel)
     callbacks = CallbacksCPMPy()
     callbacks.force_exit = True
@@ -44,8 +44,7 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
         end_time = time.time()
         t_parse = end_time - start_time
     except Exception as e:
-        print("error parsing:")
-        print(e)
+        print(f"  Error parsing: {e}", flush=True)
     cb = callbacker.cb
     start_time = time.time()
     s_mock = SolverLookup.get(solver, model=None)  # mock solver object, to run transform without posting
@@ -67,8 +66,7 @@ def run_model(lock, solver, xmodel, df_path, solve=True):
             t_solve = 0
         write_to_dataframe(lock, xmodel, solver, t_parse, t_add, t_transform, t_solve, df_path)
     except Exception as e:
-        print('error solving:')
-        print(e)
+        print(f"  Error solving: {e}", flush=True)
 
 
 
@@ -136,13 +134,13 @@ if __name__ == '__main__':
         for file in files:
             if file.endswith(".xml"):
                 xmodels.append(join(root, file))
+    print(f"Found {len(xmodels)} models in folder '{args.models}/'", flush=True)
 
     if len(xmodels) == 0:
-        print(f"no models in folder!")
+        print(f"No models: aborting!")
         sys.exit(0)
 
-    print("\nUsing solver '"+args.solver+f" with {len(xmodels)} models in "+args.models+"'." , flush=True, end="\n\n")
-    print("Will use "+str(args.amount_of_processes)+" parallel executions, starting...", flush=True, end="\n\n")
+    print(f"Will use {args.amount_of_processes} parallel solves, with solver {args.solver}...", flush=True)
 
     processes = []
     xmodel_iter = iter(xmodels)
@@ -172,17 +170,15 @@ if __name__ == '__main__':
                         new_process.start()
 
     except KeyboardInterrupt as e:
-        print("interrupting...", flush=True, end="\n")
+        print("interrupting...", flush=True)
     except Exception as e:
-        print(f"An unexpected error occurred:\n{e} \nstacktrace:\n{traceback.format_exc()}", flush=True, end="\n")
+        print(f"An unexpected error occurred:\n{e} \nstacktrace:\n{traceback.format_exc()}", flush=True)
     finally:
         gc.enable()
-        print("\nRan models for " + str(math.floor((time.time() - start_time) / 60)) + " minutes", flush=True,
-              end="\n")
         # terminate all the processes
         for process in processes:
             if process._popen is not None:
                 process.terminate()
-        print("Terminated run \n", flush=True, end="\n")
+        print(f"\nRan models for {math.floor((time.time() - start_time) / 60)} minutes", flush=True)
 
 
