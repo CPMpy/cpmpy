@@ -11,7 +11,7 @@ import pytest
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
+ALL_SOLS = False # test whether all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
@@ -26,9 +26,10 @@ NUM_GLOBAL = {
 }
 
 # Solvers not supporting arithmetic constraints
-SAT_SOLVERS = {"pysat", "pysdd"}
+SAT_SOLVERS = {"pysat", "pysdd", "pindakaas"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
+                  "pindakaas": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "z3": {"Inverse"},
                   "choco": {"Inverse"},
@@ -43,6 +44,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pindakaas": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {},
                      }
 

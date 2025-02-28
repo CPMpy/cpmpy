@@ -57,4 +57,4 @@ from .z3 import CPM_z3
 from .exact import CPM_exact
 from .choco import CPM_choco
 from .gcs import CPM_gcs
-
+from .pindakaas import CPM_pindakaas

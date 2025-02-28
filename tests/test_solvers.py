@@ -6,6 +6,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -323,6 +324,40 @@ class TestSolvers(unittest.TestCase):
         for c in cons:
             self.assertTrue(cp.Model(c).solve("pysat"))
             self.assertTrue(c.value())
+
+    @pytest.mark.skipif(not CPM_pindakaas.supported(),
+                        reason="pindakaas not installed")
+    def test_pindakaas(self):
+        # Construct the model.
+        (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
+
+        Nora = mayo | ketchup
+        Leander = ~samurai | mayo
+        Benjamin = ~andalouse | ~curry | ~samurai
+        Behrouz = ketchup | curry | andalouse
+        Guy = ~ketchup | curry | andalouse
+        Daan = ~ketchup | ~curry | andalouse
+        Celine = ~samurai
+        Anton = mayo | ~curry | ~andalouse
+        Danny = ~mayo | ketchup | andalouse | samurai
+        Luc = ~mayo | samurai
+
+        allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
+
+        model = cp.Model(allwishes)
+
+        # any solver
+        self.assertTrue(model.solve())
+
+        model = cp.Model(allwishes)
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pindakaas(model)
+        self.assertTrue(ps.solve())
+        self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
@@ -784,7 +819,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+        if solver in ('pysdd', 'pysat', 'gurobi', 'pindakaas'):  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
 
