@@ -419,7 +419,6 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT a CNF[Plus] object """
-        assert_normalized_bool_lin(cpm_expr)
         if not CPM_pysat.pb_supported():
             raise ImportError("Please install PyPBLib: pip install pypblib")
 
@@ -444,12 +443,12 @@ class CPM_pysat(SolverInterface):
         elif cpm_expr.name == ">=":
             return CardEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return CardEnc.equals(**pysat_args).clauses
+            return CardEnc.equals(**pysat_args)
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
-        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
+        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT a CNF object """
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
                 f"PySAT: Expect {cpm_expr} to be a 'wsum'"
