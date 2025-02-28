@@ -41,6 +41,8 @@ from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.linearize import linearize_constraint
 from ..transformations.reification import only_implies, only_bv_reifies
 
+import time
+
 
 class CPM_pindakaas(SolverInterface):
     """
@@ -121,7 +123,9 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None:
             raise NotSupportedError(f"{self.name}: time not supported yet")
 
-        import time
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
         t = time.time()
         my_status = self.pkl_solver.solve()
         self.cpm_status.runtime = time.time() - t
@@ -144,10 +148,16 @@ class CPM_pindakaas(SolverInterface):
         if has_sol:
             # fill in variable values
             for cpm_var in self.user_vars:
-                lit = self.solver_var(cpm_var)
-                cpm_var._value = self.pkl_solver.value(lit)
-                if cpm_var._value is None:
-                    cpm_var._value = True # dummy value
+                if cpm_var.name in self._varmap:
+                    lit = self.solver_var(cpm_var)
+                    cpm_var._value = self.pkl_solver.value(lit)
+                    if cpm_var._value is None:
+                        cpm_var._value = True # dummy value
+                else:
+                    cpm_var._value = None # pindakaas does not know this literal and will error
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         return has_sol
 
