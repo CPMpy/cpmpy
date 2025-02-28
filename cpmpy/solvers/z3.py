@@ -284,7 +284,7 @@ class CPM_z3(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+        supported = {"alldifferent", "xor", "ite", "IfThenElseNum"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
@@ -434,8 +434,8 @@ class CPM_z3(SolverInterface):
             # post the comparison
             return eval_comparison(cpm_con.name, lhs, rhs)
 
-        # rest: base (Boolean) global constraints
-        elif isinstance(cpm_con, GlobalConstraint):
+        # rest: base global constraints
+        elif isinstance(cpm_con, GlobalConstraint) or isinstance(cpm_con, GlobalFunction):
             # TODO:
             # table
 
@@ -447,7 +447,7 @@ class CPM_z3(SolverInterface):
                 for a in z3_args[2:]:
                     z3_cons = z3.Xor(z3_cons, a)
                 return z3_cons
-            elif cpm_con.name == 'ite':
+            elif cpm_con.name == 'ite' or cpm_con.name == 'IfThenElseNum':
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
 
