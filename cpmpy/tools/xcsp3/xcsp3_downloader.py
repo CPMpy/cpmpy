@@ -13,7 +13,7 @@ def install_xcsp3_instances_22():
     """
 
     XCSP3_INSTANCES_URL = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP22.zip"
-    XCSP3_INSTANCES_DESTINATION_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "tests", "models")
+    XCSP3_INSTANCES_DESTINATION_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "models")
     print(XCSP3_INSTANCES_DESTINATION_PATH)
     XCSP3_INSTANCES_DESTINATION_FILE = "temp.zip"
     XCSP3_INSTANCES_EXTRACTION_TIMEOUT = 100
@@ -54,7 +54,7 @@ def install_xcsp3_instances_23():
     """
 
     XCSP3_INSTANCES_URL = "https://www.cril.univ-artois.fr/~lecoutre/compets/instancesXCSP23.zip"
-    XCSP3_INSTANCES_DESTINATION_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "tests", "models")
+    XCSP3_INSTANCES_DESTINATION_PATH = os.path.join(pathlib.Path(__file__).parent.resolve(), "models")
     XCSP3_INSTANCES_DESTINATION_FILE = "temp.zip"
     XCSP3_INSTANCES_EXTRACTION_TIMEOUT = 100
 

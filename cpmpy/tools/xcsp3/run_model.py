@@ -16,8 +16,8 @@ from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 
 import cpmpy as cp
 from cpmpy import SolverLookup
-from cpmpy.tools.xcsp3.callbacks import CallbacksCPMPy
-from cpmpy.tools.xcsp3.installer import install_xcsp3_instances_22, install_xcsp3_instances_23
+from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
+from cpmpy.tools.xcsp3.xcsp3_downloader import install_xcsp3_instances_22, install_xcsp3_instances_23
 
 
 def check_positive(value):
