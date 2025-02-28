@@ -94,6 +94,7 @@ class CPM_pindakaas(SolverInterface):
         self.pkl_solver = pkl.CadicalSolver()
 
         # initialise everything else and post the constraints/objective
+        self.unsatisfiable = False
         super().__init__(name=name, cpm_model=cpm_model)
 
     @property
@@ -117,6 +118,11 @@ class CPM_pindakaas(SolverInterface):
             #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
             # [GUIDELINE] Add link to documentation of all solver parameters
         """
+        if self.unsatisfiable:
+            return False
+
+        import pindakaas as pkl
+
 
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
@@ -223,45 +229,50 @@ class CPM_pindakaas(SolverInterface):
 
       """
       import pindakaas as pkl
+      if self.unsatisfiable:
+          return self
 
       # add new user vars to the set
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       print(f"TF - {cpm_expr_orig}")
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
-        print(f"TF - {cpm_expr}")
-        if cpm_expr.name == 'or':
-            self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
+      try: 
+          for cpm_expr in self.transform(cpm_expr_orig):
+              print(f"TF - {cpm_expr}")
+              if cpm_expr.name == 'or':
+                  self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
 
-        elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
-            print(f"RE - {cpm_expr}")
-            a0,a1 = cpm_expr.args
-            for clause in self._encode_bool_linear(a1):
-                print(f"{clause}")
-                self.pkl_solver.add_clause([~a0]+clause)
+              elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
+                  print(f"RE - {cpm_expr}")
+                  a0,a1 = cpm_expr.args
+                  for clause in self._encode_bool_linear(a1):
+                      print(f"{clause}")
+                      self.pkl_solver.add_clause([~a0]+clause)
 
-        elif isinstance(cpm_expr, Comparison):
-            for clause in self._encode_bool_linear(cpm_expr):
-                print(f"cl: {clause}")
-                self.pkl_solver.add_clause(clause)
+              elif isinstance(cpm_expr, Comparison):
+                  for clause in self._encode_bool_linear(cpm_expr):
+                      print(f"cl: {clause}")
+                      self.pkl_solver.add_clause(clause)
 
-        elif isinstance(cpm_expr, BoolVal):
-            # base case: Boolean value
-            if cpm_expr.args[0] is False:
-                self.pkl_solver.add_clause([])
+              elif isinstance(cpm_expr, BoolVal):
+                  # base case: Boolean value
+                  if cpm_expr.args[0] is False:
+                      self.pkl_solver.add_clause([])
 
-        elif isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
+              elif isinstance(cpm_expr, _BoolVarImpl):
+                  # base case, just var or ~var
+                  self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
 
-        # a direct constraint, pass to solver
-        elif isinstance(cpm_expr, DirectConstraint):
-            raise NotImplementedError(f"TODO")
-            cpm_expr.callSolver(self, self.pysat_solver)
+              # a direct constraint, pass to solver
+              elif isinstance(cpm_expr, DirectConstraint):
+                  raise NotImplementedError(f"TODO")
+                  cpm_expr.callSolver(self, self.pysat_solver)
 
-        else:
-            raise NotImplementedError(f"{self.name}: Non supported constraint {cpm_expr}")
+              else:
+                raise NotImplementedError(f"{self.name}: Non supported constraint {cpm_expr}")
+      except pkl.Unsatisfiable:
+          self.unsatisfiable = True
 
       return self
 
