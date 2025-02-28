@@ -845,7 +845,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
+        if solver in ('pysdd', 'pysat', 'gurobi', 'pindakaas'):  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]

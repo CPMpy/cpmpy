@@ -185,7 +185,7 @@ class CPM_pindakaas(SolverInterface):
                 self._varmap[cpm_var.name] = self.pkl_solver.add_variable()
             return self._varmap[cpm_var.name]
         else:
-            raise NotImplementedError(f"{self.name}: variable {cpm_var} not supported")
+            raise NotImplementedError(f"{self.name}: variable {cpm_var} of type {type(cpm_var)} not supported")
 
 
     def transform(self, cpm_expr):
@@ -248,7 +248,7 @@ class CPM_pindakaas(SolverInterface):
                   a0,a1 = cpm_expr.args
                   for clause in self._encode_bool_linear(a1):
                       print(f"{clause}")
-                      self.pkl_solver.add_clause([~a0]+clause)
+                      self.pkl_solver.add_clause([~self.solver_var(a0)]+clause)
 
               elif isinstance(cpm_expr, Comparison):
                   for clause in self._encode_bool_linear(cpm_expr):
@@ -303,7 +303,7 @@ class CPM_pindakaas(SolverInterface):
             elif cpm_expr.name == ">=":
                 comparator = pkl.Comparator.GreaterEq
             elif cpm_expr.name == "==":
-                comparator = pkl.Comparator.Eq
+                comparator = pkl.Comparator.Equal
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
         literals = self.solver_vars(literals)

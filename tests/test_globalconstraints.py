@@ -1303,7 +1303,7 @@ class TestTypeChecks(unittest.TestCase):
 
         for name, cls in cp.SolverLookup.base_solvers():
             # The decomposition of this global introduces (as of yet) unsupported integer variables for PySAT
-            if name == "pysat": continue
+            if name in ("pysat","pindakaas"): continue
             if cls.supported() is False:
                 continue
             try:
