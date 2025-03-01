@@ -467,43 +467,18 @@ class NDVarArray(np.ndarray, Expression):
             if len(index) != self.ndim:
                 raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
 
-            # find dimensions with expressions vs constants
-            expr_dims = []
-            const_dims = []
-            for dim, idx in enumerate(index):
-                if isinstance(idx, Expression):
-                    expr_dims.append(dim)
-                else:
-                    const_dims.append((dim, idx))
+            # remove constants from idx
+            new_idx =  []
+            arr = self.copy()
+            for i, el in enumerate(index):
+                if isinstance(el, Expression):
+                    new_idx.append(el)
+                    if arr.ndim != 1: # might have removed all other dimensions
+                        arr = np.moveaxis(arr, 0, -1) # move expression-index to back
+                else: # reduce dimension
+                    arr = arr[el]
 
-            # If there are constant indices, reshape array to remove those dimensions
-            if const_dims:
-                # Build slice tuple to select constant indices
-                slice_tuple = [slice(None)] * self.ndim
-                for dim, val in const_dims:
-                    slice_tuple[dim] = val
-
-                # Select array with constant indices
-                arr = self[tuple(slice_tuple)]
-
-                # Build new index tuple with just the expressions
-                new_index = tuple(index[d] for d in expr_dims)
-
-                if len(expr_dims) == 1:
-                    # Single expression case
-                    return cp.Element(arr, new_index[0])
-                else:
-                    # Multiple expressions case
-                    flat_index = new_index[-1]
-                    for dim, idx in enumerate(new_index[:-1]):
-                        flat_index += idx * math.prod(arr.shape[dim+1:])
-                    return cp.Element(arr.flatten(), flat_index)
-            else:
-                # No constants case - use original flattening logic
-                flat_index = index[-1]
-                for dim, idx in enumerate(index[:-1]):
-                    flat_index += idx * math.prod(self.shape[dim+1:])
-                return cp.Element(self.flatten(), flat_index)
+            return cp.Element(arr, *new_idx)
 
         return super().__getitem__(index)
 
