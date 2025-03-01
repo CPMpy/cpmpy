@@ -1,5 +1,7 @@
 from copy import copy
 
+import numpy as np
+
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
 from ..expressions.core import Expression, Operator, BoolVal
 from ..expressions.utils import get_bounds, is_num
@@ -116,15 +118,17 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
                     new_lst.append(cpm_expr)
                     continue
 
-                arr, idx = args
-                lb, ub = get_bounds(idx)
+                arr, *idx = args
+                arr = np.array(arr)
+                for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
+                    if lb < 0 or ub >= arr.shape[i]: # can index can be out of bounds?
+                        guard, output_expr, extra_cons = _safen_range(cpm_expr,
+                                                                      safe_range=(0, arr.shape[i]-1),
+                                                                      idx_to_safen=i+1)
 
-                if lb < 0 or ub >= len(arr): # index can be out of bounds
-                    guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, len(arr)-1), idx_to_safen=1)
-
-                    _nbc.append(guard)  # guard must be added to nearest Boolean context
-                    _toplevel += extra_cons  # any additional constraint that must be true
-                    cpm_expr = output_expr  # replace partial function by this (total) new output expression
+                        _nbc.append(guard)  # guard must be added to nearest Boolean context
+                        _toplevel += extra_cons  # any additional constraint that must be true
+                        cpm_expr = output_expr  # replace partial function by this (total) new output expression
 
             elif cpm_expr.name == "div" or cpm_expr.name == "mod":
                 if _nbc is _toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
