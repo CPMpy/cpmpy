@@ -355,7 +355,7 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod", "element"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
@@ -464,8 +464,15 @@ class CPM_ortools(SolverInterface):
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    arr, *idx = lhs.args
+                    if len(idx) > 1: # multi-dim, convert here
+                        arr, expr_idx = lhs.to_1d_element().args
+                        idx, newcons = get_or_make_var(expr_idx)
+                        self += newcons
+                    else:
+                        idx = idx[0]
+                    return self.ort_model.AddElement(self.solver_var(idx), self.solver_vars(arr), ortrhs)
+
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     divisor = lhs.args[1]
