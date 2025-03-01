@@ -63,8 +63,11 @@
         Abs
 
 """
+import math
 import warnings  # for deprecation warning
 import numpy as np
+from numpy import ndarray
+
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
@@ -229,30 +232,51 @@ class Element(GlobalFunction):
         Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
         an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
 
+        CPMpy supports multi-dimensional Element constaints such as arr[a,b] == 10
+
         Element is a CPMpy built-in global constraint, so the class implements a few more
         extra things for convenience (.value() and .__repr__()). It is also an example of
         a 'numeric' global constraint.
     """
 
-    def __init__(self, arr, idx):
-        if is_boolexpr(idx):
-            raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if is_any_list(idx):
-            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
-        super().__init__("element", [arr, idx])
+    def __init__(self, arr, *idx):
+        if any(is_boolexpr(i) for i in idx):
+            raise TypeError("index cannot be a boolean expression: {}".format(i))
+        if isinstance(arr, ndarray):
+            arr = arr.tolist()
+        super().__init__("element", [arr]+list(idx))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
-        arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
+        arr, *idx = self.args
+        idxval = argvals(idx)
+        if any(v is None for v in idxval):
+            return None
+        try:
+            return argval(np.array(arr)[tuple(idxval)])
+        except IndexError:
             raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return None # default
+                                             + "\n Use argval(expr) to get the value of expr with relational semantics.")
+
+    def to_1d_element(self):
+        """
+            Projects the indices to a combined index and transforms the array to 1D
+        """
+        arr, *idx = self.args
+        if len(idx) == 1:
+            return self
+        arr = np.array(arr)
+        for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
+            print(i,lb,ub,arr.shape[i])
+            assert lb >= 0 and ub < arr.shape[i], "Cannot convert unsafe Element constraint to 1d, safen first"
+
+        flat_index = idx[-1]
+        for dim, idx in enumerate(idx[:-1]):
+            flat_index += idx * math.prod(arr.shape[dim + 1:])
+        return Element(arr.flatten(), flat_index)
+
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -270,7 +294,7 @@ class Element(GlobalFunction):
                [idx >= 0, idx < len(arr)], []
 
     def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
+        return "{}{}".format(np.array(self.args[0]), self.args[1:])
 
     def get_bounds(self):
         """
