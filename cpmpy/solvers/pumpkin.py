@@ -407,9 +407,9 @@ class CPM_pumpkin(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
 
-            if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
-                # a predicate
-                return [constraints.Clause([self.pum_solver.predicate_as_boolean(self.to_predicate(cpm_expr))])]
+            # if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+            #     # a predicate
+            #     return [constraints.Clause([self.pum_solver.predicate_as_boolean(self.to_predicate(cpm_expr))])]
 
             if cpm_expr.name == "==":
                 if "sum" in lhs.name or lhs.name == "sub":
