@@ -505,7 +505,6 @@ class CPM_pumpkin(SolverInterface):
                 self.user_cons[constraint_tag] = orig_expr
             for cpm_expr in self.transform(orig_expr):
                 tag = constraint_tag
-                tag = None
                 if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
 
                     bv, subexpr = cpm_expr.args
