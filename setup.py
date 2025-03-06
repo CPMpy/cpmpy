@@ -38,6 +38,22 @@ setup(
     #extra dependency, only needed if minizinc is to be used.
     extras_require={
         "FULL":  ["minizinc"],
+        # Solvers
+        "ortools": ["ortools"],
+        "z3": ["z3-solver"],
+        "choco": ["pychoco>=0.2.1"],
+        "exact": ["exact>=2.1.0"],
+        "minizinc": ["minizinc"],
+        "pysat": ["python-sat"],
+        "gurobi": ["gurobipy"],
+        "pysdd": ["pysdd"],
+        "gcs": ["gcspy"],
+        "cpo": ["docplex"],
+        # Tools
+        # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
+        # Other
+        "test": ["pytest"],
+        "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
@@ -46,6 +62,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
