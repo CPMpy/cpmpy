@@ -368,7 +368,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub1,8)
         op2 = Operator('div',[x,z])
         lb2,ub2 = op2.get_bounds()
-        self.assertEqual(lb2,-3)
+        self.assertEqual(lb2,-2)
         self.assertEqual(ub2,2)
         for lhs in inclusive_range(*x.get_bounds()):
             for rhs in inclusive_range(*y.get_bounds()):
@@ -382,25 +382,43 @@ class TestBounds(unittest.TestCase):
 
     def test_bounds_mod(self):
         x = intvar(-8, 8)
+        xneg = intvar(-8, 0)
+        xpos = intvar(0, 8)
         y = intvar(-5, -1)
         z = intvar(1, 4)
-        op1 = Operator('mod',[x,y])
+        op1 = Operator('mod',[xneg,y])
         lb1, ub1 = op1.get_bounds()
         self.assertEqual(lb1,-4)
         self.assertEqual(ub1,0)
-        op2 = Operator('mod',[x,z])
+        op2 = Operator('mod',[xpos,z])
         lb2, ub2 = op2.get_bounds()
         self.assertEqual(lb2,0)
         self.assertEqual(ub2,3)
+        op3 = Operator('mod',[xneg,z])
+        lb3, ub3 = op3.get_bounds()
+        self.assertEqual(lb3,-3)
+        self.assertEqual(ub3,0)
+        op4 = Operator('mod',[xpos,y])
+        lb4, ub4 = op4.get_bounds()
+        self.assertEqual(lb4,0)
+        self.assertEqual(ub4,4)
+        op5 = Operator('mod',[x,y])
+        lb5, ub5 = op5.get_bounds()
+        self.assertEqual(lb5,-4)
+        self.assertEqual(ub5,4)
+        op6 = Operator('mod',[x,z])
+        lb6, ub6 = op6.get_bounds()
+        self.assertEqual(lb6,-3)
+        self.assertEqual(ub6,3)
         for lhs in inclusive_range(*x.get_bounds()):
             for rhs in inclusive_range(*y.get_bounds()):
                 val = Operator('mod',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb1)
-                self.assertLessEqual(val,ub1)
+                self.assertGreaterEqual(val,lb5)
+                self.assertLessEqual(val,ub5)
             for rhs in inclusive_range(*z.get_bounds()):
                 val = Operator('mod', [lhs, rhs]).value()
-                self.assertGreaterEqual(val,lb2)
-                self.assertLessEqual(val,ub2)
+                self.assertGreaterEqual(val,lb6)
+                self.assertLessEqual(val,ub6)
 
     def test_bounds_pow(self):
         x = intvar(-8, 5)
@@ -479,6 +497,10 @@ class TestBounds(unittest.TestCase):
         self.assertListEqual([1,[3,5],[6]], ubs)
 
 
+    def test_array(self):
+        m = intvar(-3,3, shape = (3,2), name= [['a','b'],['c','d'],['e','f']])
+        self.assertEqual(str(cpm_array(m)), '[[a b]\n [c d]\n [e f]]')
+        self.assertEqual(str(cpm_array(m.T)), '[[a c e]\n [b d f]]')
 
     def test_not_operator(self):
         p = boolvar()

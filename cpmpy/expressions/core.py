@@ -298,9 +298,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([self, other])
+        return cp.Xor([self, other])
 
     def __rxor__(self, other):
         # some simple constant removal
@@ -308,9 +306,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([other, self])
+        return cp.Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -410,8 +406,7 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        from .globalfunctions import Abs
-        return Abs(self)
+        return cp.Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):
@@ -438,6 +433,9 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
+    def get_bounds(self):
+        v = int(self.args[0])
+        return (v,v)
 
     def has_subexpr(self) -> bool:
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
@@ -445,6 +443,12 @@ class BoolVal(Expression):
             along particular paths of the expression tree.
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
+
+    def implies(self, other):
+        if self.args[0]:
+            return other
+        else:
+            return other == other  # Always true, but keep variables in the model
 
 
 class Comparison(Expression):
@@ -603,23 +607,30 @@ class Operator(Expression):
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": 
+        elif self.name == "wsum":
             val = np.dot(arg_vals[0], arg_vals[1]).item()
             if round(val) == val: # it is an integer
                 return int(val)
             return val # can be a float
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
         elif self.name == "div":
             try:
-                return arg_vals[0] // arg_vals[1]
+                return int(arg_vals[0] / arg_vals[1])  # integer division
             except ZeroDivisionError:
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                               + "\n Use argval(expr) to get the value of expr with relational "
                                                 "semantics.")
+        elif self.name == "mod":
+            try:# modulo defined with integer division
+                return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])
+            except ZeroDivisionError:
+                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                              + "\n Use argval(expr) to get the value of expr with relational "
+                                                "semantics.")
+
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -663,18 +674,32 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
+                if lb2 == ub2:
+                    raise ZeroDivisionError(f"Domain of {self.args[1]} only contains 0")
+                if lb2 == 0:
+                    lb2 = 1
+                if ub2 == 0:
+                    ub2 = -1
+                bounds = [
+                    int(lb1 / lb2), int(lb1 / -1), int(lb1 / 1), int(lb1 / ub2),
+                    int(ub1 / lb2), int(ub1 / -1), int(ub1 / 1), int(ub1 / ub2)
+                ]
+            else:
+                bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'mod':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("% by domain containing 0 is not supported")
-            elif ub2 < 0:
-                return lb2 + 1, 0
-            elif lb2 > 0:
-                return 0, ub2 - 1
+            if lb2 == ub2 == 0:
+                raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
+            # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
+            lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
+            ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
+            if lb1 >= 0:  # result will be positive if first argument is positive
+                return 0, max(-lb, ub, 0)  # lb = 0
+            elif ub1 <= 0:  # result will be negative if first argument is negative
+                return min(-ub, lb, 0), 0  # ub = 0
+            return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])

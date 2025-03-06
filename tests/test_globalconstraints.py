@@ -6,6 +6,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
+from cpmpy.expressions.utils import STAR
 from cpmpy.solvers import CPM_minizinc
 
 
@@ -159,10 +160,10 @@ class TestGlobal(unittest.TestCase):
 
         means that there is a directed edge from 0 -> 3.
         """
+        # Test with domain (0,5)
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
-
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
@@ -171,18 +172,50 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Circuit(x).value())
 
-
-    def test_not_circuit(self):
-        x = cp.intvar(lb=0, ub=2, shape=3)
+        # Test with domain (-2,7)
+        x = cp.intvar(-2, 7, 6)
         circuit = cp.Circuit(x)
-
-        model = cp.Model([~circuit, x == [1,2,0]])
-        self.assertFalse(model.solve())
+        model = cp.Model([circuit])
+        self.assertTrue(model.solve())
+        self.assertTrue(circuit.value())
 
         model = cp.Model([~circuit])
         self.assertTrue(model.solve())
         self.assertFalse(circuit.value())
 
+        # Test decomposition with domain (-2,7)
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve())
+        self.assertTrue(cp.Circuit(x).value())
+
+        # Test with smaller domain (1,5)
+        x = cp.intvar(1, 5, 5)
+        circuit = cp.Circuit(x)
+        model = cp.Model([circuit])
+        self.assertFalse(model.solve())
+        self.assertFalse(circuit.value())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
+
+        # Test decomposition with domain (1,5)
+        constraints = [cp.Circuit(x).decompose()]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve())
+        self.assertFalse(cp.Circuit(x).value())
+
+
+    def test_not_circuit(self):
+        x = cp.intvar(lb=-1, ub=5, shape=4)
+        circuit = cp.Circuit(x)
+        model = cp.Model([~circuit, x == [1,2,3,0]])
+        self.assertFalse(model.solve())
+
+        model = cp.Model([~circuit])
+        self.assertTrue(model.solve())
+        self.assertFalse(circuit.value())
         self.assertFalse(cp.Model([circuit, ~circuit]).solve())
 
         all_sols = set()
@@ -442,6 +475,46 @@ class TestGlobal(unittest.TestCase):
         model += constraints[1].decompose()
         self.assertFalse(model.solve())
 
+    def test_shorttable(self):
+        iv = cp.intvar(-8,8,shape=3, name="x")
+
+        solver = "choco" if cp.SolverLookup.lookup("choco").supported() else "ortools"
+
+        cons = cp.ShortTable([iv[0], iv[1], iv[2]], [ (5, 2, 2)])
+        model = cp.Model(cons)
+        self.assertTrue(model.solve())
+
+        model = cp.Model(cons.decompose())
+        self.assertTrue(model.solve())
+
+        short_cons = cp.ShortTable(iv, [[10, 8, 2], ['*', '*', 2]])
+        model = cp.Model(short_cons)
+        self.assertTrue(model.solve(solver=solver))
+
+        model = cp.Model(short_cons.decompose())
+        self.assertTrue(model.solve())
+
+        self.assertTrue(short_cons.value())
+        self.assertEqual(iv[-1].value(), 2)
+        self.assertFalse(cp.ShortTable(iv, [[10, 8, 2], [STAR, STAR, 3]]).value())
+
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [STAR, 9, 2]])
+        model = cp.Model(short_cons)
+        self.assertFalse(model.solve(solver=solver))
+
+        short_cons = cp.ShortTable(iv, [[10, 8, STAR], [5, 9, STAR]])
+        model = cp.Model(short_cons.decompose())
+        self.assertFalse(model.solve())
+
+        # unconstrained
+        true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
+        self.assertTrue(cp.Model(true_cons).solve(solver=solver))
+        self.assertEqual(cp.Model(true_cons).solveAll(solver=solver), 17 ** 3)
+        constraining, defining = true_cons.decompose() # should be True, []
+        self.assertTrue(constraining[0])
+
+
+
     def test_table_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -499,7 +572,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_abs(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
-        iv = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, name="x")
         constraints = [cp.Abs(iv) + 9 <= 8]
         model = cp.Model(constraints)
         self.assertFalse(model.solve())
@@ -512,11 +585,21 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(abs(iv.value())), '4')
+        self.assertEqual(model.solveAll(display=iv), 15)
+
+        pos = cp.intvar(0,8, name="x")
+        constraints = [cp.Abs(pos) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
+        neg = cp.intvar(-8,0, name="x")
+        constraints = [cp.Abs(neg) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
 
     def test_element(self):
         # test 1-D
-        iv = cp.intvar(-8, 8, 3)
-        idx = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, 3, name="iv")
+        idx = cp.intvar(-8, 8, name="idx")
         # test directly the constraint
         cons = cp.Element(iv,idx) == 8
         model = cp.Model(cons)
@@ -530,7 +613,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
-        iv = cp.intvar(-8, 8, shape=(3, 3))
+        iv = cp.intvar(-8, 8, shape=(3, 3), name="iv")
         a,b = cp.intvar(0, 2, shape=2)
         cons = iv[a,b] == 8
         model = cp.Model(cons)
@@ -543,6 +626,13 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(arr[a.value(), b.value()], 1)
+        # test optimization where 1 dim is index
+        cons = iv[2, idx] == 8
+        self.assertEqual(str(cons), "[iv[2,0] iv[2,1] iv[2,2]][idx] == 8")
+        cons = iv[idx, 2] == 8
+        self.assertEqual(str(cons), "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8")
+
+
 
     def test_element_onearg(self):
 
@@ -882,6 +972,9 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model([cons, iv == [0,0,0,0,0,0]]).solve())
         self.assertTrue(cons.value())
         self.assertFalse(cp.Model([cons, iv == [0,1,2,0,0,0]]).solve())
+
+        cons = cp.Precedence([iv[0], iv[1], 4], [0, 1, 2]) # python list in stead of cpm_array
+        self.assertTrue(cp.Model([cons]).solve())
 
 
     def test_no_overlap(self):

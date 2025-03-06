@@ -79,12 +79,13 @@ TODO: small optimisations, e.g. and/or chaining (potentially after negation), se
 """
 import math
 import builtins
+import cpmpy as cp
 
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import *
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_num, is_any_list, is_int, is_star
 from .negation import push_down_negation
 
 
@@ -92,21 +93,20 @@ def flatten_model(orig_model):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
-    from ..model import Model  # otherwise circular dependency...
 
     # the top-level constraints
     basecons = flatten_constraint(orig_model.constraints)
 
     # the objective
     if orig_model.objective_ is None:
-        return Model(*basecons)  # no objective, satisfaction problem
+        return cp.Model(*basecons)  # no objective, satisfaction problem
     else:
         (newobj, newcons) = flatten_objective(orig_model.objective_)
         basecons += newcons
         if orig_model.objective_is_min:
-            return Model(*basecons, minimize=newobj)
+            return cp.Model(*basecons, minimize=newobj)
         else:
-            return Model(*basecons, maximize=newobj)
+            return cp.Model(*basecons, maximize=newobj)
 
 
 def flatten_constraint(expr):
@@ -120,7 +120,6 @@ def flatten_constraint(expr):
         TODO, what built-in python error is best?
         RE TODO: we now have custom NotImpl/NotSupported
     """
-    from ..expressions.globalconstraints import GlobalConstraint  # avoid circular import
 
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
@@ -216,11 +215,21 @@ def flatten_constraint(expr):
             lexpr, rexpr = expr.args
             rewritten = False
 
-            # rewrite 'Var == Expr' to normalzed 'Expr == Var'
-            if (expr.name == '==' or expr.name == '!=') \
-                    and __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+            # rewrite 'Var # Expr' to normalized 'Expr # Var' (where # is any comparator)
+            if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
+                assert (expr.name in ('==', '!=', '>', '>=', '<', '<='))
                 lexpr, rexpr = rexpr, lexpr
                 rewritten = True
+
+                # flip comparator in case of inequality
+                if exprname == '>':
+                    exprname = '<'
+                elif exprname == '>=':
+                    exprname = '<='
+                elif exprname == '<':
+                    exprname = '>'
+                elif exprname == '<=':
+                    exprname = '>='
 
             # already flat?
             if not expr.has_subexpr():
@@ -248,7 +257,7 @@ def flatten_constraint(expr):
             newlist.extend(lcons)
             newlist.extend(rcons)
 
-        elif isinstance(expr, GlobalConstraint):
+        elif isinstance(expr, cp.expressions.globalconstraints.GlobalConstraint):
             """
     - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
@@ -291,11 +300,11 @@ def __is_flat_var(arg):
 
 def __is_flat_var_or_list(arg):
     """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
-        or a list of __is_flat_var_or_list
+        or a list of __is_flat_var_or_list, or it is a wildcard as used in the ShortTable global constraint
     """
     return is_num(arg) or isinstance(arg, _NumVarImpl) or \
-           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg)
-
+           is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
+           is_star(arg)
 
 def get_or_make_var(expr):
     """
@@ -325,10 +334,9 @@ def get_or_make_var(expr):
         (flatexpr, flatcons) = normalized_numexpr(expr)
 
         lb, ub = flatexpr.get_bounds()
-        if not(isinstance(lb,int) and isinstance(ub,int)):
-            warnings.warn(f"CPMPy only uses integer variables, non-integer expression detected ({expr}) and it will be "
-                          f"reified into an intvar with rounded bounds. \n Your constraints will stay the same.",
-                          UserWarning)
+        if not is_int(lb) or not is_int(ub):
+            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
+                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
         return ivar, [flatexpr == ivar] + flatcons

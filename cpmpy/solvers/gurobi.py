@@ -32,8 +32,9 @@
 """
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals
+from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -43,6 +44,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from ..transformations.safening import no_partial_functions
 
 try:
     import gurobipy as gp
@@ -69,7 +71,23 @@ class CPM_gurobi(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
+        return CPM_gurobi.installed() and CPM_gurobi.license_ok()
+
+    @staticmethod
+    def installed():
+        try:
+            import gurobipy as gp
+            return True
+        except ModuleNotFoundError:
+            return False
+        except Exception as e:
+            raise e
+
+    @staticmethod
+    def license_ok():
+        if not CPM_gurobi.installed():
+            warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
+            return False
         try:
             import gurobipy as gp
             global GRB_ENV
@@ -79,7 +97,8 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except:
+        except Exception as e:
+            warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -90,9 +109,10 @@ class CPM_gurobi(SolverInterface):
         - cpm_model: a CPMpy Model()
         - subsolver: None, not used
         """
-        if not self.supported():
-            raise Exception(
-                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+        if not self.installed():
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
+        elif not self.license_ok():
+            raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
@@ -294,6 +314,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -358,7 +379,8 @@ class CPM_gurobi(SolverInterface):
                     self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
-                    assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
@@ -376,7 +398,6 @@ class CPM_gurobi(SolverInterface):
                         self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                         self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
