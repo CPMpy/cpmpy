@@ -432,6 +432,10 @@ class BoolVal(Expression):
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
+    
+    def get_bounds(self):
+        v = int(self.args[0])
+        return (v,v)
 
     def __and__(self, other):
         if self.args[0]:
