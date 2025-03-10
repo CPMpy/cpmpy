@@ -724,6 +724,13 @@ class Operator(Expression):
             #overflow happened
             raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
+
+    def __hash__(self):
+        if self.name == 'wsum':
+            return hash(("wsum", tuple(self.args[0]), tuple(self.args[1])))
+        else:
+            return super().__hash__()
+
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
@@ -758,3 +765,256 @@ def _wsum_make(arg):
         return [-1], [arg.args[0]]
     # default
     return [1], [arg]
+
+
+# Custom dictionary and set classes for CPMpy expressions.
+# These do not inherit from python dict or set, because python abstracts from the underlying hash table.
+# Meaning we cannot access it ourselves.
+# This makes you rely on super.add, which is what we are trying to avoid..
+class cpm_dict:
+    def __init__(self):
+        # Maps a hash value to a list of (key, value) pairs with that hash
+        self._hash_groups = {}
+
+    def same(self, key1, key2):
+        """
+        Custom key comparison logic
+        """
+        ex1 = isinstance(key1, cp.expressions.core.Expression)  #key1 is expression
+        ex2 = isinstance(key2, cp.expressions.core.Expression)  #key2 is expression
+        if ex1 and ex2:
+            if key1 is key2:  # same object
+                return True
+            elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+                return False  # vars with different id can't be the same.
+            else:
+                return key1.name == key2.name and self.same_args(key1.args, key2.args)
+        elif ex1:
+            return False  # one expression other not
+        elif ex2:
+            return False  # one expression other not
+        else:
+            return key1 == key2  # compare non-expressions
+
+    def same_args(self, args1, args2):
+        if is_any_list(args1):
+            if is_any_list(args2):
+                if len(args1) != len(args2):
+                    return False  # unequal lengths (zip will throw away uneven items otherwise)
+                return all(self.same_args(el1, el2) for el1, el2 in zip(args1, args2))  # recurse into args
+            else:
+                return False  # one is a list, the other not
+        elif is_any_list(args2):
+            return False  # one is a list, the other not.
+        else:  # no more lists:
+            return self.same(args1, args2)
+
+    def _get_hash_group(self, key):
+        """Returns the list of (key, value) pairs for a given hash."""
+        h = hash(key)
+        if h not in self._hash_groups:
+            self._hash_groups[h] = []
+        return self._hash_groups[h]
+
+    def __setitem__(self, key, value):
+        hash_group = self._get_hash_group(key)
+        # Check for existing key using `same`
+        for i, (existing_key, _) in enumerate(hash_group):
+            if self.same(existing_key, key):
+                hash_group[i] = (key, value)  # Update existing entry
+                return
+        # Add new key-value pair if no collision
+        hash_group.append((key, value))
+
+    def __getitem__(self, key):
+        hash_group = self._get_hash_group(key)
+        for existing_key, value in hash_group:
+            if self.same(existing_key, key):
+                return value
+        raise KeyError(f"Key {key} not found")
+
+    def __delitem__(self, key):
+        hash_group = self._get_hash_group(key)
+        for i, (existing_key, _) in enumerate(hash_group):
+            if self.same(existing_key, key):
+                del hash_group[i]
+                # Clean up empty hash groups
+                if not hash_group:
+                    del self._hash_groups[hash(key)]
+                return
+        raise KeyError(f"Key {key} not found")
+
+    def __contains__(self, key):
+        hash_group = self._get_hash_group(key)
+        return any(self.same(existing_key, key) for existing_key, _ in hash_group)
+
+    def __len__(self):
+        return sum(len(group) for group in self._hash_groups.values())
+
+    def __iter__(self):
+        for group in self._hash_groups.values():
+            for key, _ in group:
+                yield key
+
+    def items(self):
+        return [(k, v) for group in self._hash_groups.values() for k, v in group]
+
+    def keys(self):
+        return [k for group in self._hash_groups.values() for k, _ in group]
+
+    def values(self):
+        return [v for group in self._hash_groups.values() for _, v in group]
+
+    def __repr__(self):
+        items = ", ".join(f"{repr(key)}: {repr(value)}" for key, value in self.items())
+        return f"{{{items}}}"
+
+
+class cpm_set:
+    def __init__(self, iterable=None):
+        self._hash_groups = {}
+        if iterable is not None:
+            for item in iterable:
+                self.add(item)
+
+    def _get_hash_group(self, key):
+        hash_key = hash(key)
+        if hash_key not in self._hash_groups:
+            self._hash_groups[hash_key] = []
+        return self._hash_groups[hash_key]
+
+    def same(self, key1, key2):
+        """
+        Custom key comparison logic
+        """
+        ex1 = isinstance(key1, cp.expressions.core.Expression)  #key1 is expression
+        ex2 = isinstance(key2, cp.expressions.core.Expression)  #key2 is expression
+        if ex1 and ex2:
+            if key1 is key2:  # same object
+                return True
+            elif isinstance(key1, cp.variables._NumVarImpl) or isinstance(key1, cp.variables._NumVarImpl):
+                return False  # vars with different id can't be the same.
+            else:
+                return key1.name == key2.name and self.same_args(key1.args, key2.args)
+        elif ex1:
+            return False  # one expression other not
+        elif ex2:
+            return False  # one expression other not
+        else:
+            return key1 == key2  # compare non-expressions
+
+    def same_args(self, args1, args2):
+        if is_any_list(args1):
+            if is_any_list(args2):
+                if len(args1) != len(args2):
+                    return False  # unequal lengths (zip will throw away uneven items otherwise)
+                return all(self.same_args(el1, el2) for el1, el2 in zip(args1, args2))  # recurse into args
+            else:
+                return False  # one is a list, the other not
+        elif is_any_list(args2):
+            return False  # one is a list, the other not.
+        else:  # no more lists:
+            return self.same(args1, args2)
+
+    def add(self, key):
+        hash_group = self._get_hash_group(key)
+        for existing_key in hash_group:
+            if self.same(existing_key, key):
+                return  # Key already exists, do nothing
+        hash_group.append(key)
+
+    def remove(self, key):
+        hash_group = self._get_hash_group(key)
+        for i, existing_key in enumerate(hash_group):
+            if self.same(existing_key, key):
+                del hash_group[i]
+                # Clean up empty hash groups
+                if not hash_group:
+                    del self._hash_groups[hash(key)]
+                return
+        raise KeyError(f"Key {key} not found")
+
+    def __or__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        result = cpm_set(self)
+        for key in other:
+            result.add(key)
+        return result
+
+    def __and__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        result = cpm_set()
+        for key in self:
+            if key in other:
+                result.add(key)
+        return result
+
+    def __sub__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        result = cpm_set(self)
+        for key in other:
+            if key in result:
+                result.remove(key)
+        return result
+
+    def __xor__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        result = cpm_set()
+        for key in self:
+            if key not in other:
+                result.add(key)
+        for key in other:
+            if key not in self:
+                result.add(key)
+        return result
+
+    def __iadd__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        for key in other:
+            self.add(key)
+        return self
+
+    def __isub__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        for key in other:
+            if key in self:
+                self.remove(key)
+        return self
+
+    def __ixor__(self, other):
+        if not isinstance(other, cpm_set):
+            return NotImplemented
+        for key in other:
+            if key in self:
+                self.remove(key)
+            else:
+                self.add(key)
+        return self
+
+    def __contains__(self, key):
+        hash_group = self._get_hash_group(key)
+        return any(self.same(existing_key, key) for existing_key in hash_group)
+
+    def __len__(self):
+        return sum(len(group) for group in self._hash_groups.values())
+
+    def __iter__(self):
+        for group in self._hash_groups.values():
+            for key in group:
+                yield key
+
+    def items(self):
+        return [k for group in self._hash_groups.values() for k in group]
+
+    def __repr__(self):
+        return f"cpm_set({self.items()})"
+
+    def update(self, others):
+        for key in others:
+            self.add(key)
