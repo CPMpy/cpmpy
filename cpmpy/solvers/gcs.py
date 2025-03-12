@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
 ##
-## ortools.py
+## gcs.py
 ##
 """
     Interface to the Glasgow Constraint Solver's API for the cpmpy library.
@@ -16,12 +16,15 @@
 
     See:
     https://github.com/ciaranm/glasgow-constraint-solver
+
     ===============
     List of classes
     ===============
+
     .. autosummary::
         :nosignatures:
-        GlasgowConstraintSolver
+
+        CPM_gcs
 """
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
@@ -48,8 +51,10 @@ class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API.
 
-    Requires that the 'gcspy' python package is installed:
+    Requires that the 'gcspy' python package is installed: $ pip install gcspy
+
     Current installation instructions:
+
     - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
     - (on Debian-based systems, see https://apt.llvm.org for easy installation)
     - If necessary `export CXX=<your up to date C++ compiler (e.g. clang++-15)>`
@@ -57,6 +62,7 @@ class CPM_gcs(SolverInterface):
     - `git clone https://github.com/ciaranm/glasgow-constraint-solver.git`
     - `cd glasgow-constraint-solver/python`
     - `pip install .`
+
     NB: if for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
 
     For the verifier functionality, the 'veripb' tool is also required.
@@ -86,6 +92,7 @@ class CPM_gcs(SolverInterface):
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
+
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None (not supported)
