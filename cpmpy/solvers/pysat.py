@@ -225,12 +225,12 @@ class CPM_pysat(SolverInterface):
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
             Transforms cpm_var into CNF literal using ``self.pysat_vpool``
             (positive or negative integer).
 
-            so vpool is the varmap (we don't use _varmap here)
+            So vpool is the varmap (we don't use _varmap here).
         """
 
         # special case, negative-bool-view

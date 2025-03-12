@@ -702,7 +702,7 @@ try:
         print(f"x0={x[0].value()}, x1={x[1].value()}")
         cb = OrtSolutionPrinter(s, printer=myprint)```
 
-            optionally retrieve the solution count with `cb.solution_count()`
+            Optionally retrieve the solution count with ``cb.solution_count()``.
 
             Arguments:
                 verbose (bool, default = False): whether to print info on every solution found 

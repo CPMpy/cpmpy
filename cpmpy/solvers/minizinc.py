@@ -392,7 +392,7 @@ class CPM_minizinc(SolverInterface):
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
             Returns:
                 minizinc-friendly 'string' name of var.
@@ -700,7 +700,7 @@ class CPM_minizinc(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            MiniZinc-specific implementation
+            MiniZinc-specific implementation.
 
             Arguments:
                 display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
