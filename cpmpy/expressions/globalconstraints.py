@@ -105,6 +105,7 @@
         Inverse
         Table
         NegativeTable
+        ShortTable
         Xor
         Cumulative
         IfThenElse
@@ -119,9 +120,11 @@
 """
 import copy
 
+
 import cpmpy as cp
 
-from .utils import all_pairs
+from .core import BoolVal
+from .utils import all_pairs, is_int, is_bool, STAR
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -281,14 +284,39 @@ class Circuit(GlobalConstraint):
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
+        defining = []
         constraining = []
-        constraining += [AllDifferent(succ)] # different successors
-        constraining += [AllDifferent(order)] # different orders
-        constraining += [order[n-1] == 0] # symmetry breaking, last one is '0'
 
-        defining = [order[0] == succ[0]]
-        defining += [order[i] == succ[order[i-1]] for i in range(1,n)] # first one is successor of '0', ith one is successor of i-1
+        # We define the auxiliary order variables to represent the order we visit all the nodes.
+        # `order[i] == succ[order[i - 1]]`
+        # These constraints need to be in the defining part, since they define our auxiliary vars
+        # However, this would make it impossible for ~circuit to be satisfied in some cases,
+        # because there does not always exist a valid ordering
+        # This happens when the variables in succ don't take values in the domain of 'order',
+        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
+        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
 
+        lbs, ubs = get_bounds(succ)
+        if min(lbs) > 0 or max(ubs) < n - 1:
+            # no way this can be a circuit
+            return [BoolVal(False)], []
+        elif min(lbs) >= 0 and max(ubs) < n:
+            # there always exists a valid ordering, since our bounds are tight
+            a = BoolVal(True)
+        else:
+            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
+            a = boolvar()
+            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
+            for i in range(n):
+                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
+
+        constraining += [AllDifferent(succ)]  # different successors
+        constraining += [AllDifferent(order)]  # different orders
+        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
+        defining += [a.implies(order[0] == succ[0])]
+        for i in range(1, n):
+            defining += [a.implies(
+                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
         return constraining, defining
 
     def value(self):
@@ -360,6 +388,35 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+class ShortTable(GlobalConstraint):
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+         no restrictions for the corresponding variable in that tuple.
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
+        super().__init__("short_table", [array, table])
+
+    def decompose(self):
+        arr, tab = self.args
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
+                return True
+        return False
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
@@ -576,7 +633,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [vars, precedence])
+        super().__init__("precedence", [cpm_array(vars), precedence])
 
     def decompose(self):
         """
@@ -589,7 +646,10 @@ class Precedence(GlobalConstraint):
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
+                lhs = args[j] == t
+                if is_bool(lhs):  # args[j] and t could both be constants
+                    lhs = BoolVal(lhs)
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):

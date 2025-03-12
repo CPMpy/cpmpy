@@ -42,8 +42,9 @@ from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
+from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals
+from ..expressions.utils import flatlist, argvals, argval
 
 import numpy as np
 import numbers
@@ -65,13 +66,14 @@ class CPM_exact(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if exact is installed
             import exact
-            import pkg_resources
+            # check installed version
             pkg_resources.require("exact>=2.1.0")
             return True
-        except ModuleNotFoundError as e:
-            return False 
-        except VersionConflict:
+        except ModuleNotFoundError: # exact is not installed
+            return False
+        except VersionConflict: # unsupported version of exact
             warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
                           f"{pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires "
                           f"Python 3.10 or higher.")
@@ -97,7 +99,7 @@ class CPM_exact(SolverInterface):
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
         if not self.supported():
-            raise Exception("Install 'exact' as a Python package to use this solver interface")
+            raise Exception("CPM_exact: Install the python package 'exact' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
 
@@ -397,7 +399,8 @@ class CPM_exact(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialized MIP decomp
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"}) # linearize expects safe exprs
+        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent', 'abs'})) # Abs and Alldiff have a specialized MIP decomp
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=

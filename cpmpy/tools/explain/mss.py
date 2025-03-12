@@ -112,6 +112,6 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
         else:
             # UNSAT, cannot add to sat subset, reset solver to just sat subset
             s = cp.SolverLookup.get(solver)
-            s += hard
+            s += (sat_subset + hard)
 
     return sat_subset
