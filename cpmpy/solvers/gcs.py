@@ -317,10 +317,13 @@ class CPM_gcs(SolverInterface):
 
     def objective(self, expr, minimize=True):
         """
-            Post the given expression to the solver as objective to minimize/maximize
-            'objective()' can be called multiple times, only the last one is stored
-            (technical side note: any constraints created during conversion of the objective
-            are permanently posted to the solver)
+            Post the given expression to the solver as objective to minimize/maximize.
+
+            ``objective()`` can be called multiple times, only the last one is stored.
+
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are permanently posted to the solver
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)

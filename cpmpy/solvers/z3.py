@@ -19,7 +19,8 @@
     Documentation of the solver's own Python API:
     https://z3prover.github.io/api/html/namespacez3py.html
 
-    Terminology note: a 'model' for z3 is a solution!
+    .. note::
+        Terminology note: a 'model' for z3 is a solution!
 
     ===============
     List of classes
@@ -132,13 +133,15 @@ class CPM_z3(SolverInterface):
                 import z3
                 z3.Solver().help()
 
-            Warning! Some parameternames in z3 have a '.' in their name,
-            such as (arbitrarily chosen): 'sat.lookahead_simplify'
-            You have to construct a dictionary of keyword arguments upfront:
-            ```
-            params = {"sat.lookahead_simplify": True}
-            s.solve(**params)
-            ```
+            .. warning::
+                Warning! Some parameternames in z3 have a '.' in their name,
+                such as (arbitrarily chosen): ``sat.lookahead_simplify``
+                You have to construct a dictionary of keyword arguments upfront:
+                
+                .. code-block:: python
+
+                    params = {"sat.lookahead_simplify": True}
+                    s.solve(**params)
         """
         import z3
 
@@ -251,8 +254,9 @@ class CPM_z3(SolverInterface):
 
             ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         import z3
         # objective can be a nested expression for z3

@@ -131,9 +131,10 @@ class CPM_minizinc(SolverInterface):
         """
             Returns solvers supported by MiniZinc on your system
 
-            WARNING, some of them may not actually be installed on your system
-            (namely cplex, gurobi, scip, xpress)
-            the following are bundled in the bundle: chuffed, coin-bc, gecode
+            .. warning::
+                WARNING, some of them may not actually be installed on your system
+                (namely cplex, gurobi, scip, xpress).
+                The following are bundled in the bundle: chuffed, coin-bc, gecode
         """
         import minizinc
         solver_dict = minizinc.default_driver.available_solvers()
@@ -407,8 +408,9 @@ class CPM_minizinc(SolverInterface):
             Returns:
                 minizinc-friendly 'string' name of var.
 
-            XXX WARNING, this assumes it is never given a 'NegBoolView'
-            might not be true... e.g. in revar after solve?
+            .. warning::
+                WARNING, this assumes it is never given a 'NegBoolView'
+                might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
             if cpm_var < -2147483646 or cpm_var > 2147483646:

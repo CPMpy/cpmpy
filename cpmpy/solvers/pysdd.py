@@ -150,7 +150,8 @@ class CPM_pysdd(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
+            .. warning::
+                WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping

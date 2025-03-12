@@ -252,8 +252,9 @@ class CPM_gurobi(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-                are premanently posted to the solver)
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         from gurobipy import GRB
 

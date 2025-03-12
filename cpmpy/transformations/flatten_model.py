@@ -84,8 +84,9 @@ of the form specified above.
 The flattening does not promise to do common subexpression elimination or to automatically group
 commutative expressions (``and``, ``or``, ``sum``, ``wsum``, ...) but such optimisations should be added later.
 
-TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
-TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
+.. todo::
+    TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
+    TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
 import math
 import builtins
@@ -127,8 +128,10 @@ def flatten_constraint(expr):
         output: see definition of 'flat normal form' above.
 
         it will return 'Exception' if something is not supported
-        TODO, what built-in python error is best?
-        RE TODO: we now have custom NotImpl/NotSupported
+
+        .. todo::
+            TODO, what built-in python error is best?
+            RE TODO: we now have custom NotImpl/NotSupported
     """
 
     newlist = []

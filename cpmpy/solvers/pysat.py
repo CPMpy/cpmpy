@@ -23,8 +23,9 @@
     Documentation of the solver's own Python API:
     https://pysathq.github.io/docs/html/api/solvers.html
 
-    WARNING: CPMpy uses 'model' to refer to a constraint specification,
-    the PySAT docs use 'model' to refer to a solution.
+    .. warning::
+        WARNING: CPMpy uses 'model' to refer to a constraint specification,
+        the PySAT docs use 'model' to refer to a solution.
 
     ===============
     List of classes

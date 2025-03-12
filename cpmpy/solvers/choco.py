@@ -300,9 +300,10 @@ class CPM_choco(SolverInterface):
 
             ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: constraints created during conversion of the objective
-            are premanently posted to the solver. Choco accepts variables to maximize or minimize
-            so it is needed to post constraints and create auxiliary variables)
+            .. note::
+                technical side note: constraints created during conversion of the objective
+                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                so it is needed to post constraints and create auxiliary variables
         """
 
         # make objective function non-nested
