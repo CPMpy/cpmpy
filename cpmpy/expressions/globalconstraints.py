@@ -291,9 +291,10 @@ class Circuit(GlobalConstraint):
         """
             Decomposition for Circuit
 
-            Not sure where we got it from,
-            MiniZinc has slightly different one:
-            https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
+            ..
+                Not sure where we got it from,
+                MiniZinc has slightly different one:
+                https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
         succ = cpm_array(self.args)
         n = len(succ)
