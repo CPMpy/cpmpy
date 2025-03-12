@@ -87,7 +87,7 @@ class CPM_minizinc(SolverInterface):
     - ``mzn_txt_solve``: str, the 'solve' item in text form, so it can be overwritten
     - ``mzn_result``: object, containing solve results
 
-    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
     required_version = (2, 8, 2)
@@ -247,7 +247,7 @@ class CPM_minizinc(SolverInterface):
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 
-            Does not store the minizinc.Instance() or minizinc.Result()
+            Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
         # ensure all vars are known to solver

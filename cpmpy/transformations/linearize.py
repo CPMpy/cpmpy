@@ -37,7 +37,7 @@ Indicator constraints:
 | ``BoolVar -> GenExpr == Var/Constant``  |  (GenExpr.name in supported, GenExpr.is_num())  |
 +-----------------------------------------+-------------------------------------------------+
 
-Where BoolVar is a boolean variable or its negation.
+Where ``BoolVar`` is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------

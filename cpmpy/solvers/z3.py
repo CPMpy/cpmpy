@@ -125,7 +125,9 @@ class CPM_z3(SolverInterface):
                 - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-                - ... (no common examples yet)
+
+            - ... (no common examples yet)
+
             The full list doesn't seem to be documented online, you have to run its help() function:
             
             .. code-block:: python

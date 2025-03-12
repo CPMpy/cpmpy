@@ -69,7 +69,7 @@ class CPM_pysat(SolverInterface):
     - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
     - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
 
-    The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
     """
 
     @staticmethod

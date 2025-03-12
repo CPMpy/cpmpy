@@ -675,7 +675,7 @@ try:
         then retrieve the solution count with ``cb.solution_count()``
 
         Arguments:
-            - verbose whether to print info on every solution found (bool, default: False)
+            verbose (bool, default: False): whether to print info on every solution found 
     """
 
         def __init__(self, verbose=False):
@@ -709,10 +709,10 @@ try:
                 cb = OrtSolutionPrinter(s, display=vars)
                 s.solve(enumerate_all_solutions=True, solution_callback=cb)
 
-            for multiple variabes (single or NDVarArray), use:
-            `cb = OrtSolutionPrinter(s, display=[v, x, z])`
+            For multiple variables (single or NDVarArray), use:
+            ``cb = OrtSolutionPrinter(s, display=[v, x, z])``.
 
-            for a custom print function, use for example:
+            For a custom print function, use for example:
             
             .. code-block:: python
 

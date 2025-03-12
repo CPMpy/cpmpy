@@ -331,7 +331,7 @@ class CPM_exact(SolverInterface):
 
     def objective(self, expr, minimize):
         """
-            Post the given expression to the solver as objective to minimize/maximize
+            Post the given expression to the solver as objective to minimize/maximize.
 
             Arguments:
                 expr: Expression, the CPMpy expression that represents the objective function

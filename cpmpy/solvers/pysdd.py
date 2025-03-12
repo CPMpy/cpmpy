@@ -62,7 +62,7 @@ class CPM_pysdd(SolverInterface):
     - ``pysdd_manager`` : a pysdd.sdd.SddManager
     - ``pysdd_root`` : a pysdd.sdd.SddNode (changes whenever a formula is added)
 
-    The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysdd_manager`` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
     """
 
     @staticmethod
@@ -109,8 +109,9 @@ class CPM_pysdd(SolverInterface):
             See if an arbitrary model exists
 
             This is a knowledge compiler:
-                - building it is the (computationally) hard part
-                - checking for a solution is trivial after that
+
+            - building it is the (computationally) hard part
+            - checking for a solution is trivial after that
         """
 
         # ensure all vars are known to solver
@@ -240,7 +241,7 @@ class CPM_pysdd(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the ':ref:`Adding a new solver` docs on readthedocs for more information.
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 

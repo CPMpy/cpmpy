@@ -52,8 +52,8 @@
     `x ^ y`              `Xor([x, y])`                                         
     ===================  =======================================================
 
-    Python has no built-in operator for __implication__ that can be overloaded.
-    CPMpy hence has a function 'implies()' that can be called:
+    Python has no built-in operator for `implication` that can be overloaded.
+    CPMpy hence has a function :func:`~cpmpy.expressions.core.Expression.implies` that can be called:
 
     ===================  ======================
     Python Operator      CPMpy Object          

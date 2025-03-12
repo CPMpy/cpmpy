@@ -53,8 +53,8 @@ def flat2cnf(constraints):
         We do it in a principled way for each of the cases. (in)equalities
         get transformed into implications, everything is modular.
 
-        Arguments:
-        - constraints: list[Expression] or Operator
+        
+        :param constraints: list[Expression] or Operator
     """
     cnf = []
     for expr in constraints:

@@ -8,6 +8,8 @@
 
     Requires that the 'pychoco' python package is installed:
 
+    .. code-block:: console
+
         $ pip install pychoco
 
 
