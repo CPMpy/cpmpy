@@ -26,7 +26,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         :param nested: if True, new constraints will have been added to the `_toplevel` list too
         
         Special care taken for unsupported global constraints in reified contexts and for numeric global constraints
-            in a comparison.
+        in a comparison.
 
         Supported numerical global functions remain in the expression tree as is. They can be rewritten using
         :func:`cpmpy.transformations.reification.reify_rewrite`

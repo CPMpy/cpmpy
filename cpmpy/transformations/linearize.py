@@ -10,10 +10,11 @@ Linear comparison:
 - LinExpr >= Constant
 - LinExpr <= Constant
 
-    LinExpr can be any of:
-        - NumVar
-        - sum
-        - wsum
+LinExpr can be any of:
+
+- NumVar
+- sum
+- wsum
 
 Indicator constraints:
 ----------------------

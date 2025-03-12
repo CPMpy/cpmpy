@@ -26,7 +26,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         following the **relational semantics** as discussed in:
             Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
             constraint languages." International Conference on Principles and Practice of Constraint
-             Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
+            Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
 
         Under the relational semantic, an 'undefined' output for a (numerical) expression should
         propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
@@ -201,7 +201,7 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
         Examples include `div` where 0 has to be removed from the denominator
 
         Constructs an expression for each interval of safe values, and
-            introduces a new `output_var` variable
+        introduces a new `output_var` variable
 
         :param cpm_expr: The numerical expression to safen
         :param exclude: The domain value to exclude

@@ -1,7 +1,7 @@
 """
-  Transformations regarding reification constraints.
+    Transformations regarding reification constraints.
 
-  There are three types of reification (BV=BoolVar, BE=BoolExpr):
+    There are three types of reification (BV=BoolVar, BE=BoolExpr):
 
     +--------------+------------------------------------------------------------+
     | ``BV -> BE`` | single implication, from var to expression                 |
@@ -11,9 +11,9 @@
     | ``BE == BV`` | full reification / double implication (e.g. ``BV <-> BE``) |
     +--------------+------------------------------------------------------------+
 
-  Using logical operations, they can be decomposed and rewritten to each other.
+    Using logical operations, they can be decomposed and rewritten to each other.
 
-  This file implements:
+    This file implements:
 
     +---------------------------+------------------------------------------------------------------+
     | :func:`only_bv_reifies()` | transforms all reifications to ``BV -> BE`` or ``BV == BE``      |

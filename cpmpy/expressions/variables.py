@@ -176,15 +176,16 @@ def intvar(lb, ub, shape=1, name=None):
     of this specific variable in the array append to its name.
 
     The following examples show how to create integer variables of different shapes:
+    Examples:
 
-    - Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+        Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) of 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
 
         .. code-block:: python
 
             # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
             x = intvar(3, 8, name="x")
 
-    - Creation of a vector of integer variables with all having the same given lower bound and upper bound:
+        Creation of a vector of integer variables with all having the same given lower bound and upper bound:
 
         .. code-block:: python
 
@@ -194,7 +195,8 @@ def intvar(lb, ub, shape=1, name=None):
             # Python's unpacking can assign multiple intermediate variables at once
             e, x, a, m, p, l = intvar(3, 8, shape=6, name=list("exampl"))
 
-    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        
         .. code-block:: python
 
             arrx s= intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
