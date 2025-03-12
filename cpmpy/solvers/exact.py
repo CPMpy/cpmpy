@@ -6,6 +6,12 @@
 """
     Interface to Exact
 
+    Requires that the 'exact' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install exact
+
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
     propagation routines and strong cutting-planes / pseudo-Boolean conflict analysis.

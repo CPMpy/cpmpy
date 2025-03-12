@@ -9,6 +9,8 @@
     The 'ortools' python package is bundled by default with CPMpy.
     It can be installed through `pip`:
 
+    .. code-block:: console
+    
         $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
@@ -655,10 +657,13 @@ try:
         but with output printing being optional
 
         use with CPM_ortools as follows:
-        `cb = OrtSolutionCounter()`
-        `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
 
-        then retrieve the solution count with `cb.solution_count()`
+        .. code-block:: python
+            
+            cb = OrtSolutionCounter()
+            s.solve(enumerate_all_solutions=True, solution_callback=cb)
+
+        then retrieve the solution count with ``cb.solution_count()``
 
         Arguments:
             - verbose whether to print info on every solution found (bool, default: False)
@@ -688,19 +693,23 @@ try:
         """
             Native or-tools callback for solution printing.
 
-            Subclasses OrtSolutionCounter, see those docs too
+            Use with :class:`CPM_ortools` as follows:
 
-            use with CPM_ortools as follows:
-            `cb = OrtSolutionPrinter(s, display=vars)`
-            `s.solve(enumerate_all_solutions=True, solution_callback=cb)`
+            .. code-block:: python
+
+                cb = OrtSolutionPrinter(s, display=vars)
+                s.solve(enumerate_all_solutions=True, solution_callback=cb)
 
             for multiple variabes (single or NDVarArray), use:
             `cb = OrtSolutionPrinter(s, display=[v, x, z])`
 
             for a custom print function, use for example:
-            ```def myprint():
-        print(f"x0={x[0].value()}, x1={x[1].value()}")
-        cb = OrtSolutionPrinter(s, printer=myprint)```
+            
+            .. code-block:: python
+
+                def myprint():
+                    print(f"x0={x[0].value()}, x1={x[1].value()}")
+                    cb = OrtSolutionPrinter(s, printer=myprint)
 
             Optionally retrieve the solution count with ``cb.solution_count()``.
 

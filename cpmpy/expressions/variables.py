@@ -246,6 +246,10 @@ def cpm_array(arr):
         Model([ data[iv1] == iv2 ])
 
     As an alternative, you can also write the :class:`~cpmpy.expressions.globalfunctions.Element` constraint directly on `data`: 
+    
+    .. code-block:: python
+
+        Element(data, iv1) == iv2
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)

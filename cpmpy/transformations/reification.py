@@ -50,6 +50,9 @@ def only_implies(constraints):
         Transforms all reifications to BV -> BE form
 
         More specifically:
+
+        .. code-block:: text
+
             BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                               :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                               :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)

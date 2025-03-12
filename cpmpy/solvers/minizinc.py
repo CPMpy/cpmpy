@@ -8,6 +8,8 @@
 
     Requires that the 'minizinc' python package is installed:
 
+    .. code-block:: console
+
         $ pip install minizinc
 
     as well as the Minizinc bundled binary packages, downloadable from:

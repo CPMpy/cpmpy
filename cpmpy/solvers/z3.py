@@ -7,6 +7,8 @@
     Interface to z3's API
 
     Requires that the 'z3-solver' python package is installed:
+
+    .. code-block:: console
     
         $ pip install z3-solver
 
@@ -124,10 +126,11 @@ class CPM_z3(SolverInterface):
             Arguments that correspond to solver parameters:
                 - ... (no common examples yet)
             The full list doesn't seem to be documented online, you have to run its help() function:
-            ```
-            import z3
-            z3.Solver().help()
-            ```
+            
+            .. code-block:: python
+
+                import z3
+                z3.Solver().help()
 
             Warning! Some parameternames in z3 have a '.' in their name,
             such as (arbitrarily chosen): 'sat.lookahead_simplify'

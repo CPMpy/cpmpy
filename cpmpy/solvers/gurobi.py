@@ -8,6 +8,8 @@
 
     Requires that the 'gurobipy' python package is installed:
 
+    .. code-block:: console
+
         $ pip install gurobipy
     
     

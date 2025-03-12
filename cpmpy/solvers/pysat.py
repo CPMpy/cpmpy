@@ -8,6 +8,8 @@
 
     Requires that the 'python-sat' python package is installed:
 
+    .. code-block:: console
+
         $ pip install python-sat[aiger,approxmc,cryptosat,pblib]
 
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified

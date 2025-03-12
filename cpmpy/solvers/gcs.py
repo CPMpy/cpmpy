@@ -5,6 +5,13 @@
 ##
 """
     Interface to the Glasgow Constraint Solver's API for the cpmpy library.
+
+    Requires that the 'gcspy' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install gcspy
+
     The key feature of this solver is the ability to produce proof logs.
 
     See:

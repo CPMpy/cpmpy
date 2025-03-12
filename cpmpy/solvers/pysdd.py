@@ -8,6 +8,8 @@
 
     Requires that the 'PySDD' python package is installed:
 
+    .. code-block:: console
+
         $ pip install PySDD
 
     PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
@@ -373,8 +375,11 @@ class CPM_pysdd(SolverInterface):
             Returns a graphviz Dot object
 
             Display (in a notebook) with:
-            import graphviz
-            graphviz.Source(m.dot())
+
+            .. code-block:: python
+
+                import graphviz
+                graphviz.Source(m.dot())
         """
         if self.pysdd_root is None:
             from pysdd.sdd import SddManager
