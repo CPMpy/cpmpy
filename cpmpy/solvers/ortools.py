@@ -140,18 +140,27 @@ class CPM_ortools(SolverInterface):
 
             You can use any of these parameters as keyword argument to `solve()` and they will
             be forwarded to the solver. Examples include:
-                - num_search_workers=8          number of parallel workers (default: 8)
-                - log_search_progress=True      to log the search process to stdout (default: False)
-                - cp_model_presolve=False       to disable presolve (default: True, almost always beneficial)
-                - cp_model_probing_level=0      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
-                - linearization_level=0         to disable linearisation (default: 1, can also set to 2)
-                - optimize_with_core=True       to do max-sat like lowerbound optimisation (default: False)
-                - use_branching_in_lp=True      to generate more info in lp propagator (default: False)
-                - polish_lp_solution=True       to spend time in lp propagator searching integer values (default: False)
-                - symmetry_level=1              only do symmetry breaking in presolve (default: 2, also possible: 0)
 
-            example:
-            o.solve(num_search_workers=8, log_search_progress=True)
+            =============================   ============
+            Argument                        Description
+            =============================   ============
+            ``num_search_workers=8``          number of parallel workers (default: 8)
+            ``log_search_progress=True``      to log the search process to stdout (default: False)
+            ``cp_model_presolve=False``       to disable presolve (default: True, almost always beneficial)
+            ``cp_model_probing_level=0``      to disable probing (default: 2, also valid: 1, maybe 3, etc...)
+            ``linearization_level=0``         to disable linearisation (default: 1, can also set to 2)
+            ``optimize_with_core=True``       to do max-sat like lowerbound optimisation (default: False)
+            ``use_branching_in_lp=True``      to generate more info in lp propagator (default: False)
+            ``polish_lp_solution=True``       to spend time in lp propagator searching integer values (default: False)
+            ``symmetry_level=1``              only do symmetry breaking in presolve (default: 2, also possible: 0)
+            =============================   ============
+           
+
+            Examples:
+
+                .. code-block:: python
+                
+                    o.solve(num_search_workers=8, log_search_progress=True)
 
         """
         from ortools.sat.python import cp_model as ort

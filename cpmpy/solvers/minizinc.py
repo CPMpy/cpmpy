@@ -232,9 +232,17 @@ class CPM_minizinc(SolverInterface):
                 
             
             Arguments that correspond to solver parameters:
-                - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
-                - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
-                - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+
+            =======================  ===========
+            Keyword                  Description
+            =======================  ===========
+            free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
+            optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
+            =======================  ===========             
+            
+            
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 

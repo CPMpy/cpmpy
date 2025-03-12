@@ -11,39 +11,55 @@
 
     Here is a list of standard python operators and what object (with what expr.name) it creates:
 
-    **Comparisons**:
+    Comparisons
+    -----------
+    ===================  ==========================
+    Python Operator      CPMpy Object                     
+    ===================  ==========================
+    `x == y`             `Comparison("==", x, y)`         
+    `x != y`             `Comparison("!=", x, y)`         
+    `x < y`              `Comparison("<", x, y)`          
+    `x <= y`             `Comparison("<=", x, y)`         
+    `x > y`              `Comparison(">", x, y)`          
+    `x >= y`             `Comparison(">=", x, y)`         
+    ===================  ==========================
 
-    - x == y        Comparison("==", x, y)
-    - x != y        Comparison("!=", x, y)
-    - x < y         Comparison("<", x, y)
-    - x <= y        Comparison("<=", x, y)
-    - x > y         Comparison(">", x, y)
-    - x >= y        Comparison(">=", x, y)
+    Mathematical Operators
+    ----------------------
+    ===========================  ===============================================
+    Python Operator              CPMpy Object                                  
+    ===========================  ===============================================
+    `-x`                         `Operator("-", [x])`                          
+    `x + y`                      `Operator("sum", [x, y])`                     
+    `sum([x,y,z])`               `Operator("sum", [x, y, z])`                  
+    `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
+    `x - y`                      `Operator("sum", [x, -y])`                    
+    `x * y`                      `Operator("mul", [x, y])`                     
+    `x / y`                      `Operator("div", [x, y])`                     
+    `x % y`                      `Operator("mod", [x, y])`                     
+    `x ** y`                     `Operator("pow", [x, y])`  
+    ===========================  ===============================================                   
 
-    **Mathematical operators**:
-
-    - −x            Operator("-", [x])
-    - x + y         Operator("sum", [x,y])
-    - sum([x,y,z])  Operator("sum", [x,y,z])
-    - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
-    - x - y         Operator("sum", [x,-y])
-    - x * y         Operator("mul", [x,y])
-    - x / y         Operator("div", [x,y])
-    - x % y         Operator("mod", [x,y])
-    - x ** y        Operator("pow", [x,y])
-
-    **Logical operators**:
-
-    - x & y         Operator("and", [x,y])
-    - x | y         Operator("or", [x,y])
-    - ~x            Operator("not", [x])
-                    or NegBoolView(x) in case x is a Boolean variable
-    - x ^ y         Xor([x,y])  # a global constraint
+    
+    Logical Operators
+    -----------------
+    ===================  =======================================================
+    Python Operator      CPMpy Object  
+    ===================  =======================================================                                        
+    `x & y`              `Operator("and", [x, y])`                             
+    `x | y`              `Operator("or", [x, y])`                              
+    `~x`                 `Operator("not", [x])` or `NegBoolView(x)` if Boolean 
+    `x ^ y`              `Xor([x, y])`                                         
+    ===================  =======================================================
 
     Python has no built-in operator for __implication__ that can be overloaded.
     CPMpy hence has a function 'implies()' that can be called:
 
-    - x.implies(y)  Operator("->", [x,y])
+    ===================  ======================
+    Python Operator      CPMpy Object          
+    ===================  ======================
+    `x.implies(y)`       Operator("->", [x,y]) 
+    ===================  ======================
 
     Apart from operator overloading, expressions implement two important functions:
 
