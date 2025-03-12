@@ -1,18 +1,3 @@
-import shutil
-import warnings
-
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from .. import DirectConstraint
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
-from ..transformations.get_variables import get_variables
-from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.safening import no_partial_functions
-
 """
     Interface to CP Optimizers API
 
@@ -31,6 +16,23 @@ from ..transformations.safening import no_partial_functions
 
         CPM_cpo
 """
+
+import shutil
+import warnings
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .. import DirectConstraint
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
+from ..transformations.get_variables import get_variables
+from ..transformations.normalize import toplevel_list
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.safening import no_partial_functions
+
+
 
 class CPM_cpo(SolverInterface):
     """
