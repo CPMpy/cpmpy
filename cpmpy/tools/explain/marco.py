@@ -30,8 +30,8 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
                                      to return MUSes. Especially useful when `return_mus=True`.
 
     """
-    if getattr(cp.SolverLookup.get(solver), "get_core", False) is False:
-        raise ValueError("Solver does not support assumption variables, chose a different solver.")
+
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), "MARCO requires a solver that supports assumption variables"
 
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft))

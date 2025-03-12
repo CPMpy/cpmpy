@@ -34,9 +34,7 @@ def mus(soft, hard=[], solver="ortools"):
         :param: solver: the SAT-solver to use, must support assumptions, (e.g, ortools, exact, z3 or pysat)
     """
 
-    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) mus_naive instead")
-        return mus_naive(soft=soft, hard=hard, solver=solver)
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"mus requires a solver that supports assumption variables, use mus_naive with {solver} instead"
 
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
@@ -82,9 +80,7 @@ def quickxplain(soft, hard=[], solver="ortools"):
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
     """
 
-    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) quickxplain_naive instead")
-        return quickxplain_naive(soft=soft, hard=hard, solver=solver)
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"quickxplain requires a solver that supports assumption variables, use quickxplain_naive with {solver} instead"
 
     model, soft, assump = make_assump_model(soft, hard)
     s = cp.SolverLookup.get(solver, model)
@@ -142,10 +138,8 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
             Journal of Artificial Intelligence Research 78 (2023): 709-746.
 
     """
-    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) optimal_mus_naive instead")
-        return optimal_mus_naive(soft=soft, hard=hard, weights=weights, solver=solver, hs_solver=hs_solver)
-
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"optimal_mus requires a solver that supports assumption variables, use optimal_mus_naive with {solver} instead"
+    
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 

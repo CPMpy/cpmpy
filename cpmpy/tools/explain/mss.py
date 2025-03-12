@@ -52,9 +52,7 @@ def mss_grow(soft, hard=[], solver="ortools"):
         2014 IEEE 26th International Conference on Tools with Artificial Intelligence. IEEE, 2014.
     """
 
-    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) mss_grow_naive instead")
-        return mss_grow_naive(soft=soft, hard=hard, solver=solver)
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"mss_grow requires a solver that supports assumption variables, use mss_grow_naive with {solver} instead"
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
