@@ -88,45 +88,38 @@ def boolvar(shape=1, name=None):
             - If `name` is None, a name of the form ``BV<unique number>`` will be assigned to the variables.
             - If `name` is a string, it will be used as the suffix of the variable names.
             - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
-    of this specific variable in the array append to its name.
 
-    For example,
-    - `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
-    - `print(boolvar(shape=3, name=list("xyz"))` will print `[x, y, z]`
+    Notes:
 
+        - If `shape` is not 1, each element of the array will have its specific location appended to its name.
+        - Examples:
+            - ``boolvar(shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+            - ``boolvar(shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
 
-    The following examples show how to create Boolean variables of different shapes:
+    Examples:
 
-    - Creating a single (unit-sized or scalar) Boolean variable:
+        Creating a single Boolean variable:
+        
         .. code-block:: python
 
-            # creation of a unit Boolean variable
             x = boolvar(name="x")
-
-    - the creation of a vector boolean variables. 
-
+        
+        Creating a vector of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a vector of size 3 of Boolean variables
             x = boolvar(shape=3, name="x")
 
-            # note that with Python's unpacking, you can assign them
-            # to intermediate variables. This allows for fine-grained use of variables when
-            # defining the constraints of the model
+            # Assigning them to individual variables:
             e, x, a, m, p, l = boolvar(shape=6, name=list("exampl"))
 
-    - the creation of a matrix or higher-order tensor of Boolean variables. 
+        Creating a matrix or higher-order tensor of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a 9x9 matrix of Boolean variables:
             matrix = boolvar(shape=(9, 9), name="matrix")
-            # creation of a 2x2 matrix of Boolean variables, and give a name for each element:
             matrix2 = boolvar(shape=(2, 2), name=[['a', 'b'], ['c', 'd']])
-
-            # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
-            # the dimensions of the tensor, a matrix of multiple-dimensions.
-            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
-            tensor = BoolVar(shape=(3, 8, 7), name="tensor")
+            tensor = boolvar(shape=(3, 8, 7), name="tensor")
     """
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
@@ -172,10 +165,18 @@ def intvar(lb, ub, shape=1, name=None):
 
     Notes:
 
-    If shape is different from 1, then each element of the array will have the location
-    of this specific variable in the array append to its name.
+        The range of values between ``lb..ub`` is called the `domain` of the integer variable.
+        All variables in an array start from the same domain.
+        Specific values in the domain of individual variables can be forbidden with constraints.
 
-    The following examples show how to create integer variables of different shapes:
+        If `shape` is not 1, each element of the array will have its specific location appended to its name.
+
+        - ``intvar(0, 2, shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+
+        If `shape` is not 1 and a list of names has been provided (with the same length as the array), each decision variable will receive its respective name.
+
+        - ``intvar(0, 2, shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
+
     Examples:
 
         Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) of 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
