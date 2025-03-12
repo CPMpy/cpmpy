@@ -6,11 +6,11 @@
 """
     This file implements helper functions for exporting CPMpy models from and to DIMACS format.
     DIMACS is a textual format to represent CNF problems.
-    The header of the file should be formatted as `p cnf <n_vars> <n_constraints>`
+    The header of the file should be formatted as ``p cnf <n_vars> <n_constraints>``.
     If the number of variables and constraints are not given, it is inferred by the parser.
 
     Each remaining line of the file is formatted as a list of integers.
-    An integer represents a Boolean variable and a negative Boolean variable is represented using a `-` sign.
+    An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
 """
 
 import cpmpy as cp

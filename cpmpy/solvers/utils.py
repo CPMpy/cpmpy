@@ -36,12 +36,12 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         For example usage, see `examples/advanced/hyperparameter_search.py`
         https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/hyperparameter_search.py
 
-        - all_params is a dict of {key: list} items, e.g.:
-          {'val': [1,2], 'opt': [True,False]}
+        - all_params is a dict of `{key: list}` items, e.g.:
+          ``{'val': [1,2], 'opt': [True,False]}``
 
-        - output is an generator over all {key:value} combinations
+        - output is an generator over all `{key:value}` combinations
           of the keys and values. For the example above:
-          generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])
+          ``generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])``
     """
     if remaining_keys is None or cur_params is None:
         # init

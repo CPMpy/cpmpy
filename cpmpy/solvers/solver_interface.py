@@ -123,7 +123,7 @@ class SolverInterface(object):
                 expr: Expression, the CPMpy expression that represents the objective function
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
         """
         raise NotImplementedError("Solver does not support objective functions")
 

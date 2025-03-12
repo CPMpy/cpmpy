@@ -65,8 +65,9 @@ class CPM_choco(SolverInterface):
     https://pychoco.readthedocs.io/en/latest/
 
     Creates the following attributes (see parent constructor for more):
-    chc_model: the pychoco.Model() created by _model()
-    chc_solver: the choco Model().get_solver() instance used in solve()
+    
+    - ``chc_model`` : the pychoco.Model() created by _model()
+    - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
 
     """
 
@@ -297,7 +298,7 @@ class CPM_choco(SolverInterface):
                 expr: Expression, the CPMpy expression that represents the objective function
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
             (technical side note: constraints created during conversion of the objective
             are premanently posted to the solver. Choco accepts variables to maximize or minimize

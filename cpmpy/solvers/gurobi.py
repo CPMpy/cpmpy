@@ -64,9 +64,9 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-        - grb_model: object, TEMPLATE's model object
+    
+    - ``grb_model``: object, TEMPLATE's model object
 
-    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
     """
 
@@ -141,10 +141,11 @@ class CPM_gurobi(SolverInterface):
 
             Arguments that correspond to solver parameters:
             Examples of gurobi supported arguments include:
-                - Threads : int
-                - MIPFocus: int
-                - ImproveStartTime : bool
-                - FlowCoverCuts: int
+
+            - ``Threads`` : int
+            - ``MIPFocus`` : int
+            - ``ImproveStartTime`` : bool
+            - ``FlowCoverCuts`` : int
 
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """

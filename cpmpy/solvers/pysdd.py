@@ -14,7 +14,7 @@
     https://pysdd.readthedocs.io/en/latest/
 
     This solver can ONLY be used for solution checking and enumeration over Boolean variables!
-    That is, only logical constraints (and,or,implies,==,!=) and Boolean global constraints.
+    That is, only logical constraints (`and`, `or`, `implies`, `==`, `!=`) and Boolean global constraints.
 
     Documentation of the solver's own Python API:
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
@@ -55,9 +55,10 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
     Creates the following attributes (see parent constructor for more):
-        - pysdd_vtree: a pysdd.sdd.Vtree
-        - pysdd_manager: a pysdd.sdd.SddManager
-        - pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
+
+    - ``pysdd_vtree`` : a pysdd.sdd.Vtree
+    - ``pysdd_manager`` : a pysdd.sdd.SddManager
+    - ``pysdd_root`` : a pysdd.sdd.SddNode (changes whenever a formula is added)
 
     The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
     """

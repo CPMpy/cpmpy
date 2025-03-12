@@ -79,10 +79,11 @@ class CPM_minizinc(SolverInterface):
 
 
     Creates the following attributes (see parent constructor for more):
-        - mzn_model: object, the minizinc.Model instance
-        - mzn_solver: object, the minizinc.Solver instance
-        - mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
-        - mzn_result: object, containing solve results
+
+    - ``mzn_model``: object, the minizinc.Model instance
+    - ``mzn_solver``: object, the minizinc.Solver instance
+    - ``mzn_txt_solve``: str, the 'solve' item in text form, so it can be overwritten
+    - ``mzn_result``: object, containing solve results
 
     The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
@@ -221,7 +222,7 @@ class CPM_minizinc(SolverInterface):
         """
             Call the MiniZinc solver
             
-            Creates and calls an Instance with the already created mzn_model and mzn_solver
+            Creates and calls an Instance with the already created ``mzn_model`` and ``mzn_solver``
 
             Arguments:
                 time_limit (float, optional):       maximum solve time in seconds 

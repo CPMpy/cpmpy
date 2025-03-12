@@ -10,13 +10,14 @@
   auxiliary variables.
 
   What is then left to do is to tseitin encode the following into CNF:
-  - BV with BV a BoolVar (or NegBoolView)
-  - or([BV]) constraint
-  - and([BV]) constraint
-  - BE != BV  with BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV
-  - BE == BV
-  - BE -> BV
-  - BV -> BE
+
+  - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
+  - ``or([BV])`` constraint
+  - ``and([BV])`` constraint
+  - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
+  - ``BE == BV``
+  - ``BE -> BV``
+  - ``BV -> BE``
 """
 from ..expressions.core import Operator
 from ..expressions.variables import _BoolVarImpl
@@ -41,13 +42,13 @@ def flat2cnf(constraints):
 
         What is now left to do is to tseitin encode:
 
-  - BV with BV a BoolVar (or NegBoolView)
-  - or([BV]) constraint
-  - and([BV]) constraint
-  - BE != BV  with BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV
-  - BE == BV
-  - BE -> BV
-  - BV -> BE
+        - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
+        - ``or([BV])`` constraint
+        - ``and([BV])`` constraint
+        - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
+        - ``BE == BV``
+        - ``BE -> BV``
+        - ``BV -> BE``
 
         We do it in a principled way for each of the cases. (in)equalities
         get transformed into implications, everything is modular.

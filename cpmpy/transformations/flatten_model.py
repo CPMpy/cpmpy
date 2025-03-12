@@ -72,7 +72,7 @@ The output after calling :func:`flatten_model()` or :func:`flatten_constraint()`
 of the form specified above.
 
 The flattening does not promise to do common subexpression elimination or to automatically group
-commutative expressions (and, or, sum, wsum, ...) but such optimisations should be added later.
+commutative expressions (``and``, ``or``, ``sum``, ``wsum``, ...) but such optimisations should be added later.
 
 TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
 TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten

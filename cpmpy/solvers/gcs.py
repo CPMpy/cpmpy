@@ -53,15 +53,16 @@ class CPM_gcs(SolverInterface):
     NB: if for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
 
     For the verifier functionality, the 'veripb' tool is also required.
-    See `https://gitlab.com/MIAOresearch/software/VeriPB#installation` for installation instructions. 
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions. 
 
     Creates the following attributes (see parent constructor for more):
-    - gcs: the gcspy solver object
-    - objective_var: optional: the variable used as objective
-    - proof_location: location of the last proof produced by the solver
-    - proof_name: name of the last proof (means <proof_name>.opb and <proof_name>.pbp will be present at the proof location)
-    - veripb_return_code: return code from the last VeriPB check.
-    - proof_check_timeout: whether the last VeriPB check timed out.
+
+    - ``gcs`` : the gcspy solver object
+    - ``objective_var`` : optional: the variable used as objective
+    - ``proof_location`` : location of the last proof produced by the solver
+    - ``proof_name`` : name of the last proof (means <proof_name>.opb and <proof_name>.pbp will be present at the proof location)
+    - ``veripb_return_code`` : return code from the last VeriPB check.
+    - ``proof_check_timeout`` : whether the last VeriPB check timed out.
     """
 
     @staticmethod
@@ -380,12 +381,13 @@ class CPM_gcs(SolverInterface):
         Verify a solver-produced proof using VeriPB.
 
         Requires that the 'veripb' tool is installed and on system path. 
-        See `https://gitlab.com/MIAOresearch/software/VeriPB#installation` for installation instructions. 
+        See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions. 
+
         Arguments:
             - name:             name for the the proof files (default to self.proof_name)
             - location:         location for the proof files (default to current working directory).
             - time_limit:       time limit for verification (ignored if verify=False) 
-            - veripb_args:      list of command line arguments to pass to veripb e.g. `--trace --useColor` (run `veripb --help` for a full list)
+            - veripb_args:      list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
             - display_output:   whether to print the output from VeriPB
         """
         if not which("veripb"):

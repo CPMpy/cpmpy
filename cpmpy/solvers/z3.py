@@ -55,9 +55,9 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-        - z3_solver: object, z3's Solver() object
+        
+    - ``z3_solver``: object, z3's Solver() object
 
-    The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
     """
 
@@ -246,7 +246,7 @@ class CPM_z3(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
             (technical side note: any constraints created during conversion of the objective
             are premanently posted to the solver)

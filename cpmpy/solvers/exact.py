@@ -55,11 +55,13 @@ class CPM_exact(SolverInterface):
 
     Requires that the 'exact' python package is installed:
     $ pip install exact
+
     See https://pypi.org/project/exact for more information.
 
     Creates the following attributes (see parent constructor for more):
-        - xct_solver: the Exact instance used in solve() and solveAll()
-        - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+
+    - ``xct_solver`` : the Exact instance used in solve() and solveAll()
+    - ``assumption_dict`` : maps Exact variables to (Exact value, CPM assumption expression)
     """
 
     @staticmethod
@@ -144,7 +146,7 @@ class CPM_exact(SolverInterface):
         """
             Call Exact
 
-            Overwrites self.cpm_status
+            Overwrites ``self.cpm_status``
 
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,

@@ -37,16 +37,16 @@
     CPMpy also implements `Numeric Global Constraints`. For these, the CPMpy :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint` does not
     exactly match what is implemented in the solver, but for good reason!!
 
-    For example solvers may implement the global constraint `Minimum(iv1, iv2, iv3) == iv4` through an API
-    call `addMinimumEquals([iv1,iv2,iv3], iv4)`.
+    For example solvers may implement the global constraint ``Minimum(iv1, iv2, iv3) == iv4`` through an API
+    call ``addMinimumEquals([iv1,iv2,iv3], iv4)``.
 
-    However, CPMpy also wishes to support the expressions `Minimum(iv1, iv2, iv3) > iv4` as well as
-    `iv4 + Minimum(iv1, iv2, iv3)`. 
+    However, CPMpy also wishes to support the expressions ``Minimum(iv1, iv2, iv3) > iv4`` as well as
+    ``iv4 + Minimum(iv1, iv2, iv3)``. 
 
-    Hence, the CPMpy global constraint only captures the `Minimum(iv1, iv2, iv3)` part, whose return type
+    Hence, the CPMpy global constraint only captures the ``Minimum(iv1, iv2, iv3)`` part, whose return type
     is numeric and can be used in any other CPMpy expression. Only at the time of transforming the CPMpy
     model to the solver API, will the expressions be decomposed and auxiliary variables introduced as needed
-    such that the solver only receives `Minimum(iv1, iv2, iv3) == ivX` expressions.
+    such that the solver only receives ``Minimum(iv1, iv2, iv3) == ivX`` expressions.
     This is the burden of the CPMpy framework, not of the user who wants to express a problem formulation.
 
 
@@ -80,6 +80,7 @@
 
         def my_circuit_decomp(self):
             return [self.args[0] == 1], [] # does not actually enforce circuit
+
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
         vars = intvar(1,9, shape=10)
@@ -87,7 +88,7 @@
 
         Model(constr).solve()
 
-    The above will use 'my_circuit_decomp', if the solver does not
+    The above will use ``my_circuit_decomp``, if the solver does not
     natively support :class:`~cpmpy.expressions.globalconstraints.Circuit`.
 
     ===============
@@ -135,8 +136,8 @@ class GlobalConstraint(Expression):
     """
         Abstract superclass of GlobalConstraints
 
-        Like all expressions it has a `.name` and `.args` property.
-        Overwrites the `.is_bool()` method.
+        Like all expressions it has a ``.name`` and ``.args`` property.
+        Overwrites the ``.is_bool()`` method.
     """
 
     def is_bool(self):
@@ -404,7 +405,7 @@ class Table(GlobalConstraint):
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
-         no restrictions for the corresponding variable in that tuple.
+        no restrictions for the corresponding variable in that tuple.
     """
     def __init__(self, array, table):
         array = flatlist(array)
@@ -710,8 +711,8 @@ class NoOverlap(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
-    must be equal to occ[i].
+    The number of occurrences of each value `vals[i]` in the list of variables `vars`
+    must be equal to `occ[i]`.
     """
 
     def __init__(self, vars, vals, occ, closed=False):
@@ -951,7 +952,7 @@ class LexChainLessEq(GlobalConstraint):
 
 class DirectConstraint(Expression):
     """
-        A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
+        A ``DirectConstraint`` will directly call a function of the underlying solver when added to a CPMpy solver
 
         It can not be reified, it is not flattened, it can not contain other CPMpy expressions than variables.
         When added to a CPMpy solver, it will literally just directly call a function on the underlying solver,
@@ -981,7 +982,7 @@ class DirectConstraint(Expression):
 
     def callSolver(self, CPMpy_solver, Native_solver):
         """
-            Call the `directname`() function of the native solver,
+            Call the `directname()` function of the native solver,
             with stored arguments replacing CPMpy variables with solver variables as needed.
 
             SolverInterfaces will call this function when this constraint is added.

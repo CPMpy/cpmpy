@@ -16,7 +16,7 @@
     https://pysathq.github.io/
 
     This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,implies,==,!=) or cardinality constraints.
+    and only logical constraints (`and`, `or`, `implies`, `==`, `!=`) or cardinality constraints.
 
     Documentation of the solver's own Python API:
     https://pysathq.github.io/docs/html/api/solvers.html
@@ -62,8 +62,9 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
-        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
-        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
+
+    - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
+    - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
 
     The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
     """
@@ -226,8 +227,8 @@ class CPM_pysat(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
 
-            Transforms cpm_var into CNF literal using self.pysat_vpool
-            (positive or negative integer)
+            Transforms cpm_var into CNF literal using ``self.pysat_vpool``
+            (positive or negative integer).
 
             so vpool is the varmap (we don't use _varmap here)
         """

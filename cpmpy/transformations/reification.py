@@ -108,12 +108,12 @@ def reify_rewrite(constraints, supported=frozenset()):
         (so after `flatten_constraint()` and 'decompose_global()')
         Output will also be in Flat Normal Form
 
-        Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
+        Boolean expressions ``and``, ``or``, and ``->`` and comparison expression ``IV1==IV2`` are assumed to support reification
         (actually currently all comparisons <op> in {'==', '!=', '<=', '<', '>=', '>'},
-         IV1 <op> IV2 are assumed to support reification BV -> (IV1 <op> IV2))
+        ``IV1 <op> IV2`` are assumed to support reification ``BV -> (IV1 <op> IV2)``)
 
         :param supported: a (frozen)set of expression names that support reification in the solver, including
-                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. BV -> (LHS == V)
+                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
     if not is_any_list(constraints):
         # assume list, so make list

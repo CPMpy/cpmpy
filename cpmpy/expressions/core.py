@@ -80,7 +80,7 @@ from ..exceptions import IncompleteFunctionError, TypeError
 
 class Expression(object):
     """
-    An Expression represents a symbolic function with a self.name and self.args (arguments)
+    An Expression represents a symbolic function with a `self.name` and `self.args` (arguments)
 
     Each Expression is considered to be a function whose value can be used
       in other expressions

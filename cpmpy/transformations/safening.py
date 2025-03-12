@@ -12,14 +12,15 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         A partial function is a function whose output is not defined for all possible inputs.
 
         In CPMpy, this is the case for the following 3 numeric functions:
-            - (Integer) division 'x // y': undefined when y=0
-            - Modulo 'x mod y': undefined when y=0
-            - Element 'Arr[idx]': undefined when idx is not in the range of Arr
+
+        - (Integer) division ``x // y``: undefined when y=0
+        - Modulo ``x mod y``: undefined when y=0
+        - Element ``Arr[idx]``: undefined when idx is not in the range of Arr
 
         A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
         value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
-        expression like `b <-> (Arr[idx] == 5)` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
-        Should idx be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
+        expression like ``b <-> (Arr[idx] == 5)`` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
+        Should `idx` be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
 
         This transformation will transform a partial function (e.g. Arr[idx]) into a total function
         following the **relational semantics** as discussed in:
@@ -31,8 +32,8 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
         be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
 
-        To enable this, we want to rewrite an expression like `b <-> (partial == 5)` to something like
-        `b <-> (is_defined & (total == 5))`. The key idea is to create a copy of the potentially unsafe
+        To enable this, we want to rewrite an expression like ``b <-> (partial == 5)`` to something like
+        ``b <-> (is_defined & (total == 5))``. The key idea is to create a copy of the potentially unsafe
         argument, that can only take 'safe' values. Using this new argument in the original expression results
         in a total function. We now have the original argument variable, which is decoupled from the expression,
         and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
@@ -40,9 +41,9 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
         argument remains decoupled (can take any value, as will the function's output).
 
-        WARNING! Under the relational semantics, `b <-> ~(partial==5)` and `b <-> (partial!=5) mean
-        different things! The second is `b <-> (is_defined & (total!=5))` the first is
-        `b <-> (~is_defined | (total!=5)).
+        WARNING! Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
+        different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
+        ``b <-> (~is_defined | (total!=5))``.
 
 
         A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
