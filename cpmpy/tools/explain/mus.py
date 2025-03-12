@@ -34,8 +34,8 @@ def mus(soft, hard=[], solver="ortools"):
         :param: solver: the SAT-solver to use, must support assumptions, (e.g, ortools, exact, z3 or pysat)
     """
 
-    if "get_core" not in cp.SolverLookup.get(solver).__dict__:
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) naive version instead")
+    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
+        warnings.warn(f"{solver} does not support assumption variables, will use (slower) mus_naive instead")
         return mus_naive(soft=soft, hard=hard, solver=solver)
 
     # make assumption (indicator) variables and soft-constrained model
@@ -82,8 +82,8 @@ def quickxplain(soft, hard=[], solver="ortools"):
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
     """
 
-    if "get_core" not in cp.SolverLookup.get(solver).__dict__:
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) naive version instead")
+    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
+        warnings.warn(f"{solver} does not support assumption variables, will use (slower) quickxplain_naive instead")
         return quickxplain_naive(soft=soft, hard=hard, solver=solver)
 
     model, soft, assump = make_assump_model(soft, hard)
@@ -142,19 +142,16 @@ def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortool
             Journal of Artificial Intelligence Research 78 (2023): 709-746.
 
     """
-
-    if "get_core" not in cp.SolverLookup.get(solver).__dict__:
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) naive version instead")
+    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
+        warnings.warn(f"{solver} does not support assumption variables, will use (slower) optimal_mus_naive instead")
         return optimal_mus_naive(soft=soft, hard=hard, weights=weights, solver=solver, hs_solver=hs_solver)
 
     model, soft, assump = make_assump_model(soft, hard)
     dmap = dict(zip(assump, soft)) # map assumption variables to constraints
 
     s = cp.SolverLookup.get(solver, model)
-    if do_solution_hint and 'solution_hint' in s.__dict__:
-        # algo is constructive, so favor large subsets
-        if solver != "ortools": # causes weidness in OR-Tools: https://github.com/google/or-tools/issues/4324
-            s.solution_hint(assump, [1]*len(assump))
+    if do_solution_hint and hasattr(s, 'solution_hint'): # algo is constructive, so favor large subsets
+        s.solution_hint(assump, [1]*len(assump))
 
     assert s.solve(assumptions=assump) is False
 
@@ -268,7 +265,7 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
     core = do_recursion(soft, hard, [])
     return core
 
-def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ortools"):
+def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
     """
         Naive implementation of `optimal_mus` without assumption variables and incremental solving
     """
@@ -276,7 +273,7 @@ def optimal_mus_naive(soft, hard=[], weights=1, solver="ortools", hs_solver="ort
     soft = toplevel_list(soft, merge_and=False)
     bvs = cp.boolvar(shape=len(soft))
 
-    if is_num(weights):
+    if weights is None:
         weights = np.ones(len(bvs), dtype=int)
     hs_solver = cp.SolverLookup.get(hs_solver)
     hs_solver.minimize(cp.sum(bvs * np.array(weights)))

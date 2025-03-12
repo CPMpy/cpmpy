@@ -30,7 +30,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
                                      to return MUSes. Especially useful when `return_mus=True`.
 
     """
-    if "get_core" not in cp.SolverLookup.get(solver).__dict__:
+    if getattr(cp.SolverLookup.get(solver), "get_core", False) is False:
         raise ValueError("Solver does not support assumption variables, chose a different solver.")
 
     model, soft, assump = make_assump_model(soft, hard)
@@ -39,7 +39,7 @@ def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True
 
     # map solver for computing hitting sets
     map_solver = cp.SolverLookup.get(map_solver)
-    do_solution_hint = do_solution_hint and 'solution_hint' in map_solver.__dict__  # solver may not support solution hinting...
+    do_solution_hint = do_solution_hint and hasattr(map_solver, 'solution_hint')  # solver may not support solution hinting...
 
     map_solver += cp.any(assump)
     if do_solution_hint:

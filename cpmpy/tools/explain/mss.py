@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions.utils import is_any_list
 from cpmpy.transformations.normalize import toplevel_list
 
-from .utils import make_assump_model, assumption_solvers
+from .utils import make_assump_model
 
 # Maximum Satisfiable Subset
 # assumes the solver supports 'maximize', if not... revert to 'mss_grow'
@@ -52,8 +52,8 @@ def mss_grow(soft, hard=[], solver="ortools"):
         2014 IEEE 26th International Conference on Tools with Artificial Intelligence. IEEE, 2014.
     """
 
-    if "get_core" not in cp.SolverLookup.get(solver).__dict__:
-        warnings.warn(f"{solver} does not support assumption variables, will use (slower) naive version instead")
+    if not hasattr(cp.SolverLookup.get(solver), "get_core"):
+        warnings.warn(f"{solver} does not support assumption variables, will use (slower) mss_grow_naive instead")
         return mss_grow_naive(soft=soft, hard=hard, solver=solver)
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
