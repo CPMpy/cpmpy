@@ -1,6 +1,6 @@
 """
   Converts the logical constraints into disjuctions using the tseitin transform,
-        including flattening global constraints that are is_bool() and not in `supported`.
+        including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
   
   Other constraints are copied verbatim so this transformation
   can also be used in non-pure CNF settings
@@ -37,7 +37,7 @@ def to_cnf(constraints):
 def flat2cnf(constraints):
     """
         Converts from 'flat normal form' all logical constraints into Conjunctive Normal Form,
-        including flattening global constraints that are is_bool() and not in `supported`.
+        including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
 
         What is now left to do is to tseitin encode:
 

@@ -1,5 +1,5 @@
 """
-  Transformations regarding Comparison constraints (originally).
+  Transformations regarding :class:`~cpmpy.expressions.core.Comparison` constraints (originally).
   Now, it is regarding numeric expressions in general, including nested ones.
   
   Let with <op> one of == or !=,<,<=,>,>=
@@ -12,7 +12,7 @@
   The NumExpr can be a sum, wsum or global function with a non-bool return type.
     
   This file implements:
-    - only_numexpr_equality():    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
+    - :func:`only_numexpr_equality()`:    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
 import copy

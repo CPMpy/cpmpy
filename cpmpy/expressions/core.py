@@ -4,7 +4,7 @@
 ## expressions.py
 ##
 """
-    The `Expression` superclass and common subclasses `Expression` and `Operator`.
+    The :class:`~cpmpy.expressions.core.Expression` superclass and common subclasses :class:`~cpmpy.expressions.core.Comparison` and :class:`~cpmpy.expressions.core.Operator`.
     
     None of these objects should be directly created, they are automatically created through operator
     overloading on variables and expressions.
@@ -47,12 +47,12 @@
 
     Apart from operator overloading, expressions implement two important functions:
 
-    - `is_bool()`   
+    - :func:`~cpmpy.expressions.core.Expression.is_bool`   
         which returns whether the return type of the expression is Boolean.
         If it does, the expression can be used as top-level constraint
         or in logical operators.
 
-    - `value()`     
+    - :func:`~cpmpy.expressions.core.Expression.value`    
         computes the value of this expression, by calling .value() on its
         subexpressions and doing the appropriate computation
         this is used to conveniently print variable values, objective values
@@ -86,11 +86,12 @@ class Expression(object):
       in other expressions
 
     Expressions may implement:
-    - is_bool():    whether its return type is Boolean
-    - value():      the value of the expression, default None
-    - implies(x):   logical implication of this expression towards x
-    - __repr__():   for pretty printing the expression
-    - any __op__ python operator overloading
+
+    - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
+    - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
+    - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
+    - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
+    - any ``__op__`` python operator overloading
     """
 
     def __init__(self, name, arg_list):
@@ -156,7 +157,7 @@ class Expression(object):
         return hash(self.__repr__())
 
     def has_subexpr(self):
-        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+        """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
             Results are cached for future calls and reset when the expression changes

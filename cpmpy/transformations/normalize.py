@@ -15,7 +15,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 
 def toplevel_list(cpm_expr, merge_and=True):
     """
-    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with `.is_bool()` true.
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
     :param cpm_expr: Expression or list of Expressions
     :param merge_and: if True then a toplevel 'and' will have its arguments merged at top level

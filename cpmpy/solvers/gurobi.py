@@ -67,6 +67,7 @@ class CPM_gurobi(SolverInterface):
         - grb_model: object, TEMPLATE's model object
 
     The `DirectConstraint`, when used, calls a function on the `grb_model` object.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
     """
 
     @staticmethod
@@ -304,7 +305,7 @@ class CPM_gurobi(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
             :type cpm_expr: Expression or list of Expression

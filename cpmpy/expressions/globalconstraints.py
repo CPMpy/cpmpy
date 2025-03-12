@@ -9,12 +9,12 @@
     Using global constraints
     ------------------------
 
-    Solvers can have specialised implementations for global constraints. CPMpy has GlobalConstraint
+    Solvers can have specialised implementations for global constraints. CPMpy has :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`
     expressions so that they can be passed to the solver as is when supported.
 
-    If a solver does not support a global constraint (see solvers/) then it will be automatically
-    decomposed by calling its `.decompose()` function.
-    The `.decompose()` function returns two arguments:
+    If a solver does not support a global constraint (see :ref:`Solver Interfaces <solver-interfaces>`) then it will be automatically
+    decomposed by calling its :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose()` function.
+    The :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose()` function returns two arguments:
         - a list of simpler constraints replacing the global constraint
         - if the decomposition introduces *new variables*, then the second argument has to be a list
             of constraints that (totally) define those new variables
@@ -34,7 +34,7 @@
     Numeric global constraints
     --------------------------
 
-    CPMpy also implements __Numeric Global Constraints__. For these, the CPMpy GlobalConstraint does not
+    CPMpy also implements `Numeric Global Constraints`. For these, the CPMpy :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint` does not
     exactly match what is implemented in the solver, but for good reason!!
 
     For example solvers may implement the global constraint `Minimum(iv1, iv2, iv3) == iv4` through an API
@@ -53,7 +53,7 @@
     Subclassing GlobalConstraint
     ----------------------------
     
-    If you do wish to add a GlobalConstraint, because it is supported by solvers or because you will do
+    If you do wish to add a :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, because it is supported by solvers or because you will do
     advanced analysis and rewriting on it, then preferably define it with a standard decomposition, e.g.:
 
     .. code-block:: python
@@ -65,15 +65,16 @@
             def decompose(self):
                 return [self.args[0] != self.args[1]] # your decomposition
 
-    If it is a __numeric global constraint__ meaning that its return type is numeric (see `Minimum` and `Element`)
-    then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
+    ..
+        If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
+        then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
 
 
     Alternative decompositions
     --------------------------
     
     For advanced use cases where you want to use another decomposition than the standard decomposition
-    of a GlobalConstraint expression, you can overwrite the 'decompose' function of the class, e.g.:
+    of a :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint` expression, you can overwrite the :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose` function of the class, e.g.:
 
     .. code-block:: python
 
@@ -87,7 +88,7 @@
         Model(constr).solve()
 
     The above will use 'my_circuit_decomp', if the solver does not
-    natively support 'circuit'.
+    natively support :class:`~cpmpy.expressions.globalconstraints.Circuit`.
 
     ===============
     List of classes
@@ -522,7 +523,7 @@ class InDomain(GlobalConstraint):
 
 class Xor(GlobalConstraint):
     """
-        The 'xor' exclusive-or constraint
+        The :class:`Xor` exclusive-or constraint
     """
 
     def __init__(self, arg_list):
@@ -556,7 +557,7 @@ class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
         Ensures that the capacity of the resource is never exceeded
-        Equivalent to noOverlap when demand and capacity are equal to 1
+        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs
     """
     def __init__(self, start, duration, end, demand, capacity):
@@ -909,7 +910,7 @@ class LexLessEq(GlobalConstraint):
 
 
 class LexChainLess(GlobalConstraint):
-    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
+    """ Given a matrix X, :class:`LexChainLess` enforces that all rows are lexicographically ordered.
     """
     def __init__(self, X):
         # Ensure the numpy array is 2D
@@ -959,7 +960,7 @@ class DirectConstraint(Expression):
         See the documentation of the solver (constructor) for details on how that solver handles them.
 
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
-        then use `directvar()` instead, or access the solver object from the solver interface directly.
+        then use :func:`~cpmpy.expressions.variables.directvar` instead, or access the solver object from the solver interface directly.
     """
     def __init__(self, name, arguments, novar=None):
         """

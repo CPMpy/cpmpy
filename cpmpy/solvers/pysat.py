@@ -249,7 +249,7 @@ class CPM_pysat(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
             :type cpm_expr: Expression or list of Expression
@@ -366,7 +366,7 @@ class CPM_pysat(SolverInterface):
 
     def get_core(self):
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those assumptions which are False (in the UNSAT core)
 

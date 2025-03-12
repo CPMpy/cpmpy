@@ -283,12 +283,12 @@ class SolverInterface(object):
 
     def get_core(self):
         """
-        For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT.
+        For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT.
 
         Typically implemented in SAT-based solvers
         
         Returns a small subset of assumption literals that are unsat together.
-        (a literal is either a `_BoolVarImpl` or a `NegBoolView` in case of its negation, e.g. x or ~x)
+        (a literal is either a :class:`~cpmpy.expressions.variables._BoolVarImpl` or a :class:`~cpmpy.expressions.variables.NegBoolView` in case of its negation, e.g. x or ~x)
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
         raise NotSupportedError("Solver does not support unsat core extraction")

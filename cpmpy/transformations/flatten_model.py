@@ -68,7 +68,7 @@ Objective: (up to one nesting)
     - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
               wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
 
-The output after calling flatten_model() or flatten_constraint() will ONLY contain expressions
+The output after calling :func:`flatten_model()` or :func:`flatten_constraint()` will ONLY contain expressions
 of the form specified above.
 
 The flattening does not promise to do common subexpression elimination or to automatically group

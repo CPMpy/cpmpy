@@ -58,6 +58,7 @@ class CPM_z3(SolverInterface):
         - z3_solver: object, z3's Solver() object
 
     The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
     """
 
     @staticmethod
@@ -274,7 +275,7 @@ class CPM_z3(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
             :type cpm_expr: Expression or list of Expression
@@ -464,7 +465,7 @@ class CPM_z3(SolverInterface):
 
     def get_core(self):
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those variables that are False (in the UNSAT core)
 

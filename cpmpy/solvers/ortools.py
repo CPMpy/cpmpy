@@ -65,7 +65,7 @@ class CPM_ortools(SolverInterface):
         - ort_model: the ortools.sat.python.cp_model.CpModel() created by _model()
         - ort_solver: the ortools cp_model.CpSolver() instance used in solve()
 
-    The `DirectConstraint`, when used, calls a function on the `ort_model` object.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``ort_model`` object.
     """
 
     @staticmethod
@@ -349,7 +349,7 @@ class CPM_ortools(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
             :type cpm_expr: Expression or list of Expression
@@ -581,7 +581,7 @@ class CPM_ortools(SolverInterface):
     def get_core(self):
         from ortools.sat.python import cp_model as ort
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, ``get_core()`` returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those variables that are False (in the UNSAT core)
 
