@@ -26,7 +26,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
         transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
         also for the reified uses of NumExpr
 
-        :param supported  a (frozen)set of expression names that supports all comparisons in the solver
+        :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
     """
 
     # shallow copy (could support inplace too this way...)

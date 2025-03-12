@@ -100,8 +100,8 @@ class CPM_choco(SolverInterface):
         calling solve(), a prime way to use more advanced solver features
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
         """
         if not self.supported():
             raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
@@ -134,8 +134,8 @@ class CPM_choco(SolverInterface):
             Call the Choco solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):   maximum solve time in seconds 
+                kwargs:                         any keyword argument, sets parameters of solver object
 
         """
         # ensure all vars are known to solver
@@ -201,12 +201,13 @@ class CPM_choco(SolverInterface):
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
-                - time_limit:  maximum solve time in seconds (float, default: None)
+                solution_limit: stop after this many solutions (default: None)
+                time_limit (float, optional):   maximum solve time in seconds
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
 
         # ensure all vars are known to solver
@@ -292,8 +293,9 @@ class CPM_choco(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
 
@@ -344,10 +346,10 @@ class CPM_choco(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)

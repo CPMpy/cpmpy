@@ -76,14 +76,14 @@ def boolvar(shape=1, name=None):
     Boolean decision variables will take either the value `True` or `False`.
     
     Arguments:
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        shape (int or tuple of int, optional) : The shape of the n-dimensional array of variables. Default is 1.
+    
+        name (str, list of str, tuple of str, or None, optional) : 
+            Name(s) to assign to the variables. Default is None.
 
-    If name is None then a name 'BV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
-
-    If shape is different from 1, then each element of the array will have the location
+            - If `name` is None, a name of the form ``BV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
     of this specific variable in the array append to its name.
 
     For example,
@@ -151,18 +151,18 @@ def intvar(lb, ub, shape=1, name=None):
     the decision variable can take, as well as the highest value (ub).
 
     Arguments:
-    lb -- lower bound on the values the variable can take (int)
-    ub -- upper bound on the values the variable can take (int)
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        lb (int) : Lower bound on the values the variable can take.
+        ub (int) : Upper bound on the values the variable can take.
+        shape (int or tuple of int, optional) :
+            The shape of the n-dimensional array of variables. Default is 1.
+        name (str, list of str, tuple of str, or None, optional) :
+            Name(s) to assign to the variables. Default is None.
 
-    The range of values between lb..ub is called the __domain__ of the integer variable.
-    All variables in an array start from the same domain.
-    Specific values in the domain of individual variables can be forbidden with constraints.
+            - If `name` is None, a name of the form ``IV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
 
-    If name is None then a name 'IV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
+    Notes:
 
     If shape is different from 1, then each element of the array will have the location
     of this specific variable in the array append to its name.

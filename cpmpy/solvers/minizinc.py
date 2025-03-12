@@ -156,8 +156,8 @@ class CPM_minizinc(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: str, name of a subsolver (optional)
                           has to be one of solvernames()
         """
         if not self.installed():
@@ -224,9 +224,10 @@ class CPM_minizinc(SolverInterface):
             Creates and calls an Instance with the already created mzn_model and mzn_solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
-
+                time_limit (float, optional):       maximum solve time in seconds 
+                **kwargs (any keyword argument):    sets parameters of solver object
+                
+            
             Arguments that correspond to solver parameters:
                 - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
                 - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
@@ -392,7 +393,8 @@ class CPM_minizinc(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
 
-            Returns minizinc-friendly 'string' name of var
+            Returns:
+                minizinc-friendly 'string' name of var.
 
             XXX WARNING, this assumes it is never given a 'NegBoolView'
             might not be true... e.g. in revar after solve?
@@ -454,10 +456,10 @@ class CPM_minizinc(SolverInterface):
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
@@ -700,14 +702,15 @@ class CPM_minizinc(SolverInterface):
             MiniZinc-specific implementation
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - kwargs:      any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
+                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
+                time_limit:         stop after this many seconds (default: None)
+                solution_limit:     stop after this many solutions (default: None)
+                call_from_model:    whether the method is called from a CPMpy Model instance or not
+                **kwargs:           any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
         # XXX: check that no objective function??
         if self.has_objective():

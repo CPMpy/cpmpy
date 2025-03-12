@@ -110,9 +110,8 @@ class CPM_pysat(SolverInterface):
         Only supports satisfaction problems (no objective)
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: str, name of the pysat solver, e.g. glucose4
-            see .solvernames() to get the list of available solver(names)
+            cpm_model (Model(), a CPMpy Model(), optional):
+            subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
             raise Exception("CPM_pysat: Install the python package 'python-sat' to use this solver interface "
@@ -150,12 +149,14 @@ class CPM_pysat(SolverInterface):
             Call the PySAT solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
-                           runtime exceeds given time_limit.
-                           Warning: the time_limit is not very accurate at subsecond level
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
+                time_limit (float, optional):   Maximum solve time in seconds. Auto-interrups in case the
+                                                runtime exceeds given time_limit.
+                                                
+                                                .. warning::
+                                                    Warning: the time_limit is not very accurate at subsecond level
+                assumptions: list of CPMpy Boolean variables that are assumed to be true.
+                            For use with :func:`s.get_core() <get_core()>`: if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
+                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
         # ensure all vars are known to solver
@@ -250,10 +251,10 @@ class CPM_pysat(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)

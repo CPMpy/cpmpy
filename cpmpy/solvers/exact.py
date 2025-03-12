@@ -90,8 +90,8 @@ class CPM_exact(SolverInterface):
         Exact solver object xct_solver.
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -219,12 +219,12 @@ class CPM_exact(SolverInterface):
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """
@@ -325,8 +325,9 @@ class CPM_exact(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
         self.objective_ = expr

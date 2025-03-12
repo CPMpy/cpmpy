@@ -140,7 +140,7 @@ def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
 
-    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
+        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
     """
     warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
     return [sv for sv in builtin_solvers if sv.supported()]

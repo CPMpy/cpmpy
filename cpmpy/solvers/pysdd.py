@@ -84,8 +84,8 @@ class CPM_pysdd(SolverInterface):
         Only supports satisfaction problems and solution enumeration
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model(), optional
+            subsolver: None
         """
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
@@ -155,7 +155,8 @@ class CPM_pysdd(SolverInterface):
                 - time_limit, solution_limit, kwargs: not used
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found            
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -239,10 +240,10 @@ class CPM_pysdd(SolverInterface):
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)

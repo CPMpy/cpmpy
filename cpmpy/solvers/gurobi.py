@@ -106,8 +106,8 @@ class CPM_gurobi(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
-        - subsolver: None, not used
+            cpm_model: a CPMpy Model()
+            subsolver: None, not used
         """
         if not self.installed():
             raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
@@ -135,8 +135,8 @@ class CPM_gurobi(SolverInterface):
             Call the gurobi solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                - time_limit (float, optional):  maximum solve time in seconds 
+                - **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
             Examples of gurobi supported arguments include:
@@ -306,10 +306,10 @@ class CPM_gurobi(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -452,12 +452,12 @@ class CPM_gurobi(SolverInterface):
             a more efficient native implementation
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """

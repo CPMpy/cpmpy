@@ -19,12 +19,12 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
     """
         Decomposes any global constraint not supported by the solver
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
-            if nested is True, new constraints will have been added to the `_toplevel` list too
-
-        - supported: a set of supported global constraints or global functions
-        - supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
-        - toplevel: a list of constraints that should be added toplevel, carried as pass by reference to recursive calls
-
+            
+        :param supported: a set of supported global constraints or global functions
+        :param supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
+        :param _toplevel: a list of constraints that should be added toplevel, carried as pass by reference to recursive calls
+        :param nested: if True, new constraints will have been added to the `_toplevel` list too
+        
         Special care taken for unsupported global constraints in reified contexts and for numeric global constraints
             in a comparison.
 

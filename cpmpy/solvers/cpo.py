@@ -97,8 +97,8 @@ class CPM_cpo(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: str, name of a subsolver (optional)
         """
         if not self.installed():
             raise Exception("CPM_cpo: Install the python package 'docplex'")
@@ -117,8 +117,8 @@ class CPM_cpo(SolverInterface):
             Call the CP Optimizer solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):   maximum solve time in seconds 
+                kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
             # LogVerbosity, this parameter determines the verbosity of the search log

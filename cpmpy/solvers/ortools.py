@@ -91,8 +91,8 @@ class CPM_ortools(SolverInterface):
         calling solve(), a prime way to use more advanced solver features
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None, not used
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None, not used
         """
         if not self.supported():
             raise Exception("CPM_ortools: Install the python package 'ortools' to use this solver interface.")
@@ -124,14 +124,14 @@ class CPM_ortools(SolverInterface):
             Call the CP-SAT solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
-                           get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
-            - solution_callback: an `ort.CpSolverSolutionCallback` object. CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
-
-            Additional keyword arguments:
+                time_limit (float, optional):  maximum solve time in seconds 
+                assumptions:    list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                                For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                                get_core() returns a small subset of assumption variables that are unsat together.
+                                Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+                solution_callback (an `ort.CpSolverSolutionCallback` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, 
+                                                                                don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
+                
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
 
@@ -239,12 +239,13 @@ class CPM_ortools(SolverInterface):
             It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping. 
                         default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
         if self.has_objective():
             raise NotSupportedError("OR-tools does not support finding all optimal solutions.")
@@ -350,10 +351,10 @@ class CPM_ortools(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
@@ -380,10 +381,10 @@ class CPM_ortools(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: self
+            :return: self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -703,10 +704,10 @@ try:
             optionally retrieve the solution count with `cb.solution_count()`
 
             Arguments:
-                - verbose: whether to print info on every solution found (bool, default: False)
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                verbose (bool, default = False): whether to print info on every solution found 
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                             default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
+                solution_limit (default = None): stop after this many solutions 
         """
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)

@@ -112,7 +112,7 @@ def reify_rewrite(constraints, supported=frozenset()):
         (actually currently all comparisons <op> in {'==', '!=', '<=', '<', '>=', '>'},
          IV1 <op> IV2 are assumed to support reification BV -> (IV1 <op> IV2))
 
-        :param supported  a (frozen)set of expression names that support reification in the solver, including
+        :param supported: a (frozen)set of expression names that support reification in the solver, including
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. BV -> (LHS == V)
     """
     if not is_any_list(constraints):

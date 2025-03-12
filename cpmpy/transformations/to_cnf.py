@@ -27,9 +27,8 @@ def to_cnf(constraints):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
-        Arguments:
-        - constraints: list[Expression] or Operator
-        - supported: (frozen)set of global constraint names that do not need to be decomposed
+        :param constraints: list[Expression] or Operator
+        :param supported: (frozen)set of global constraint names that do not need to be decomposed
     """
     fnf = flatten_constraint(constraints)
     fnf = only_implies(fnf)

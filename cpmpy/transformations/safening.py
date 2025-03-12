@@ -52,10 +52,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         to know the specifics of the partial function being made total.
 
 
-        :param: list_of_expr: list of CPMpy expressions
-        :param: _toplevel: list of new expressions to put toplevel (used internally)
-        :param: _nbc: list of new expressions to put in nearest Boolean context (used internally)
-        :param: safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
+        :param list_of_expr: list of CPMpy expressions
+        :param _toplevel: list of new expressions to put toplevel (used internally)
+        :param _nbc: list of new expressions to put in nearest Boolean context (used internally)
+        :param safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
                                  a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
     """
 

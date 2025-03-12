@@ -114,11 +114,11 @@ class CPM_z3(SolverInterface):
             Call the z3 solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
-                           get_core() returns a small subset of assumption variables that are unsat together.
-            - kwargs:      any keyword argument, sets parameters of solver object
+                - time_limit:  maximum solve time in seconds (float, optional)
+                - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                            For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                            get_core() returns a small subset of assumption variables that are unsat together.
+                - kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
                 - ... (no common examples yet)
@@ -276,10 +276,10 @@ class CPM_z3(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)

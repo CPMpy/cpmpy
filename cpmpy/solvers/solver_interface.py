@@ -46,8 +46,8 @@ class SolverInterface(object):
             Check for support in current system setup. Return True if the system
             has package installed or supports solver, else returns False.
 
-        Returns:
-            [bool]: Solver support by current system setup.
+            Returns:
+                [bool]: Solver support by current system setup.
         """
         return False
 
@@ -119,8 +119,9 @@ class SolverInterface(object):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
         """
@@ -158,7 +159,7 @@ class SolverInterface(object):
         """
             Returns the value of the objective function of the latest solver run on this model
 
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
+            :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
         return self.objective_value_
 
@@ -186,10 +187,10 @@ class SolverInterface(object):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
@@ -238,7 +239,8 @@ class SolverInterface(object):
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
                 - any other keyword argument
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
         if self.has_objective():
             raise NotSupportedError(f"Solver of type {self} does not support finding all optimal solutions!")
