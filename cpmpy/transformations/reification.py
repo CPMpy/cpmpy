@@ -57,7 +57,7 @@ def only_bv_reifies(constraints):
 
 def only_implies(constraints):
     """
-        Transforms all reifications to BV -> BE form
+        Transforms all reifications to ``BV -> BE`` form
 
         More specifically:
 
@@ -69,7 +69,7 @@ def only_implies(constraints):
             BV == BE :: ~BV -> ~BE, BV -> BE
 
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
-        AFTER `flatten()` and 'only_bv_reifies()'.
+        AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
     newcons = []
     retransform = []
@@ -118,7 +118,7 @@ def reify_rewrite(constraints, supported=frozenset()):
         to a version that uses standard constraints and reification over equalities between variables.
 
         Input is expected to be in Flat Normal Form without unsupported globals present.
-        (so after `flatten_constraint()` and 'decompose_global()')
+        (so after :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`~cpmpy.transformations.decompose_global.decompose_global()`)
         Output will also be in Flat Normal Form
 
         Boolean expressions ``and``, ``or``, and ``->`` and comparison expression ``IV1==IV2`` are assumed to support reification

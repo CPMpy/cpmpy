@@ -549,6 +549,7 @@ class CPM_exact(SolverInterface):
     def solution_hint(self, cpm_vars, vals):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
+
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """

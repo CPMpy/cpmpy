@@ -135,6 +135,7 @@ class CPM_ortools(SolverInterface):
                 solution_callback (an `ort.CpSolverSolutionCallback` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, 
                                                                                 don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
                 
+                
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
 
@@ -327,7 +328,7 @@ class CPM_ortools(SolverInterface):
 
             Used especially to post an expression as objective function
 
-            Accepted by ORTools:
+            Accepted by OR-Tools:
             - Decision variable: Var
             - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
                       wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
@@ -572,11 +573,11 @@ class CPM_ortools(SolverInterface):
 
     def solution_hint(self, cpm_vars, vals):
         """
-        or-tools supports warmstarting the solver with a feasible solution
+        OR-Tools supports warmstarting the solver with a feasible solution.
 
         More specifically, it will branch that variable on that value first if possible. This is known as 'phase saving' in the SAT literature, but then extended to integer variables.
 
-        The solution hint does NOT need to satisfy all constraints, it should just provide reasonable default values for the variables. It can decrease solving times substantially, especially when solving a similar model repeatedly
+        The solution hint does NOT need to satisfy all constraints, it should just provide reasonable default values for the variables. It can decrease solving times substantially, especially when solving a similar model repeatedly.
 
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
@@ -591,7 +592,6 @@ class CPM_ortools(SolverInterface):
 
 
     def get_core(self):
-        from ortools.sat.python import cp_model as ort
         """
             For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, ``get_core()`` returns a small subset of assumption variables that are unsat together.
 
@@ -599,10 +599,11 @@ class CPM_ortools(SolverInterface):
 
             Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
 
-            For pure or-tools example, see http://github.com/google/or-tools/blob/master/ortools/sat/samples/assumptions_sample_sat.py
+            For pure OR-Tools example, see http://github.com/google/or-tools/blob/master/ortools/sat/samples/assumptions_sample_sat.py
 
-            Requires or-tools >= 8.2!!!
+            Requires ortools >= 8.2!!!
         """
+        from ortools.sat.python import cp_model as ort
         assert (self.ort_status == ort.INFEASIBLE), "get_core(): solver must return UNSAT"
         assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
@@ -660,7 +661,7 @@ try:
 
     class OrtSolutionCounter(ort.CpSolverSolutionCallback):
         """
-        Native or-tools callback for solution counting.
+        Native ortools callback for solution counting.
 
         It is based on ortools' built-in `ObjectiveSolutionPrinter`
         but with output printing being optional
@@ -700,7 +701,9 @@ try:
 
     class OrtSolutionPrinter(OrtSolutionCounter):
         """
-            Native or-tools callback for solution printing.
+            Native OR-Tools callback for solution printing.
+
+            Subclasses :class:`OrtSolutionCounter`, see those docs too.
 
             Use with :class:`CPM_ortools` as follows:
 

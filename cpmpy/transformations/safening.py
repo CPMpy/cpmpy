@@ -1,3 +1,6 @@
+"""
+"""
+
 from copy import copy
 
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array

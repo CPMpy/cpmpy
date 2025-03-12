@@ -30,7 +30,7 @@
     is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors 
     with more than 2 dimensions are all supported too. For the implementation of this, 
     CPMpy builts on numpy's n-dimensional `ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`_ 
-    (vectorized operators and advanced indexing).
+    and inherits many of its benefits (vectorized operators and advanced indexing).
 
     This module contains the cornerstone ``boolvar()`` and ``intvar()`` functions, which create (numpy arrays of) 
     variables. There is also a helper function ``cpm_array()`` for wrapping standard numpy arrays so they can be 
@@ -77,8 +77,8 @@ def BoolVar(shape=1, name=None):
 
 def boolvar(shape=1, name=None):
     """
-    Boolean decision variables will take either the value `True` or `False`.
-    
+    Create Boolean decision variables that take either the value `True` or `False`.
+
     Arguments:
         shape (int or tuple of int, optional) : The shape of the n-dimensional array of variables. Default is 1.
     

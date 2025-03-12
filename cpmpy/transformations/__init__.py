@@ -23,5 +23,6 @@
         negation
         normalize
         reification
+        safening
         to_cnf
 """
