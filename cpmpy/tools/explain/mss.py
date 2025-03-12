@@ -1,3 +1,5 @@
+import warnings
+
 import cpmpy as cp
 from cpmpy.expressions.utils import is_any_list
 from cpmpy.transformations.normalize import toplevel_list
@@ -51,7 +53,8 @@ def mss_grow(soft, hard=[], solver="ortools"):
     """
 
     if "get_core" not in cp.SolverLookup.get(solver).__dict__:
-        raise ValueError(f"Solver does not support assumption variables, any of {assumption_solvers()}.")
+        warnings.warn(f"{solver} does not support assumption variables, will use (slower) naive version instead")
+        return mss_grow_naive(soft=soft, hard=hard, solver=solver)
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
