@@ -17,7 +17,7 @@
     You can read more about available licences at https://www.gurobi.com/downloads/
 
     Documentation of the solver's own Python API:
-    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
 
     ===============
     List of classes

@@ -19,7 +19,7 @@
     that uses SAT (satisfiability) methods and lazy-clause generation.
 
     Documentation of the solver's own Python API:
-    https://google.github.io/or-tools/python/ortools/sat/python/cp_model.html
+    https://developers.google.com/optimization/reference/python/sat/python/cp_model
 
     ===============
     List of classes

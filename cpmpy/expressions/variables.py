@@ -29,7 +29,7 @@
     In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape 
     is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors 
     with more than 2 dimensions are all supported too. For the implementation of this, 
-    CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits 
+    CPMpy builts on numpy's n-dimensional `ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`_ 
     (vectorized operators and advanced indexing).
 
     This module contains the cornerstone ``boolvar()`` and ``intvar()`` functions, which create (numpy arrays of) 
