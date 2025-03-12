@@ -167,6 +167,10 @@ class GlobalConstraint(Expression):
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`AllDifferent` instead.
+    """
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
                   "stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
@@ -215,6 +219,10 @@ class AllDifferentExcept0(AllDifferentExceptN):
 
 
 def allequal(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`AllEqual` instead.
+    """
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
                   DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -257,6 +265,10 @@ class AllEqualExceptN(GlobalConstraint):
 
 
 def circuit(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`Circuit` instead.
+    """
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
                   DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments

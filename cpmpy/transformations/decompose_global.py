@@ -188,6 +188,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 # old way of doing decompositions post-flatten
 # will be removed in any future version!
 def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
+    """
+    .. deprecated:: 0.9.16
+          Please use :func:`decompose_in_tree()` instead.
+    """
     warnings.warn("Deprecated, use `decompose_in_tree()` instead, will be removed in stable version", DeprecationWarning)
     """
         DEPRECATED!!! USE `decompose_in_tree()` instead!
@@ -272,6 +276,10 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
     return newlist
 
 def do_decompose(cpm_expr):
+    """
+    .. deprecated:: 0.9.13
+          Please use :func:`decompose_in_tree()` instead.
+    """
     warnings.warn("Deprecated, never meant to be used outside this transformation; will be removed in stable version",
                   DeprecationWarning)
     """

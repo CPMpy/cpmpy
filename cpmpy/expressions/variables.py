@@ -67,6 +67,10 @@ from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_
 
 
 def BoolVar(shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
+    """
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
     return boolvar(shape=shape, name=name)
 
@@ -141,6 +145,10 @@ def boolvar(shape=1, name=None):
 
 
 def IntVar(lb, ub, shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
+    """
     warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
     return intvar(lb, ub, shape=shape, name=name)
 
@@ -208,6 +216,10 @@ def intvar(lb, ub, shape=1, name=None):
     return r
 
 def cparray(arr):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
+    """
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
     return cpm_array(arr)
 

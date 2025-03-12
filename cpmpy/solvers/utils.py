@@ -139,6 +139,9 @@ builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, 
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
+       
+        .. deprecated:: 0.9.4
+            Please use :class:`SolverLookup` object instead.
 
         :return: a list of SolverInterface sub-classes :list[SolverInterface]:
     """

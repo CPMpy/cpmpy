@@ -130,6 +130,10 @@ def recurse_negation(expr):
 
 
 def negated_normal(expr):
+    """
+    .. deprecated:: 0.9.16
+          Please use :func:`recurse_negation()` instead.
+    """
     warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in "
                   "the expression (or use `push_down_negation` on the full expression tree); will be removed in "
                   "stable version", DeprecationWarning)
