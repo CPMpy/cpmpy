@@ -1,14 +1,12 @@
 name: Github Tests
-
 on: [push] # Can also put pull_request here, but then we dont run it when directly pushing to master
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
@@ -18,14 +16,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest pytest-xdist requests pandas
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install python-sat
+          pip install python-sat pypblib
           pip install z3-solver
           pip install exact
           pip install pysdd
           pip install pychoco
+          pip install ./submodules/pindakaas/crates/pyndakaas
           sudo snap install minizinc --classic
           pip install minizinc
       - name: Test with pytest
         run: |
           python -m pytest -n 4 tests/
-

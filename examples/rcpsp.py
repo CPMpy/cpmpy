@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 from cpmpy import *
 
 # toy model taken from :
