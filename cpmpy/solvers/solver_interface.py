@@ -137,15 +137,15 @@ class SolverInterface(object):
 
             Overwrites self.cpm_status
 
-        :param model: CPMpy model to be parsed.
-        :type model: Model
+            :param model: CPMpy model to be parsed.
+            :type model: Model
 
-        :param time_limit: optional, time limit in seconds
-        :type time_limit: int or float
+            :param time_limit: optional, time limit in seconds
+            :type time_limit: int or float
 
-        :return: Bool:
-            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
-            - False     if no solution is found
+            :return: Bool:
+                - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+                - False     if no solution is found
         """
         return False
 
@@ -207,10 +207,10 @@ class SolverInterface(object):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: self
+            :return: self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -301,14 +301,14 @@ class SolverInterface(object):
             Take a CPMpy Model and SolverStatus object and return
             the proper answer (True/False/objective_value)
 
-        :param cpm_status: status extracted from the solver
-        :type cpm_status: SolverStatus
+            :param cpm_status: status extracted from the solver
+            :type cpm_status: SolverStatus
 
-        :param objective_value: None or Int, as computed by solver [DEPRECATED]
+            :param objective_value: None or Int, as computed by solver [DEPRECATED]
 
-        :return: Bool
-            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
-            - False     if no solution is found
+            :return: Bool
+                - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+                - False     if no solution is found
         """
         return (cpm_status.exitstatus == ExitStatus.OPTIMAL or \
                 cpm_status.exitstatus == ExitStatus.FEASIBLE)

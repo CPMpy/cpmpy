@@ -28,8 +28,9 @@ def to_cnf(constraints):
     """
         Converts all logical constraints into Conjunctive Normal Form
 
-        :param constraints: list[Expression] or Operator
-        :param supported: (frozen)set of global constraint names that do not need to be decomposed
+        Arguments:
+            constraints:    list[Expression] or Operator
+            supported:      (frozen)set of global constraint names that do not need to be decomposed
     """
     fnf = flatten_constraint(constraints)
     fnf = only_implies(fnf)
@@ -53,8 +54,8 @@ def flat2cnf(constraints):
         We do it in a principled way for each of the cases. (in)equalities
         get transformed into implications, everything is modular.
 
-        
-        :param constraints: list[Expression] or Operator
+        Arguments:
+            constraints: list[Expression] or Operator
     """
     cnf = []
     for expr in constraints:

@@ -138,8 +138,8 @@ class CPM_gurobi(SolverInterface):
             Call the gurobi solver
 
             Arguments:
-                - time_limit (float, optional):  maximum solve time in seconds 
-                - **kwargs:                      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):  maximum solve time in seconds 
+                **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
             Examples of gurobi supported arguments include:
