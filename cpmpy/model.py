@@ -203,7 +203,7 @@ class Model(object):
 
             Status information includes exit status (optimality) and runtime.
 
-        :return: an object of :class:`SolverStatus`
+            :return: an object of :class:`SolverStatus`
         """
         return self.cpm_status
 
@@ -211,7 +211,7 @@ class Model(object):
         """
             Returns the value of the objective function of the latste solver run on this model
 
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
+            :return: an integer or 'None' if it is not run, or a satisfaction problem
         """
         return self.objective_.value()
 
