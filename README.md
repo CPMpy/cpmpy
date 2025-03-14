@@ -1,3 +1,7 @@
+<p align="center">
+    <b>CPMpy</b>: a <b>C</b>onstraint <b>P</b>rogramming and <b>M</b>odeling library in <b>Py</b>thon, based on numpy, with direct solver access.
+</p>
+
 <div align="center">
 
 ![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
@@ -7,43 +11,38 @@
 ![Licence](https://img.shields.io/github/license/CPMpy/cpmpy?label=Licence)
 </div>
 
-<p align="center">
-    <i><b>CPMpy</b>: a <b>C</b>onstraint <b>P</b>rogramming and <b>M</b>odeling library in <b>Py</b>thon, based on numpy, with direct solver access.</i>
-</p>
-
----
 
 **Documentation: [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)**
 
 ---
 
-## Constraint solving at your finger tips
+### Constraint solving at your finger tips
 
 For combinatorial optimisation problems with Boolean and integer variables. With many high-level constraints that are automatically decomposed as needed for the solver.
 
-Lightweight, well-documented, used in research and industry. 
+Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
 
 ### 🔑 Key Features
 
-* **Solver-independent**: use and compare CP, MIP, SMT, PB and SAT solvers
+* **Solver-agnostic**: use and compare CP, MIP, SMT, PB and SAT solvers
 * **ML-friendly**: decision variables are numpy arrays, vectorized operators and constraints
 * **Incremental solving**: great for machine learning, explanation and interactive use cases
-* **Extensively tested**: large test-suite and <a href="https://github.com/CPMpy/fuzz-test">actively fuzz-tested</a>
-* **Tools**: for parameter-tuning, explanation generation
+* **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
+* **Tools**: for parameter-tuning, debugging and explanation generation
 * **Flexible**: easy to add constraints or solvers, also direct solver access
-* **Open Source**: [Apache 2.0 license]( https://github.com/cpmpy/cpmpy/blob/master/LICENSE)
+* **Open Source**: [Apache 2.0 license](https://github.com/cpmpy/cpmpy/blob/master/LICENSE)
 
 ### 🔩 Solvers
 
 CPMpy can translate to a wide variaty of constraint solving paradigms, including both commercial and open-source solvers.
 
-* **CP Solvers**: OR-Tools (default), Choco, IBM CP Optimizer (license required), Glasgow GCS, MiniZinc+solvers
+* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
 * **MIP Solvers**: Gurobi (license required), IBM CPLEX (license required)
 * **SMT Solvers**: Z3
 * **PB Solvers**: Exact
 * **SAT Solvers**: PySAT+solvers, PySDD
 
-### Ecosystem
+### 🌳 Ecosystem
 
 CPMpy is part of the scientific Python ecosystem, making it easy to use it in Jupyter notebooks, to add visualisations with matplotlib, or to use it in a machine learning pipeline.
 
@@ -54,7 +53,7 @@ Other projects that build on CPMpy:
 * [Sudoku Assistant](https://sudoku-assistant.cs.kuleuven.be): an Android app for sudoku scanning, solving and intelligent hints
 * [CHAT-Opt demonstrator](https://chatopt.cs.kuleuven.be): translates natural language problem descriptions into CPMpy models
 
-Also, CPMpy participated in the [2024 XCSP3 competition](https://www.xcsp.org/2024/2024-xcsp3-competition.html), making its solvers win 3 gold and 1 silver medal.
+Also, CPMpy participated in the [2024 XCSP3 competition](https://www.xcsp.org/competitions/), making its solvers win 3 gold and 1 silver medal.
 
 ## 🔧 Library development
 
