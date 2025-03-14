@@ -1,18 +1,3 @@
-import shutil
-import warnings
-
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from .. import DirectConstraint
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
-from ..transformations.get_variables import get_variables
-from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.safening import no_partial_functions
-
 """
     Interface to CP Optimizers API
 
@@ -32,12 +17,32 @@ from ..transformations.safening import no_partial_functions
         CPM_cpo
 """
 
+import shutil
+import warnings
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .. import DirectConstraint
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
+from ..transformations.get_variables import get_variables
+from ..transformations.normalize import toplevel_list
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.safening import no_partial_functions
+
+
+
 class CPM_cpo(SolverInterface):
     """
-    Interface to CP Optimizers API
+    Interface to CP Optimizers API.
 
     Requires that the 'docplex' python package is installed:
-    $ pip install docplex
+
+    .. code-block:: console
+    
+        $ pip install docplex
 
     docplex documentation:
     https://ibmdecisionoptimization.github.io/docplex-doc/
@@ -49,11 +54,14 @@ class CPM_cpo(SolverInterface):
 
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+
     Academic license:
     https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
 
     Creates the following attributes (see parent constructor for more):
-    - cpo_model: object, CP Optimizers model object
+
+    - ``cpo_model``: object, CP Optimizers model object
+
     """
 
     _docp = None  # Static attribute to hold the docplex.cp module
@@ -97,8 +105,8 @@ class CPM_cpo(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: str, name of a subsolver (optional)
         """
         if not self.installed():
             raise Exception("CPM_cpo: Install the python package 'docplex'")
@@ -117,21 +125,25 @@ class CPM_cpo(SolverInterface):
             Call the CP Optimizer solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):   maximum solve time in seconds 
+                kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-            # LogVerbosity, this parameter determines the verbosity of the search log
-              Choose a value from  [‘Quiet’, ‘Terse’, ‘Normal’, ‘Verbose’]. Default value is ‘Quiet’.
-            # OptimalityTolerance: This parameter sets an absolute tolerance on the objective value for optimization models.
-            The value is a positive float. Default value is 1e-09.
-            # RelativeOptimalityTolerance This parameter sets a relative tolerance on the objective value for optimization models.
-            The optimality of a solution is proven if either of the two parameters’ criteria is fulfilled.
-            # Presolve: This parameter controls the presolve of the model to produce more compact formulations and to achieve more domain reduction. Possible values for this parameter are On (presolve is activated) and Off (presolve is deactivated).
-            The value is a symbol in [‘On’, ‘Off’]. Default value is ‘On’.
-            # Workers: This parameter sets the number of workers to run in parallel to solve your model.
-            # The value is a positive integer. Default value is Auto. (Auto = use all available CPU cores)
-            # all solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
+
+
+            =============================   ============
+            Argument                        Description
+            =============================   ============
+            LogVerbosity                    Determines the verbosity of the search log. Choose a value from  ['Quiet', 'Terse', 'Normal', 'Verbose']. Default value is 'Quiet'.
+            OptimalityTolerance             This parameter sets an absolute tolerance on the objective value for optimization models. The value is a positive float. Default value is 1e-09.
+            RelativeOptimalityTolerance     This parameter sets a relative tolerance on the objective value for optimization models. The optimality of a solution is proven if either of the two parameters' criteria is fulfilled.
+            Presolve                        This parameter controls the presolve of the model to produce more compact formulations and to achieve more domain reduction. Possible values for this parameter are On (presolve is activated) and Off (presolve is deactivated).
+                                            The value is a symbol in ['On', 'Off']. Default value is 'On'.
+            Workers                         This parameter sets the number of workers to run in parallel to solve your model. The value is a positive integer. Default value is Auto. (Auto = use all available CPU cores)
+            =============================   ============
+
+            All solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
+
         """
 
         # ensure all vars are known to solver
@@ -196,7 +208,7 @@ class CPM_cpo(SolverInterface):
 
             If the problem is an optimization problem, returns only optimal solutions.
 
-           Args:
+            Arguments:
                 display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
                          Default is None, meaning nothing is displayed.
                 time_limit: Stop after this many seconds. Default is None.
@@ -274,11 +286,11 @@ class CPM_cpo(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-
-            are permanently posted to the solver)
+            .. note::
+            
+                technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
         dom = self.get_docp().modeler
         if self.has_objective():
@@ -300,12 +312,12 @@ class CPM_cpo(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -331,10 +343,10 @@ class CPM_cpo(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: self
+            :return: self
         """
 
         # add new user vars to the set

@@ -8,6 +8,8 @@
 
     Requires that the 'minizinc' python package is installed:
 
+    .. code-block:: console
+
         $ pip install minizinc
 
     as well as the Minizinc bundled binary packages, downloadable from:
@@ -79,12 +81,13 @@ class CPM_minizinc(SolverInterface):
 
 
     Creates the following attributes (see parent constructor for more):
-        - mzn_model: object, the minizinc.Model instance
-        - mzn_solver: object, the minizinc.Solver instance
-        - mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
-        - mzn_result: object, containing solve results
 
-    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+    - ``mzn_model``: object, the minizinc.Model instance
+    - ``mzn_solver``: object, the minizinc.Solver instance
+    - ``mzn_txt_solve``: str, the 'solve' item in text form, so it can be overwritten
+    - ``mzn_result``: object, containing solve results
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
     """
 
     required_version = (2, 8, 2)
@@ -128,9 +131,10 @@ class CPM_minizinc(SolverInterface):
         """
             Returns solvers supported by MiniZinc on your system
 
-            WARNING, some of them may not actually be installed on your system
-            (namely cplex, gurobi, scip, xpress)
-            the following are bundled in the bundle: chuffed, coin-bc, gecode
+            .. warning::
+                WARNING, some of them may not actually be installed on your system
+                (namely cplex, gurobi, scip, xpress).
+                The following are bundled in the bundle: chuffed, coin-bc, gecode
         """
         import minizinc
         solver_dict = minizinc.default_driver.available_solvers()
@@ -156,8 +160,8 @@ class CPM_minizinc(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: str, name of a subsolver (optional)
                           has to be one of solvernames()
         """
         if not self.installed():
@@ -221,20 +225,29 @@ class CPM_minizinc(SolverInterface):
         """
             Call the MiniZinc solver
             
-            Creates and calls an Instance with the already created mzn_model and mzn_solver
+            Creates and calls an Instance with the already created ``mzn_model`` and ``mzn_solver``
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
-
+                time_limit (float, optional):       maximum solve time in seconds 
+                **kwargs (any keyword argument):    sets parameters of solver object
+                
+            
             Arguments that correspond to solver parameters:
-                - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
-                - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
-                - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+
+            =======================  ===========
+            Keyword                  Description
+            =======================  ===========
+            free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
+            optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
+            =======================  ===========             
+            
+            
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 
-            Does not store the minizinc.Instance() or minizinc.Result()
+            Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
         # ensure all vars are known to solver
@@ -390,12 +403,14 @@ class CPM_minizinc(SolverInterface):
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
-            Returns minizinc-friendly 'string' name of var
+            Returns:
+                minizinc-friendly 'string' name of var.
 
-            XXX WARNING, this assumes it is never given a 'NegBoolView'
-            might not be true... e.g. in revar after solve?
+            .. warning::
+                WARNING, this assumes it is never given a 'NegBoolView'
+                might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
             if cpm_var < -2147483646 or cpm_var > 2147483646:
@@ -454,10 +469,10 @@ class CPM_minizinc(SolverInterface):
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
@@ -697,17 +712,18 @@ class CPM_minizinc(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            MiniZinc-specific implementation
+            MiniZinc-specific implementation.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - kwargs:      any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
+                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
+                time_limit:         stop after this many seconds (default: None)
+                solution_limit:     stop after this many solutions (default: None)
+                call_from_model:    whether the method is called from a CPMpy Model instance or not
+                **kwargs:           any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
         # XXX: check that no objective function??
         if self.has_objective():

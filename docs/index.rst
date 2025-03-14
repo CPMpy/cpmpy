@@ -16,6 +16,8 @@ CPMpy is a Constraint Programming and Modeling library in Python, based on numpy
 
    modeling
 
+.. _supported-solvers:
+
 Supported solvers
 -----------------
 

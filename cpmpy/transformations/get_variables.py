@@ -78,7 +78,7 @@ def get_variables(expr, collect=None):
 
 def print_variables(expr_or_model):
     """
-        Print variables _and their domains_
+        Print variables **and their domains**
 
         argument 'expr_or_model' can be an expression or a model
     """
