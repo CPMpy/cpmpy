@@ -1,7 +1,7 @@
 Installation instructions
 =========================
 
-CPMpy requires Python ``3.6`` or newer. The package is available on `PyPI <https://pypi.org/>`_.
+CPMpy requires Python ``3.8`` or newer. The package is available on `PyPI <https://pypi.org/>`_.
 
 The easiest way is to install using the 'pip' command line package manager. In a terminal, run:
 
