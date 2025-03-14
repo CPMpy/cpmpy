@@ -86,8 +86,10 @@ class Model(object):
         """
             Add one or more constraints to the model
 
-            m = Model()
-            m += [x > 0]
+            .. code-block:: python
+
+                m = Model()
+                m += [x > 0]
         """
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
