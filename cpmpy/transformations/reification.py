@@ -3,25 +3,21 @@
 
     There are three types of reification (BV=BoolVar, BE=BoolExpr):
 
-    +--------------+------------------------------------------------------------+
-    | ``BV -> BE`` | single implication, from var to expression                 |
-    +--------------+------------------------------------------------------------+
-    | ``BV <- BE`` | single implication, from expression to var                 |
-    +--------------+------------------------------------------------------------+
-    | ``BE == BV`` | full reification / double implication (e.g. ``BV <-> BE``) |
-    +--------------+------------------------------------------------------------+
+    =============  ============================================================
+    ``BV -> BE``   single implication, from var to expression                 
+    ``BV <- BE``   single implication, from expression to var                
+    ``BE == BV``   full reification / double implication (e.g. ``BV <-> BE``) 
+    =============  ============================================================
 
     Using logical operations, they can be decomposed and rewritten to each other.
 
     This file implements:
 
-    +---------------------------+------------------------------------------------------------------+
-    | :func:`only_bv_reifies()` | transforms all reifications to ``BV -> BE`` or ``BV == BE``      |
-    +---------------------------+------------------------------------------------------------------+
-    | :func:`only_implies()`    | transforms all reifications to ``BV -> BE`` form                 |
-    +---------------------------+------------------------------------------------------------------+
-    | :func:`reify_rewrite()`   | rewrites reifications not supported by a solver to ones that are |
-    +---------------------------+------------------------------------------------------------------+
+    ==========================  =================================================================
+    :func:`only_bv_reifies()`   transforms all reifications to ``BV -> BE`` or ``BV == BE``      
+    :func:`only_implies()`      transforms all reifications to ``BV -> BE`` form                 
+    :func:`reify_rewrite()`     rewrites reifications not supported by a solver to ones that are 
+    ==========================  =================================================================
 """
 import copy
 from ..expressions.core import Operator, Comparison, Expression

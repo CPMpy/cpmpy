@@ -27,29 +27,25 @@ Indicator constraints:
 | ``BoolVar -> LinExpr <= Constant`` |
 +------------------------------------+
 
-+-----------------------------------------+-------------------------------------------------+
-| ``BoolVar -> GenExpr``                  |  (GenExpr.name in supported, GenExpr.is_bool()) |
-+-----------------------------------------+-------------------------------------------------+
-| ``BoolVar -> GenExpr >= Var/Constant``  |  (GenExpr.name in supported, GenExpr.is_num())  |
-+-----------------------------------------+-------------------------------------------------+
-| ``BoolVar -> GenExpr <= Var/Constant``  |  (GenExpr.name in supported, GenExpr.is_num())  |
-+-----------------------------------------+-------------------------------------------------+
-| ``BoolVar -> GenExpr == Var/Constant``  |  (GenExpr.name in supported, GenExpr.is_num())  |
-+-----------------------------------------+-------------------------------------------------+
+========================================   ==============================================
+``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
+``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+========================================   ==============================================
 
 Where ``BoolVar`` is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------
-+------------------------------+-------------------------------------------------+
-| ``GenExpr``                  | (GenExpr.name in supported, GenExpr.is_bool())  |
-+------------------------------+-------------------------------------------------+
-| ``GenExpr == Var/Constant``  | (GenExpr.name in supported, GenExpr.is_num())   |
-+------------------------------+-------------------------------------------------+
-| ``GenExpr <= Var/Constant``  | (GenExpr.name in supported, GenExpr.is_num())   |
-+------------------------------+-------------------------------------------------+
-| ``GenExpr >= Var/Constant``  | (GenExpr.name in supported, GenExpr.is_num())   |
-+------------------------------+-------------------------------------------------+
+
+============================  ==============================================
+``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
+``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
+============================  ============================================== 
+
 
 
 """
