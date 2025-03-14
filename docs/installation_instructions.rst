@@ -1,7 +1,7 @@
 Installation instructions
 =========================
 
-CPMpy requires Python ``3.6`` or newer. The package is available on `PyPI <https://pypi.org/>`_.
+CPMpy requires Python ``3.8`` or newer. The package is available on `PyPI <https://pypi.org/>`_.
 
 The easiest way is to install using the 'pip' command line package manager. In a terminal, run:
 
@@ -22,6 +22,16 @@ CPMpy has regular small releases with updates and improvements, so it is a good 
 .. code-block:: bash
 
     $ pip install -U cpmpy
+
+
+CPMpy supports a multitude of solvers of different technologies to be used as backend. Easy installation is provided through optional dependencies:
+
+.. code-block:: bash
+
+    # Choose any subset of solvers to install
+    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, minizinc, pysat, pysdd, z3] 
+
+Some solver require additional steps (like acquiring a (aca.) license). Have a look at :ref:`this <supported-solvers>` overview.
 
 
 Installing from a git repository
