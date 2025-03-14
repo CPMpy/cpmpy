@@ -58,7 +58,7 @@
     ===================  ======================
     Python Operator      CPMpy Object          
     ===================  ======================
-    `x.implies(y)`       Operator("->", [x,y]) 
+    `x.implies(y)`       `Operator("->", [x,y])` 
     ===================  ======================
 
     Apart from operator overloading, expressions implement two important functions:
