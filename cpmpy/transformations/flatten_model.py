@@ -288,8 +288,11 @@ def flatten_constraint(expr):
 def flatten_objective(expr, supported=frozenset(["sum","wsum"])):
     """
     - Decision variable: Var
-    - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
-              wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+    - Linear: 
+        ======================                       ========
+        sum([Var])                                   (CPMpy class 'Operator', name 'sum')
+        wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
+        ======================                       ========
     """
     # lets be very explicit here
     if is_any_list(expr):
@@ -371,20 +374,28 @@ def normalized_boolexpr(expr):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
-            - subexpr == BoolVar
-            - subexpr -> BoolVar
+
+        .. code-block:: text
+
+            subexpr == BoolVar
+            subexpr -> BoolVar
 
         are valid output expressions.
 
         Currently, this is the case for subexpr:
-        - Boolean operators: and([Var]), or([Var])             (CPMpy class 'Operator', is_bool())
-        - Boolean equality: Var == Var                         (CPMpy class 'Comparison')
-        - Global constraint: global([Var]*)                    (CPMpy class 'GlobalConstraint')
-        - Comparison constraint (see elsewhere)                (CPMpy class 'Comparison')
 
-        output: (base_expr, base_cons) with:
-            base_expr: same as 'expr', but all arguments are variables
-            base_cons: list of flat normal constraints
+        =====================================  =============================  ==============
+        Boolean operators                      ``and([Var])``, ``or([Var])``  :class:`~cpmpy.expressions.core.Operator`, not :func:`~cpmpy.expressions.core.Operator.is_bool()`                      
+        Boolean equality                       ``Var == Var``                 :class:`~cpmpy.expressions.core.Comparison`                                                                            
+        Global constraint (Boolean)            ``global([Var]*)``             :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, :func:`~cpmpy.expressions.core.Operator.is_bool()`     
+        Comparison constraint (see elsewhere)                                 :class:`~cpmpy.expressions.core.Comparison`       
+        =====================================  =============================  ==============                                                                     
+
+        Result:
+            (base_expr, base_cons) with:
+            
+            - base_expr: same as 'expr', but all arguments are variables
+            - base_cons: list of flat normal constraints
     """
     assert(not __is_flat_var(expr))
     assert(expr.is_bool()) 
@@ -469,9 +480,11 @@ def normalized_numexpr(expr):
         - Global constraint (non-Boolean) (examples: Max,Min,Element)
                                                            (CPMpy class 'GlobalConstraint', not is_bool()))
 
-        output: (base_expr, base_cons) with:
-            base_expr: same as 'expr', but all arguments are variables
-            base_cons: list of flat normal constraints
+        Result:
+            (base_expr, base_cons) with:
+            
+            - base_expr: same as 'expr', but all arguments are variables
+            - base_cons: list of flat normal constraints
     """
     # XXX a boolexpr is also a valid numexpr... e.g. 30*(iv > 5) + ... see mario obj.
     if __is_flat_var(expr):
