@@ -84,7 +84,7 @@ def max(*iterable, **kwargs):
 
         if iterable does not contain CPMpy expressions, the built-in is called
         else a Maximum functional global constraint is constructed; no keyword
-          arguments are supported in that case
+        arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
@@ -101,7 +101,7 @@ def min(*iterable, **kwargs):
 
         if iterable does not contain CPMpy expressions, the built-in is called
         else a Minimum functional global constraint is constructed; no keyword
-          arguments are supported in that case
+        arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])

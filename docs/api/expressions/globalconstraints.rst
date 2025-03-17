@@ -1,5 +1,5 @@
 Global Constraints (:mod:`cpmpy.expressions.globalconstraints`)
-===================================================
+===============================================================
 
 .. automodule:: cpmpy.expressions.globalconstraints
     :members:

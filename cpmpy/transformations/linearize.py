@@ -10,30 +10,42 @@ Linear comparison:
 - LinExpr >= Constant
 - LinExpr <= Constant
 
-    LinExpr can be any of:
-        - NumVar
-        - sum
-        - wsum
+LinExpr can be any of:
+
+- NumVar
+- sum
+- wsum
 
 Indicator constraints:
 ----------------------
-- BoolVar -> LinExpr == Constant
-- BoolVar -> LinExpr >= Constant
-- BoolVar -> LinExpr <= Constant
 
-- BoolVar -> GenExpr                    (GenExpr.name in supported, GenExpr.is_bool())
-- BoolVar -> GenExpr >= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr <= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr == Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
++------------------------------------+
+| ``BoolVar -> LinExpr == Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr >= Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr <= Constant`` |
++------------------------------------+
 
-Where BoolVar is a boolean variable or its negation.
+========================================   ==============================================
+``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
+``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+========================================   ==============================================
+
+Where ``BoolVar`` is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------
-- GenExpr                               (GenExpr.name in supported, GenExpr.is_bool())
-- GenExpr == Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr <= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr >= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
+
+============================  ==============================================
+``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
+``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
+============================  ============================================== 
+
 
 
 """
@@ -64,10 +76,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
+    Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
-    `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
+    :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+    Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
 
     """
 

@@ -21,9 +21,9 @@ from cpmpy.transformations.normalize import toplevel_list
 
 def make_assump_model(soft, hard=[], name=None):
     """
-        Construct implied version of all soft constraints
-        Can be used to extract cores (see tools.mus)
-        Provide name for assumption variables with `name` param
+        Construct implied version of all soft constraints.
+        Can be used to extract cores (see :func:`tools.mus() <cpmpy.tools.explain.mus.mus>`).
+        Provide name for assumption variables with `name` param.
     """
     # ensure toplevel list
     soft2 = toplevel_list(soft, merge_and=False)

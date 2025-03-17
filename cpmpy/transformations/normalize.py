@@ -15,10 +15,11 @@ from ..expressions.globalconstraints import GlobalConstraint
 
 def toplevel_list(cpm_expr, merge_and=True):
     """
-    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with `.is_bool()` true.
+    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
-    - cpm_expr: Expression or list of Expressions
-    - merge_and: if True then a toplevel 'and' will have its arguments merged at top level
+    Arguments:
+        cpm_expr:   Expression or list of Expressions
+        merge_and:  if True then a toplevel 'and' will have its arguments merged at top level
     """
     # very efficient version with limited function lookups and list operations
     def unravel(lst, append):
@@ -49,7 +50,9 @@ def simplify_boolean(lst_of_expr, num_context=False):
     """
     removes boolean constants from all CPMpy expressions
     only resulting boolean constant is literal 'false'
-    - list_of_expr: list of CPMpy expressions
+    
+    Arguments:
+        list_of_expr: list of CPMpy expressions
     """
 
     newlist = []

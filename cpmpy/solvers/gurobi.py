@@ -8,6 +8,8 @@
 
     Requires that the 'gurobipy' python package is installed:
 
+    .. code-block:: console
+
         $ pip install gurobipy
     
     
@@ -15,7 +17,7 @@
     You can read more about available licences at https://www.gurobi.com/downloads/
 
     Documentation of the solver's own Python API:
-    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
 
     ===============
     List of classes
@@ -64,9 +66,10 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-        - grb_model: object, TEMPLATE's model object
+    
+    - ``grb_model``: object, TEMPLATE's model object
 
-    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
     """
 
     @staticmethod
@@ -106,8 +109,8 @@ class CPM_gurobi(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
-        - subsolver: None, not used
+            cpm_model: a CPMpy Model()
+            subsolver: None, not used
         """
         if not self.installed():
             raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
@@ -135,15 +138,16 @@ class CPM_gurobi(SolverInterface):
             Call the gurobi solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):  maximum solve time in seconds 
+                **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
             Examples of gurobi supported arguments include:
-                - Threads : int
-                - MIPFocus: int
-                - ImproveStartTime : bool
-                - FlowCoverCuts: int
+
+            - ``Threads`` : int
+            - ``MIPFocus`` : int
+            - ``ImproveStartTime`` : bool
+            - ``FlowCoverCuts`` : int
 
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
@@ -248,8 +252,9 @@ class CPM_gurobi(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-                are premanently posted to the solver)
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         from gurobipy import GRB
 
@@ -304,12 +309,12 @@ class CPM_gurobi(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -452,12 +457,12 @@ class CPM_gurobi(SolverInterface):
             a more efficient native implementation
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """
