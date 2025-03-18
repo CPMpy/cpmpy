@@ -107,9 +107,6 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 else:
                     newlist.append(~args[0])
 
-            elif expr.name == "wsum":
-                newlist.append(Operator(expr.name, [args[0], simplify_boolean(args[1])]))
-
             else: # numerical expressions
                 newlist.append(Operator(expr.name, args))
 
@@ -175,6 +172,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
             expr = copy.copy(expr)
             expr.update_args(simplify_boolean(expr.args)) # TODO: how to determine boolean or numerical context? also i this even needed?
             newlist.append(expr)
+        
+        elif isinstance(expr, list): # nested list of args
+            newlist.append(simplify_boolean(expr))
+
         else: # variables/constants/direct constraints
             newlist.append(expr)
     return newlist
