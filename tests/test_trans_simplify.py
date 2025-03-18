@@ -124,3 +124,12 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(cons)), "[x != 2]")
         self.assertTrue(cp.Model(cons).solve())
 
+        # Simplify boolean expressions nested within a weighted sum
+        #   wsum([1, 2], [bv[0] != 0, bv[1] != 1]) ----> wsum([1, 2], [bv[0], ~bv[1]])
+        bv = cp.boolvar(name="bv", shape=2)
+        weights = cp.cpm_array([1, 2])
+        bool_as_ints = cp.cpm_array([0, 1])
+        cons = sum( weights * (bv != bool_as_ints) ) == 1
+        self.assertEqual(str(self.transform(cons)), "[sum([1, 2] * [bv[0], ~bv[1]]) == 1]")
+        self.assertTrue(cp.Model(cons).solve())
+

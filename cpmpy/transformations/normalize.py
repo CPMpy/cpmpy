@@ -227,6 +227,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
             newlist.append(expr)
         elif is_bool(expr):  # unlikely base-case (Boolean constant)
             newlist.append(int(expr) if num_context else BoolVal(expr))
+        elif isinstance(expr, list):  # nested list in args (like for wsum)
+            newlist.append(simplify_boolean(expr))
         else:  # variables/constants/direct constraints
             newlist.append(expr)
     return newlist
