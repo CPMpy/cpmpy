@@ -250,7 +250,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar = intvar(*get_bounds(lhs))
                     newlist += linearize_constraint([lhs == newvar])
