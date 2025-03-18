@@ -26,7 +26,7 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 
 * **Solver-agnostic**: use and compare CP, MIP, SMT, PB and SAT solvers
 * **ML-friendly**: decision variables are numpy arrays, vectorized operators and constraints
-* **Incremental solving**: great for machine learning, explanation and interactive use cases
+* **Incremental solving**: assumption variables, adding constraints and updating objectives
 * **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
 * **Tools**: for parameter-tuning, debugging and explanation generation
 * **Flexible**: easy to add constraints or solvers, also direct solver access
