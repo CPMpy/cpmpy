@@ -108,7 +108,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(~args[0])
 
             elif expr.name == "wsum":
-                newlist.append(Operator(expr.name, (args[0], simplify_boolean(args[1]))))
+                newlist.append(Operator(expr.name, [args[0], simplify_boolean(args[1])]))
 
             else: # numerical expressions
                 newlist.append(Operator(expr.name, args))
