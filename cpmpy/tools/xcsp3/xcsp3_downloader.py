@@ -93,3 +93,20 @@ def install_xcsp3_instances_23():
             if target in file:
                 filename = os.path.join(root, file)
                 convert(filename)
+
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser(description='XCSP3 Downloader')
+    parser.add_argument('--install-2022', action='store_true', help='Install XCSP3 2022 instances')
+    parser.add_argument('--install-2023', action='store_true', help='Install XCSP3 2023 instances')
+    args = parser.parse_args()
+
+    if args.install_2022:
+        install_xcsp3_instances_22()
+    if args.install_2023:
+        install_xcsp3_instances_23()
+
+if __name__ == "__main__":
+    main()
+
