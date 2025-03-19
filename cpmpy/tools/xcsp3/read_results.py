@@ -1,3 +1,7 @@
+"""
+Some utilities for analysing the results of running a mock of the XCSP3 competition.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 

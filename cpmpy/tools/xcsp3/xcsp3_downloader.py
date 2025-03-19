@@ -1,3 +1,7 @@
+"""
+Utilities for downloading instances for the XCSP3 competition.
+"""
+
 import os
 import pathlib
 import zipfile

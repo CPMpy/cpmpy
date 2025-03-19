@@ -19,7 +19,10 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
 
 
-class CallbacksCPMPy(Callbacks):
+class CallbacksCPMPy(Callbacks):  
+    """
+        A pycsp3-compatible callback for parsing XCSP3 instances into a CPMPy model.
+    """
 
     def __init__(self):
         super().__init__()

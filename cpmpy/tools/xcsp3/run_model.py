@@ -1,3 +1,7 @@
+"""
+CLI runner for the XCSP3 competition.
+"""
+
 import gc
 
 import os
