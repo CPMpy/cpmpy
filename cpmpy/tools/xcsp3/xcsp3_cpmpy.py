@@ -33,9 +33,9 @@ from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 # Utils
 import os, pathlib
 sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve()))
-from solution import solution_xml
-from callbacks import CallbacksCPMPy
-from xcsp3.perf_timer import PerfContext, TimerContext
+from xcsp3_solution import solution_xml
+from parser_callbacks import CallbacksCPMPy
+# from xcsp3.perf_timer import PerfContext, TimerContext
 
 # Configuration
 SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]
@@ -526,10 +526,12 @@ def run(args: Args):
     else:
         path = None
 
-    with PerfContext(path=path):
-        with TimerContext("total") as tc:
-            run_helper(args)
-    print_comment(f"Total time taken: {tc.time}")
+    # with PerfContext(path=path):
+    #     with TimerContext("total") as tc:
+
+    run_helper(args)
+    
+    # print_comment(f"Total time taken: {tc.time}")
     
 
 def run_helper(args:Args):
@@ -580,14 +582,14 @@ def run_helper(args:Args):
 
     # Transfer model to solver
     with prepend_print():# as output: #TODO immediately print
-        with TimerContext("transform") as tc:
-            if args.solver == "exact": # Exact2 takes its options at creation time
-                s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model, **solver_arguments(args, model))
-            else:
-                s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
+        # with TimerContext("transform") as tc:
+        if args.solver == "exact": # Exact2 takes its options at creation time
+            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model, **solver_arguments(args, model))
+        else:
+            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
     # for o in output:
     #     print_comment(o)
-    print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
+    # print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
 
     # Solve model
     time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
@@ -601,33 +603,39 @@ def run_helper(args:Args):
         print_comment("Giving up, not enough time to start solving.")
         print_status(ExitStatus.unknown)
         return 
-            
+    
+    if CPM_gurobi.installed():
+        from gurobipy import GurobiError
+    else:
+        class GurobiError(Exception):  # Define a dummy GurobiError
+            pass
+        
     if args.solve:
         try:
-            with TimerContext("solve") as tc:
-                if args.solver == "exact": # Exact takes its options at creation time
-                    if args.solve_all:
-                        nr_sols = s.solveAll(
-                            time_limit=time_limit
-                        )
-                        print_comment(f"Found {nr_sols} solutions.")
-                    else:
-                        sat = s.solve(
-                            time_limit=time_limit
-                        )
+            # with TimerContext("solve") as tc:
+            if args.solver == "exact": # Exact takes its options at creation time
+                if args.solve_all:
+                    nr_sols = s.solveAll(
+                        time_limit=time_limit
+                    )
+                    print_comment(f"Found {nr_sols} solutions.")
                 else:
-                    if args.solve_all:
-                        nr_sols = s.solveAll(
-                            time_limit=time_limit,
-                            **solver_arguments(args, model)
-                        ) 
-                        print_comment(f"Found {nr_sols} solutions.")
-                    else:
-                        sat = s.solve(
-                            time_limit=time_limit,
-                            **solver_arguments(args, model)
-                        ) 
-            print_comment(f"took {(tc.time):.4f} seconds to solve")
+                    sat = s.solve(
+                        time_limit=time_limit
+                    )
+            else:
+                if args.solve_all:
+                    nr_sols = s.solveAll(
+                        time_limit=time_limit,
+                        **solver_arguments(args, model)
+                    ) 
+                    print_comment(f"Found {nr_sols} solutions.")
+                else:
+                    sat = s.solve(
+                        time_limit=time_limit,
+                        **solver_arguments(args, model)
+                    ) 
+            # print_comment(f"took {(tc.time):.4f} seconds to solve")
         except MemoryError:
             print_comment("Ran out of memory when trying to solve.")
         except GurobiError as e:
