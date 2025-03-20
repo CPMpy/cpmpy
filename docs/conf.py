@@ -109,6 +109,13 @@ html_js_files = [
     'custom.js',
 ]
 
+html_theme_options = {
+    "repository_url": "https://github.com/CPMpy/cpmpy",
+    "use_repository_button": True,
+}
+
+html_title = "CPMpy documentation"
+
 # man_pages = [
 #     (master_doc, 'pysat', u'PySAT Documentation',
 #      [author], 1)
