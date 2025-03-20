@@ -31,47 +31,52 @@ CPMpy can translate to many different solvers, and even provides direct access t
      - **Installation**
      - **Assumption interface?**
      - **Notes**
-   * - **Or-Tools**
+   * - :doc:`OR-Tools <api/solvers/ortools>`
      - CP-SAT
      - pip
      - Yes
      - Assumptions NOT incremental! Every solve starts from scratch
-   * - **Choco**
+   * - :doc:`Choco <api/solvers/choco>`
      - CP
      - pip
      - No
      - 
-   * - **GCS**
+   * - :doc:`GCS <api/solvers/gcs>`
      - CP
      - pip
      - No
      - Supports proof logging
-   * - **MiniZinc**
+   * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
      - pip + local install
      - No
      - Communicates through textfiles
-   * - **Z3**
+   * - :doc:`Z3 <api/solvers/z3>`
      - SMT
      - pip
      - Yes
      - 
-   * - **Gurobi**
+   * - :doc:`CP Optimizer <api/solvers/cpo>`
+     - CP
+     - pip + local install + (aca.) license
+     - No
+     - 
+   * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - pip + (aca.) license
      - No
      - 
-   * - **Exact**
+   * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - pip (only Linux, Win(py>3.10))
      - Yes
      - Manual installation on Mac possible
-   * - **PySAT**
+   * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - pip
      - Yes
      - Only Boolean variables (CPMpy transformation incomplete)
-   * - **PySDD**
+   * - :doc:`PySDD <api/solvers/pysdd>`
      - SAT Counter
      - pip
      - Yes
