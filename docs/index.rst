@@ -102,9 +102,11 @@ To make clear how well supported and tested these solvers are, we work with a ti
     - "exact" the Exact integer linear programming solver
     - "choco" the Choco constraint solver
     - "gcs" the Glasgow Constraint Solver
+    - "cpo" the CP Optimizer solver
 
 * Tier 3 solvers: they are work in progress and live in a pull request
     - "scip" the SCIP Optimisation Suite (open source MIP solver)
+    - "cplex" the CPLEX solver
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 
