@@ -106,7 +106,7 @@ To make clear how well supported and tested these solvers are, we work with a ti
 
 * Tier 3 solvers: they are work in progress and live in a pull request
     - "scip" the SCIP Optimisation Suite (open source MIP solver)
-    - "cplex" the CPLEX solver
+    - "cplex" the CPLEX solver (commercial MIP solver)
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 
