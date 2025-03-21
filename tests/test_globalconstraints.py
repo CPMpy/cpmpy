@@ -572,7 +572,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_abs(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
-        iv = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, name="x")
         constraints = [cp.Abs(iv) + 9 <= 8]
         model = cp.Model(constraints)
         self.assertFalse(model.solve())
@@ -585,6 +585,16 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(abs(iv.value())), '4')
+        self.assertEqual(model.solveAll(display=iv), 15)
+
+        pos = cp.intvar(0,8, name="x")
+        constraints = [cp.Abs(pos) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
+        neg = cp.intvar(-8,0, name="x")
+        constraints = [cp.Abs(neg) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
 
     def test_element(self):
         # test 1-D

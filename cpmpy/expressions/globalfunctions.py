@@ -128,10 +128,12 @@ class Minimum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
@@ -164,10 +166,12 @@ class Maximum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
@@ -195,13 +199,26 @@ class Abs(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         arg = self.args[0]
-        return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
+        lb, ub = get_bounds(arg)
+        # when argument is exclusively on one side of the sign
+        if lb >= 0:
+            return [eval_comparison(cpm_op, arg, cpm_rhs)], []
+        elif ub <= 0:
+            return [eval_comparison(cpm_op, -arg, cpm_rhs)], []
+        else: # when domain crosses over 0
+            newarg = intvar(*self.get_bounds())
+            is_pos = boolvar()
+            return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
+                    [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
+
 
 
     def get_bounds(self):
@@ -259,10 +276,12 @@ class Element(GlobalFunction):
             `Element(arr,ix)` represents the array lookup itself (a numeric variable)
             When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
             it is a constraint, and that one can be decomposed.
+
             Returns two lists of constraints:
-                1) constraints representing the comparison
-                2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-                   they should be enforced toplevel.
+
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
 
         """
         arr, idx = self.args
@@ -355,6 +374,7 @@ class NValue(GlobalFunction):
         NValue(arr) can only be decomposed if it's part of a comparison
 
         Based on "simple decomposition" from:
+        
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
@@ -404,6 +424,7 @@ class NValueExcept(GlobalFunction):
         NValue(arr) can only be decomposed if it's part of a comparison
 
         Based on "simple decomposition" from:
+
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.

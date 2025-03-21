@@ -8,13 +8,15 @@
 
     Requires that the 'PySDD' python package is installed:
 
+    .. code-block:: console
+
         $ pip install PySDD
 
     PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
     https://pysdd.readthedocs.io/en/latest/
 
     This solver can ONLY be used for solution checking and enumeration over Boolean variables!
-    That is, only logical constraints (and,or,implies,==,!=) and Boolean global constraints.
+    That is, only logical constraints (`and`, `or`, `implies`, `==`, `!=`) and Boolean global constraints.
 
     Documentation of the solver's own Python API:
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
@@ -55,11 +57,12 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
     Creates the following attributes (see parent constructor for more):
-        - pysdd_vtree: a pysdd.sdd.Vtree
-        - pysdd_manager: a pysdd.sdd.SddManager
-        - pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
 
-    The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
+    - ``pysdd_vtree`` : a pysdd.sdd.Vtree
+    - ``pysdd_manager`` : a pysdd.sdd.SddManager
+    - ``pysdd_root`` : a pysdd.sdd.SddNode (changes whenever a formula is added)
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysdd_manager`` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
     """
 
     @staticmethod
@@ -84,8 +87,8 @@ class CPM_pysdd(SolverInterface):
         Only supports satisfaction problems and solution enumeration
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model(), optional
+            subsolver: None
         """
         if not self.supported():
             raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
@@ -106,8 +109,9 @@ class CPM_pysdd(SolverInterface):
             See if an arbitrary model exists
 
             This is a knowledge compiler:
-                - building it is the (computationally) hard part
-                - checking for a solution is trivial after that
+
+            - building it is the (computationally) hard part
+            - checking for a solution is trivial after that
         """
 
         # ensure all vars are known to solver
@@ -147,7 +151,8 @@ class CPM_pysdd(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
+            .. warning::
+                WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
@@ -155,7 +160,8 @@ class CPM_pysdd(SolverInterface):
                 - time_limit, solution_limit, kwargs: not used
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found            
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -235,14 +241,14 @@ class CPM_pysdd(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the ':ref:`Adding a new solver` docs on readthedocs for more information.
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
@@ -371,8 +377,11 @@ class CPM_pysdd(SolverInterface):
             Returns a graphviz Dot object
 
             Display (in a notebook) with:
-            import graphviz
-            graphviz.Source(m.dot())
+
+            .. code-block:: python
+
+                import graphviz
+                graphviz.Source(m.dot())
         """
         if self.pysdd_root is None:
             from pysdd.sdd import SddManager
