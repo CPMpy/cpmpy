@@ -1,36 +1,69 @@
+<p align="center">
+    <b>CPMpy</b>: a <b>C</b>onstraint <b>P</b>rogramming and <b>M</b>odeling library in <b>Py</b>thon, based on numpy, with direct solver access.
+</p>
+
+<div align="center">
+
 ![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
 ![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
 ![PyPI downloads](https://img.shields.io/pypi/dm/cpmpy?label=Pypi%20Downloads&logo=pypi&logoColor=white)
 ![Tests](https://github.com/CPMpy/cpmpy/actions/workflows/python-test.yml/badge.svg)
 ![Licence](https://img.shields.io/github/license/CPMpy/cpmpy?label=Licence)
+</div>
 
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
-
-* Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
-* Solver-independent: transparently translating to CP, MIP, SMT, SAT
-* Incremental solving and direct access to the underlying solvers
-* And much more...
 
 **Documentation: [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)**
 
-CPMpy is still in Beta stage, and bugs can occur. If so, please report the issue on the [GitHub issue tracker](https://github.com/CPMpy/cpmpy/issues) if it does not exist yet!
+---
 
-## Open Source
+### Constraint solving at your finger tips
+
+For combinatorial optimisation problems with Boolean and integer variables. With many high-level constraints that are automatically decomposed as needed for the solver.
+
+Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
+
+### 🔑 Key Features
+
+* **Solver-agnostic**: use and compare CP, MIP, SMT, PB and SAT solvers
+* **ML-friendly**: decision variables are numpy arrays, vectorized operators and constraints
+* **Incremental solving**: assumption variables, adding constraints and updating objectives
+* **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
+* **Tools**: for parameter-tuning, debugging and explanation generation
+* **Flexible**: easy to add constraints or solvers, also direct solver access
+* **Open Source**: [Apache 2.0 license](https://github.com/cpmpy/cpmpy/blob/master/LICENSE)
+
+### 🔩 Solvers
+
+CPMpy can translate to a wide variaty of constraint solving paradigms, including both commercial and open-source solvers.
+
+* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
+* **MIP Solvers**: Gurobi (license required), IBM CPLEX (license required)
+* **SMT Solvers**: Z3
+* **PB Solvers**: Exact
+* **SAT Solvers**: PySAT+solvers, PySDD
+
+### 🌳 Ecosystem
+
+CPMpy is part of the scientific Python ecosystem, making it easy to use it in Jupyter notebooks, to add visualisations with matplotlib, or to use it in a machine learning pipeline.
+
+Other projects that build on CPMpy:
+* [PyConA](https://github.com/CPMpy/pyconA): a cpmpy-based library for constraint acquisition
+* [XCP-explain](https://github.com/CPMpy/XCP-explain): a library for explainable constraint programming
+* [Fuzz-Test](https://github.com/CPMpy/fuzz-test): fuzz testing of constraint solvers
+* [Sudoku Assistant](https://sudoku-assistant.cs.kuleuven.be): an Android app for sudoku scanning, solving and intelligent hints
+* [CHAT-Opt demonstrator](https://chatopt.cs.kuleuven.be): translates natural language problem descriptions into CPMpy models
+
+Also, CPMpy participated in the [2024 XCSP3 competition](https://www.xcsp.org/competitions/), making its solvers win 3 gold and 1 silver medal.
+
+## 🔧 Library development
 
 CPMpy has the open-source [Apache 2.0 license]( https://github.com/cpmpy/cpmpy/blob/master/LICENSE) and is run as an open-source project. All discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests. 
 
-Join us! We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the examples folder.
+Join us! We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the `examples/` folder.
 
+Are you a **solver developer**? We are keen to integrate solvers that have a Python API on pip. Check out our [adding solvers](https://cpmpy.readthedocs.io/en/latest/adding_solver.html) documentation and contact us!
 
-Are you a solver developer? We are keen to integrate solvers that have a Python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
-
-## Teaching with CPMpy
-
-CPMpy can be a good library for courses and projects on **modeling constrained optimisation problems**, because its usage is similar to that of other data science libraries (especially `numpy`), and because it translates to the fundamental languages of SAT, SMT, MIP, and CP transparently.
-
-Contact Prof. Tias Guns if you are interested in, or are going to develop, teaching material using CPMpy. For example we have CPMpy snippets of part of Prof. Pierre Flener's excellent ["Modelling for Combinatorial Optimisation [M4CO]"](https://user.it.uu.se/~pierref/courses/COCP/slides/).
-
-## Acknowledgments
+## 🙏 Acknowledgments
 
 Part of the development received funding through Prof. Tias Guns his European Research Council (ERC) Consolidator grant, under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
 
@@ -46,3 +79,4 @@ You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language co
 }
 ```
 
+If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to collaborations and contract research.

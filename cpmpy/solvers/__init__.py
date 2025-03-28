@@ -20,6 +20,7 @@
         exact
         choco
         gcs
+        cpo
         utils
 
     ===============
@@ -37,6 +38,7 @@
         CPM_exact
         CPM_choco
         CPM_gcs
+        CPM_cpo
 
     =================
     List of functions
@@ -58,3 +60,4 @@ from .exact import CPM_exact
 from .choco import CPM_choco
 from .gcs import CPM_gcs
 from .pindakaas import CPM_pindakaas
+from .cpo import CPM_cpo

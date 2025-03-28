@@ -28,9 +28,9 @@ def mus(soft, hard=[], solver="ortools"):
         Will extract an unsat core and then shrink the core further
         by repeatedly ommitting one assumption variable.
 
-        :param: soft: soft constraints, list of expressions
-        :param: hard: hard constraints, optional, list of expressions
-        :param: solver: name of a solver, see SolverLookup.solvernames()
+        :param soft: soft constraints, list of expressions
+        :param hard: hard constraints, optional, list of expressions
+        :param solver: name of a solver, see SolverLookup.solvernames()
             "z3" and "gurobi" are incremental, "ortools" restarts the solver
     """
     # make assumption (indicator) variables and soft-constrained model
@@ -179,9 +179,9 @@ def mus_naive(soft, hard=[], solver="ortools"):
         Best to only use for testing on solvers that do not support assumptions.
         For others, use `mus()`
 
-        :param: soft: soft constraints, list of expressions
-        :param: hard: hard constraints, optional, list of expressions
-        :param: solver: name of a solver, see SolverLookup.solvernames()
+        :param soft: soft constraints, list of expressions
+        :param hard: hard constraints, optional, list of expressions
+        :param solver: name of a solver, see SolverLookup.solvernames()
     """
     # ensure toplevel list
     soft = toplevel_list(soft, merge_and=False)
