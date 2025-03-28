@@ -330,27 +330,16 @@ class TestSolvers(unittest.TestCase):
                         reason="pindakaas not installed")
     def test_pindakaas(self):
         # Construct the model.
-        (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
 
-        Nora = mayo | ketchup
-        Leander = ~samurai | mayo
-        Benjamin = ~andalouse | ~curry | ~samurai
-        Behrouz = ketchup | curry | andalouse
-        Guy = ~ketchup | curry | andalouse
-        Daan = ~ketchup | ~curry | andalouse
-        Celine = ~samurai
-        Anton = mayo | ~curry | ~andalouse
-        Danny = ~mayo | ketchup | andalouse | samurai
-        Luc = ~mayo | samurai
-
-        allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
-
-        model = cp.Model(allwishes)
-
-        # any solver
-        self.assertTrue(model.solve())
-
-        model = cp.Model(allwishes)
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+        model = cp.Model([
+            cp.any((x[0], x[1])),
+            cp.any((~x[0], ~x[1])),
+            2*x[0] + 3*x[1] + 5*x[2] <= 6,
+            b.implies(2*x[0] + 3*x[1] + 5*x[2] <= 6),
+            (cp.Xor([x[0], x[1], x[2]])) >= (cp.BoolVal(True))
+        ])
 
         # any solver
         self.assertTrue(model.solve())
@@ -358,7 +347,6 @@ class TestSolvers(unittest.TestCase):
         # direct solver
         ps = CPM_pindakaas(model)
         self.assertTrue(ps.solve())
-        self.assertEqual([False, True, False, True, False], [v.value() for v in [mayo, ketchup, curry, andalouse, samurai]])
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),

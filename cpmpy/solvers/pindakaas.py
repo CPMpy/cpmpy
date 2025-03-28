@@ -91,7 +91,8 @@ class CPM_pindakaas(SolverInterface):
             raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
 
         import pindakaas as pkl
-        self.pkl_solver = pkl.CadicalSolver()
+        self.pkl_solver = pkl.Cadical()
+        # self.pkl_solver = pkl.Cnf()
 
         # initialise everything else and post the constraints/objective
         self.unsatisfiable = False
@@ -130,10 +131,12 @@ class CPM_pindakaas(SolverInterface):
             raise NotSupportedError(f"{self.name}: time not supported yet")
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        user_vars = self.solver_vars(list(self.user_vars))
 
         t = time.time()
-        my_status = self.pkl_solver.solve()
+        assert hasattr(self.pkl_solver, 'solve'), f"Pindakaas ClauseDatabase did not have solve:\n{self.pkl_solver}"
+        my_status = self.pkl_solver.solve(user_vars)
+
         self.cpm_status.runtime = time.time() - t
 
         # translate exit status
@@ -235,25 +238,18 @@ class CPM_pindakaas(SolverInterface):
       # add new user vars to the set
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
-      print(f"TF - {cpm_expr_orig}")
       # transform and post the constraints
       try: 
           for cpm_expr in self.transform(cpm_expr_orig):
-              print(f"TF - {cpm_expr}")
               if cpm_expr.name == 'or':
                   self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
 
               elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
-                  print(f"RE - {cpm_expr}")
                   a0,a1 = cpm_expr.args
-                  for clause in self._encode_bool_linear(a1):
-                      print(f"{clause}")
-                      self.pkl_solver.add_clause([~self.solver_var(a0)]+clause)
+                  self._add_bool_linear(a1, conditions=[~a0])
 
               elif isinstance(cpm_expr, Comparison):
-                  for clause in self._encode_bool_linear(cpm_expr):
-                      print(f"cl: {clause}")
-                      self.pkl_solver.add_clause(clause)
+                  self._add_bool_linear(cpm_expr)
 
               elif isinstance(cpm_expr, BoolVal):
                   # base case: Boolean value
@@ -278,7 +274,7 @@ class CPM_pindakaas(SolverInterface):
 
 
     """ Unpack implied literal, clause, sum, or weighted sum """
-    def _encode_bool_linear(self, cpm_expr):
+    def _add_bool_linear(self, cpm_expr, conditions=[]):
         import pindakaas as pkl
         literals = None
         coefficients = None
@@ -306,10 +302,12 @@ class CPM_pindakaas(SolverInterface):
                 comparator = pkl.Comparator.Equal
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
-        literals = self.solver_vars(literals)
-        cnf = pkl.Cnf(self.pkl_solver.variables())
-        cnf.add_linear(literals, coefficients=coefficients, comparator=comparator, k=k)
-        # TODO set correct latest var
-        print(f"CNF = {cnf}")
-        return cnf
+
+        self.pkl_solver.add_linear(
+                self.solver_vars(literals),
+                coefficients=coefficients,
+                comparator=comparator,
+                k=k,
+                conditions=self.solver_vars(conditions)
+            )
 
