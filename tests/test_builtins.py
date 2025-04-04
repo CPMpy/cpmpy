@@ -64,12 +64,17 @@ class TestBuiltin(unittest.TestCase):
         # only Python constants
         x = [False, True]
         self.assertEqual(str(cpm_all(x)), "False")
-        # only CPMPy True constant
+        # one CPMPy True constant
         x = [cp.BoolVal(True)]
         self.assertEqual(str(cpm_all(x)), "boolval(True)")
         # one python True constant
         x = [True]
         self.assertEqual(str(cpm_all(x)), "True")
+        # Python and CPMpy True constant
+        x = [True, cp.BoolVal(True)]
+        self.assertEqual(str(cpm_all(x)), "boolval(True)")
+        x = [cp.BoolVal(True), True]
+        self.assertEqual(str(cpm_all(x)), "boolval(True)")
 
         # should also work with overloaded operators
         expr = cp.BoolVal(False) & cp.BoolVal(True)
@@ -95,12 +100,17 @@ class TestBuiltin(unittest.TestCase):
         # only Python constants
         x = [False, True]
         self.assertEqual(str(cpm_any(x)), "True")
-        # only CPMPy True constant
+        # one CPMPy True constant
         x = [cp.BoolVal(True)]
         self.assertEqual(str(cpm_any(x)), "boolval(True)")
         # one python True constant
         x = [True]
         self.assertEqual(str(cpm_any(x)), "True")
+        # Python and CPMpy True constant
+        x = [True, cp.BoolVal(True)]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [cp.BoolVal(True), True]  
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
 
         expr = cp.BoolVal(False) | cp.BoolVal(True)
         self.assertEqual(str(expr), "boolval(True)")
