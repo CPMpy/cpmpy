@@ -30,8 +30,10 @@ model = cp.Model()
 for job_id, group in df_data.groupby('job_id'):
     model += (cp.sum(active[group.index]) == 1)
 
+# For all jobs ensure start + dur = end (also for inactives, thats OK)
+model += (start + df_data['duration'] == end)
+
 # No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
-# This also enforces that start + dur = end for each task (also for inactives, thats OK)
 for mach_id, group in df_data.groupby('machine_id'):
     sel = group.index
     model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
