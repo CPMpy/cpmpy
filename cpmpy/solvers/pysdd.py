@@ -38,7 +38,7 @@
 from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal
+from ..expressions.core import Expression, BoolVal, cpm_set
 from ..expressions.variables import _BoolVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
@@ -252,7 +252,7 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}) #keep unsupported xor for error message purposes.
+        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, expr_dict=self.expr_dict) #keep unsupported xor for error message purposes.
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
@@ -283,7 +283,7 @@ class CPM_pysdd(SolverInterface):
             if not isinstance(v, _BoolVarImpl):
                 raise NotSupportedError(f"CPM_pysdd: only Boolean variables allowed -- {type(v)}: {v}")
         # add new user vars to the set
-        self.user_vars |= set(newvars)
+        self.user_vars |= cpm_set(newvars)
 
         # if needed initialize (arbitrary) vtree from all user-specified vars
         # we waited till here to already have some vars... beneficial?
