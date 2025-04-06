@@ -6,6 +6,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -311,6 +312,40 @@ class TestSolvers(unittest.TestCase):
         # check get core, more realistic
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_card(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [sum(x) > 3, sum(x) <= 2, sum(x) == 4, (sum(x) <= 1) & (sum(x) != 2),
+                b.implies(sum(x) > 3), b == (sum(x) != 2), (sum(x) >= 3).implies(b)]
+        for c in cons:
+            self.assertTrue(cp.Model(c).solve("pysat"))
+            self.assertTrue(c.value())
+
+    @pytest.mark.skipif(not CPM_pindakaas.supported(),
+                        reason="pindakaas not installed")
+    def test_pindakaas(self):
+        # Construct the model.
+
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+        model = cp.Model([
+            cp.any((x[0], x[1])),
+            cp.any((~x[0], ~x[1])),
+            2*x[0] + 3*x[1] + 5*x[2] <= 6,
+            b.implies(2*x[0] + 3*x[1] + 5*x[2] <= 6),
+            (cp.Xor([x[0], x[1], x[2]])) >= (cp.BoolVal(True))
+        ])
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pindakaas(model)
+        self.assertTrue(ps.solve())
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
@@ -772,7 +807,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+        if solver in ('pysdd', 'pysat', 'gurobi', 'pindakaas'):  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
 

@@ -37,7 +37,17 @@ setup(
     ],
     #extra dependency, only needed if minizinc is to be used.
     extras_require={
-        "FULL":  ["minizinc"],
+        "FULL": ["minizinc"],
+        "dev": ["pytest"],
+        "docs": [
+            "numpy>=1.17.0", # TODO why higher ?
+            "myst-parser",
+            "sphinx-automodapi",
+             # cannot be updated due to m2r2 no longer being maintained -> switch to MyST?
+            "sphinx>=5.3.0",
+            "sphinx_rtd_theme>=2.0.0",
+            "readthedocs-sphinx-search>=0.3.2",
+            ]
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",

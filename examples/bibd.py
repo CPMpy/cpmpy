@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Balanced Incomplete Block Design (BIBD) in CPMpy
 

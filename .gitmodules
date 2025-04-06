@@ -1,0 +1,3 @@
+[submodule "submodules/pindakaas"]
+	path = submodules/pindakaas
+	url = https://github.com/hbierlee/pindakaas.git
