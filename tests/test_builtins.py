@@ -84,6 +84,9 @@ class TestBuiltin(unittest.TestCase):
         expr = cp.BoolVal(False) & True
         self.assertEqual(str(expr), "boolval(False)")
 
+        # 1 and 0 are not Boolean
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) & 1)
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) & 0)
 
     def test_any(self):
         # edge-cases
@@ -118,3 +121,7 @@ class TestBuiltin(unittest.TestCase):
         self.assertEqual(str(expr), "boolval(True)")
         expr = cp.BoolVal(False) | True
         self.assertEqual(str(expr), "boolval(True)")
+
+        # 1 and 0 are not Boolean
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) | 1)
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) | 0)
