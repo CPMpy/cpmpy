@@ -10,13 +10,12 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list, is_bool, is_boolexpr
 
-
 def push_down_negation(lst_of_expr, toplevel=True):
     """
         Transformation that checks all elements from the list,
-        and pushes down any negation it finds with the `recurse_negation()` function.
+        and pushes down any negation it finds with the :func:`recurse_negation()` function.
 
-        Assumes the input is a list (typically from `toplevel_list()`) en ensures the output is
+        Assumes the input is a list (typically from :func:`~cpmpy.transformations.normalize.toplevel_list()`) en ensures the output is
         a toplevel_list if the input was.
     """
     if isinstance(lst_of_expr, np.ndarray) and not (lst_of_expr.dtype == object):
@@ -69,8 +68,8 @@ def recurse_negation(expr):
         Negate 'expr' by pushing the negation down into it and its args
 
         Comparison: swap comparison sign
-        Operator.is_bool(): apply DeMorgan
-        Global: leave "NOT" operator before global constraint. Use `decompose_globals` for this (AFTER ISSUE #293)
+        :func:`Operator.is_bool() <cpmpy.expressions.core.Operator.is_bool()>`: apply DeMorgan
+        Global: leave "NOT" operator before global constraint. Use :func:`cpmpy.transformations.decompose_global.decompose_in_tree()` for this (AFTER ISSUE #293)
     """
 
     if isinstance(expr, (_BoolVarImpl,BoolVal)):
@@ -122,12 +121,19 @@ def recurse_negation(expr):
         newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return ~newexpr
 
+    elif is_bool(expr): # unlikely case with non-CPMpy True or False
+        return ~BoolVal(expr)
+        
     # numvars or direct constraint
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
 
 
 def negated_normal(expr):
+    """
+    .. deprecated:: 0.9.16
+          Please use :func:`recurse_negation()` instead.
+    """
     warnings.warn("Deprecated, use `recurse_negation()` instead which will negate and push down all negations in "
                   "the expression (or use `push_down_negation` on the full expression tree); will be removed in "
                   "stable version", DeprecationWarning)

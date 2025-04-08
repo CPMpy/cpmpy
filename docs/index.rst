@@ -8,13 +8,15 @@ CPMpy is a Constraint Programming and Modeling library in Python, based on numpy
 * Easy to integrate with machine learning and visualisation libraries, because decision variables are numpy arrays.
 * Solver-independent: transparently translating to CP, MIP, SMT and SAT solvers
 * Incremental solving and direct access to the underlying solvers
-* and much more...
+* And much more...
 
 .. toctree::
    :maxdepth: 1
    :caption: Usage
 
    modeling
+
+.. _supported-solvers:
 
 Supported solvers
 -----------------
@@ -27,49 +29,54 @@ CPMpy can translate to many different solvers, and even provides direct access t
    * - **Solver**
      - **Technology**
      - **Installation**
-     - **Assumption variables?**
+     - **Assumption interface?**
      - **Notes**
-   * - **Or-Tools**
+   * - :doc:`OR-Tools <api/solvers/ortools>`
      - CP-SAT
      - pip
      - Yes
      - Assumptions NOT incremental! Every solve starts from scratch
-   * - **Choco**
+   * - :doc:`Choco <api/solvers/choco>`
      - CP
      - pip
      - No
      - 
-   * - **GCS**
+   * - :doc:`GCS <api/solvers/gcs>`
      - CP
      - pip
      - No
      - Supports proof logging
-   * - **MiniZinc**
+   * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
      - pip + local install
      - No
      - Communicates through textfiles
-   * - **Z3**
+   * - :doc:`Z3 <api/solvers/z3>`
      - SMT
      - pip
      - Yes
      - 
-   * - **Gurobi**
+   * - :doc:`CP Optimizer <api/solvers/cpo>`
+     - CP
+     - pip + local install + (aca.) license
+     - No
+     - 
+   * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - pip + (aca.) license
      - No
      - 
-   * - **Exact**
+   * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - pip (only Linux, Win(py>3.10))
      - Yes
      - Manual installation on Mac possible
-   * - **PySAT**
+   * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - pip
      - Yes
      - Only Boolean variables (CPMpy transformation incomplete)
-   * - **PySDD**
+   * - :doc:`PySDD <api/solvers/pysdd>`
      - SAT Counter
      - pip
      - Yes
@@ -95,9 +102,11 @@ To make clear how well supported and tested these solvers are, we work with a ti
     - "exact" the Exact integer linear programming solver
     - "choco" the Choco constraint solver
     - "gcs" the Glasgow Constraint Solver
+    - "cpo" the CP Optimizer solver
 
 * Tier 3 solvers: they are work in progress and live in a pull request
     - "scip" the SCIP Optimisation Suite (open source MIP solver)
+    - "cplex" the CPLEX solver (commercial MIP solver)
 
 We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
 

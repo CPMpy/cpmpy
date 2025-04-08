@@ -15,13 +15,15 @@ Implementing the template consists of the following parts:
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
   * `solveAll()` optionally, if the solver natively supports solution enumeration
 
+For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``.
+
 ## Transformations and posting constraints
 
 CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and then posted to the solver.
 
 CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from actually *posting* the supported constraints directly to the solver.
 
-For example, a SAT solver only accepts clauses (disjunctions) over Boolean variables as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
+For example, a SAT solver only accepts clauses (disjunctions) as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
 
 The `__add__()` method will first call this `transform()`. This will return a list of CPMpy 'or' expression over decision variables. It then only has to iterate over those and call the solver its native API to create such clauses. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
@@ -88,6 +90,7 @@ class SolverX {
 ```
 
 If you have such a C++ API, then there exist automatic python packages that can make Python bindings, such as [CPPYY](https://cppyy.readthedocs.io/en/latest/) or [pybind11](https://pybind11.readthedocs.io/en/stable/).
+For Rust, similar packages are available, such as [PyO3](https://pyo3.rs).
 
 We have not done this ourselves yet, so get in touch to share your experience and advice!
 

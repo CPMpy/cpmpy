@@ -8,6 +8,8 @@
 
     Requires that the 'python-sat' python package is installed:
 
+    .. code-block:: console
+
         $ pip install python-sat[aiger,approxmc,cryptosat,pblib]
 
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
@@ -16,13 +18,14 @@
     https://pysathq.github.io/
 
     This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,implies,==,!=) or cardinality constraints.
+    and only logical constraints (`and`, `or`, `implies`, `==`, `!=`) or cardinality constraints.
 
     Documentation of the solver's own Python API:
     https://pysathq.github.io/docs/html/api/solvers.html
 
-    WARNING: CPMpy uses 'model' to refer to a constraint specification,
-    the PySAT docs use 'model' to refer to a solution.
+    .. warning::
+        WARNING: CPMpy uses 'model' to refer to a constraint specification,
+        the PySAT docs use 'model' to refer to a solution.
 
     ===============
     List of classes
@@ -39,9 +42,10 @@
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
+from ..transformations.linearize import canonical_comparison, only_positive_coefficients
 from ..expressions.utils import is_int, flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
@@ -61,10 +65,11 @@ class CPM_pysat(SolverInterface):
     https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
-        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
-        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
-    The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
+    - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
+    - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
     """
 
     @staticmethod
@@ -77,8 +82,10 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import IDPool
             from pysat.solvers import Solver
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     @staticmethod
@@ -107,12 +114,11 @@ class CPM_pysat(SolverInterface):
         Only supports satisfaction problems (no objective)
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: str, name of the pysat solver, e.g. glucose4
-            see .solvernames() to get the list of available solver(names)
+            cpm_model (Model(), a CPMpy Model(), optional):
+            subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
-            raise Exception("CPM_pysat: Install the python 'python-sat' package to use this solver interface "
+            raise Exception("CPM_pysat: Install the python package 'python-sat' to use this solver interface "
                             "(NOT the 'pysat' package!)")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysat: only satisfaction, does not support an objective function")
@@ -147,12 +153,14 @@ class CPM_pysat(SolverInterface):
             Call the PySAT solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
-                           runtime exceeds given time_limit.
-                           Warning: the time_limit is not very accurate at subsecond level
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
+                time_limit (float, optional):   Maximum solve time in seconds. Auto-interrups in case the
+                                                runtime exceeds given time_limit.
+                                                
+                                                .. warning::
+                                                    Warning: the time_limit is not very accurate at subsecond level
+                assumptions: list of CPMpy Boolean variables that are assumed to be true.
+                            For use with :func:`s.get_core() <get_core()>`: if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
+                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
         # ensure all vars are known to solver
@@ -220,12 +228,12 @@ class CPM_pysat(SolverInterface):
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
-            Transforms cpm_var into CNF literal using self.pysat_vpool
-            (positive or negative integer)
+            Transforms cpm_var into CNF literal using ``self.pysat_vpool``
+            (positive or negative integer).
 
-            so vpool is the varmap (we don't use _varmap here)
+            So vpool is the varmap (we don't use _varmap here).
         """
 
         # special case, negative-bool-view
@@ -238,7 +246,6 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -246,12 +253,12 @@ class CPM_pysat(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
@@ -259,6 +266,8 @@ class CPM_pysat(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
+        cpm_cons = canonical_comparison(cpm_cons)
+        cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
@@ -361,7 +370,7 @@ class CPM_pysat(SolverInterface):
 
     def get_core(self):
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those assumptions which are False (in the UNSAT core)
 

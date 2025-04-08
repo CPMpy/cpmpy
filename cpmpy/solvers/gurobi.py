@@ -8,6 +8,8 @@
 
     Requires that the 'gurobipy' python package is installed:
 
+    .. code-block:: console
+
         $ pip install gurobipy
     
     
@@ -15,7 +17,7 @@
     You can read more about available licences at https://www.gurobi.com/downloads/
 
     Documentation of the solver's own Python API:
-    https://www.gurobi.com/documentation/current/refman/py_python_api_details.html
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
 
     ===============
     List of classes
@@ -32,8 +34,9 @@
 """
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals
+from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -43,6 +46,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
+from ..transformations.safening import no_partial_functions
 
 try:
     import gurobipy as gp
@@ -62,14 +66,31 @@ class CPM_gurobi(SolverInterface):
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     Creates the following attributes (see parent constructor for more):
-        - grb_model: object, TEMPLATE's model object
+    
+    - ``grb_model``: object, TEMPLATE's model object
 
-    The `DirectConstraint`, when used, calls a function on the `grb_model` object.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
     """
 
     @staticmethod
     def supported():
-        # try to import the package
+        return CPM_gurobi.installed() and CPM_gurobi.license_ok()
+
+    @staticmethod
+    def installed():
+        try:
+            import gurobipy as gp
+            return True
+        except ModuleNotFoundError:
+            return False
+        except Exception as e:
+            raise e
+
+    @staticmethod
+    def license_ok():
+        if not CPM_gurobi.installed():
+            warnings.warn(f"License check failed, python package 'gurobipy' is not installed! Please check 'CPM_gurobi.installed()' before attempting to check license.")
+            return False
         try:
             import gurobipy as gp
             global GRB_ENV
@@ -79,7 +100,8 @@ class CPM_gurobi(SolverInterface):
                 GRB_ENV.setParam("OutputFlag", 0)
                 GRB_ENV.start()
             return True
-        except:
+        except Exception as e:
+            warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -87,12 +109,13 @@ class CPM_gurobi(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
-        - subsolver: None, not used
+            cpm_model: a CPMpy Model()
+            subsolver: None, not used
         """
-        if not self.supported():
-            raise Exception(
-                "CPM_gurobi: Install the python package 'gurobipy' and make sure your licence is activated!")
+        if not self.installed():
+            raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
+        elif not self.license_ok():
+            raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
@@ -115,15 +138,16 @@ class CPM_gurobi(SolverInterface):
             Call the gurobi solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):  maximum solve time in seconds 
+                **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
             Examples of gurobi supported arguments include:
-                - Threads : int
-                - MIPFocus: int
-                - ImproveStartTime : bool
-                - FlowCoverCuts: int
+
+            - ``Threads`` : int
+            - ``MIPFocus`` : int
+            - ``ImproveStartTime`` : bool
+            - ``FlowCoverCuts`` : int
 
             For a full list of gurobi parameters, please visit https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
         """
@@ -188,7 +212,7 @@ class CPM_gurobi(SolverInterface):
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
-                var._value = None
+                cpm_var._value = None
 
         return has_sol
 
@@ -228,8 +252,9 @@ class CPM_gurobi(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-                are premanently posted to the solver)
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         from gurobipy import GRB
 
@@ -284,16 +309,17 @@ class CPM_gurobi(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -358,7 +384,8 @@ class CPM_gurobi(SolverInterface):
                     self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
-                    assert is_num(lhs.args[1]), "Gurobi only supports division by constants"
+                    if not is_num(lhs.args[1]):
+                        raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
@@ -376,7 +403,6 @@ class CPM_gurobi(SolverInterface):
                         self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        assert a == 2, "Gurobi: 'pow', only support quadratic constraints (x**2)"
                         self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
@@ -431,12 +457,12 @@ class CPM_gurobi(SolverInterface):
             a more efficient native implementation
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """

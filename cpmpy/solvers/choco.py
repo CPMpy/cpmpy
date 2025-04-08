@@ -8,12 +8,15 @@
 
     Requires that the 'pychoco' python package is installed:
 
+    .. code-block:: console
+
         $ pip install pychoco
 
 
     Documentation of the solver's own Python API:
-    https://pypi.org/project/pychoco/
-    https://pychoco.readthedocs.io/en/latest/
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
 
     ===============
     List of classes
@@ -23,7 +26,7 @@
         :nosignatures:
 
         CPM_choco
-    
+
     ==============
     Module details
     ==============
@@ -32,18 +35,23 @@ import time
 
 import numpy as np
 
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
+
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
+from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException
 
@@ -56,12 +64,14 @@ class CPM_choco(SolverInterface):
     $ pip install pychoco
 
     See detailed installation instructions at:
-    https://pypi.org/project/pychoco/
-    https://pychoco.readthedocs.io/en/latest/
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
 
     Creates the following attributes (see parent constructor for more):
-    chc_model: the pychoco.Model() created by _model()
-    chc_solver: the choco Model().get_solver() instance used in solve()
+    
+    - ``chc_model`` : the pychoco.Model() created by _model()
+    - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
 
     """
 
@@ -69,19 +79,20 @@ class CPM_choco(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if pychoco is installed
             import pychoco as chc
             # check it's the correct version
             # CPMPy uses features only available from 0.2.1
-            from importlib.metadata import version as get_version
-            from packaging import version
-            pychoco_version = get_version("pychoco")
-            if version.parse(pychoco_version) < version.parse("0.2.1"):
-                import warnings
-                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, but you have version {pychoco_version}")
-                return False
+            pkg_resources.require("pychoco>=0.2.1")
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except VersionConflict: # unsupported version of pychoco
+            warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('pychoco').version}.")
+            return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -94,11 +105,11 @@ class CPM_choco(SolverInterface):
         calling solve(), a prime way to use more advanced solver features
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'pychoco' package to use this solver interface")
+            raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
 
         import pychoco as chc
 
@@ -128,8 +139,8 @@ class CPM_choco(SolverInterface):
             Call the Choco solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):   maximum solve time in seconds 
+                kwargs:                         any keyword argument, sets parameters of solver object
 
         """
         # ensure all vars are known to solver
@@ -195,12 +206,13 @@ class CPM_choco(SolverInterface):
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
-                - time_limit:  maximum solve time in seconds (float, default: None)
+                solution_limit: stop after this many solutions (default: None)
+                time_limit (float, optional):   maximum solve time in seconds
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
 
         # ensure all vars are known to solver
@@ -286,14 +298,16 @@ class CPM_choco(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: constraints created during conversion of the objective
-            are premanently posted to the solver. Choco accepts variables to maximize or minimize
-            so it is needed to post constraints and create auxiliary variables)
+            .. note::
+                technical side note: constraints created during conversion of the objective
+                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                so it is needed to post constraints and create auxiliary variables
         """
 
         # make objective function non-nested
@@ -336,19 +350,20 @@ class CPM_choco(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-                     
+
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
@@ -538,6 +553,17 @@ class CPM_choco(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table, False)
+            elif cpm_expr.name == 'short_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                table = np.array(table)
+                table[table == STAR] = np.nan
+                table = table.astype(float) # nan's require float dtype
+                # Choco requires a wildcard value not present in dom of args,
+                # take value lower than anything else
+                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
+                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)

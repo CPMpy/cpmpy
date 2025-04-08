@@ -23,7 +23,7 @@ import builtins  # to use the original Python-builtins
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
-from .core import Expression, Operator
+from .core import Expression, Operator, BoolVal
 from .globalfunctions import Minimum, Maximum, Abs
 
 
@@ -32,25 +32,40 @@ from .globalfunctions import Minimum, Maximum, Abs
 def all(iterable):
     """
         all() overwrites python built-in,
-        if iterable contains an `Expression`, then returns an Operator("and", iterable)
-        otherwise returns whether all of the arguments is true
+        if iterable contains any `Expression`, then returns an Operator("and", iterable)
+        otherwise returns whether all of the arguments are true
     """
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
+    is_expr, return_false = False, False
     for elem in iterable:
-        if is_false_cst(elem):
-            return False  # no need to create constraint
+        if isinstance(elem, Expression): # probably most likely case
+            is_expr = True
+            if isinstance(elem, BoolVal):
+                if not elem.args[0]: # False constant
+                    return_false = True
+            elif elem.is_bool():
+                collect.append(elem)
+            else:
+                raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
         elif is_true_cst(elem):
             pass
-        elif isinstance(elem, Expression) and elem.is_bool():
-            collect.append(elem)
+        elif is_false_cst(elem):
+            return_false = True
+        elif isinstance(elem, list):
+            raise Exception("Encountered list in 'all', only accept non-nested lists")
         else:
-            raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
+            raise Exception("Unexpected argument '{}' to 'all'".format(elem))
+    
+    if return_false:
+        return BoolVal(False) if is_expr else False
+    if len(collect) == 0:
+        return BoolVal(True) if is_expr else True
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
         return Operator("and", collect)
-    return True
+    raise Exception(f"Unepxected collection {collect}")
 
 
 # any: listwise 'or'
@@ -62,20 +77,35 @@ def any(iterable):
     """
     if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
     collect = [] # logical expressions
+    is_expr, return_true = False, False
     for elem in iterable:
-        if is_true_cst(elem):
-            return True # no need to create constraint
+        if isinstance(elem, Expression): # probably most likely case
+            is_expr = True
+            if isinstance(elem, BoolVal):
+                if elem.args[0]: # True constant
+                    return_true = True
+            elif elem.is_bool():
+                collect.append(elem)
+            else:
+                raise Exception("Non-Boolean argument '{}' to 'all'".format(elem))
+        elif is_true_cst(elem):
+            return_true = True
         elif is_false_cst(elem):
             pass
-        elif isinstance(elem, Expression) and elem.is_bool():
-            collect.append(elem)
+        elif isinstance(elem, list):
+            raise Exception("Encountered list in 'all', only accept non-nested lists")
         else:
-            raise Exception("Non-Boolean argument '{}' to 'any'".format(elem))
+            raise Exception("Unexpected argument '{}' to 'all'".format(elem))
+    
+    if return_true:
+        return BoolVal(True) if is_expr else True
+    if len(collect) == 0:
+        return BoolVal(False) if is_expr else False
     if len(collect) == 1:
         return collect[0]
     if len(collect) >= 2:
         return Operator("or", collect)
-    return False
+    raise Exception(f"Unepxected collection {collect}")
 
 
 def max(*iterable, **kwargs):
@@ -84,7 +114,7 @@ def max(*iterable, **kwargs):
 
         if iterable does not contain CPMpy expressions, the built-in is called
         else a Maximum functional global constraint is constructed; no keyword
-          arguments are supported in that case
+        arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
@@ -101,7 +131,7 @@ def min(*iterable, **kwargs):
 
         if iterable does not contain CPMpy expressions, the built-in is called
         else a Minimum functional global constraint is constructed; no keyword
-          arguments are supported in that case
+        arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])

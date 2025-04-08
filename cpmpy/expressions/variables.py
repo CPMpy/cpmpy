@@ -25,15 +25,15 @@
     Boolean and Integer decision variables are the key elements of a CP model.
 
     All variables in CPMpy are n-dimensional array objects and have defined dimensions. 
-    Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. 
+    Following the numpy library, the dimension sizes of an n-dimenionsal array is called its ``shape``. 
     In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape 
     is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors 
     with more than 2 dimensions are all supported too. For the implementation of this, 
-    CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits 
-    (vectorized operators and advanced indexing).
+    CPMpy builts on numpy's n-dimensional `ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`_ 
+    and inherits many of its benefits (vectorized operators and advanced indexing).
 
-    This module contains the cornerstone `boolvar()` and `intvar()` functions, which create (numpy arrays of) 
-    variables. There is also a helper function `cpm_array()` for wrapping standard numpy arrays so they can be 
+    This module contains the cornerstone ``boolvar()`` and ``intvar()`` functions, which create (numpy arrays of) 
+    variables. There is also a helper function ``cpm_array()`` for wrapping standard numpy arrays so they can be 
     indexed by a variable. Apart from these 3 functions, none of the classes in this module should be directly 
     instantiated; they are created by these 3 helper functions.
 
@@ -61,67 +61,65 @@ import warnings # for deprecation warning
 from functools import reduce
 
 import numpy as np
-from .core import Expression
-from .utils import is_num, is_int, is_boolexpr, get_bounds
+import cpmpy as cp  # to avoid circular import
+from .core import Expression, Operator
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 
 def BoolVar(shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
+    """
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
     return boolvar(shape=shape, name=name)
 
 
 def boolvar(shape=1, name=None):
     """
-    Boolean decision variables will take either the value `True` or `False`.
-    
+    Create Boolean decision variables that take either the value `True` or `False`.
+
     Arguments:
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        shape (int or tuple of int, optional) : The shape of the n-dimensional array of variables. Default is 1.
+    
+        name (str, list of str, tuple of str, or None, optional) : 
+            Name(s) to assign to the variables. Default is None.
 
-    If name is None then a name 'BV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
+            - If `name` is None, a name of the form ``BV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
 
-    If shape is different from 1, then each element of the array will have the location
-    of this specific variable in the array append to its name.
+    Notes:
 
-    For example,
-    - `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
-    - `print(boolvar(shape=3, name=list("xyz"))` will print `[x, y, z]`
+        - If `shape` is not 1, each element of the array will have its specific location appended to its name.
+        - Examples:
+            - ``boolvar(shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+            - ``boolvar(shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
 
+    Examples:
 
-    The following examples show how to create Boolean variables of different shapes:
-
-    - Creating a single (unit-sized or scalar) Boolean variable:
+        Creating a single Boolean variable:
+        
         .. code-block:: python
 
-            # creation of a unit Boolean variable
             x = boolvar(name="x")
-
-    - the creation of a vector boolean variables. 
-
+        
+        Creating a vector of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a vector of size 3 of Boolean variables
             x = boolvar(shape=3, name="x")
 
-            # note that with Python's unpacking, you can assign them
-            # to intermediate variables. This allows for fine-grained use of variables when
-            # defining the constraints of the model
+            # Assigning them to individual variables:
             e, x, a, m, p, l = boolvar(shape=6, name=list("exampl"))
 
-    - the creation of a matrix or higher-order tensor of Boolean variables. 
+        Creating a matrix or higher-order tensor of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a 9x9 matrix of Boolean variables:
             matrix = boolvar(shape=(9, 9), name="matrix")
-            # creation of a 2x2 matrix of Boolean variables, and give a name for each element:
             matrix2 = boolvar(shape=(2, 2), name=[['a', 'b'], ['c', 'd']])
-
-            # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
-            # the dimensions of the tensor, a matrix of multiple-dimensions.
-            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
-            tensor = BoolVar(shape=(3, 8, 7), name="tensor")
+            tensor = boolvar(shape=(3, 8, 7), name="tensor")
     """
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
@@ -140,6 +138,10 @@ def boolvar(shape=1, name=None):
 
 
 def IntVar(lb, ub, shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
+    """
     warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
     return intvar(lb, ub, shape=shape, name=name)
 
@@ -150,32 +152,41 @@ def intvar(lb, ub, shape=1, name=None):
     the decision variable can take, as well as the highest value (ub).
 
     Arguments:
-    lb -- lower bound on the values the variable can take (int)
-    ub -- upper bound on the values the variable can take (int)
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        lb (int) : Lower bound on the values the variable can take.
+        ub (int) : Upper bound on the values the variable can take.
+        shape (int or tuple of int, optional) :
+            The shape of the n-dimensional array of variables. Default is 1.
+        name (str, list of str, tuple of str, or None, optional) :
+            Name(s) to assign to the variables. Default is None.
 
-    The range of values between lb..ub is called the __domain__ of the integer variable.
-    All variables in an array start from the same domain.
-    Specific values in the domain of individual variables can be forbidden with constraints.
+            - If `name` is None, a name of the form ``IV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
 
-    If name is None then a name 'IV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
+    Notes:
 
-    If shape is different from 1, then each element of the array will have the location
-    of this specific variable in the array append to its name.
+        The range of values between ``lb..ub`` is called the `domain` of the integer variable.
+        All variables in an array start from the same domain.
+        Specific values in the domain of individual variables can be forbidden with constraints.
 
-    The following examples show how to create integer variables of different shapes:
+        If `shape` is not 1, each element of the array will have its specific location appended to its name.
 
-    - Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+        - ``intvar(0, 2, shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+
+        If `shape` is not 1 and a list of names has been provided (with the same length as the array), each decision variable will receive its respective name.
+
+        - ``intvar(0, 2, shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
+
+    Examples:
+
+        Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) of 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
 
         .. code-block:: python
 
             # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
             x = intvar(3, 8, name="x")
 
-    - Creation of a vector of integer variables with all having the same given lower bound and upper bound:
+        Creation of a vector of integer variables with all having the same given lower bound and upper bound:
 
         .. code-block:: python
 
@@ -185,7 +196,8 @@ def intvar(lb, ub, shape=1, name=None):
             # Python's unpacking can assign multiple intermediate variables at once
             e, x, a, m, p, l = intvar(3, 8, shape=6, name=list("exampl"))
 
-    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        
         .. code-block:: python
 
             arrx s= intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
@@ -207,6 +219,10 @@ def intvar(lb, ub, shape=1, name=None):
     return r
 
 def cparray(arr):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
+    """
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
     return cpm_array(arr)
 
@@ -216,10 +232,10 @@ def cpm_array(arr):
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
 
     In CP modeling languages, indexing an array by an integer variable is common, e.g. `[1,2,3,4][var1] == var2`.
-    This is called an __element__ constraint. Python does not allow expressing it on standard arrays,
+    This is called an `element` constraint. Python does not allow expressing it on standard arrays,
     but CPMpy-numpy arrays do allow it, so you first have to wrap the array.
 
-    Note that 'arr' will be transformed to vector and indexed as such, 2-dimensional indexing is not supported (yet?).
+    Note that `arr` will be transformed to vector and indexed as such, 2-dimensional indexing is not supported (yet?).
 
     .. code-block:: python
 
@@ -232,11 +248,16 @@ def cpm_array(arr):
 
         Model([ data[iv1] == iv2 ])
 
-    As an alternative, you can also write the `Element` constraint directly on `data`: `Element(data, iv1) == iv2`
+    As an alternative, you can also write the :class:`~cpmpy.expressions.globalfunctions.Element` constraint directly on `data`: 
+    
+    .. code-block:: python
+
+        Element(data, iv1) == iv2
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
-    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr)
+    order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
+    return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 
 
 class NullShapeError(Exception):
@@ -405,6 +426,12 @@ class NDVarArray(np.ndarray, Expression):
     Do not create this object directly, use one of the functions in this module
     """
     def __init__(self, shape, **kwargs):
+        # bit ugly, but np.int and np.bool do not play well with > overloading
+        if np.issubdtype(self.dtype, np.integer):
+            self.astype(int)
+        elif np.issubdtype(self.dtype, np.bool_):
+            self.astype(bool)
+
         # TODO: global name?
         # this is nice and sneaky, 'self' is the list_of_arguments!
         Expression.__init__(self, "NDVarArray", self)
@@ -447,35 +474,40 @@ class NDVarArray(np.ndarray, Expression):
         return super().__repr__()
 
     def __getitem__(self, index):
-        from .globalfunctions import Element # here to avoid circular
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return Element(self, index)
+            return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
+
+            if len(index) != self.ndim:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+
             # find dimension of expression in index
-            expr_dim = next(dim for dim,idx in enumerate(index) if isinstance(idx, Expression))
-            arr = self[tuple(index[:expr_dim])] # select remaining dimensions
-            index = index[expr_dim:]
+            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
+            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
+                # TODO can we do the same for more than one Expression? Not sure...
+                index  = list(index)
+                index += [index.pop(expr_dim[0])]
+
+                arr = np.moveaxis(self, expr_dim[0], -1)
+                return cp.Element(arr[index[:-1]], index[-1])
+
+
+            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
+            index = index[expr_dim[0]:]
 
             # calculate index for flat array
             flat_index = index[-1]
             for dim, idx in enumerate(index[:-1]):
                 flat_index += idx * math.prod(arr.shape[dim+1:])
             # using index expression as single var for flat array
-            return Element(arr.flatten(), flat_index)
+            return cp.Element(arr.flatten(), flat_index)
 
-        ret = super().__getitem__(index)
-        # this is a bit ugly,
-        # but np.int and np.bool do not play well with > overloading
-        if isinstance(ret, np.integer):
-            return int(ret)
-        elif isinstance(ret, np.bool_):
-            return bool(ret)
-        return ret
+        return super().__getitem__(index)
 
     """
     make the given array the first dimension in the returned array
@@ -506,15 +538,14 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.sum(NDVarArray) as people might use it
         """
-        from .python_builtins import sum as cpm_sum
 
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the sum over the whole array
-            return cpm_sum(self)
+            return cp.sum(self)
 
-        return cpm_array(np.apply_along_axis(cpm_sum, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.sum, axis=axis, arr=self))
 
 
     def prod(self, axis=None, out=None):
@@ -535,34 +566,30 @@ class NDVarArray(np.ndarray, Expression):
         """
             overwrite np.max(NDVarArray) as people might use it
         """
-        from .python_builtins import max as cpm_max
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the maximum over the whole array
-            return cpm_max(self)
+            return cp.max(self)
 
-        return cpm_array(np.apply_along_axis(cpm_max, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.max, axis=axis, arr=self))
 
     def min(self, axis=None, out=None):
         """
             overwrite np.min(NDVarArray) as people might use it
         """
-        from .python_builtins import min as cpm_min
         if out is not None:
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want the minimum over the whole array
-            return cpm_min(self)
+            return cp.min(self)
 
-        return cpm_array(np.apply_along_axis(cpm_min, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.min, axis=axis, arr=self))
 
     def any(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
-        from .python_builtins import any as cpm_any
-
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
@@ -570,18 +597,15 @@ class NDVarArray(np.ndarray, Expression):
             raise NotImplementedError()
 
         if axis is None:    # simple case where we want a disjunction over the whole array
-            return cpm_any(self)
+            return cp.any(self)
 
-        return cpm_array(np.apply_along_axis(cpm_any, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.any, axis=axis, arr=self))
 
 
     def all(self, axis=None, out=None):
         """
             overwrite np.any(NDVarArray)
         """
-
-        from .python_builtins import all as cpm_all
-
         if any(not is_boolexpr(x) for x in self.flat):
             raise TypeError("Cannot call .any() in an array not consisting only of bools")
 
@@ -589,9 +613,9 @@ class NDVarArray(np.ndarray, Expression):
             raise NotImplementedError()
 
         if axis is None:  # simple case where we want a conjunction over the whole array
-            return cpm_all(self)
+            return cp.all(self)
 
-        return cpm_array(np.apply_along_axis(cpm_all, axis=axis, arr=self))
+        return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
     def get_bounds(self):
         lbs, ubs = zip(*[get_bounds(e) for e in self])

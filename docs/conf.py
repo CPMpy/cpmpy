@@ -20,11 +20,11 @@ import cpmpy
 # -- Project information -----------------------------------------------------
 
 project = 'CPMpy'
-copyright = '2024, Tias Guns'
+copyright = '2025, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.23'
+release = '0.9.24'
 
 # variables to be accessed from html
 html_context = {
@@ -45,7 +45,10 @@ extensions = [
     'myst_parser',
     'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
-    'sphinx_automodapi.smart_resolver'
+    'sphinx_automodapi.smart_resolver',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.todo',
+    'sphinx.ext.autosectionlabel'
 ]
 
 myst_enable_extensions = [
@@ -66,6 +69,11 @@ myst_enable_extensions = [
 
 numpydoc_show_class_members = False
 numpydoc_show_inherited_class_members = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+
+
+todo_include_todos = True
 
 source_suffix =  ['.rst', '.md']
 # source_suffix =  '.rst'

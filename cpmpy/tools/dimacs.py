@@ -6,11 +6,11 @@
 """
     This file implements helper functions for exporting CPMpy models from and to DIMACS format.
     DIMACS is a textual format to represent CNF problems.
-    The header of the file should be formatted as `p cnf <n_vars> <n_constraints>`
+    The header of the file should be formatted as ``p cnf <n_vars> <n_constraints>``.
     If the number of variables and constraints are not given, it is inferred by the parser.
 
     Each remaining line of the file is formatted as a list of integers.
-    An integer represents a Boolean variable and a negative Boolean variable is represented using a `-` sign.
+    An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
 """
 
 import cpmpy as cp
@@ -30,9 +30,11 @@ def write_dimacs(model, fname=None):
         Writes CPMpy model to DIMACS format
         Uses the "to_cnf" transformation from CPMpy
 
-        # TODO: implement pseudoboolean constraints in to_cnf
+        .. todo::
+            TODO: implement pseudoboolean constraints in to_cnf
+
         :param model: a CPMpy model
-        :fname: optional, file name to write the DIMACS output to
+        :param fname: optional, file name to write the DIMACS output to
     """
 
     constraints = toplevel_list(model.constraints)
@@ -71,42 +73,51 @@ def write_dimacs(model, fname=None):
 
 def read_dimacs(fname):
     """
-        Read a CPMpy model from a DIMACS formatted file
-        If the number of variables and constraints is not present in the header, they are inferred.
-        :param: fname: the name of the DIMACS file
-        :param: sep: optional, separator used in the DIMACS file, will try to infer if None
+        Read a CPMpy model from a DIMACS formatted file strictly following the specification:
+        https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
+        
+        .. note::
+            The p-line has to denote the correct number of variables and clauses
+        
+        :param fname: the name of the DIMACS file
+        :param sep: optional, separator used in the DIMACS file, will try to infer if None
     """
 
     m = cp.Model()
 
     with open(fname, "r") as f:
-
-        lines = f.readlines()
-        for i, line in enumerate(lines): # DIMACS allows for comments, skip comment lines
-            if line.startswith("p cnf"):
-                break
+        clause = []
+        nr_vars = None
+        for line in f.readlines():
+            if line == "" or line.startswith("c"):
+                continue  # skip empty and comment lines
+            elif line.startswith("p"):
+                params = line.strip().split(" ")
+                assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
+                _,typ,nr_vars,nr_cls = params
+                if typ != "cnf":
+                    raise ValueError("Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
+                nr_vars = int(nr_vars)
+                if nr_vars>0:
+                    bvs = cp.boolvar(shape=nr_vars)
+                nr_cls = int(nr_cls)
             else:
-                assert line.startswith("c"), f"Expected comment on line {i}, but got {line}"
+                assert nr_vars is not None, "Expected p-line before first clause"
+                for token in line.strip().split():
+                    i = int(token.strip())
+                    if i == 0:
+                        m += cp.any(clause)
+                        clause = []
+                    else:
+                        var=abs(i)-1
+                        assert var < nr_vars, "Expected at most {nr_vars} variables (from p-line) but found literal {i} in clause {line}"
+                        bv = bvs[var]
 
-        cnf = "\n".join(lines[i+1:]) # part of file containing clauses
+                        clause.append(bv if i > 0 else ~bv)
 
-        bvs = []
-        txt_clauses = re.split(r"\n* \n*0", cnf) # clauses end with ` 0` but can have arbitrary newlines
-
-        for txt_ints in txt_clauses:
-            if txt_ints is None or len(txt_ints.strip()) == 0:
-                continue # empty clause or weird format
-
-            clause = []
-            ints = [int(idx.strip()) for idx in txt_ints.split(" ") if len(idx.strip())]
-
-            for i in ints:
-                if abs(i) >= len(bvs):  # var does not exist yet, create
-                    bvs += [cp.boolvar() for _ in range(abs(i) - len(bvs))]
-                bv = bvs[abs(i) - 1]
-                clause.append(bv if i > 0 else ~bv)
-
-            m += cp.any(clause)
+        assert nr_vars is not None, "Expected file to contain p-line, but did not"
+        assert len(clause) == 0, f"Expected last clause to be terminated by 0, but it was not"
+        assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
 
     return m
 
