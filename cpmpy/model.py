@@ -31,6 +31,8 @@ import copy
 import warnings
 
 import numpy as np
+
+from .exceptions import NotSupportedError
 from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
@@ -48,9 +50,10 @@ class Model(object):
         """
             Arguments of constructor:
 
-            - `*args`: Expression object(s) or list(s) of Expression objects
-            - `minimize`: Expression object representing the objective to minimize
-            - `maximize`: Expression object representing the objective to maximize
+            Arguments:
+                `*args`: Expression object(s) or list(s) of Expression objects
+                `minimize`: Expression object representing the objective to minimize
+                `maximize`: Expression object representing the objective to maximize
 
             At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
         """
@@ -83,8 +86,10 @@ class Model(object):
         """
             Add one or more constraints to the model
 
-            m = Model()
-            m += [x > 0]
+            .. code-block:: python
+
+                m = Model()
+                m += [x > 0]
         """
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
@@ -111,8 +116,9 @@ class Model(object):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr (Expression):      the CPMpy expression that represents the objective function
+                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
         """
@@ -142,16 +148,21 @@ class Model(object):
     def solve(self, solver=None, time_limit=None, **kwargs):
         """ Send the model to a solver and get the result
 
-        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
-        :type string: None (default) or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!)
+        Arguments:
+            solver (string or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!), optional): 
+                name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
+            time_limit (int or float, optional): time limit in seconds
 
-        :param time_limit: optional, time limit in seconds
-        :type time_limit: int or float
+            
+        Returns:
+            bool: the computed output:
 
-        :return: Bool: the computed output:
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
+        if kwargs and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -164,19 +175,22 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None):
+    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
             Delegated to the solver, who might implement this efficiently
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
+                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
+                solution_limit:     stop after this many solutions (default: None)
 
             Returns: number of solutions found
         """
+        if kwargs and solver is None:
+            raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
             s = solver(self)
@@ -184,7 +198,7 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True)
+        ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
@@ -195,7 +209,8 @@ class Model(object):
 
             Status information includes exit status (optimality) and runtime.
 
-        :return: an object of :class:`SolverStatus`
+            Returns:
+                an object of :class:`SolverStatus`
         """
         return self.cpm_status
 
@@ -203,7 +218,8 @@ class Model(object):
         """
             Returns the value of the objective function of the latste solver run on this model
 
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
+            Returns:
+                an integer or 'None' if it is not run, or a satisfaction problem
         """
         return self.objective_.value()
 
@@ -225,9 +241,10 @@ class Model(object):
 
     def to_file(self, fname):
         """
-            Serializes this model to a .pickle format
+            Serializes this model to a ``.pickle`` format
 
-            :param: fname: Filename of the resulting serialized model
+            Arguments:
+                fname (FileDescriptorOrPath): Filename of the resulting serialized model
         """
         with open(fname,"wb") as f:
             pickle.dump(self, file=f)
@@ -238,7 +255,8 @@ class Model(object):
         """
             Reads a Model instance from a binary pickled file
 
-            :return: an object of :class: `Model`
+            Returns:
+                an object of :class: `Model`
         """
         with open(fname, "rb") as f:
             m = pickle.load(f)
