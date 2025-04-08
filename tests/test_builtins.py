@@ -48,33 +48,33 @@ class TestBuiltin(unittest.TestCase):
         self.assertNotEqual(str(cp.abs(iv[0].value())), '4')
 
     # Boolean builtins
-
     def test_all(self):
         # edge-cases
-        # CPMpy False -> should return CPMpy False
+        # Only CPMpy expressions
         x = [cp.boolvar(), cp.BoolVal(False), cp.boolvar()]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")        
+        x = [cp.BoolVal(True)]
+        self.assertEqual(str(cpm_all(x)), "boolval(True)")
+        x = [cp.BoolVal(False)]
         self.assertEqual(str(cpm_all(x)), "boolval(False)")
-        # python False, but also expression! -> should return CPMpy False
+
+        # mix of Python and CPMpy expressions
         x = [cp.boolvar(), False, cp.boolvar()]
         self.assertEqual(str(cpm_all(x)), "boolval(False)")
         x = [False, cp.BoolVal(False)]
         self.assertEqual(str(cpm_all(x)), "boolval(False)")
+        x = [False, cp.BoolVal(True)]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
         x = [cp.BoolVal(False), False]
         self.assertEqual(str(cpm_all(x)), "boolval(False)")
-        # only Python constants
+        x = [cp.BoolVal(True), False]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+
+        # only Python constants, should override default
         x = [False, True]
         self.assertEqual(str(cpm_all(x)), "False")
-        # one CPMPy True constant
-        x = [cp.BoolVal(True)]
-        self.assertEqual(str(cpm_all(x)), "boolval(True)")
-        # one python True constant
-        x = [True]
+        x = []
         self.assertEqual(str(cpm_all(x)), "True")
-        # Python and CPMpy True constant
-        x = [True, cp.BoolVal(True)]
-        self.assertEqual(str(cpm_all(x)), "boolval(True)")
-        x = [cp.BoolVal(True), True]
-        self.assertEqual(str(cpm_all(x)), "boolval(True)")
 
         # should also work with overloaded operators
         expr = cp.BoolVal(False) & cp.BoolVal(True)
@@ -90,31 +90,33 @@ class TestBuiltin(unittest.TestCase):
 
     def test_any(self):
         # edge-cases
-        # CPMpy True -> should return CPMpy True
+
+        # Only CPMpy expressions
         x = [cp.boolvar(), cp.BoolVal(True), cp.boolvar()]
         self.assertEqual(str(cpm_any(x)), "boolval(True)")
-        # python True, but also expression! -> should return CPMpy True
+        x = [cp.BoolVal(True)]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [cp.BoolVal(False)]
+        self.assertEqual(str(cpm_any(x)), "boolval(False)")
+        
+
+        # mix of Python and CPMpy expressions
         x = [cp.boolvar(), True, cp.boolvar()]
         self.assertEqual(str(cpm_any(x)), "boolval(True)")
         x = [True, cp.BoolVal(True)]
         self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [False, cp.BoolVal(False)]
+        self.assertEqual(str(cpm_any(x)), "boolval(False)")
         x = [cp.BoolVal(True), True]
         self.assertEqual(str(cpm_any(x)), "boolval(True)")
-        # only Python constants
+        
+        # only Python constants, should override default
         x = [False, True]
         self.assertEqual(str(cpm_any(x)), "True")
-        # one CPMPy True constant
-        x = [cp.BoolVal(True)]
-        self.assertEqual(str(cpm_any(x)), "boolval(True)")
-        # one python True constant
-        x = [True]
-        self.assertEqual(str(cpm_any(x)), "True")
-        # Python and CPMpy True constant
-        x = [True, cp.BoolVal(True)]
-        self.assertEqual(str(cpm_any(x)), "boolval(True)")
-        x = [cp.BoolVal(True), True]  
-        self.assertEqual(str(cpm_any(x)), "boolval(True)")
-
+        x = []
+        self.assertEqual(str(cpm_any(x)), "False")
+        
+        # should also work with overloaded operators
         expr = cp.BoolVal(False) | cp.BoolVal(True)
         self.assertEqual(str(expr), "boolval(True)")
         expr = False | cp.BoolVal(True)
