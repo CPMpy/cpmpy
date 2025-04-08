@@ -318,6 +318,7 @@ class CPM_z3(SolverInterface):
         :return: self
         """
         # all variables are user variables, handled in `solver_var()`
+        # but this misses variables which are part of constraints that don't get posted
         get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
