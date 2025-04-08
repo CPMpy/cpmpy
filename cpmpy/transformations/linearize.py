@@ -342,7 +342,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             # link Boolean matrix and integer variable
             for arg, row in zip(cpm_expr.args, x):
                 if is_num(arg): # constant, fix directly
-                    newlist.append(row[arg-lb] == 1)
+                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
                 else: # ensure result is canonical
                     newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
