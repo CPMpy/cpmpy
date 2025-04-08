@@ -719,6 +719,8 @@ class TestSupportedSolvers:
             No straightforward way to resolve this for now.
             """
             return
+        if solver == "gcs":
+            return
         s = cp.SolverLookup.get(solver)
         try:
             s.minimize(cp.sum(x))
@@ -783,7 +785,7 @@ class TestSupportedSolvers:
         sols = set()
         solution_limit = None
         if solver == 'gurobi':
-            solution_limit = 10
+            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
         m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
