@@ -20,7 +20,7 @@
 
 ### Constraint solving at your finger tips
 
-For combinatorial optimisation problems with Boolean and integer variables. With many high-level constraints that are automatically decomposed when not natively supported by the solver.
+For combinatorial problems with Boolean and integer variables. With many high-level constraints that are automatically decomposed when not natively supported by the solver.
 
 Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
 

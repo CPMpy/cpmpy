@@ -3,7 +3,7 @@ CPMpy: Constraint Programming and Modeling in Python
 
 Souce code and issue tracker: https://github.com/CPMpy/cpmpy
 
-CPMpy is ideal for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
+CPMpy is ideal for solving combinatorial problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
 .. toctree::
    :maxdepth: 1
