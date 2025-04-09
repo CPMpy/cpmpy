@@ -24,6 +24,16 @@ CPMpy has regular small releases with updates and improvements, so it is a good 
     $ pip install -U cpmpy
 
 
+CPMpy supports a multitude of solvers of different technologies to be used as backend. Easy installation is provided through optional dependencies:
+
+.. code-block:: bash
+
+    # Choose any subset of solvers to install
+    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, minizinc, pysat, pysdd, z3] 
+
+Some solver require additional steps (like acquiring a (aca.) license). Have a look at :ref:`this <supported-solvers>` overview.
+
+
 Installing from a git repository
 --------------------------------
 If you want the very latest, or perhaps from an in-development branch, you can install directly from github as follows:
