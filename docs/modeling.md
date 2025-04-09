@@ -430,9 +430,9 @@ else:
 ```
 The status of solve-call can be the following:
 1. `ExitStatus.OPTIMAL`: The solver found a solution to a satifaction problem or an optimal solution in case of optimization.
-2. `ExitStatus.FEASIBLE`: The solver found a feasible solution to an optimization problem, but did not proof optimality.
+2. `ExitStatus.FEASIBLE`: The solver found a feasible solution to an optimization problem, but did not prove optimality.
 3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
-4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, not proved the problem is unsatisfiable. Can happen when a time-limit is reached.
+4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
 5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
 
 ## Finding all solutions
