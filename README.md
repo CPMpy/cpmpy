@@ -26,7 +26,7 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 
 ### 🔑 Key Features
 
-* **Solver-agnostic**: use and compare CP, MIP, SMT, PB and SAT solvers
+* **Solver-agnostic**: use and compare CP, ILP, SMT, PB and SAT solvers
 * **ML-friendly**: decision variables are numpy arrays, with vectorized operations and constraints
 * **Incremental solving**: assumption variables, adding constraints and updating objectives
 * **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
@@ -38,7 +38,7 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 CPMpy can translate to a wide variaty of constraint solving paradigms, including both commercial and open-source solvers.
 
 * **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
-* **MIP Solvers**: Gurobi (license required), IBM CPLEX (license required)
+* **ILP Solvers**: Gurobi (license required)
 * **SMT Solvers**: Z3
 * **PB Solvers**: Exact
 * **SAT Solvers**: PySAT+solvers, PySDD
