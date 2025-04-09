@@ -176,6 +176,7 @@ class CPM_pumpkin(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             elif isinstance(result, SatisfactionUnderAssumptionsResult.Unsatisfiable):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                self._pum_core = [] # empty core, no required assumptions to prove UNSAT
             elif  isinstance(result, SatisfactionUnderAssumptionsResult.UnsatisfiableUnderAssumptions):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 self._pum_core = result._0
@@ -395,10 +396,13 @@ class CPM_pumpkin(SolverInterface):
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
-            return [constraints.Clause([self.solver_var(cpm_expr)])]
+            forced_sum = Operator("sum", [cpm_expr])
+            return [constraints.Equals(self._sum_args(forced_sum), 1)]
 
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or":
+                hacked = Operator("sum", cpm_expr.args)
+                return [constraints.LessThanOrEquals(self._sum_args(hacked, negate=True), -1)]
                 return [constraints.Clause(self.solver_vars(cpm_expr.args))]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
@@ -463,11 +467,11 @@ class CPM_pumpkin(SolverInterface):
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}")
 
         elif isinstance(cpm_expr, BoolVal): # unlikely base case
+            a = boolvar() # dummy variable
             if cpm_expr.value() is True:
-                a = self.solver_var(boolvar()) # dummy variable
-                return [constraints.Clause([a])]
+                return self._get_constraint(Operator("sum", [a]) >= 0)
             else:
-                return [constraints.Clause([])]
+                return self._get_constraint(Operator("sum", [a]) <= -1)
 
         else:
             raise ValueError("Unexpected constraint:", cpm_expr)
@@ -509,15 +513,15 @@ class CPM_pumpkin(SolverInterface):
 
                     bv, subexpr = cpm_expr.args
                     for cons in self._get_constraint(subexpr):
-                        if isinstance(cons, constraints.Clause):
-                            tag = None
+                        if isinstance(cons, constraints.Clause):    
+                            raise ValueError("_get_constraint should not return clauses")
                         self.pum_solver.add_implication(cons, self.solver_var(bv), tag=tag)
                 else:
                     solver_constraints = self._get_constraint(cpm_expr)
 
                     for cons in solver_constraints:
                         if isinstance(cons, constraints.Clause):
-                            tag = None
+                            raise ValueError("_get_constraint should not return clauses")
                         self.pum_solver.add_constraint(cons,tag=tag)
 
         return self
