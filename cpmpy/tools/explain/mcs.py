@@ -55,7 +55,7 @@ def mcs_grow_naive(soft, hard, solver="ortools"):
 
         :param: soft: list of soft constraints that may be part of the minimal correction subset
         :param: hard: list of hard constraints, will be added to the model before solving
-        :param: solver: the SAT-solver to use, ideally incremental such as gurobi
+        :param: solver: the SAT-solver to use, ideally incremental such as "gurobi", "exact"
     """
     soft2 = toplevel_list(soft, merge_and=False)
     mymss = mss_grow_naive(soft2, hard, solver)
