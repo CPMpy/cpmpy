@@ -121,41 +121,38 @@ class Expression(NDArrayOperatorsMixin, object):
         # Only handle the __call__ method
         if method != "__call__":
             return NotImplemented
-
-        # Map NumPy ufuncs to CPMpy method names
+        
+        # Map NumPy ufuncs to CPMpy method names:
+        # ufunc, operator, reverse operator (when needed, as expressions are in rhs)
         op_map = {
             # Comparisons
-            np.equal: "eq",
-            np.not_equal: "ne",
-            np.less: "lt",
-            np.less_equal: "le",
-            np.greater: "gt",
-            np.greater_equal: "ge",
+            np.equal: [Expression.__eq__, Expression.__eq__],
+            np.not_equal: [Expression.__ne__, Expression.__ne__],
+            np.less: [Expression.__lt__, Expression.__gt__],
+            np.less_equal: [Expression.__le__, Expression.__ge__],
+            np.greater: [Expression.__gt__, Expression.__lt__],
+            np.greater_equal: [Expression.__ge__, Expression.__le__],
             # Arithmetic
-            np.add: "add",
-            np.subtract: "sub",
-            np.multiply: "mul",
-            np.floor_divide: "floordiv",
-            np.true_divide: "truediv",  # Will warn and use floordiv
-            np.mod: "mod",
-            np.power: "pow",
+            np.add: [Expression.__add__, Expression.__radd__],
+            np.subtract: [Expression.__sub__, Expression.__rsub__],
+            np.multiply: [Expression.__mul__, Expression.__rmul__],
+            np.floor_divide: [Expression.__floordiv__, Expression.__rfloordiv__],
+            np.true_divide: [Expression.__truediv__, Expression.__rtruediv__],  # Will warn and use floordiv
+            np.mod: [Expression.__mod__, Expression.__rmod__],
+            np.power: [Expression.__pow__, Expression.__rpow__],
             # Logical
-            np.logical_and: "and",
-            np.logical_or: "or",
-            np.logical_xor: "xor"
+            np.logical_and: [Expression.__and__, Expression.__rand__],
+            np.logical_or: [Expression.__or__, Expression.__ror__],
+            np.logical_xor: [Expression.__xor__, Expression.__rxor__]
         }
         
         # Handle binary operations
         if len(inputs) == 2 and ufunc in op_map:
             x, y = inputs
+
             if isinstance(x, Expression):
-                return getattr(x, f"__r{op_map[ufunc]}__")(y)
-
-            # If y is a CPMpy Expression and x is a NumPy array/scalar
-            if isinstance(x, np.ndarray) or np.isscalar(x):
-                method_name = f"__r{op_map[ufunc]}__"
-                print("method_name: ", method_name)
-
+                return op_map[ufunc][0](x, y)
+            elif isinstance(x, np.ndarray) or np.isscalar(x):
                 # For array operations with multiple elements
                 if isinstance(x, np.ndarray) and x.size > 1:
                     from cpmpy.expressions.variables import NDVarArray
@@ -167,7 +164,7 @@ class Expression(NDArrayOperatorsMixin, object):
                     # For scalar operations or arrays with single element
                     if isinstance(x, np.ndarray):
                         x = x.item()
-                return getattr(y, method_name)(x)
+                return op_map[ufunc][1](y, x)
                 
         # For other methods or ufuncs not supported
         raise NotImplementedError(f"Unsupported operation: {ufunc.__name__}")
