@@ -99,7 +99,7 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
 Open Source
 -----------
 
-CPMpy is open source: `Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/master/LICENSE>`_ and the development process is open too: all discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests.
+CPMpy is open source: `Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/master/LICENSE>`_ and the development process is open too: all discussions happen on GitHub, even between direct colleagues, and all changes are reviewed through pull requests.
 
 **Join us!** We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the `examples folder <https://github.com/CPMpy/cpmpy/tree/master/examples>`_.
 
