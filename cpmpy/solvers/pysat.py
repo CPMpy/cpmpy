@@ -89,7 +89,7 @@ class CPM_pysat(SolverInterface):
 
 
     @staticmethod
-    def solvernames(*args):
+    def solvernames(**kwargs):
         """
             Returns solvers supported by PySAT on your system
         """
