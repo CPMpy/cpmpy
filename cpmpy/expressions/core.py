@@ -121,7 +121,7 @@ class Expression(NDArrayOperatorsMixin, object):
         # Only handle the __call__ method
         if method != "__call__":
             return NotImplemented
-            
+
         # Map NumPy ufuncs to CPMpy method names
         op_map = {
             # Comparisons
@@ -148,9 +148,11 @@ class Expression(NDArrayOperatorsMixin, object):
         # Handle binary operations
         if len(inputs) == 2 and ufunc in op_map:
             x, y = inputs
-            
+            if isinstance(x, Expression):
+                return getattr(x, f"__r{op_map[ufunc]}__")(y)
+
             # If y is a CPMpy Expression and x is a NumPy array/scalar
-            if isinstance(y, Expression) and (isinstance(x, np.ndarray) or np.isscalar(x)):
+            if isinstance(x, np.ndarray) or np.isscalar(x):
                 method_name = f"__r{op_map[ufunc]}__"
                 print("method_name: ", method_name)
 
