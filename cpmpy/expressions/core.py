@@ -110,6 +110,16 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
+            np.less: "lt",
+            np.less_equal: "le",
+            np.greater: "gt",
+            np.greater_equal: "ge",
+            # Arithmetic
+            np.add: "add",
+            np.subtract: "sub",
+            np.multiply: "mul",
+            np.floor_divide: "floordiv",
+            np.true_divide: "truediv",  # Will warn and use floordiv
     def __init__(self, name, arg_list):
         self.name = name
 
