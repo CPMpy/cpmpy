@@ -42,20 +42,20 @@ class TestNumpyufuncs(unittest.TestCase):
         # Test comparisons with NumPy int on the left side
         expr2 = np.int_(1) == self.iv % 2
         self.assertIsInstance(expr2, Comparison)
-        self.assertEqual(str(expr2), "1 == (var) mod 2")        
+        self.assertEqual(str(expr2), "(var) mod 2 == 1")
 
         expr2 = np.int_(1) > self.iv % 2
         self.assertIsInstance(expr2, Comparison)
-        self.assertEqual(str(expr2), "1 > (var) mod 2")
+        self.assertEqual(str(expr2), "(var) mod 2 < 1")
 
         expr2 = np.int_(1) < self.iv % 2
         self.assertIsInstance(expr2, Comparison)
-        self.assertEqual(str(expr2), "1 < (var) mod 2")
+        self.assertEqual(str(expr2), "(var) mod 2 > 1")
 
         # Test operation with NumPy int on the left side
         expr2 = np.int_(1) >= np.int_(2) % self.iv
         self.assertIsInstance(expr2, Comparison)
-        self.assertEqual(str(expr2), "1 >= 2 mod (var)")
+        self.assertEqual(str(expr2), "2 mod (var) <= 1")
 
 class TestSum(unittest.TestCase):
 
