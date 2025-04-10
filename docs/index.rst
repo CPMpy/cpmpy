@@ -38,7 +38,7 @@ CPMpy can translate to many different solvers, and even provides direct access t
      - CP
      - pip
      - No
-     -
+     - 
    * - **GCS**
      - CP
      - pip
@@ -53,12 +53,12 @@ CPMpy can translate to many different solvers, and even provides direct access t
      - SMT
      - pip
      - Yes
-     -
+     - 
    * - **Gurobi**
      - ILP
      - pip + (aca.) license
      - No
-     -
+     - 
    * - **Exact**
      - Pseudo-Boolean
      - pip (only Linux, Win(py>3.10))
