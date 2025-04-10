@@ -306,44 +306,20 @@ class Expression(NDArrayOperatorsMixin, object):
                 return ~self
         return Comparison("==", self, other)
 
-    def __req__(self, other):
-        # BoolExpr == 1|true|0|false, common case, simply BoolExpr
-        if self.is_bool() and is_num(other):
-            if other is True or other == 1:
-                return self
-            if other is False or other == 0:
-                return ~self
-        return Comparison("==", other, self)
-
     def __ne__(self, other):
         return Comparison("!=", self, other)
-
-    def __rne__(self, other):
-        return Comparison("!=", other, self)
 
     def __lt__(self, other):
         return Comparison("<", self, other)
 
-    def __rlt__(self, other):
-        return Comparison("<", other, self)
-
     def __le__(self, other):
         return Comparison("<=", self, other)
-
-    def __rle__(self, other):
-        return Comparison("<=", other, self)
 
     def __gt__(self, other):
         return Comparison(">", self, other)
 
-    def __rgt__(self, other):
-        return Comparison(">", other, self)
-
     def __ge__(self, other):
         return Comparison(">=", self, other)
-
-    def __rge__(self, other):
-        return Comparison(">=", other, self)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
