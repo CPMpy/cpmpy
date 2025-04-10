@@ -88,13 +88,14 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
+from numpy.lib.mixins import NDArrayOperatorsMixin
 import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
-class Expression(object):
+class Expression(NDArrayOperatorsMixin, object):
     """
     An Expression represents a symbolic function with a `self.name` and `self.args` (arguments)
 
@@ -110,6 +111,22 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        """
+        Handle NumPy ufuncs for CPMpy expressions.
+        
+        This method is called when a NumPy ufunc is applied to a CPMpy expression.
+        It ensures that CPMpy expressions handle the operation correctly.
+        """
+        # Only handle the __call__ method
+        if method != "__call__":
+            return NotImplemented
+            
+        # Map NumPy ufuncs to CPMpy method names
+        op_map = {
+            # Comparisons
+            np.equal: "eq",
+            np.not_equal: "ne",
             np.less: "lt",
             np.less_equal: "le",
             np.greater: "gt",
@@ -120,6 +137,40 @@ class Expression(object):
             np.multiply: "mul",
             np.floor_divide: "floordiv",
             np.true_divide: "truediv",  # Will warn and use floordiv
+            np.mod: "mod",
+            np.power: "pow",
+            # Logical
+            np.logical_and: "and",
+            np.logical_or: "or",
+            np.logical_xor: "xor"
+        }
+        
+        # Handle binary operations
+        if len(inputs) == 2 and ufunc in op_map:
+            x, y = inputs
+            
+            # If y is a CPMpy Expression and x is a NumPy array/scalar
+            if isinstance(y, Expression) and (isinstance(x, np.ndarray) or np.isscalar(x)):
+                method_name = f"__r{op_map[ufunc]}__"
+                print("method_name: ", method_name)
+
+                # For array operations with multiple elements
+                if isinstance(x, np.ndarray) and x.size > 1:
+                    from cpmpy.expressions.variables import NDVarArray
+                    
+                    # Broadcast if needed
+                    if not isinstance(y, NDVarArray) or len(y) != x.size:
+                        raise ValueError("Incompatible dimensions for array operation")
+                        
+                else:
+                    # For scalar operations or arrays with single element
+                    if isinstance(x, np.ndarray):
+                        x = x.item()
+                return getattr(y, method_name)(x)
+                
+        # For other methods or ufuncs not supported
+        raise NotImplementedError(f"Unsupported operation: {ufunc.__name__}")
+
     def __init__(self, name, arg_list):
         self.name = name
 
@@ -254,20 +305,44 @@ class Expression(object):
                 return ~self
         return Comparison("==", self, other)
 
+    def __req__(self, other):
+        # BoolExpr == 1|true|0|false, common case, simply BoolExpr
+        if self.is_bool() and is_num(other):
+            if other is True or other == 1:
+                return self
+            if other is False or other == 0:
+                return ~self
+        return Comparison("==", other, self)
+
     def __ne__(self, other):
         return Comparison("!=", self, other)
+
+    def __rne__(self, other):
+        return Comparison("!=", other, self)
 
     def __lt__(self, other):
         return Comparison("<", self, other)
 
+    def __rlt__(self, other):
+        return Comparison("<", other, self)
+
     def __le__(self, other):
         return Comparison("<=", self, other)
+
+    def __rle__(self, other):
+        return Comparison("<=", other, self)
 
     def __gt__(self, other):
         return Comparison(">", self, other)
 
+    def __rgt__(self, other):
+        return Comparison(">", other, self)
+
     def __ge__(self, other):
         return Comparison(">=", self, other)
+
+    def __rge__(self, other):
+        return Comparison(">=", other, self)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
