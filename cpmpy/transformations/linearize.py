@@ -275,7 +275,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar = intvar(*get_bounds(lhs))
                     newlist += linearize_constraint([lhs == newvar])
@@ -378,7 +378,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             # link Boolean matrix and integer variable
             for arg, row in zip(cpm_expr.args, x):
                 if is_num(arg): # constant, fix directly
-                    newlist.append(row[arg-lb] == 1)
+                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
                 else: # ensure result is canonical
                     newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
