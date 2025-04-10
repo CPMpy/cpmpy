@@ -7,6 +7,8 @@
     Interface to z3's API
 
     Requires that the 'z3-solver' python package is installed:
+
+    .. code-block:: console
     
         $ pip install z3-solver
 
@@ -17,7 +19,8 @@
     Documentation of the solver's own Python API:
     https://z3prover.github.io/api/html/namespacez3py.html
 
-    Terminology note: a 'model' for z3 is a solution!
+    .. note::
+        Terminology note: a 'model' for z3 is a solution!
 
     ===============
     List of classes
@@ -55,9 +58,10 @@ class CPM_z3(SolverInterface):
     https://github.com/Z3Prover/z3#python
 
     Creates the following attributes (see parent constructor for more):
-        - z3_solver: object, z3's Solver() object
+        
+    - ``z3_solver``: object, z3's Solver() object
 
-    The `DirectConstraint`, when used, calls a function in the `z3` namespace and `z3_solver.add()`'s the result.
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
     """
 
     @staticmethod
@@ -114,27 +118,32 @@ class CPM_z3(SolverInterface):
             Call the z3 solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - assumptions: list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
-                           get_core() returns a small subset of assumption variables that are unsat together.
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):       maximum solve time in seconds
+                assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                                                    For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                                                    get_core() returns a small subset of assumption variables that are unsat together.
+                **kwargs:                           any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
-                - ... (no common examples yet)
-            The full list doesn't seem to be documented online, you have to run its help() function:
-            ```
-            import z3
-            z3.Solver().help()
-            ```
 
-            Warning! Some parameternames in z3 have a '.' in their name,
-            such as (arbitrarily chosen): 'sat.lookahead_simplify'
-            You have to construct a dictionary of keyword arguments upfront:
-            ```
-            params = {"sat.lookahead_simplify": True}
-            s.solve(**params)
-            ```
+            - ... (no common examples yet)
+
+            The full list doesn't seem to be documented online, you have to run its help() function:
+            
+            .. code-block:: python
+
+                import z3
+                z3.Solver().help()
+
+            .. warning::
+                Warning! Some parameternames in z3 have a '.' in their name,
+                such as (arbitrarily chosen): ``sat.lookahead_simplify``
+                You have to construct a dictionary of keyword arguments upfront:
+                
+                .. code-block:: python
+
+                    params = {"sat.lookahead_simplify": True}
+                    s.solve(**params)
         """
         import z3
 
@@ -245,10 +254,11 @@ class CPM_z3(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: any constraints created during conversion of the objective
-            are premanently posted to the solver)
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         import z3
         # objective can be a nested expression for z3
@@ -274,12 +284,12 @@ class CPM_z3(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -464,7 +474,7 @@ class CPM_z3(SolverInterface):
 
     def get_core(self):
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those variables that are False (in the UNSAT core)
 

@@ -12,7 +12,8 @@ from .utils import make_assump_model
 def marco(soft, hard=[], solver="ortools", map_solver="ortools", return_mus=True, return_mcs=True, do_solution_hint=True):
     """
         Enumerating minimal unsatisfiable subsets (MUSes) and minimal correction sets (MCSes)
-         of unsatisfiable constraints.
+        of unsatisfiable constraints.
+        
         Iteratively generates a subset of constraints (the seed) and checks whether it is SAT.
         When the seed is SAT, it is grown to an MSS to derive an MCS.
         This MCS is then added to the Map solver as a set to hit

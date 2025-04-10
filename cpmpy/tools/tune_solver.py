@@ -126,9 +126,9 @@ class GridSearchTuner(ParameterTuner):
 
     def tune(self, time_limit=None, max_tries=None, fix_params={}):
         """
-            :param: time_limit: Time budget to run tuner in seconds. Solver will be interrupted when time budget is exceeded
-            :param: max_tries: Maximum number of configurations to test
-            :param: fix_params: Non-default parameters to run solvers with.
+            :param time_limit: Time budget to run tuner in seconds. Solver will be interrupted when time budget is exceeded
+            :param max_tries: Maximum number of configurations to test
+            :param fix_params: Non-default parameters to run solvers with.
         """
         if time_limit is not None:
             start_time = time.time()
