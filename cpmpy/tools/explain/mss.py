@@ -45,7 +45,7 @@ def mss_grow(soft, hard=[], solver="ortools"):
 
         :param: soft: list of soft constraints to find a maximal satisfiable subset of
         :param: hard: list of hard constraints, will be added to the model before solving
-        :param: solver: the SAT-solver to use, must support assumptions, (e.g, ortools, exact, z3 or pysat)
+        :param: solver: name of a solver, must support assumptions (e.g, "ortools", "exact", "z3" or "pysat")
 
         Exploits the solution found to add more constraints at once, cfr:
         Mencía, Carlos, and Joao Marques-Silva. "Efficient relaxations of over-constrained CSPs."
