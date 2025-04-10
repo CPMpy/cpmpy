@@ -1,7 +1,7 @@
 CPMpy: Constraint Programming and Modeling in Python
 ====================================================
 
-Souce code and issue tracker: https://github.com/CPMpy/cpmpy
+Source code and issue tracker: https://github.com/CPMpy/cpmpy
 
 CPMpy is ideal for solving combinatorial problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
@@ -101,7 +101,7 @@ Open Source
 
 CPMpy is open source: `Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/master/LICENSE>`_ and the development process is open too: all discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests.
 
-**Join us!** We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the examples folder.
+**Join us!** We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the `examples folder <https://github.com/CPMpy/cpmpy/tree/master/examples>`_.
 
 
 Are you a solver developer? We are keen to `integrate solvers <adding_solver.html>`_ that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
