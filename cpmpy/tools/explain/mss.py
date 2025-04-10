@@ -88,7 +88,7 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
 
         :param: soft: list of soft constraints to find a maximal satisfiable subset of
         :param: hard: list of hard constraints, will be added to the model before solving
-        :param: solver: the SAT-solver to use, ideally incremental such as gurobi
+        :param: solver: the SAT-solver to use, ideally incremental such as "gurobi", "exact"
     """
 
     soft = toplevel_list(soft, merge_and=False)
