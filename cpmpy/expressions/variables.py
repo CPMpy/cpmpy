@@ -632,21 +632,44 @@ class NDVarArray(np.ndarray, Expression):
     # VECTORIZED comparisons
     def __eq__(self, other):
         return self._vectorized(other, '__eq__')
+        
+    def __req__(self, other):
+        return self._vectorized(other, '__eq__')
 
     def __ne__(self, other):
+        return self._vectorized(other, '__ne__')
+        
+    def __rne__(self, other):
         return self._vectorized(other, '__ne__')
 
     def __lt__(self, other):
         return self._vectorized(other, '__lt__')
+        
+    def __rlt__(self, other):
+        # For right-hand side comparison, we need to flip the operator
+        # other < self is the same as self > other
+        return self._vectorized(other, '__gt__')
 
     def __le__(self, other):
         return self._vectorized(other, '__le__')
+        
+    def __rle__(self, other):
+        # other <= self is the same as self >= other
+        return self._vectorized(other, '__ge__')
 
     def __gt__(self, other):
         return self._vectorized(other, '__gt__')
+        
+    def __rgt__(self, other):
+        # other > self is the same as self < other
+        return self._vectorized(other, '__lt__')
 
     def __ge__(self, other):
         return self._vectorized(other, '__ge__')
+        
+    def __rge__(self, other):
+        # other >= self is the same as self <= other
+        return self._vectorized(other, '__le__')
 
     # VECTORIZED math operators
     # only 'abs' 'neg' and binary ones
