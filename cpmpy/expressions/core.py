@@ -91,7 +91,7 @@ import numpy as np
 from numpy.lib.mixins import NDArrayOperatorsMixin
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -535,9 +535,78 @@ class BoolVal(Expression):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
+    def __int__(self):
+        """Called to implement conversion to numerical"""
+        return int(self.args[0])
+
     def get_bounds(self):
         v = int(self.args[0])
         return (v,v)
+
+    def __and__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] and other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return other
+            else:
+                return BoolVal(False)
+        raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+    
+    def __rand__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] and other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return other
+            else:
+                return BoolVal(False)
+        raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+
+    
+    def __or__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] or other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if not self.args[0]:
+                return other
+            else:
+                return BoolVal(True)
+        raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+        
+    def __ror__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] or other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if not self.args[0]:
+                return other
+            else:
+                return BoolVal(True)
+        raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+    def __xor__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] ^ other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return ~other
+            else:
+                return other
+        raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+    
+    
+    def __rxor__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] ^ other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return ~other
+            else:
+                return other
+        raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+    
 
     def has_subexpr(self) -> bool:
         """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?

@@ -1,4 +1,4 @@
-# UnSAT core extraction with assumptions
+# Solving with assumptions
 
 When a model is unsatisfiable, it can be desirable to get a better idea of which Boolean variables make it unsatisfiable. Commonly, these Boolean variables are 'switches' that turn constraints on or off, hence such Boolean variables can be used to get a better idea of which _constraints_ make the model unsatisfiable.
 
