@@ -160,7 +160,6 @@ class Expression(NDArrayOperatorsMixin, object):
                 if isinstance(x, np.ndarray) and x.size > 1:
                     from cpmpy.expressions.variables import NDVarArray
                     
-                    # Broadcast if needed
                     if not isinstance(y, NDVarArray) or len(y) != x.size:
                         raise ValueError("Incompatible dimensions for array operation")
                         
