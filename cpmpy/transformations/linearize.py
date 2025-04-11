@@ -3,10 +3,6 @@ Transformations regarding linearization of constraints.
 
 Linearized constraints have one of the following forms:
 
-Unsatisfiable:
-------------------
-- BoolVal(False)
-
 Linear comparison:
 ------------------
 - LinExpr == Constant
