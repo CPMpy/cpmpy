@@ -512,7 +512,9 @@ cp.SolverLookup.base_solvers() # returns a list of tuples,
 Additionally, one can get the status of each of the solvers:
 ```python
 import cpmpy as cp
-cp.SolverLookup.status() # prints 'solver status' table to stdout
+cp.SolverLookup.status() # returns list of per-solver status reports: (name, installed, version)
+# [('ortools', True, '9.12.4544'), ('pysat', True, '1.8.dev16'), ...]
+cp.SolverLookup.print_status() # prints 'solver status' table to stdout
 ```
 ```console
 Solver               Installed  Version        
@@ -537,7 +539,7 @@ cp.SolverLookup.get('pysat').solvernames()
 ```
 
 
-See get a list of all installed solvers (with subsolvers):
+To get a list of all installed solvers (with subsolvers):
 ```python
 import cpmpy as cp
 cp.SolverLookup.solvernames()

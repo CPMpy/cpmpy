@@ -135,6 +135,15 @@ class SolverLookup():
 
     @classmethod
     def status(cls):
+        """
+        Returns the status of all solvers supported by CPMpy as a list of tuples.
+
+        Each tuple consists of:
+
+        - solver name: <base_solver> or <base_solver>:<subsolver>
+        - install status
+        - version of solver's Python library
+        """
         result = []
         for (basename, CPM_slv) in cls.base_solvers():
             installed = CPM_slv.supported()
