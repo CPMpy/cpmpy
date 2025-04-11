@@ -401,20 +401,6 @@ def only_positive_bv(lst_of_expr):
             lhs, rhs = cpm_expr.args
             new_cons = []
 
-            if isinstance(lhs, _NumVarImpl):
-                if isinstance(lhs,NegBoolView):
-                    lhs, rhs = Operator("wsum",[[-1], [lhs._bv]]), 1 - rhs
-
-            if lhs.name == "sum" and any(isinstance(a, NegBoolView) for a in lhs.args):
-                lhs = Operator("wsum",[[1]*len(lhs.args), lhs.args])
-
-            if lhs.name == "wsum":
-                weights, args = lhs.args
-                idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
-                nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-                lhs = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
-                rhs -= sum(weights[i] for i in idxes)
-
             if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
             # other operators in comparison such as "min", "max"
                 lhs = copy.copy(lhs)
@@ -423,6 +409,12 @@ def only_positive_bv(lst_of_expr):
                         new_arg, cons = get_or_make_var(1 - arg)
                         lhs.args[i] = new_arg
                         new_cons += cons
+                        
+            else:
+                lhs, const = only_positive_bv_sub(lhs)
+                if const == []:
+                    const = 0
+                rhs -= const
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
             newlist += linearize_constraint(new_cons)
@@ -444,6 +436,46 @@ def only_positive_bv(lst_of_expr):
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
     return newlist
+
+def only_positive_bv_sub(expr):
+    """
+        Replaces an pure expression containing NegBoolView with an equivalent expression using only BoolVar.
+        expr is expected to be linearized.
+        
+        Returns a tuple of the new expression as a wsum and a constant, which can be added to the wsum or subtracted from the rhs (depending on the usecase).
+    """
+    if isinstance(expr, _NumVarImpl):
+        if isinstance(expr,NegBoolView):
+            expr, const = Operator("wsum",[[-1], [expr._bv]]), 1
+        else:
+            expr, const = Operator("wsum",[[1], [expr]]), 0
+
+    elif expr.name == "sum" and any(isinstance(a, NegBoolView) for a in expr.args):
+        # count number of negboolviews
+        const = sum([1 for a in expr.args if isinstance(a, NegBoolView)])
+        expr = Operator("wsum",[[-1 if isinstance(arg, NegBoolView) else 1 for arg in expr.args], [arg._bv if isinstance(arg, NegBoolView) else arg for arg in expr.args]])
+
+    elif expr.name == "wsum":
+        weights, args = expr.args
+        idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
+        nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
+        expr = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
+        const = sum(weights[i] for i in idxes)
+
+    else:
+    # other operators in comparison such as "min", "max"
+        expr = copy.copy(expr)
+        const = []
+        for i,arg in enumerate(list(expr.args)):
+            if isinstance(arg, NegBoolView):
+                new_arg, cons = get_or_make_var(1 - arg)
+                expr.args[i] = new_arg
+                const.append(cons)
+                
+    return expr, const
+    
+    
+    
 
 def canonical_comparison(lst_of_expr):
 
@@ -582,8 +614,16 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     Only difference with flatten_objective is that no negated boolvars are allowed.
     """
     flatexpr, flatcons = flatten_objective(expr, supported=supported)
-    if any([isinstance(x, NegBoolView) for x in flatlist(flatexpr.args)]):  # negated boolvars
-        var, cons = get_or_make_var(flatexpr)
-        return var, cons + flatcons
-    else:
-        return flatexpr, flatcons
+    pos_expr, const = only_positive_bv_sub(flatexpr)
+    if isinstance(const, list):
+         return pos_expr, flatcons + const
+    pos_expr = Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1]+[const]])
+    return pos_expr, flatcons
+    
+
+    
+    # if any([isinstance(x, NegBoolView) for x in flatlist(flatexpr.args)]):  # negated boolvars
+    #     var, cons = get_or_make_var(flatexpr)
+    #     return var, cons + flatcons
+    # else:
+    #     return flatexpr, flatcons

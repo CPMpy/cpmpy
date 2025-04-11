@@ -46,17 +46,43 @@ class TestTransLinearize(unittest.TestCase):
     def test_bug_468(self):
         from cpmpy.solvers import CPM_exact, CPM_gurobi
         if CPM_gurobi.supported():
-            a, b, c = boolvar(shape=3)
-            m = cp.Model(cp.any([a, b, c]))
-            m.minimize(3 * a + 4 * ~b + 3 * ~c)
+            b = boolvar()
+            m = cp.Model(cp.any([b]))
+            m.minimize(~b)
             m.solve(solver="gurobi")
-            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
-        if CPM_exact.supported():
+            self.assertEqual([b.value()], [True])
             a, b, c = boolvar(shape=3)
             m = cp.Model(cp.any([a, b, c]))
-            m.minimize(3 * a + 4 * ~b + 3 * ~c)
+            m.minimize(a + ~b + ~c)
+            m.solve("gurobi")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(3*a + 4*~b + 3*~c)
+            m.solve("gurobi")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            ivs = cp.intvar(0, 5, shape=3)
+            m.maximize(ivs[0] * ivs[1] * ivs[2])
+            m.solve("gurobi")
+            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
+        if CPM_exact.supported():
+            b = boolvar()
+            m = cp.Model(cp.any([b]))
+            m.minimize(~b)
+            m.solve(solver="exact")
+            self.assertEqual([b.value()], [True])
+            a, b, c = boolvar(shape=3)
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(a + ~b + ~c)
             m.solve("exact")
             self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(3*a + 4*~b + 3*~c)
+            m.solve("exact")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            ivs = cp.intvar(0, 5, shape=3)
+            m.maximize(ivs[0] * ivs[1] * ivs[2])
+            m.solve("exact")
+            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
 
     def test_constraint(self):
         x,y,z = [cp.intvar(0,5, name=n) for n in "xyz"]
@@ -458,8 +484,8 @@ class testCanonical_comparison(unittest.TestCase):
 
     def test_only_positive_bv_implied_by_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str([p >= 1]), str(only_positive_bv(linearize_constraint([p]))))
+        self.assertEqual("[sum([1] * [p]) >= 1]", str(only_positive_bv(linearize_constraint([p]))))
 
     def test_only_positive_bv_implied_by_negated_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
+        self.assertEqual("[sum([1] * [p]) <= 0]", str(only_positive_bv(linearize_constraint([~p]))))
