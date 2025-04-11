@@ -45,7 +45,10 @@ import re
 import warnings
 import sys
 import os
+import json
+import platform
 from datetime import timedelta  # for mzn's timeout
+from pathlib import Path
 
 import numpy as np
 
@@ -125,25 +128,65 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
-
+        
     @staticmethod
-    def solvernames():
+    def solvernames(installed:bool=False):
         """
             Returns solvers supported by MiniZinc on your system
 
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system
+
+            Returns:
+                list of solver names
+
             .. warning::
-                WARNING, some of them may not actually be installed on your system
-                (namely cplex, gurobi, scip, xpress).
-                The following are bundled in the bundle: chuffed, coin-bc, gecode
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                be installed on your system (namely cplex, gurobi, scip, xpress).
+                The following are bundled with minizinc: chuffed, coin-bc, gecode.
+                Use ``installed=True`` if you only want the names actually installed solvers.
         """
         import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
+        driver = minizinc.default_driver
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
+        # Collect solver names
+        all_solvers = []
+        output = driver._run(["--solvers-json"])
+        solvers = json.loads(output.stdout)        
+        for solver_dict in solvers:
+            tag = solver_dict["id"].split(".")[-1]
+            if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
+                all_solvers.append(tag)
+
+        if not installed:
+            """
+            Return all solver names, without checking if they're actually available on the system.
+            """
+            return set(all_solvers)
+
+        else:
+            """
+            Test which solver executables are available by attempting to solve a small model.
+            """
+            solver_names = set()
+
+            test_model = """
+            var 1..3: x;
+            solve satisfy;
+            """
+
+            driver_dict = minizinc.default_driver.available_solvers()
+
+            for tag in all_solvers:
+                try:
+                    model = minizinc.Model()
+                    model.add_string(test_model)
+                    instance = minizinc.Instance(driver_dict[tag][0], model)
+                    instance.solve(timeout=timedelta(seconds=1))
+                    solver_names.add(tag)
+                except Exception:
+                    pass  # Solver not working or not installed
+
         return solver_names
 
     # variable name can not be any of these keywords
