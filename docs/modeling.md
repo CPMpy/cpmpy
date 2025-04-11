@@ -498,15 +498,53 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 
 The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
-The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst).
-See the full list of solvers known by CPMpy with:
 
+The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst) or by using the following:
+
+```python
+import cpmpy as cp
+cp.SolverLookup.base_solvers() # returns a list of tuples, 
+                               # where each tuple is a pair of (<solver name>, <cpmpy solver class>)
+# [('ortools', <class 'cpmpy.solvers.ortools.CPM_ortools'>), ('z3', <class 'cpmpy.solvers.z3.CPM_z3'>), ('minizinc', <class 'cpmpy.solvers.minizinc.CPM_minizinc'>), ('gcs', <class 'cpmpy.solvers.gcs.CPM_gcs'>), ('gurobi', <class 'cpmpy.solvers.gurobi.CPM_gurobi'>), ('pysat', <class 'cpmpy.solvers.pysat.CPM_pysat'>), ('pysdd', <class 'cpmpy.solvers.pysdd.CPM_pysdd'>), ('exact', <class 'cpmpy.solvers.exact.CPM_exact'>), ('choco', <class 'cpmpy.solvers.choco.CPM_choco'>), ('cpo', <class 'cpmpy.solvers.cpo.CPM_cpo'>)]
+```
+
+
+Additionally, one can get the status of each of the solvers:
+```python
+import cpmpy as cp
+cp.SolverLookup.status() # prints 'solver status' table to stdout
+```
+```console
+Solver               Installed  Version        
+--------------------------------------------------
+ortools              Yes        9.12.4544
+z3                   Yes        4.14.1.0       
+minizinc             Yes        0.10.0
+gcs                  No         -
+gurobi               No         -
+pysat                Yes        1.8.dev16      
+pysdd                No         -
+exact                Yes        2.1.0
+choco                No         -
+cpo                  No         -
+```
+
+Some solvers (like minizinc and pysat) also provide a collection of subsolvers:
+```python
+import cpmpy as cp
+cp.SolverLookup.get('pysat').solvernames()
+# ['cadical103', 'cadical153', 'cadical195', 'gluecard3', 'gluecard4', 'glucose3', 'glucose4', 'glucose42', 'lingeling', 'maplechrono', 'maplecm', 'maplesat', 'mergesat3', 'minicard', 'minisat22', 'minisat-gh']
+```
+
+
+See get a list of all installed solvers (with subsolvers):
 ```python
 import cpmpy as cp
 cp.SolverLookup.solvernames()
 ```
 
 On a system with pysat and minizinc installed, this for example gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']`
+
 
 You can specify a solvername when calling `solve()` on a model:
 
@@ -515,10 +553,26 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 m = cp.Model(cp.sum(x) <= 5)
 # use named solver
-m.solve(solver="minizinc:chuffed")
+m.solve(solver="minizinc:chuffed") # <solver> or <solver>:<subsolver>
 ```
 
-Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+You can even use the same model across different solvers to see which one you like best:
+```python
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3)
+m = cp.Model(cp.sum(x) <= 5)
+
+for solvername in cp.SolverLookup.solvernames()
+    m.solve(solver=solvername)
+    print(m.status())
+```
+
+```{Note}
+For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+```console
+    Exception: CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.
+```
+
 
 ## Model versus solver interface
 
