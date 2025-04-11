@@ -127,7 +127,7 @@ class CPM_pysdd(SolverInterface):
 
         # translate exit status
         if has_sol:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL # optimal, also without objective
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             for cpm_var in self.user_vars:
@@ -189,6 +189,12 @@ class CPM_pysdd(SolverInterface):
                 projected_sols.add(tuple(projectedsol))
         else:
             projected_sols = set(sddmodels)
+
+        if len(projected_sols) >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        else:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+
         if display is None:
             # the desired, fast computation
             return len(projected_sols)
