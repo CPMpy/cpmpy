@@ -1,3 +1,5 @@
+import warnings
+
 import cpmpy as cp
 from cpmpy.expressions.utils import is_any_list
 from cpmpy.transformations.normalize import toplevel_list
@@ -40,7 +42,17 @@ def mss_grow(soft, hard=[], solver="ortools"):
         Computes a subset-maximal set of constraints by greedily adding contraints.
         Relies on solving under assumptions, so using an incremental solver is adviced
         No guarantees on optimality, but can be faster in some cases
+
+        :param: soft: list of soft constraints to find a maximal satisfiable subset of
+        :param: hard: list of hard constraints, will be added to the model before solving
+        :param: solver: name of a solver, must support assumptions (e.g, "ortools", "exact", "z3" or "pysat")
+
+        Exploits the solution found to add more constraints at once, cfr:
+        Mencía, Carlos, and Joao Marques-Silva. "Efficient relaxations of over-constrained CSPs."
+        2014 IEEE 26th International Conference on Tools with Artificial Intelligence. IEEE, 2014.
     """
+
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"mss_grow requires a solver that supports assumption variables, use mss_grow_naive with {solver} instead"
 
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
@@ -53,11 +65,12 @@ def mss_grow(soft, hard=[], solver="ortools"):
     else:
         sat_subset = []
 
-    to_check = list(set(assump) - set(sat_subset))
+    to_check = set(assump) - set(sat_subset)
     while len(to_check):
         a = to_check.pop()
         if s.solve(assumptions=sat_subset + [a]) is True:
-            sat_subset.append(a)
+            sat_subset = [a for a, c in zip(assump, soft) if a.value() or c.value()]
+            to_check -= set(sat_subset)
         else:
             # UNSAT, cannot add
             pass
@@ -72,6 +85,10 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
         Computes a subset-maximal set of constraints by greedily adding contraints.
         Can be used when solver does not support assumptions
         No guarantees on optimality, but can be faster in some cases
+
+        :param: soft: list of soft constraints to find a maximal satisfiable subset of
+        :param: hard: list of hard constraints, will be added to the model before solving
+        :param: solver: the SAT-solver to use, ideally incremental such as "gurobi", "exact"
     """
 
     soft = toplevel_list(soft, merge_and=False)
@@ -82,13 +99,17 @@ def mss_grow_naive(soft, hard=[], solver="ortools"):
 
     to_check = list(soft)
     sat_subset = []
+    s = cp.SolverLookup.get(solver)
+    s += hard
 
     while len(to_check):
         c = to_check.pop()
-        if cp.Model(sat_subset + [c] + hard).solve(solver=solver) is True:
-            sat_subset += [c]
+        s += c
+        if s.solve() is True:
+            sat_subset.append(c)
         else:
-            # UNSAT, cannot add to sat subset
-            pass
+            # UNSAT, cannot add to sat subset, reset solver to just sat subset
+            s = cp.SolverLookup.get(solver)
+            s += (sat_subset + hard)
 
     return sat_subset

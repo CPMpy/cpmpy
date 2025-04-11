@@ -3,7 +3,8 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison
+from cpmpy.expressions.utils import argvals
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -66,7 +67,8 @@ class TestTransLinearize(unittest.TestCase):
         # test implies
         self.assertEqual(str(linearize_constraint([a.implies(b)])), "[sum([1, -1] * [a, b]) <= 0]")
         self.assertEqual(str(linearize_constraint([a.implies(~b)])), "[sum([1, -1] * [a, ~b]) <= 0]")
-        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), "[(a) -> (sum([x, y, z]) >= 0)]")
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), str([]))
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 2)])), "[(a) -> (sum([x, y, z]) >= 2)]")
         self.assertEqual(str(linearize_constraint([a.implies(x+y+z > 0)])), "[(a) -> (sum([x, y, z]) >= 1)]")
         # test sub
         self.assertEqual(str(linearize_constraint([Operator("sub",[x,y]) >= z])), "[sum([1, -1, -1] * [x, y, z]) >= 0]")
@@ -86,6 +88,14 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c3), "sum([1, -1] * [~a, ~BV4]) <= 0")
 
 
+    def test_single_boolvar(self):
+        """ Linearize should convert Boolean literals to constraints (either linear or clause) """
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(linearize_constraint([p])))
+        self.assertEqual(str([p <= 0]), str(linearize_constraint([~p])))
+        self.assertEqual(str([Operator("or", [p])]), str(linearize_constraint([p], supported={"or"})))
+        self.assertEqual(str([Operator("or", [~p])]), str(linearize_constraint([~p], supported={"or"})))
+
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
 
@@ -104,9 +114,116 @@ class TestTransLinearize(unittest.TestCase):
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
+    def test_linearize_modulo(self):
+        x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
+        y = cp.intvar(1,5, name="y")
+        vars = [x,y,z]
+
+        constraint = [x % y  == z]
+        lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
+        self.assertEqual(count,lin_count) # same on all vars
+
+    def test_linearize_division(self):
+        x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
+        y = cp.intvar(1, 5, name="y")
+        vars = [x, y, z]
+
+        constraint = [x // y == z]
+        lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        lin_count = cp.Model(lin_cons).solveAll(solver="ortools",
+                                                display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, lin_all_sols)  # same on decision vars
+        self.assertEqual(count, lin_count)  # same on all vars
+
+    def test_abs(self):
+
+        pos = cp.intvar(0,5,name="pos")
+        neg = cp.intvar(-5,0,name="neg")
+        x = cp.intvar(-5,5,name="x")
+        y = cp.intvar(-5,5)
+
+        for lhs in (pos,neg,x):
+            cons = cp.Abs(lhs) == y
+            cnt = cp.Model(cons).solveAll()
+            lcnt = cp.Model(linearize_constraint([cons])).solveAll(display=self.assertTrue(cons.value()))
+            self.assertEqual(cnt, lcnt)
+
+
+    def test_alldiff(self):
+        # alldiff has a specialized linearization
+
+        x = cp.intvar(1, 5, shape=3, name="x")
+        cons = cp.AllDifferent(x)
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 5 * 4 * 3)
+
+        # should also work with constants in arguments
+        x,y,z = x
+        cons = cp.AllDifferent([x,3,y,True,z])
+        lincons = linearize_constraint([cons])
+
+        def cb():
+            assert cons.value()
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
+
+    def test_issue_580(self):
+        x = cp.intvar(1, 5, name='x')
+        lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(),{2,4})
+
+
+        lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[IV8 <= 0, sum([2, -1] * [IV9, IV10]) == 0, sum([1, -1] * [IV8, IV11]) == 0, sum([1, 1, -1] * [IV10, IV8, x]) == 0]')
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(), {2, 4}) # can never be < 0
+
+        lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(), {1,3,5})
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
+        c = cp.AllDifferent(arr)
+
+        linear_c = linearize_constraint([c])
+        # this triggers an error
+        pos_c = only_positive_bv([c])
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="exact")
+
+
+
 class TestConstRhs(unittest.TestCase):
 
-    def  test_numvar(self):
+    def test_numvar(self):
         a, b = [cp.intvar(0, 10, name=n) for n in "ab"]
 
         cons = linearize_constraint([a <= b])[0]
@@ -158,12 +275,20 @@ class TestConstRhs(unittest.TestCase):
 
 class TestVarsLhs(unittest.TestCase):
 
-    def test_sum(self):
+    def test_trivial_unsat_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
 
+        # trivial UNSAT
         cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
-        self.assertEqual("sum([a, b, c]) <= -5", str(cons))
+        self.assertEqual(str(cp.BoolVal(False)), str(cons))
+
+    def test_sum(self):
+        a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
+        rhs = 15
+
+        cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
+        self.assertEqual(str(cp.sum([a,b,c]) <= 5), str(cons))
 
     def test_wsum(self):
         a, b, c = [cp.intvar(0, 10,name=n) for n in "abc"]
@@ -185,6 +310,60 @@ class TestVarsLhs(unittest.TestCase):
         cons = [(~cond).implies(Operator("wsum",[[1,2,3,-1],[a,b,c,10]]) <= rhs)]
         cons = linearize_constraint(cons)[0]
         self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
+
+    def test_pow(self):
+
+        a,b = cp.intvar(0,10, name=tuple("ab"), shape=2)
+
+        cons = a ** 3 == b
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+
+        self.assertEqual(lin_cons[0], "((a) * (a)) == (IV0)")
+        self.assertEqual(lin_cons[1], "((a) * (IV0)) == (IV1)")
+        self.assertEqual(lin_cons[2], "sum([1, -1] * [IV1, b]) == 0")
+
+        # this is not supported
+        cons = a ** b == 3
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+
+    def test_mod_triv(self):
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+        # x mod y <= 2 is trivially true for x,y in 1..3
+        self.assertEqual(str([]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
+
+    def test_mod(self):
+
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+
+        # disallows 2 mod 3 = 2
+        cons = (x % y) <= 1
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+        self.assertSetEqual(sols, linsols)
+
+        # check special cases of supported sets
+        self.assertRaises(NotImplementedError,
+                          lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
+                          )
+
+        same_cons = linearize_constraint([cons], supported={"mod"})
+        self.assertEqual(str(same_cons[0]), str(cons))
+
+        # what about half-reified?
+        bv = cp.boolvar(name="bv")
+        cons = bv.implies((x % y) <= 1)
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
+        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
+
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value())))
+        self.assertSetEqual(sols, linsols)
 
     def test_others(self):
 
@@ -258,3 +437,25 @@ class testCanonical_comparison(unittest.TestCase):
         cons = canonical_comparison(cons)[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
+    def test_only_positive_coefficients(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1],[a,b,c]]) > 0])
+        self.assertEqual(str([Operator("sum",[a, b, ~c]) > 1]), str(only_pos))
+
+    def test_only_positive_coefficients_implied(self):
+        a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
+        only_pos = only_positive_coefficients([p.implies(Operator("wsum",[[1,1,-1],[a,b,c]]) > 0)])
+        self.assertEqual(str([p.implies(Operator("sum",[a, b, ~c]) > 1)]), str(only_pos))
+
+    def test_only_positive_coefficients_pb_and_int(self):
+        a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
+        only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
+        self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
+
+    def test_only_positive_bv_implied_by_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(only_positive_bv(linearize_constraint([p]))))
+
+    def test_only_positive_bv_implied_by_negated_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
