@@ -56,11 +56,12 @@
 
         Minimum
         Maximum
+        Abs
         Element
         Count
         Among
         NValue
-        Abs
+        NValueExcept
 
 """
 import warnings  # for deprecation warning
@@ -240,7 +241,7 @@ def element(arg_list):
 class Element(GlobalFunction):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants of variables (the first argument)
+        with 'Arr' an array of constants or variables (the first argument)
         and 'Idx' an integer decision variable, representing the index into the array.
 
         Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
