@@ -58,7 +58,7 @@ from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 from .decompose_global import decompose_in_tree
 
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, flatten_objective
 from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
@@ -66,7 +66,7 @@ from ..exceptions import TransformationNotImplementedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, flatlist
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
@@ -571,8 +571,6 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
-
-
 
 def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     """
