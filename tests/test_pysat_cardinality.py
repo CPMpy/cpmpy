@@ -45,15 +45,6 @@ class TestCardinality(unittest.TestCase):
         # all must be true
         self.assertEqual(sum(self.bvs.value()), 3)
 
-    def test_pysat_atleast_edge_case(self):
-
-        atmost = cp.Model(
-            sum(self.bvs) < 0
-        )
-
-        with self.assertRaises(ValueError):
-            ps = CPM_pysat(atmost)
-
 
     def test_pysat_equals(self):
         equals = cp.Model(
@@ -95,6 +86,38 @@ class TestCardinality(unittest.TestCase):
         self.assertTrue(ps.solve())
 
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
+
+    def test_pysat_linear_other(self):
+        expressions = [
+            self.bvs[0] + self.bvs[1] + self.bvs[2] > 0,
+            # now with var/expr on RHS
+            self.bvs[0] + self.bvs[1] > self.bvs[2],
+            self.bvs[0] > self.bvs[1] + self.bvs[2],
+            self.bvs[0] > (self.bvs[1] | self.bvs[2]),
+        ]
+
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            cp.Model(expression).solve("pysat")
+
+    def test_encode_pb_oob(self):
+        self.assertTrue(len(self.bvs) == 3)
+        # test out of bounds (meaningless) thresholds
+        expressions = [
+            sum(self.bvs) <= 5,  # true
+            sum(self.bvs) <= 3,  # true
+            sum(self.bvs) <= -2,  # false
+            sum(self.bvs) <= 0,  # undecided
+
+            sum(self.bvs) >= -2,  # true
+            sum(self.bvs) >= 0,  # true
+            sum(self.bvs) >= 5,  # false
+            sum(self.bvs) >= 3,  # undecided
+        ]
+
+        ## check all types of linear constraints are handled
+        for expression in expressions:
+            cp.Model(expression).solve("pysat")
 
     def test_pysat_different(self):
         
