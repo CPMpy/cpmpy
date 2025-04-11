@@ -1,5 +1,5 @@
 """
-    Methods to transform CPMpy expressions in other CPMpy expressions
+    Methods to transform CPMpy expressions into other CPMpy expressions.
 
     Input and output are always CPMpy expressions, so transformations can
     be chained and called multiple times, as needed.
@@ -15,6 +15,14 @@
     .. autosummary::
         :nosignatures:
 
+        comparison
+        decompose_global
         flatten_model
         get_variables
+        linearize
+        negation
+        normalize
+        reification
+        safening
+        to_cnf
 """
