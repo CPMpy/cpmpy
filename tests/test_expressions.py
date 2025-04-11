@@ -283,35 +283,35 @@ class TestArrayExpressions(unittest.TestCase):
         self.assertTrue(all(y.value() == res))
 
     def test_any(self):
-        from cpmpy.expressions.python_builtins import any
+        from cpmpy.expressions.python_builtins import any as cpm_any
         x = boolvar(shape=10, name="x")
         y = boolvar(name="y")
         model = cp.Model(y == x.any())
         model.solve()
-        self.assertTrue(y.value() == any(x.value()))
+        self.assertTrue(y.value() == cpm_any(x.value()))
         # with axis arg
         x = boolvar(shape=(10,10), name="x")
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.any(axis=0))
         model.solve()
-        res = np.array([any(x[i, ...].value()) for i in range(len(y))])
+        res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
+        
 
     def test_all(self):
-        from cpmpy.expressions.python_builtins import all
+        from cpmpy.expressions.python_builtins import all as cpm_all
         x = boolvar(shape=10, name="x")
         y = boolvar(name="y")
         model = cp.Model(y == x.all())
         model.solve()
-        self.assertTrue(y.value() == all(x.value()))
+        self.assertTrue(y.value() == cpm_all(x.value()))
         # with axis arg
         x = boolvar(shape=(10,10), name="x")
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.all(axis=0))
         model.solve()
-        res = np.array([all(x[i, ...].value()) for i in range(len(y))])
+        res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
-
 
     def test_multidim(self):
 

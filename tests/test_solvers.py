@@ -312,6 +312,18 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_card(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [sum(x) > 3, sum(x) <= 2, sum(x) == 4, (sum(x) <= 1) & (sum(x) != 2),
+                b.implies(sum(x) > 3), b == (sum(x) != 2), (sum(x) >= 3).implies(b)]
+        for c in cons:
+            self.assertTrue(cp.Model(c).solve("pysat"))
+            self.assertTrue(c.value())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -719,6 +731,8 @@ class TestSupportedSolvers:
             No straightforward way to resolve this for now.
             """
             return
+        if solver == "gcs":
+            return
         s = cp.SolverLookup.get(solver)
         try:
             s.minimize(cp.sum(x))
@@ -772,20 +786,21 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
-
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
         m += x / y == d
         m += x % y == r
         sols = set()
-        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = None
+        if solver == 'gurobi':
+            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
-            # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv

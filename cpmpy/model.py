@@ -16,6 +16,7 @@
     See the examples for basic usage, which involves:
 
     - creation, e.g. `m = Model(cons, minimize=obj)` 
+    - adding constraints, e.g. `m += (x | y)`
     - solving, e.g. `m.solve()` 
     - optionally, checking status/runtime, e.g. `m.status()` 
 
