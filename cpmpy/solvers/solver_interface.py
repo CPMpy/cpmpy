@@ -20,6 +20,7 @@
     Each solver has its own class that inherits from `SolverInterface`.
 
 """
+from typing import Optional
 import warnings
 import time
 from enum import Enum
@@ -50,6 +51,13 @@ class SolverInterface(object):
                 [bool]: Solver support by current system setup.
         """
         return False
+    
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        return None
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """

@@ -40,6 +40,9 @@
     Module details
     ==============
 """
+from typing import Optional
+import pkg_resources
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -103,6 +106,15 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('python-sat').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

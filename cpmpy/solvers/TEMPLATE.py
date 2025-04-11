@@ -13,6 +13,7 @@
     To ensure that, include it inside supported() and other functions that need it...
 """
 
+from typing import Optional
 import warnings
 import pkg_resources
 from pkg_resources import VersionConflict
@@ -77,6 +78,15 @@ class CPM_template(SolverInterface):
         except Exception as e:
             raise e
 
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('TEMPLATEpy').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

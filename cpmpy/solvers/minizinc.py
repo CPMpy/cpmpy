@@ -42,12 +42,14 @@
     ==============
 """
 import re
+from typing import Optional
 import warnings
 import sys
 import os
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
@@ -145,6 +147,16 @@ class CPM_minizinc(SolverInterface):
             if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
                 solver_names.add(name)
         return solver_names
+    
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('minizinc').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
