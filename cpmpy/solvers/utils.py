@@ -131,6 +131,38 @@ class SolverLookup():
                 # found the right solver
                 return CPM_slv
         raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
+    
+
+    @classmethod
+    def status(cls):
+        """
+        Prints a tabulated status report of the different solvers,
+        i.e. whether they are installed on the system and if so which version.
+        """
+        
+        # Arguments:
+        #     subsolvers (boolean): whether to include the subsolvers (if applicable) in the status report
+   
+        print(f"{'Solver':<20} {'Installed':<10} {'Version':<15}")
+        print("-" * 50)
+        for (basename, CPM_slv) in cls.base_solvers():
+
+            installed = CPM_slv.supported()
+            version = CPM_slv.version() if installed and hasattr(CPM_slv, 'version') else "-"
+            if version is None:
+                version = "Not found"
+            print(f"{basename:<20} {'Yes' if installed else 'No':<10} {version:<15}")
+
+            # TODO: Can add subsolver status report once pull request #623 has been resolved
+            # Handle subsolvers
+            # if subsolvers and installed:
+            #     if hasattr(CPM_slv, "solvernames"):
+            #         # Get (installed) subsolvers
+            #         subnames = CPM_slv.solvernames()
+            #         installed_subnames = CPM_slv.solvernames(installed=True)
+            #         for subn in subnames:
+            #             is_installed = subn in installed_subnames
+            #             print(f" ↪ {subn:<17} {'Yes' if is_installed else 'No':<10} {' ':<15}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
