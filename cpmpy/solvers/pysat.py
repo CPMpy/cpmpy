@@ -41,6 +41,7 @@
     ==============
 """
 from typing import Optional
+import warnings
 import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -96,16 +97,20 @@ class CPM_pysat(SolverInterface):
         """
             Returns solvers supported by PySAT on your system
         """
-        from pysat.solvers import SolverNames
-        names = []
-        for name, attr in vars(SolverNames).items():
-            # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
-            if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
-                if name not in attr:
-                    name = attr[-1]
-                names.append(name)
-        return names
-
+        if CPM_pysat.supported():
+            from pysat.solvers import SolverNames, Solver
+            names = []
+            for name, attr in vars(SolverNames).items():
+                # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
+                if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
+                    if name not in attr:
+                        name = attr[-1]
+                    names.append(name)  
+            return names
+        else:
+            warnings.warn("PySAT is not installed or not supported on this system.")
+            return []
+    
     @staticmethod
     def version() -> Optional[str]:
         """

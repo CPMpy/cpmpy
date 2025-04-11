@@ -138,15 +138,19 @@ class CPM_minizinc(SolverInterface):
                 (namely cplex, gurobi, scip, xpress).
                 The following are bundled in the bundle: chuffed, coin-bc, gecode
         """
-        import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
+        if CPM_minizinc.supported():
+            import minizinc
+            solver_dict = minizinc.default_driver.available_solvers()
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
-        return solver_names
+            solver_names = set()
+            for full_name in solver_dict.keys():
+                name = full_name.split(".")[-1]
+                if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
+                    solver_names.add(name)
+            return solver_names
+        else:
+            warnings.warn("MiniZinc is not installed or not supported on this system.")
+            return []
     
     @staticmethod
     def version() -> Optional[str]:
