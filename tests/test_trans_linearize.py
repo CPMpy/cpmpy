@@ -39,9 +39,19 @@ class TestTransLinearize(unittest.TestCase):
             iv = intvar(1, 9)
             e1 = (bv[0] * bv[1] == iv)
             s1 = cp.Model(e1).solve("gurobi")
-            s1 = cp.Model(e1).solve("ortools")
             self.assertTrue(s1)
             self.assertEqual([bv[0].value(), bv[1].value(), iv.value()],[True, True, 1])
+
+    def test_bug_468(self):
+        from cpmpy.solvers import CPM_exact
+        if CPM_exact.supported():
+            a, b, c = boolvar(shape=3)
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(3 * a + 4 * ~b + 3 * ~c)
+            m.solve("exact")
+            self.assertEqual([a.value(), b.value(), c.value()], [True, False, False])
+            m.solve(solver="gurobi")
+            self.assertEqual([a.value(), b.value(), c.value()], [True, False, False])
 
     def test_constraint(self):
         x,y,z = [cp.intvar(0,5, name=n) for n in "xyz"]
