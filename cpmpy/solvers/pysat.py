@@ -6,9 +6,11 @@
 """
     Interface to PySAT's API
 
-    Requires that the 'python-sat' python package is installed:
+    Requires that the 'pysat' optional dependency is installed:
 
-        $ pip install python-sat[aiger,approxmc,cryptosat,pblib]
+    .. code-block:: console
+
+        $ pip install cpmpy[pysat]
 
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
     interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
@@ -16,13 +18,14 @@
     https://pysathq.github.io/
 
     This solver can be used if the model only has Boolean variables,
-    and only logical constraints (and,or,implies,==,!=) or cardinality constraints.
+    and only logical constraints (`and`, `or`, `implies`, `==`, `!=`) or cardinality constraints.
 
     Documentation of the solver's own Python API:
     https://pysathq.github.io/docs/html/api/solvers.html
 
-    WARNING: CPMpy uses 'model' to refer to a constraint specification,
-    the PySAT docs use 'model' to refer to a solution.
+    .. warning::
+        WARNING: CPMpy uses 'model' to refer to a constraint specification,
+        the PySAT docs use 'model' to refer to a solution.
 
     ===============
     List of classes
@@ -57,18 +60,21 @@ class CPM_pysat(SolverInterface):
     """
     Interface to PySAT's API
 
-    Requires that the 'python-sat' python package is installed:
-    $ pip install python-sat
+    Requires that the 'python-sat' python package. The recommend :
+    $ pip install cpmpy[pysat]
 
     See detailed installation instructions at:
     https://pysathq.github.io/installation
 
     Creates the following attributes (see parent constructor for more):
-        - pysat_vpool: a pysat.formula.IDPool for the variable mapping
-        - pysat_solver: a pysat.solver.Solver() (default: glucose4)
 
-    The `DirectConstraint`, when used, calls a function on the `pysat_solver` object.
+    - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
+    - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
     """
+
+    IMPORT_PYSAT_PBLIB_ERROR = ImportError("PySAT was installed without optional dependency `pblib`, which is required to encode (weighted) sums. To install PySAT with recommended optional dependencies, run `pip install cpmpy[pysat]`.")
 
     @staticmethod
     def supported():
@@ -86,16 +92,6 @@ class CPM_pysat(SolverInterface):
             raise e
 
     @staticmethod
-    def pb_supported():
-        try:
-            from pypblib import pblib
-            from pysat.pb import PBEnc
-            import pysat
-            return True
-        except ImportError as e:
-            return False
-
-    @staticmethod
     def solvernames():
         """
             Returns solvers supported by PySAT on your system
@@ -110,7 +106,6 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -121,13 +116,11 @@ class CPM_pysat(SolverInterface):
         Only supports satisfaction problems (no objective)
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: str, name of the pysat solver, e.g. glucose4
-            see .solvernames() to get the list of available solver(names)
+            cpm_model (Model(), a CPMpy Model(), optional):
+            subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
-            raise Exception("CPM_pysat: Install the python package 'python-sat' to use this solver interface "
-                            "(NOT the 'pysat' package!)")
+            raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysat: only satisfaction, does not support an objective function")
 
@@ -140,6 +133,17 @@ class CPM_pysat(SolverInterface):
             subsolver = "glucose4" # something recent...
         elif subsolver.startswith('pysat:'):
             subsolver = subsolver[6:] # strip 'pysat:'
+
+        # try to import the PBEnc (pblib) module once
+        try:
+            from pysat.card import CardEnc, EncType
+            self._CardEnc = CardEnc
+            self._EncType = EncType
+            from pysat.pb import PBEnc
+            self._PBEnc = PBEnc
+        except NameError:
+            self._PBEnc = None
+            self._CardEnc = None
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -161,12 +165,14 @@ class CPM_pysat(SolverInterface):
             Call the PySAT solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional). Auto-interrups in case the
-                           runtime exceeds given time_limit.
-                           Warning: the time_limit is not very accurate at subsecond level
-            - assumptions: list of CPMpy Boolean variables that are assumed to be true.
-                           For use with s.get_core(): if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
-                           Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
+                time_limit (float, optional):   Maximum solve time in seconds. Auto-interrups in case the
+                                                runtime exceeds given time_limit.
+                                                
+                                                .. warning::
+                                                    Warning: the time_limit is not very accurate at subsecond level
+                assumptions: list of CPMpy Boolean variables that are assumed to be true.
+                            For use with :func:`s.get_core() <get_core()>`: if the model is UNSAT, get_core() returns a small subset of assumption variables that are unsat together.
+                            Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
         # ensure all vars are known to solver
@@ -234,12 +240,12 @@ class CPM_pysat(SolverInterface):
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
-            Transforms cpm_var into CNF literal using self.pysat_vpool
-            (positive or negative integer)
+            Transforms cpm_var into CNF literal using ``self.pysat_vpool``
+            (positive or negative integer).
 
-            so vpool is the varmap (we don't use _varmap here)
+            So vpool is the varmap (we don't use _varmap here).
         """
 
         # special case, negative-bool-view
@@ -259,7 +265,14 @@ class CPM_pysat(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+
+            In the case of PySAT, the supported constraints are over Boolean variables:
+
+            - Boolean clauses
+            - Cardinality constraint (`sum`)
+            - Pseudo-Boolean constraints (`wsum`)
 
             In the case of PySAT, the supported constraints are over Boolean variables:
 
@@ -278,7 +291,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or", "bv"}))  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}))  # the core of the MIP-linearization
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
@@ -318,40 +331,28 @@ class CPM_pysat(SolverInterface):
                 # BoolVar() -> or(...)
                 args = [~a0]+a1.args
                 self.pysat_solver.add_clause(self.solver_vars(args))
-            elif isinstance(a1, Comparison) and a1.args[0].name == "sum":
+            elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
                 # implied sum comparison (a0->sum(bvs)<>val)
                 # convert sum to cnf
                 cnf = self._pysat_cardinality(a1, reified=True)
                 # implication of conjunction is conjunction of individual implications
-                nimplvar = [self.solver_var(~a0)]
-                cnf = [nimplvar+c for c in cnf]
+                antecedent = [self.solver_var(~a0)]
+                cnf = [antecedent+c for c in cnf]
                 self.pysat_solver.append_formula(cnf)
-
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
-                # convert wsum to cnf
                 cnf = self._pysat_pseudoboolean(a1)
                 # implication of conjunction is conjunction of individual implications
-                nimplvar = [self.solver_var(~a0)]
-                cnf = [nimplvar+c for c in cnf]
-                self.pysat_solver.append_formula(cnf)
+                antecedent = [self.solver_var(~a0)]
+                self.pysat_solver.append_formula([antecedent+c for c in cnf])
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
-        elif isinstance(cpm_expr, Comparison):
-            # comparisons between Booleans will have been transformed out
-            # check if comparison of cardinality/pseudo-boolean constraint
-            if isinstance(cpm_expr.args[0], Operator):
-                if cpm_expr.args[0].name == "sum":
-                    # convert to cnf and post
-                    cnf = self._pysat_cardinality(cpm_expr)
-                    self.pysat_solver.append_formula(cnf)
-                elif cpm_expr.args[0].name == "wsum":
-                    # convert to cnf and post
-                    cnf = self._pysat_pseudoboolean(cpm_expr)
-                    self.pysat_solver.append_formula(cnf)
-                else:
-                    raise NotImplementedError(f"Operator constraint {cpm_expr} not supported by CPM_pysat")
+        elif isinstance(cpm_expr, Comparison): # root-level comparisons have been linearized
+            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
+                self.pysat_solver.append_formula(self._pysat_cardinality(cpm_expr))
+            elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
+                self.pysat_solver.append_formula(self._pysat_pseudoboolean(cpm_expr))
             else:
                 raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
 
@@ -401,7 +402,7 @@ class CPM_pysat(SolverInterface):
 
     def get_core(self):
         """
-            For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
             CPMpy will return only those assumptions which are False (in the UNSAT core)
 
@@ -418,11 +419,9 @@ class CPM_pysat(SolverInterface):
 
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
-        """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT a CNF[Plus] object """
-        if not CPM_pysat.pb_supported():
-            raise ImportError("Please install PyPBLib: pip install pypblib")
-
-        from pysat.card import CardEnc, EncType
+        """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
+        if self._CardEnc is None:
+            raise self.IMPORT_PYSAT_PBLIB_ERROR
 
         # unpack and transform to PySAT argument
         lhs, rhs = cpm_expr.args
@@ -436,59 +435,37 @@ class CPM_pysat(SolverInterface):
 
         # Some subsolvers (e.g. MiniCard) support native root context cardinality constraints
         if not reified and self.pysat_solver.supports_atmost():
-            pysat_args["encoding"] = EncType.native
+            pysat_args["encoding"] = self._EncType.native
 
         if cpm_expr.name == "<=":
-            return CardEnc.atmost(**pysat_args)
+            return self._CardEnc.atmost(**pysat_args)
         elif cpm_expr.name == ">=":
-            return CardEnc.atleast(**pysat_args)
+            return self._CardEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return CardEnc.equals(**pysat_args)
+            return self._CardEnc.equals(**pysat_args)
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
-        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT a CNF object """
+        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
+        if self._PBEnc is None:
+            raise self.IMPORT_PYSAT_PBLIB_ERROR
+
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
                 f"PySAT: Expect {cpm_expr} to be a 'wsum'"
             )
 
-        if not CPM_pysat.pb_supported():
-            raise ImportError("Please install PyPBLib: pip install pypblib")
-
-        from pysat.pb import PBEnc
-
         # unpack and transform to PySAT arguments
         lhs, rhs = cpm_expr.args
         lits = self.solver_vars(lhs.args[1])
-        pysat_args = {
-                "weights": lhs.args[0],
-                "lits": lits,
-                "bound": rhs,
-                "vpool":self.pysat_vpool,
-                }
+        pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
 
         if cpm_expr.name == "<=":
-            return PBEnc.atmost(**pysat_args)
+            return self._PBEnc.atmost(**pysat_args).clauses
         elif cpm_expr.name == ">=":
-            return PBEnc.atleast(**pysat_args)
+            return self._PBEnc.atleast(**pysat_args).clauses
         elif cpm_expr.name == "==":
-            return PBEnc.equals(**pysat_args)
-
-"""
-  An assert to test whether cpm_expr is a normalized Boolean linear constraint of the form `LinExpr <=/==/>= Constant`.
-"""
-def assert_normalized_bool_lin(cpm_expr):
-    # we assume transformations are applied such that the below is true
-    ERR = "PySAT: Expected {cpm_expr} to be a normalized linear constraint (`LinExpr <=/==/>= Constant`) over Boolean literals"
-    assert isinstance(cpm_expr, Comparison), f"{ERR}, but did not receive a Comparison"
-    lhs,rhs = cpm_expr.args
-    assert is_int(rhs), f"{ERR}, but the RHS was not a Constant"
-    if lhs.name == "sum":
-        lits = lhs.args
-    elif lhs.name == "wsum":
-        lits = lhs.args[1]
-    else:
-        assert False, f"{ERR}, but the LHS was not a `sum` or `wsum`"
-    assert all(isinstance(v, _BoolVarImpl) for v in lits), f"{ERR}, but {lits} were not all Boolean literals"
+            return self._PBEnc.equals(**pysat_args).clauses
+        else:
+            raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")

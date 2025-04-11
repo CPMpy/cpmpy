@@ -151,6 +151,7 @@ class TestCardinality(unittest.TestCase):
                 (sum(x) != 3).implies(b),
                ]
         for c in cons:
+            print(f"XXX {c}")
             cp.Model(c).solve(SOLVER)
             self.assertTrue(c.value())
 

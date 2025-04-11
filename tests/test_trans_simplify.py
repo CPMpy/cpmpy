@@ -68,11 +68,27 @@ class TransSimplify(unittest.TestCase):
 
 
     def test_simplify_expressions(self):
-
+        # global constraints
         expr = cp.AllDifferent(self.ivs) == 0
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
         expr = 0 == cp.AllDifferent(self.ivs)
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2])])]')
+        # with constant, does not change (surprisingly? but we cannot check what the res type is...)
+        expr = cp.AllDifferent(self.ivs.tolist() + [False]) == 0
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(False))])]')
+        expr = 0 == cp.AllDifferent(self.ivs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(True))])]')
+
+        # global functions
+        expr = cp.max(self.ivs) == 0
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2]) == 0]')
+        expr = 0 == cp.max(self.ivs)
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2]) == 0]')
+        # with constant, does not change (surprisingly? but we cannot check what the res type is...)
+        expr = cp.max(self.ivs.tolist() + [False]) == 0
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(False)) == 0]')
+        expr = 0 == cp.max(self.ivs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(True)) == 0]')
 
         expr = (self.ivs[0] <= self.ivs[1]) == 0
         self.assertEqual(str(self.transform(expr)), '[not([(iv[0]) <= (iv[1])])]')
@@ -106,5 +122,14 @@ class TransSimplify(unittest.TestCase):
         x = cp.intvar(0, 3, name="x")
         cons = (x == 2) == (bv == 4)
         self.assertEqual(str(self.transform(cons)), "[x != 2]")
+        self.assertTrue(cp.Model(cons).solve())
+
+        # Simplify boolean expressions nested within a weighted sum
+        #   wsum([1, 2], [bv[0] != 0, bv[1] != 1]) ----> wsum([1, 2], [bv[0], ~bv[1]])
+        bv = cp.boolvar(name="bv", shape=2)
+        weights = cp.cpm_array([1, 2])
+        bool_as_ints = cp.cpm_array([0, 1])
+        cons = sum( weights * (bv != bool_as_ints) ) == 1
+        self.assertEqual(str(self.transform(cons)), "[sum([1, 2] * [bv[0], ~bv[1]]) == 1]")
         self.assertTrue(cp.Model(cons).solve())
 

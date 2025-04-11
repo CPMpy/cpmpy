@@ -1,3 +1,5 @@
+.. _solver-interfaces:
+
 Solver interfaces (:mod:`cpmpy.solvers`)
 ========================================
 
