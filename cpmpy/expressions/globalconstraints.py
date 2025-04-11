@@ -387,11 +387,21 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
                             f"{array}")
+        if isinstance(table, np.ndarray):  # Ensure it is a list
+            assert table.ndim == 2, "Table's table must be a 2D array"
+            assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+            #table = table.tolist()
+        else:
+            tmp = np.array(table)
+            assert tmp.ndim == 2, "Table's table must be a 2D array"
+            assert tmp.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+            #assert len(table) > 0 and len(table[0]) > 0, "Table's table must be a list of lists"
+            #assert all(isinstance(elem, int) for row in table for elem in row), \
+            #    "Table's table must be a table of ints"
+            
         super().__init__("table", [array, table])
 
     def decompose(self):
@@ -403,6 +413,12 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args  # the table 'tab' is asserted to only hold constants
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -433,6 +449,13 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -452,6 +475,13 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
