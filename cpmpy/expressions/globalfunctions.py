@@ -285,6 +285,11 @@ class Element(GlobalFunction):
 
         """
         arr, idx = self.args
+        if is_num(idx): # index is constant, we only enforce one constraint
+            try:
+                return [eval_comparison(cpm_op, arr[idx], cpm_rhs)], []
+            except IndexError: # out-of-bounds is undefined (TODO check how to handle partial fixed result)
+                return [], [False]
         return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
                [idx >= 0, idx < len(arr)], []
 

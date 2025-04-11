@@ -1325,3 +1325,14 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+
+    def test_issue627(self):
+        for s, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                try:
+                    # constant look-up
+                    self.assertTrue(cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s))
+                    # constant out-of-bounds look-up
+                    self.assertFalse(cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
