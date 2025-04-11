@@ -28,6 +28,7 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
+import copy
 
 import cpmpy as cp
 import numpy as np
@@ -208,3 +209,13 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+# Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
+STAR = "*" # define constant here
+def is_star(arg):
+    """
+        Check if arg is star as used in the ShortTable global constraint
+    """
+    return isinstance(arg, type(STAR)) and arg == STAR
+
+

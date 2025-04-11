@@ -3,6 +3,8 @@ import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.core import Operator
+from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.z3 import CPM_z3
@@ -797,4 +799,21 @@ class TestSupportedSolvers:
     def test_false(self, solver):
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
+    def test_partial_div_mod(self, solver):
+        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+            return
+        x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
 
+        vars = [x,y,d,r]
+        m = cp.Model()
+        # modulo toplevel
+        m += x / y == d
+        m += x % y == r
+        sols = set()
+        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
+        for sol in sols:
+            xv, yv, dv, rv = sol
+            # print(xv,yv,dv,rv)
+            assert dv * yv + rv == xv
+            assert (Operator('div', [xv, yv])).value() == dv
+            assert (Operator('mod', [xv, yv])).value() == rv

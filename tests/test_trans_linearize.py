@@ -3,6 +3,7 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
+from cpmpy.expressions.utils import argvals
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
@@ -94,6 +95,53 @@ class TestTransLinearize(unittest.TestCase):
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
+    def test_linearize_modulo(self):
+        x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
+        y = cp.intvar(1,5, name="y")
+        vars = [x,y,z]
+
+        constraint = [x % y  == z]
+        lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
+        self.assertEqual(count,lin_count) # same on all vars
+
+    def test_linearize_division(self):
+        x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
+        y = cp.intvar(1, 5, name="y")
+        vars = [x, y, z]
+
+        constraint = [x // y == z]
+        lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+
+        all_sols = set()
+        lin_all_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        lin_count = cp.Model(lin_cons).solveAll(solver="ortools",
+                                                display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, lin_all_sols)  # same on decision vars
+        self.assertEqual(count, lin_count)  # same on all vars
+
+    def test_abs(self):
+
+        pos = cp.intvar(0,5,name="pos")
+        neg = cp.intvar(-5,0,name="neg")
+        x = cp.intvar(-5,5,name="x")
+        y = cp.intvar(-5,5)
+
+        for lhs in (pos,neg,x):
+            cons = cp.Abs(lhs) == y
+            cnt = cp.Model(cons).solveAll()
+            lcnt = cp.Model(linearize_constraint([cons])).solveAll(display=self.assertTrue(cons.value()))
+            self.assertEqual(cnt, lcnt)
+
+
     def test_alldiff(self):
         # alldiff has a specialized linearization
 
@@ -118,11 +166,25 @@ class TestTransLinearize(unittest.TestCase):
         n_sols = cp.Model(lincons).solveAll(display=cb)
         self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
+    def test_issue_580(self):
+        x = cp.intvar(1, 5, name='x')
+        lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(),{2,4})
+
+
+        lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(), {2, 4}) # can never be < 0
+
+        lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
+        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertIn(x.value(), {1,3,5})
 
 
 class TestConstRhs(unittest.TestCase):
 
-    def  test_numvar(self):
+    def test_numvar(self):
         a, b = [cp.intvar(0, 10, name=n) for n in "ab"]
 
         cons = linearize_constraint([a <= b])[0]
