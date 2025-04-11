@@ -350,6 +350,10 @@ class CPM_minizinc(SolverInterface):
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+        
         # make mzn_inst
         (kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         kwargs['all_solutions'] = True

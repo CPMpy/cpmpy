@@ -35,6 +35,7 @@
     Module details
     ==============
 """
+from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -317,6 +318,8 @@ class CPM_z3(SolverInterface):
         :return: self
         """
         # all variables are user variables, handled in `solver_var()`
+        # unless their constraint gets simplified away, so lets collect them anyway
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
