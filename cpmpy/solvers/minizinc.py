@@ -130,9 +130,9 @@ class CPM_minizinc(SolverInterface):
             return True
         
     @staticmethod
-    def solvernames(installed:bool=False):
+    def solvernames(installed:bool=True):
         """
-            Returns solvers supported by MiniZinc on your system
+            Returns solvers supported by MiniZinc (on your system)
 
             Arguments:
                 installed (boolean): whether to filter the solvernames to those installed on your system
