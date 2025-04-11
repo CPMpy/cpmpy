@@ -437,7 +437,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert is_true_cst(arg) or is_false_cst(arg)
+        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
