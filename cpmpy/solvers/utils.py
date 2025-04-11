@@ -37,12 +37,12 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         For example usage, see `examples/advanced/hyperparameter_search.py`
         https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/hyperparameter_search.py
 
-        - all_params is a dict of {key: list} items, e.g.:
-          {'val': [1,2], 'opt': [True,False]}
+        - all_params is a dict of `{key: list}` items, e.g.:
+          ``{'val': [1,2], 'opt': [True,False]}``
 
-        - output is an generator over all {key:value} combinations
+        - output is an generator over all `{key:value}` combinations
           of the keys and values. For the example above:
-          generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])
+          ``generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])``
     """
     if remaining_keys is None or cur_params is None:
         # init
@@ -141,8 +141,11 @@ builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, 
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
+       
+        .. deprecated:: 0.9.4
+            Please use :class:`SolverLookup` object instead.
 
-    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
+        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
     """
     warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
     return [sv for sv in builtin_solvers if sv.supported()]

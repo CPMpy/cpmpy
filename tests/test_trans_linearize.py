@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -180,6 +180,25 @@ class TestTransLinearize(unittest.TestCase):
         lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
         self.assertTrue(cp.Model(lin_mod).solve())
         self.assertIn(x.value(), {1,3,5})
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
+        c = cp.AllDifferent(arr)
+
+        linear_c = linearize_constraint([c])
+        # this triggers an error
+        pos_c = only_positive_bv([c])
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="exact")
+
 
 
 class TestConstRhs(unittest.TestCase):
