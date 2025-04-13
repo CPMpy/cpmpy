@@ -28,6 +28,8 @@
     See detailed installation instructions at:
     https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
+    The rest of this documentation is for advanced users.
+
     ===============
     List of classes
     ===============
