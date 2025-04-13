@@ -4,13 +4,7 @@
 ## exact.py
 ##
 """
-    Interface to Exact
-
-    Requires that the 'exact' python package is installed:
-
-    .. code-block:: console
-    
-        $ pip install exact
+    Interface to the Python interface of Exact
 
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
@@ -18,6 +12,28 @@
 
     The solver's git repository:
     https://gitlab.com/nonfiction-software/exact
+
+    Exact is incremental and supports assumption variables/unsat core extraction.
+
+    Always use :func:`cp.SolverLookup.get("exact") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'exact' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install exact
+
+    .. warning::
+        Exact requires Python 3.10 or higher and the pip install only works on Linux and Windows.
+        On MacOS, you have to install the package from source.
+
+    See https://pypi.org/project/exact for more information.
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -59,15 +75,13 @@ class CPM_exact(SolverInterface):
     """
     Interface to the Python interface of Exact
 
-    Requires that the 'exact' python package is installed:
-    $ pip install exact
-
-    See https://pypi.org/project/exact for more information.
-
     Creates the following attributes (see parent constructor for more):
 
     - ``xct_solver`` : the Exact instance used in solve() and solveAll()
     - ``assumption_dict`` : maps Exact variables to (Exact value, CPM assumption expression)
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
     @staticmethod

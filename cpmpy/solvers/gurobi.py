@@ -6,18 +6,27 @@
 """
     Interface to the python 'gurobi' package
 
+    Gurobi Optimizer is a highly efficient commercial solver for Integer Linear Programming (and more).
+
+    Gurobi Optimizer is incremental; it does not support assumption variables/unsat core extraction.
+
+    Always use :func:`cp.SolverLookup.get("gurobi") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
     Requires that the 'gurobipy' python package is installed:
 
     .. code-block:: console
 
         $ pip install gurobipy
     
-    
-    In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
+    Gurobi Optimizer requires an active licence (for example a free academic license)
     You can read more about available licences at https://www.gurobi.com/downloads/
 
-    Documentation of the solver's own Python API:
-    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
+    See detailed installation instructions at:
+    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
 
     ===============
     List of classes
@@ -59,17 +68,14 @@ class CPM_gurobi(SolverInterface):
     """
     Interface to Gurobi's API
 
-    Requires that the 'gurobipy' python package is installed:
-    $ pip install gurobipy
-
-    See detailed installation instructions at:
-    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
-
     Creates the following attributes (see parent constructor for more):
     
     - ``grb_model``: object, TEMPLATE's model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
+    
+    Documentation of the solver's own Python API:
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
     @staticmethod

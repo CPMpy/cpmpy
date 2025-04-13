@@ -6,26 +6,33 @@
 """
     Interface to PySAT's API
 
+    PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
+    interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
+    to a variety of cardinality and pseudo-Boolean encodings.
+    https://pysathq.github.io/
+
+    .. warning::
+        This solver can only be used if the model only uses Boolean variables.
+        It does not support optimization.
+    
+    PySAT is incremental and supports assumption variables/unsat core extraction.
+
+    Always use :func:`cp.SolverLookup.get("pysat") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
     Requires that the 'pysat' optional dependency is installed:
 
     .. code-block:: console
 
         $ pip install cpmpy[pysat]
 
-    PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
-    interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
-    to a variety of cardinality and pseudo-Boolean encodings.
-    https://pysathq.github.io/
+    See detailed installation instructions at:
+    https://pysathq.github.io/installation
 
-    This solver can be used if the model only has Boolean variables,
-    and only logical constraints (`and`, `or`, `implies`, `==`, `!=`) or cardinality constraints.
-
-    Documentation of the solver's own Python API:
-    https://pysathq.github.io/docs/html/api/solvers.html
-
-    .. warning::
-        WARNING: CPMpy uses 'model' to refer to a constraint specification,
-        the PySAT docs use 'model' to refer to a solution.
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -63,15 +70,20 @@ class CPM_pysat(SolverInterface):
     Requires that the 'python-sat' python package. The recommend :
     $ pip install cpmpy[pysat]
 
-    See detailed installation instructions at:
-    https://pysathq.github.io/installation
-
     Creates the following attributes (see parent constructor for more):
 
     - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
     - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
+
+    Documentation of the solver's own Python API:
+    https://pysathq.github.io/docs/html/api/solvers.html
+
+    .. note::
+        CPMpy uses 'model' to refer to a constraint specification,
+        the PySAT docs use 'model' to refer to a solution.
+
     """
 
     IMPORT_PYSAT_PBLIB_ERROR = ImportError("PySAT was installed without optional dependency `pblib`, which is required to encode (weighted) sums. To install PySAT with recommended optional dependencies, run `pip install cpmpy[pysat]`.")

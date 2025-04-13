@@ -6,17 +6,29 @@
 """
     Interface to Choco solver's Python API
 
+    Choco-solver is an open-source Java library for Constraint Programming (see https://choco-solver.org/).
+    It comes with many features such as various types of variables, various state-of-the-art constraint, various search strategies, etc.
+
+    Choco is not? incremental; it does not support assumption variables/unsat core extraction.
+
+    Always use :func:`cp.SolverLookup.get("choco") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
     Requires that the 'pychoco' python package is installed:
 
     .. code-block:: console
 
         $ pip install pychoco
 
-
-    Documentation of the solver's own Python API:
+    Detailed installation instructions available at:
     
     - https://pypi.org/project/pychoco/
     - https://pychoco.readthedocs.io/en/latest/
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -60,18 +72,15 @@ class CPM_choco(SolverInterface):
     """
     Interface to the Choco solver python API
 
-    Requires that the 'pychoco' python package is installed:
-    $ pip install pychoco
-
-    See detailed installation instructions at:
-    
-    - https://pypi.org/project/pychoco/
-    - https://pychoco.readthedocs.io/en/latest/
-
     Creates the following attributes (see parent constructor for more):
     
     - ``chc_model`` : the pychoco.Model() created by _model()
     - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
+
+    Documentation of the solver's own Python API:
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
 
     """
 

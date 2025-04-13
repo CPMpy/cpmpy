@@ -5,21 +5,31 @@
 ##
 """
     Interface to OR-Tools' CP-SAT Python API. 
-    
-    The 'ortools' python package is bundled by default with CPMpy.
-    It can be installed through `pip`:
-
-    .. code-block:: console
-    
-        $ pip install ortools
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
     The OR-Tools CP-SAT solver is an award-winning constraint programming solver
     that uses SAT (satisfiability) methods and lazy-clause generation.
 
-    Documentation of the solver's own Python API:
-    https://developers.google.com/optimization/reference/python/sat/python/cp_model
+    OrTools supports assumption variables and unsat core extraction, but it is not incremental: every solve() call starts from scratch.
+
+    Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+    
+    The 'ortools' python package is bundled by default with CPMpy.
+    It can also be installed separately through `pip`:
+
+    .. code-block:: console
+    
+        $ pip install ortools
+
+    Detailed installation instructions available at:
+    https://developers.google.com/optimization/install
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -57,18 +67,15 @@ class CPM_ortools(SolverInterface):
     """
     Interface to the Python 'ortools' CP-SAT API
 
-    Requires that the 'ortools' python package is installed:
-    $ pip install ortools
-
-    See detailed installation instructions at:
-    https://developers.google.com/optimization/install
-
     Creates the following attributes (see parent constructor for more):
 
     - ``ort_model``: the ortools.sat.python.cp_model.CpModel() created by _model()
     - ``ort_solver``: the ortools cp_model.CpSolver() instance used in solve()
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``ort_model`` object.
+
+    Documentation of the solver's own Python API:
+    https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
     @staticmethod
