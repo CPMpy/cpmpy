@@ -1,5 +1,5 @@
 """
-Transformations regarding linearization of constraints.
+Transforms flat constraints into linear constraints.
 
 Linearized constraints have one of the following forms:
 

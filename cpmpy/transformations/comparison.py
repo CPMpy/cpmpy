@@ -1,8 +1,7 @@
 """
-  Transformations regarding :class:`~cpmpy.expressions.core.Comparison` constraints (originally).
-  Now, it is regarding numeric expressions in general, including nested ones.
+  Transforms non-equality comparisons into equality comparisons as needed.
   
-  Let with <op> one of == or !=,<,<=,>,>=
+  Let <op> be one of == or !=,<,<=,>,>=
   Numeric expressions in Flat Normal Form are of the kind
     - NumExpr <op> IV
     - BoolVar == NumExpr <op> IV

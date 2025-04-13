@@ -1,5 +1,5 @@
 """
-    Decompose any global constraint not supported by the solver.
+    Decompose global constraints not supported by the solver.
 """
 
 import copy

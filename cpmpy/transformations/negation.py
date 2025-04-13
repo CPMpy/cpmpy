@@ -1,5 +1,5 @@
 """
-    Transformations dealing with negations.
+    Transformations dealing with negations (used by other transformations).
 """
 import copy
 import warnings  # for deprecation warning

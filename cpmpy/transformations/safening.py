@@ -1,4 +1,5 @@
 """
+    Transforms partial functions into total functions.
 """
 
 from copy import copy

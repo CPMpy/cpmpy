@@ -1,5 +1,5 @@
 """
-    Normalizing the constraints given to a CPMpy model.
+    Normalize a toplevel list, or simplify Boolean expressions.
 """
 
 import copy

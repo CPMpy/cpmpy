@@ -1,5 +1,5 @@
 """
-Returns an list of all variables in the model or expressions
+Getting and printing variables in the model or expression.
 
 Variables are ordered by appearance, e.g. first encountered first
 """

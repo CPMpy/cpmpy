@@ -1,9 +1,15 @@
 """
+  Meta-transformation for obtaining a CNF from a list of constraints.
+
   Converts the logical constraints into disjuctions using the tseitin transform,
         including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
+
+  .. note::
+    The transformation is no longer used by the SAT solvers, and may be outdated.
+    Check :meth:`CPM_pysat.transform <cpmpy.solvers.pysat.CPM_pysat.transform>` for an up-to-date alternative.
   
   Other constraints are copied verbatim so this transformation
-  can also be used in non-pure CNF settings
+  can also be used in non-pure CNF settings.
 
   The implementation first converts the list of constraints
   to 'flat normal form', this already flattens subexpressions using
