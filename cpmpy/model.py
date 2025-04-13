@@ -156,6 +156,15 @@ class Model(object):
         """
         return self.objective_ is not None
 
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the last solver run on this model
+
+            Returns:
+                an integer or 'None' if it is not run or is a satisfaction problem
+        """
+        return self.objective_.value()
+
     def solve(self, solver=None, time_limit=None, **kwargs):
         """ Send the model to a solver and get the result.
 
@@ -228,15 +237,6 @@ class Model(object):
                 an object of :class:`SolverStatus`
         """
         return self.cpm_status
-
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
-
-            Returns:
-                an integer or 'None' if it is not run, or a satisfaction problem
-        """
-        return self.objective_.value()
 
     def __repr__(self):
         """
