@@ -10,6 +10,7 @@ CPMpy is ideal for solving combinatorial problems like assignment problems or co
    :caption: Getting started:
 
    modeling
+   summary
 
 .. _supported-solvers:
 
@@ -111,7 +112,6 @@ Are you a solver developer? We are keen to `integrate solvers <adding_solver.htm
    :maxdepth: 1
    :caption: API documentation:
 
-   api/quickstart
    api/model
    api/expressions
    api/transformations
