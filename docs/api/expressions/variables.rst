@@ -5,3 +5,4 @@ Decision Variables (:mod:`cpmpy.expressions.variables`)
     :members:
     :undoc-members:
     :inherited-members:
+    :private-members:
