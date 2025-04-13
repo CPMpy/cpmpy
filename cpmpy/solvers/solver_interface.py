@@ -1,4 +1,12 @@
 """
+    Generic interface, solver status and exit status.
+
+    Contains the abstract :class:`SolverInterface` for defining solver interfaces,
+    as well as a class :class:`SolverStatus` that collects solver statistics,
+    and the :class:`ExitStatus` class that represents possible exist statuses.
+
+    Each solver has its own class that inherits from :class:`SolverInterface`.
+
     ===============
     List of classes
     ===============
@@ -9,15 +17,6 @@
         SolverInterface
         SolverStatus
         ExitStatus
-
-    ==================
-    Module description
-    ==================
-    Contains the abstract class `SolverInterface` for defining solver interfaces,
-    as well as a class `SolverStatus` that collects solver statistics,
-    and the `ExitStatus` class that represents possible exist statuses.
-
-    Each solver has its own class that inherits from `SolverInterface`.
 
 """
 import warnings
