@@ -222,9 +222,9 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(BoolVal(name in {"!=", "<", "<="})) # all other operators evaluate to False
             else:
                 res = eval_comparison(name, lhs, rhs)
-                if is_bool(res):
+                if is_bool(res): # Result is a Boolean constant
                     newlist.append(int(res) if num_context else BoolVal(res))
-                else:
+                else: # Result is an expression
                     newlist.append(res)                    
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
