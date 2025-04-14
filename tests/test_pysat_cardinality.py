@@ -186,7 +186,12 @@ class TestCardinality(unittest.TestCase):
 
     def test_pysat_minicard_impied_cardinality_constraint(self):
         # Implied cardinality constraints are not handled natively
-        self.assertTrue(cp.Model(cp.boolvar().implies(sum(cp.boolvar(3)) <= 2)).solve("pysat:minicard"))
+        bvs = cp.boolvar(3)
+        m = cp.Model([
+            cp.boolvar().implies(sum(bvs) <= 2),
+            sum(bvs) >= 2, # followed by non-implied
+        ])
+        m.solve("pysat:minicard")
 
     def test_pysat_minicard_impied_cardinality_constraint(self):
         # Implied cardinality constraints are not handled natively

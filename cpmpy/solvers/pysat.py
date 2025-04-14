@@ -134,16 +134,14 @@ class CPM_pysat(SolverInterface):
         elif subsolver.startswith('pysat:'):
             subsolver = subsolver[6:] # strip 'pysat:'
 
-        # try to import the PBEnc (pblib) module once
+        # try to import the pblib module once
         try:
-            from pysat.card import CardEnc, EncType
-            self._CardEnc = CardEnc
-            self._EncType = EncType
-            from pysat.pb import PBEnc
-            self._PBEnc = PBEnc
+            from pysat import card, pb
+            self._card = card
+            self._pb = pb
         except NameError:
-            self._PBEnc = None
-            self._CardEnc = None
+            self._card = None
+            self._pb = None
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -431,7 +429,7 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
-        if self._CardEnc is None:
+        if self._card is None:
             raise self.IMPORT_PYSAT_PBLIB_ERROR
 
         # unpack and transform to PySAT argument
@@ -446,20 +444,20 @@ class CPM_pysat(SolverInterface):
 
         # Some subsolvers (e.g. MiniCard) support native root context cardinality constraints
         if not reified and self.pysat_solver.supports_atmost():
-            pysat_args["encoding"] = self._EncType.native
+            pysat_args["encoding"] = self._card.EncType.native
 
         if cpm_expr.name == "<=":
-            return self._CardEnc.atmost(**pysat_args)
+            return self._card.CardEnc.atmost(**pysat_args)
         elif cpm_expr.name == ">=":
-            return self._CardEnc.atleast(**pysat_args)
+            return self._card.CardEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return self._CardEnc.equals(**pysat_args)
+            return self._card.CardEnc.equals(**pysat_args)
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
         """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
-        if self._PBEnc is None:
+        if self._pb is None:
             raise self.IMPORT_PYSAT_PBLIB_ERROR
 
         if cpm_expr.args[0].name != "wsum":
@@ -473,10 +471,10 @@ class CPM_pysat(SolverInterface):
         pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
 
         if cpm_expr.name == "<=":
-            return self._PBEnc.atmost(**pysat_args).clauses
+            return self._pb.PBEnc.atmost(**pysat_args).clauses
         elif cpm_expr.name == ">=":
-            return self._PBEnc.atleast(**pysat_args).clauses
+            return self._pb.PBEnc.atleast(**pysat_args).clauses
         elif cpm_expr.name == "==":
-            return self._PBEnc.equals(**pysat_args).clauses
+            return self._pb.PBEnc.equals(**pysat_args).clauses
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
