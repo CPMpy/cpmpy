@@ -6,14 +6,14 @@
 """
     Interface to PySDD's API
 
-    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
-    https://pysdd.readthedocs.io/en/latest/
+    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD).
+    (see https://pysdd.readthedocs.io/en/latest/)
 
     .. warning::    
         This solver can ONLY be used for solution checking and enumeration over Boolean variables!
         It does not support optimization.
 
-    PySDD is incremental and supports assumption variables/unsat core extraction.
+    PySDD is **incremental** and supports **assumption variables**/**unsat core extraction**.
 
     Always use :func:`cp.SolverLookup.get("pysdd") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -58,7 +58,7 @@ from ..transformations.normalize import toplevel_list, simplify_boolean
 
 class CPM_pysdd(SolverInterface):
     """
-    Interface to pysdd's API
+    Interface to PySDD's API.
 
     Creates the following attributes (see parent constructor for more):
 

@@ -4,14 +4,14 @@
 ## z3.py
 ##
 """
-    Interface to z3's API
+    Interface to Z3's Python API.
 
     Z3 is a highly versatile and effective theorem prover from Microsoft.
     Underneath, it is an SMT solver with a wide scala of theory solvers.
     We will interface to the finite-domain integer related parts of the API.
-    https://github.com/Z3Prover/z3
+    (see https://github.com/Z3Prover/z3)
 
-    Z3 is incremental and supports assumption variables/unsat core extraction.
+    Z3 is **incremental** and supports **assumption variables**/**unsat core extraction**.
 
     .. warning::
         For incrementally solving an optimisation function, instantiate the solver object
@@ -61,7 +61,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_z3(SolverInterface):
     """
-    Interface to z3's API
+    Interface to Z3's Python API.
 
     Creates the following attributes (see parent constructor for more):
         

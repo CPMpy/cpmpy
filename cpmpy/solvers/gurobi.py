@@ -4,11 +4,11 @@
 ## gurobi.py
 ##
 """
-    Interface to the python 'gurobi' package
+    Interface to Gurobi Optimizer's Python API.
 
     Gurobi Optimizer is a highly efficient commercial solver for Integer Linear Programming (and more).
 
-    Gurobi Optimizer is incremental; it does not support assumption variables/unsat core extraction.
+    Gurobi Optimizer is **incremental**; it does not support assumption variables/unsat core extraction.
 
     Always use :func:`cp.SolverLookup.get("gurobi") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -68,7 +68,7 @@ except ImportError:
 
 class CPM_gurobi(SolverInterface):
     """
-    Interface to Gurobi's API
+    Interface to Gurobi's Python API
 
     Creates the following attributes (see parent constructor for more):
     

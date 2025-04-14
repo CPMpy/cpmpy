@@ -8,6 +8,7 @@
 
     See:
     https://github.com/ciaranm/glasgow-constraint-solver
+
     The key feature of this CP solver is the ability to produce proof logs.
 
     GCS is not incremental; it does not support assumption variables/unsat core extraction.
@@ -28,13 +29,14 @@
 
     - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
     - (on Debian-based systems, see https://apt.llvm.org for easy installation)
-    - If necessary `export CXX=<your up to date C++ compiler (e.g. clang++-15)>`
+    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-15)>``
     - Ensure you have Boost installed
-    - `git clone https://github.com/ciaranm/glasgow-constraint-solver.git`
-    - `cd glasgow-constraint-solver/python`
-    - `pip install .`
+    - ``git clone https://github.com/ciaranm/glasgow-constraint-solver.git``
+    - ``cd glasgow-constraint-solver/python``
+    - ``pip install .``
 
-    NB: if for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
+    .. note::
+        If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
 
     For the verifier functionality, the 'veripb' tool is also required.
     See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 

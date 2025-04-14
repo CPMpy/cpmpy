@@ -9,9 +9,10 @@
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
     The OR-Tools CP-SAT solver is an award-winning constraint programming solver
-    that uses SAT (satisfiability) methods and lazy-clause generation.
+    that uses SAT (satisfiability) methods and lazy-clause generation 
+    (see https://developers.google.com/optimization).
 
-    OrTools supports assumption variables and unsat core extraction, but it is not incremental: every solve() call starts from scratch.
+    OR-Tools supports **assumption variables** and **unsat core extraction**, but it is not incremental: every solve() call starts from scratch.
 
     Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -65,7 +66,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the Python 'ortools' CP-SAT API
+    Interface to OR-Tools' CP-SAT Python API. 
 
     Creates the following attributes (see parent constructor for more):
 

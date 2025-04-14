@@ -9,13 +9,13 @@
     PySAT is a Python (2.7, 3.4+) toolkit, which aims at providing a simple and unified
     interface to a number of state-of-art Boolean satisfiability (SAT) solvers as well as
     to a variety of cardinality and pseudo-Boolean encodings.
-    https://pysathq.github.io/
+    (see https://pysathq.github.io/)
 
     .. warning::
         This solver can only be used if the model only uses Boolean variables.
         It does not support optimization.
     
-    PySAT is incremental and supports assumption variables/unsat core extraction.
+    PySAT is **incremental** and supports **assumption variables**/**unsat core extraction**.
 
     Always use :func:`cp.SolverLookup.get("pysat") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -65,10 +65,13 @@ from ..transformations.reification import only_implies, only_bv_reifies, reify_r
 
 class CPM_pysat(SolverInterface):
     """
-    Interface to PySAT's API
+    Interface to PySAT's API.
 
-    Requires that the 'python-sat' python package. The recommend :
-    $ pip install cpmpy[pysat]
+    Requires that the 'python-sat' python package is installed. The recommended approach:
+    
+    .. code-block:: console
+
+        $ pip install cpmpy[pysat]
 
     Creates the following attributes (see parent constructor for more):
 

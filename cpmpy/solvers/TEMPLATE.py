@@ -30,7 +30,10 @@
     ============
 
     Requires that the 'TEMPLATEpy' python package is installed:
-    $ pip install TEMPLATEpy
+
+    .. code-block:: console
+    
+        $ pip install TEMPLATEpy
 
     See detailed installation instructions at:
     <URL to detailed solver installation instructions, if any>

@@ -14,6 +14,7 @@
     https://www.minizinc.org
 
     MiniZinc is not incremental; it does not support assumption variables/unsat core extraction.
+    
     The MiniZinc interface is text-based: CPMpy writes a textfile and passes it to the minizinc Python package.
 
     Always use :func:`cp.SolverLookup.get("minizinc") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
@@ -34,10 +35,10 @@
     See detailed installation instructions at:
     https://minizinc-python.readthedocs.io/en/latest/getting_started.html
 
-    Note for **Jupyter notebook** users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
-    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
-    You can overcome this by `pip install nest_asyncio`
-    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
+    Note for **Jupyter notebook** users: MiniZinc uses AsyncIO, so using it in a Jupyter notebook gives
+    you the following error: ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+    You can overcome this by ``pip install nest_asyncio``
+    and adding in the top cell ``import nest_asyncio; nest_asyncio.apply()``
 
     The rest of this documentation is for advanced users.
 

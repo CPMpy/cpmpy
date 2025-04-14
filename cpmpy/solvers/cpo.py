@@ -1,10 +1,10 @@
 """
-    Interface to CP Optimizers API
+    Interface to CP Optimizer's Python API.
 
     CP Optimizer, also a feature of IBM ILOG Optimization Studio, is a software library of constraint programming tools 
     supporting constraint propagation, domain reduction, and highly optimized solution search.
 
-    CP Optimizer is not? incremental; it does not support assumption variables/unsat core extraction.
+    CP Optimizer is not incremental; it does not support assumption variables/unsat core extraction.
 
     Always use :func:`cp.SolverLookup.get("cpo") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -63,7 +63,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_cpo(SolverInterface):
     """
-    Interface to CP Optimizers API.
+    Interface to CP Optimizer's Python API.
 
     Creates the following attributes (see parent constructor for more):
 
