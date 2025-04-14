@@ -70,7 +70,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool
 
 
 class GlobalFunction(Expression):
@@ -285,13 +285,13 @@ class Element(GlobalFunction):
 
         """
         arr, idx = self.args
-        if is_num(idx): # index is constant, we only enforce one constraint
-            try:
-                return [eval_comparison(cpm_op, arr[idx], cpm_rhs)], []
-            except IndexError: # out-of-bounds is undefined (TODO check how to handle partial fixed result)
-                return [], [False]
-        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)], []
+        cons = []
+        for i,var in enumerate(arr):
+            cond = idx == i
+            if is_bool(cond) and not isinstance(cond, cp.BoolVal): # constant
+                cond = cp.BoolVal(cond) # convert True/np.bool_ into BoolVal to enable .implies(..)
+            cons += [cond.implies(eval_comparison(cpm_op, arr[i], cpm_rhs))]
+        return cons + [idx >= 0, idx < len(arr)], []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
