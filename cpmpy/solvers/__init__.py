@@ -13,6 +13,14 @@
     - :meth:`cp.SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` -- List all installed solvers (including subsolvers).
     - :meth:`cp.SolverLookup.get(solvername, model=None) <cpmpy.solvers.utils.SolverLookup.get>` -- Initialize a specific solver.
 
+    For example creating a CPMpy solver object for OR-Tools:
+
+    .. code-block:: python
+
+        import cpmpy as cp
+        s = cp.SolverLookup.get("ortools")
+        # can now use solver object 's' over and over again 
+
 
     =========================
     List of solver submodules
