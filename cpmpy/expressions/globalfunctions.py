@@ -70,7 +70,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool
 
 
 class GlobalFunction(Expression):
@@ -256,6 +256,8 @@ class Element(GlobalFunction):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if is_any_list(idx):
             raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
+        if is_int(idx): # prevents OR-Tools error
+            idx = cp.intvar(idx, idx)
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
