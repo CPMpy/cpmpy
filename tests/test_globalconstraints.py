@@ -1336,3 +1336,12 @@ class TestTypeChecks(unittest.TestCase):
                     self.assertFalse(cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_element_index_dom_mismatched(self):
+        for s, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                try:
+                    # the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
+                    assert str(cp.Element([0,1,2], cp.intvar(-1,1)).decompose_comparison("==", cp.intvar(1,5))) == "([(IV0 == 0) -> (IV1 == 0), IV0 >= 0, IV0 <= 1], [])"
+                except (NotImplementedError, NotSupportedError):
+                    pass

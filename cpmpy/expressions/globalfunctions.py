@@ -70,7 +70,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst
 
 
 class GlobalFunction(Expression):
@@ -288,12 +288,18 @@ class Element(GlobalFunction):
         """
         arr, idx = self.args
         cons = []
-        for i,var in enumerate(arr):
+        # the decomposition posts `idx=i -> arr[i] <CMP_OP> cpm_rhs`
+        # for every  `i` in the intersection of array indices and the bounds of `idx`
+        lb, ub = idx.get_bounds()
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr))
+        for i in range(new_lb, new_ub):
             cond = idx == i
-            if is_bool(cond) and not isinstance(cond, cp.BoolVal): # constant
-                cond = cp.BoolVal(cond) # convert True/np.bool_ into BoolVal to enable .implies(..)
+            if is_true_cst(cond):
+                return [eval_comparison(cpm_op, arr[i], cpm_rhs)], []
+            elif is_false_cst(cond):
+                continue
             cons += [cond.implies(eval_comparison(cpm_op, arr[i], cpm_rhs))]
-        return cons + [idx >= 0, idx < len(arr)], []
+        return cons + [idx >= new_lb, idx <= new_ub], []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
