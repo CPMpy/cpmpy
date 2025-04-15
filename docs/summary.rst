@@ -28,7 +28,7 @@ Solvers
 Decision Variables
 ~~~~~~~~~~~~~~~~~~
 
-:mod:`Decision variables <cpmpy.expressions.variables>` are NumPy-like objects: shape=None|1 creates one variable, shape=4 creates a vector of 4 variables, shape=(2,3) creates a matrix of 2x3 variables, etc.
+:mod:`Decision variables <cpmpy.expressions.variables>` are NumPy-like objects: ``shape=None|1`` creates one variable, ``shape=4`` creates a vector of 4 variables, ``shape=(2,3)`` creates a matrix of 2x3 variables, etc.
 Name is optional too, indices are automatically added to the name so each variable has a unique name.
 
 - :meth:`x = cp.boolvar(shape=4, name="x") <cpmpy.expressions.variables.boolvar>` -- Create four Boolean decision variables.
