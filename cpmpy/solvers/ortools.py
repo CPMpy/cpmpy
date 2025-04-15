@@ -41,9 +41,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -480,9 +480,15 @@ class CPM_ortools(SolverInterface):
                 elif lhs.name == 'div':
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
-                    # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    arr, idx = lhs.args
+                    if is_int(idx) and (idx < 0 or idx >= len(arr)):
+                        idx = intvar(idx,idx)
+                    # OR-Tools has slight different in argument order
+                    return self.ort_model.AddElement(
+                        self.solver_var(idx),
+                        self.solver_vars(arr),
+                        ortrhs
+                    )
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args

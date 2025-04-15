@@ -70,7 +70,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst, get_bounds
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst, get_bounds, implies
 
 
 class GlobalFunction(Expression):
@@ -256,8 +256,6 @@ class Element(GlobalFunction):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if is_any_list(idx):
             raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
-        if is_int(idx): # prevents OR-Tools error
-            idx = cp.intvar(idx, idx)
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
@@ -287,19 +285,14 @@ class Element(GlobalFunction):
 
         """
         arr, idx = self.args
-        cons = []
-        # the decomposition posts `idx=i -> arr[i] <CMP_OP> cpm_rhs`
-        # for every  `i` in the intersection of array indices and the bounds of `idx`
-        new_lb, new_ub = max(lb, 0), min(ub, len(arr))
+        # for every  `i` in the intersection of array indices and the bounds of `idx`..
         lb, ub = get_bounds(idx)
-        for i in range(new_lb, new_ub):
-            cond = idx == i
-            if is_true_cst(cond):
-                return [eval_comparison(cpm_op, arr[i], cpm_rhs)], []
-            elif is_false_cst(cond):
-                continue
-            cons += [cond.implies(eval_comparison(cpm_op, arr[i], cpm_rhs))]
-        return cons + [idx >= new_lb, idx <= new_ub], []
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
+        return [  # ..we post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+            implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(new_lb, new_ub + 1)
+        ] + [  # also enforce the new bounds 
+            idx >= new_lb, idx <= new_ub
+        ], []  # no auxiliary variables
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])

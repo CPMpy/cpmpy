@@ -194,6 +194,15 @@ def get_bounds(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
+def implies(expr, other):
+    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also works for non-expressions """
+    if expr is True:
+        return other
+    elif expr is False:
+        return BoolVal(True)
+    else:
+        return expr.implies(other)
+
 # Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
 STAR = "*" # define constant here
 def is_star(arg):
