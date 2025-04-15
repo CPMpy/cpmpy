@@ -23,11 +23,12 @@
     Installation
     ============
 
-    Requires that the 'pysat' optional dependency is installed:
+    Requires that the 'python-sat' package is installed. If you want to also solve
+    pseudo-Boolean constraints, you should also install its optional dependency 'pblib', as follows:
 
     .. code-block:: console
 
-        $ pip install cpmpy[pysat]
+        $ pip install python-sat[pblib]
 
     See detailed installation instructions at:
     https://pysathq.github.io/installation
@@ -66,12 +67,6 @@ from ..transformations.reification import only_implies, only_bv_reifies, reify_r
 class CPM_pysat(SolverInterface):
     """
     Interface to PySAT's API.
-
-    Requires that the 'python-sat' python package is installed. The recommended approach:
-    
-    .. code-block:: console
-
-        $ pip install cpmpy[pysat]
 
     Creates the following attributes (see parent constructor for more):
 
