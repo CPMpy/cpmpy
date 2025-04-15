@@ -54,7 +54,7 @@ def get_variables(expr, collect=None):
                     extract(e.args[0], append)  # skip data in arg1
                 else:
                     extract(e.args, append)
-            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            elif isinstance(e, (list,tuple, np.flatiter, np.ndarray,set)):
                 extract(e, append)
 
     if collect is not None:
