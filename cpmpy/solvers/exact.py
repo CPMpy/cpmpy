@@ -169,8 +169,8 @@ class CPM_exact(SolverInterface):
         
         # set additional keyword arguments
         if(len(kwargs.items())>0):
-            wrn_txt = "Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
-            wrn_txt += "Use cp.SolverLookup.lookup('exact')(**{parameter-with-hyphen: 42}) to set Exact parameters"
+            wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
+            wrn_txt += "Use cp.SolverLookup.lookup('exact', **{parameter-with-hyphen: 42}) to set Exact parameters"
             warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
