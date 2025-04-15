@@ -14,6 +14,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install ".[test, z3, choco, exact, pysat, pysdd, choco, minizinc]"
+          pip install pytest-xdist
           sudo snap install minizinc --classic
       - name: Test with pytest
         run: |
