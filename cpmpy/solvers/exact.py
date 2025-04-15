@@ -13,8 +13,6 @@
     The solver's git repository:
     https://gitlab.com/nonfiction-software/exact
 
-    Exact is **incremental** and supports **assumption variables**/**unsat core extraction**.
-
     Always use :func:`cp.SolverLookup.get("exact") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

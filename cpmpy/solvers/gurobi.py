@@ -8,8 +8,6 @@
 
     Gurobi Optimizer is a highly efficient commercial solver for Integer Linear Programming (and more).
 
-    Gurobi Optimizer is **incremental**; it does not support assumption variables/unsat core extraction.
-
     Always use :func:`cp.SolverLookup.get("gurobi") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

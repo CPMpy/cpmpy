@@ -21,8 +21,6 @@
 
     <some information on the solver>
 
-    TEMPLATE is <not> incremental and <does not> support assumption variables/unsat core extraction.
-
     Always use :func:`cp.SolverLookup.get("TEMPLATE") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

@@ -4,8 +4,6 @@
     CP Optimizer, also a feature of IBM ILOG Optimization Studio, is a software library of constraint programming tools 
     supporting constraint propagation, domain reduction, and highly optimized solution search.
 
-    CP Optimizer is not incremental; it does not support assumption variables/unsat core extraction.
-
     Always use :func:`cp.SolverLookup.get("cpo") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

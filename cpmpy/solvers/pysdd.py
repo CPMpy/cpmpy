@@ -13,8 +13,6 @@
         This solver can ONLY be used for solution checking and enumeration over Boolean variables!
         It does not support optimization.
 
-    PySDD is **incremental** and supports **assumption variables**/**unsat core extraction**.
-
     Always use :func:`cp.SolverLookup.get("pysdd") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

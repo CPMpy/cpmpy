@@ -13,8 +13,6 @@
     language that is understood by a wide range of solvers.
     https://www.minizinc.org
 
-    MiniZinc is not incremental; it does not support assumption variables/unsat core extraction.
-    
     The MiniZinc interface is text-based: CPMpy writes a textfile and passes it to the minizinc Python package.
 
     Always use :func:`cp.SolverLookup.get("minizinc") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.

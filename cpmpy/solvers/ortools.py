@@ -12,8 +12,6 @@
     that uses SAT (satisfiability) methods and lazy-clause generation 
     (see https://developers.google.com/optimization).
 
-    OR-Tools supports **assumption variables** and **unsat core extraction**, but it is not incremental: every solve() call starts from scratch.
-
     Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

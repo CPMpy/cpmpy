@@ -15,8 +15,6 @@
         This solver can only be used if the model only uses Boolean variables.
         It does not support optimization.
     
-    PySAT is **incremental** and supports **assumption variables**/**unsat core extraction**.
-
     Always use :func:`cp.SolverLookup.get("pysat") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

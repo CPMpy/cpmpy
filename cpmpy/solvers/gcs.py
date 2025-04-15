@@ -11,8 +11,6 @@
 
     The key feature of this CP solver is the ability to produce proof logs.
 
-    GCS is not incremental; it does not support assumption variables/unsat core extraction.
-
     Always use :func:`cp.SolverLookup.get("gcs") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
     ============

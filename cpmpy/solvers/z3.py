@@ -11,8 +11,6 @@
     We will interface to the finite-domain integer related parts of the API.
     (see https://github.com/Z3Prover/z3)
 
-    Z3 is **incremental** and supports **assumption variables**/**unsat core extraction**.
-
     .. warning::
         For incrementally solving an optimisation function, instantiate the solver object
         with a model that has an objective function, e.g. ``s = cp.SolverLookup.get("z3", Model(maximize=1))``.
