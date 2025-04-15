@@ -4,27 +4,24 @@
 ## model.py
 ##
 """
-    The `Model` class is a lazy container for constraints and an objective function.
+    The :class:`Model <cpmpy.model.Model>` class is a lazy container for constraints and an objective function.
+    Constraints and objectives are CPMpy :mod:`expressions <cpmpy.expressions>`.
 
     It is lazy in that it only stores the constraints and objective that are added
-    to it. Processing only starts when solve() is called, and this does not modify
+    to it. Processing only starts when :meth:`solve() <cpmpy.model.Model.solve>` is called, and this does not modify
     the constraints or objective stored in the model.
 
-    A model can be solved multiple times, and constraints can be added to it inbetween
-    solve calls.
+    A model can be solved multiple times, and constraints can be added inbetween solve calls.
+    Note that constraints are added using the ``+=`` operator (implemented by :meth:`__add__() <cpmpy.model.Model.__add__>`).
 
-    See the examples for basic usage, which involves:
-
-    - creation, e.g. `m = Model(cons, minimize=obj)` 
-    - adding constraints, e.g. `m += (x | y)`
-    - solving, e.g. `m.solve()` 
-    - optionally, checking status/runtime, e.g. `m.status()` 
+    See the full list of functions below.
 
     ===============
     List of classes
     ===============
     .. autosummary::
         :nosignatures:
+        :toctree:
 
         Model
 """
@@ -85,8 +82,15 @@ class Model(object):
         
     def __add__(self, con):
         """
-            Add one or more constraints to the model
+        Add one or more constraints to the model.
 
+        Arguments:
+            con (Expression or list): Expression object(s) or list(s) of Expression objects representing constraints
+
+        Returns:
+            Model: Returns self to allow for method chaining
+
+        Example:
             .. code-block:: python
 
                 m = Model()
@@ -113,22 +117,6 @@ class Model(object):
         return self
 
 
-    def objective(self, expr, minimize):
-        """
-            Post the given expression to the solver as objective to minimize/maximize
-
-            Arguments:
-                expr (Expression):      the CPMpy expression that represents the objective function
-                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
-
-            'objective()' can be called multiple times, only the last one is stored
-        """
-        self.objective_ = expr
-        self.objective_is_min = minimize
-
-    def has_objective(self):
-        return self.objective_ is not None
-
     def minimize(self, expr):
         """
             Minimize the given objective function
@@ -145,13 +133,46 @@ class Model(object):
         """
         self.objective(expr, minimize=False)
 
-    # solver: name of supported solver or any SolverInterface object
+    def objective(self, expr, minimize):
+        """
+            Users will typically use :meth:`minimize() <cpmpy.model.Model.minimize>` or :meth:`maximize() <cpmpy.model.Model.maximize>` to set the objective function,
+            this is the generic implementation for both.
+
+            Arguments:
+                expr (Expression):      the CPMpy expression that represents the objective function
+                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
+
+            'objective()' can be called multiple times, only the last one is stored
+        """
+        self.objective_ = expr
+        self.objective_is_min = minimize
+
+    def has_objective(self):
+        """
+            Check if the model has an objective function
+
+            Returns:
+                bool: True if the model has an objective function, False otherwise
+        """
+        return self.objective_ is not None
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the last solver run on this model
+
+            Returns:
+                an integer or 'None' if it is not run or is a satisfaction problem
+        """
+        return self.objective_.value()
+
     def solve(self, solver=None, time_limit=None, **kwargs):
-        """ Send the model to a solver and get the result
+        """ Send the model to a solver and get the result.
+
+            Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
 
         Arguments:
             solver (string or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!), optional): 
-                name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
+                name of a solver to use.
             time_limit (int or float, optional): time limit in seconds
 
             
@@ -180,14 +201,16 @@ class Model(object):
         """
             Compute all solutions and optionally display the solutions.
 
-            Delegated to the solver, who might implement this efficiently
+            If no solution is found, the solver status will be 'Unsatisfiable'.
+            If at least one solution was found and the solver exhausted all possible solutions, the solver status will be 'Optimal', otherwise 'Feasible'.
 
             Arguments:
                 display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                                     default/None: nothing displayed
                 solution_limit:     stop after this many solutions (default: None)
 
-            Returns: number of solutions found
+            Returns:
+                int: number of solutions found (within the time and solution limit)
         """
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
@@ -215,16 +238,13 @@ class Model(object):
         """
         return self.cpm_status
 
-    def objective_value(self):
+    def __repr__(self):
         """
-            Returns the value of the objective function of the latste solver run on this model
+            Returns a string representation of the model
 
             Returns:
-                an integer or 'None' if it is not run, or a satisfaction problem
+                str: A string representation of the model
         """
-        return self.objective_.value()
-
-    def __repr__(self):
         cons_str = ""
         for c in self.constraints:
             cons_str += "    {}\n".format(c)

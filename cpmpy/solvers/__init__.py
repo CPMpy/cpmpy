@@ -5,9 +5,18 @@
     :mod:`cpmpy.transformations` as well as specific reformulations to map the
     CPMpy expression to the solver's Python API.
 
-    ==================
-    List of submodules
-    ==================
+    =========================
+    List of helper submodules
+    =========================
+    .. autosummary::
+        :nosignatures:
+
+        solver_interface
+        utils
+
+    =========================
+    List of solver submodules
+    =========================
     .. autosummary::
         :nosignatures:
 
@@ -21,24 +30,6 @@
         choco
         gcs
         cpo
-        utils
-
-    ===============
-    List of classes
-    ===============
-    .. autosummary::
-        :nosignatures:
-
-        CPM_ortools
-        CPM_minizinc
-        CPM_pysat
-        CPM_gurobi
-        CPM_pysdd
-        CPM_z3
-        CPM_exact
-        CPM_choco
-        CPM_gcs
-        CPM_cpo
 
     =================
     List of functions

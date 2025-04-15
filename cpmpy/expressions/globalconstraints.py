@@ -106,18 +106,24 @@
         Circuit
         Inverse
         Table
-        NegativeTable
         ShortTable
+        NegativeTable
+        IfThenElse
+        InDomain
         Xor
         Cumulative
-        IfThenElse
+        Precedence
+        NoOverlap
         GlobalCardinalityCount
-        DirectConstraint
-        InDomain
         Increasing
         Decreasing
         IncreasingStrict
         DecreasingStrict
+        LexLess
+        LexLessEq
+        LexChainLess
+        LexChainLessEq
+        DirectConstraint
 
 """
 import copy
@@ -463,6 +469,11 @@ class NegativeTable(GlobalConstraint):
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
+    """
+        The IfThenElse constraint, defining a conditional expression
+        of the form: if condition then if_true else if_false
+        where condition, if_true and if_false are all boolean expressions.
+    """
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
@@ -685,6 +696,9 @@ class Precedence(GlobalConstraint):
 
 
 class NoOverlap(GlobalConstraint):
+    """
+    NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
+    """
 
     def __init__(self, start, dur, end):
         assert is_any_list(start), "start should be a list"
@@ -705,6 +719,7 @@ class NoOverlap(GlobalConstraint):
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
+
     def value(self):
         start, dur, end = argvals(self.args)
         if any(s + d != e for s,d,e in zip(start, dur, end)):

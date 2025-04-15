@@ -24,8 +24,8 @@
     `x >= y`             `Comparison(">=", x, y)`         
     ===================  ==========================
 
-    Mathematical Operators
-    ----------------------
+    Arithmetic Operators
+    --------------------
     ===========================  ===============================================
     Python Operator              CPMpy Object                                  
     ===========================  ===============================================
@@ -35,9 +35,9 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x / y`                      `Operator("div", [x, y])`                     
-    `x % y`                      `Operator("mod", [x, y])`                     
-    `x ** y`                     `Operator("pow", [x, y])`  
+    `x // y`                     `Operator("div", [x, y])` (integer division)
+    `x % y`                      `Operator("mod", [x, y])` (modulo)                    
+    `x ** y`                     `Operator("pow", [x, y])` (power)  
     ===========================  ===============================================                   
 
     
@@ -437,7 +437,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert is_true_cst(arg) or is_false_cst(arg)
+        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):

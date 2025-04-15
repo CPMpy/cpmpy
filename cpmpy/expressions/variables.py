@@ -275,9 +275,11 @@ class NullShapeError(Exception):
 
 class _NumVarImpl(Expression):
     """
-    Abstract **continuous numerical** variable with given lowerbound and upperbound.
+    Abstract base class for numerical variables in CPMpy.
 
-    Abstract class, only mean to be subclassed
+    This class implements the common functionality for numerical variables,
+    including bounds checking and value management. It should not be instantiated
+    directly, but rather through the helper functions :func:`~cpmpy.expressions.variables.intvar` and :func:`~cpmpy.expressions.variables.boolvar`.
     """
     def __init__(self, lb, ub, name):
         assert (is_num(lb) and is_num(ub))
@@ -323,9 +325,10 @@ class _NumVarImpl(Expression):
 
 class _IntVarImpl(_NumVarImpl):
     """
-    **Integer** variable with given lowerbound and upperbound.
+    Implementation class for integer variables in CPMpy.
 
-    Do not create this object directly, use `intvar()` instead
+    This class represents integer decision variables with a given domain [lb, ub] (inclusive).
+    It should not be instantiated directly, but rather through the :func:`~cpmpy.expressions.variables.intvar` helper function.
     """
     counter = 0
 
@@ -349,9 +352,10 @@ class _IntVarImpl(_NumVarImpl):
 
 class _BoolVarImpl(_IntVarImpl):
     """
-    **Boolean** variable with given lowerbound and upperbound.
+    Implementation class for Boolean variables in CPMpy.
 
-    Do not create this object directly, use `boolvar()` instead
+    This class represents Boolean decision variables that can take values True/False.
+    It should not be instantiated directly, but rather through the :func:`~cpmpy.expressions.variables.boolvar` helper function.
     """
     counter = 0
 

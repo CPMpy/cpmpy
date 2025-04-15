@@ -313,6 +313,18 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_card(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [sum(x) > 3, sum(x) <= 2, sum(x) == 4, (sum(x) <= 1) & (sum(x) != 2),
+                b.implies(sum(x) > 3), b == (sum(x) != 2), (sum(x) >= 3).implies(b)]
+        for c in cons:
+            self.assertTrue(cp.Model(c).solve("pysat"))
+            self.assertTrue(c.value())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
