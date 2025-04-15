@@ -4,7 +4,7 @@
 ## exact.py
 ##
 """
-    Interface to the Python interface of Exact
+    Interface to Exact's Python API
 
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
@@ -73,7 +73,7 @@ import numbers
 
 class CPM_exact(SolverInterface):
     """
-    Interface to the Python interface of Exact
+    Interface to Exact's Python API
 
     Creates the following attributes (see parent constructor for more):
 
