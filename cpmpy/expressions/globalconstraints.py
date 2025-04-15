@@ -187,6 +187,10 @@ class AllDifferent(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
+        from cpmpy.transformations.linearize import linearize_constraint
+        # Boolean encoding of alldifferent
+        return linearize_constraint([self]), []
+
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
     def value(self):
@@ -239,6 +243,7 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
+
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 

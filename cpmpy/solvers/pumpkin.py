@@ -302,7 +302,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
-        supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max", "alldifferent", "cumulative"}
+        supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max", "cumulative"}
         cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif) # reified element not supported yet (TODO?)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
