@@ -496,7 +496,7 @@ class TestSolvers(unittest.TestCase):
         
         # taken from https://gitlab.com/nonfiction-software/exact/-/blob/main/python_examples/proof_logging.py
         options = {"proof-log": proof_file, "proof-assumptions":"0"}
-        exact = cp.SolverLookup.lookup("exact")(m, **options)
+        exact = cp.SolverLookup.get("exact",m, **options)
         self.assertFalse(exact.solve())
 
         with open(proof_file+".proof", "r") as f:
