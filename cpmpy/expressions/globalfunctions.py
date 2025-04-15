@@ -70,7 +70,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, Comparison
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst, get_bounds
 
 
 class GlobalFunction(Expression):
@@ -290,8 +290,8 @@ class Element(GlobalFunction):
         cons = []
         # the decomposition posts `idx=i -> arr[i] <CMP_OP> cpm_rhs`
         # for every  `i` in the intersection of array indices and the bounds of `idx`
-        lb, ub = idx.get_bounds()
         new_lb, new_ub = max(lb, 0), min(ub, len(arr))
+        lb, ub = get_bounds(idx)
         for i in range(new_lb, new_ub):
             cond = idx == i
             if is_true_cst(cond):
