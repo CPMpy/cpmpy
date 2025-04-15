@@ -1,7 +1,7 @@
 Summary sheet
 =============
 
-More extensive user documentation in `Modeling and solving with CPMpy <modeling.md>`_.
+More extensive user documentation in :doc:`Modeling and solving with CPMpy <modeling>`.
 
 ``import cpmpy as cp``
 
