@@ -166,7 +166,7 @@ class CPM_exact(SolverInterface):
                 - False     if no solution is found
         """
         from exact import Exact as xct
-        
+ 
         # set additional keyword arguments
         if(len(kwargs.items())>0):
             wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
