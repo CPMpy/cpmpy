@@ -382,7 +382,7 @@ class CPM_ortools(SolverInterface):
                                              # reified expr must go before this
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -408,11 +408,12 @@ class CPM_ortools(SolverInterface):
             self._post_constraint(con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     # TODO: 'reifiable' is an artefact from the early days
     # only 3 constraints support it (and,or,sum),
     # we can just add reified support for those and not need `reifiable` or returning the constraint
-    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # then we can remove _post_constraint and have its code inside the for loop of `add()`
     # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """

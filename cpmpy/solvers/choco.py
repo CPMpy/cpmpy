@@ -372,7 +372,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -401,6 +401,7 @@ class CPM_choco(SolverInterface):
                 c.post()
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _get_constraint(self, cpm_expr):
         """

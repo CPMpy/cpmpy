@@ -436,7 +436,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr): # helper function
         return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -531,6 +531,7 @@ class CPM_exact(SolverInterface):
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
             
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def get_core(self):
         from exact import Exact as xct

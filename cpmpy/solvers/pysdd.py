@@ -256,7 +256,7 @@ class CPM_pysdd(SolverInterface):
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -305,6 +305,7 @@ class CPM_pysdd(SolverInterface):
                                                 self._pysdd_expr(cpm_con))
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _pysdd_expr(self, cpm_con):
         """

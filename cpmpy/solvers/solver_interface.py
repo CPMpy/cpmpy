@@ -78,7 +78,7 @@ class SolverInterface(object):
 
         # rest uses own API
         if cpm_model is not None:
-            # post all constraints at once, implemented in __add__()
+            # post all constraints at once, implemented in `add()`
             self += cpm_model.constraints
 
             # post objective
@@ -193,7 +193,7 @@ class SolverInterface(object):
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -216,9 +216,14 @@ class SolverInterface(object):
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
-            raise NotImplementedError("solver __add__(): abstract function, overwrite")
+            raise NotImplementedError("solver add(): abstract function, overwrite")
 
         return self
+    __add__ = add  # avoid redirect in superclass
+    
+    # needed here for subclasses, avoid redirect with `__add__ = add` in the solver class
+    def __add__(self, cpm_expr):
+        return self.add(cpm_expr)
 
 
     # OPTIONAL functions
