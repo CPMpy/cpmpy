@@ -68,9 +68,9 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
+from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, is_bool, is_true_cst, is_false_cst, get_bounds, implies
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
 class GlobalFunction(Expression):
@@ -237,6 +237,7 @@ def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
+
 class Element(GlobalFunction):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
