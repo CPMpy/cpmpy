@@ -150,13 +150,15 @@ class CPM_minizinc(SolverInterface):
         driver = minizinc.default_driver
 
         # Collect solver names
-        all_solvers = []
+        all_solvers, all_versions = [], []
         output = driver._run(["--solvers-json"])
         solvers = json.loads(output.stdout)        
         for solver_dict in solvers:
             tag = solver_dict["id"].split(".")[-1]
+            version = solver_dict["version"]
             if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
                 all_solvers.append(tag)
+                all_versions.append(version)
 
         if not installed:
             """
@@ -166,28 +168,12 @@ class CPM_minizinc(SolverInterface):
 
         else:
             """
-            Test which solver executables are available by attempting to solve a small model.
+            Test which solver executables are available by retrieving version information
             """
-            solver_names = set()
+            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"]
+            installed_solvers = [all_solvers[i] for i in valid_indices]
 
-            test_model = """
-            var 1..3: x;
-            solve satisfy;
-            """
-
-            driver_dict = minizinc.default_driver.available_solvers()
-
-            for tag in all_solvers:
-                try:
-                    model = minizinc.Model()
-                    model.add_string(test_model)
-                    instance = minizinc.Instance(driver_dict[tag][0], model)
-                    instance.solve(timeout=timedelta(seconds=1))
-                    solver_names.add(tag)
-                except Exception:
-                    pass  # Solver not working or not installed
-
-        return solver_names
+            return set(installed_solvers)
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
