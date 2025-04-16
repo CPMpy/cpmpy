@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -57,7 +57,8 @@ class TestTransLinearize(unittest.TestCase):
         # test implies
         self.assertEqual(str(linearize_constraint([a.implies(b)])), "[sum([1, -1] * [a, b]) <= 0]")
         self.assertEqual(str(linearize_constraint([a.implies(~b)])), "[sum([1, -1] * [a, ~b]) <= 0]")
-        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), "[(a) -> (sum([x, y, z]) >= 0)]")
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 0)])), str([]))
+        self.assertEqual(str(linearize_constraint([a.implies(x+y+z >= 2)])), "[(a) -> (sum([x, y, z]) >= 2)]")
         self.assertEqual(str(linearize_constraint([a.implies(x+y+z > 0)])), "[(a) -> (sum([x, y, z]) >= 1)]")
         # test sub
         self.assertEqual(str(linearize_constraint([Operator("sub",[x,y]) >= z])), "[sum([1, -1, -1] * [x, y, z]) >= 0]")
@@ -76,6 +77,14 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(c2), "(a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)")
         self.assertEqual(str(c3), "sum([1, -1] * [~a, ~BV4]) <= 0")
 
+
+    def test_single_boolvar(self):
+        """ Linearize should convert Boolean literals to constraints (either linear or clause) """
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(linearize_constraint([p])))
+        self.assertEqual(str([p <= 0]), str(linearize_constraint([~p])))
+        self.assertEqual(str([Operator("or", [p])]), str(linearize_constraint([p], supported={"or"})))
+        self.assertEqual(str([Operator("or", [~p])]), str(linearize_constraint([~p], supported={"or"})))
 
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
@@ -174,12 +183,32 @@ class TestTransLinearize(unittest.TestCase):
 
 
         lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
+        self.assertEqual(str(lin_mod), '[IV8 <= 0, sum([2, -1] * [IV9, IV10]) == 0, sum([1, -1] * [IV8, IV11]) == 0, sum([1, 1, -1] * [IV10, IV8, x]) == 0]')
         self.assertTrue(cp.Model(lin_mod).solve())
         self.assertIn(x.value(), {2, 4}) # can never be < 0
 
         lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
         self.assertTrue(cp.Model(lin_mod).solve())
         self.assertIn(x.value(), {1,3,5})
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
+        c = cp.AllDifferent(arr)
+
+        linear_c = linearize_constraint([c])
+        # this triggers an error
+        pos_c = only_positive_bv([c])
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames(): # otherwise, not supported
+            model = cp.Model(c)
+            model.solve(solver="exact")
+
 
 
 class TestConstRhs(unittest.TestCase):
@@ -236,12 +265,20 @@ class TestConstRhs(unittest.TestCase):
 
 class TestVarsLhs(unittest.TestCase):
 
-    def test_sum(self):
+    def test_trivial_unsat_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
 
+        # trivial UNSAT
         cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
-        self.assertEqual("sum([a, b, c]) <= -5", str(cons))
+        self.assertEqual(str(cp.BoolVal(False)), str(cons))
+
+    def test_sum(self):
+        a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
+        rhs = 15
+
+        cons = linearize_constraint([cp.sum([a,b,c,10]) <= rhs])[0]
+        self.assertEqual(str(cp.sum([a,b,c]) <= 5), str(cons))
 
     def test_wsum(self):
         a, b, c = [cp.intvar(0, 10,name=n) for n in "abc"]
@@ -280,11 +317,17 @@ class TestVarsLhs(unittest.TestCase):
         self.assertRaises(NotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
 
+    def test_mod_triv(self):
+        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
+        # x mod y <= 2 is trivially true for x,y in 1..3
+        self.assertEqual(str([]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
+
     def test_mod(self):
 
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
 
-        cons = (x % y) <= 2
+        # disallows 2 mod 3 = 2
+        cons = (x % y) <= 1
         sols = set()
         cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
@@ -301,9 +344,9 @@ class TestVarsLhs(unittest.TestCase):
         same_cons = linearize_constraint([cons], supported={"mod"})
         self.assertEqual(str(same_cons[0]), str(cons))
 
-        # what about reified?
+        # what about half-reified?
         bv = cp.boolvar(name="bv")
-        cons = bv.implies((x % y) <= 2)
+        cons = bv.implies((x % y) <= 1)
         sols = set()
         cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
@@ -398,3 +441,11 @@ class testCanonical_comparison(unittest.TestCase):
         a, b, c, x, y = [cp.boolvar(name=n) for n in "abc"] + [cp.intvar(0, 3, name=n) for n in "xy"]
         only_pos = only_positive_coefficients([Operator("wsum",[[1,1,-1,1,-1],[a,b,c,x,y]]) > 0])
         self.assertEqual(str([Operator("wsum",[[1,1,1,1,-1],[a,b,~c,x,y]]) > 1]), str(only_pos))
+
+    def test_only_positive_bv_implied_by_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p >= 1]), str(only_positive_bv(linearize_constraint([p]))))
+
+    def test_only_positive_bv_implied_by_negated_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))

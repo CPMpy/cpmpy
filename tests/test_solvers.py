@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
@@ -313,6 +314,18 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_card(self):
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+
+        cons = [sum(x) > 3, sum(x) <= 2, sum(x) == 4, (sum(x) <= 1) & (sum(x) != 2),
+                b.implies(sum(x) > 3), b == (sum(x) != 2), (sum(x) >= 3).implies(b)]
+        for c in cons:
+            self.assertTrue(cp.Model(c).solve("pysat"))
+            self.assertTrue(c.value())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="MiniZinc not installed")
@@ -478,6 +491,29 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("exact", m)
         self.assertEqual(s.solveAll(display=_trixor_callback),7)
 
+    @pytest.mark.skipif(not CPM_exact.supported(), 
+                        reason="Exact not installed")
+    def test_parameters_to_exact(self):
+    
+        # php with 5 pigeons, 4 holes
+        p,h = 40,39
+        x = cp.boolvar(shape=(p,h))
+        m = cp.Model(x.sum(axis=1) >= 1, x.sum(axis=0) <= 1)
+
+        # this should raise a warning
+        with self.assertWarns(UserWarning):
+            self.assertFalse(m.solve(solver="exact", verbosity=10))
+        
+        # can we indeed set a parameter? Try with prooflogging
+        proof_file = tempfile.NamedTemporaryFile(delete=False).name
+        
+        # taken from https://gitlab.com/nonfiction-software/exact/-/blob/main/python_examples/proof_logging.py
+        options = {"proof-log": proof_file, "proof-assumptions":"0"}
+        exact = cp.SolverLookup.get("exact",m, **options)
+        self.assertFalse(exact.solve())
+
+        with open(proof_file+".proof", "r") as f:
+            self.assertEquals(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -720,6 +756,8 @@ class TestSupportedSolvers:
             No straightforward way to resolve this for now.
             """
             return
+        if solver == "gcs":
+            return
         s = cp.SolverLookup.get(solver)
         try:
             s.minimize(cp.sum(x))
@@ -773,20 +811,21 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat' or solver == 'gurobi':  # don't support div with vars
+        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
             return
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
-
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
         m += x / y == d
         m += x % y == r
         sols = set()
-        m.solveAll(solver=solver, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = None
+        if solver == 'gurobi':
+            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
-            # print(xv,yv,dv,rv)
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv
@@ -869,10 +908,18 @@ class TestSupportedSolvers:
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
-
-
-
-
-
-
-
+    def test_hidden_user_vars(self, solver):
+        """
+        Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
+        still get correctly captured and posted.
+        """
+        if solver == 'pysdd' or solver == 'pysat':  # pysat and pysdd don't support integer decision variables
+            return
+        
+        x = cp.intvar(1, 4, shape=1)
+        # Dubious constraint which enforces nothing, gets decomposed to empty list
+        # -> resulting CP model is empty
+        m = cp.Model([cp.AllDifferentExceptN([x], 1)])
+        s = cp.SolverLookup().get(solver, m)
+        assert len(s.user_vars) == 1 # check if var captured as a user_var
+        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model

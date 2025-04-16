@@ -27,6 +27,7 @@ from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
 from .choco import CPM_choco
+from .cpo   import CPM_cpo
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -35,12 +36,12 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         For example usage, see `examples/advanced/hyperparameter_search.py`
         https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/hyperparameter_search.py
 
-        - all_params is a dict of {key: list} items, e.g.:
-          {'val': [1,2], 'opt': [True,False]}
+        - all_params is a dict of `{key: list}` items, e.g.:
+          ``{'val': [1,2], 'opt': [True,False]}``
 
-        - output is an generator over all {key:value} combinations
+        - output is an generator over all `{key:value}` combinations
           of the keys and values. For the example above:
-          generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])
+          ``generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])``
     """
     if remaining_keys is None or cur_params is None:
         # init
@@ -77,6 +78,7 @@ class SolverLookup():
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
                 ("choco", CPM_choco),
+                ("cpo", CPM_cpo),
                ]
 
     @classmethod
@@ -92,11 +94,15 @@ class SolverLookup():
         return names
 
     @classmethod
-    def get(cls, name=None, model=None):
+    def get(cls, name=None, model=None, **init_kwargs):
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
             This is the preferred way to initialise a solver from its name
+
+            :param name: name of the solver to use
+            :param model: model to pass to the solver constructor
+            :param init_kwargs: additional keyword arguments to pass to the solver constructor
         """
         solver_cls = cls.lookup(name=name)
 
@@ -104,7 +110,7 @@ class SolverLookup():
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return solver_cls(model, subsolver=subname)
+        return solver_cls(model, subsolver=subname, **init_kwargs)
 
     @classmethod
     def lookup(cls, name=None):
@@ -137,8 +143,11 @@ builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, 
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
+       
+        .. deprecated:: 0.9.4
+            Please use :class:`SolverLookup` object instead.
 
-    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
+        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
     """
     warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
     return [sv for sv in builtin_solvers if sv.supported()]

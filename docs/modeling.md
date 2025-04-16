@@ -4,13 +4,21 @@ This page explains and demonstrates how to use CPMpy to model and solve combinat
 
 ## Installation
 
-Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](#selecting-a-solver)):
+Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver:
 
 ```commandline
 pip install cpmpy
 ```
 
-CPMpy requires python verion  3.8 or higher.
+Additional solvers can be downloaded as optional dependencies (see how to use alternative solvers [here](#selecting-a-solver)):
+
+```commandline
+pip install cpmpy[gurobi, choco, exact] # installs 3 additional solving backends
+```
+
+An overview of the available backends can be found [here](index.rst#supported-solvers).
+
+CPMpy requires python version  3.8 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
 

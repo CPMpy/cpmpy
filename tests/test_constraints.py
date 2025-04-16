@@ -4,6 +4,7 @@ import cpmpy
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
 from cpmpy.expressions.globalfunctions import *
+from cpmpy.expressions.core import Comparison
 
 import pytest
 
@@ -17,7 +18,7 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "ShortTable", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -191,6 +192,8 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
         elif name == "NegativeTable":
             expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
+        elif name == "ShortTable":
+            expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
         elif name == "IfThenElse":
             expr = cls(*BOOL_ARGS)
         elif name == "InDomain":
@@ -232,7 +235,7 @@ def global_constraints(solver):
             expr = LexLess(X, Y)
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)          
+            expr = LexChainLess(X)
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
             expr = LexChainLess(X)
@@ -243,7 +246,7 @@ def global_constraints(solver):
             continue
         else:
             yield expr
-            
+
 
 def reify_imply_exprs(solver):
     """

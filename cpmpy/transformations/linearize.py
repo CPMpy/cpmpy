@@ -3,37 +3,48 @@ Transformations regarding linearization of constraints.
 
 Linearized constraints have one of the following forms:
 
-
 Linear comparison:
 ------------------
 - LinExpr == Constant
 - LinExpr >= Constant
 - LinExpr <= Constant
 
-    LinExpr can be any of:
-        - NumVar
-        - sum
-        - wsum
+LinExpr can be any of:
+
+- NumVar
+- sum
+- wsum
 
 Indicator constraints:
 ----------------------
-- BoolVar -> LinExpr == Constant
-- BoolVar -> LinExpr >= Constant
-- BoolVar -> LinExpr <= Constant
 
-- BoolVar -> GenExpr                    (GenExpr.name in supported, GenExpr.is_bool())
-- BoolVar -> GenExpr >= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr <= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr == Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
++------------------------------------+
+| ``BoolVar -> LinExpr == Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr >= Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr <= Constant`` |
++------------------------------------+
 
-Where BoolVar is a boolean variable or its negation.
+========================================   ==============================================
+``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
+``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+========================================   ==============================================
+
+Where ``BoolVar`` is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------
-- GenExpr                               (GenExpr.name in supported, GenExpr.is_bool())
-- GenExpr == Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr <= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr >= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
+
+============================  ==============================================
+``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
+``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
+============================  ============================================== 
+
 
 
 """
@@ -59,33 +70,40 @@ from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
+    Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
-    `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
-
+    Arguments:
+    - `supported`: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
+    :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+    Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
+    - `reified`: whether the constraint is fully reified
     """
 
     newlist = []
     for cpm_expr in lst_of_expr:
-
-        # boolvar
+        # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
-            newlist.append(sum([cpm_expr]) >= 1)
+            if "or" in supported:
+                # post clause explicitly (don't use cp.any, which will just return the BoolVar)
+                newlist.append(Operator("or", [cpm_expr]))
+            elif isinstance(cpm_expr, NegBoolView):
+                # might as well remove the negation
+                newlist.append(sum([~cpm_expr]) <= 0)
+            else: # positive literal
+                newlist.append(sum([cpm_expr]) >= 1)
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
-            if cpm_expr.name == "and":
+            if cpm_expr.name == "and" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
-            elif cpm_expr.name == "or":
+            elif cpm_expr.name == "or" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= 1)
 
             # xor
@@ -107,10 +125,25 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
-                    newlist += [cond.implies(lin) for lin in lin_sub]
+                    # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
+                    indicator_constraints=[]
+                    for lin in lin_sub:
+                        if is_true_cst(lin):
+                            continue
+                        elif is_false_cst(lin):
+                            indicator_constraints=[] # do not add any constraints
+                            newlist+=linearize_constraint([~cond], supported=supported) # post linear version of unary constraint
+                            break # do not need to add other
+                        else:
+                            indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                    newlist+=indicator_constraints
+
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
+
+            else: # supported operator
+                newlist.append(cpm_expr)
 
 
         # comparisons
@@ -238,7 +271,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar = intvar(*get_bounds(lhs))
                     newlist += linearize_constraint([lhs == newvar])
@@ -264,6 +297,17 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
+
+            # check trivially true/false (not allowed by PySAT Card/PB)
+            if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
+                lb,ub = lhs.get_bounds()
+                t_lb = eval_comparison(cpm_expr.name, lb, rhs)
+                t_ub = eval_comparison(cpm_expr.name, ub, rhs)
+                if t_lb and t_ub:
+                    continue
+                elif not t_lb and not t_ub:
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported) # post the linear version of False
+                    break
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
@@ -330,7 +374,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             # link Boolean matrix and integer variable
             for arg, row in zip(cpm_expr.args, x):
                 if is_num(arg): # constant, fix directly
-                    newlist.append(row[arg-lb] == 1)
+                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
                 else: # ensure result is canonical
                     newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
@@ -392,10 +436,10 @@ def only_positive_bv(lst_of_expr):
                 subexpr = only_positive_bv([subexpr])
                 newlist += [cond.implies(expr) for expr in subexpr]
 
-
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
-
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 

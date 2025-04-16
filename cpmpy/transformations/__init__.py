@@ -1,5 +1,5 @@
 """
-    Methods to transform CPMpy expressions into other CPMpy expressions
+    Methods to transform CPMpy expressions into other CPMpy expressions.
 
     Input and output are always CPMpy expressions, so transformations can
     be chained and called multiple times, as needed.
@@ -23,5 +23,6 @@
         negation
         normalize
         reification
+        safening
         to_cnf
 """

@@ -4,7 +4,7 @@
 ## exact.py
 ##
 """
-    Interface to Exact
+    Interface to Exact's Python API
 
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
@@ -12,6 +12,26 @@
 
     The solver's git repository:
     https://gitlab.com/nonfiction-software/exact
+
+    Always use :func:`cp.SolverLookup.get("exact") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'exact' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install exact
+
+    .. warning::
+        Exact requires Python 3.10 or higher and the pip install only works on Linux and Windows.
+        On MacOS, you have to install the package from source.
+
+    See https://pypi.org/project/exact for more information.
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -51,15 +71,15 @@ import numbers
 
 class CPM_exact(SolverInterface):
     """
-    Interface to the Python interface of Exact
-
-    Requires that the 'exact' python package is installed:
-    $ pip install exact
-    See https://pypi.org/project/exact for more information.
+    Interface to Exact's Python API
 
     Creates the following attributes (see parent constructor for more):
-        - xct_solver: the Exact instance used in solve() and solveAll()
-        - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+
+    - ``xct_solver`` : the Exact instance used in solve() and solveAll()
+    - ``assumption_dict`` : maps Exact variables to (Exact value, CPM assumption expression)
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
     @staticmethod
@@ -90,8 +110,8 @@ class CPM_exact(SolverInterface):
         Exact solver object xct_solver.
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -104,7 +124,6 @@ class CPM_exact(SolverInterface):
         assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
-
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
@@ -144,10 +163,10 @@ class CPM_exact(SolverInterface):
         """
             Call Exact
 
-            Overwrites self.cpm_status
+            Overwrites ``self.cpm_status``
 
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
+                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
             :type assumptions: list of CPMpy Boolean variables
 
@@ -159,10 +178,12 @@ class CPM_exact(SolverInterface):
                 - False     if no solution is found
         """
         from exact import Exact as xct
-
+ 
         # set additional keyword arguments
         if(len(kwargs.items())>0):
-            warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
+            wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
+            wrn_txt += "Use cp.SolverLookup.lookup('exact', **{parameter-with-hyphen: 42}) to set Exact parameters"
+            warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -233,12 +254,12 @@ class CPM_exact(SolverInterface):
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """
@@ -379,10 +400,11 @@ class CPM_exact(SolverInterface):
 
     def objective(self, expr, minimize):
         """
-            Post the given expression to the solver as objective to minimize/maximize
+            Post the given expression to the solver as objective to minimize/maximize.
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
         self.objective_ = expr
@@ -446,7 +468,7 @@ class CPM_exact(SolverInterface):
         Implemented through chaining multiple solver-independent **transformation functions** from
         the `cpmpy/transformations/` directory.
 
-        See the 'Adding a new solver' docs on readthedocs for more information.
+        See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -596,6 +618,7 @@ class CPM_exact(SolverInterface):
     def solution_hint(self, cpm_vars, vals):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
+
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """

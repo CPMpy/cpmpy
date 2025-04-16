@@ -1,7 +1,7 @@
-CPMpy choco interface (:mod:`cpmpy.solvers.choco`)
+MARCO (:mod:`cpmpy.tools.explain.marco`)
 =====================================================
 
-.. automodule:: cpmpy.solvers.choco
+.. automodule:: cpmpy.tools.explain.marco
     :members:
     :undoc-members:
     :inherited-members:

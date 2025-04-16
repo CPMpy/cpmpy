@@ -56,11 +56,12 @@
 
         Minimum
         Maximum
+        Abs
         Element
         Count
         Among
         NValue
-        Abs
+        NValueExcept
 
 """
 import warnings  # for deprecation warning
@@ -68,9 +69,9 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
+from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
 class GlobalFunction(Expression):
@@ -128,10 +129,12 @@ class Minimum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         lb, ub = self.get_bounds()
         _min = intvar(lb, ub)
@@ -164,10 +167,12 @@ class Maximum(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         lb, ub = self.get_bounds()
         _max = intvar(lb, ub)
@@ -195,13 +200,26 @@ class Abs(GlobalFunction):
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
         Decomposition if it's part of a comparison
+
         Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+
+        1) constraints representing the comparison
+        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+           they should be enforced toplevel.
         """
         arg = self.args[0]
-        return ([Comparison(cpm_op, Maximum([arg, -arg]), cpm_rhs)],[])
+        lb, ub = get_bounds(arg)
+        # when argument is exclusively on one side of the sign
+        if lb >= 0:
+            return [eval_comparison(cpm_op, arg, cpm_rhs)], []
+        elif ub <= 0:
+            return [eval_comparison(cpm_op, -arg, cpm_rhs)], []
+        else: # when domain crosses over 0
+            newarg = intvar(*self.get_bounds())
+            is_pos = boolvar()
+            return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
+                    [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
+
 
 
     def get_bounds(self):
@@ -220,10 +238,11 @@ def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
+
 class Element(GlobalFunction):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants of variables (the first argument)
+        with 'Arr' an array of constants or variables (the first argument)
         and 'Idx' an integer decision variable, representing the index into the array.
 
         Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
@@ -259,15 +278,24 @@ class Element(GlobalFunction):
             `Element(arr,ix)` represents the array lookup itself (a numeric variable)
             When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
             it is a constraint, and that one can be decomposed.
+
             Returns two lists of constraints:
-                1) constraints representing the comparison
-                2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-                   they should be enforced toplevel.
+
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
 
         """
         arr, idx = self.args
-        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)], []
+        # Find where the array indices and the bounds of `idx` intersect
+        lb, ub = get_bounds(idx)
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
+        cons=[]
+        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+        for i in range(new_lb, new_ub+1):
+            cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
+        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
+        return cons, []  # no auxiliary variables
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -355,6 +383,7 @@ class NValue(GlobalFunction):
         NValue(arr) can only be decomposed if it's part of a comparison
 
         Based on "simple decomposition" from:
+        
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
@@ -404,6 +433,7 @@ class NValueExcept(GlobalFunction):
         NValue(arr) can only be decomposed if it's part of a comparison
 
         Based on "simple decomposition" from:
+
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
