@@ -2,7 +2,7 @@
     Transformations are used by solvers to convert (high-level) CPMpy expressions
     into the low-level constraints they support.
 
-    Normal users never need to use these functions directly.
+    Typical users never need to use these functions directly.
 
     **CPMpy’s transformations** selectively rewrite only those constraint expressions that a solver does not support. While solvers can use any transformation they need, lower-level solvers largely reuse those of higher-level ones, creating a waterfall pattern:
 
