@@ -52,7 +52,7 @@ CPMpy overwrites the following :mod:`Python built-ins <cpmpy.expressions.python_
 - :meth:`cp.sum <cpmpy.expressions.python_builtins.sum>`, :meth:`cp.abs <cpmpy.expressions.python_builtins.abs>`, :meth:`cp.max <cpmpy.expressions.python_builtins.max>`, :meth:`cp.min <cpmpy.expressions.python_builtins.min>`
 - :meth:`cp.all <cpmpy.expressions.python_builtins.all>`, :meth:`cp.any <cpmpy.expressions.python_builtins.any>`
 
-You can **index** CPMpy expressions with an integer variable: ``x[y]``, which will create an :class:`Element <cpmpy.expressions.globalconstraints.Element>` object.
+You can **index** CPMpy expressions with an integer decision variable: ``x[y]``, which will create an :class:`Element <cpmpy.expressions.globalfunctions.Element>` expression object.
 To index non-CPMpy arrays, wrap them with :func:`~cpmpy.expressions.variables.cpm_array`: ``cpm_array([1,2,3])[y]``.
 
 Global Functions
