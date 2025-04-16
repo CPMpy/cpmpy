@@ -6,21 +6,29 @@
 """
     Interface to PySDD's API
 
+    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD).
+    (see https://pysdd.readthedocs.io/en/latest/)
+
+    .. warning::    
+        This solver can ONLY be used for solution checking and enumeration over Boolean variables!
+        It does not support optimization.
+
+    Always use :func:`cp.SolverLookup.get("pysdd") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
     Requires that the 'PySDD' python package is installed:
 
     .. code-block:: console
 
         $ pip install PySDD
 
-    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
-    https://pysdd.readthedocs.io/en/latest/
+    See detailed installation instructions at:
+    https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
-    This solver can ONLY be used for solution checking and enumeration over Boolean variables!
-    That is, only logical constraints (`and`, `or`, `implies`, `==`, `!=`) and Boolean global constraints.
-
-    Documentation of the solver's own Python API:
-    https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
-
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -48,13 +56,7 @@ from ..transformations.normalize import toplevel_list, simplify_boolean
 
 class CPM_pysdd(SolverInterface):
     """
-    Interface to pysdd's API
-
-    Requires that the 'PySDD' python package is installed:
-    $ pip install pysdd
-
-    See detailed installation instructions at:
-    https://pysdd.readthedocs.io/en/latest/usage/installation.html
+    Interface to PySDD's API.
 
     Creates the following attributes (see parent constructor for more):
 
@@ -63,6 +65,9 @@ class CPM_pysdd(SolverInterface):
     - ``pysdd_root`` : a pysdd.sdd.SddNode (changes whenever a formula is added)
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysdd_manager`` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
+
+    Documentation of the solver's own Python API:
+    https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
     @staticmethod

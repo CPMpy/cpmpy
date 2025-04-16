@@ -1,16 +1,51 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## TEMPLATE.py
+##
 """
-    Template file for a new solver interface
+    Interface to TEMPLATE's API
 
-    Replace <TEMPLATE> by the solver's name, and implement the missing pieces
-    The functions are ordered in a way that could be convenient to 
-    start from the top and continue in that order
+    .. note::
+        [GUIDELINE] Replace <TEMPLATE> by the solver's name, and implement the missing pieces
+        The functions are ordered in a way that could be convenient to 
+        start from the top and continue in that order.
 
-    After you are done filling in the template, remove all comments starting with [GUIDELINE]
+    .. note::
+        After you are done filling in the template, remove all comments starting with [GUIDELINE]
 
-    WARNING: do not include the python package at the top of the file,
-    as CPMpy should also work without this solver installed.
-    To ensure that, include it inside supported() and other functions that need it...
+    .. warning::
+        [GUIDELINE] do not include the python package at the top of the file,
+        as CPMpy should also work without this solver installed.
+        To ensure that, include it inside supported() and other functions that need it...
+
+    <some information on the solver>
+
+    Always use :func:`cp.SolverLookup.get("TEMPLATE") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'TEMPLATEpy' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install TEMPLATEpy
+
+    See detailed installation instructions at:
+    <URL to detailed solver installation instructions, if any>
+
+    The rest of this documentation is for advanced users.
+
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_template
 """
 
 import warnings
@@ -28,36 +63,15 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 
-"""
-    Interface to TEMPLATE's API
-
-    <some information on the solver>
-
-    Documentation of the solver's own Python API:
-    <URL to docs or source code>
-
-    ===============
-    List of classes
-    ===============
-
-    .. autosummary::
-        :nosignatures:
-
-        CPM_template
-"""
-
 class CPM_template(SolverInterface):
     """
     Interface to TEMPLATE's API
 
-    Requires that the 'TEMPLATEpy' python package is installed:
-    $ pip install TEMPLATEpy
-
-    See detailed installation instructions at:
-    <URL to detailed solver installation instructions, if any>
-
     Creates the following attributes (see parent constructor for more):
     - tpl_model: object, TEMPLATE's model object
+
+    Documentation of the solver's own Python API:
+    <URL to docs or source code>
     """
 
     @staticmethod

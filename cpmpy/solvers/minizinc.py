@@ -4,17 +4,7 @@
 ## minizinc.py
 ##
 """
-    Interface to MiniZinc's Python API
-
-    Requires that the 'minizinc' python package is installed:
-
-    .. code-block:: console
-
-        $ pip install minizinc
-
-    as well as the Minizinc bundled binary packages, downloadable from:
-    https://github.com/MiniZinc/MiniZincIDE/releases
-
+    Interface to MiniZinc's Python API.
 
     MiniZinc is a free and open-source constraint modeling language.
     MiniZinc is used to model constraint satisfaction and optimization problems in
@@ -23,10 +13,32 @@
     language that is understood by a wide range of solvers.
     https://www.minizinc.org
 
-    Documentation of the solver's own Python API:
-    https://minizinc-python.readthedocs.io/
+    The MiniZinc interface is text-based: CPMpy writes a textfile and passes it to the minizinc Python package.
 
-    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+    Always use :func:`cp.SolverLookup.get("minizinc") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'minizinc' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install minizinc
+
+    as well as the MiniZinc bundled binary packages, downloadable from:
+    https://www.minizinc.org/software.html
+
+    See detailed installation instructions at:
+    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
+
+    Note for **Jupyter notebook** users: MiniZinc uses AsyncIO, so using it in a Jupyter notebook gives
+    you the following error: ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+    You can overcome this by ``pip install nest_asyncio``
+    and adding in the top cell ``import nest_asyncio; nest_asyncio.apply()``
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -65,21 +77,6 @@ class CPM_minizinc(SolverInterface):
     """
     Interface to MiniZinc's Python API
 
-    Requires that the 'minizinc' python package is installed:
-    $ pip install minizinc
-    
-    as well as the MiniZinc bundled binary packages, downloadable from:
-    https://www.minizinc.org/software.html
-
-    See detailed installation instructions at:
-    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
-
-    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
-    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
-    You can overcome this by `pip install nest_asyncio`
-    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
-
-
     Creates the following attributes (see parent constructor for more):
 
     - ``mzn_model``: object, the minizinc.Model instance
@@ -88,6 +85,9 @@ class CPM_minizinc(SolverInterface):
     - ``mzn_result``: object, containing solve results
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+
+    Documentation of the solver's own Python API:
+    https://minizinc-python.readthedocs.io/
     """
 
     required_version = (2, 8, 2)

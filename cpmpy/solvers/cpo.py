@@ -1,11 +1,36 @@
 """
-    Interface to CP Optimizers API
+    Interface to CP Optimizer's Python API.
 
     CP Optimizer, also a feature of IBM ILOG Optimization Studio, is a software library of constraint programming tools 
     supporting constraint propagation, domain reduction, and highly optimized solution search.
 
-    Documentation of the solver's own Python API: (all modeling functions)
-    https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
+    Always use :func:`cp.SolverLookup.get("cpo") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'docplex' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install docplex
+
+    docplex documentation:
+    https://ibmdecisionoptimization.github.io/docplex-doc/
+
+    You will also need to install CPLEX Optimization Studio from IBM's website,
+    and add the location of the CP Optimizer binary to your path.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
+
+    See detailed installation instructions at:
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -36,31 +61,14 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_cpo(SolverInterface):
     """
-    Interface to CP Optimizers API.
-
-    Requires that the 'docplex' python package is installed:
-
-    .. code-block:: console
-    
-        $ pip install docplex
-
-    docplex documentation:
-    https://ibmdecisionoptimization.github.io/docplex-doc/
-
-    You will also need to install CPLEX Optimization Studio from IBM's website,
-    and add the location of the CP Optimizer binary to your path.
-    There is a free community version available.
-    https://www.ibm.com/products/ilog-cplex-optimization-studio
-
-    See detailed installation instructions at:
-    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
-
-    Academic license:
-    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+    Interface to CP Optimizer's Python API.
 
     Creates the following attributes (see parent constructor for more):
 
     - ``cpo_model``: object, CP Optimizers model object
+
+    Documentation of the solver's own Python API: (all modeling functions)
+    https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     """
 
