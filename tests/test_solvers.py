@@ -828,3 +828,19 @@ class TestSupportedSolvers:
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv
+
+    def test_hidden_user_vars(self, solver):
+        """
+        Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
+        still get correctly captured and posted.
+        """
+        if solver == 'pysdd' or solver == 'pysat':  # pysat and pysdd don't support integer decision variables
+            return
+        
+        x = cp.intvar(1, 4, shape=1)
+        # Dubious constraint which enforces nothing, gets decomposed to empty list
+        # -> resulting CP model is empty
+        m = cp.Model([cp.AllDifferentExceptN([x], 1)])
+        s = cp.SolverLookup().get(solver, m)
+        assert len(s.user_vars) == 1 # check if var captured as a user_var
+        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
