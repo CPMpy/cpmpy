@@ -17,8 +17,8 @@ from .flatten_model import flatten_constraint, normalized_numexpr
 
 def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
     """
-        Decomposes any global constraint not supported by the solver
-        Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
+        Decomposes any global constraint not supported by the solver.
+        Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions.
             
         :param supported: a set of supported global constraints or global functions
         :param supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
@@ -30,7 +30,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 
         Supported numerical global functions remain in the expression tree as is. They can be rewritten using
         :func:`cpmpy.transformations.reification.reify_rewrite`
-        The following `bv -> NumExpr <comp> Var/Const` can be rewritten as  [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
+        The following ``bv -> NumExpr <comp> Var/Const`` can be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
         So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     if _toplevel is None:

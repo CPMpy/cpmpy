@@ -5,15 +5,15 @@ Linearized constraints have one of the following forms:
 
 Linear comparison:
 ------------------
-- LinExpr == Constant
-- LinExpr >= Constant
-- LinExpr <= Constant
+- ``LinExpr == Constant``
+- ``LinExpr >= Constant``
+- ``LinExpr <= Constant``
 
 LinExpr can be any of:
 
-- NumVar
-- sum
-- wsum
+- `NumVar`
+- `sum`
+- `wsum`
 
 Indicator constraints:
 ----------------------
@@ -77,10 +77,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
     Arguments:
-    - `supported`: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
-    :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
-    - `reified`: whether the constraint is fully reified
+        supported: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
+            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+            Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
+        reified: whether the constraint is fully reified
     """
 
     newlist = []
@@ -389,8 +389,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
 def only_positive_bv(lst_of_expr):
     """
-        Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
-        cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
+        Replaces constraints containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+        `lst_of_expr` is expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
 
         Resulting expression is linear.
     """
@@ -530,9 +530,9 @@ def canonical_comparison(lst_of_expr):
 def only_positive_coefficients(lst_of_expr):
     """
         Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
-        This can simplify a wsum into sum.
-        cpm_expr is expected to be a canonical comparison.
-        Only apply after applying canonical_comparison(cpm_expr)
+        This can simplify a `wsum` into `sum`.
+        `cpm_expr` is expected to be a canonical comparison.
+        Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
 
         Resulting expression is linear.
     """
