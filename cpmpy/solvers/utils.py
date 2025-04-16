@@ -182,7 +182,7 @@ class SolverLookup():
 
             # If this is a subsolver (indicated by a ':' in the name), indent the output
             if ':' in basename:
-                print(f" ↪ {basename.split(":")[-1]:<22} {'Yes' if installed else 'No':<10} {(version if version else ' '):<15}")  # Subsolver with indentation
+                print(f" ↪ {basename.split(':')[-1]:<22} {'Yes' if installed else 'No':<10} {(version if version else ' '):<15}")  # Subsolver with indentation
             else:
                 # For main solvers, show version if available
                 version = version if version else "Not found" if installed else "-"
