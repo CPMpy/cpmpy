@@ -77,7 +77,7 @@ Global Functions
 Global Constraints
 ~~~~~~~~~~~~~~~~~~
 
-:mod:`Global constraints <cpmpy.expressions.globalconstraints>` are constraints (Boolean functions) that some solvers support natively. All global constraints can be reified and used in other expressions, which CPMpy will handle.
+:mod:`Global constraints <cpmpy.expressions.globalconstraints>` are constraints (Boolean functions) that some solvers support natively. All global constraints can be reified (implication, equivalence) and used in other expressions, which CPMpy will handle.
 
 .. currentmodule:: cpmpy.expressions.globalconstraints
 .. autosummary::
