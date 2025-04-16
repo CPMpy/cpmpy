@@ -42,12 +42,14 @@
     ==============
 """
 import re
+from typing import Optional
 import warnings
 import sys
 import os
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
@@ -136,15 +138,29 @@ class CPM_minizinc(SolverInterface):
                 (namely cplex, gurobi, scip, xpress).
                 The following are bundled in the bundle: chuffed, coin-bc, gecode
         """
-        import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
+        if CPM_minizinc.supported():
+            import minizinc
+            solver_dict = minizinc.default_driver.available_solvers()
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
-        return solver_names
+            solver_names = set()
+            for full_name in solver_dict.keys():
+                name = full_name.split(".")[-1]
+                if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
+                    solver_names.add(name)
+            return solver_names
+        else:
+            warnings.warn("MiniZinc is not installed or not supported on this system.")
+            return []
+    
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('minizinc').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
