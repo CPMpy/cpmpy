@@ -198,9 +198,9 @@ def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
     if isinstance(expr, cp.expressions.core.Expression):
         return expr.implies(other)
-    elif arg is True or arg is np.True_:
+    elif expr is True or expr is np.True_:
         return other
-    elif arg is False or arg is np.False_:
+    elif expr is False or expr is np.False_:
         return BoolVal(True)
     else:
         return expr.implies(other)
