@@ -114,7 +114,7 @@ class CPM_template(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
-        #           internally, the constructor relies on __add__ which uses the above solver native object(s)
+        #           internally, the constructor relies on `add()` which uses the above solver native object(s)
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
@@ -254,7 +254,7 @@ class CPM_template(SolverInterface):
 
         # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
         #       in that case, this function may be removed and a case-by-case analysis of the numerical expression
-        #           used in the constraint at hand is required in __add__
+        #           used in the constraint at hand is required in `add()`
         #       For an example of such solver interface, check out solvers/choco.py or solvers/exact.py
 
         if is_num(cpm_expr):
@@ -279,7 +279,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` first calls `transform()`
+    # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -305,7 +305,7 @@ class CPM_template(SolverInterface):
         # ...
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -398,6 +398,7 @@ class CPM_template(SolverInterface):
                 raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core

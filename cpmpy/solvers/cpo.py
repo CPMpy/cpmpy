@@ -312,7 +312,7 @@ class CPM_cpo(SolverInterface):
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
 
-    # `__add__()` first calls `transform()`
+    # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -338,7 +338,7 @@ class CPM_cpo(SolverInterface):
         # no flattening required
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -366,6 +366,7 @@ class CPM_cpo(SolverInterface):
             self.cpo_model.add(cpo_con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _cpo_expr(self, cpm_con):
         """

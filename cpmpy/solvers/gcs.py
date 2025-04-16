@@ -451,7 +451,7 @@ class CPM_gcs(SolverInterface):
 
         return self.veripb_return_code
     
-    def __add__(self, cpm_cons):
+    def add(self, cpm_cons):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -649,6 +649,7 @@ class CPM_gcs(SolverInterface):
                 raise NotImplementedError(cpm_expr)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
 
         

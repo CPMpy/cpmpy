@@ -295,7 +295,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -390,6 +390,7 @@ class CPM_pysat(SolverInterface):
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
 
       return self
+    __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars, vals):
         """

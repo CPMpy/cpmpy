@@ -486,7 +486,7 @@ class CPM_minizinc(SolverInterface):
                      "lex_chain_lesseq", "among"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -512,6 +512,7 @@ class CPM_minizinc(SolverInterface):
             self.mzn_model.add_string(mzn_str)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _convert_expression(self, expr) -> str:
         """
