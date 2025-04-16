@@ -112,7 +112,6 @@ class CPM_exact(SolverInterface):
         assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
-
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
@@ -167,10 +166,12 @@ class CPM_exact(SolverInterface):
                 - False     if no solution is found
         """
         from exact import Exact as xct
-
+ 
         # set additional keyword arguments
         if(len(kwargs.items())>0):
-            warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
+            wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
+            wrn_txt += "Use cp.SolverLookup.lookup('exact', **{parameter-with-hyphen: 42}) to set Exact parameters"
+            warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))

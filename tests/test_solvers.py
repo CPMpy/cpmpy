@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
@@ -489,6 +490,29 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("exact", m)
         self.assertEqual(s.solveAll(display=_trixor_callback),7)
 
+    @pytest.mark.skipif(not CPM_exact.supported(), 
+                        reason="Exact not installed")
+    def test_parameters_to_exact(self):
+    
+        # php with 5 pigeons, 4 holes
+        p,h = 40,39
+        x = cp.boolvar(shape=(p,h))
+        m = cp.Model(x.sum(axis=1) >= 1, x.sum(axis=0) <= 1)
+
+        # this should raise a warning
+        with self.assertWarns(UserWarning):
+            self.assertFalse(m.solve(solver="exact", verbosity=10))
+        
+        # can we indeed set a parameter? Try with prooflogging
+        proof_file = tempfile.NamedTemporaryFile(delete=False).name
+        
+        # taken from https://gitlab.com/nonfiction-software/exact/-/blob/main/python_examples/proof_logging.py
+        options = {"proof-log": proof_file, "proof-assumptions":"0"}
+        exact = cp.SolverLookup.get("exact",m, **options)
+        self.assertFalse(exact.solve())
+
+        with open(proof_file+".proof", "r") as f:
+            self.assertEquals(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
