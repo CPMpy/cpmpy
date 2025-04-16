@@ -132,6 +132,27 @@ class CPM_minizinc(SolverInterface):
             return True
         
     @staticmethod
+    def _solver_names_and_version():
+        if CPM_minizinc.supported():
+            import minizinc
+            driver = minizinc.default_driver
+            
+            # Collect solver names
+            all_solvers, all_versions = [], []
+            output = driver._run(["--solvers-json"])
+            solvers = json.loads(output.stdout)        
+            for solver_dict in solvers:
+                tag = solver_dict["id"].split(".")[-1]
+                version = solver_dict["version"]
+                if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
+                    all_solvers.append(tag)
+                    all_versions.append(version)
+            return all_solvers, all_versions
+        else:
+            warnings.warn("MiniZinc is not installed or not supported on this system.")
+            return [], []
+
+    @staticmethod
     def solvernames(installed:bool=True):
         """
             Returns solvers supported by MiniZinc (on your system)
@@ -148,24 +169,8 @@ class CPM_minizinc(SolverInterface):
                 The following are bundled with minizinc: chuffed, coin-bc, gecode.
                 Use ``installed=True`` if you only want the names actually installed solvers.
         """
-        if CPM_minizinc.supported():
-            import minizinc
-            driver = minizinc.default_driver
-            
-            # Collect solver names
-            all_solvers, all_versions = [], []
-            output = driver._run(["--solvers-json"])
-            solvers = json.loads(output.stdout)        
-            for solver_dict in solvers:
-                tag = solver_dict["id"].split(".")[-1]
-                version = solver_dict["version"]
-                if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
-                    all_solvers.append(tag)
-                        all_versions.append(version)
-        else:
-            warnings.warn("MiniZinc is not installed or not supported on this system.")
-            return []
-    
+
+        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
 
         if not installed:
             """
