@@ -4,6 +4,7 @@ import cpmpy
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
 from cpmpy.expressions.globalfunctions import *
+from cpmpy.expressions.core import Comparison
 
 import pytest
 
