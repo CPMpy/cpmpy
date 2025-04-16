@@ -113,6 +113,10 @@ class CPM_pysat(SolverInterface):
         else:
             warnings.warn("PySAT is not installed or not supported on this system.")
             return []
+        
+    @staticmethod
+    def solverversion(subsolver:str):
+        return None
     
     @staticmethod
     def version() -> Optional[str]:

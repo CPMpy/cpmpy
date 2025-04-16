@@ -186,9 +186,18 @@ class CPM_minizinc(SolverInterface):
             installed_solvers = [all_solvers[i] for i in valid_indices]
 
             return set(installed_solvers)
+        
+    @staticmethod
+    def solverversion(subsolver:str):
+        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
+        try:
+            solver_index = all_solvers.index(subsolver)
+            return all_versions[solver_index]
+        except ValueError:
+            raise ValueError(f"Subsolver '{subsolver}' not found in the list of available solvers.")
 
     @staticmethod
-    def version() -> Optional[str]:
+    def version(subsolver=None) -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
         """
