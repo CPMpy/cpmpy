@@ -152,7 +152,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             if lhs.name == "sub":
                 # convert to wsum
-                lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
+                lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
             if lhs.name == "-":
