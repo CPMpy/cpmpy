@@ -1342,5 +1342,8 @@ class TestTypeChecks(unittest.TestCase):
             Check transform of `[0,1,2][x in -1..1] == y in 1..5`
             Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
         """
-        assert str(cp.Element([0,1,2], cp.intvar(-1,1, name="x")).decompose_comparison("==", cp.intvar(1,5, name="y"))) \
-                == "([(x == 0) -> (y == 0), (x == 1) -> (y == 1), x >= 0, x <= 1], [])"
+        constraint=cp.Element([0,1,2], cp.intvar(-1,1, name="x"))
+        self.assertEqual(
+            str(constraint.decompose_comparison("==", cp.intvar(1,5, name="y"))),
+            "([(x == 0) -> (y == 0), (x == 1) -> (y == 1), x >= 0, x <= 1], [])"
+        )
