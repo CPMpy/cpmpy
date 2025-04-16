@@ -286,14 +286,15 @@ class Element(GlobalFunction):
 
         """
         arr, idx = self.args
-        # for every  `i` in the intersection of array indices and the bounds of `idx`..
+        # Find where the array indices and the bounds of `idx` intersect
         lb, ub = get_bounds(idx)
         new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
-        return [  # ..we post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
-            implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(new_lb, new_ub + 1)
-        ] + [  # also enforce the new bounds 
-            idx >= new_lb, idx <= new_ub
-        ], []  # no auxiliary variables
+        cons=[]
+        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+        for i in range(new_lb, new_ub+1):
+            cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
+        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
+        return cons, []  # no auxiliary variables
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
