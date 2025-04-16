@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_sub, linearize_objective
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -42,17 +42,47 @@ class TestTransLinearize(unittest.TestCase):
             s1 = cp.Model(e1).solve("gurobi")
             self.assertTrue(s1)
             self.assertEqual([bv[0].value(), bv[1].value(), iv.value()],[True, True, 1])
-
+            
     def test_bug_468(self):
-        from cpmpy.solvers import CPM_exact
-        if CPM_exact.supported():
+        from cpmpy.solvers import CPM_exact, CPM_gurobi
+        if CPM_gurobi.supported():
+            b = boolvar()
+            m = cp.Model(cp.any([b]))
+            m.minimize(~b)
+            m.solve(solver="gurobi")
+            self.assertEqual([b.value()], [True])
             a, b, c = boolvar(shape=3)
             m = cp.Model(cp.any([a, b, c]))
-            m.minimize(3 * a + 4 * ~b + 3 * ~c)
+            m.minimize(a + ~b + ~c)
+            m.solve("gurobi")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(3*a + 4*~b + 3*~c)
+            m.solve("gurobi")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            ivs = cp.intvar(0, 5, shape=3)
+            m.maximize(ivs[0] * ivs[1] * ivs[2])
+            m.solve("gurobi")
+            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
+        if CPM_exact.supported():
+            b = boolvar()
+            m = cp.Model(cp.any([b]))
+            m.minimize(~b)
+            m.solve(solver="exact")
+            self.assertEqual([b.value()], [True])
+            a, b, c = boolvar(shape=3)
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(a + ~b + ~c)
             m.solve("exact")
-            self.assertEqual([a.value(), b.value(), c.value()], [True, False, False])
-            m.solve(solver="gurobi")
-            self.assertEqual([a.value(), b.value(), c.value()], [True, False, False])
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            m = cp.Model(cp.any([a, b, c]))
+            m.minimize(3*a + 4*~b + 3*~c)
+            m.solve("exact")
+            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
+            ivs = cp.intvar(0, 5, shape=3)
+            m.maximize(ivs[0] * ivs[1] * ivs[2])
+            m.solve("exact")
+            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
 
     def test_constraint(self):
         x,y,z = [cp.intvar(0,5, name=n) for n in "xyz"]
@@ -459,3 +489,15 @@ class testCanonical_comparison(unittest.TestCase):
     def test_only_positive_bv_implied_by_negated_literal(self):
         p = cp.boolvar(name="p")
         self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
+        
+    def test_only_positive_bv_sub_implied_by_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str((p, 0)), str(only_positive_bv_sub(p)))
+        
+    def test_only_positive_bv_sub_implied_by_negated_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_sub(~p)))
+        
+    def test_only_positive_bv_sub_multiple_literals(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_sub(~a+~b+c)))
