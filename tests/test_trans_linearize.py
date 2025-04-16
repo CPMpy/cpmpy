@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_sub, linearize_objective
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -484,8 +484,20 @@ class testCanonical_comparison(unittest.TestCase):
 
     def test_only_positive_bv_implied_by_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual("[sum([1] * [p]) >= 1]", str(only_positive_bv(linearize_constraint([p]))))
+        self.assertEqual(str([p >= 1]), str(only_positive_bv(linearize_constraint([p]))))
 
     def test_only_positive_bv_implied_by_negated_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual("[sum([1] * [p]) <= 0]", str(only_positive_bv(linearize_constraint([~p]))))
+        self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
+        
+    def test_only_positive_bv_sub_implied_by_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str((p, 0)), str(only_positive_bv_sub(p)))
+        
+    def test_only_positive_bv_sub_implied_by_negated_literal(self):
+        p = cp.boolvar(name="p")
+        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_sub(~p)))
+        
+    def test_only_positive_bv_sub_multiple_literals(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_sub(~a+~b+c)))
