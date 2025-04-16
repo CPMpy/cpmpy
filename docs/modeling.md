@@ -560,11 +560,8 @@ m.solve(solver="minizinc:chuffed") # <solver> or <solver>:<subsolver>
 
 You can even use the same model across different solvers to see which one you like best:
 ```python
-import cpmpy as cp
-x = cp.intvar(0,10, shape=3)
-m = cp.Model(cp.sum(x) <= 5)
-
-for solvername in cp.SolverLookup.solvernames()
+# m = same model as above
+for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) installed on the system
     m.solve(solver=solvername)
     print(m.status())
 ```
