@@ -10,6 +10,7 @@ CPMpy is ideal for solving combinatorial problems like assignment problems or co
    :caption: Getting started:
 
    modeling
+   summary
 
 .. _supported-solvers:
 
