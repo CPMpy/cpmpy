@@ -219,9 +219,8 @@ class SolverInterface(object):
             raise NotImplementedError("solver add(): abstract function, overwrite")
 
         return self
-    __add__ = add  # avoid redirect in superclass
     
-    # needed here for subclasses, avoid redirect with `__add__ = add` in the solver class
+    # needed here for subclasses that don't do the more direct `__add__ = add` in their class
     def __add__(self, cpm_expr):
         return self.add(cpm_expr)
 
