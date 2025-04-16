@@ -481,7 +481,7 @@ class CPM_ortools(SolverInterface):
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
                     arr, idx = lhs.args
-                    if is_int(idx) and (idx < 0 or idx >= len(arr)):
+                    if is_int(idx): # OR-Tools does not handle all constant integer cases
                         idx = intvar(idx,idx)
                     # OR-Tools has slight different in argument order
                     return self.ort_model.AddElement(
