@@ -180,7 +180,12 @@ class CPM_gurobi(SolverInterface):
 
         # translate exit status
         if grb_status == GRB.OPTIMAL:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:

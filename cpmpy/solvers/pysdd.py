@@ -132,7 +132,8 @@ class CPM_pysdd(SolverInterface):
 
         # translate exit status
         if has_sol:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL # optimal, also without objective
+            # Only CSP (does not support COP)
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             for cpm_var in self.user_vars:

@@ -153,12 +153,17 @@ class CPM_template(SolverInterface):
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
-        # ├─ sat -> OPTIMAL            ├─ optimal -> OPTIMAL
+        # ├─ sat -> FEASIBLE           ├─ optimal -> OPTIMAL
         # ├─ unsat -> UNSATISFIABLE    ├─ sub-optimal -> FEASIBLE
         # └─ timeout -> UNKNOWN        ├─ unsat -> UNSATISFIABLE
         #                              └─ timeout -> UNKNOWN
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:

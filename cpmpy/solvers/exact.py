@@ -211,7 +211,7 @@ class CPM_exact(SolverInterface):
         self.objective_value_ = None
         # translate exit status
         #   see 'toOptimum' documentation:
-        #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Exact.hpp?ref_type=heads#L369
+        #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/interface/IntProg.cpp#L877
         if my_status == "UNSAT": # found unsatisfiability
             if self.has_objective() and self.xct_solver.hasSolution(): # optimisation problem -> unsat = no better solution found
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
@@ -219,7 +219,12 @@ class CPM_exact(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "SAT": # the optimal value has been found
             assert self.xct_solver.hasSolution()
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL # found solution (CSP)
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout

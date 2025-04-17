@@ -210,7 +210,12 @@ class CPM_pysat(SolverInterface):
 
         # translate exit status
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL # optimal, also without objective
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:

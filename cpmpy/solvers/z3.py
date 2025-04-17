@@ -198,7 +198,7 @@ class CPM_z3(SolverInterface):
                 else: # suboptimal / not proven
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # CSP
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status == "unsat":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "unknown":
