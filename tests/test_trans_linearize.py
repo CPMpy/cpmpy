@@ -45,44 +45,15 @@ class TestTransLinearize(unittest.TestCase):
             
     def test_bug_468(self):
         from cpmpy.solvers import CPM_exact, CPM_gurobi
+        a, b, c = boolvar(shape=3)
+        m = cp.Model(cp.any([a, b, c]))
+        m.minimize(3*a + 4*~b + 3*~c)
         if CPM_gurobi.supported():
-            b = boolvar()
-            m = cp.Model(cp.any([b]))
-            m.minimize(~b)
-            m.solve(solver="gurobi")
-            self.assertEqual([b.value()], [True])
-            a, b, c = boolvar(shape=3)
-            m = cp.Model(cp.any([a, b, c]))
-            m.minimize(a + ~b + ~c)
             m.solve("gurobi")
             self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
-            m = cp.Model(cp.any([a, b, c]))
-            m.minimize(3*a + 4*~b + 3*~c)
-            m.solve("gurobi")
-            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
-            ivs = cp.intvar(0, 5, shape=3)
-            m.maximize(ivs[0] * ivs[1] * ivs[2])
-            m.solve("gurobi")
-            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
         if CPM_exact.supported():
-            b = boolvar()
-            m = cp.Model(cp.any([b]))
-            m.minimize(~b)
-            m.solve(solver="exact")
-            self.assertEqual([b.value()], [True])
-            a, b, c = boolvar(shape=3)
-            m = cp.Model(cp.any([a, b, c]))
-            m.minimize(a + ~b + ~c)
             m.solve("exact")
             self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
-            m = cp.Model(cp.any([a, b, c]))
-            m.minimize(3*a + 4*~b + 3*~c)
-            m.solve("exact")
-            self.assertEqual([a.value(), b.value(), c.value()], [False, True, True])
-            ivs = cp.intvar(0, 5, shape=3)
-            m.maximize(ivs[0] * ivs[1] * ivs[2])
-            m.solve("exact")
-            self.assertEqual([ivs[0].value(), ivs[1].value(), ivs[2].value()], [5, 5, 5])
 
     def test_constraint(self):
         x,y,z = [cp.intvar(0,5, name=n) for n in "xyz"]
@@ -494,10 +465,40 @@ class testCanonical_comparison(unittest.TestCase):
         p = cp.boolvar(name="p")
         self.assertEqual(str((p, 0)), str(only_positive_bv_sub(p)))
         
-    def test_only_positive_bv_sub_implied_by_negated_literal(self):
+    def test_only_positive_bv_sub_negated_litral(self):
         p = cp.boolvar(name="p")
         self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_sub(~p)))
         
-    def test_only_positive_bv_sub_multiple_literals(self):
+    def test_only_positive_bv_sub_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_sub(~a+~b+c)))
+        
+    def test_only_positive_bv_sub_wsum(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        self.assertEqual(str((Operator("wsum",[[-4, 5, 1],[a,b,c]]), 4)), str(only_positive_bv_sub(4*~a+5*b+c)))
+        
+    def test_only_positive_bv_sub_non_linear(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        with self.assertRaises(ValueError) as cm:
+            only_positive_bv_sub(~a * b * c)
+            self.assertEqual(str(cm.exception), "unexpected expression, should be sum, wsum or var but got ((~a) * (b)) * (c)")
+            
+    def test_linearize_objective_negated_literal(self):
+        p = cp.boolvar(name="p")
+        obj = linearize_objective(~p)
+        self.assertEqual(str(obj), str((Operator("wsum",[[-1, 1],[p, 1]]), [])))
+        
+    def test_linearize_objective_sum(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(~a + ~b + c)
+        self.assertEqual(str(obj), str((Operator("wsum",[[-1, -1, 1, 1],[a,b,c,2]]), [])))
+        
+    def test_linearize_objective_wsum(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(4*~a + 5*~b + c)
+        self.assertEqual(str(obj), str((Operator("wsum",[[-4, -5, 1, 1],[a,b,c,9]]), [])))
+        
+    def test_linearize_objective_non_linear(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(~a * b * c)
+        self.assertEqual(str(obj), "(IV1, [((IV0) * (c)) == (IV1), ((~a) * (b)) == (IV0)])")

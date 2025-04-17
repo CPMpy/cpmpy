@@ -437,12 +437,15 @@ def only_positive_bv(lst_of_expr):
 
 def only_positive_bv_sub(expr):
     """
-        Replaces a linear expression containing NegBoolView with an equivalent expression using only BoolVar.
-        expr is expected to be a var, sum or wsum.
+        Replaces a linear expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
+        using only :class:`~cpmpy.expressions.variables.BoolVar`. 
         
-        If the expression has a NegBoolView, the function returns a tuple of the new expression as a wsum and a constant, 
-        which can be added to the wsum or subtracted from the rhs (depending on the usecase).
-        Otherwise the original expression is returned with a constant of 0.
+        Arguments:
+        - `expr`: linear expression (sum, wsum, var)
+        
+        Returns tuple of:
+        - `expr`: linear expression (sum, wsum, var) without NegBoolView
+        - `const`: constant to be added to the the expression (or removed from the rhs of a comparison, as fit)
     """
     if isinstance(expr, _NumVarImpl):
         if isinstance(expr,NegBoolView):
@@ -453,7 +456,7 @@ def only_positive_bv_sub(expr):
     elif expr.name == "sum":
         nbv_sel = [isinstance(a, NegBoolView) for a in expr.args]
         if any(nbv_sel):
-        # count number of negboolviews
+            # count number of negboolviews
             const = 0
             weights = []
             args = []
@@ -465,7 +468,7 @@ def only_positive_bv_sub(expr):
                 else:
                     weights.append(1)
                     args.append(expr.args[i])
-            expr = Operator("wsum", [weights, args]) # force making wsum, even for arity = 1
+            expr = Operator("wsum", [weights, args])
         else:
             expr, const = expr, 0
 
@@ -480,7 +483,7 @@ def only_positive_bv_sub(expr):
                     weights[i] = -weights[i]
                     args[i] = args[i]._bv
                 
-            expr = Operator("wsum", [weights, args]) # force making wsum, even for arity = 1
+            expr = Operator("wsum", [weights, args]) 
         else:
             expr, const = expr, 0
 
@@ -636,7 +639,7 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
         pos_expr, const = only_positive_bv_sub(flatexpr)
         if (const != 0):
             assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
-            pos_expr = Operator("wsum", [pos_expr.args[0]+[-1], pos_expr.args[1] + [const]])
+            pos_expr = Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1] + [const]])
         return pos_expr, flatcons
     
     else: 
