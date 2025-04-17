@@ -1,32 +1,28 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
-##
-## pindakaas.py
-##
 """
-    Interface to Pindakaas (`pkd`) API
+Interface to Pindakaas (`pkd`) API
 
-    Requires that the `pkd` library python package is installed:
+Requires that the `pkd` library python package is installed:
 
-        $ pip install pindakaas
+    $ pip install pindakaas
 
-    `pkd` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
-    See https://github.com/pindakaashq/pindakaas.
+`pkd` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
+See https://github.com/pindakaashq/pindakaas.
 
-    This solver can be used if the model only has PB constraints.
+This solver can be used if the model only has PB constraints.
 
-    ===============
-    List of classes
-    ===============
+===============
+List of classes
+===============
 
-    .. autosummary::
-        :nosignatures:
+.. autosummary::
+    :nosignatures:
 
-        CPM_pindakaas
+    CPM_pindakaas
 
-    ==============
-    Module details
-    ==============
+==============
+Module details
+==============
 """
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -63,10 +59,10 @@ class CPM_pindakaas(SolverInterface):
         # try to import the package
         try:
             import pindakaas as pkd
+
             return True
         except ImportError as e:
             return False
-
 
     @staticmethod
     def solvernames():
@@ -74,7 +70,6 @@ class CPM_pindakaas(SolverInterface):
         #     Returns solvers supported by `pkd` on your system
         # """
         return ["cadical"]
-
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -84,13 +79,18 @@ class CPM_pindakaas(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: str, name of a subsolver (optional)
         """
-        name="pindakaas"
+        name = "pindakaas"
         if not self.supported():
-            raise Exception(f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface")
+            raise Exception(
+                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
+            )
         if cpm_model and cpm_model.objective_ is not None:
-            raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
+            raise NotSupportedError(
+                f"CPM_{name}: only satisfaction, does not support an objective function"
+            )
 
         import pindakaas as pkd
+
         self.pkl_solver = pkd.Cadical()
 
         # initialise everything else and post the constraints/objective
@@ -100,29 +100,29 @@ class CPM_pindakaas(SolverInterface):
     @property
     def native_model(self):
         """
-            Returns the solver's underlying native model (for direct solver access).
+        Returns the solver's underlying native model (for direct solver access).
         """
-        raise NotSupportedError(f"{self.name}: sub-solvers not yet supported, encode-only")
-
+        raise NotSupportedError(
+            f"{self.name}: sub-solvers not yet supported, encode-only"
+        )
 
     def solve(self, time_limit=None, assumptions=None):
         """
-            Call the `pkd` solver
+        Call the `pkd` solver
 
-            Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+        Arguments:
+        - time_limit:  maximum solve time in seconds (float, optional)
+        - kwargs:      any keyword argument, sets parameters of solver object
 
-            Arguments that correspond to solver parameters:
-            # [GUIDELINE] Please document key solver arguments that the user might wish to change
-            #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
-            # [GUIDELINE] Add link to documentation of all solver parameters
+        Arguments that correspond to solver parameters:
+        # [GUIDELINE] Please document key solver arguments that the user might wish to change
+        #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
+        # [GUIDELINE] Add link to documentation of all solver parameters
         """
         if self.unsatisfiable:
             return False
 
         import pindakaas as pkd
-
 
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
@@ -133,7 +133,9 @@ class CPM_pindakaas(SolverInterface):
         user_vars = self.solver_vars(list(self.user_vars))
 
         t = time.time()
-        assert hasattr(self.pkl_solver, 'solve'), f"Pindakaas ClauseDatabase did not have solve:\n{self.pkl_solver}"
+        assert hasattr(
+            self.pkl_solver, "solve"
+        ), f"Pindakaas ClauseDatabase did not have solve:\n{self.pkl_solver}"
         my_status = self.pkl_solver.solve(user_vars)
 
         self.cpm_status.runtime = time.time() - t
@@ -147,7 +149,9 @@ class CPM_pindakaas(SolverInterface):
             # can happen when timeout is reached
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:  # another?
-            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
+            raise NotImplementedError(
+                my_status
+            )  # a new status type was introduced, please report on github
 
         # # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -160,35 +164,37 @@ class CPM_pindakaas(SolverInterface):
                     lit = self.solver_var(cpm_var)
                     cpm_var._value = self.pkl_solver.value(lit)
                     if cpm_var._value is None:
-                        cpm_var._value = True # dummy value
+                        cpm_var._value = True  # dummy value
                 else:
-                    cpm_var._value = None # pindakaas does not know this literal and will error
-        else: # clear values of variables
+                    cpm_var._value = (
+                        None  # pindakaas does not know this literal and will error
+                    )
+        else:  # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
 
         return has_sol
 
-
     def solver_var(self, cpm_var):
         """
-            Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+        Creates solver variable for cpmpy variable
+        or returns from cache if previously created
 
-            Transforms cpm_var into CNF literal using self.pkl_solver
-            (positive or negative integer)
+        Transforms cpm_var into CNF literal using self.pkl_solver
+        (positive or negative integer)
         """
-        if isinstance(cpm_var, NegBoolView): # negative literal
-             # get inner variable and return its negated solver var
+        if isinstance(cpm_var, NegBoolView):  # negative literal
+            # get inner variable and return its negated solver var
             return ~self.solver_var(cpm_var._bv)
-        elif isinstance(cpm_var, _BoolVarImpl): # positive literal
-             # insert if new
+        elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
+            # insert if new
             if cpm_var.name not in self._varmap:
                 self._varmap[cpm_var.name] = self.pkl_solver.add_variable()
             return self._varmap[cpm_var.name]
         else:
-            raise NotImplementedError(f"{self.name}: variable {cpm_var} of type {type(cpm_var)} not supported")
-
+            raise NotImplementedError(
+                f"{self.name}: variable {cpm_var} of type {type(cpm_var)} not supported"
+            )
 
     def transform(self, cpm_expr):
         """
@@ -210,89 +216,97 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or", "bv"}))
+        cpm_cons = linearize_constraint(
+            cpm_cons, supported=frozenset({"sum", "wsum", "and", "or", "bv"})
+        )
         return cpm_cons
 
     def __add__(self, cpm_expr_orig):
-      """
-            Eagerly add a constraint to the underlying solver.
+        """
+        Eagerly add a constraint to the underlying solver.
 
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
+        Any CPMpy expression given is immediately transformed (through `transform()`)
+        and then posted to the solver in this function.
 
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
+        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+        the user knows and cares about (and will be populated with a value after solve). All other variables
+        are auxiliary variables created by transformations.
 
-            What 'supported' means depends on the solver capabilities, and in effect on what transformations
-            are applied in `transform()`.
+        What 'supported' means depends on the solver capabilities, and in effect on what transformations
+        are applied in `transform()`.
 
-      """
-      import pindakaas as pkd
-      if self.unsatisfiable:
-          return self
+        """
+        import pindakaas as pkd
 
-      # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+        if self.unsatisfiable:
+            return self
 
-      # transform and post the constraints
-      try: 
-          for cpm_expr in self.transform(cpm_expr_orig):
-              if cpm_expr.name == 'or':
-                  self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
-              elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
-                  a0,a1 = cpm_expr.args
-                  self._add_bool_linear(a1, conditions=[~a0])
+        # transform and post the constraints
+        try:
+            for cpm_expr in self.transform(cpm_expr_orig):
+                if cpm_expr.name == "or":
+                    self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
 
-              elif isinstance(cpm_expr, Comparison):
-                  self._add_bool_linear(cpm_expr)
+                elif cpm_expr.name == "->":  # BV -> BE only thanks to only_bv_reifies
+                    a0, a1 = cpm_expr.args
+                    self._add_bool_linear(a1, conditions=[~a0])
 
-              elif isinstance(cpm_expr, BoolVal):
-                  # base case: Boolean value
-                  if cpm_expr.args[0] is False:
-                      self.pkl_solver.add_clause([])
+                elif isinstance(cpm_expr, Comparison):
+                    self._add_bool_linear(cpm_expr)
 
-              elif isinstance(cpm_expr, _BoolVarImpl):
-                  # base case, just var or ~var
-                  self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
+                elif isinstance(cpm_expr, BoolVal):
+                    # base case: Boolean value
+                    if cpm_expr.args[0] is False:
+                        self.pkl_solver.add_clause([])
 
-              # a direct constraint, pass to solver
-              elif isinstance(cpm_expr, DirectConstraint):
-                  raise NotImplementedError(f"TODO")
-                  cpm_expr.callSolver(self, self.pysat_solver)
+                elif isinstance(cpm_expr, _BoolVarImpl):
+                    # base case, just var or ~var
+                    self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
 
-              else:
-                raise NotImplementedError(f"{self.name}: Non supported constraint {cpm_expr}")
-      except pkd.Unsatisfiable:
-          self.unsatisfiable = True
+                # a direct constraint, pass to solver
+                elif isinstance(cpm_expr, DirectConstraint):
+                    raise NotImplementedError(f"TODO")
+                    cpm_expr.callSolver(self, self.pysat_solver)
 
-      return self
+                else:
+                    raise NotImplementedError(
+                        f"{self.name}: Non supported constraint {cpm_expr}"
+                    )
+        except pkd.Unsatisfiable:
+            self.unsatisfiable = True
 
+        return self
 
     """ Unpack implied literal, clause, sum, or weighted sum """
+
     def _add_bool_linear(self, cpm_expr, conditions=[]):
         import pindakaas as pkd
+
         literals = None
         coefficients = None
         comparator = None
         k = None
         if isinstance(cpm_expr, _BoolVarImpl):
             literals = [cpm_expr]
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == 'or':
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "or":
             literals = cpm_expr.args
-        elif hasattr(cpm_expr, 'decompose'):
+        elif hasattr(cpm_expr, "decompose"):
             self += a0.implies(cpm_expr.decompose())
         elif isinstance(cpm_expr, Comparison):
-            lhs,k = cpm_expr.args
+            lhs, k = cpm_expr.args
             if lhs.name == "sum":
                 literals = lhs.args
             elif lhs.name == "wsum":
-                coefficients,literals = lhs.args
+                coefficients, literals = lhs.args
             else:
-                raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
+                raise ValueError(
+                    f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
+                )
             if cpm_expr.name == "<=":
                 comparator = pkd.Comparator.LessEq
             elif cpm_expr.name == ">=":
@@ -303,10 +317,9 @@ class CPM_pindakaas(SolverInterface):
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
         self.pkl_solver.add_linear(
-                self.solver_vars(literals),
-                coefficients=coefficients,
-                comparator=comparator,
-                k=k,
-                conditions=self.solver_vars(conditions)
-            )
-
+            self.solver_vars(literals),
+            coefficients=coefficients,
+            comparator=comparator,
+            k=k,
+            conditions=self.solver_vars(conditions),
+        )
