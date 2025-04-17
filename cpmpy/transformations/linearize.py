@@ -406,12 +406,12 @@ def only_positive_bv(lst_of_expr):
                 lhs = copy.copy(lhs)
                 for i,arg in enumerate(list(lhs.args)):
                     if isinstance(arg, NegBoolView):
-                        new_arg, cons = get_or_make_var(1 - arg)
+                        new_arg, cons = get_or_make_var(1 - arg._bv)
                         lhs.args[i] = new_arg
                         new_cons += cons
                         
             else:
-                lhs, const = only_positive_bv_sub(lhs)
+                lhs, const = only_positive_bv_linear(lhs)
                 rhs -= const
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
@@ -435,26 +435,27 @@ def only_positive_bv(lst_of_expr):
 
     return newlist
 
-def only_positive_bv_sub(expr):
+def only_positive_bv_linear(cpm_expr):
     """
         Replaces a linear expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
         using only :class:`~cpmpy.expressions.variables.BoolVar`. 
         
         Arguments:
-        - `expr`: linear expression (sum, wsum, var)
+        - `cpm_expr`: linear expression (sum, wsum, var)
         
         Returns tuple of:
-        - `expr`: linear expression (sum, wsum, var) without NegBoolView
-        - `const`: constant to be added to the the expression (or removed from the rhs of a comparison, as fit)
+        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
+        - `const`: The difference between the original expression and the new expression, 
+                   i.e. the constant term that was removed as part of rewriting the expression.
     """
-    if isinstance(expr, _NumVarImpl):
-        if isinstance(expr,NegBoolView):
-            expr, const = Operator("wsum",[[-1], [expr._bv]]), 1
+    if isinstance(cpm_expr, _NumVarImpl):
+        if isinstance(cpm_expr,NegBoolView):
+            pos_expr, const = Operator("wsum",[[-1], [cpm_expr._bv]]), 1
         else:
-            expr, const = expr, 0
+            pos_expr, const = cpm_expr, 0
 
-    elif expr.name == "sum":
-        nbv_sel = [isinstance(a, NegBoolView) for a in expr.args]
+    elif cpm_expr.name == "sum":
+        nbv_sel = [isinstance(a, NegBoolView) for a in cpm_expr.args]
         if any(nbv_sel):
             # count number of negboolviews
             const = 0
@@ -464,16 +465,16 @@ def only_positive_bv_sub(expr):
                 if nbv:
                     const += 1
                     weights.append(-1)
-                    args.append(expr.args[i]._bv)
+                    args.append(cpm_expr.args[i]._bv)
                 else:
                     weights.append(1)
-                    args.append(expr.args[i])
-            expr = Operator("wsum", [weights, args])
+                    args.append(cpm_expr.args[i])
+            pos_expr = Operator("wsum", [weights, args])
         else:
-            expr, const = expr, 0
+            pos_expr, const = cpm_expr, 0
 
-    elif expr.name == "wsum":
-        weights, args = expr.args
+    elif cpm_expr.name == "wsum":
+        weights, args = cpm_expr.args
         nbv_sel = [isinstance(a, NegBoolView) for a in args]
         if any(nbv_sel):
             const = 0
@@ -483,14 +484,14 @@ def only_positive_bv_sub(expr):
                     weights[i] = -weights[i]
                     args[i] = args[i]._bv
                 
-            expr = Operator("wsum", [weights, args]) 
+            pos_expr = Operator("wsum", [weights, args]) 
         else:
-            expr, const = expr, 0
+            pos_expr, const = cpm_expr, 0
 
     else:
-        raise ValueError(f"unexpected expression, should be sum, wsum or var but got {expr}")
+        raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
                 
-    return expr, const
+    return pos_expr, const
     
     
     
@@ -636,15 +637,14 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     flatexpr, flatcons = flatten_objective(expr, supported=supported)
     
     if isinstance(flatexpr, _NumVarImpl) or flatexpr.name in {"sum","wsum"}:
-        pos_expr, const = only_positive_bv_sub(flatexpr)
+        pos_expr, const = only_positive_bv_linear(flatexpr)
         if (const != 0):
             assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
             pos_expr = Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1] + [const]])
         return pos_expr, flatcons
     
     else: 
-        if flatexpr.name not in supported:
-            raise Exception(f"{flatexpr} is not linear or is not supported. Please report on github")
+        assert flatexpr.name in supported, (f"Unexpected numerical expression, {flatexpr} is not linear and not supported, please report on github")
         # other operators in expression such as "min", "max"
         new_cons = []
         nbv_sel = [isinstance(a, NegBoolView) for a in flatexpr.args]

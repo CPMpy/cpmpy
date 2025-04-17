@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_sub, linearize_objective
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_linear, linearize_objective
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -468,34 +468,39 @@ class testCanonical_comparison(unittest.TestCase):
         self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
         
         
-class test_only_positive_bv(unittest.TestCase):
+class testOnlyPositiveBv(unittest.TestCase):
     def setUp(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))
         self.bvars = cp.boolvar((3,))
 
-    def test_only_positive_bv_sub_implied_by_literal(self):
+    def test_only_positive_bv_linear_positive_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str((p, 0)), str(only_positive_bv_sub(p)))
+        self.assertEqual(str((p, 0)), str(only_positive_bv_linear(p)))
         
-    def test_only_positive_bv_sub_negated_litral(self):
+    def test_only_positive_bv_linear_negated_litral(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_sub(~p)))
+        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_linear(~p)))
         
-    def test_only_positive_bv_sub_sum(self):
+    def test_only_positive_bv_linear_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_sub(~a+~b+c)))
+        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_linear(~a+~b+c)))
         
-    def test_only_positive_bv_sub_wsum(self):
+    def test_only_positive_bv_linear_wsum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("wsum",[[-4, 5, 1],[a,b,c]]), 4)), str(only_positive_bv_sub(4*~a+5*b+c)))
+        self.assertEqual(str((Operator("wsum",[[-4, 5, 1],[a,b,c]]), 4)), str(only_positive_bv_linear(4*~a+5*b+c)))
         
-    def test_only_positive_bv_sub_non_linear(self):
+    def test_only_positive_bv_linear_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         with self.assertRaises(ValueError) as cm:
-            only_positive_bv_sub(~a * b * c)
+            only_positive_bv_linear(~a * b * c)
             self.assertEqual(str(cm.exception), "unexpected expression, should be sum, wsum or var but got ((~a) * (b)) * (c)")
+            
+    def test_linearize_objective_positive_literal(self):
+        p = cp.boolvar(name="p")
+        obj = linearize_objective(p)
+        self.assertEqual(str(obj), str((p, [])))
             
     def test_linearize_objective_negated_literal(self):
         p = cp.boolvar(name="p")
