@@ -119,6 +119,9 @@ class CPM_pysdd(SolverInterface):
             - checking for a solution is trivial after that
         """
 
+        if time_limit is not None:
+            raise NotImplementedError("PySDD.solve(), time_limit not (yet?) supported")
+        
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 

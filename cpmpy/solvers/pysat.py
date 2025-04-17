@@ -191,8 +191,11 @@ class CPM_pysat(SolverInterface):
             self.assumption_vars = assumptions
 
         import time
-        # set time limit?
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            
             from threading import Timer
             t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
             t.start()

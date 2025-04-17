@@ -161,7 +161,10 @@ class CPM_z3(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 

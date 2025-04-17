@@ -157,8 +157,11 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
 
         start = time.time()
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
