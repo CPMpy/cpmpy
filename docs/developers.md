@@ -7,17 +7,10 @@ This page introduces how to get started on developing on CPMpy itself, with a fo
 
 ## Setting up your development environment
 
-The easiest way to get started is to clone the repository, create and activate a virtual environment, and use pip to do an 'editable install' of your local CPMpy folder.
+The easiest is to use the pip to do an 'editable install' of your local CPMpy folder. 
 
-```sh
-# minimal installation
-git clone git@github.com:CPMpy/cpmpy.git
-python -m venv venv
-source ./venv/bin/activate
+```python
 pip install --editable .
-
-# Solve a sudoku example to test the installation
-python ./examples/sudoku.py
 ```
 
 With that, any change you do there (including checking out different branches) is automatically used wherever you use CPMpy on your system.
@@ -25,19 +18,18 @@ With that, any change you do there (including checking out different branches) i
 
 ## Running the test suite
 
-We only accept pull requests that pass all the tests. In general, you want to know if your changes screwed up another part. From your local CPMpy folder with the virtual environment activated, install the developer dependencies (e.g. `pytest`) and execute:
+We only accept pull requests that pass all the tests. In general, you want to know if your changes screwed up another part. From your local CPMpy folder, execute:
 
-```sh
-pip install --editable .[dev]
-pytest tests
+```python
+python -m pytest tests/
 ```
 
 This will run all tests in our `tests/` folder.
 
-You can also run an individual test file, as such (e.g. when wanting to test a new solver):
+You can also run an individual test, as such (e.g. when wanting to test a new solver):
 
-```sh
-pytest tests/test_solvers.py
+```python
+python -m pytest tests/test_solvers.py
 ```
 
 ## Code structure

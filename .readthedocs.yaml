@@ -11,10 +11,7 @@ build:
 
 python:
   install:
-    - method: pip
-      path: ..
-      extra_requirements:
-        - docs
+    - requirements: docs/requirements.txt
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   builder: html
