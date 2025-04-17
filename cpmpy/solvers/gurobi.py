@@ -161,8 +161,11 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
         # call the solver, with parameters

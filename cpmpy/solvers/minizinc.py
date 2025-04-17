@@ -250,6 +250,10 @@ class CPM_minizinc(SolverInterface):
             Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
@@ -735,6 +739,11 @@ class CPM_minizinc(SolverInterface):
             raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio
+
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
         coroutine = self._solveAll(display=display, time_limit=time_limit,

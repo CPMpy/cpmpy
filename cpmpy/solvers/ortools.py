@@ -174,8 +174,10 @@ class CPM_ortools(SolverInterface):
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        # set time limit?
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:

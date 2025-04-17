@@ -198,10 +198,17 @@ class CPM_exact(SolverInterface):
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            timeout = time_limit
+        else:
+            timeout = 0
+            
         # call the solver, with parameters
         start = time.time()
-        my_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
-        #                                     timeout=time_limit if time_limit is not None else 0)
+        my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
         end = time.time()
 
         # new status, translate runtime
