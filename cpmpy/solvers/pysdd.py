@@ -196,32 +196,31 @@ class CPM_pysdd(SolverInterface):
         else:
             projected_sols = set(sddmodels)
 
-        if len(projected_sols) >= 1:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        if projected_sols:
+            if projected_sols == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                # time limit not (yet) supported -> always all solutions found
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
 
-        if display is None:
-            # the desired, fast computation
-            return len(projected_sols)
-
-        else:
+        # display if needed
+        if display is not None:
             # manually walking over the tree, much slower...
-            solution_count = 0
             for sol in projected_sols:
-                solution_count += 1
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
 
-                # display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
                     print(argvals(display))
                 else:
                     display()  # callback
-            return solution_count
+        
+        return len(projected_sols)
 
     def solver_var(self, cpm_var):
         """

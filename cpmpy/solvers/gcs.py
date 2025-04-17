@@ -300,7 +300,7 @@ class CPM_gcs(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif num_sols >= 1:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        else: # maybe unsat, maybe not
+        else: # maybe unsat, maybe not (maybe a timeout)
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # clear user vars if no solution found

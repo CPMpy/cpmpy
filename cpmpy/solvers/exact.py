@@ -322,7 +322,7 @@ class CPM_exact(SolverInterface):
             timelim = self._update_time(timelim, start, end) # update remaining time
 
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
-            if my_status == "UNSAT": # found unsatisfiability
+            if my_status == "UNSAT": # found unsatisfiability (no more solutions to be found)
                 self._fillVars() # erases the solution
                 break
             elif my_status == "SAT": # found solution, but not optimality proven
@@ -350,7 +350,7 @@ class CPM_exact(SolverInterface):
         if solsfound: # found some solutions
             if solsfound == solution_limit: # matched solution limit
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif my_status == "UNSAT": # found all solutions
+            elif my_status == "UNSAT": # found all solutions (before limits were reached)
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else: # timeout
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE

@@ -217,7 +217,12 @@ class CPM_ortools(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             # CSP
             else:
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                # for .solveAll(), if all solutions found status is OPTIMAL
+                if kwargs.get("enumerate_all_solutions", False):
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                # regular .solve()
+                else:
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
