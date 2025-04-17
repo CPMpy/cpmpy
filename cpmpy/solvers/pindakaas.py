@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Interface to Pindakaas (`pkd`) API
+Interface to Pindakaas (`pkd`) API.
 
 Requires that the `pkd` library python package is installed:
 
@@ -24,25 +24,25 @@ List of classes
 Module details
 ==============
 """
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
-from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_int, flatlist
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
-from ..transformations.normalize import toplevel_list, simplify_boolean
-from ..transformations.linearize import linearize_constraint
-from ..transformations.reification import only_implies, only_bv_reifies
-
+import importlib
 import time
+
+from ..exceptions import NotSupportedError
+from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.variables import NegBoolView, _BoolVarImpl
+from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.flatten_model import flatten_constraint
+from ..transformations.get_variables import get_variables
+from ..transformations.linearize import linearize_constraint
+from ..transformations.normalize import simplify_boolean, toplevel_list
+from ..transformations.reification import only_bv_reifies, only_implies
+from .solver_interface import ExitStatus, SolverInterface
 
 
 class CPM_pindakaas(SolverInterface):
     """
-    Interface to TEMPLATE's API
+    Interface to TEMPLATE's API.
 
     Requires that the 'TEMPLATEpy' python package is installed:
     $ pip install TEMPLATEpy
@@ -56,24 +56,18 @@ class CPM_pindakaas(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
-        try:
-            import pindakaas as pkd
-
-            return True
-        except ImportError as e:
-            return False
+        """Return if solver is installed."""
+        # check import since python>=3.4
+        return importlib.util.find_spec("spam") is not None
 
     @staticmethod
     def solvernames():
-        # """
-        #     Returns solvers supported by `pkd` on your system
-        # """
+        """Return solvers supported by `pkd` on your system."""
         return ["cadical"]
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
-        Constructor of the native solver object
+        Construct the native solver object.
 
         Arguments:
         - cpm_model: Model(), a CPMpy Model() (optional)
@@ -99,16 +93,14 @@ class CPM_pindakaas(SolverInterface):
 
     @property
     def native_model(self):
-        """
-        Returns the solver's underlying native model (for direct solver access).
-        """
+        """Returns the solver's underlying native model (for direct solver access)."""
         raise NotSupportedError(
             f"{self.name}: sub-solvers not yet supported, encode-only"
         )
 
     def solve(self, time_limit=None, assumptions=None):
         """
-        Call the `pkd` solver
+        Call the `pkd` back-end SAT solver.
 
         Arguments:
         - time_limit:  maximum solve time in seconds (float, optional)
@@ -121,8 +113,6 @@ class CPM_pindakaas(SolverInterface):
         """
         if self.unsatisfiable:
             return False
-
-        import pindakaas as pkd
 
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
@@ -177,8 +167,7 @@ class CPM_pindakaas(SolverInterface):
 
     def solver_var(self, cpm_var):
         """
-        Creates solver variable for cpmpy variable
-        or returns from cache if previously created
+        Create solver variable for cpmpy variable or returns from cache if previously created.
 
         Transforms cpm_var into CNF literal using self.pkl_solver
         (positive or negative integer)
@@ -198,7 +187,7 @@ class CPM_pindakaas(SolverInterface):
 
     def transform(self, cpm_expr):
         """
-            Transform arbitrary CPMpy expressions to constraints the solver supports
+            Transform arbitrary CPMpy expressions to constraints the solver supports.
 
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
@@ -270,7 +259,7 @@ class CPM_pindakaas(SolverInterface):
 
                 # a direct constraint, pass to solver
                 elif isinstance(cpm_expr, DirectConstraint):
-                    raise NotImplementedError(f"TODO")
+                    raise NotImplementedError("TODO")
                     cpm_expr.callSolver(self, self.pysat_solver)
 
                 else:
@@ -295,8 +284,6 @@ class CPM_pindakaas(SolverInterface):
             literals = [cpm_expr]
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "or":
             literals = cpm_expr.args
-        elif hasattr(cpm_expr, "decompose"):
-            self += a0.implies(cpm_expr.decompose())
         elif isinstance(cpm_expr, Comparison):
             lhs, k = cpm_expr.args
             if lhs.name == "sum":
