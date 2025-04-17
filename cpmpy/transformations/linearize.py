@@ -451,20 +451,36 @@ def only_positive_bv_sub(expr):
             expr, const = expr, 0
 
     elif expr.name == "sum":
-        if any(isinstance(a, NegBoolView) for a in expr.args):
+        nbv_sel = [isinstance(a, NegBoolView) for a in expr.args]
+        if any(nbv_sel):
         # count number of negboolviews
-            const = sum([1 for a in expr.args if isinstance(a, NegBoolView)])
-            expr = Operator("wsum",[[-1 if isinstance(arg, NegBoolView) else 1 for arg in expr.args], [arg._bv if isinstance(arg, NegBoolView) else arg for arg in expr.args]])
+            const = 0
+            weights = []
+            args = []
+            for i, nbv in enumerate(nbv_sel):
+                if nbv:
+                    const += 1
+                    weights.append(-1)
+                    args.append(expr.args[i]._bv)
+                else:
+                    weights.append(1)
+                    args.append(expr.args[i])
+            expr = Operator("wsum", [weights, args]) # force making wsum, even for arity = 1
         else:
             expr, const = expr, 0
 
     elif expr.name == "wsum":
         weights, args = expr.args
-        if any(isinstance(a, NegBoolView) for a in args):
-            idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
-            nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-            expr = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
-            const = sum(weights[i] for i in idxes)
+        nbv_sel = [isinstance(a, NegBoolView) for a in args]
+        if any(nbv_sel):
+            const = 0
+            for i, nbv in enumerate(nbv_sel):
+                if nbv:
+                    const += weights[i]
+                    weights[i] = -weights[i]
+                    args[i] = args[i]._bv
+                
+            expr = Operator("wsum", [weights, args]) # force making wsum, even for arity = 1
         else:
             expr, const = expr, 0
 
@@ -616,21 +632,26 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     
     flatexpr, flatcons = flatten_objective(expr, supported=supported)
     
-    if isinstance(flatexpr, Operator) and flatexpr.name not in {"sum","wsum"}:
-        if flatexpr.name not in supported:
-            raise Exception(f"{flatexpr} is not linear or is not supported. Please report on github")
-        # other operators in expression such as "min", "max"
-        posexpr = copy.copy(flatexpr)
-        new_cons = []
-        for i,arg in enumerate(list(posexpr.args)):
-            if isinstance(arg._bv, NegBoolView):
-                new_arg, cons = get_or_make_var(1 - arg)
-                posexpr.args[i] = new_arg
-                new_cons += cons
-        return posexpr, flatcons + new_cons
-    elif (isinstance(flatexpr, Operator) and flatexpr.name in {"sum","wsum"}) or isinstance(flatexpr, _NumVarImpl):
+    if isinstance(flatexpr, _NumVarImpl) or flatexpr.name in {"sum","wsum"}:
         pos_expr, const = only_positive_bv_sub(flatexpr)
         if (const != 0):
             assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
             pos_expr = Operator("wsum", [pos_expr.args[0]+[-1], pos_expr.args[1] + [const]])
         return pos_expr, flatcons
+    
+    else: 
+        if flatexpr.name not in supported:
+            raise Exception(f"{flatexpr} is not linear or is not supported. Please report on github")
+        # other operators in expression such as "min", "max"
+        new_cons = []
+        nbv_sel = [isinstance(a, NegBoolView) for a in flatexpr.args]
+        if any(nbv_sel):
+            posexpr = copy.copy(flatexpr)
+            for i,arg in enumerate(list(posexpr.args)):
+                if isinstance(arg, NegBoolView):
+                    new_arg, cons = get_or_make_var(1 - arg._bv)
+                    posexpr.args[i] = new_arg
+                    new_cons += cons
+            return posexpr, flatcons + new_cons
+        else:
+            return flatexpr, flatcons
