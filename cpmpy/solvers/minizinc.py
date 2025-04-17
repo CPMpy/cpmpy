@@ -250,9 +250,8 @@ class CPM_minizinc(SolverInterface):
             Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
-        if time_limit is not None:
-            if time_limit <= 0:
-                raise ValueError("Time limit must be positive")
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))

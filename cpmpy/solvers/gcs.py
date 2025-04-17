@@ -163,9 +163,8 @@ class CPM_gcs(SolverInterface):
         self.proof_location = proof_location
      
         # set time limit
-        if time_limit is not None:
-            if time_limit <= 0:
-                raise ValueError("Time limit must be positive")
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
                  
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
