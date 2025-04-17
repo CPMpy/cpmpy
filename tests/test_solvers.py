@@ -838,7 +838,7 @@ class TestSupportedSolvers:
 
         assert m.status().exitstatus == ExitStatus.NOT_RUN
         assert m.solve(solver=solver)
-        assert m.status().exitstatus == ExitStatus.OPTIMAL # optimal, even without obj function!
+        assert m.status().exitstatus == ExitStatus.FEASIBLE
 
         try: # now try optimization, not supported for all solvers
             m.maximize(cp.sum(bv))
