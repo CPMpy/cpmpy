@@ -483,9 +483,17 @@ class testOnlyPositiveBv(unittest.TestCase):
         p = cp.boolvar(name="p")
         self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_linear(~p)))
         
+    def test_only_positive_bv_linear_sum_positive_input(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        self.assertEqual(str((Operator("sum",[a,b,c]), 0)), str(only_positive_bv_linear(a+b+c)))
+        
     def test_only_positive_bv_linear_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_linear(~a+~b+c)))
+        
+    def test_only_positive_bv_linear_wsum_positive_input(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        self.assertEqual(str((Operator("wsum",[[4, 5, 1],[a,b,c]]), 0)), str(only_positive_bv_linear(4*a+5*b+c)))
         
     def test_only_positive_bv_linear_wsum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
@@ -507,15 +515,30 @@ class testOnlyPositiveBv(unittest.TestCase):
         obj = linearize_objective(~p)
         self.assertEqual(str(obj), str((Operator("wsum",[[-1, 1],[p, 1]]), [])))
         
+    def test_linearize_objective_sum_positive_input(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(a + b + c)
+        self.assertEqual(str(obj), str((Operator("sum",[a,b,c]), [])))
+        
     def test_linearize_objective_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = linearize_objective(~a + ~b + c)
         self.assertEqual(str(obj), str((Operator("wsum",[[-1, -1, 1, 1],[a,b,c,2]]), [])))
         
+    def test_linearize_objective_wsum_positive_input(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(4*a + 5*b + c)
+        self.assertEqual(str(obj), str((Operator("wsum",[[4, 5, 1],[a,b,c]]), [])))
+        
     def test_linearize_objective_wsum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = linearize_objective(4*~a + 5*~b + c)
         self.assertEqual(str(obj), str((Operator("wsum",[[-4, -5, 1, 1],[a,b,c,9]]), [])))
+        
+    def test_linearize_objective_non_linear_positive_input(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = linearize_objective(~a * b * c)
+        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
         
     def test_linearize_objective_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
