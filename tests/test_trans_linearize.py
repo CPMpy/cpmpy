@@ -380,6 +380,12 @@ class TestVarsLhs(unittest.TestCase):
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
 class testCanonical_comparison(unittest.TestCase):
+    def setUp(self):
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+        self.ivars = cp.intvar(1, 10, shape=(5,))
+        self.bvars = cp.boolvar((3,))
+    
     def test_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
@@ -461,6 +467,14 @@ class testCanonical_comparison(unittest.TestCase):
         p = cp.boolvar(name="p")
         self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
         
+        
+class test_only_positive_bv(unittest.TestCase):
+    def setUp(self):
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+        self.ivars = cp.intvar(1, 10, shape=(5,))
+        self.bvars = cp.boolvar((3,))
+
     def test_only_positive_bv_sub_implied_by_literal(self):
         p = cp.boolvar(name="p")
         self.assertEqual(str((p, 0)), str(only_positive_bv_sub(p)))
@@ -501,4 +515,4 @@ class testCanonical_comparison(unittest.TestCase):
     def test_linearize_objective_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = linearize_objective(~a * b * c)
-        self.assertEqual(str(obj), "(IV1, [((IV0) * (c)) == (IV1), ((~a) * (b)) == (IV0)])")
+        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
