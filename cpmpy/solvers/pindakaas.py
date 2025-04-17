@@ -57,7 +57,7 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def supported():
         """Return if solver is installed."""
-        # check import since python>=3.4
+        # check import without importing
         return importlib.util.find_spec("spam") is not None
 
     @staticmethod
@@ -85,7 +85,7 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pkd
 
-        self.pkl_solver = pkd.Cadical()
+        self.pkl_solver = pkd.Cadical
 
         # initialise everything else and post the constraints/objective
         self.unsatisfiable = False
