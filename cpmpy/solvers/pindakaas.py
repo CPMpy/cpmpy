@@ -4,13 +4,13 @@
 ## pindakaas.py
 ##
 """
-    Interface to Pindakaas (`pkl`) API
+    Interface to Pindakaas (`pkd`) API
 
-    Requires that the `pkl` library python package is installed:
+    Requires that the `pkd` library python package is installed:
 
         $ pip install pindakaas
 
-    `pkl` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
+    `pkd` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
     See https://github.com/pindakaashq/pindakaas.
 
     This solver can be used if the model only has PB constraints.
@@ -62,7 +62,7 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pindakaas as pkl
+            import pindakaas as pkd
             return True
         except ImportError as e:
             return False
@@ -71,7 +71,7 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def solvernames():
         # """
-        #     Returns solvers supported by `pkl` on your system
+        #     Returns solvers supported by `pkd` on your system
         # """
         return ["cadical"]
 
@@ -90,9 +90,8 @@ class CPM_pindakaas(SolverInterface):
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
 
-        import pindakaas as pkl
-        self.pkl_solver = pkl.Cadical()
-        # self.pkl_solver = pkl.Cnf()
+        import pindakaas as pkd
+        self.pkl_solver = pkd.Cadical()
 
         # initialise everything else and post the constraints/objective
         self.unsatisfiable = False
@@ -108,7 +107,7 @@ class CPM_pindakaas(SolverInterface):
 
     def solve(self, time_limit=None, assumptions=None):
         """
-            Call the `pkl` solver
+            Call the `pkd` solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
@@ -122,7 +121,7 @@ class CPM_pindakaas(SolverInterface):
         if self.unsatisfiable:
             return False
 
-        import pindakaas as pkl
+        import pindakaas as pkd
 
 
         if assumptions is not None:
@@ -231,7 +230,7 @@ class CPM_pindakaas(SolverInterface):
             are applied in `transform()`.
 
       """
-      import pindakaas as pkl
+      import pindakaas as pkd
       if self.unsatisfiable:
           return self
 
@@ -267,7 +266,7 @@ class CPM_pindakaas(SolverInterface):
 
               else:
                 raise NotImplementedError(f"{self.name}: Non supported constraint {cpm_expr}")
-      except pkl.Unsatisfiable:
+      except pkd.Unsatisfiable:
           self.unsatisfiable = True
 
       return self
@@ -275,7 +274,7 @@ class CPM_pindakaas(SolverInterface):
 
     """ Unpack implied literal, clause, sum, or weighted sum """
     def _add_bool_linear(self, cpm_expr, conditions=[]):
-        import pindakaas as pkl
+        import pindakaas as pkd
         literals = None
         coefficients = None
         comparator = None
@@ -295,11 +294,11 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
             if cpm_expr.name == "<=":
-                comparator = pkl.Comparator.LessEq
+                comparator = pkd.Comparator.LessEq
             elif cpm_expr.name == ">=":
-                comparator = pkl.Comparator.GreaterEq
+                comparator = pkd.Comparator.GreaterEq
             elif cpm_expr.name == "==":
-                comparator = pkl.Comparator.Equal
+                comparator = pkd.Comparator.Equal
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
