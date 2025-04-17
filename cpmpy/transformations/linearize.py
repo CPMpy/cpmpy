@@ -649,12 +649,16 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
         new_cons = []
         nbv_sel = [isinstance(a, NegBoolView) for a in flatexpr.args]
         if any(nbv_sel):
-            posexpr = copy.copy(flatexpr)
-            for i,arg in enumerate(list(posexpr.args)):
-                if isinstance(arg, NegBoolView):
+            new_args = []
+            for i,arg in enumerate(flatexpr.args):
+                if nbv_sel[i]:
                     new_arg, cons = get_or_make_var(1 - arg._bv)
-                    posexpr.args[i] = new_arg
+                    new_args.append(new_arg)
                     new_cons += cons
+                else:
+                    new_args.append(arg)
+            posexpr = copy.copy(flatexpr)
+            posexpr.update_args(new_args)
             return posexpr, flatcons + new_cons
         else:
             return flatexpr, flatcons

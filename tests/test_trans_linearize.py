@@ -537,8 +537,8 @@ class testOnlyPositiveBv(unittest.TestCase):
         
     def test_linearize_objective_non_linear_positive_input(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(~a * b * c)
-        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
+        obj = linearize_objective(a * b * c)
+        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((a) * (b)) == (IV5)])")
         
     def test_linearize_objective_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
