@@ -444,6 +444,9 @@ class NValueExcept(GlobalFunction):
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
+        if lb == ub: # if the domain has only one value then check if it is n or not
+            return [eval_comparison(cmp_op, int(lb != n), cpm_rhs)], []
+
         constraints = []
 
         # introduce boolvar for each possible value
