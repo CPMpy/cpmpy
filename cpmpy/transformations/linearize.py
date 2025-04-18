@@ -473,6 +473,8 @@ def canonical_comparison(lst_of_expr):
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
+                elif isinstance(rhs, BoolVal):
+                    lhs2, rhs = [-1] if rhs.value() else [], 0 
                 elif isinstance(rhs, Operator) and rhs.name == "-":
                     lhs2, rhs = [rhs.args[0]], 0
                 elif isinstance(rhs, Operator) and rhs.name == "sum":
@@ -484,6 +486,7 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
+                
                 # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
