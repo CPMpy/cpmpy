@@ -66,7 +66,7 @@ from ..exceptions import TransformationNotImplementedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, flatlist
+from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
