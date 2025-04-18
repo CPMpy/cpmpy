@@ -4,7 +4,16 @@
 ## choco.py
 ##
 """
-    Interface to Choco solver's Python API
+    Interface to Choco solver's Python API.
+
+    Choco-solver is an open-source Java library for Constraint Programming (see https://choco-solver.org/).
+    It comes with many features such as various types of variables, various state-of-the-art constraints, various search strategies, etc.
+
+    Always use :func:`cp.SolverLookup.get("choco") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'pychoco' python package is installed:
 
@@ -12,11 +21,12 @@
 
         $ pip install pychoco
 
-
-    Documentation of the solver's own Python API:
+    Detailed installation instructions available at:
     
     - https://pypi.org/project/pychoco/
     - https://pychoco.readthedocs.io/en/latest/
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -60,18 +70,15 @@ class CPM_choco(SolverInterface):
     """
     Interface to the Choco solver python API
 
-    Requires that the 'pychoco' python package is installed:
-    $ pip install pychoco
-
-    See detailed installation instructions at:
-    
-    - https://pypi.org/project/pychoco/
-    - https://pychoco.readthedocs.io/en/latest/
-
     Creates the following attributes (see parent constructor for more):
     
     - ``chc_model`` : the pychoco.Model() created by _model()
     - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
+
+    Documentation of the solver's own Python API:
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
 
     """
 
@@ -150,8 +157,11 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
 
         start = time.time()
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
@@ -372,7 +382,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -401,6 +411,7 @@ class CPM_choco(SolverInterface):
                 c.post()
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _get_constraint(self, cpm_expr):
         """

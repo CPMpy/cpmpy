@@ -1,19 +1,19 @@
 """
-Transformations regarding linearization of constraints.
+Transforms flat constraints into linear constraints.
 
 Linearized constraints have one of the following forms:
 
 Linear comparison:
 ------------------
-- LinExpr == Constant
-- LinExpr >= Constant
-- LinExpr <= Constant
+- ``LinExpr == Constant``
+- ``LinExpr >= Constant``
+- ``LinExpr <= Constant``
 
 LinExpr can be any of:
 
-- NumVar
-- sum
-- wsum
+- `NumVar`
+- `sum`
+- `wsum`
 
 Indicator constraints:
 ----------------------
@@ -77,10 +77,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
     Arguments:
-    - `supported`: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
-    :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
-    - `reified`: whether the constraint is fully reified
+        supported: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
+            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+            Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
+        reified: whether the constraint is fully reified
     """
 
     newlist = []
@@ -152,7 +152,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             if lhs.name == "sub":
                 # convert to wsum
-                lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
+                lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
             if lhs.name == "-":
@@ -615,9 +615,9 @@ def canonical_comparison(lst_of_expr):
 def only_positive_coefficients(lst_of_expr):
     """
         Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
-        This can simplify a wsum into sum.
-        cpm_expr is expected to be a canonical comparison.
-        Only apply after applying canonical_comparison(cpm_expr)
+        This can simplify a `wsum` into `sum`.
+        `cpm_expr` is expected to be a canonical comparison.
+        Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
 
         Resulting expression is linear.
     """

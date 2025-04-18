@@ -4,7 +4,15 @@
 ## gurobi.py
 ##
 """
-    Interface to the python 'gurobi' package
+    Interface to Gurobi Optimizer's Python API.
+
+    Gurobi Optimizer is a highly efficient commercial solver for Integer Linear Programming (and more).
+
+    Always use :func:`cp.SolverLookup.get("gurobi") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'gurobipy' python package is installed:
 
@@ -12,12 +20,13 @@
 
         $ pip install gurobipy
     
-    
-    In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
+    Gurobi Optimizer requires an active licence (for example a free academic license)
     You can read more about available licences at https://www.gurobi.com/downloads/
 
-    Documentation of the solver's own Python API:
-    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
+    See detailed installation instructions at:
+    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -57,19 +66,16 @@ except ImportError:
 
 class CPM_gurobi(SolverInterface):
     """
-    Interface to Gurobi's API
-
-    Requires that the 'gurobipy' python package is installed:
-    $ pip install gurobipy
-
-    See detailed installation instructions at:
-    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
+    Interface to Gurobi's Python API
 
     Creates the following attributes (see parent constructor for more):
     
     - ``grb_model``: object, TEMPLATE's model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
+    
+    Documentation of the solver's own Python API:
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
     @staticmethod
@@ -96,8 +102,7 @@ class CPM_gurobi(SolverInterface):
             global GRB_ENV
             if GRB_ENV is None:
                 # initialise the native gurobi model object
-                GRB_ENV = gp.Env()
-                GRB_ENV.setParam("OutputFlag", 0)
+                GRB_ENV = gp.Env(params={"OutputFlag": 0})
                 GRB_ENV.start()
             return True
         except Exception as e:
@@ -122,7 +127,7 @@ class CPM_gurobi(SolverInterface):
         self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
+        # it is sufficient to implement add() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
 
     @property
@@ -155,8 +160,11 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
         # call the solver, with parameters
@@ -333,7 +341,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -450,6 +458,7 @@ class CPM_gurobi(SolverInterface):
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
       return self
+    __add__ = add  # avoid redirect in superclass
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """

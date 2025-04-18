@@ -1,5 +1,5 @@
 """
-    Transformations regarding reification constraints.
+    Transformations that rewrite reified constraints as needed.
 
     There are three types of reification (BV=BoolVar, BE=BoolExpr):
 

@@ -5,21 +5,30 @@
 ##
 """
     Interface to OR-Tools' CP-SAT Python API. 
+
+    Google OR-Tools is open source software for combinatorial optimization, which seeks
+    to find the best solution to a problem out of a very large set of possible solutions.
+    The OR-Tools CP-SAT solver is an award-winning constraint programming solver
+    that uses SAT (satisfiability) methods and lazy-clause generation 
+    (see https://developers.google.com/optimization).
+
+    Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
     
     The 'ortools' python package is bundled by default with CPMpy.
-    It can be installed through `pip`:
+    It can also be installed separately through `pip`:
 
     .. code-block:: console
     
         $ pip install ortools
 
-    Google OR-Tools is open source software for combinatorial optimization, which seeks
-    to find the best solution to a problem out of a very large set of possible solutions.
-    The OR-Tools CP-SAT solver is an award-winning constraint programming solver
-    that uses SAT (satisfiability) methods and lazy-clause generation.
+    Detailed installation instructions available at:
+    https://developers.google.com/optimization/install
 
-    Documentation of the solver's own Python API:
-    https://developers.google.com/optimization/reference/python/sat/python/cp_model
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -41,9 +50,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -55,13 +64,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the Python 'ortools' CP-SAT API
-
-    Requires that the 'ortools' python package is installed:
-    $ pip install ortools
-
-    See detailed installation instructions at:
-    https://developers.google.com/optimization/install
+    Interface to OR-Tools' CP-SAT Python API. 
 
     Creates the following attributes (see parent constructor for more):
 
@@ -69,6 +72,9 @@ class CPM_ortools(SolverInterface):
     - ``ort_solver``: the ortools cp_model.CpSolver() instance used in solve()
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``ort_model`` object.
+
+    Documentation of the solver's own Python API:
+    https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
     @staticmethod
@@ -168,8 +174,10 @@ class CPM_ortools(SolverInterface):
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        # set time limit?
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
@@ -382,7 +390,7 @@ class CPM_ortools(SolverInterface):
                                              # reified expr must go before this
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -408,11 +416,12 @@ class CPM_ortools(SolverInterface):
             self._post_constraint(con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     # TODO: 'reifiable' is an artefact from the early days
     # only 3 constraints support it (and,or,sum),
     # we can just add reified support for those and not need `reifiable` or returning the constraint
-    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # then we can remove _post_constraint and have its code inside the for loop of `add()`
     # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
@@ -480,9 +489,15 @@ class CPM_ortools(SolverInterface):
                 elif lhs.name == 'div':
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
-                    # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    arr, idx = lhs.args
+                    if is_int(idx): # OR-Tools does not handle all constant integer cases
+                        idx = intvar(idx,idx)
+                    # OR-Tools has slight different in argument order
+                    return self.ort_model.AddElement(
+                        self.solver_var(idx),
+                        self.solver_vars(arr),
+                        ortrhs
+                    )
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args

@@ -1,11 +1,36 @@
 """
-    Interface to CP Optimizers API
+    Interface to CP Optimizer's Python API.
 
     CP Optimizer, also a feature of IBM ILOG Optimization Studio, is a software library of constraint programming tools 
     supporting constraint propagation, domain reduction, and highly optimized solution search.
 
-    Documentation of the solver's own Python API: (all modeling functions)
-    https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
+    Always use :func:`cp.SolverLookup.get("cpo") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'docplex' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install docplex
+
+    docplex documentation:
+    https://ibmdecisionoptimization.github.io/docplex-doc/
+
+    You will also need to install CPLEX Optimization Studio from IBM's website,
+    and add the location of the CP Optimizer binary to your path.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
+
+    See detailed installation instructions at:
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -36,31 +61,14 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_cpo(SolverInterface):
     """
-    Interface to CP Optimizers API.
-
-    Requires that the 'docplex' python package is installed:
-
-    .. code-block:: console
-    
-        $ pip install docplex
-
-    docplex documentation:
-    https://ibmdecisionoptimization.github.io/docplex-doc/
-
-    You will also need to install CPLEX Optimization Studio from IBM's website,
-    and add the location of the CP Optimizer binary to your path.
-    There is a free community version available.
-    https://www.ibm.com/products/ilog-cplex-optimization-studio
-
-    See detailed installation instructions at:
-    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
-
-    Academic license:
-    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+    Interface to CP Optimizer's Python API.
 
     Creates the following attributes (see parent constructor for more):
 
     - ``cpo_model``: object, CP Optimizers model object
+
+    Documentation of the solver's own Python API: (all modeling functions)
+    https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     """
 
@@ -152,6 +160,10 @@ class CPM_cpo(SolverInterface):
         # call the solver, with parameters
         if 'LogVerbosity' not in kwargs:
             kwargs['LogVerbosity'] = 'Quiet'
+        
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
         self.cpo_result = self.cpo_model.solve(TimeLimit=time_limit, **kwargs)
 
         # new status, translate runtime
@@ -304,7 +316,7 @@ class CPM_cpo(SolverInterface):
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
 
-    # `__add__()` first calls `transform()`
+    # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -330,7 +342,7 @@ class CPM_cpo(SolverInterface):
         # no flattening required
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -358,6 +370,7 @@ class CPM_cpo(SolverInterface):
             self.cpo_model.add(cpo_con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _cpo_expr(self, cpm_con):
         """

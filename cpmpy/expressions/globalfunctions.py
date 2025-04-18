@@ -56,11 +56,12 @@
 
         Minimum
         Maximum
+        Abs
         Element
         Count
         Among
         NValue
-        Abs
+        NValueExcept
 
 """
 import warnings  # for deprecation warning
@@ -68,9 +69,9 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison
+from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
 class GlobalFunction(Expression):
@@ -237,10 +238,11 @@ def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
+
 class Element(GlobalFunction):
     """
         The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants of variables (the first argument)
+        with 'Arr' an array of constants or variables (the first argument)
         and 'Idx' an integer decision variable, representing the index into the array.
 
         Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
@@ -285,8 +287,15 @@ class Element(GlobalFunction):
 
         """
         arr, idx = self.args
-        return [(idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)) for i in range(len(arr))] + \
-               [idx >= 0, idx < len(arr)], []
+        # Find where the array indices and the bounds of `idx` intersect
+        lb, ub = get_bounds(idx)
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
+        cons=[]
+        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+        for i in range(new_lb, new_ub+1):
+            cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
+        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
+        return cons, []  # no auxiliary variables
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])

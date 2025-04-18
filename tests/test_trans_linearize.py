@@ -222,6 +222,22 @@ class TestTransLinearize(unittest.TestCase):
             model = cp.Model(c)
             model.solve(solver="exact")
 
+    def test_sub(self):
+        x = cp.intvar(0,10, name="x")
+        y = cp.intvar(0,10, name="y")
+
+        cons = Operator("sub", [3, x]) == y
+        [lin_cons] = linearize_constraint([cons])
+        self.assertEqual(str(lin_cons), "sum([-1, -1] * [x, y]) == -3")
+
+        cons = Operator("sub", [x, 3]) == y
+        [lin_cons] = linearize_constraint([cons])
+        self.assertEqual(str(lin_cons), "sum([1, -1] * [x, y]) == 3")
+
+        cons = Operator("sub", [x,y]) == 3
+        [lin_cons] = linearize_constraint([cons])
+        self.assertEqual(str(lin_cons), "sum([1, -1] * [x, y]) == 3")
+
 
 
 class TestConstRhs(unittest.TestCase):
