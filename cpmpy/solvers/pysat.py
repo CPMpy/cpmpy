@@ -81,8 +81,6 @@ class CPM_pysat(SolverInterface):
 
     """
 
-    IMPORT_PYSAT_PBLIB_ERROR = ImportError("The model contains a PB or cardinality constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
-
     @staticmethod
     def supported():
         # try to import the package
@@ -98,7 +96,7 @@ class CPM_pysat(SolverInterface):
         except Exception as e:
             raise e
 
-    _pblib = None  # holds pysat.[card,pb] modules if installed
+    _pb = None  # holds pysat.pb module if its dependency `pypblib` installed
 
     @staticmethod
     def solvernames():
@@ -144,10 +142,12 @@ class CPM_pysat(SolverInterface):
             subsolver = subsolver[6:] # strip 'pysat:'
 
         # try to import pypblib once (TODO I'd like class initialization, but can't find proper docs for it )
-        if CPM_pysat._pblib is None:
+        if CPM_pysat._pb is None:
+            from pysat import card
+            CPM_pysat._card = card  # native
             try:
-                from pysat import card, pb
-                CPM_pysat._pblib = (card, pb)
+                from pysat import pb  # require pypblib
+                CPM_pysat._pb = pb
                 # return True # now imported
             except ModuleNotFoundError:
                 return CPM_pysat._pblib is False # not installed, avoid reimporting
@@ -439,10 +439,7 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
-        if self._pblib is None:
-            raise self.IMPORT_PYSAT_PBLIB_ERROR
-
-        (card, _) = self._pblib
+        assert self._card is not None, "Native module which should have been cached in init"
 
         # unpack and transform to PySAT argument
         lhs, rhs = cpm_expr.args
@@ -456,21 +453,21 @@ class CPM_pysat(SolverInterface):
 
         # Some subsolvers (e.g. MiniCard) support native root context cardinality constraints
         if not reified and self.pysat_solver.supports_atmost():
-            pysat_args["encoding"] = card.EncType.native
+            pysat_args["encoding"] = self._card.EncType.native
 
         if cpm_expr.name == "<=":
-            return card.CardEnc.atmost(**pysat_args)
+            return self._card.CardEnc.atmost(**pysat_args)
         elif cpm_expr.name == ">=":
-            return card.CardEnc.atleast(**pysat_args)
+            return self._card.CardEnc.atleast(**pysat_args)
         elif cpm_expr.name == "==":
-            return card.CardEnc.equals(**pysat_args)
+            return self._card.CardEnc.equals(**pysat_args)
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
-        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
-        if self._pblib is None:
-            raise self.IMPORT_PYSAT_PBLIB_ERROR
+        """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
+        if self._pb is None:
+            raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
 
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
@@ -482,12 +479,12 @@ class CPM_pysat(SolverInterface):
         lits = self.solver_vars(lhs.args[1])
         pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
 
-        (_, pb) = self._pblib
+
         if cpm_expr.name == "<=":
-            return pb.PBEnc.atmost(**pysat_args).clauses
+            return self._pb.PBEnc.atmost(**pysat_args).clauses
         elif cpm_expr.name == ">=":
-            return pb.PBEnc.atleast(**pysat_args).clauses
+            return self._pb.PBEnc.atleast(**pysat_args).clauses
         elif cpm_expr.name == "==":
-            return pb.PBEnc.equals(**pysat_args).clauses
+            return self._pb.PBEnc.equals(**pysat_args).clauses
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
