@@ -164,7 +164,10 @@ class CPM_z3(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
@@ -328,7 +331,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -357,6 +360,7 @@ class CPM_z3(SolverInterface):
             self.z3_solver.add(z3_con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _z3_expr(self, cpm_con):
         """

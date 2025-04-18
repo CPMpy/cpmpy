@@ -128,7 +128,7 @@ class CPM_gurobi(SolverInterface):
         self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
+        # it is sufficient to implement add() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
 
     @property
@@ -161,8 +161,11 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
         # call the solver, with parameters
@@ -341,7 +344,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -458,6 +461,7 @@ class CPM_gurobi(SolverInterface):
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
       return self
+    __add__ = add  # avoid redirect in superclass
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
