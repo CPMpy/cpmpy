@@ -91,10 +91,11 @@ class CPM_pysat(SolverInterface):
             from pysat.formula import IDPool
             from pysat.solvers import Solver
 
+            from pysat import card
+            CPM_pysat._card = card  # native
+
             # try to import pypblib once
             if CPM_pysat._pb is None:
-                from pysat import card
-                CPM_pysat._card = card  # native
                 try:
                     from pysat import pb  # require pypblib
                     CPM_pysat._pb = pb

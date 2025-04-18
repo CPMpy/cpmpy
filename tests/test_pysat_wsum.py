@@ -15,6 +15,9 @@ def test_pypblib_error():
             lambda : CPM_pysat(cp.Model(2*cp.boolvar() + 3 * cp.boolvar() + 5 * cp.boolvar() <= 6)).solve()
         )
 
+    # this one should still work without `pypblib`
+    assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
+
 @pytest.mark.skipif(not pblib_available, reason="pypblib not installed")
 class TestEncodePseudoBooleanConstraint(unittest.TestCase):
     def setUp(self):
