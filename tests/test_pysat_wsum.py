@@ -7,7 +7,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 import importlib # can check for modules *without* importing them
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
-@pytest.mark.skipif(pblib_available, reason="`pypblib` not installed")
+@pytest.mark.skipif(pblib_available, reason="`pypblib` is installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
     unittest.TestCase().assertRaises(
