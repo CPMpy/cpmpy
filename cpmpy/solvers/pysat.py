@@ -149,8 +149,8 @@ class CPM_pysat(SolverInterface):
                 from pysat import pb  # require pypblib
                 CPM_pysat._pb = pb
                 # return True # now imported
-            except ModuleNotFoundError:
-                return CPM_pysat._pblib is False # not installed, avoid reimporting
+            except (ModuleNotFoundError, NameError): # pysat returns the wrong error type (latter i/o former)
+                return CPM_pysat._pb is False  # not installed, avoid reimporting
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
