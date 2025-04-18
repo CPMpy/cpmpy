@@ -148,9 +148,8 @@ class CPM_pysat(SolverInterface):
             try:
                 from pysat import pb  # require pypblib
                 CPM_pysat._pb = pb
-                # return True # now imported
             except (ModuleNotFoundError, NameError): # pysat returns the wrong error type (latter i/o former)
-                return CPM_pysat._pb is False  # not installed, avoid reimporting
+                CPM_pysat._pb = False  # not installed, avoid reimporting
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -466,8 +465,9 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_pseudoboolean(self, cpm_expr):
         """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
-        if self._pb is None:
+        if self._pb is False:
             raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
+        assert self._pb is not None, "We should have imported the `pb` module if it was installed."
 
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
