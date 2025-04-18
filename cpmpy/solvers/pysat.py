@@ -100,22 +100,20 @@ class CPM_pysat(SolverInterface):
             from pysat import card
             CPM_pysat._card = card  # native
 
-            # try to import pypblib once
-            if CPM_pysat._pb is None:
+            # try to import pypblib and avoid ever re-import by setting `_pb`
+            if not hasattr(CPM_pysat, ("_pb")):
                 try:
                     from pysat import pb  # require pypblib
+                    """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
                     CPM_pysat._pb = pb
                 except (ModuleNotFoundError, NameError):  # pysat returns the wrong error type (latter i/o former)
-                    CPM_pysat._pb = False  # not installed, avoid reimporting
+                    CPM_pysat._pb = None  # not installed, avoid reimporting
 
             return True
         except ModuleNotFoundError:
             return False
         except Exception as e:
             raise e
-
-    """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
-    _pb = None  # 
 
     @staticmethod
     def solvernames():
@@ -473,9 +471,8 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_pseudoboolean(self, cpm_expr):
         """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
-        if self._pb is False:
+        if self._pb is None:
             raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
-        assert self._pb is not None, "We should have imported the `pb` module if it was installed."
 
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
