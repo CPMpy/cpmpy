@@ -84,13 +84,13 @@ class SolverLookup():
     @classmethod
     def print_status(cls):
         """
-            Print all CPMpy solvers and their installation status.
+            Print all CPMpy solvers and their installation status on this system.
         """
         for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
-                print(f"{basename}: Ready to use")
+                print(f"{basename}: Supported, ready to use.")
             else:
-                print(f"{basename}: Not installed")
+                print(f"{basename}: Not supported (missing Python package, binary or license).")
 
     @classmethod
     def supported(cls):
