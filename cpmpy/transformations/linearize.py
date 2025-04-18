@@ -389,35 +389,43 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
 def only_positive_bv(lst_of_expr):
     """
-        Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
-        cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
+        Replaces Comparisons containing NegBoolView with equivalent expression using only BoolVar.
+        Comparisons are expected to be linearized. Only apply after applying linearize_constraint(cpm_expr).
 
-        Resulting expression is linear.
+        Resulting expression is linear if the original expression was linear.
     """
     newlist = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
+            new_lhs = lhs
             new_cons = []
 
             if isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}:
-                lhs, const = only_positive_bv_linear(lhs)
+                new_lhs, const = only_positive_bv_linear(lhs)
                 rhs -= const
-                
             else:
-            # other operators in comparison such as "min", "max"
-                lhs = copy.copy(lhs)
-                for i,arg in enumerate(list(lhs.args)):
-                    if isinstance(arg, NegBoolView):
-                        new_arg = cp.boolvar()
-                        cons = [new_arg + arg._bv == 1]
-                        lhs.args[i] = new_arg
-                        new_cons += cons
-                        
+                # other operators in comparison such as "min", "max"
+                nbv_sel = [isinstance(a, NegBoolView) for a in lhs.args]
+                if any(nbv_sel):
+                    new_args = []
+                    for i, nbv in enumerate(nbv_sel):
+                        if nbv:
+                            aux = cp.boolvar()
+                            new_args.append(aux)
+                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                        else:
+                            new_args.append(lhs.args[i])
 
-            newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-            newlist += linearize_constraint(new_cons)
+                    new_lhs = copy.copy(lhs)
+                    new_lhs.update_args(new_args)
+
+            if new_lhs != lhs:
+                newlist.append(eval_comparison(cpm_expr.name, new_lhs, rhs))
+                newlist += new_cons  # already linear
+            else:
+                newlist.append(cpm_expr)
 
         # reification
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -448,55 +456,53 @@ def only_positive_bv_linear(cpm_expr):
         Returns tuple of:
         - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
         - `const`: The difference between the original expression and the new expression, 
-                   i.e. the constant term that was removed as part of rewriting the expression.
+                   i.e. a constant term that must be added to pos_expr to be an equivalent linear expression.
     """
     if isinstance(cpm_expr, _NumVarImpl):
         if isinstance(cpm_expr,NegBoolView):
-            pos_expr, const = Operator("wsum",[[-1], [cpm_expr._bv]]), 1
+            return Operator("wsum",[[-1], [cpm_expr._bv]]), 1
         else:
-            pos_expr, const = cpm_expr, 0
+            return cpm_expr, 0
 
     elif cpm_expr.name == "sum":
+        # indicator on arguments being negboolviews
         nbv_sel = [isinstance(a, NegBoolView) for a in cpm_expr.args]
         if any(nbv_sel):
-            # count number of negboolviews
             const = 0
             weights = []
-            args = []
+            variables = []
             for i, nbv in enumerate(nbv_sel):
                 if nbv:
                     const += 1
                     weights.append(-1)
-                    args.append(cpm_expr.args[i]._bv)
+                    variables.append(cpm_expr.args[i]._bv)
                 else:
                     weights.append(1)
-                    args.append(cpm_expr.args[i])
-            pos_expr = Operator("wsum", [weights, args])
+                    variables.append(cpm_expr.args[i])
+            return Operator("wsum", [weights, variables]), const
         else:
-            pos_expr, const = cpm_expr, 0
+            return cpm_expr, 0
 
     elif cpm_expr.name == "wsum":
-        weights, args = cpm_expr.args
-        nbv_sel = [isinstance(a, NegBoolView) for a in args]
+        # indicator on arguments of the wsum variable being negboolviews
+        nbv_sel = [isinstance(a, NegBoolView) for a in cpm_expr.args[1]]
         if any(nbv_sel):
+            # copy weights and variables
+            weights = [w for w in cpm_expr.args[0]]
+            variables = [v for v in cpm_expr.args[1]]
             const = 0
             for i, nbv in enumerate(nbv_sel):
                 if nbv:
                     const += weights[i]
                     weights[i] = -weights[i]
-                    args[i] = args[i]._bv
-                
-            pos_expr = Operator("wsum", [weights, args]) 
+                    variables[i] = variables[i]._bv
+            return Operator("wsum", [weights, variables]), const
         else:
-            pos_expr, const = cpm_expr, 0
+            return cpm_expr, 0
 
     else:
         raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
-                
-    return pos_expr, const
-    
-    
-    
+
 
 def canonical_comparison(lst_of_expr):
 
@@ -627,13 +633,9 @@ def only_positive_coefficients(lst_of_expr):
 
 def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     """
-    Takes a linear expression and outputs:
+    Takes an expression and returns a linearized flattenned objective and a list of constraints.
     
-    - Decision variable: Var
-    - Linear: sum([Var])                                   (CPMpy class 'Operator', name 'sum')
-              wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
-
-    Only difference with flatten_objective is that no negated boolvars are allowed.
+    Only difference with flatten_objective is that linear objectives will not contain negated boolvars.
     """
     
     flatexpr, flatcons = flatten_objective(expr, supported=supported)
@@ -647,4 +649,4 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     
     else: 
         assert flatexpr.name in supported, (f"Unexpected numerical expression, {flatexpr} is not linear and not supported, please report on github")
-        assert not any([isinstance(a, NegBoolView) for a in flatexpr.args]), f"Unexpected expression, {flatexpr} contains negated boolean variables, please report on github" # this should be impossible since flatten objective only returns positive vars
+        return flatexpr, flatcons
