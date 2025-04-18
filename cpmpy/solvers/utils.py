@@ -93,13 +93,15 @@ class SolverLookup():
                 print(f"{basename}: Not installed")
 
     @classmethod
-    def available(cls):
+    def supported(cls):
         """
-            Return the list of names of all solvers and subsolvers available on this system (for use in `SolverLookup.get(name)`)
+            Return the list of names of all solvers (and subsolvers) supported on this system.
 
             If a solver name is returned, it means that both the Python package is installed and the
-            solver is available for immediate use: the solver's `.supported()` function returns True.
+            solver's `.supported()` function returns True and is hence ready for immediate use
             (e.g. any separate binaries are installed if necessary, and licenses are active if needed).
+
+            Typical use case is to use these names in `SolverLookup.get(name)`.
         """
         names = []
         for (basename, CPM_slv) in cls.base_solvers():
@@ -113,9 +115,9 @@ class SolverLookup():
 
     @classmethod
     def solvernames(cls):
-        # The older (more cryptically named) way to get the list of installed solvers.
+        # The older (more indirectly named) way to get the list of names of *supported* solvers.
         # Will be deprecated at some point.
-        return cls.available()
+        return cls.supported()
 
     @classmethod
     def get(cls, name=None, model=None, **init_kwargs):
