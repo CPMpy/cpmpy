@@ -27,7 +27,7 @@
 
         $ pip install pysat
 
-    If you want to also solve pseudo-Boolean and cardinality constraints, you should also install its optional dependency 'pypblib', as follows:
+    If you want to also solve pseudo-Boolean constraints, you should also install its optional dependency 'pypblib', as follows:
 
     .. code-block:: console
 
