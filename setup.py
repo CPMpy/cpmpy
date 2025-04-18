@@ -44,7 +44,7 @@ setup(
         "choco": ["pychoco>=0.2.1"],
         "exact": ["exact>=2.1.0"],
         "minizinc": ["minizinc"],
-        "pysat": ["python-sat[pblib]"],
+        "pysat": ["python-sat"],
         "gurobi": ["gurobipy"],
         "pysdd": ["pysdd"],
         "gcs": ["gcspy"],
