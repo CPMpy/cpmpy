@@ -82,7 +82,7 @@ class SolverLookup():
                ]
 
     @classmethod
-    def status(cls):
+    def print_status(cls):
         """
             Print all CPMpy solvers and their installation status.
         """
@@ -93,11 +93,12 @@ class SolverLookup():
                 print(f"{basename}: Not installed")
 
     @classmethod
-    def installed(cls):
+    def available(cls):
         """
-            Return the list of all solvers and subsolvers that are supported on this system.
+            Return the list of names of all solvers and subsolvers available on this system (for use in `SolverLookup.get(name)`)
 
-            Installed means that both the Python package is installed, and the solver is ready-to-use.
+            If a solver name is returned, it means that both the Python package is installed and the
+            solver is available for immediate use: the solver's `.supported()` function returns True.
             (e.g. any separate binaries are installed if necessary, and licenses are active if needed).
         """
         names = []
@@ -114,7 +115,7 @@ class SolverLookup():
     def solvernames(cls):
         # The older (more cryptically named) way to get the list of installed solvers.
         # Will be deprecated at some point.
-        return cls.installed()
+        return cls.available()
 
     @classmethod
     def get(cls, name=None, model=None, **init_kwargs):
