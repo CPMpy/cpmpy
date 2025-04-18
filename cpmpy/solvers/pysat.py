@@ -21,7 +21,13 @@
     Installation
     ============
 
-    Requires that the 'python-sat' package is installed. If you want to also solve pseudo-Boolean and cardinality constraints, you should also install its optional dependency 'pypblib', as follows:
+    Requires that the 'python-sat' package is installed:
+
+    .. code-block:: console
+
+        $ pip install pysat
+
+    If you want to also solve pseudo-Boolean and cardinality constraints, you should also install its optional dependency 'pypblib', as follows:
 
     .. code-block:: console
 
