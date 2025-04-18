@@ -80,7 +80,7 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def __add__(self, con):
+    def add(self, con):
         """
         Add one or more constraints to the model.
 
@@ -115,6 +115,7 @@ class Model(object):
 
         self.constraints.append(con)
         return self
+    __add__ = add  # Make __add__() (for the += operation) be the same as add() 
 
 
     def minimize(self, expr):

@@ -250,6 +250,9 @@ class CPM_minizinc(SolverInterface):
             Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
@@ -486,7 +489,7 @@ class CPM_minizinc(SolverInterface):
                      "lex_chain_lesseq", "among"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -512,6 +515,7 @@ class CPM_minizinc(SolverInterface):
             self.mzn_model.add_string(mzn_str)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _convert_expression(self, expr) -> str:
         """
@@ -734,6 +738,11 @@ class CPM_minizinc(SolverInterface):
             raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio
+
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
         coroutine = self._solveAll(display=display, time_limit=time_limit,
