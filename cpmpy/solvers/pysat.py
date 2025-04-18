@@ -90,6 +90,17 @@ class CPM_pysat(SolverInterface):
             # while we need the 'python-sat' package, some more checks:
             from pysat.formula import IDPool
             from pysat.solvers import Solver
+
+            # try to import pypblib once
+            if CPM_pysat._pb is None:
+                from pysat import card
+                CPM_pysat._card = card  # native
+                try:
+                    from pysat import pb  # require pypblib
+                    CPM_pysat._pb = pb
+                except (ModuleNotFoundError, NameError):  # pysat returns the wrong error type (latter i/o former)
+                    CPM_pysat._pb = False  # not installed, avoid reimporting
+
             return True
         except ModuleNotFoundError:
             return False
@@ -140,16 +151,6 @@ class CPM_pysat(SolverInterface):
             subsolver = "glucose4" # something recent...
         elif subsolver.startswith('pysat:'):
             subsolver = subsolver[6:] # strip 'pysat:'
-
-        # try to import pypblib once (TODO I'd like class initialization, but can't find proper docs for it )
-        if CPM_pysat._pb is None:
-            from pysat import card
-            CPM_pysat._card = card  # native
-            try:
-                from pysat import pb  # require pypblib
-                CPM_pysat._pb = pb
-            except (ModuleNotFoundError, NameError): # pysat returns the wrong error type (latter i/o former)
-                CPM_pysat._pb = False  # not installed, avoid reimporting
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
