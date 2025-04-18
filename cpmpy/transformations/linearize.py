@@ -58,7 +58,7 @@ from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 from .decompose_global import decompose_in_tree
 
-from .flatten_model import flatten_constraint, get_or_make_var, flatten_objective
+from .flatten_model import flatten_constraint, get_or_make_var
 from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
@@ -389,8 +389,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
 def only_positive_bv(lst_of_expr):
     """
-        Replaces Comparisons containing NegBoolView with equivalent expression using only BoolVar.
-        Comparisons are expected to be linearized. Only apply after applying linearize_constraint(cpm_expr).
+        Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+        Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
 
         Resulting expression is linear if the original expression was linear.
     """
