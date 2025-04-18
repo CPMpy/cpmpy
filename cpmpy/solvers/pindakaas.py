@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# /usr/bin/env python
 """
 Interface to Pindakaas (`pkd`) API.
 
