@@ -97,9 +97,9 @@ class SolverLookup():
         """
             Return the list of names of all solvers (and subsolvers) supported on this system.
 
-            If a solver name is returned, it means that both the Python package is installed and the
-            solver's `.supported()` function returns True and is hence ready for immediate use
-            (e.g. any separate binaries are installed if necessary, and licenses are active if needed).
+            If a solver name is returned, it means that the solver's `.supported()` function returns True
+            and it is hence ready for immediate use
+            (e.g. any separate binaries are also installed if necessary, and licenses are active if needed).
 
             Typical use case is to use these names in `SolverLookup.get(name)`.
         """
