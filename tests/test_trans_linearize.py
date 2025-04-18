@@ -4,6 +4,8 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
+from cpmpy.transformations.decompose_global import decompose_global
+from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_linear, linearize_objective
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
@@ -535,7 +537,7 @@ class testOnlyPositiveBv(unittest.TestCase):
         obj = linearize_objective(4*~a + 5*~b + c)
         self.assertEqual(str(obj), str((Operator("wsum",[[-4, -5, 1, 1],[a,b,c,9]]), [])))
         
-    def test_linearize_objective_non_linear_positive_input(self):
+    def test_linearize_objective_non_linear_positive_input(self): # TODO: make boolvars
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = linearize_objective(a * b * c)
         self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((a) * (b)) == (IV5)])")
@@ -544,3 +546,16 @@ class testOnlyPositiveBv(unittest.TestCase):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = linearize_objective(~a * b * c)
         self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
+        
+    def test_linearize_objective_max(self):
+        a, b = [cp.boolvar(name=n) for n in "ab"]
+        expr = cp.max((~a * b), (a * ~b ))
+        # self.assertEqual(str(expr.args), "(max((~a) * (b), (a) * (~b)))")
+        obj = linearize_objective(cp.max((~a * b), (a * ~b )))
+        self.assertEqual(str(obj), "(IV7, [(max(IV5,IV6)) == (IV7), ((~a) * (b)) == (IV5), ((a) * (~b)) == (IV6)])")
+        
+    def test_only_positive_bv_max(self):
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
+        obj = only_positive_bv(linearize_constraint([cp.max(~a,b) >= c], supported={"sum", "wsum", "max"}))
+        self.assertEqual(str(obj), "[(max(BV3,b)) >= (c), (BV3) + (a) == 1]")
+        

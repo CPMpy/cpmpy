@@ -401,18 +401,20 @@ def only_positive_bv(lst_of_expr):
             lhs, rhs = cpm_expr.args
             new_cons = []
 
-            if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
+            if isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}:
+                lhs, const = only_positive_bv_linear(lhs)
+                rhs -= const
+                
+            else:
             # other operators in comparison such as "min", "max"
                 lhs = copy.copy(lhs)
                 for i,arg in enumerate(list(lhs.args)):
                     if isinstance(arg, NegBoolView):
-                        new_arg, cons = get_or_make_var(1 - arg._bv)
+                        new_arg = cp.boolvar()
+                        cons = [new_arg + arg._bv == 1]
                         lhs.args[i] = new_arg
                         new_cons += cons
                         
-            else:
-                lhs, const = only_positive_bv_linear(lhs)
-                rhs -= const
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
             newlist += linearize_constraint(new_cons)
@@ -645,20 +647,4 @@ def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
     
     else: 
         assert flatexpr.name in supported, (f"Unexpected numerical expression, {flatexpr} is not linear and not supported, please report on github")
-        # other operators in expression such as "min", "max"
-        new_cons = []
-        nbv_sel = [isinstance(a, NegBoolView) for a in flatexpr.args]
-        if any(nbv_sel):
-            new_args = []
-            for i,arg in enumerate(flatexpr.args):
-                if nbv_sel[i]:
-                    new_arg, cons = get_or_make_var(1 - arg._bv)
-                    new_args.append(new_arg)
-                    new_cons += cons
-                else:
-                    new_args.append(arg)
-            posexpr = copy.copy(flatexpr)
-            posexpr.update_args(new_args)
-            return posexpr, flatcons + new_cons
-        else:
-            return flatexpr, flatcons
+        assert not any([isinstance(a, NegBoolView) for a in flatexpr.args]), f"Unexpected expression, {flatexpr} contains negated boolean variables, please report on github" # this should be impossible since flatten objective only returns positive vars
