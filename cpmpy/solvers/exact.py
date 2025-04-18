@@ -45,7 +45,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.linearize import linearize_constraint, only_positive_bv, linearize_objective
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
@@ -341,10 +341,11 @@ class CPM_exact(SolverInterface):
         self.objective_ = expr
         self.objective_is_min_ = minimize
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = linearize_objective(expr)
-        self += flat_cons  # add potentially created constraints
+        # make objective function non-nested and with positive BoolVars only
+        (flat_obj, flat_cons) = flatten_objective(expr)
+        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
+        self += flat_cons  # add potentially created constraints
 
         # make objective function or variable and post
         xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)

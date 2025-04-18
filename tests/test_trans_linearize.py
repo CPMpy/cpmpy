@@ -6,7 +6,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_linear, linearize_objective
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -477,84 +477,87 @@ class testOnlyPositiveBv(unittest.TestCase):
         self.ivars = cp.intvar(1, 10, shape=(5,))
         self.bvars = cp.boolvar((3,))
 
-    def test_only_positive_bv_linear_positive_literal(self):
+    def test_only_positive_bv_wsum_const_positive_literal(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str((p, 0)), str(only_positive_bv_linear(p)))
+        self.assertEqual(str((p, 0)), str(only_positive_bv_wsum_const(p)))
         
-    def test_only_positive_bv_linear_negated_litral(self):
+    def test_only_positive_bv_wsum_const_negated_litral(self):
         p = cp.boolvar(name="p")
-        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_linear(~p)))
+        self.assertEqual(str((Operator("wsum",[[-1],[p]]), 1)), str(only_positive_bv_wsum_const(~p)))
         
-    def test_only_positive_bv_linear_sum_positive_input(self):
+    def test_only_positive_bv_wsum_const_sum_positive_input(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("sum",[a,b,c]), 0)), str(only_positive_bv_linear(a+b+c)))
+        self.assertEqual(str((Operator("sum",[a,b,c]), 0)), str(only_positive_bv_wsum_const(a+b+c)))
         
-    def test_only_positive_bv_linear_sum(self):
+    def test_only_positive_bv_wsum_const_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_linear(~a+~b+c)))
+        self.assertEqual(str((Operator("wsum",[[-1, -1, 1],[a,b,c]]), 2)), str(only_positive_bv_wsum_const(~a+~b+c)))
         
-    def test_only_positive_bv_linear_wsum_positive_input(self):
+    def test_only_positive_bv_wsum_const_wsum_positive_input(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("wsum",[[4, 5, 1],[a,b,c]]), 0)), str(only_positive_bv_linear(4*a+5*b+c)))
+        self.assertEqual(str((Operator("wsum",[[4, 5, 1],[a,b,c]]), 0)), str(only_positive_bv_wsum_const(4*a+5*b+c)))
         
-    def test_only_positive_bv_linear_wsum(self):
+    def test_only_positive_bv_wsum_const_wsum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        self.assertEqual(str((Operator("wsum",[[-4, 5, 1],[a,b,c]]), 4)), str(only_positive_bv_linear(4*~a+5*b+c)))
+        self.assertEqual(str((Operator("wsum",[[-4, 5, 1],[a,b,c]]), 4)), str(only_positive_bv_wsum_const(4*~a+5*b+c)))
         
-    def test_only_positive_bv_linear_non_linear(self):
+    def test_only_positive_bv_wsum_const_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         with self.assertRaises(ValueError) as cm:
-            only_positive_bv_linear(~a * b * c)
+            only_positive_bv_wsum_const(~a * b * c)
             self.assertEqual(str(cm.exception), "unexpected expression, should be sum, wsum or var but got ((~a) * (b)) * (c)")
             
-    def test_linearize_objective_positive_literal(self):
+    def test_only_positive_bv_wsum_positive_literal(self):
         p = cp.boolvar(name="p")
-        obj = linearize_objective(p)
-        self.assertEqual(str(obj), str((p, [])))
+        obj = only_positive_bv_wsum(p)
+        self.assertEqual(str(obj), str(p))
             
-    def test_linearize_objective_negated_literal(self):
+    def test_only_positive_bv_wsum_negated_literal(self):
         p = cp.boolvar(name="p")
-        obj = linearize_objective(~p)
-        self.assertEqual(str(obj), str((Operator("wsum",[[-1, 1],[p, 1]]), [])))
+        obj = only_positive_bv_wsum(~p)
+        self.assertEqual(str(obj), str(Operator("wsum",[[-1, 1],[p, 1]])))
         
-    def test_linearize_objective_sum_positive_input(self):
+    def test_only_positive_bv_wsum_sum_positive_input(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(a + b + c)
-        self.assertEqual(str(obj), str((Operator("sum",[a,b,c]), [])))
+        obj = only_positive_bv_wsum(a + b + c)
+        self.assertEqual(str(obj), str(Operator("sum",[a,b,c])))
         
-    def test_linearize_objective_sum(self):
+    def test_only_positive_bv_wsum_sum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(~a + ~b + c)
-        self.assertEqual(str(obj), str((Operator("wsum",[[-1, -1, 1, 1],[a,b,c,2]]), [])))
+        obj = only_positive_bv_wsum(~a + ~b + c)
+        self.assertEqual(str(obj), str(Operator("wsum",[[-1, -1, 1, 1],[a,b,c,2]])))
         
-    def test_linearize_objective_wsum_positive_input(self):
+    def test_only_positive_bv_wsum_wsum_positive_input(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(4*a + 5*b + c)
-        self.assertEqual(str(obj), str((Operator("wsum",[[4, 5, 1],[a,b,c]]), [])))
+        obj = only_positive_bv_wsum(4*a + 5*b + c)
+        self.assertEqual(str(obj), str(Operator("wsum",[[4, 5, 1],[a,b,c]])))
         
-    def test_linearize_objective_wsum(self):
+    def test_only_positive_bv_wsum_wsum(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(4*~a + 5*~b + c)
-        self.assertEqual(str(obj), str((Operator("wsum",[[-4, -5, 1, 1],[a,b,c,9]]), [])))
+        obj = only_positive_bv_wsum(4*~a + 5*~b + c)
+        self.assertEqual(str(obj), str(Operator("wsum",[[-4, -5, 1, 1],[a,b,c,9]])))
         
-    def test_linearize_objective_non_linear_positive_input(self): # TODO: make boolvars
+    def test_only_positive_bv_wsum_non_linear_positive_input(self): # TODO: make boolvars
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(a * b * c)
-        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((a) * (b)) == (IV5)])")
+        flat_obj, flat_cons = flatten_objective(a * b * c)
+        flat_obj = only_positive_bv_wsum(flat_obj)
+        self.assertEqual(str((flat_obj, flat_cons)), "(IV6, [((IV5) * (c)) == (IV6), ((a) * (b)) == (IV5)])")
         
-    def test_linearize_objective_non_linear(self):
+    def test_only_positive_bv_wsum_non_linear(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
-        obj = linearize_objective(~a * b * c)
-        self.assertEqual(str(obj), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
+        flat_obj, flat_cons = flatten_objective(~a * b * c)
+        flat_obj = only_positive_bv_wsum(flat_obj)
+        self.assertEqual(str((flat_obj, flat_cons)), "(IV6, [((IV5) * (c)) == (IV6), ((~a) * (b)) == (IV5)])")
         
-    def test_linearize_objective_max(self):
+    def test_only_flat_positive_bv_wsum_max(self):
         a, b = [cp.boolvar(name=n) for n in "ab"]
         expr = cp.max((~a * b), (a * ~b ))
+        flat_obj, flat_cons = flatten_objective(expr)
         # self.assertEqual(str(expr.args), "(max((~a) * (b), (a) * (~b)))")
-        obj = linearize_objective(cp.max((~a * b), (a * ~b )))
-        self.assertEqual(str(obj), "(IV7, [(max(IV5,IV6)) == (IV7), ((~a) * (b)) == (IV5), ((a) * (~b)) == (IV6)])")
+        obj = only_positive_bv_wsum(flat_obj)
+        self.assertEqual(str((obj, flat_cons)), "(IV7, [(max(IV5,IV6)) == (IV7), ((~a) * (b)) == (IV5), ((a) * (~b)) == (IV6)])")
         
-    def test_only_positive_bv_max(self):
+    def test_only_flat_positive_bv_max(self):
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = only_positive_bv(linearize_constraint([cp.max(~a,b) >= c], supported={"sum", "wsum", "max"}))
         self.assertEqual(str(obj), "[(max(BV3,b)) >= (c), (BV3) + (a) == 1]")

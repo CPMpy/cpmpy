@@ -403,7 +403,7 @@ def only_positive_bv(lst_of_expr):
             new_cons = []
 
             if isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}:
-                new_lhs, const = only_positive_bv_linear(lhs)
+                new_lhs, const = only_positive_bv_wsum_const(lhs)
                 rhs -= const
             else:
                 # other operators in comparison such as "min", "max"
@@ -445,10 +445,36 @@ def only_positive_bv(lst_of_expr):
 
     return newlist
 
-def only_positive_bv_linear(cpm_expr):
+def only_positive_bv_wsum(expr):
     """
-        Replaces a linear expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
+        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
         using only :class:`~cpmpy.expressions.variables.BoolVar`. 
+
+        It might add a constant term to the expression, if you want the constant separately, use :func:`only_positive_bv_wsum_const`.
+        
+        Arguments:
+        - `cpm_expr`: linear expression (sum, wsum, var)
+        
+        Returns tuple of:
+        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
+    """
+    if isinstance(expr, _NumVarImpl) or expr.name in {"sum","wsum"}:
+        pos_expr, const = only_positive_bv_wsum_const(expr)
+        if const == 0:
+            return pos_expr
+        else:
+            assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
+            # should we check if it already has a constant term?
+            return Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1]+[const]])
+    else:
+        return expr
+
+def only_positive_bv_wsum_const(cpm_expr):
+    """
+        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
+        using only :class:`~cpmpy.expressions.variables.BoolVar` as well as a constant term that must be added to the new expression to be equivalent.
+
+        If you want the expression where the constant term is part of the wsum returned, use :func:`only_positive_bv_wsum`.
         
         Arguments:
         - `cpm_expr`: linear expression (sum, wsum, var)
@@ -630,23 +656,3 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
-
-def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
-    """
-    Takes an expression and returns a linearized flattenned objective and a list of constraints.
-    
-    Only difference with flatten_objective is that linear objectives will not contain negated boolvars.
-    """
-    
-    flatexpr, flatcons = flatten_objective(expr, supported=supported)
-    
-    if isinstance(flatexpr, _NumVarImpl) or flatexpr.name in {"sum","wsum"}:
-        pos_expr, const = only_positive_bv_linear(flatexpr)
-        if (const != 0):
-            assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
-            pos_expr = Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1] + [const]])
-        return pos_expr, flatcons
-    
-    else: 
-        assert flatexpr.name in supported, (f"Unexpected numerical expression, {flatexpr} is not linear and not supported, please report on github")
-        return flatexpr, flatcons
