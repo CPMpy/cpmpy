@@ -102,8 +102,7 @@ class CPM_gurobi(SolverInterface):
             global GRB_ENV
             if GRB_ENV is None:
                 # initialise the native gurobi model object
-                GRB_ENV = gp.Env()
-                GRB_ENV.setParam("OutputFlag", 0)
+                GRB_ENV = gp.Env(params={"OutputFlag": 0})
                 GRB_ENV.start()
             return True
         except Exception as e:
