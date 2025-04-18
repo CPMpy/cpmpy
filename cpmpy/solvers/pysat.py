@@ -114,7 +114,8 @@ class CPM_pysat(SolverInterface):
         except Exception as e:
             raise e
 
-    _pb = None  # holds pysat.pb module if its dependency `pypblib` installed
+    """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
+    _pb = None  # 
 
     @staticmethod
     def solvernames():
@@ -446,7 +447,6 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
-        assert self._card is not None, "Native module which should have been cached in init"
 
         # unpack and transform to PySAT argument
         lhs, rhs = cpm_expr.args
