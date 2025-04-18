@@ -58,7 +58,7 @@ from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 from .decompose_global import decompose_in_tree
 
-from .flatten_model import flatten_constraint, get_or_make_var
+from .flatten_model import flatten_constraint, get_or_make_var, flatten_objective
 from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
@@ -630,3 +630,23 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+def linearize_objective(expr, supported=frozenset(["sum","wsum"])):
+    """
+    Takes an expression and returns a linearized flattenned objective and a list of constraints.
+    
+    Only difference with flatten_objective is that linear objectives will not contain negated boolvars.
+    """
+    
+    flatexpr, flatcons = flatten_objective(expr, supported=supported)
+    
+    if isinstance(flatexpr, _NumVarImpl) or flatexpr.name in {"sum","wsum"}:
+        pos_expr, const = only_positive_bv_linear(flatexpr)
+        if (const != 0):
+            assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
+            pos_expr = Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1] + [const]])
+        return pos_expr, flatcons
+    
+    else: 
+        assert flatexpr.name in supported, (f"Unexpected numerical expression, {flatexpr} is not linear and not supported, please report on github")
+        return flatexpr, flatcons
