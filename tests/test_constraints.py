@@ -27,9 +27,10 @@ NUM_GLOBAL = {
 }
 
 # Solvers not supporting arithmetic constraints
-SAT_SOLVERS = {"pysat", "pysdd"}
+SAT_SOLVERS = {"pysat", "pysdd", "pindakaas"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
+                  "pindakaas": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "z3": {"Inverse"},
                   "choco": {"Inverse"},
@@ -44,6 +45,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pindakaas": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {},
                      }
 
