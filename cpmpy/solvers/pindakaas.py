@@ -116,17 +116,12 @@ class CPM_pindakaas(SolverInterface):
 
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
-        if time_limit is not None:
-            raise NotSupportedError(f"{self.name}: time not supported yet")
 
         # ensure all vars are known to solver
         user_vars = self.solver_vars(list(self.user_vars))
 
         t = time.time()
-        assert hasattr(
-            self.pkl_solver, "solve"
-        ), f"Pindakaas ClauseDatabase did not have solve:\n{self.pkl_solver}"
-        my_status = self.pkl_solver.solve(user_vars)
+        my_status = self.pkl_solver.solve(user_vars, time_limit=time_limit)
 
         self.cpm_status.runtime = time.time() - t
 
