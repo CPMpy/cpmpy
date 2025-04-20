@@ -58,7 +58,7 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         """Return if solver is installed."""
         # check import without importing
-        return importlib.util.find_spec("spam") is not None
+        return importlib.util.find_spec("pindakaas") is not None
 
     @staticmethod
     def solvernames():
