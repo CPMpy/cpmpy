@@ -58,16 +58,16 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         """Return if solver is installed."""
         # check import without importing
-        spec = importlib.util.find_spec("pindakaas")
-        if spec is None:
-            return False
-        else:
+        try:
             import pindakaas as pkd
 
             CPM_pindakaas.subsolvers = dict(
-                s for s in inspect.getmembers(pkd.solver, inspect.isclass)
+                (name.lower(), solver)
+                for name, solver in inspect.getmembers(pkd.solver, inspect.isclass)
             )
             return True
+        except ModuleNotFoundError:
+            return False
 
     @staticmethod
     def solvernames():
@@ -145,9 +145,8 @@ class CPM_pindakaas(SolverInterface):
 
         t = time.time()
 
-        #
+        # If no subsolver selected, use Cadical as default Cnf solver
         if isinstance(self.pkd_solver, pkd.Cnf):
-            print(self.pkd_solver)
             self.pkd_solver = pkd.solver.Cadical(self.pkd_solver)
 
         my_status = self.pkd_solver.solve(time_limit=time_limit)
