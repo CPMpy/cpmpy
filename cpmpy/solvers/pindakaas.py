@@ -25,11 +25,11 @@ Module details
 ==============
 """
 import importlib
+import inspect
 import time
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
@@ -58,12 +58,22 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         """Return if solver is installed."""
         # check import without importing
-        return importlib.util.find_spec("pindakaas") is not None
+        spec = importlib.util.find_spec("pindakaas")
+        if spec is None:
+            return False
+        else:
+            import pindakaas as pkd
+
+            CPM_pindakaas.subsolvers = dict(
+                s for s in inspect.getmembers(pkd.solver, inspect.isclass)
+            )
+            return True
 
     @staticmethod
     def solvernames():
         """Return solvers supported by `pkd` on your system."""
-        return ["cadical"]
+        if CPM_pindakaas.supported():
+            return list(CPM_pindakaas.subsolvers)
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -85,16 +95,25 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pkd
 
-        self.pkl_solver = pkd.solvers.Cadical()
+        try:
+            # Set subsolver or use Cnf if None
+            self.pkd_solver = (
+                pkd.Cnf()
+                if subsolver is None
+                else CPM_pindakaas.subsolvers.get[subsolver]
+            )
+        except KeyError:
+            raise ValueError(
+                f"Expected subsolver to be `None` or one of {CPM_pindakaas.subsolvers()}, but was {subsolver}"
+            )
 
-        # initialise everything else and post the constraints/objective
-        self.unsatisfiable = False
+        self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         super().__init__(name=name, cpm_model=cpm_model)
 
     @property
     def native_model(self):
         """Returns the solver's underlying native model (for direct solver access)."""
-        self.pkl_solver
+        self.pkd_solver
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -110,7 +129,8 @@ class CPM_pindakaas(SolverInterface):
         # [GUIDELINE] Add link to documentation of all solver parameters
         """
         if self.unsatisfiable:
-            return False
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            return self._solve_return(self.cpm_status)
 
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
@@ -121,8 +141,16 @@ class CPM_pindakaas(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        import pindakaas as pkd
+
         t = time.time()
-        my_status = self.pkl_solver.solve(time_limit=time_limit)
+
+        #
+        if isinstance(self.pkd_solver, pkd.Cnf):
+            print(self.pkd_solver)
+            self.pkd_solver = pkd.solver.Cadical(self.pkd_solver)
+
+        my_status = self.pkd_solver.solve(time_limit=time_limit)
 
         self.cpm_status.runtime = time.time() - t
 
@@ -148,7 +176,7 @@ class CPM_pindakaas(SolverInterface):
             for cpm_var in self.user_vars:
                 if cpm_var.name in self._varmap:
                     lit = self.solver_var(cpm_var)
-                    cpm_var._value = self.pkl_solver.value(lit)
+                    cpm_var._value = self.pkd_solver.value(lit)
                     if cpm_var._value is None:
                         cpm_var._value = True  # dummy value
                 else:
@@ -165,7 +193,7 @@ class CPM_pindakaas(SolverInterface):
         """
         Create solver variable for cpmpy variable or returns from cache if previously created.
 
-        Transforms cpm_var into CNF literal using self.pkl_solver
+        Transforms cpm_var into CNF literal using self.pkd_solver
         (positive or negative integer)
         """
         if isinstance(cpm_var, NegBoolView):  # negative literal
@@ -174,7 +202,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pkl_solver.add_variable()
+                self._varmap[cpm_var.name] = self.pkd_solver.add_variable()
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):
             raise NotSupportedError(
@@ -241,14 +269,14 @@ class CPM_pindakaas(SolverInterface):
                 if isinstance(cpm_expr, BoolVal):
                     # base case: Boolean value
                     if cpm_expr.args[0] is False:
-                        self.pkl_solver.add_clause([])
+                        self.pkd_solver.add_clause([])
 
                 elif isinstance(cpm_expr, _BoolVarImpl):
                     # base case, just var or ~var
-                    self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
+                    self.pkd_solver.add_clause([self.solver_var(cpm_expr)])
 
                 elif cpm_expr.name == "or":
-                    self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
+                    self.pkd_solver.add_clause(self.solver_vars(cpm_expr.args))
 
                 elif cpm_expr.name == "->":
                     a0, a1 = cpm_expr.args
@@ -298,7 +326,7 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
-        self.pkl_solver.add_linear(
+        self.pkd_solver.add_linear(
             self.solver_vars(literals),
             coefficients=coefficients,
             comparator=comparator,
