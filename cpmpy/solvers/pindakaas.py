@@ -30,7 +30,7 @@ import time
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import NegBoolView, _BoolVarImpl
+from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
@@ -85,7 +85,7 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pkd
 
-        self.pkl_solver = pkd.Cadical
+        self.pkl_solver = pkd.solvers.Cadical()
 
         # initialise everything else and post the constraints/objective
         self.unsatisfiable = False
@@ -94,9 +94,7 @@ class CPM_pindakaas(SolverInterface):
     @property
     def native_model(self):
         """Returns the solver's underlying native model (for direct solver access)."""
-        raise NotSupportedError(
-            f"{self.name}: sub-solvers not yet supported, encode-only"
-        )
+        self.pkl_solver
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -117,11 +115,14 @@ class CPM_pindakaas(SolverInterface):
         if assumptions is not None:
             raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+
         # ensure all vars are known to solver
-        user_vars = self.solver_vars(list(self.user_vars))
+        self.solver_vars(list(self.user_vars))
 
         t = time.time()
-        my_status = self.pkl_solver.solve(user_vars, time_limit=time_limit)
+        my_status = self.pkl_solver.solve(time_limit=time_limit)
 
         self.cpm_status.runtime = time.time() - t
 
@@ -175,9 +176,13 @@ class CPM_pindakaas(SolverInterface):
             if cpm_var.name not in self._varmap:
                 self._varmap[cpm_var.name] = self.pkl_solver.add_variable()
             return self._varmap[cpm_var.name]
+        elif isinstance(cpm_var, _IntVarImpl):
+            raise NotSupportedError(
+                f"{self.name}: integer variable {cpm_var} of type {type(cpm_var)} not supported"
+            )
         else:
             raise NotImplementedError(
-                f"{self.name}: variable {cpm_var} of type {type(cpm_var)} not supported"
+                f"{self.name}: unexpected variable {cpm_var} of type {type(cpm_var)} not"
             )
 
     def transform(self, cpm_expr):
@@ -233,17 +238,7 @@ class CPM_pindakaas(SolverInterface):
         # transform and post the constraints
         try:
             for cpm_expr in self.transform(cpm_expr_orig):
-                if cpm_expr.name == "or":
-                    self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
-
-                elif cpm_expr.name == "->":  # BV -> BE only thanks to only_bv_reifies
-                    a0, a1 = cpm_expr.args
-                    self._add_bool_linear(a1, conditions=[~a0])
-
-                elif isinstance(cpm_expr, Comparison):
-                    self._add_bool_linear(cpm_expr)
-
-                elif isinstance(cpm_expr, BoolVal):
+                if isinstance(cpm_expr, BoolVal):
                     # base case: Boolean value
                     if cpm_expr.args[0] is False:
                         self.pkl_solver.add_clause([])
@@ -252,14 +247,19 @@ class CPM_pindakaas(SolverInterface):
                     # base case, just var or ~var
                     self.pkl_solver.add_clause([self.solver_var(cpm_expr)])
 
-                # a direct constraint, pass to solver
-                elif isinstance(cpm_expr, DirectConstraint):
-                    raise NotImplementedError("TODO")
-                    cpm_expr.callSolver(self, self.pysat_solver)
+                elif cpm_expr.name == "or":
+                    self.pkl_solver.add_clause(self.solver_vars(cpm_expr.args))
+
+                elif cpm_expr.name == "->":
+                    a0, a1 = cpm_expr.args
+                    self._add_bool_linear(a1, conditions=[~a0])
+
+                elif isinstance(cpm_expr, Comparison):
+                    self._add_bool_linear(cpm_expr)
 
                 else:
-                    raise NotImplementedError(
-                        f"{self.name}: Non supported constraint {cpm_expr}"
+                    raise NotSupportedError(
+                        f"{self.name}: Unsupported constraint {cpm_expr}"
                     )
         except pkd.Unsatisfiable:
             self.unsatisfiable = True
