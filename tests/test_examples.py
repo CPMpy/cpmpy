@@ -45,14 +45,13 @@ def test_examples(solver, example):
     if solver in ('gurobi', 'minizinc') and any(x in example for x in ["npuzzle", "tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
         return pytest.skip(reason=f"exclude {example} for gurobi, too slow or solver specific")
 
-    original_base_solver = SolverLookup.base_solvers
     try:
         solver_class = SolverLookup.lookup(solver)
         if not solver_class.supported():
             return pytest.skip(reason=f"solver {solver} not supported")
 
         # Overwrite SolverLookup.base_solvers so our solver is the only
-        SolverLookup.base_solvers = lambda: [(solver, solver_class)] + original_base_solver()
+        SolverLookup.base_solvers = lambda: [(solver, solver_class)]
         loader = importlib.machinery.SourceFileLoader("example", example)
         mod = types.ModuleType(loader.name)
         loader.exec_module(mod)  # this runs the scripts
@@ -61,13 +60,11 @@ def test_examples(solver, example):
             raise Exception("Example not supported by ortools, which is currently able to run all models, but raised") from e
         pytest.skip(reason=f"Skipped, solver or its transformation does not support model, raised {type(e).__name__}: {e}")
     except ValueError as e:
-        if hasattr(e, 'message') and e.message.contains("Unknown solver"):
+        if "Unknown solver" in str(e):
             pytest.skip(reason=f"Skipped, example uses specific solver, raised: {e}")
         else:  # still fail for other reasons
             raise e
     except ModuleNotFoundError as e:
         pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
-    finally:
-        SolverLookup.base_solvers = original_base_solver
 
 
