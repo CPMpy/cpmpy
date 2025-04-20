@@ -444,13 +444,10 @@ class NValueExcept(GlobalFunction):
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
-        if lb == ub: # if the domain has only one value then check if it is n or not
-            return [eval_comparison(cmp_op, int(lb != n), cpm_rhs)], []
-
         constraints = []
 
         # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub + 1 - lb))
+        bvars = boolvar(shape=(ub+1-lb,)) # shape is tuple to ensure it is a 1D array
         idx_of_n = n - lb
         if 0 <= idx_of_n < len(bvars):
             count_of_vals = cp.sum(bvars[:idx_of_n]) + cp.sum(bvars[idx_of_n+1:])
