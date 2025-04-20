@@ -18,7 +18,7 @@ jobs:
           pip install ".[test, z3, choco, exact, pysat, pysdd, choco, minizinc]"
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
-          pip install ./submodules/pindakaas/crates/pyndakaas
+          pip install ./submodules/pindakaas/crates/pindakaas
           sudo snap install minizinc --classic
       - name: Test with pytest
         run: |
