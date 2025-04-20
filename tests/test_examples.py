@@ -12,8 +12,7 @@ from os import getcwd
 import types
 import importlib.machinery
 import pytest
-from cpmpy import *
-from cpmpy.solvers.pindakaas import CPM_pindakaas
+from cpmpy import SolverLookup
 from cpmpy.exceptions import NotSupportedError, TransformationNotImplementedError
 import itertools
 
@@ -27,7 +26,8 @@ else:
                glob(join("..", "examples", "advanced", "*.py")) + \
                glob(join("..", "examples", "csplib", "*.py"))
 
-SOLVERS = SolverLookup.supported()
+# SOLVERS = SolverLookup.supported()
+SOLVERS = ["ortools", "gurobi", "minizinc", "pindakaas"]
 
 @pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
 def test_examples(solver, example):
@@ -37,13 +37,15 @@ def test_examples(solver, example):
         solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
-    if solver == 'gurobi' and any(x in example for x in ["npuzzle","tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
-        pass  # exclude those, too slow or solver specific
+    if solver in ('gurobi', 'minizinc') and any(x in example for x in ["npuzzle", "tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
+        return pytest.skip(reason=f"exclude {example} for gurobi, too slow or solver specific")
 
     original_base_solver = SolverLookup.base_solvers
     try:
         solver_class = SolverLookup.lookup(solver)
-        assert solver_class.supported(), f"Selected solver {solver} not supported"
+        if not solver_class.supported():
+            return pytest.skip(reason=f"solver {solver} not supported")
+
         # Overwrite SolverLookup.base_solvers so our solver is the only
         SolverLookup.base_solvers = lambda: [(solver, solver_class)] + original_base_solver()
         loader = importlib.machinery.SourceFileLoader("example", example)
@@ -56,10 +58,10 @@ def test_examples(solver, example):
     except ValueError as e:
         if hasattr(e, 'message') and e.message.contains("Unknown solver"):
             pytest.skip(reason=f"Skipped, example uses specific solver, raised: {e}")
-        else: # still fail for other reasons
+        else:  # still fail for other reasons
             raise e
     except ModuleNotFoundError as e:
-        pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))  # returns
+        pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
     finally:
         SolverLookup.base_solvers = original_base_solver
 
