@@ -160,6 +160,10 @@ class CPM_cpo(SolverInterface):
         # call the solver, with parameters
         if 'LogVerbosity' not in kwargs:
             kwargs['LogVerbosity'] = 'Quiet'
+        
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
         self.cpo_result = self.cpo_model.solve(TimeLimit=time_limit, **kwargs)
 
         # new status, translate runtime

@@ -717,6 +717,20 @@ class TestSupportedSolvers:
         s.solve()
         assert [int(a) for a in v.value()] == [0, 1, 0]
 
+    def test_time_limit(self, solver):
+        if solver == "pysdd": # pysdd does not support time limit
+            return
+        
+        x = cp.boolvar(shape=3)
+        m = cp.Model(x[0] | x[1] | x[2])
+        assert m.solve(solver=solver, time_limit=1)
+
+        try:
+            m.solve(solver=solver, time_limit=-1)
+            assert False
+        except ValueError:
+            pass
+
     def test_installed_solvers_solveAll(self, solver):
         # basic model
         v = cp.boolvar(3)

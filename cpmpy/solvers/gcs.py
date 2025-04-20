@@ -162,6 +162,10 @@ class CPM_gcs(SolverInterface):
             self.proof_name = proof_name
         self.proof_location = proof_location
      
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+                 
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
@@ -209,6 +213,12 @@ class CPM_gcs(SolverInterface):
 
         # Verify proof, if requested
         if verify:
+
+            # set time limit
+            if verify_time_limit is not None:
+                if verify_time_limit <= 0:
+                    raise ValueError("Time limit for verifying must be positive")
+
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
                         veripb_args=veripb_args, display_output=display_verifier_output)
             
