@@ -4,6 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
+from cpmpy.exceptions import TransformationNotImplementedError
 from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
@@ -343,7 +344,7 @@ class TestVarsLhs(unittest.TestCase):
 
         # this is not supported
         cons = a ** b == 3
-        self.assertRaises(NotImplementedError,
+        self.assertRaises(TransformationNotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
 
     def test_mod_triv(self):
@@ -366,7 +367,7 @@ class TestVarsLhs(unittest.TestCase):
         self.assertSetEqual(sols, linsols)
 
         # check special cases of supported sets
-        self.assertRaises(NotImplementedError,
+        self.assertRaises(TransformationNotImplementedError,
                           lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
                           )
 
