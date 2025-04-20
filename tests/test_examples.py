@@ -13,6 +13,9 @@ import types
 import importlib.machinery
 import pytest
 from cpmpy import *
+from cpmpy.solvers.pindakaas import CPM_pindakaas
+from cpmpy.exceptions import NotSupportedError, TransformationNotImplementedError
+import itertools
 
 cwd = getcwd()
 if 'y' in cwd[-2:]:
@@ -24,51 +27,40 @@ else:
                glob(join("..", "examples", "advanced", "*.py")) + \
                glob(join("..", "examples", "csplib", "*.py"))
 
-@pytest.mark.parametrize("example", EXAMPLES)
-def test_examples(example):
+SOLVERS = SolverLookup.supported()
+
+@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
+def test_examples(solver, example):
     """Loads example files and executes with default solver
 
-class TestExamples(unittest.TestCase):
-
     Args:
+        solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
-    # do not run, dependency local to that folder
-    if example.endswith('explain_satisfaction.py'):
-        return
+    if solver == 'gurobi' and any(x in example for x in ["npuzzle","tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
+        pass  # exclude those, too slow or solver specific
 
-    # catch ModuleNotFoundError if example imports stuff that may not be installed
+    original_base_solver = SolverLookup.base_solvers
     try:
+        solver_class = SolverLookup.lookup(solver)
+        assert solver_class.supported(), f"Selected solver {solver} not supported"
+        # Overwrite SolverLookup.base_solvers so our solver is the only
+        SolverLookup.base_solvers = lambda: [(solver, solver_class)] + original_base_solver()
         loader = importlib.machinery.SourceFileLoader("example", example)
         mod = types.ModuleType(loader.name)
         loader.exec_module(mod)  # this runs the scripts
+    except (NotSupportedError, TransformationNotImplementedError) as e:
+        if solver == 'ortools':  # `from` augments exception trace
+            raise Exception("Example not supported by ortools, which is currently able to run all models, but raised") from e
+        pytest.skip(reason=f"Skipped, solver or its transformation does not support model, raised {type(e).__name__}: {e}")
+    except ValueError as e:
+        if hasattr(e, 'message') and e.message.contains("Unknown solver"):
+            pytest.skip(reason=f"Skipped, example uses specific solver, raised: {e}")
+        else: # still fail for other reasons
+            raise e
     except ModuleNotFoundError as e:
-        pytest.skip('skipped, module {} is required'.format(str(e).split()[-1]))  # returns
+        pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))  # returns
+    finally:
+        SolverLookup.base_solvers = original_base_solver
 
-    # run again with gurobi, if installed on system
-    if any(x in example for x in ["npuzzle","tst_likevrp", "ortools_presolve_propagate", 'sudoku_ratrun1.py']):
-        # exclude those, too slow or solver specific
-        return
-    gbi_slv = SolverLookup.lookup("gurobi")
-    if gbi_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
-        f = SolverLookup.base_solvers
-        try:
-            SolverLookup.base_solvers = lambda: [('gurobi', gbi_slv)]+f()
-            loader.exec_module(mod)
-        finally:
-            SolverLookup.base_solvers = f
 
-    # run again with minizinc, if installed on system
-    if example in ['./examples/npuzzle.py', './examples/tsp_likevrp.py', './examples/sudoku_ratrun1.py', './examples/sudoku_chockablock.py']:
-        # except for these too slow ones
-        return
-    mzn_slv = SolverLookup.lookup('minizinc')
-    if mzn_slv.supported():
-        # temporarily brute-force overwrite SolverLookup.base_solvers so our solver is default
-        f = SolverLookup.base_solvers
-        try:
-            SolverLookup.base_solvers = lambda: [('minizinc', mzn_slv)]+f()
-            loader.exec_module(mod)
-        finally:
-            SolverLookup.base_solvers = f
