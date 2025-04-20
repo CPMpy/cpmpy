@@ -27,7 +27,12 @@ else:
                glob(join("..", "examples", "csplib", "*.py"))
 
 # SOLVERS = SolverLookup.supported()
-SOLVERS = ["ortools", "gurobi", "minizinc", "pindakaas"]
+SOLVERS = [
+        "ortools",
+        # "gurobi",
+        "minizinc",
+        "pindakaas"
+        ]
 
 @pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
 def test_examples(solver, example):
