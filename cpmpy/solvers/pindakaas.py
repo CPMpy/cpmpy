@@ -24,12 +24,11 @@ List of classes
 Module details
 ==============
 """
-import importlib
 import inspect
 import time
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.core import BoolVal, Comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
@@ -132,9 +131,6 @@ class CPM_pindakaas(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             return self._solve_return(self.cpm_status)
 
-        if assumptions is not None:
-            raise NotSupportedError(f"{self.name}: assumptions currently unsupported")
-
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
@@ -149,7 +145,11 @@ class CPM_pindakaas(SolverInterface):
         if isinstance(self.pkd_solver, pkd.Cnf):
             self.pkd_solver = pkd.solver.Cadical(self.pkd_solver)
 
-        my_status = self.pkd_solver.solve(time_limit=time_limit)
+        my_status = self.pkd_solver.solve(
+            time_limit=time_limit,
+            assumptions=[] if assumptions is None else self.solver_vars(assumptions),
+            # TODO make assumptions default None
+        )
 
         self.cpm_status.runtime = time.time() - t
 
@@ -178,10 +178,8 @@ class CPM_pindakaas(SolverInterface):
                     cpm_var._value = self.pkd_solver.value(lit)
                     if cpm_var._value is None:
                         cpm_var._value = True  # dummy value
-                else:
-                    cpm_var._value = (
-                        None  # pindakaas does not know this literal and will error
-                    )
+                else:  # if pindakaas does not know the literal, it will error
+                    cpm_var._value = None
         else:  # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
