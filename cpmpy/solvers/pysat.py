@@ -51,10 +51,12 @@
     Module details
     ==============
 """
+from threading import Timer
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import canonical_comparison, only_positive_coefficients
 from ..expressions.utils import is_int, flatlist
@@ -65,6 +67,7 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
+from ..transformations.int2bool import int2bool, int2bool_make
 
 
 class CPM_pysat(SolverInterface):
@@ -161,6 +164,7 @@ class CPM_pysat(SolverInterface):
         # initialise the native solver object
         self.pysat_vpool = IDPool()
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
+        self.ivarmap = dict()  # for the integer to boolean encoders
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
@@ -188,8 +192,13 @@ class CPM_pysat(SolverInterface):
                             Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        # ensure all Boolean vars are known to solver
+        for v in list(self.user_vars):  # can change during iteration
+            if isinstance(v, _BoolVarImpl):
+                self.solver_vars(v)
+            else:  # intvar
+                if not v in self.ivarmap:
+                    self += int2bool_make(self.ivarmap, v)
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -197,13 +206,11 @@ class CPM_pysat(SolverInterface):
             pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
-        import time
         # set time limit
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             
-            from threading import Timer
             t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
             t.start()
             my_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
@@ -237,13 +244,21 @@ class CPM_pysat(SolverInterface):
             sol = frozenset(self.pysat_solver.get_model())  # to speed up lookup
             # fill in variable values
             for cpm_var in self.user_vars:
-                lit = self.solver_var(cpm_var)
-                if lit in sol:
-                    cpm_var._value = True
-                elif -lit in sol:
-                    cpm_var._value = False
-                else: # not specified, dummy val
-                    cpm_var._value = True
+                if isinstance(cpm_var, _BoolVarImpl):
+                    lit = self.solver_var(cpm_var)
+                    if lit in sol:
+                        cpm_var._value = True
+                    else:  # -lit in sol (=False) or not specified (=False)
+                        cpm_var._value = False
+                elif isinstance(cpm_var, _IntVarImpl):
+                    assert cpm_var.name in self.ivarmap, "Integer variable %s not found in ivarenc" % cpm_var.name
+                    varenc = self.ivarmap[cpm_var.name]
+                    lits = self.solver_vars(varenc.vars())
+                    # default value=False
+                    vals = [lit in sol for lit in lits]
+                    cpm_var._value = varenc.decode(vals)
+                else:
+                    raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -302,6 +317,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}))  # the core of the MIP-linearization
+        cpm_cons = int2bool(cpm_cons, ivarmap=self.ivarmap)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
