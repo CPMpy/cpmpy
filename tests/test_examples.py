@@ -9,8 +9,9 @@ Will only run solver tests on solvers that are installed
 from glob import glob
 from os.path import join
 from os import getcwd
-import types
-import importlib.machinery
+import sys
+
+import runpy
 import pytest
 from cpmpy import SolverLookup
 from cpmpy.exceptions import NotSupportedError, TransformationNotImplementedError
@@ -29,12 +30,13 @@ else:
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
         "ortools",
-        # "gurobi",
+        "gurobi",
         "minizinc",
-        "pindakaas"
+        "pindakaas",
         ]
 
 @pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
+@pytest.mark.timeout(60)  # some examples take long, use 10 second timeout
 def test_examples(solver, example):
     """Loads example files and executes with default solver
 
@@ -46,15 +48,16 @@ def test_examples(solver, example):
         return pytest.skip(reason=f"exclude {example} for gurobi, too slow or solver specific")
 
     try:
+        base_solvers = SolverLookup.base_solvers
         solver_class = SolverLookup.lookup(solver)
         if not solver_class.supported():
+            # check this here, as unsupported solvers can fail the example for various reasons
             return pytest.skip(reason=f"solver {solver} not supported")
 
-        # Overwrite SolverLookup.base_solvers so our solver is the only
-        SolverLookup.base_solvers = lambda: [(solver, solver_class)]
-        loader = importlib.machinery.SourceFileLoader("example", example)
-        mod = types.ModuleType(loader.name)
-        loader.exec_module(mod)  # this runs the scripts
+        # Overwrite SolverLookup.base_solvers to set the target solver first, making it the default
+        SolverLookup.base_solvers = lambda: sorted(base_solvers(), key=lambda s: s[0] == solver, reverse=True)
+        sys.argv = [example]  # avoid pytest arguments being passed the executed module
+        runpy.run_path(example, run_name="__main__")  # many examples won't do anything `__name__ != "__main__"`
     except (NotSupportedError, TransformationNotImplementedError) as e:
         if solver == 'ortools':  # `from` augments exception trace
             raise Exception("Example not supported by ortools, which is currently able to run all models, but raised") from e
@@ -66,5 +69,6 @@ def test_examples(solver, example):
             raise e
     except ModuleNotFoundError as e:
         pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
-
+    finally:
+        SolverLookup.base_solvers = base_solvers
 
