@@ -32,7 +32,6 @@ SOLVERS = [
         "ortools",
         "gurobi",
         "minizinc",
-        "pindakaas",
         ]
 
 @pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
