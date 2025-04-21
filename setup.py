@@ -52,7 +52,7 @@ setup(
         # Tools
         # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
         # Other
-        "test": ["pytest"],
+        "test": ["pytest", "pytest-timeout"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
     },
     classifiers=[
