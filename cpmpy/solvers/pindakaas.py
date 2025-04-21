@@ -233,7 +233,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
         cpm_cons = linearize_constraint(
-            cpm_cons, supported=frozenset({"sum", "wsum", "and", "or", "bv"})
+            cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"})
         )
         return cpm_cons
 
@@ -265,48 +265,36 @@ class CPM_pindakaas(SolverInterface):
         # transform and post the constraints
         try:
             for cpm_expr in self.transform(cpm_expr_orig):
-                if isinstance(cpm_expr, BoolVal):
-                    # base case: Boolean value
-                    if cpm_expr.args[0] is False:
-                        self.pkd_solver.add_clause([])
-
-                elif isinstance(cpm_expr, _BoolVarImpl):
-                    # base case, just var or ~var
-                    self.pkd_solver.add_clause([self.solver_var(cpm_expr)])
-
-                elif cpm_expr.name == "or":
-                    self.pkd_solver.add_clause(self.solver_vars(cpm_expr.args))
-
-                elif cpm_expr.name == "->":
-                    a0, a1 = cpm_expr.args
-                    self._add_bool_linear(a1, conditions=[~a0])
-
-                elif isinstance(cpm_expr, Comparison):
-                    self._add_bool_linear(cpm_expr)
-
-                else:
-                    raise NotSupportedError(
-                        f"{self.name}: Unsupported constraint {cpm_expr}"
-                    )
+                self._add(cpm_expr)
         except pkd.Unsatisfiable:
             self.unsatisfiable = True
 
         return self
 
-    """ Unpack implied literal, clause, sum, or weighted sum """
-
-    def _add_bool_linear(self, cpm_expr, conditions=[]):
+    def _add(self, cpm_expr, conditions=[]):
         import pindakaas as pkd
 
-        literals = None
-        coefficients = None
-        comparator = None
-        k = None
-        if isinstance(cpm_expr, _BoolVarImpl):
-            literals = [cpm_expr]
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "or":
-            literals = cpm_expr.args
-        elif isinstance(cpm_expr, Comparison):
+        if isinstance(cpm_expr, BoolVal):
+            # base case: Boolean value
+            if cpm_expr.args[0] is False:
+                self.pkd_solver.add_clause(conditions)
+
+        elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
+            self.pkd_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+
+        elif cpm_expr.name == "or":  # (implied) clause
+            self.pkd_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+
+        elif cpm_expr.name == "->":  # implication
+            a0, a1 = cpm_expr.args
+            self._add(a1, conditions=conditions + [~self.solver_var(a0)])
+
+        elif isinstance(cpm_expr, Comparison):  # Bool linear
+            literals = None
+            coefficients = None
+            comparator = None
+            k = None
+
             lhs, k = cpm_expr.args
             if lhs.name == "sum":
                 literals = lhs.args
@@ -325,10 +313,12 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
-        self.pkd_solver.add_linear(
-            self.solver_vars(literals),
-            coefficients=coefficients,
-            comparator=comparator,
-            k=k,
-            conditions=self.solver_vars(conditions),
-        )
+            self.pkd_solver.add_linear(
+                self.solver_vars(literals),
+                coefficients=coefficients,
+                comparator=comparator,
+                k=k,
+                conditions=conditions,
+            )
+        else:
+            raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
