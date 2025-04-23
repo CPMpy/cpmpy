@@ -395,7 +395,7 @@ class NValue(GlobalFunction):
         constraints = []
 
         # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub+1-lb))
+        bvars = boolvar(shape=(ub+1-lb,))
 
         args = cpm_array(self.args)
         # bvar is true if the value is taken by any variable
