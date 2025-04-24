@@ -13,7 +13,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
-from cpmpy.tools.xcsp3 import xcsp3_globals
+from cpmpy.tools.xcsp3 import xcsp3_globals as xglobals
 from cpmpy import cpm_array
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
