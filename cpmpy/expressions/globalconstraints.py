@@ -420,11 +420,13 @@ class ShortTable(GlobalConstraint):
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if not all(is_int(x) or x == STAR for row in table for x in row):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        if isinstance(table, np.ndarray): # Ensure it is a list
+            raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
+        if isinstance(table, np.ndarray): # Ensure table is a list
             table = table.tolist()
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}: "
+                            f"{table}")
         super().__init__("short_table", [array, table])
 
     def decompose(self):
