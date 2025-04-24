@@ -501,6 +501,8 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
+        if not all(is_int(x) for x in arr):
+            raise TypeError(f"The second argument of InDomain should contain only integers")
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
