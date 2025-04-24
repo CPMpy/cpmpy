@@ -770,6 +770,8 @@ class Increasing(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("Increasing expects a list, but got", args)
         super().__init__("increasing", flatlist(args))
 
     def decompose(self):
