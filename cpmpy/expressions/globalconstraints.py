@@ -794,6 +794,8 @@ class Decreasing(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("Decreasing expects a list, but got", args)
         super().__init__("decreasing", flatlist(args))
 
     def decompose(self):
@@ -816,6 +818,8 @@ class IncreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("IncreasingStrict expects a list, but got", args)
         super().__init__("strictly_increasing", flatlist(args))
 
     def decompose(self):
@@ -838,6 +842,8 @@ class DecreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("DecreasingStrict expects a list, but got", args)
         super().__init__("strictly_decreasing", flatlist(args))
 
     def decompose(self):
