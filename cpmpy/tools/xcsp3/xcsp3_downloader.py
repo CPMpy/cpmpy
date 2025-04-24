@@ -2,6 +2,7 @@
 Utilities for downloading instances for the XCSP3 competition.
 """
 
+import lzma
 import os
 import pathlib
 import zipfile
@@ -75,6 +76,8 @@ def install_xcsp3_instances_23():
     with zipfile.ZipFile(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, XCSP3_INSTANCES_DESTINATION_FILE), 'r') as zip_ref:
         zip_ref.extractall(XCSP3_INSTANCES_DESTINATION_PATH)
 
+    os.rename(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, "XCSP23_V2"), os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, "instancesXCSP23"))
+
     pathlib.Path(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, XCSP3_INSTANCES_DESTINATION_FILE)).unlink()
 
     def convert(file):
@@ -87,7 +90,7 @@ def install_xcsp3_instances_23():
 
     # Example usage
     target = ".lzma"
-    for root, dir, files in os.walk(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, "instancesXCSP22")):
+    for root, dir, files in os.walk(os.path.join(XCSP3_INSTANCES_DESTINATION_PATH, "instancesXCSP23")):
         print(f"Extracting {root}")
         for file in tqdm.tqdm(files):
             if target in file:
