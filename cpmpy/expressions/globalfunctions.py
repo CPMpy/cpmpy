@@ -395,7 +395,7 @@ class NValue(GlobalFunction):
         constraints = []
 
         # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub+1-lb))
+        bvars = boolvar(shape=(ub+1-lb,)) # shape is tuple to ensure it is a 1D array
 
         args = cpm_array(self.args)
         # bvar is true if the value is taken by any variable
@@ -447,7 +447,7 @@ class NValueExcept(GlobalFunction):
         constraints = []
 
         # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub + 1 - lb))
+        bvars = boolvar(shape=(ub+1-lb,)) # shape is tuple to ensure it is a 1D array
         idx_of_n = n - lb
         if 0 <= idx_of_n < len(bvars):
             count_of_vals = cp.sum(bvars[:idx_of_n]) + cp.sum(bvars[idx_of_n+1:])
