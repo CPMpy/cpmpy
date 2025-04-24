@@ -511,6 +511,8 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
+        if not isinstance(expr, Expression):
+            raise TypeError(f"The first argument of InDomain should be an expression")
         if not all(is_int(x) for x in arr):
             raise TypeError(f"The second argument of InDomain should contain only integers")
         super().__init__("InDomain", [expr, arr])
