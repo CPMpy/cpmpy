@@ -670,7 +670,7 @@ class Precedence(GlobalConstraint):
     """
     def __init__(self, vars, precedence):
         if not is_any_list(vars):
-            raise TypeError("Precedence expects a list of variables, but got", vars)
+            raise TypeError("Precedence expects a list as first argument, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
         super().__init__("precedence", [cpm_array(vars), precedence])
