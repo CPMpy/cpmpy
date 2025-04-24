@@ -450,8 +450,13 @@ class NegativeTable(GlobalConstraint):
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+            raise TypeError(f"The first argument of NegativeTable constraint should only contain variables/expressions: "
                             f"{array}")
+        if isinstance(table, np.ndarray): # Ensure table is a list
+            table = table.tolist()
+        if not all(is_int(x) for row in table for x in row):
+            raise TypeError(f"the second argument of NegativeTable constraint should only contain integers: "
+                            f"{table}")
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
