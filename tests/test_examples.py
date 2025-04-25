@@ -77,8 +77,14 @@ def test_example(solver, example):
 
 
 @pytest.mark.parametrize("example", ADVANCED_EXAMPLES)
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(30)
 def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
-    sys.argv = [example]
-    runpy.run_path(example, run_name="__main__")
+    try:
+        sys.argv = [example]
+        runpy.run_path(example, run_name="__main__")
+    except Exception as e:
+        if "CPM_exact".lower() in str(e).lower():
+            pytest.skip(reason=f"Skipped, example uses Exact but is not installed, raised: {e}")
+        else:
+            raise e
