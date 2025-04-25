@@ -19,13 +19,8 @@ import itertools
 
 prefix = '.' if 'y' in getcwd()[-2:] else '..'
 
-TO_SKIP = [
-    "prob001_convert_data.py"
-]
-
 EXAMPLES = glob(join(prefix, "examples", "*.py")) + \
            glob(join(prefix, "examples", "csplib", "*.py"))
-EXAMPLES = [e for e in EXAMPLES if not any(x in e for x in TO_SKIP)]
 
 ADVANCED_EXAMPLES = glob(join(prefix, "examples", "advanced", "*.py"))
 
@@ -36,7 +31,9 @@ SOLVERS = [
     "minizinc",
 ]
 
-@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))  # run the test for each combination of solver and example
+
+# run the test for each combination of solver and example
+@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
 @pytest.mark.timeout(60)  # 60-second timeout for each test
 def test_example(solver, example):
     """Loads the example file and executes its __main__ block with the given solver being set as default.
@@ -45,7 +42,10 @@ def test_example(solver, example):
         solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
-    if solver in ('gurobi', 'minizinc') and any(x in example for x in ["npuzzle.py", "tst_likevrp.py", 'sudoku_', 'pareto_optimal.py', 'prob009_perfect_squares.py', 'blocks_world.py', 'flexible_jobshop.py']):
+    if solver in ('gurobi', 'minizinc') and any(x in example for x in
+                                                ["npuzzle.py", "tst_likevrp.py", 'sudoku_', 'pareto_optimal.py',
+                                                 'prob009_perfect_squares.py', 'blocks_world.py',
+                                                 'flexible_jobshop.py']):
         return pytest.skip(reason=f"exclude {example} for {solver}, too slow or solver-specific")
 
     base_solvers = SolverLookup.base_solvers
