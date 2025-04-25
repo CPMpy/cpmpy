@@ -248,16 +248,28 @@ class IntVarEncDirect(IntVarEnc):
         so only one of the Boolean variables can be True
         """
         return [cp.sum(self.bvars) == 1]
+
+    def eq(self, d):
+        """
+        Return a literal whether x==d
+        """
+        try:
+            return self.bvars[d - self.offset]
+        except IndexError:
+            return cp.BoolVal(False)
     
     def encode_comparison(self, op, rhs):
         """
         Encode a comparison over the variable: self <op> rhs
         """
+
         if op == "==":
-            # one yes, hence also rest no
-            return [b if i==(rhs-self.offset) else ~b for i,b in enumerate(self.bvars)]
+            # one yes, hence also rest no, if rhs is not in domain will set all to no
+            # return [b if i==(rhs-self.offset) else ~b for i,b in enumerate(self.bvars)]
+            # return [self.eq(rhs) for i, b in enumerate(self.bvars)]
+            return [self.eq(rhs)]
         elif op == "!=":
-            return [~self.bvars[rhs - self.offset]]
+            return [~self.eq(rhs)]
         elif op == "<":
             # all higher-or-equal values are False
             return list(~self.bvars[rhs-self.offset:])
