@@ -67,7 +67,7 @@ if __name__ == "__main__":
     model, (x, diffs) = all_interval(args.length)
     found_n = model.solveAll(solution_limit=args.solution_limit,
                              display=lambda: print_solution(x, diffs))
-    if found_n == 0:
-        print(f"Fund {found_n} solutions")
+    if found_n > 0:
+        print(f"Found {found_n} solutions")
     else:
         raise ValueError("Problem is unsatisfiable")
