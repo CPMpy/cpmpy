@@ -40,6 +40,7 @@ def int2bool(cpm_lst: List[Expression], ivarmap=None, encoding="auto"):
             is_halfreif = True
             b = expr.args[0]  # PAY ATTENTION: we will overwrite expr by the rhs of the ->
             expr = expr.args[1]
+            cpm_out.append(b == b) # ensure b is in the model
         
         # now replace intvars with their encoding
         if isinstance(expr, Comparison):

@@ -375,7 +375,9 @@ class CPM_pysat(SolverInterface):
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
         elif isinstance(cpm_expr, Comparison): # root-level comparisons have been linearized
-            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
+            if cpm_expr.name == "==" and isinstance(cpm_expr.args[0], _BoolVarImpl) and isinstance(cpm_expr.args[1], _BoolVarImpl) and cpm_expr.args[0] == cpm_expr.args[1]:
+                continue  # `p == p` (added to keep `p` in the model)
+            elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
                 self.pysat_solver.append_formula(self._pysat_cardinality(cpm_expr))
             elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
                 self.pysat_solver.append_formula(self._pysat_pseudoboolean(cpm_expr))
