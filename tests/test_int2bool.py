@@ -50,16 +50,8 @@ class TestTransInt2Bool:
     @pytest.mark.parametrize("constraint", CONSTRAINTS, ids=str)
     def test_transforms(self, constraint, setup):
         flat = int2bool(flatten_constraint(constraint))
-        orig = constraint
-
-        flat_m = cp.Model(flat)
-        orig_m = cp.Model(orig)
-
+        num_sols_cons = cp.Model(constraint).solveAll(solver="ortools")  # trusted model
+        num_sols_flat = cp.Model(flat).solveAll(solver="pysat")
         assert (
-            flat_m.solve() == orig_m.solve()
-        ), f"{constraint} is not equisatisfiable with {flat}"
-        num_sols_orig = orig_m.solveAll()
-        num_sols_flat = flat_m.solveAll()
-        assert (
-            num_sols_flat == num_sols_orig
-        ), f"{constraint} has different number of sols with {flat}"
+            num_sols_cons == num_sols_flat
+        ), f"Constraint and its transformations have different number of solutions, meaning:\n{constraint} != {flat}"
