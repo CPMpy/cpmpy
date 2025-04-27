@@ -67,7 +67,7 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, int2bool_encode
+from ..transformations.int2bool import int2bool, _encode_int_var
 
 
 class CPM_pysat(SolverInterface):
@@ -198,7 +198,7 @@ class CPM_pysat(SolverInterface):
                 self.solver_vars(v)
             elif isinstance(v, _IntVarImpl):  # intvar
                 if v.name not in self.ivarmap:
-                    enc, cons = int2bool_encode(self.ivarmap, v)
+                    enc, cons = _encode_int_var(self.ivarmap, v)
                     self += cons
                     self.solver_vars(enc.vars())
             else:
@@ -333,7 +333,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}))  # the core of the MIP-linearization
-        cpm_cons = int2bool(cpm_cons, ivarmap=self.ivarmap)
+        cpm_cons = int2bool(cpm_cons, self.ivarmap)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 

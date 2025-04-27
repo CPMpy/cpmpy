@@ -34,9 +34,9 @@ CONSTRAINTS = [
 ] + [
     con if antecedent is True else antecedent.implies(con)
     for cmp in (
-        "==",
         ">=",
         "<=",
+        "==",
         # "!=", ">", "<", # not produced by linearize
     )
     for con in (
