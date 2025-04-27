@@ -88,6 +88,23 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(list(rev.value()), expected_inverse)
 
 
+    def test_ortools_solve_empty(self):
+        user_vars = []
+        sols = []
+        cp.Model().solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
+        assert len(sols) == 1, "An empty CSP (with 0 user variables) should have one solution (with an empty assignment)"
+        assert sols == [tuple()]
+
+    def test_ortools_solve_all(self):
+        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
+        p = cp.boolvar(name="p")
+        user_vars = [x, y, z, p]
+        sols = []
+        cp.Model(p.implies(
+            2 * x + 3 * y + 5 * z == 12
+        )).solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
+        assert len(sols) == len(set(sols)), "There should be no duplicate solutions"
+
     def test_ortools_direct_solver(self):
         """
         Test direct solver access.
