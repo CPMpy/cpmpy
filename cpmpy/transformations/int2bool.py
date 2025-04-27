@@ -4,7 +4,7 @@ from typing import List
 import cpmpy as cp
 from abc import ABC, abstractmethod
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl
-from ..expressions.core import Comparison, Operator
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..transformations.get_variables import get_variables
 from ..expressions.core import Expression
 
@@ -14,7 +14,8 @@ def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto"):
     assert encoding in (
         "auto",
         "direct",
-    ), "Only auto or direct encoding is supported"
+        "order",
+    ), "Only auto, direct, and order encoding are supported"
 
     cpm_out = []
     for expr in cpm_lst:
@@ -36,9 +37,7 @@ def _encode_expr(ivarmap, expr, encoding):
     if expr.name == "->":
         # Encode implication recursively
         p, consequent = expr.args
-        constraints, domain_constraints = _encode_expr(
-            ivarmap, consequent, encoding
-        )
+        constraints, domain_constraints = _encode_expr(ivarmap, consequent, encoding)
         return (
             [p.implies(constraint) for constraint in constraints],
             domain_constraints + [p == p],  # keep `p` in model
@@ -53,17 +52,15 @@ def _encode_expr(ivarmap, expr, encoding):
                     ivarmap, lhs.args[0], expr.name, rhs, encoding
                 )
             else:
-                return _encode_linear(
-                    ivarmap, lhs.args, expr.name, rhs, encoding=encoding
-                )
+                return _encode_linear(ivarmap, lhs.args, expr.name, rhs, encoding)
         elif lhs.name == "wsum":
             return _encode_linear(
                 ivarmap,
                 lhs.args[1],
                 expr.name,
                 rhs,
+                encoding,
                 weights=lhs.args[0],
-                encoding=encoding,
             )
         else:
             raise NotImplementedError(
@@ -79,19 +76,26 @@ def _encode_expr(ivarmap, expr, encoding):
     return (constraints, domain_constraints)
 
 
-def _encode_int_var(ivarmap, x, encoding="auto"):
+def _encode_int_var(ivarmap, x, encoding):
     """Return encoding of `x` and its domain constraints (if newly encoded)."""
-    if isinstance(x, _BoolVarImpl):
+    if isinstance(x, BoolVal):
+        return x, []
+    elif isinstance(x, _BoolVarImpl):
         return x, []
     elif x.name in ivarmap:
-        return ivarmap[x.name][0], []
+        return ivarmap[x.name], []
     else:
-        x_enc = IntVarEncDirect(x)
-        ivarmap[x.name] = (x_enc, x)
+        if encoding == "direct":
+            x_enc = IntVarEncDirect(x)
+        elif encoding == "order":
+            x_enc = IntVarEncOrder(x)
+        else:
+            raise NotImplementedError(encoding)
+        ivarmap[x.name] = x_enc
         return (x_enc, x_enc.encode_domain_constraint())
 
 
-def _encode_linear(ivarmap, xs, cmp, rhs, weights=None, encoding="auto"):
+def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None):
     """
     Convert a weighted sum to a pseudo-boolean constraint.
 
@@ -110,11 +114,12 @@ def _encode_linear(ivarmap, xs, cmp, rhs, weights=None, encoding="auto"):
             pb_weights += [w]
             pb_literals += [x]
         else:
-            x_enc, x_cons = _encode_int_var(ivarmap, x, encoding)
+            x_enc, x_cons = _encode_int_var(ivarmap, x, _decide_encoding(x, cmp))
             domain_constraints += x_cons
-            ws, xs = x_enc.encode_term(w)
+            ws, xs, k = x_enc.encode_term(w)
             pb_weights += ws
             pb_literals += list(xs)  # convert from numpy array TODO better way?
+            rhs -= k
 
     # Revert back to sum if we happen to have constructed one
     if all(w == 1 for w in pb_weights):
@@ -125,17 +130,27 @@ def _encode_linear(ivarmap, xs, cmp, rhs, weights=None, encoding="auto"):
     return [comparison], domain_constraints
 
 
-def _encode_comparison(ivarmap, lhs, op, rhs, encoding="auto"):
-    enc, domain_constraints = _encode_int_var(ivarmap, lhs, encoding)
-    return enc.encode_comparison(op, rhs), domain_constraints
+def _encode_comparison(ivarmap, lhs, cmp, rhs, encoding):
+    enc, domain_constraints = _encode_int_var(ivarmap, lhs, _decide_encoding(lhs, cmp))
+    return enc.encode_comparison(cmp, rhs), domain_constraints
+
+
+def _decide_encoding(x, cmp=None):
+    """Decide encoding of `x` via on simple heuristic based on linear comparator and domain size."""
+    if cmp in (None, "==", "!="):
+        return "direct"
+    else:  # inequality
+        return "order"
 
 
 class IntVarEnc(ABC):
     """Abstract base class for integer variable encodings."""
 
-    def __init__(self, varname):
+    def __init__(self, x):
         """Create encoding of integer variable `v`."""
-        self.varname = varname
+        if _dom_size(x) == 0:
+            raise ValueError("empty domain is unsat")
+        self._x = x
 
     @abstractmethod
     def vars(self):
@@ -192,18 +207,16 @@ class IntVarEncDirect(IntVarEnc):
     Uses a Boolean 'equality' variable for each value in the domain.
     """
 
-    def __init__(self, v):
+    def __init__(self, x):
         """Create direct encoding of integer variable `v`."""
-        super().__init__(v.name)
-        self.offset = v.lb
-        n = v.ub + 1 - v.lb  # number of Boolean variables
-        if n == 0:
-            assert False, "Unsat"
-        elif n == 1:
-            self.bvars = cp.cpm_array([cp.boolvar(name=f"EncDir({v.name})")])
-            # self.bvars = cp.cpm_array([BoolVal(True)])
+        super().__init__(x)
+        dom_size = _dom_size(self._x)
+        if dom_size == 0:
+            assert False, "Should be handled in super"
+        elif dom_size == 1:
+            self.bvars = cp.cpm_array([cp.boolvar(name=f"EncDir({x.name})")])
         else:
-            self.bvars = cp.boolvar(shape=n, name=f"EncDir({v.name})")
+            self.bvars = cp.boolvar(shape=dom_size, name=f"EncDir({x.name})")
 
     def vars(self):
         """Return encoding variables."""
@@ -211,11 +224,11 @@ class IntVarEncDirect(IntVarEnc):
 
     def decode(self):
         """Decode integer assignment from its encoding's assignment."""
-        for i, v in enumerate([var.value() for var in self.vars()]):
-            if v is None:
+        for d, x_eq_d in enumerate(self.vars(), start=self._x.lb):
+            if x_eq_d.value() is None:
                 return None
-            elif v is True:
-                return self.offset + i
+            elif x_eq_d.value() is True:
+                return d
         raise ValueError(f"The direct encoding was assigned all-false: {self.vars()}")
 
     def encode_domain_constraint(self):
@@ -229,40 +242,116 @@ class IntVarEncDirect(IntVarEnc):
 
     def eq(self, d):
         """Return a literal whether x==d."""
-        i = d - self.offset
+        i = d - self._x.lb
         if i in range(len(self.bvars)):
             return self.bvars[i]
         else:  # don't use try IndexError since negative values wrap
-            return cp.BoolVal(False)
+            return BoolVal(False)
 
     def encode_comparison(self, op, rhs):
         """Encode a comparison over the variable: self <op> rhs."""
         if op == "==":
             # one yes, hence also rest no, if rhs is not in domain will set all to no
-            # return [b if i==(rhs-self.offset) else ~b for i,b in enumerate(self.bvars)]
-            # return [self.eq(rhs) for i, b in enumerate(self.bvars)]
             return [self.eq(rhs)]
         elif op == "!=":
             return [~self.eq(rhs)]
         elif op == "<":
             # all higher-or-equal values are False
-            return list(~self.bvars[rhs - self.offset :])
+            return list(~self.bvars[rhs - self._x.lb :])
         elif op == "<=":
             # all higher values are False
-            return list(~self.bvars[rhs - self.offset + 1 :])
+            return list(~self.bvars[rhs - self._x.lb + 1 :])
         elif op == ">":
             # all lower values are False
-            return list(~self.bvars[: rhs - self.offset + 1])
+            return list(~self.bvars[: rhs - self._x.lb + 1])
         elif op == ">=":
             # all lower-or-equal values are False
-            return list(~self.bvars[: rhs - self.offset])
+            return list(~self.bvars[: rhs - self._x.lb])
         else:
             raise NotImplementedError(f"int2bool: comparison with op {op} unknown")
 
     def encode_term(self, w=1):
         """Rewrite term w*self to terms [w1, w2 ,...]*[bv1, bv2, ...]."""
-        return [w * (self.offset + i) for i in range(len(self.bvars))], self.bvars
+        return [w * (self._x.lb + i) for i in range(len(self.bvars))], self.bvars, 0
 
 
-# TODO: class IntVarEncOrder(IntVarEnc)
+class IntVarEncOrder(IntVarEnc):
+    """
+    Order (or thermometer) encoding of an integer variable.
+
+    Uses a Boolean 'inequality' variable for each value in the domain.
+    """
+
+    def __init__(self, x):
+        """Create order encoding of integer variable `x`."""
+        super().__init__(x)
+        dom_size = _dom_size(self._x)
+        if dom_size == 0:
+            assert False, "Should be handled in super"
+        elif dom_size == 1:
+            self.bvars = cp.cpm_array([])
+        elif dom_size == 2:
+            self.bvars = cp.cpm_array([cp.boolvar(name=f"EncOrd({x.name})")])
+        else:
+            # the order encoding requires one less variable than the direct encoding
+            self.bvars = cp.boolvar(shape=dom_size - 1, name=f"EncOrd({x.name})")
+
+    def vars(self):
+        """Return encoding variables."""
+        return self.bvars
+
+    def decode(self):
+        """Decode integer assignment from its encoding's assignment."""
+        d = self._x.lb
+        for x_geq_d in self.vars():
+            if x_geq_d.value() is None:
+                return None
+            elif x_geq_d.value() is True:
+                d += 1
+            elif x_geq_d.value() is False:
+                return d
+        return d  # all true
+
+    def encode_domain_constraint(self):
+        """Return order encoding domain constraint (i.e. encoding variables are sorted in descending order)."""
+        if len(self.vars()) <= 1:
+            return []
+        return [curr.implies(prev) for prev, curr in zip(self.vars(), self.vars()[1:])]
+
+    def geq(self, d):
+        """Return a literal whether x>=d."""
+        if d <= self._x.lb:
+            return BoolVal(True)  # d < lb
+        elif d > self._x.ub:
+            return BoolVal(False)  # d > ub
+        else:
+            return self.bvars[d - self._x.lb - 1]
+
+    def encode_comparison(self, op, rhs):
+        """Encode a comparison over the variable: self <op> rhs."""
+        if op == "==":  # x>=d and x<d+1
+            return [self.geq(rhs), ~self.geq(rhs + 1)]
+        elif op == "!=":  # x<d or x>=d+1
+            return [(~self.geq(rhs)) or self.geq(rhs + 1)]
+        elif op == ">=":
+            return [self.geq(rhs)]
+        elif op == ">":
+            return [self.geq(rhs + 1)]
+        elif op == "<=":
+            return [~self.geq(rhs + 1)]
+        elif op == "<":
+            return [~self.geq(rhs)]
+        else:
+            raise NotImplementedError(f"int2bool: comparison with op {op} unknown")
+
+    def encode_term(self, w=1):
+        """Rewrite term w*self to terms [w1, w2 ,...]*[bv1, bv2, ...]."""
+        return [w for _ in self.bvars], self.bvars, w * self._x.lb
+
+
+def _dom_size(x):
+    """Return domain size of variable `x`."""
+    return x.ub + 1 - x.lb
+
+
 # TODO: class IntVarEncLog(IntVarEnc)

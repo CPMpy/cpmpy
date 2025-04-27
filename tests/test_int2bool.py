@@ -8,12 +8,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.model import Model
 
 from cpmpy.transformations.int2bool import int2bool
-from cpmpy.expressions.variables import (
-    _IntVarImpl,
-    _BoolVarImpl,
-    intvar,
-    boolvar,
-)  # to reset counters
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl, intvar, boolvar
 
 
 x = intvar(0, 2, name="x")
@@ -48,9 +43,30 @@ CONSTRAINTS = [
         # Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 11), TODO or tools gives too moany sols
         # Comparison(cmp, Operator("wsum", [[2, 3, 5, 4], [x, y, z, c]]), 16),  # TODO same
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),
+        Comparison(
+            cmp,
+            Operator(
+                "wsum",
+                [
+                    [2, 3, 4],
+                    [
+                        intvar(-2, 2, name="x"),
+                        intvar(2, 4, name="y"),
+                        ~boolvar(name="b"),
+                    ],
+                ],
+            ),
+            15,
+        ),  # non-zero lbs
         Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),
     )
     for antecedent in (True, p, ~p)
+]
+
+
+ENCODINGS = [
+    "direct",
+    "order",
 ]
 
 
@@ -64,16 +80,21 @@ def setup():
 class TestTransInt2Bool:
 
     import importlib
+    import itertools
 
-    @pytest.mark.parametrize("constraint", CONSTRAINTS, ids=str)
+    @pytest.mark.parametrize(
+        ("constraint", "encoding"), itertools.product(CONSTRAINTS, ENCODINGS), ids=str
+    )
     @pytest.mark.skipif(
         not (CPM_pysat.supported() and importlib.util.find_spec("pypblib")),
         reason="PySAT+pblib not supported",
     )
-    def test_transforms(self, constraint, setup):
+    def test_transforms(self, constraint, encoding, setup):
         user_vars = set(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap)
+        flat = int2bool(
+            flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding
+        )
 
         cons_sols = []
         flat_sols = []
@@ -83,9 +104,9 @@ class TestTransInt2Bool:
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
-        pysat = CPM_pysat()
+        pysat = CPM_pysat(encoding=encoding)
         for c in flat:
-            pysat.add(flat)
+            pysat.add(c)
 
         # pysat.user_vars = set(get_variables(flat))
         pysat.ivarmap = ivarmap

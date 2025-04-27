@@ -67,7 +67,7 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, _encode_int_var
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 
 
 class CPM_pysat(SolverInterface):
@@ -133,7 +133,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, encoding="auto"):
         """
         Constructor of the native solver object
 
@@ -145,6 +145,7 @@ class CPM_pysat(SolverInterface):
         Arguments:
             cpm_model (Model(), a CPMpy Model(), optional):
             subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
+            encoding used to represent integer variables with Boolean vairalbes
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
@@ -165,6 +166,7 @@ class CPM_pysat(SolverInterface):
         self.pysat_vpool = IDPool()
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
         self.ivarmap = dict()  # for the integer to boolean encoders
+        self.encoding = encoding
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
@@ -193,24 +195,24 @@ class CPM_pysat(SolverInterface):
         """
 
         # ensure all Boolean vars are known to solver
-        for v in list(self.user_vars):  # can change during iteration
-            if isinstance(v, _BoolVarImpl):
-                self.solver_vars(v)
-            elif isinstance(v, _IntVarImpl):  # intvar
-                if v.name not in self.ivarmap:
-                    enc, cons = _encode_int_var(self.ivarmap, v)
+        for x in list(self.user_vars):  # can change during iteration
+            if isinstance(x, _BoolVarImpl):
+                self.solver_vars(x)
+            elif isinstance(x, _IntVarImpl):  # intvar
+                if x.name not in self.ivarmap:
+                    enc, cons = _encode_int_var(self.ivarmap, x, _decide_encoding(x, None))
                     self += cons
                     self.solver_vars(enc.vars())
             else:
                 raise TypeError
 
-        # the user vars are the Booleans
+        # the user vars are only the Booleans (e.g. to make solveAll behave consistently)
         user_vars = set()
-        for v in self.user_vars:
-            if isinstance(v, _BoolVarImpl):
-                user_vars.add(v)
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
             else:
-                user_vars.update(self.ivarmap[v.name][0].vars())  # extends set with iterable
+                user_vars.update(self.ivarmap[x.name].vars())  # extends set with iterable
         self.user_vars = user_vars
 
 
@@ -271,8 +273,8 @@ class CPM_pysat(SolverInterface):
 
             # Now assign the integer variables using their encoding
             # TODO might needlessly assign non-user int variables
-            for (enc, int_var) in self.ivarmap.values():
-                int_var._value = enc.decode()
+            for enc in self.ivarmap.values():
+                enc._x._value = enc.decode()
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -333,7 +335,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}))  # the core of the MIP-linearization
-        cpm_cons = int2bool(cpm_cons, self.ivarmap)
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
