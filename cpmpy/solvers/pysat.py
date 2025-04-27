@@ -337,8 +337,8 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def add(self, cpm_expr_orig, transform=True):
-      """
+    def add(self, cpm_expr_orig):
+        """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
@@ -352,14 +352,20 @@ class CPM_pysat(SolverInterface):
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
-      """
-      # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            self._add_expr(cpm_expr)
 
-      # transform and post the constraints
-      cpm_exprs = self.transform(cpm_expr_orig) if transform else cpm_expr_orig
-      for cpm_expr in cpm_exprs:
+        return self
+
+    __add__ = add  # avoid redirect in superclass
+
+    def _add_expr(self, cpm_expr):
+        """ Add expression to solver without transformation (internal use) """
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
@@ -393,7 +399,7 @@ class CPM_pysat(SolverInterface):
 
         elif isinstance(cpm_expr, Comparison): # root-level comparisons have been linearized
             if cpm_expr.name == "==" and isinstance(cpm_expr.args[0], _BoolVarImpl) and isinstance(cpm_expr.args[1], _BoolVarImpl) and cpm_expr.args[0] == cpm_expr.args[1]:
-                continue  # `p == p` (added to keep `p` in the model)
+                return  # `p == p` (added to keep `p` in the model)
             elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
                 self.pysat_solver.append_formula(self._pysat_cardinality(cpm_expr))
             elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
@@ -433,9 +439,6 @@ class CPM_pysat(SolverInterface):
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
-
-      return self
-    __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars, vals):
         """

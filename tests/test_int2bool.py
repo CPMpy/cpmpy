@@ -84,7 +84,9 @@ class TestTransInt2Bool:
         )
         cons_sols = sorted(cons_sols)
         pysat = CPM_pysat()
-        pysat.add(flat, transform=False)
+        for c in flat:
+            pysat.add(flat)
+
         # pysat.user_vars = set(get_variables(flat))
         pysat.ivarmap = ivarmap
         pysat.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))
