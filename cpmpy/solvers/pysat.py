@@ -67,7 +67,7 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, int2bool_make
+from ..transformations.int2bool import int2bool, int2bool_encode
 
 
 class CPM_pysat(SolverInterface):
@@ -196,9 +196,23 @@ class CPM_pysat(SolverInterface):
         for v in list(self.user_vars):  # can change during iteration
             if isinstance(v, _BoolVarImpl):
                 self.solver_vars(v)
-            else:  # intvar
-                if not v in self.ivarmap:
-                    self += int2bool_make(self.ivarmap, v)
+            elif isinstance(v, _IntVarImpl):  # intvar
+                if v.name not in self.ivarmap:
+                    enc, cons = int2bool_encode(self.ivarmap, v)
+                    self += cons
+                    self.solver_vars(enc.vars())
+            else:
+                raise TypeError
+
+        # the user vars are the Booleans
+        user_vars = set()
+        for v in self.user_vars:
+            if isinstance(v, _BoolVarImpl):
+                user_vars.add(v)
+            else:
+                user_vars.update(self.ivarmap[v.name][0].vars())  # extends set with iterable
+        self.user_vars = user_vars
+
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -251,14 +265,14 @@ class CPM_pysat(SolverInterface):
                     else:  # -lit in sol (=False) or not specified (=False)
                         cpm_var._value = False
                 elif isinstance(cpm_var, _IntVarImpl):
-                    assert cpm_var.name in self.ivarmap, "Integer variable %s not found in ivarenc" % cpm_var.name
-                    varenc = self.ivarmap[cpm_var.name]
-                    lits = self.solver_vars(varenc.vars())
-                    # default value=False
-                    vals = [lit in sol for lit in lits]
-                    cpm_var._value = varenc.decode(vals)
+                    assert False, "user_vars should only contain Booleans"
                 else:
                     raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
+
+            # Now assign the integer variables using their encoding
+            # TODO might needlessly assign non-user int variables
+            for (enc, int_var) in self.ivarmap.values():
+                int_var._value = enc.decode()
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -281,7 +295,9 @@ class CPM_pysat(SolverInterface):
 
         # special case, negative-bool-view
         # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
+        if isinstance(cpm_var, BoolVal):
+            return cpm_var
+        elif isinstance(cpm_var, NegBoolView):
             # just a view, get actual var identifier, return -id
             return -self.pysat_vpool.id(cpm_var._bv.name)
         elif isinstance(cpm_var, _BoolVarImpl):
@@ -321,7 +337,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig, transform=True):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -342,7 +358,8 @@ class CPM_pysat(SolverInterface):
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+      cpm_exprs = self.transform(cpm_expr_orig) if transform else cpm_expr_orig
+      for cpm_expr in cpm_exprs:
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 

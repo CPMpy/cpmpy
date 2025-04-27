@@ -139,7 +139,7 @@ def argval(a):
 
 
 def argvals(arr):
-    if is_any_list(arr):
+    if is_any_list(arr) or isinstance(arr, set):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
