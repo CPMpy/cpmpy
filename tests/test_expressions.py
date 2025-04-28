@@ -5,7 +5,7 @@ import numpy as np
 from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
-from cpmpy.expressions.core import Operator, Expression
+from cpmpy.expressions.core import Operator, Expression, Comparison
 from cpmpy.expressions.utils import get_bounds, argval
 
 class TestComparison(unittest.TestCase):
@@ -31,6 +31,31 @@ class TestComparison(unittest.TestCase):
         )
         for c in m.constraints:
             self.assertTrue(cp.Model(c).solve())
+
+class TestNumpyufuncs(unittest.TestCase):
+    def setUp(self):
+        self.iv = cp.intvar(0, 10, name="var")
+
+    def test_numpy_ufuncs(self):
+        """Test that NumPy array comparisons with CPMpy expressions work consistently"""
+        
+        # Test comparisons with NumPy int on the left side
+        expr2 = np.int_(1) == self.iv % 2
+        self.assertIsInstance(expr2, Comparison)
+        self.assertEqual(str(expr2), "(var) mod 2 == 1")
+
+        expr2 = np.int_(1) > self.iv % 2
+        self.assertIsInstance(expr2, Comparison)
+        self.assertEqual(str(expr2), "(var) mod 2 < 1")
+
+        expr2 = np.int_(1) < self.iv % 2
+        self.assertIsInstance(expr2, Comparison)
+        self.assertEqual(str(expr2), "(var) mod 2 > 1")
+
+        # Test operation with NumPy int on the left side
+        expr2 = np.int_(1) >= np.int_(2) % self.iv
+        self.assertIsInstance(expr2, Comparison)
+        self.assertEqual(str(expr2), "2 mod (var) <= 1")
 
 class TestSum(unittest.TestCase):
 
@@ -576,12 +601,6 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a % b).value()))
 
 
-
-
-
-
-
-
 class TestBuildIns(unittest.TestCase):
 
     def setUp(self):
@@ -602,6 +621,7 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(list(self.x))))
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
+
 
 if __name__ == '__main__':
     unittest.main()

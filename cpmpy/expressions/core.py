@@ -88,13 +88,14 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
+from numpy.lib.mixins import NDArrayOperatorsMixin
 import cpmpy as cp
 
 from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
-class Expression(object):
+class Expression(NDArrayOperatorsMixin, object):
     """
     An Expression represents a symbolic function with a `self.name` and `self.args` (arguments)
 
@@ -109,6 +110,64 @@ class Expression(object):
     - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
     - any ``__op__`` python operator overloading
     """
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        """
+        Handle NumPy ufuncs for CPMpy expressions.
+        
+        This method is called when a NumPy ufunc is applied to a CPMpy expression.
+        It ensures that CPMpy expressions handle the operation correctly.
+        """
+        # Only handle the __call__ method
+        if method != "__call__":
+            return NotImplemented
+        
+        # Map NumPy ufuncs to CPMpy method names:
+        # ufunc, operator, reverse operator (when needed, as expressions are in rhs)
+        op_map = {
+            # Comparisons
+            np.equal: [Expression.__eq__, Expression.__eq__],
+            np.not_equal: [Expression.__ne__, Expression.__ne__],
+            np.less: [Expression.__lt__, Expression.__gt__],
+            np.less_equal: [Expression.__le__, Expression.__ge__],
+            np.greater: [Expression.__gt__, Expression.__lt__],
+            np.greater_equal: [Expression.__ge__, Expression.__le__],
+            # Arithmetic
+            np.add: [Expression.__add__, Expression.__radd__],
+            np.subtract: [Expression.__sub__, Expression.__rsub__],
+            np.multiply: [Expression.__mul__, Expression.__rmul__],
+            np.floor_divide: [Expression.__floordiv__, Expression.__rfloordiv__],
+            np.true_divide: [Expression.__truediv__, Expression.__rtruediv__],  # Will warn and use floordiv
+            np.mod: [Expression.__mod__, Expression.__rmod__],
+            np.power: [Expression.__pow__, Expression.__rpow__],
+            # Logical
+            np.logical_and: [Expression.__and__, Expression.__rand__],
+            np.logical_or: [Expression.__or__, Expression.__ror__],
+            np.logical_xor: [Expression.__xor__, Expression.__rxor__]
+        }
+        
+        # Handle binary operations
+        if len(inputs) == 2 and ufunc in op_map:
+            x, y = inputs
+
+            if isinstance(x, Expression):
+                return op_map[ufunc][0](x, y)
+            elif isinstance(x, np.ndarray) or np.isscalar(x):
+                # For array operations with multiple elements
+                if isinstance(x, np.ndarray) and x.size > 1:
+                    from cpmpy.expressions.variables import NDVarArray
+                    
+                    if not isinstance(y, NDVarArray) or len(y) != x.size:
+                        raise ValueError("Incompatible dimensions for array operation")
+                        
+                else:
+                    # For scalar operations or arrays with single element
+                    if isinstance(x, np.ndarray):
+                        x = x.item()
+                return op_map[ufunc][1](y, x)
+                
+        # For other methods or ufuncs not supported
+        raise NotImplementedError(f"Unsupported operation: {ufunc.__name__}")
 
     def __init__(self, name, arg_list):
         self.name = name
