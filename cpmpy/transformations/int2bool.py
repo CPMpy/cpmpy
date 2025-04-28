@@ -1,6 +1,7 @@
 """Convert integer linear constraints to pseudo-boolean constraints."""
 
 from typing import List
+import itertools
 import math
 import cpmpy as cp
 from abc import ABC, abstractmethod
@@ -9,6 +10,9 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..transformations.get_variables import get_variables
 from ..expressions.core import Expression
 
+UNKNOWN_COMPARATOR_ERROR = ValueError(
+    "Comparator is not known or should have been simplified by linearize."
+)
 EMPTY_DOMAIN_ERROR = ValueError(
     "Attempted to encode variable with empty domain (which is unsat)"
 )
@@ -113,40 +117,43 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
 
     # Check for trivial sat/unsat, since pysat does not handle those
     if check_bounds is True:
-        constraint = None
+        # if the bounds are trivially sat/unsat, the value will be set to True/False
+        value = None
         lb = sum(w * x.lb if w >= 0 else w * x.ub for w, x in zip(weights, xs))
         ub = sum(w * x.ub if w >= 0 else w * x.lb for w, x in zip(weights, xs))
 
         if cmp in ("==", "!="):
             if lb == rhs == ub:
-                constraint = BoolVal(True)
+                value = BoolVal(True)
             elif rhs not in range(lb, ub + 1):
-                constraint = BoolVal(False)
-            if cmp == "!=":
-                constraint = ~constraint
+                value = BoolVal(False)
+            if cmp == "!=" and value is not None:
+                value = ~value
         elif cmp == "<=":
             if ub <= rhs:
-                constraint = BoolVal(True)
+                value = BoolVal(True)
             elif lb > rhs:
-                constraint = BoolVal(False)
+                value = BoolVal(False)
         elif cmp == ">=":
             if lb >= rhs:
-                constraint = BoolVal(True)
+                value = BoolVal(True)
             elif ub < rhs:
-                constraint = BoolVal(False)
+                value = BoolVal(False)
         else:
             raise NotImplementedError
 
-        if constraint is not None:
+        # if trivial sat/unsat, ensure variables are encoded and return
+        if value is not None:
+            # TODO realy necessary to add encoding?
             domain_constraints = []
             for x in xs:
                 _, x_dom_cons = _encode_int_var(
                     ivarmap, x, _decide_encoding(x, cmp, encoding)
                 )
                 domain_constraints += x_dom_cons
-            return [constraint], domain_constraints
+            return [value], domain_constraints
 
-    terms = []  # (weight, literal) tuples
+    terms = []
     domain_constraints = []
     for w, x in zip(weights, xs):
         if isinstance(x, _BoolVarImpl):
@@ -171,14 +178,14 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
         else:
             lhs = Operator("wsum", (pb_weights, pb_literals))
 
-    constraint = Comparison(cmp, lhs, rhs)
+    value = Comparison(cmp, lhs, rhs)
 
-    return [constraint], domain_constraints
+    return [value], domain_constraints
 
 
 def _encode_comparison(ivarmap, lhs, cmp, rhs, encoding):
     encoding = _decide_encoding(lhs, cmp, encoding)
-    if encoding == "binary":
+    if encoding == "binary" and cmp in (">=", "<="):
         return _encode_linear(ivarmap, [lhs], cmp, rhs, encoding)
     else:
         lhs_enc, domain_constraints = _encode_int_var(ivarmap, lhs, encoding)
@@ -211,6 +218,10 @@ class IntVarEnc(ABC):
     def vars(self):
         """Return the Boolean variables in the encoding."""
         return self._xs
+
+    def _offset(self, d):
+        """ "Map domain value `d` to the encoding range (e.g. for the direct encoding to the encoding variable index x==i)"""
+        return d - self._x.lb
 
     def decode(self):
         """Return the integer value of the encoding."""
@@ -248,15 +259,13 @@ class IntVarEnc(ABC):
 
     @abstractmethod
     def encode_term(self, w=1):
-        """
-        Encode w*self as a weighted sum of Boolean variables.
+        """Encode `w*self` as a weighted sum of Boolean variables plus a constant.
 
         Args:
             w: The weight to multiply the variable by
 
         Returns:
-            tuple: (weights, variables) where weights is a list of weights and
-                  variables is a list of Boolean variables
+            tuple: (terms, k)  # with `terms` a list of `(weight, literal)` tuples and `k` an integer constant
         """
         pass
 
@@ -290,33 +299,25 @@ class IntVarEncDirect(IntVarEnc):
 
     def eq(self, d):
         """Return a literal whether x==d."""
-        i = d - self._x.lb
-        if i in range(len(self._xs)):
-            return self._xs[i]
-        else:  # don't use try IndexError since negative values wrap
+        if self._x.lb <= d <= self._x.ub:
+            return self._xs[self._offset(d)]
+        else:  # don't use `try .. except IndexError` since negative values wrap!
             return BoolVal(False)
 
-    def encode_comparison(self, op, rhs):
-        """Encode a comparison over the variable: self <op> rhs."""
+    def encode_comparison(self, op, d):
         if op == "==":
             # one yes, hence also rest no, if rhs is not in domain will set all to no
-            return [self.eq(rhs)]
+            return [self.eq(d)]
         elif op == "!=":
-            return [~self.eq(rhs)]
-        elif op == "<":
-            # all higher-or-equal values are False
-            return list(~self._xs[rhs - self._x.lb :])
+            return [~self.eq(d)]
         elif op == "<=":
             # all higher values are False
-            return list(~self._xs[rhs - self._x.lb + 1 :])
-        elif op == ">":
-            # all lower values are False
-            return list(~self._xs[: rhs - self._x.lb + 1])
+            return list(~self._xs[self._offset(d + 1) :])
         elif op == ">=":
             # all lower-or-equal values are False
-            return list(~self._xs[: rhs - self._x.lb])
+            return list(~self._xs[: self._offset(d)])
         else:
-            raise NotImplementedError(f"int2bool: comparison with op {op} unknown")
+            raise UNKNOWN_COMPARATOR_ERROR
 
     def encode_term(self, w=1):
         return [(w * i, b) for i, b in enumerate(self._xs)], self._x.lb * w
@@ -339,15 +340,19 @@ class IntVarEncOrder(IntVarEnc):
         elif dom_size == 2:
             xs = cp.cpm_array([cp.boolvar(name=f"EncOrd({x.name})")])
         else:
-            # the order encoding requires one less variable than the direct encoding
+            # note that the order encoding requires one less variable than the direct encoding
             xs = cp.boolvar(shape=dom_size - 1, name=f"EncOrd({x.name})")
         super().__init__(x, xs)
 
     def encode_domain_constraint(self):
         """Return order encoding domain constraint (i.e. encoding variables are sorted in descending order)."""
-        if len(self.vars()) <= 1:
+        if len(self._xs) <= 1:
             return []
-        return [curr.implies(prev) for prev, curr in zip(self.vars(), self.vars()[1:])]
+        # Encode implication chain `x>=d -> x>=d-1` (using sliding window trick)
+        return [curr.implies(prev) for prev, curr in zip(self._xs, self._xs[1:])]
+
+    def _offset(self, d):
+        return d - self._x.lb - 1
 
     def geq(self, d):
         """Return a literal whether x>=d."""
@@ -356,24 +361,19 @@ class IntVarEncOrder(IntVarEnc):
         elif d > self._x.ub:
             return BoolVal(False)  # d > ub
         else:
-            return self._xs[d - self._x.lb - 1]
+            return self._xs[self._offset(d)]
 
     def encode_comparison(self, op, rhs):
-        """Encode a comparison over the variable: self <op> rhs."""
         if op == "==":  # x>=d and x<d+1
             return [self.geq(rhs), ~self.geq(rhs + 1)]
         elif op == "!=":  # x<d or x>=d+1
-            return [(~self.geq(rhs)) or self.geq(rhs + 1)]
+            return [cp.any([~self.geq(rhs), self.geq(rhs + 1)])]
         elif op == ">=":
             return [self.geq(rhs)]
-        elif op == ">":
-            return [self.geq(rhs + 1)]
         elif op == "<=":
             return [~self.geq(rhs + 1)]
-        elif op == "<":
-            return [~self.geq(rhs)]
         else:
-            raise NotImplementedError(f"int2bool: comparison with op {op} unknown")
+            raise UNKNOWN_COMPARATOR_ERROR
 
     def encode_term(self, w=1):
         """Rewrite term w*self to terms [w1, w2 ,...]*[bv1, bv2, ...]."""
@@ -402,9 +402,6 @@ class IntVarEncBinary(IntVarEnc):
             xs = cp.boolvar(shape=bits, name=f"EncBin({x.name})")
         super().__init__(x, xs)
 
-    def _offset(self, d):
-        return d - self._x.lb
-
     def encode_domain_constraint(self):
         """Return binary encoding domain constraint (i.e. upper bound is respected; the lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb` )."""
         # return [self.leq(self._x.ub)] # TODO use lexicographic
@@ -420,54 +417,50 @@ class IntVarEncBinary(IntVarEnc):
         ]
 
     def _bitstring(self, d):
-        """Return offset binary representation of `d`."""
+        """Return offset binary representation of `d` as Booleans in order of increasing signicance (e.g. `4` return `001`)."""
         # more efficient implementation probably not necessary
-        "{0:b}".format(self._offset(d))
-
-    def geq(self, d):
-        """Return encoding of x>=d."""
-        if d <= self._x.lb:
-            return BoolVal(True)  # d < lb
-        elif d > self._x.ub:
-            return BoolVal(False)  # d > ub
+        i = self._offset(d)
+        if (
+            i == 0
+        ):  # otherwise the bitstring will formatted to '0' (which is inconsistent with empty encodings of constants)
+            return []
         else:
-            terms, k = self.encode_term()
-            # TODO lexicographic
-            return Comparison(">=", Operator("wsum", list(_unzip(terms))), d - k)
+            return (
+                True if bit == "1" else False for bit in reversed("{0:b}".format(i))
+            )
 
-    def encode_comparison(self, cmp, rhs):
-        """Encode a comparison over the variable: self <op> rhs."""
-        raise NotImplemented
+    def eq(self, d):
+        """Returns a list of literals which in conjunction enforced x==d."""
+        if self._x.lb == d == self._x.ub:
+            return [BoolVal(True)]
+        elif self._x.lb <= d <= self._x.ub:
+            # x_i = bit_i for every bit in the representation
+            return [
+                x if bit else (~x)
+                for bit, x in itertools.zip_longest(self._bitstring(d), self._xs)
+            ]
+        else:  # don't use try IndexError since negative values wrap
+            return [BoolVal(False)]
 
-    #     return [Comparison(op, Operator("wsum", list(_unzip(terms))), d - k)]
-    #     if op == "==":  # x>=d and x<d+1
-    #         return [self.geq(rhs), ~self.geq(rhs + 1)]
-    #     elif op == "!=":  # x<d or x>=d+1
-    #         return [(~self.geq(rhs)) or self.geq(rhs + 1)]
-    #     elif op == ">=":
-    #         return [self.geq(rhs)]
-    #     elif op == ">":
-    #         return [self.geq(rhs + 1)]
-    #     elif op == "<=":
-    #         return [~self.geq(rhs + 1)]
-    #     elif op == "<":
-    #         return [~self.geq(rhs)]
-    #     else:
-    #         raise NotImplementedError(f"int2bool: comparison with op {op} unknown")
+    def encode_comparison(self, cmp, d):
+        if cmp == "==":  # x>=d and x<d+1
+            return self.eq(d)
+        elif cmp == "!=":  # x<d or x>=d+1
+            return [cp.any(~x for x in self.eq(d))]
+        elif cmp == ">=":
+            raise NotImplementedError
+        elif cmp == "<=":
+            raise NotImplementedError
+        else:
+            raise UNKNOWN_COMPARATOR_ERROR
 
     def encode_term(self, w=1):
-        """Rewrite term w*self to terms [w1, w2 ,...]*[bv1, bv2, ...]."""
-        return [(w * (2**i), b) for i, b in enumerate(self.vars())], w * self._x.lb
+        return [(w * (2**i), b) for i, b in enumerate(self._xs)], w * self._x.lb
 
 
 def _unzip(iterable):
-    """Unzip iterable of tuples into a tuple of multiple iterables."""
     return zip(*iterable)
 
 
 def _dom_size(x):
-    """Return domain size of variable `x`."""
     return x.ub + 1 - x.lb
-
-
-# TODO: class IntVarEncLog(IntVarEnc)

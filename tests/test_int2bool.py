@@ -11,14 +11,10 @@ from cpmpy.transformations.int2bool import int2bool
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl, intvar, boolvar
 
 
-# x = intvar(0, 2, name="x")
-# y = intvar(0, 2, name="y")
-# z = intvar(0, 2, name="z")
-
+# add some small but non-trivial integer variables (i.e. non-zero lower bounds, domain size not a power of two)
 x = intvar(1, 3, name="x")
 y = intvar(1, 3, name="y")
 z = intvar(1, 3, name="z")
-
 
 p = boolvar(name="p")
 q = boolvar(name="q")
@@ -37,7 +33,8 @@ CONSTRAINTS = [
         ">=",
         "<=",
         "==",
-        # "!=", ">", "<", # not produced by linearize
+        "!=",
+        # ">", "<", # not produced by linearize
     )
     for con in (
         Comparison(cmp, c, 1),
@@ -49,6 +46,9 @@ CONSTRAINTS = [
         # Comparison(cmp, Operator("wsum", [[2, 3, 5, 4], [x, y, z, c]]), 16),  # TODO same
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),
+        Comparison(
+            cmp, Operator("wsum", [[2, 3], [x, p]]), 5
+        ),  # mix int and bool terms
         Comparison(
             cmp,
             Operator(
@@ -63,8 +63,7 @@ CONSTRAINTS = [
                 ],
             ),
             15,
-        ),  # non-zero lbs
-        Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),
+        ),  # another extra weird constraint
     )
     for antecedent in (True, p, ~p)
 ]
