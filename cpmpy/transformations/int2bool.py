@@ -6,8 +6,8 @@ import math
 import cpmpy as cp
 from abc import ABC, abstractmethod
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..transformations.get_variables import get_variables
 from ..expressions.core import Expression
 
 UNKNOWN_COMPARATOR_ERROR = ValueError(
@@ -39,10 +39,9 @@ def _encode_expr(ivarmap, expr, encoding):
     constraints = []
     domain_constraints = []
 
-    xs = get_variables(expr)
     # skip all Boolean expressions
-    if all(isinstance(x, _BoolVarImpl) for x in xs):
-        return ([expr], [])
+    if isinstance(expr, (BoolVal, _BoolVarImpl, DirectConstraint)) or expr.name == "or":
+        return [expr], []
     elif expr.name == "->":
         # Encode implication recursively
         p, consequent = expr.args
@@ -54,13 +53,15 @@ def _encode_expr(ivarmap, expr, encoding):
     elif isinstance(expr, Comparison):
         lhs, rhs = expr.args
         # Encode linears with single left-hand term using more efficient `_encode_comparison`
-        if type(lhs) is _IntVarImpl:
+        if type(lhs) is _BoolVarImpl:
+            return [expr], []
+        elif type(lhs) is _IntVarImpl:
             return _encode_comparison(ivarmap, lhs, expr.name, rhs, encoding)
         elif lhs.name == "sum":
             if len(lhs.args) == 1:
-                return _encode_comparison(
-                    ivarmap, lhs.args[0], expr.name, rhs, encoding
-                )
+                return _encode_expr(
+                    ivarmap, Comparison(expr.name, lhs.args[0], rhs), encoding
+                )  # even though it seems trivial (to call `_encode_comparison`), using recursion avoids bugs
             else:
                 return _encode_linear(ivarmap, lhs.args, expr.name, rhs, encoding)
         elif lhs.name == "wsum":
