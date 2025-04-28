@@ -114,9 +114,11 @@ class TestTransInt2Bool:
         for c in flat:
             pysat.add(c)
 
-        pysat.user_vars |= user_vars  #
+        # unfortunately, some tricky edge cases where trivial constraints remove their variables by using the above `add` method
+        # this only happens in this test set-up
+        # to fix this, we add user variables which may have been removed!
+        pysat.user_vars |= user_vars
 
-        # pysat.user_vars = set(get_variables(flat))
         pysat.ivarmap = ivarmap
         pysat.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))
         flat_sols = sorted(flat_sols)

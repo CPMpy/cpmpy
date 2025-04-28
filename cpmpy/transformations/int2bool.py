@@ -185,12 +185,9 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
 
 def _encode_comparison(ivarmap, lhs, cmp, rhs, encoding):
     encoding = _decide_encoding(lhs, cmp, encoding)
-    if encoding == "binary" and cmp in (">=", "<="):
-        return _encode_linear(ivarmap, [lhs], cmp, rhs, encoding)
-    else:
-        lhs_enc, domain_constraints = _encode_int_var(ivarmap, lhs, encoding)
-        constraints = lhs_enc.encode_comparison(cmp, rhs)
-        return constraints, domain_constraints
+    lhs_enc, domain_constraints = _encode_int_var(ivarmap, lhs, encoding)
+    constraints = lhs_enc.encode_comparison(cmp, rhs)
+    return constraints, domain_constraints
 
 
 def _decide_encoding(x, cmp=None, encoding="auto"):
@@ -403,18 +400,9 @@ class IntVarEncBinary(IntVarEnc):
         super().__init__(x, xs)
 
     def encode_domain_constraint(self):
-        """Return binary encoding domain constraint (i.e. upper bound is respected; the lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb` )."""
-        # return [self.leq(self._x.ub)] # TODO use lexicographic
-        return [  # encode directly to avoid bounds check making this constraint trivial
-            _encode_linear(
-                {self._x.name: self},  # ensure known encoding of _x
-                [self._x],  # x <= x.ub
-                "<=",
-                self._x.ub,
-                "binary",
-                check_bounds=False,
-            )
-        ]
+        """Return binary encoding domain constraint (i.e. upper bound is respected with `self._x<=self._x.ub`. The lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb`)."""
+        # encode directly to avoid bounds check for this seemingly tautological constraint
+        return self.encode_comparison("<=", self._x.ub, check_bounds=False)
 
     def _bitstring(self, d):
         """Return offset binary representation of `d` as Booleans in order of increasing signicance (e.g. `4` return `001`)."""
@@ -442,15 +430,20 @@ class IntVarEncBinary(IntVarEnc):
         else:  # don't use try IndexError since negative values wrap
             return [BoolVal(False)]
 
-    def encode_comparison(self, cmp, d):
+    def encode_comparison(self, cmp, d, check_bounds=True):
         if cmp == "==":  # x>=d and x<d+1
             return self.eq(d)
         elif cmp == "!=":  # x<d or x>=d+1
             return [cp.any(~x for x in self.eq(d))]
-        elif cmp == ">=":
-            raise NotImplementedError
-        elif cmp == "<=":
-            raise NotImplementedError
+        elif cmp in (">=", "<="):
+            # TODO lexicographic encoding might be more efficitive, but currently we just use the PB encoding
+            constraint, domain_constraints = _encode_linear(
+                {self._x.name: self}, [self._x], cmp, d, None, check_bounds=check_bounds
+            )
+            assert (
+                domain_constraints == []
+            ), f"{self._x} should have already been encoded, so no domain constraints should be returned"
+            return constraint
         else:
             raise UNKNOWN_COMPARATOR_ERROR
 
