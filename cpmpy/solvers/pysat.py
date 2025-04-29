@@ -145,7 +145,7 @@ class CPM_pysat(SolverInterface):
         Arguments:
             cpm_model (Model(), a CPMpy Model(), optional):
             subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
-            encoding used to represent integer variables with Boolean vairalbes
+            encoding (str, "auto", "direct", "order", "binary") used to represent integer variables with Boolean vairalbes
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
@@ -272,8 +272,8 @@ class CPM_pysat(SolverInterface):
                 else:
                     raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-            # Now assign the integer variables using their encoding
-            # TODO might needlessly assign non-user int variables
+            # Now assign the user integer variables using their encodings
+            # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`
             for enc in self.ivarmap.values():
                 enc._x._value = enc.decode()
 
