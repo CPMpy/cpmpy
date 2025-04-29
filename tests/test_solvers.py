@@ -143,7 +143,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -170,7 +170,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -180,7 +180,7 @@ class TestSolvers(unittest.TestCase):
         cpm_status = s.solve(solution_callback=cb)
         self.assertEqual(s.objective_value(), 5.0)
 
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
 
 
         # manually enumerating solutions
@@ -307,11 +307,16 @@ class TestSolvers(unittest.TestCase):
 
         # check get core, simple
         self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
-        self.assertEqual(ps2.get_core(), [mayo,~mayo])
+        print(ps2.get_core())
+        print(set(ps2.get_core()))
+        print([mayo,~mayo])
+        print(set([mayo,~mayo]))
+        print(set(ps2.get_core()) == set([mayo,~mayo]))
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,~mayo]))
 
         # check get core, more realistic
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
-        self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -484,7 +489,7 @@ class TestSolvers(unittest.TestCase):
 
 
         def _trixor_callback():
-            assert bv[0]+bv[1]+bv[2] >= 1
+            assert (bv[0]+bv[1]+bv[2]).value() >= 1
 
         m = cp.Model([bv[0] | bv[1] | bv[2]])
         s = cp.SolverLookup.get("exact", m)
@@ -857,4 +862,4 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
+        assert s.solveAll(solution_limit=100) == 4     # check if still correct number of solutions, even though empty model

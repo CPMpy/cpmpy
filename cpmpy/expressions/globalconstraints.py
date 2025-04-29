@@ -515,7 +515,7 @@ class InDomain(GlobalConstraint):
 
         defining = []
         #if expr is not a var
-        if not isinstance(expr,_IntVarImpl):
+        if not isinstance(expr,Expression):
             aux = intvar(lb, ub)
             defining.append(aux == expr)
             expr = aux
