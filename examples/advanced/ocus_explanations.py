@@ -265,7 +265,7 @@ def cost_func(soft, soft_weights):
 
     def cost_lit(cons):
         # return soft weight if the constraint is a soft constraint
-        if len({cons} & set(soft)) > 0:
+        if cons in set(soft):
             return soft_weights[soft.index(cons)]
         return 1
 
