@@ -1,12 +1,12 @@
 # /usr/bin/env python
 """
-Interface to Pindakaas (`pkd`) API.
+Interface to Pindakaas (`pdk`) API.
 
-Requires that the `pkd` library python package is installed:
+Requires that the `pdk` library python package is installed:
 
     $ pip install pindakaas
 
-`pkd` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
+`pdk` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
 See https://github.com/pindakaashq/pindakaas.
 
 This solver can be used if the model only has PB constraints.
@@ -58,11 +58,11 @@ class CPM_pindakaas(SolverInterface):
         """Return if solver is installed."""
         # check import without importing
         try:
-            import pindakaas as pkd
+            import pindakaas as pdk
 
             CPM_pindakaas.subsolvers = dict(
                 (name.lower(), solver)
-                for name, solver in inspect.getmembers(pkd.solver, inspect.isclass)
+                for name, solver in inspect.getmembers(pdk.solver, inspect.isclass)
             )
             return True
         except ModuleNotFoundError:
@@ -70,7 +70,7 @@ class CPM_pindakaas(SolverInterface):
 
     @staticmethod
     def solvernames():
-        """Return solvers supported by `pkd` on your system."""
+        """Return solvers supported by `pdk` on your system."""
         if CPM_pindakaas.supported():
             return list(CPM_pindakaas.subsolvers)
 
@@ -92,12 +92,12 @@ class CPM_pindakaas(SolverInterface):
                 f"CPM_{name}: only satisfaction, does not support an objective function"
             )
 
-        import pindakaas as pkd
+        import pindakaas as pdk
 
         try:
             # Set subsolver or use Cnf if None
             self.pkd_solver = (
-                pkd.Cnf()
+                pdk.Cnf()
                 if subsolver is None
                 else CPM_pindakaas.subsolvers.get[subsolver]
             )
@@ -116,7 +116,7 @@ class CPM_pindakaas(SolverInterface):
 
     def solve(self, time_limit=None, assumptions=None):
         """
-        Call the `pkd` back-end SAT solver.
+        Call the `pdk` back-end SAT solver.
 
         Arguments:
         - time_limit:  maximum solve time in seconds (float, optional)
@@ -137,13 +137,13 @@ class CPM_pindakaas(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        import pindakaas as pkd
+        import pindakaas as pdk
 
         t = time.time()
 
         # If no subsolver selected, use Cadical as default Cnf solver
-        if isinstance(self.pkd_solver, pkd.Cnf):
-            self.pkd_solver = pkd.solver.Cadical(self.pkd_solver)
+        if isinstance(self.pkd_solver, pdk.Cnf):
+            self.pkd_solver = pdk.solver.Cadical(self.pkd_solver)
 
         my_status = self.pkd_solver.solve(
             time_limit=time_limit,
@@ -252,7 +252,7 @@ class CPM_pindakaas(SolverInterface):
         are applied in `transform()`.
 
         """
-        import pindakaas as pkd
+        import pindakaas as pdk
 
         if self.unsatisfiable:
             return self
@@ -264,13 +264,13 @@ class CPM_pindakaas(SolverInterface):
         try:
             for cpm_expr in self.transform(cpm_expr_orig):
                 self._add(cpm_expr)
-        except pkd.Unsatisfiable:
+        except pdk.Unsatisfiable:
             self.unsatisfiable = True
 
         return self
 
     def _add(self, cpm_expr, conditions=[]):
-        import pindakaas as pkd
+        import pindakaas as pdk
 
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
@@ -303,11 +303,11 @@ class CPM_pindakaas(SolverInterface):
                     f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
                 )
             if cpm_expr.name == "<=":
-                comparator = pkd.Comparator.LessEq
+                comparator = pdk.Comparator.LessEq
             elif cpm_expr.name == ">=":
-                comparator = pkd.Comparator.GreaterEq
+                comparator = pdk.Comparator.GreaterEq
             elif cpm_expr.name == "==":
-                comparator = pkd.Comparator.Equal
+                comparator = pdk.Comparator.Equal
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
