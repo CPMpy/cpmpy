@@ -4,7 +4,18 @@
 ## gcs.py
 ##
 """
-    Interface to the Glasgow Constraint Solver's API for the cpmpy library.
+    Interface to the Glasgow Constraint Solver's API for the CPMpy library.
+
+    See:
+    https://github.com/ciaranm/glasgow-constraint-solver
+
+    The key feature of this CP solver is the ability to produce proof logs.
+
+    Always use :func:`cp.SolverLookup.get("gcs") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'gcspy' python package is installed:
 
@@ -12,10 +23,23 @@
 
         $ pip install gcspy
 
-    The key feature of this solver is the ability to produce proof logs.
+    Source installation instructions:
 
-    See:
-    https://github.com/ciaranm/glasgow-constraint-solver
+    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
+    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
+    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-15)>``
+    - Ensure you have Boost installed
+    - ``git clone https://github.com/ciaranm/glasgow-constraint-solver.git``
+    - ``cd glasgow-constraint-solver/python``
+    - ``pip install .``
+
+    .. note::
+        If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
+
+    For the verifier functionality, the 'veripb' tool is also required.
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -51,23 +75,6 @@ class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API.
 
-    Requires that the 'gcspy' python package is installed: $ pip install gcspy
-
-    Current installation instructions:
-
-    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
-    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
-    - If necessary `export CXX=<your up to date C++ compiler (e.g. clang++-15)>`
-    - Ensure you have Boost installed
-    - `git clone https://github.com/ciaranm/glasgow-constraint-solver.git`
-    - `cd glasgow-constraint-solver/python`
-    - `pip install .`
-
-    NB: if for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
-
-    For the verifier functionality, the 'veripb' tool is also required.
-    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions. 
-
     Creates the following attributes (see parent constructor for more):
 
     - ``gcs`` : the gcspy solver object
@@ -76,6 +83,9 @@ class CPM_gcs(SolverInterface):
     - ``proof_name`` : name of the last proof (means <proof_name>.opb and <proof_name>.pbp will be present at the proof location)
     - ``veripb_return_code`` : return code from the last VeriPB check.
     - ``proof_check_timeout`` : whether the last VeriPB check timed out.
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
     @staticmethod
@@ -152,6 +162,10 @@ class CPM_gcs(SolverInterface):
             self.proof_name = proof_name
         self.proof_location = proof_location
      
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+                 
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
@@ -199,6 +213,12 @@ class CPM_gcs(SolverInterface):
 
         # Verify proof, if requested
         if verify:
+
+            # set time limit
+            if verify_time_limit is not None:
+                if verify_time_limit <= 0:
+                    raise ValueError("Time limit for verifying must be positive")
+
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
                         veripb_args=veripb_args, display_output=display_verifier_output)
             
@@ -441,7 +461,7 @@ class CPM_gcs(SolverInterface):
 
         return self.veripb_return_code
     
-    def __add__(self, cpm_cons):
+    def add(self, cpm_cons):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -639,6 +659,7 @@ class CPM_gcs(SolverInterface):
                 raise NotImplementedError(cpm_expr)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
 
         

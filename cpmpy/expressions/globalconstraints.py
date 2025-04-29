@@ -869,6 +869,9 @@ class LexLess(GlobalConstraint):
         """
         X, Y = cpm_array(self.args)
 
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+
         bvar = boolvar(shape=(len(X) + 1))
 
         # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
@@ -914,6 +917,9 @@ class LexLessEq(GlobalConstraint):
         subsequent positions.
         """
         X, Y = cpm_array(self.args)
+
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
 
         bvar = boolvar(shape=(len(X) + 1))
         defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]

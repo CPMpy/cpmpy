@@ -1,5 +1,5 @@
 """
-    Normalizing the constraints given to a CPMpy model.
+    Normalize a toplevel list, or simplify Boolean expressions.
 """
 
 import copy
@@ -17,7 +17,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 
 def toplevel_list(cpm_expr, merge_and=True):
     """
-    unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
+    Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
     Arguments:
         cpm_expr:   Expression or list of Expressions
@@ -51,10 +51,10 @@ def toplevel_list(cpm_expr, merge_and=True):
 
 def simplify_boolean(lst_of_expr, num_context=False):
     """
-    removes boolean constants from all CPMpy expressions
-    only resulting boolean constant is literal 'false'
-    Boolean constants are promoted to int if in numerical context,
-    ints are never converted to Bool
+    Removes boolean constants from all CPMpy expressions.
+    Only resulting boolean constant is literal 'false'.
+    Boolean constants are promoted to `int` if in a numerical context,
+    `ints` are never converted to `bool`.
     
     Arguments:
         list_of_expr: list of CPMpy expressions

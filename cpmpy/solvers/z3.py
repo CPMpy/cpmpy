@@ -4,7 +4,22 @@
 ## z3.py
 ##
 """
-    Interface to z3's API
+    Interface to Z3's Python API.
+
+    Z3 is a highly versatile and effective theorem prover from Microsoft.
+    Underneath, it is an SMT solver with a wide scala of theory solvers.
+    We will interface to the finite-domain integer related parts of the API.
+    (see https://github.com/Z3Prover/z3)
+
+    .. warning::
+        For incrementally solving an optimisation function, instantiate the solver object
+        with a model that has an objective function, e.g. ``s = cp.SolverLookup.get("z3", Model(maximize=1))``.
+
+    Always use :func:`cp.SolverLookup.get("z3") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'z3-solver' python package is installed:
 
@@ -12,15 +27,10 @@
     
         $ pip install z3-solver
 
-    Z3 is a highly versatile and effective theorem prover from Microsoft.
-    Underneath, it is an SMT solver with a wide scala of theory solvers.
-    We will interface to the finite-domain integer related parts of the API
+    See detailed installation instructions at:
+    https://github.com/Z3Prover/z3#python
 
-    Documentation of the solver's own Python API:
-    https://z3prover.github.io/api/html/namespacez3py.html
-
-    .. note::
-        Terminology note: a 'model' for z3 is a solution!
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -35,6 +45,7 @@
     Module details
     ==============
 """
+from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -49,19 +60,19 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_z3(SolverInterface):
     """
-    Interface to z3's API
-
-    Requires that the 'z3-solver' python package is installed:
-    $ pip install z3-solver
-
-    See detailed installation instructions at:
-    https://github.com/Z3Prover/z3#python
+    Interface to Z3's Python API.
 
     Creates the following attributes (see parent constructor for more):
         
     - ``z3_solver``: object, z3's Solver() object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
+
+    Documentation of the solver's own Python API:
+    https://z3prover.github.io/api/html/namespacez3py.html
+
+    .. note::
+        Terminology note: a 'model' for z3 is a solution!
     """
 
     @staticmethod
@@ -150,7 +161,10 @@ class CPM_z3(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
@@ -298,7 +312,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -317,6 +331,8 @@ class CPM_z3(SolverInterface):
         :return: self
         """
         # all variables are user variables, handled in `solver_var()`
+        # unless their constraint gets simplified away, so lets collect them anyway
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
@@ -325,6 +341,7 @@ class CPM_z3(SolverInterface):
             self.z3_solver.add(z3_con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _z3_expr(self, cpm_con):
         """
