@@ -34,6 +34,7 @@ setup(
     install_requires=[
         'ortools>=9.9',
         'numpy>=1.5',
+        'setuptools',
     ],
     #extra dependency, only needed if minizinc is to be used.
     extras_require={
