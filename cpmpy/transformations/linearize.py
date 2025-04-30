@@ -168,9 +168,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                 elif lhs.name == "pow" and "pow" not in supported:
                     if "mul" not in supported:
-                        raise TransformationNotImplementedError("Cannot linearize power without multiplication")
+                        raise NotImplementedError("Cannot linearize power without multiplication")
                     if not is_num(lhs.args[1]):
-                        raise TransformationNotImplementedError("Cannot linearize power with ")
+                        raise NotImplementedError("Cannot linearize power with ")
                     # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
                     x, n = lhs.args
                     new_lhs = 1
@@ -182,7 +182,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                 elif lhs.name == "mod" and "mod" not in supported:
                     if "mul" not in supported:
-                        raise TransformationNotImplementedError("Cannot linearize modulo without multiplication")
+                        raise NotImplementedError("Cannot linearize modulo without multiplication")
 
                     if cpm_expr.name != "==":
                         new_rhs, newcons = get_or_make_var(lhs)
@@ -231,7 +231,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
-                        raise TransformationNotImplementedError("Cannot linearize division without multiplication")
+                        raise NotImplementedError("Cannot linearize division without multiplication")
 
                     if cpm_expr.name != "==":
                         new_rhs, newcons = get_or_make_var(lhs)
