@@ -857,4 +857,5 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
+        solution_limit = 5 if solver == "gurobi" else None
+        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
