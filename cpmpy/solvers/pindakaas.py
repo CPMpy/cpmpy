@@ -1,12 +1,12 @@
 # /usr/bin/env python
 """
-Interface to Pindakaas (`pdk`) API.
+Interface to Pindakaas (`pindakaas`) API.
 
-Requires that the `pdk` library python package is installed:
+Requires that the `pindakaas` library python package is installed:
 
     $ pip install pindakaas
 
-`pdk` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
+`pindakaas` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
 See https://github.com/pindakaashq/pindakaas.
 
 This solver can be used if the model only has PB constraints.
@@ -20,9 +20,6 @@ List of classes
 
     CPM_pindakaas
 
-==============
-Module details
-==============
 """
 import inspect
 import time
@@ -41,25 +38,21 @@ from .solver_interface import ExitStatus, SolverInterface
 
 class CPM_pindakaas(SolverInterface):
     """
-    Interface to TEMPLATE's API.
-
-    Requires that the 'TEMPLATEpy' python package is installed:
-    $ pip install TEMPLATEpy
-
-    See detailed installation instructions at:
-    <URL to detailed solver installation instructions, if any>
+    Interface to Pindakaas' Python API.
 
     Creates the following attributes (see parent constructor for more):
-    - tpl_model: object, TEMPLATE's model object
+
+    - ``pkd_solver``: the `pindakaas` solver or formula object
     """
+
+    # TODO add link to docs Documentation of the solver's own Python API: ...
 
     @staticmethod
     def supported():
-        """Return if solver is installed."""
-        # check import without importing
         try:
             import pindakaas as pdk
 
+            # check subsolvers via `solver.*` modules
             CPM_pindakaas.subsolvers = dict(
                 (name.lower(), solver)
                 for name, solver in inspect.getmembers(pdk.solver, inspect.isclass)
@@ -70,21 +63,13 @@ class CPM_pindakaas(SolverInterface):
 
     @staticmethod
     def solvernames():
-        """Return solvers supported by `pdk` on your system."""
         if CPM_pindakaas.supported():
             return list(CPM_pindakaas.subsolvers)
 
     def __init__(self, cpm_model=None, subsolver=None):
-        """
-        Construct the native solver object.
-
-        Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
-        """
         name = "pindakaas"
         if not self.supported():
-            raise Exception(
+            raise ImportError(
                 f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
             )
         if cpm_model and cpm_model.objective_ is not None:
@@ -111,22 +96,10 @@ class CPM_pindakaas(SolverInterface):
 
     @property
     def native_model(self):
-        """Returns the solver's underlying native model (for direct solver access)."""
         self.pkd_solver
 
     def solve(self, time_limit=None, assumptions=None):
-        """
-        Call the `pdk` back-end SAT solver.
-
-        Arguments:
-        - time_limit:  maximum solve time in seconds (float, optional)
-        - kwargs:      any keyword argument, sets parameters of solver object
-
-        Arguments that correspond to solver parameters:
-        # [GUIDELINE] Please document key solver arguments that the user might wish to change
-        #       for example: assumptions=[x,y,z], log_output=True, var_ordering=3, num_cores=8, ...
-        # [GUIDELINE] Add link to documentation of all solver parameters
-        """
+        # TODO assumptions undocumented/unsupported in solver_interface?
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             return self._solve_return(self.cpm_status)
@@ -187,12 +160,6 @@ class CPM_pindakaas(SolverInterface):
         return has_sol
 
     def solver_var(self, cpm_var):
-        """
-        Create solver variable for cpmpy variable or returns from cache if previously created.
-
-        Transforms cpm_var into CNF literal using self.pkd_solver
-        (positive or negative integer)
-        """
         if isinstance(cpm_var, NegBoolView):  # negative literal
             # get inner variable and return its negated solver var
             return ~self.solver_var(cpm_var._bv)
@@ -212,12 +179,10 @@ class CPM_pindakaas(SolverInterface):
 
     def transform(self, cpm_expr):
         """
-            Transform arbitrary CPMpy expressions to constraints the solver supports.
+            Transform arbitrary CPMpy expressions to constraints the `pindakaas` solver supports.
 
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
-
-            See the 'Adding a new solver' docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -235,23 +200,7 @@ class CPM_pindakaas(SolverInterface):
         )
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
-        """
-        Eagerly add a constraint to the underlying solver.
-
-        Any CPMpy expression given is immediately transformed (through `transform()`)
-        and then posted to the solver in this function.
-
-        This can raise 'NotImplementedError' for any constraint not supported after transformation
-
-        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-        the user knows and cares about (and will be populated with a value after solve). All other variables
-        are auxiliary variables created by transformations.
-
-        What 'supported' means depends on the solver capabilities, and in effect on what transformations
-        are applied in `transform()`.
-
-        """
+    def add(self, cpm_expr_orig):
         import pindakaas as pdk
 
         if self.unsatisfiable:
@@ -269,7 +218,10 @@ class CPM_pindakaas(SolverInterface):
 
         return self
 
+    __add__ = add
+
     def _add(self, cpm_expr, conditions=[]):
+        """Add for a single, transformed expression, implied by conditions (mostly for internal use)"""
         import pindakaas as pdk
 
         if isinstance(cpm_expr, BoolVal):
