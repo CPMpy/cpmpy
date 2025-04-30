@@ -18,7 +18,7 @@ def test_pypblib_error():
     # this one should still work without `pypblib`
     assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
 
-@pytest.mark.skipif(not pblib_available, reason="pypblib not installed")
+@pytest.mark.skipif((not CPM_pysat.supported()) or pblib_available, reason= "`pysat` is not installed" if not CPM_pysat.supported() else"`pypblib` is installed")
 class TestEncodePseudoBooleanConstraint(unittest.TestCase):
     def setUp(self):
         self.bv = boolvar(shape=3)
