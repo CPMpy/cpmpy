@@ -512,7 +512,7 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(exact.solve())
 
         with open(proof_file+".proof", "r") as f:
-            self.assertEquals(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
+            self.assertEqual(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
