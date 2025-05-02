@@ -481,7 +481,9 @@ class CPM_gcs(SolverInterface):
                 self.gcs.post_or([self.solver_var(cpm_expr)])
             elif isinstance(cpm_expr, BoolVal):
                 if not cpm_expr:
-                    self.gcs.post_or([])
+                    # bit a hack, empty clause does not work (issue #73 on gcs github)
+                    a = boolvar()
+                    self.gcs.post_and(self.solver_vars([a,~a]))
             elif isinstance(cpm_expr, Operator) or \
                 (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
                 and not isinstance(cpm_expr.args[1], _NumVarImpl)): 
