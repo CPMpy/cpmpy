@@ -14,3 +14,14 @@ def skip_on_exception(exc_type, message_contains=None, skip_message=None):
                 raise  # Re-raise if the message doesn't match
         return wrapper
     return decorator
+
+
+def apply_decorator_to_tests(decorator):
+    def class_decorator(cls):
+        for attr_name in dir(cls):
+            if attr_name.startswith("test_"):
+                attr = getattr(cls, attr_name)
+                if callable(attr):
+                    setattr(cls, attr_name, decorator(attr))
+        return cls
+    return class_decorator
