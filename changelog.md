@@ -41,6 +41,8 @@
 - **Standardize solver version checks**: Unified approach to checking solver version compatibility. [#568](https://github.com/CPMpy/cpmpy/pull/568)  
 - **Update requirements**: Upped our minimal python requirement from 3.6 to 3.7. [#573](https://github.com/CPMpy/cpmpy/pull/573)
 
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.23...v0.9.24
+
 <!-- ---------------------------------- - ---------------------------------- -->
 
 ## 0.9.23
@@ -51,6 +53,8 @@ Quick release, because we want the updated tools to be available.
 * Extension to tools: MARCO and SMUS 
 * Added tests for incremental solving and fixed incemental solving with objective in Exact
 * Cumulative decomposition fix when capacity was numpy integer.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.22...v0.9.23
 
 <!-- ---------------------------------- - ---------------------------------- -->
 
@@ -79,6 +83,8 @@ Quick release, because we want the updated tools to be available.
 Thanks to 2 new contributors!
 * [@ThomSerg](https://github.com/ThomSerg) and [@sin3000x](https://github.com/sin3000x)
 
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.21...v0.9.22
+
 <!-- ---------------------------------- - ---------------------------------- -->
 
 ## 0.9.21
@@ -104,6 +110,8 @@ Thanks to 2 new contributors!
 * Extending automatic testsuite
 * Check if minizinc executable is installed
 
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.20...v0.9.21
+
 <!-- ---------------------------------- - ---------------------------------- -->
 
 ## 0.9.20
@@ -116,6 +124,8 @@ Thanks to 2 new contributors!
 * Added a warning when expressions have non-integer bounds, as these will be rounded
 * Fixed a bug in our helper function is_bool, now also recognises our BoolVal objects
 * Updated our ortools and minizinc version requirements.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.19..v0.9.20
 
 <!-- ---------------------------------- - ---------------------------------- -->
 
@@ -139,6 +149,8 @@ Thanks to 2 new contributors!
 * Correctly handle global constraints with list-arguments of length 1
 * Add missing edge case in flatten
 * Type check table constraint first argument, cannot be a constant.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.18...v0.9.19
 
 <!-- ---------------------------------- - ---------------------------------- -->
 
