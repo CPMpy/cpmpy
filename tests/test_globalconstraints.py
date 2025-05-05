@@ -12,7 +12,7 @@ from cpmpy.solvers import CPM_minizinc
 from utils import skip_on_missing_pblib
 
 
-@skip_on_missing_pblib
+@skip_on_missing_pblib()
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
