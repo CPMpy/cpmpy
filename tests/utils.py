@@ -49,7 +49,7 @@ def smart_decorator(method_decorator):
             raise TypeError("smart_decorator can only be used on classes or callables")
     return wrapper
 
-def skip_on_missing_pblib(func):
+def skip_on_missing_pblib():
     return smart_decorator(
         skip_on_exception(
             ImportError,
