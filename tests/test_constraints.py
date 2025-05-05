@@ -8,7 +8,7 @@ from cpmpy.expressions.core import Comparison
 
 import pytest
 
-from tests.utils import skip_on_exception
+from utils import skip_on_exception
 
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
