@@ -274,7 +274,7 @@ def verify(cons):
 
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
-@skip_on_missing_pblib()
+@skip_on_missing_pblib
 def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
@@ -289,7 +289,7 @@ def test_bool_constraints(solver, constraint):
 
 
 @pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
-@skip_on_missing_pblib()
+@skip_on_missing_pblib
 def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
@@ -304,7 +304,7 @@ def test_comparison_constraints(solver, constraint):
 
 
 @pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
-@skip_on_missing_pblib()
+@skip_on_missing_pblib
 def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
