@@ -18,6 +18,21 @@ def get_version(rel_path):
 with open("README.md", "r") as readme_file:
     long_description = readme_file.read()
 
+
+solver_dependencies = {
+    "ortools": ["ortools"],
+    "z3": ["z3-solver"],
+    "choco": ["pychoco>=0.2.1"],
+    "exact": ["exact>=2.1.0"],
+    "minizinc": ["minizinc"],
+    "pysat": ["python-sat"],
+    "gurobi": ["gurobipy"],
+    "pysdd": ["pysdd"],
+    "gcs": ["gcspy"],
+    "cpo": ["docplex"],
+}
+solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
+
 setup(
     name='cpmpy',
     version=get_version("cpmpy/__init__.py"),
@@ -35,26 +50,15 @@ setup(
         'ortools>=9.9',
         'numpy>=1.5',
     ],
-    #extra dependency, only needed if minizinc is to be used.
-    extras_require={
-        "FULL":  ["minizinc"],
+    extras_require=(
         # Solvers
-        "ortools": ["ortools"],
-        "z3": ["z3-solver"],
-        "choco": ["pychoco>=0.2.1"],
-        "exact": ["exact>=2.1.0"],
-        "minizinc": ["minizinc"],
-        "pysat": ["python-sat"],
-        "gurobi": ["gurobipy"],
-        "pysdd": ["pysdd"],
-        "gcs": ["gcspy"],
-        "cpo": ["docplex"],
+        solver_dependencies | {
         # Tools
         # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
         # Other
         "test": ["pytest"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
-    },
+    }),
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.8",
