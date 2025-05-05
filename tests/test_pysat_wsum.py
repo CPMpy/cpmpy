@@ -5,7 +5,7 @@ from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
 import importlib # can check for modules *without* importing them
-pysat_available = importlib.util.find_spec("pysat") is not None
+pysat_available = CPM_pysat.supported()
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
 @pytest.mark.skipif(not (pysat_available and not pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` is installed")
