@@ -9,14 +9,10 @@ from cpmpy.exceptions import TypeError, NotSupportedError
 from cpmpy.expressions.utils import STAR
 from cpmpy.solvers import CPM_minizinc
 
-from utils import skip_on_exception, apply_decorator_to_tests
+from utils import skip_on_missing_pblib
 
 
-@apply_decorator_to_tests(skip_on_exception(
-    ImportError,
-    message_contains="PB constraint",
-    skip_message="Skipping due to missing PBLib."
-))
+@skip_on_missing_pblib()
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
