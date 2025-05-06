@@ -7,7 +7,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.linearize import only_positive_coefficients
 
-pblib_available = importlib.util.find_spec("pypblib") is not None
+from utils import skip_on_missing_pblib
 
 SOLVER = "pysat"
 
@@ -136,7 +136,7 @@ class TestCardinality(unittest.TestCase):
         self.assertTrue(ps.solve())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
-    @pytest.mark.skipif(not pblib_available, reason="`pypblib` not installed")
+    @skip_on_missing_pblib()
     def test_pysat_card_implied(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)

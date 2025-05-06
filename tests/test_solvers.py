@@ -16,6 +16,8 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
+from utils import skip_on_missing_pblib
+
 pysat_available = CPM_pysat.supported()
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
@@ -318,6 +320,7 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
 
     @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+    @skip_on_missing_pblib()
     def test_pysat_card(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
