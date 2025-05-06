@@ -70,6 +70,10 @@ def smart_decorator(method_decorator):
     return wrapper
 
 
+# ---------------------------------------------------------------------------- #
+#                              Specific Decorators                             #
+# ---------------------------------------------------------------------------- #
+
 from cpmpy.solvers.pysat import CPM_pysat
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
