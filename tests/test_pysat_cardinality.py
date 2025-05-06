@@ -7,12 +7,11 @@ from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.linearize import only_positive_coefficients
 
-from utils import skip_on_missing_pblib
+from utils import skip_on_missing_pblib, skip_on_missing_solver
 
 SOLVER = "pysat"
 
-@pytest.mark.skipif(not CPM_pysat.supported(),
-                    reason="PySAT not installed")
+@skip_on_missing_solver("pysat")
 class TestCardinality(unittest.TestCase):
         
     def setUp(self):

@@ -74,6 +74,15 @@ def smart_decorator(method_decorator):
 #                              Specific Decorators                             #
 # ---------------------------------------------------------------------------- #
 
+def skip_on_missing_solver(solver:str):
+    """
+    Skip test when 'solver' is not available on current system.
+    """
+    base_solvers = cp.SolverLookup().base_solvers()
+    for s, cls in base_solvers:
+        if s == solver:
+            return pytest.mark.skipif(not cls.supported(), reason=f"`{solver}` not installed")
+
 from cpmpy.solvers.pysat import CPM_pysat
 pblib_available = importlib.util.find_spec("pypblib") is not None
 

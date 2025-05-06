@@ -6,6 +6,7 @@ import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco
 
+from utils import skip_on_missing_solver
 
 class TestDirectORTools(unittest.TestCase):
 
@@ -41,8 +42,7 @@ class TestDirectExact(unittest.TestCase):
         self.assertEqual(model.solveAll(), 3)
 
 
-@pytest.mark.skipif(not CPM_pysat.supported(),
-                    reason="PySAT not installed")
+@skip_on_missing_solver("pysat")
 class TestDirectPySAT(unittest.TestCase):
 
     def test_direct_clause(self):
