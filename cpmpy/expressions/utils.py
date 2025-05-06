@@ -28,12 +28,9 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
-import copy
-
 import cpmpy as cp
 import numpy as np
 import math
-import copy
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
 from cpmpy.exceptions import IncompleteFunctionError
@@ -174,21 +171,6 @@ def eval_comparison(str_op, lhs, rhs):
         return lhs <= rhs
     else:
         raise Exception("Not a known comparison:", str_op)
-
-
-def flip_comparison(cpm_expr):
-
-    new_expr = copy.copy(cpm_expr)
-    if cpm_expr.name == "==": new_expr.name = "!="
-    elif cpm_expr.name == "<=": new_expr.name = ">"
-    elif cpm_expr.name == ">=": new_expr.name = "<"
-    elif cpm_expr.name == "<" : new_expr.name = ">="
-    elif cpm_expr.name == ">" : new_expr.name = "<="
-    elif cpm_expr.name == "!=": new_expr.name = "=="
-    else:
-        raise ValueError("Not a comparison:", cpm_expr)
-    return new_expr
-
 
 def get_bounds(expr):
     """ return the bounds of the expression
