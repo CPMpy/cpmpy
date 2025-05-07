@@ -19,12 +19,12 @@ jobs:
           sudo snap install minizinc --classic
 
           # install pumpkin from source
-          git clone https://github.com/consol-lab/pumpkin
-          cd pumpkin/pumpkin_py
+          git clone https://github.com/consol-lab/pumpkin Pumpkin_solver
+          cd Pumpkin_solver/pumpkin-py
           pip install maturin
           maturin develop
           cd ../../
-          
+
       - name: Test with pytest
         run: |
           python -m pytest -n 4 tests/
