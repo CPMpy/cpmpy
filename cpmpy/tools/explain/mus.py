@@ -52,11 +52,9 @@ def mus(soft, hard=[], solver="ortools"):
     for c in sorted(core, key=lambda c : -len(get_variables(dmap[c]))):
         if c not in core:
             continue # already removed
-        core.remove(c)
-        if s.solve(assumptions=list(core)) is True:
-            core.add(c)
-        else: # UNSAT, use new solver core (clause set refinement)
-            core = set(s.get_core())
+
+        if not s.solve(assumptions=list(core)):
+            core = set(s.get_core()) # UNSAT, use new solver core (clause set refinement)
 
     return [dmap[avar] for avar in core]
 
