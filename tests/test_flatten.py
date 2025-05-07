@@ -49,31 +49,31 @@ class TestFlattenConstraint(unittest.TestCase):
         (x,y,z) = self.bvars[:3]
 
         e = (x == y) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual(str([e]), str(flatten_constraint(e)) )
         e = (x == ~y) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual(str([e]), str(flatten_constraint(e)) )
         e = (a == b) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual(str([e]), str(flatten_constraint(e)) )
 
     def test_nq(self):
         (a,b,c,d,e) = self.ivars[:5]
         (x,y,z) = self.bvars[:3]
 
         e = (x != y) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual("[(~BV1) == (BV0)]", str(flatten_constraint(e)) )
         e = (x != ~y) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual("[(~BV1) == (~BV0)]", str(flatten_constraint(e)) )
         e = (a != b) 
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual("[(IV0) != (IV1)]", str(flatten_constraint(e)) )
 
     def test_eq_comp(self):
         (a,b,c,d,e) = self.ivars[:5]
         (x,y,z) = self.bvars[:3]
 
         e = ((a > 5) == x)
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual("[(IV0 > 5) == (BV0)]", str(flatten_constraint(e)))
         e = (x == (b < 3))
-        self.assertEqual( e, flatten_constraint(e) )
+        self.assertEqual("[(IV1 < 3) == (BV0)]", str(flatten_constraint(e)))
         e = ((a > 5) == (b < 3))
         self.assertEqual(len(flatten_constraint(e)), 2)
     

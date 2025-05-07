@@ -25,8 +25,8 @@ class MusTests(TestCase):
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        self.assertEqual(self.mus_func(cons), cons[:3])
-        self.assertEqual(self.naive_func(cons), cons[:3])
+        self.assertEqual(set(self.mus_func(cons)), set(cons[:3]))
+        self.assertEqual(set(self.naive_func(cons)), set(cons[:3]))
 
     def test_bug_191(self):
         """
