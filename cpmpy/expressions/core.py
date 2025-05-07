@@ -555,6 +555,12 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+    
+    def __bool__(self):
+        # will be called when comparing elements in a container, but always with `==`
+        if self.name == "==":
+            return repr(self.args[0]) == repr(self.args[1])
+        super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
