@@ -1,5 +1,67 @@
 # Change log
 
+## 0.9.25
+
+### Added
+* **New solver**: IBM CP Optimizer [#576](https://github.com/CPMpy/cpmpy/pull/576)
+* **New global**: `ShortTable` [#469](https://github.com/CPMpy/cpmpy/pull/469)
+* `model.add()` as new default to add constraints to model (same behaviour as `+=`) [#640](https://github.com/CPMpy/cpmpy/pull/640)
+* Easy install of all solvers through the `"all"` optional dependency, i.e. `pip install cpmpy[all]` [#665](https://github.com/CPMpy/cpmpy/pull/665)
+* More complex variants of the Sudoku puzzle (in examples) [#577](https://github.com/CPMpy/cpmpy/pull/577)
+* API summery sheet [#629](https://github.com/CPMpy/cpmpy/pull/629)
+
+* Linearisation for `div`, `abs` and `mod` [#516](https://github.com/CPMpy/cpmpy/pull/516)
+* Linearisation for subtraction [#639](https://github.com/CPMpy/cpmpy/pull/639)
+* `div` linearisation for Gurobi [#593](https://github.com/CPMpy/cpmpy/pull/593)
+* Native cardinality constraints for PySAT [#588](https://github.com/CPMpy/cpmpy/pull/588)
+* `wsum` support for PySAT
+
+* Support for constants in `Element` global function [#630](https://github.com/CPMpy/cpmpy/pull/630)
+
+* `SolverLookup` now has `.supported()` and `.print_status()` to get information on the available solvers on the current system [#641](https://github.com/CPMpy/cpmpy/pull/641)
+* `solveAll()` now accepts solver-specific kwargs, just like `solve()` [#582](https://github.com/CPMpy/cpmpy/pull/582)
+
+* Optional dependencies for solvers and tools (setup.py) [#599](https://github.com/CPMpy/cpmpy/pull/599)
+* Documentation for all CPMpy exceptions [#622](https://github.com/CPMpy/cpmpy/pull/622)
+
+
+
+### Changed
+* Bumped minimal Python version from 3.7 to 3.8 [#575](https://github.com/CPMpy/cpmpy/pull/575)
+* `mod` and `div` now default to integer division
+* Improved reading of DIMACS formatted files [#587](https://github.com/CPMpy/cpmpy/pull/587)
+* Avoid max-based decomposition for `abs` if possible [#595](https://github.com/CPMpy/cpmpy/pull/595)
+* Cleanup semantics of Boolean Python builtins [#602](https://github.com/CPMpy/cpmpy/pull/602)
+* Performance optimisation of `simplify_bool` [#592](https://github.com/CPMpy/cpmpy/pull/592)
+* Ensure `AllDifferent` decomposition is linear [#614](https://github.com/CPMpy/cpmpy/pull/614)
+* Much improved README 
+* Improved docs formatting, especially for the Python API docstrings [#603](https://github.com/CPMpy/cpmpy/pull/603)
+* Improved API documentation of explanation tools [#512](https://github.com/CPMpy/cpmpy/pull/512)
+* Better exceptions for explanation tools [#512](https://github.com/CPMpy/cpmpy/pull/512)
+* Improve documentation of non-standard solver args passing for Exact [#616](https://github.com/CPMpy/cpmpy/pull/616)
+* General documentation improvements [#619](https://github.com/CPMpy/cpmpy/pull/619), [#633](https://github.com/CPMpy/cpmpy/pull/633), [#634](https://github.com/CPMpy/cpmpy/pull/634)
+* Skip subset of `PySAT` tests when optional dependency `pblib` is not available [#668](https://github.com/CPMpy/cpmpy/pull/668)
+
+### Fixed
+* Linearisation with boolean constants [#581](https://github.com/CPMpy/cpmpy/pull/581)
+* Linearisation of `AllDifferent` with integer constants [#547](https://github.com/CPMpy/cpmpy/pull/547)
+* Side conditions for `Precedence` global [#589](https://github.com/CPMpy/cpmpy/pull/589)
+* `simplify_bool` on non-CPMpy expressions [#626](https://github.com/CPMpy/cpmpy/pull/626)
+* Handling of negative variables in objective during linearisation [#495](https://github.com/CPMpy/cpmpy/pull/495)
+* Integers in `GCC` global for Choco-solver [#646](https://github.com/CPMpy/cpmpy/pull/646)
+* `NValueExceptN` for single value range [#645](https://github.com/CPMpy/cpmpy/pull/645)
+* Handling of empty clauses in GCS [#662](https://github.com/CPMpy/cpmpy/pull/662)
+* Missing user vars when calling `solveAll()`, resulting in incorrect number of solutions [#609](https://github.com/CPMpy/cpmpy/pull/609)
+* Consistent handling of non-positive `time_limit` [#642](https://github.com/CPMpy/cpmpy/pull/642)
+* Added `setuptools` to required dependencies (can be missing on some installs) [#664](https://github.com/CPMpy/cpmpy/pull/664)
+* DIMACS tempfiles on Windows [#601](https://github.com/CPMpy/cpmpy/pull/601)
+
+### Removed
+
+* Removed support for Python version 3.7 [#575](https://github.com/CPMpy/cpmpy/pull/575)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.24...v0.9.25
+
 <!-- ---------------------------------- - ---------------------------------- -->
 
 ## 0.9.24
