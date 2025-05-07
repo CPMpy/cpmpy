@@ -4,7 +4,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -16,6 +18,7 @@ jobs:
           pip install ".[test, z3, choco, exact, pysat, pysdd, choco, minizinc]"
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
+          pip install ./submodules/pindakaas/crates/pyndakaas
           sudo snap install minizinc --classic
       - name: Test with pytest
         run: |
