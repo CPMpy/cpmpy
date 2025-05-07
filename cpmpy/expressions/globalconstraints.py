@@ -381,7 +381,7 @@ class Inverse(GlobalConstraint):
         constraining, defining = [], []
         for i,x in enumerate(fwd):
             if is_num(x) and not 0 <= x < len(rev): 
-                return [cp.BoolVal(False)], [] # this will never work
+                return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
            
             lb, ub = get_bounds(x)
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
