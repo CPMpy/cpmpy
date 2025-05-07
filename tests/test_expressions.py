@@ -577,12 +577,6 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a % b).value()))
 
 
-
-
-
-
-
-
 class TestBuildIns(unittest.TestCase):
 
     def setUp(self):
@@ -603,6 +597,58 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(list(self.x))))
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
+
+
+class TestContainer(unittest.TestCase):
+
+    def setUp(self):
+        self.x = cp.intvar(0,10,name="x")
+        self.y = cp.intvar(0,10,name="y")
+        self.z = cp.intvar(0,10,name="z")
+
+    def test_list(self):
+        lst = [self.x, self.y, self.z]
+        assert lst == [self.x, self.y, self.z]
+        assert not lst == [self.x, self.z, self.y]
+        assert lst != [self.x, self.z, self.y]
+     
+    def test_set(self):
+        s = {self.x, self.y, self.z}
+        assert s == {self.x, self.y, self.z}
+        assert {self.x} <= s # test subset
+        assert s & {self.x} == {self.x} # test intersection
+        assert s | {self.x} == s # test union
+        assert s - {self.x} == {self.y, self.z} # test difference
+        assert s ^ {self.x} == {self.y, self.z} # test symmetric difference
+        assert s ^ {self.x, self.y} == {self.z}
+        assert s ^ {self.x, self.y, self.z} == set()
+
+        # tricky cases, force hash collisions
+        self.x.__hash__ = lambda self: 1
+        self.y.__hash__ = lambda self: 1
+        assert s == {self.x, self.y, self.z}
+        assert {self.x} <= s # test subset
+        assert s & {self.x} == {self.x} # test intersection
+        assert s | {self.x} == s # test union
+        assert s - {self.x} == {self.y, self.z} # test difference
+        assert s ^ {self.x} == {self.y, self.z} # test symmetric difference
+        assert s ^ {self.x, self.y} == {self.z}
+        assert s ^ {self.x, self.y, self.z} == set()
+
+    def test_dict(self):
+        d = {self.x: "x", self.y: "y", self.z: "z"}
+        assert d == {self.x: "x", self.y: "y", self.z: "z"}
+        assert d[self.x] == "x"
+        assert d[self.y] == "y"
+        assert d[self.z] == "z"
+
+        # tricky cases, force hash collisions
+        self.x.__hash__ = lambda self: 1
+        self.y.__hash__ = lambda self: 1
+        assert d == {self.x: "x", self.y: "y", self.z: "z"}
+        assert d[self.x] == "x"
+        assert d[self.y] == "y"
+        assert d[self.z] == "z"
 
 if __name__ == '__main__':
     unittest.main()
