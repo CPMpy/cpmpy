@@ -34,10 +34,10 @@ SAT_SOLVERS = {"pysat", "pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "z3": {"Inverse"},
-                  "choco": {"Inverse"},
-                  "ortools":{"Inverse"},
-                  "exact": {"Inverse"},
+                  "z3": {},
+                  "choco": {},
+                  "ortools":{},
+                  "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   "gcs": {}
                   }
