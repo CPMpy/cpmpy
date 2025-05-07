@@ -5,7 +5,7 @@
 ### Added
 * **New solver**: IBM CP Optimizer [#576](https://github.com/CPMpy/cpmpy/pull/576)
 * **New global**: `ShortTable` [#469](https://github.com/CPMpy/cpmpy/pull/469)
-* `model.add()` as new default to add constraints to model (instead of `+=`) [#640](https://github.com/CPMpy/cpmpy/pull/640)
+* `model.add()` as new default to add constraints to model (same behaviour as `+=`) [#640](https://github.com/CPMpy/cpmpy/pull/640)
 * Easy install of all solvers through the `"all"` optional dependency, i.e. `pip install cpmpy[all]` [#665](https://github.com/CPMpy/cpmpy/pull/665)
 * More complex variants of the Sudoku puzzle (in examples) [#577](https://github.com/CPMpy/cpmpy/pull/577)
 * API summery sheet [#629](https://github.com/CPMpy/cpmpy/pull/629)
