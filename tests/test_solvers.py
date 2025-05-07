@@ -518,7 +518,7 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(exact.solve())
 
         with open(proof_file+".proof", "r") as f:
-            self.assertEquals(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
+            self.assertEqual(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -863,4 +863,5 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
+        solution_limit = 5 if solver == "gurobi" else None
+        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
