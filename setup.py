@@ -15,7 +15,7 @@ def get_version(rel_path):
     else:
         raise RuntimeError("Unable to find version string.")
 
-with open("README.md", "r") as readme_file:
+with open("README.md", "r", encoding="utf8") as readme_file:
     long_description = readme_file.read()
 
 
@@ -49,6 +49,7 @@ setup(
     install_requires=[
         'ortools>=9.9',
         'numpy>=1.5',
+        'setuptools',
     ],
     extras_require=(
         # Solvers
