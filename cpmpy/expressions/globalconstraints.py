@@ -389,7 +389,7 @@ class Inverse(GlobalConstraint):
             else: # partial! need safening here
                 is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
                 constraining += [is_defined, total_expr == i]
-            defining += toplevel
+                defining += toplevel
         
         return constraining, defining
 
