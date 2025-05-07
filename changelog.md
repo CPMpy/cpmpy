@@ -23,6 +23,8 @@
 * Optional dependencies for solvers and tools (setup.py) [#599](https://github.com/CPMpy/cpmpy/pull/599)
 * Documentation for all CPMpy exceptions [#622](https://github.com/CPMpy/cpmpy/pull/622)
 
+* Install all solvers through `all` optional dependency, i.e. `pip install cpmpy[all]` [#665](https://github.com/CPMpy/cpmpy/pull/665)
+
 
 ### Changed
 * Bumped minimal Python version from 3.7 to 3.8 [#575](https://github.com/CPMpy/cpmpy/pull/575)
@@ -37,6 +39,7 @@
 * Improved API documentation of explanation tools & better exceptions [#512](https://github.com/CPMpy/cpmpy/pull/512)
 * Improve documentation of non-standard solver args for Exact [#616](https://github.com/CPMpy/cpmpy/pull/616)
 * General documentation improvements [#619](https://github.com/CPMpy/cpmpy/pull/619), [#633](https://github.com/CPMpy/cpmpy/pull/633), [#634](https://github.com/CPMpy/cpmpy/pull/634)
+* Skip tests when optional dependency `pblib` is not available [#668](https://github.com/CPMpy/cpmpy/pull/668)
 
 ### Fixed
 * Linearisation with boolean constants [#581](https://github.com/CPMpy/cpmpy/pull/581)
@@ -50,6 +53,7 @@
 * Integers in `GCC` global for Choco-solver [#646](https://github.com/CPMpy/cpmpy/pull/646)
 * `NValueExceptN` for single value range [#645](https://github.com/CPMpy/cpmpy/pull/645)
 * Handling of empty clauses in GCS [#662](https://github.com/CPMpy/cpmpy/pull/662)
+* Added `setuptools` to required dependencies (can be missing on some installs) [#664](https://github.com/CPMpy/cpmpy/pull/664)
 
 **Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.24...v0.9.25
 
