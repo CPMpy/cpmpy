@@ -1,4 +1,3 @@
-import importlib
 import unittest
 import pytest
 import cpmpy as cp 
