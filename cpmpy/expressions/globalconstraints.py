@@ -374,7 +374,6 @@ class Inverse(GlobalConstraint):
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
-        from cpmpy.transformations.safening import _safen_range
 
         fwd, rev = self.args
         rev = cpm_array(rev)
@@ -388,7 +387,7 @@ class Inverse(GlobalConstraint):
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
                 constraining.append(rev[x] == i)
             else: # partial! need safening here
-                is_defined, total_expr, toplevel =_safen_range(rev[x], (0, len(rev)-1), 1)
+                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
                 constraining += [is_defined, total_expr == i]
             defining += toplevel
         
