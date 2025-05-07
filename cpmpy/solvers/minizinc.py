@@ -64,6 +64,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
@@ -394,7 +395,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += cpm_any([v != v.value() for v in self.user_vars])
 
         if solution_count == 0:
             # clear user vars if no solution found
