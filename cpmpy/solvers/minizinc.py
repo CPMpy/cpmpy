@@ -369,19 +369,17 @@ class CPM_minizinc(SolverInterface):
             if mzn_result.solution is None:
                 break
 
+             # fill in variable values
+            mznsol = mzn_result.solution
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
+                else:
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
             # display (and reverse-map first) if needed
             if display is not None:
-                mznsol = mzn_result.solution
-
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if hasattr(mznsol, sol_var):
-                        cpm_var._value = getattr(mznsol, sol_var)
-                    else:
-                        print("Warning, no value for ", sol_var)
-
-                # and the actual displaying
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
