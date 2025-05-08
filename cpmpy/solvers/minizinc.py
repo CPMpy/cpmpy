@@ -57,7 +57,10 @@ import re
 import warnings
 import sys
 import os
+import json
+import platform
 from datetime import timedelta  # for mzn's timeout
+from pathlib import Path
 
 import numpy as np
 
@@ -125,26 +128,52 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
-
+        
     @staticmethod
-    def solvernames():
+    def solvernames(installed:bool=True):
         """
-            Returns solvers supported by MiniZinc on your system
+            Returns solvers supported by MiniZinc (on your system)
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system
+
+            Returns:
+                list of solver names
 
             .. warning::
-                WARNING, some of them may not actually be installed on your system
-                (namely cplex, gurobi, scip, xpress).
-                The following are bundled in the bundle: chuffed, coin-bc, gecode
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                be installed on your system (namely cplex, gurobi, scip, xpress).
+                The following are bundled with minizinc: chuffed, coin-bc, gecode.
+                Use ``installed=True`` if you only want the names actually installed solvers.
         """
         import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
+        driver = minizinc.default_driver
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
-        return solver_names
+        # Collect solver names
+        all_solvers, all_versions = [], []
+        output = driver._run(["--solvers-json"])
+        solvers = json.loads(output.stdout)        
+        for solver_dict in solvers:
+            tag = solver_dict["id"].split(".")[-1]
+            version = solver_dict["version"]
+            if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
+                all_solvers.append(tag)
+                all_versions.append(version)
+
+        if not installed:
+            """
+            Return all solver names, without checking if they're actually available on the system.
+            """
+            return set(all_solvers)
+
+        else:
+            """
+            Test which solver executables are available by retrieving version information
+            """
+            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"]
+            installed_solvers = [all_solvers[i] for i in valid_indices]
+
+            return set(installed_solvers)
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
