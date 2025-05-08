@@ -16,12 +16,15 @@ from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 def test_solve(model, exp_sols, user_vars, description=None):
-    user_vars = []
-    sols = []
-    cp.Model().solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
-    assert len(set(sols)) == len(sols), "Reported solutions should be unique"
-    assert len(sols) == len(exp_sols), "Reported number of solutions did not match"
-    assert sols == exp_sols, "Solutions did not match expected"
+    try:
+        user_vars = []
+        sols = []
+        cp.Model().solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
+        assert len(set(sols)) == len(sols), "Reported solutions should be unique"
+        assert len(sols) == len(exp_sols), "Reported number of solutions did not match"
+        assert sols == exp_sols, "Solutions did not match expected"
+    except AssertionError as e:
+        raise Exception(description) from e
 
 
 
