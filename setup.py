@@ -51,15 +51,15 @@ setup(
         'numpy>=1.5',
         'setuptools',
     ],
-    extras_require=(
+    extras_require={
         # Solvers
-        solver_dependencies | {
+        **solver_dependencies,
         # Tools
         # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
         # Other
         "test": ["pytest"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
-    }),
+    },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.8",
