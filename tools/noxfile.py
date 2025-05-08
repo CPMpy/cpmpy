@@ -52,8 +52,11 @@ def pytest(session):
     # Solver filtering
     selected_solvers = SOLVERS.copy()
     # Remove "exact" if Python < 3.10
-    if ("exact" in selected_solvers) and (major, minor) < (3, 10) or (major, minor) > (3, 12):
+    if ("exact" in selected_solvers) and (major, minor) < (3, 10):
         selected_solvers.remove("exact")
+    # Remove "cpo" if Python >= 3.13
+    if ("cpo" in selected_solvers) and (major, minor) >= (3, 13):
+        selected_solvers.remove("cpo")
 
     # Add MiniZinc to PATH if it was installed (see "install_minizinc" session) and included in the session
     if "minizinc" in SOLVERS:
@@ -117,7 +120,7 @@ def pytest(session):
     # Install pytest dependencies
     session.install("pytest-xdist", "--no-cache")
     
-
+    # If manually installing CPLEX binaries
     # session.run(
     #     "bash", 
     #     "-c", 
