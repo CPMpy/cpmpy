@@ -15,7 +15,56 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
+def test_solve(model, exp_sols, user_vars, description=None):
+    user_vars = []
+    sols = []
+    cp.Model().solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
+    assert len(set(sols)) == len(sols), "Reported solutions should be unique"
+    assert len(sols) == len(exp_sols), "Reported number of solutions did not match"
+    assert sols == exp_sols, "Solutions did not match expected"
+
+
+
 class TestSolvers(unittest.TestCase):
+
+    def test_empty_model(self):
+        test_solve(
+            cp.Model().solveAll(),
+            [tuple()],
+            tuple(),
+            description="An empty CSP (with 0 user variables) should have one solution (with an empty assignment)"
+        )
+
+    def test_true_constant(self):
+        test_solve(
+            cp.Model(cp.BoolVal(True)).solveAll(),
+            [tuple()],
+            tuple(),
+            description="A CSP with one True constant (and 0 user variables) should have one solution (with an empty assignment)"
+        )
+
+    def test_two_true_constants(self):
+        test_solve(
+            cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(),
+            [tuple()],
+            tuple(),
+            description="A CSP with two True constants (and 0 user variables) should have one solution (with an empty assignment)"
+        )
+
+    def test_false_constant(self):
+        test_solve(
+            cp.Model(cp.BoolVal(False)).solveAll(),
+            [],
+            tuple(),
+            description="A CSP with a False constant (and 0 user variables) should have no solutions"
+        )
+
+    @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
+    def test_implied_linear(self):
+        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
+        p = cp.boolvar(name="p")
+        user_vars = (x, y, z, p)
+        test_solve(cp.Model(cp.BoolVal(True)).solveAll(), None, user_vars)
 
     # should move this test elsewhere later
     def test_tsp(self):
@@ -87,23 +136,6 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
-
-    def test_ortools_solve_empty(self):
-        user_vars = []
-        sols = []
-        cp.Model().solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
-        assert len(sols) == 1, "An empty CSP (with 0 user variables) should have one solution (with an empty assignment)"
-        assert sols == [tuple()]
-
-    def test_ortools_solve_all(self):
-        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
-        p = cp.boolvar(name="p")
-        user_vars = [x, y, z, p]
-        sols = []
-        cp.Model(p.implies(
-            2 * x + 3 * y + 5 * z == 12
-        )).solveAll(display=lambda: sols.append(tuple(argvals(user_vars))))
-        assert len(sols) == len(set(sols)), "There should be no duplicate solutions"
 
     def test_ortools_direct_solver(self):
         """
