@@ -1,3 +1,4 @@
+import os
 import unittest
 import tempfile
 
@@ -10,7 +11,11 @@ from cpmpy.solvers.solver_interface import ExitStatus
 class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.tmpfile = tempfile.NamedTemporaryFile()
+        self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
+    def tearDown(self) -> None:
+        self.tmpfile.close()
+        os.remove(self.tmpfile.name)
 
     def dimacs_to_model(self, cnf_str):
         # return read_dimacs(io.StringIO(cnf_str))

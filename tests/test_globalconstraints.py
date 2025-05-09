@@ -9,7 +9,10 @@ from cpmpy.exceptions import TypeError, NotSupportedError
 from cpmpy.expressions.utils import STAR
 from cpmpy.solvers import CPM_minizinc
 
+from utils import skip_on_missing_pblib
 
+
+@skip_on_missing_pblib(skip_on_exception_only=True)
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -572,7 +575,7 @@ class TestGlobal(unittest.TestCase):
 
     def test_abs(self):
         from cpmpy.transformations.decompose_global import decompose_in_tree
-        iv = cp.intvar(-8, 8)
+        iv = cp.intvar(-8, 8, name="x")
         constraints = [cp.Abs(iv) + 9 <= 8]
         model = cp.Model(constraints)
         self.assertFalse(model.solve())
@@ -585,6 +588,16 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(abs(iv.value())), '4')
+        self.assertEqual(model.solveAll(display=iv), 15)
+
+        pos = cp.intvar(0,8, name="x")
+        constraints = [cp.Abs(pos) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
+        neg = cp.intvar(-8,0, name="x")
+        constraints = [cp.Abs(neg) != 4]
+        self.assertEqual(cp.Model(decompose_in_tree(constraints)).solveAll(), 8)
+
 
     def test_element(self):
         # test 1-D
@@ -1292,7 +1305,8 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3, name="x")
 
         for name, cls in cp.SolverLookup.base_solvers():
-
+            # The decomposition of this global introduces (as of yet) unsupported integer variables for PySAT
+            if name == "pysat": continue
             if cls.supported() is False:
                 continue
             try:
@@ -1314,3 +1328,25 @@ class TestTypeChecks(unittest.TestCase):
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         self.assertRaises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+
+    def test_issue627(self):
+        for s, cls in cp.SolverLookup.base_solvers():
+            if cls.supported():
+                try:
+                    # constant look-up
+                    self.assertTrue(cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s))
+                    # constant out-of-bounds look-up
+                    self.assertFalse(cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s))
+                except (NotImplementedError, NotSupportedError):
+                    pass
+
+    def test_element_index_dom_mismatched(self):
+        """
+            Check transform of `[0,1,2][x in -1..1] == y in 1..5`
+            Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
+        """
+        constraint=cp.Element([0,1,2], cp.intvar(-1,1, name="x"))
+        self.assertEqual(
+            str(constraint.decompose_comparison("==", cp.intvar(1,5, name="y"))),
+            "([(x == 0) -> (y == 0), (x == 1) -> (y == 1), x >= 0, x <= 1], [])"
+        )

@@ -1,17 +1,23 @@
 """
-  Transformations regarding reification constraints.
+    Transformations that rewrite reified constraints as needed.
 
-  There are three types of reification (BV=BoolVar, BE=BoolExpr):
-    - BV -> BE      single implication, from var to expression
-    - BV <- BE      single implication, from expression to var
-    - BE == BV      full reification / double implication (e.g. BV <-> BE)
+    There are three types of reification (BV=BoolVar, BE=BoolExpr):
 
-  Using logical operations, they can be decomposed and rewritten to each other.
+    =============  ============================================================
+    ``BV -> BE``   single implication, from var to expression                 
+    ``BV <- BE``   single implication, from expression to var                
+    ``BE == BV``   full reification / double implication (e.g. ``BV <-> BE``) 
+    =============  ============================================================
 
-  This file implements:
-    - only_bv_reifies():    transforms all reifications to BV -> BE or BV == BE
-    - only_implies():       transforms all reifications to BV -> BE form
-    - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
+    Using logical operations, they can be decomposed and rewritten to each other.
+
+    This file implements:
+
+    ==========================  =================================================================
+    :func:`only_bv_reifies()`   transforms all reifications to ``BV -> BE`` or ``BV == BE``      
+    :func:`only_implies()`      transforms all reifications to ``BV -> BE`` form                 
+    :func:`reify_rewrite()`     rewrites reifications not supported by a solver to ones that are 
+    ==========================  =================================================================
 """
 import copy
 from ..expressions.core import Operator, Comparison, Expression
@@ -47,16 +53,19 @@ def only_bv_reifies(constraints):
 
 def only_implies(constraints):
     """
-        Transforms all reifications to BV -> BE form
+        Transforms all reifications to ``BV -> BE`` form
 
         More specifically:
+
+        .. code-block:: text
+
             BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                               :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                               :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
             BV == BE :: ~BV -> ~BE, BV -> BE
 
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
-        AFTER `flatten()` and 'only_bv_reifies()'.
+        AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
     newcons = []
     retransform = []
@@ -105,15 +114,15 @@ def reify_rewrite(constraints, supported=frozenset()):
         to a version that uses standard constraints and reification over equalities between variables.
 
         Input is expected to be in Flat Normal Form without unsupported globals present.
-        (so after `flatten_constraint()` and 'decompose_global()')
+        (so after :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`~cpmpy.transformations.decompose_global.decompose_global()`)
         Output will also be in Flat Normal Form
 
-        Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
+        Boolean expressions ``and``, ``or``, and ``->`` and comparison expression ``IV1==IV2`` are assumed to support reification
         (actually currently all comparisons <op> in {'==', '!=', '<=', '<', '>=', '>'},
-         IV1 <op> IV2 are assumed to support reification BV -> (IV1 <op> IV2))
+        ``IV1 <op> IV2`` are assumed to support reification ``BV -> (IV1 <op> IV2)``)
 
-        :param supported  a (frozen)set of expression names that support reification in the solver, including
-                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. BV -> (LHS == V)
+        :param supported: a (frozen)set of expression names that support reification in the solver, including
+                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
     if not is_any_list(constraints):
         # assume list, so make list

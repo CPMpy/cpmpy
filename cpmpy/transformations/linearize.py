@@ -1,39 +1,50 @@
 """
-Transformations regarding linearization of constraints.
+Transforms flat constraints into linear constraints.
 
 Linearized constraints have one of the following forms:
 
-
 Linear comparison:
 ------------------
-- LinExpr == Constant
-- LinExpr >= Constant
-- LinExpr <= Constant
+- ``LinExpr == Constant``
+- ``LinExpr >= Constant``
+- ``LinExpr <= Constant``
 
-    LinExpr can be any of:
-        - NumVar
-        - sum
-        - wsum
+LinExpr can be any of:
+
+- `NumVar`
+- `sum`
+- `wsum`
 
 Indicator constraints:
 ----------------------
-- BoolVar -> LinExpr == Constant
-- BoolVar -> LinExpr >= Constant
-- BoolVar -> LinExpr <= Constant
 
-- BoolVar -> GenExpr                    (GenExpr.name in supported, GenExpr.is_bool())
-- BoolVar -> GenExpr >= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr <= Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
-- BoolVar -> GenExpr == Var/Constant    (GenExpr.name in supported, GenExpr.is_num())
++------------------------------------+
+| ``BoolVar -> LinExpr == Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr >= Constant`` |
++------------------------------------+
+| ``BoolVar -> LinExpr <= Constant`` |
++------------------------------------+
 
-Where BoolVar is a boolean variable or its negation.
+========================================   ==============================================
+``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
+``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
+========================================   ==============================================
+
+Where ``BoolVar`` is a boolean variable or its negation.
 
 General comparisons or expressions
 -----------------------------------
-- GenExpr                               (GenExpr.name in supported, GenExpr.is_bool())
-- GenExpr == Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr <= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
-- GenExpr >= Var/Constant               (GenExpr.name in supported, GenExpr.is_num())
+
+============================  ==============================================
+``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
+``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
+``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
+============================  ============================================== 
+
 
 
 """
@@ -59,33 +70,40 @@ from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
-    Only apply after 'cpmpy.transformations.flatten_model.flatten_constraint()' 'and only_implies()'.
+    Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
-    `AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-    Any other unsupported global constraint should be decomposed using `cpmpy.transformations.decompose_global.decompose_global()`
-
+    Arguments:
+        supported: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
+            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
+            Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
+        reified: whether the constraint is fully reified
     """
 
     newlist = []
     for cpm_expr in lst_of_expr:
-
-        # boolvar
+        # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
-            newlist.append(sum([cpm_expr]) >= 1)
+            if "or" in supported:
+                # post clause explicitly (don't use cp.any, which will just return the BoolVar)
+                newlist.append(Operator("or", [cpm_expr]))
+            elif isinstance(cpm_expr, NegBoolView):
+                # might as well remove the negation
+                newlist.append(sum([~cpm_expr]) <= 0)
+            else: # positive literal
+                newlist.append(sum([cpm_expr]) >= 1)
 
         # Boolean operators
         elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
             # conjunction
-            if cpm_expr.name == "and":
+            if cpm_expr.name == "and" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
 
             # disjunction
-            elif cpm_expr.name == "or":
+            elif cpm_expr.name == "or" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= 1)
 
             # xor
@@ -107,10 +125,25 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
                     lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
-                    newlist += [cond.implies(lin) for lin in lin_sub]
+                    # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
+                    indicator_constraints=[]
+                    for lin in lin_sub:
+                        if is_true_cst(lin):
+                            continue
+                        elif is_false_cst(lin):
+                            indicator_constraints=[] # do not add any constraints
+                            newlist+=linearize_constraint([~cond], supported=supported) # post linear version of unary constraint
+                            break # do not need to add other
+                        else:
+                            indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                    newlist+=indicator_constraints
+
                     # ensure no new solutions are created
                     new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified)
+
+            else: # supported operator
+                newlist.append(cpm_expr)
 
 
         # comparisons
@@ -119,7 +152,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             if lhs.name == "sub":
                 # convert to wsum
-                lhs = sum([1 * lhs.args[0] + -1 * lhs.args[1]])
+                lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
             if lhs.name == "-":
@@ -238,7 +271,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and abs not in supported:
+            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar = intvar(*get_bounds(lhs))
                     newlist += linearize_constraint([lhs == newvar])
@@ -264,6 +297,17 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
+
+            # check trivially true/false (not allowed by PySAT Card/PB)
+            if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
+                lb,ub = lhs.get_bounds()
+                t_lb = eval_comparison(cpm_expr.name, lb, rhs)
+                t_ub = eval_comparison(cpm_expr.name, ub, rhs)
+                if t_lb and t_ub:
+                    continue
+                elif not t_lb and not t_ub:
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported) # post the linear version of False
+                    break
 
             # now fix the comparisons themselves
             if cpm_expr.name == "<":
@@ -330,7 +374,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
             # link Boolean matrix and integer variable
             for arg, row in zip(cpm_expr.args, x):
                 if is_num(arg): # constant, fix directly
-                    newlist.append(row[arg-lb] == 1)
+                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
                 else: # ensure result is canonical
                     newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
@@ -345,43 +389,43 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False):
 
 def only_positive_bv(lst_of_expr):
     """
-        Replaces constraints containing NegBoolView with equivalent expression using only BoolVar.
-        cpm_expr is expected to be linearized. Only apply after applying linearize_constraint(cpm_expr)
+        Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+        Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
 
-        Resulting expression is linear.
+        Resulting expression is linear if the original expression was linear.
     """
     newlist = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
+            new_lhs = lhs
             new_cons = []
 
-            if isinstance(lhs, _NumVarImpl):
-                if isinstance(lhs,NegBoolView):
-                    lhs, rhs = Operator("wsum",[[-1], [lhs._bv]]), 1 - rhs
+            if isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}:
+                new_lhs, const = only_positive_bv_wsum_const(lhs)
+                rhs -= const
+            else:
+                # other operators in comparison such as "min", "max"
+                nbv_sel = [isinstance(a, NegBoolView) for a in lhs.args]
+                if any(nbv_sel):
+                    new_args = []
+                    for i, nbv in enumerate(nbv_sel):
+                        if nbv:
+                            aux = cp.boolvar()
+                            new_args.append(aux)
+                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                        else:
+                            new_args.append(lhs.args[i])
 
-            if lhs.name == "sum" and any(isinstance(a, NegBoolView) for a in lhs.args):
-                lhs = Operator("wsum",[[1]*len(lhs.args), lhs.args])
+                    new_lhs = copy.copy(lhs)
+                    new_lhs.update_args(new_args)
 
-            if lhs.name == "wsum":
-                weights, args = lhs.args
-                idxes = {i for i, a in enumerate(args) if isinstance(a, NegBoolView)}
-                nw, na = zip(*[(-w,a._bv) if i in idxes else (w,a) for i, (w,a) in enumerate(zip(weights, args))])
-                lhs = Operator("wsum", [list(nw), list(na)]) # force making wsum, even for arity = 1
-                rhs -= sum(weights[i] for i in idxes)
-
-            if isinstance(lhs, Operator) and lhs.name not in {"sum","wsum"}:
-            # other operators in comparison such as "min", "max"
-                lhs = copy.copy(lhs)
-                for i,arg in enumerate(list(lhs.args)):
-                    if isinstance(arg, NegBoolView):
-                        new_arg, cons = get_or_make_var(1 - arg)
-                        lhs.args[i] = new_arg
-                        new_cons += cons
-
-            newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-            newlist += linearize_constraint(new_cons)
+            if new_lhs != lhs:
+                newlist.append(eval_comparison(cpm_expr.name, new_lhs, rhs))
+                newlist += new_cons  # already linear
+            else:
+                newlist.append(cpm_expr)
 
         # reification
         elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
@@ -392,14 +436,99 @@ def only_positive_bv(lst_of_expr):
                 subexpr = only_positive_bv([subexpr])
                 newlist += [cond.implies(expr) for expr in subexpr]
 
-
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
         elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
-
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")
 
     return newlist
+
+def only_positive_bv_wsum(expr):
+    """
+        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
+        using only :class:`~cpmpy.expressions.variables.BoolVar`. 
+
+        It might add a constant term to the expression, if you want the constant separately, use :func:`only_positive_bv_wsum_const`.
+        
+        Arguments:
+        - `cpm_expr`: linear expression (sum, wsum, var)
+        
+        Returns tuple of:
+        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
+    """
+    if isinstance(expr, _NumVarImpl) or expr.name in {"sum","wsum"}:
+        pos_expr, const = only_positive_bv_wsum_const(expr)
+        if const == 0:
+            return pos_expr
+        else:
+            assert isinstance(pos_expr, Operator) and pos_expr.name == "wsum", f"unexpected expression, should be wsum but got {pos_expr}"
+            # should we check if it already has a constant term?
+            return Operator("wsum", [pos_expr.args[0]+[1], pos_expr.args[1]+[const]])
+    else:
+        return expr
+
+def only_positive_bv_wsum_const(cpm_expr):
+    """
+        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
+        using only :class:`~cpmpy.expressions.variables.BoolVar` as well as a constant term that must be added to the new expression to be equivalent.
+
+        If you want the expression where the constant term is part of the wsum returned, use :func:`only_positive_bv_wsum`.
+        
+        Arguments:
+        - `cpm_expr`: linear expression (sum, wsum, var)
+        
+        Returns tuple of:
+        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
+        - `const`: The difference between the original expression and the new expression, 
+                   i.e. a constant term that must be added to pos_expr to be an equivalent linear expression.
+    """
+    if isinstance(cpm_expr, _NumVarImpl):
+        if isinstance(cpm_expr,NegBoolView):
+            return Operator("wsum",[[-1], [cpm_expr._bv]]), 1
+        else:
+            return cpm_expr, 0
+
+    elif cpm_expr.name == "sum":
+        # indicator on arguments being negboolviews
+        nbv_sel = [isinstance(a, NegBoolView) for a in cpm_expr.args]
+        if any(nbv_sel):
+            const = 0
+            weights = []
+            variables = []
+            for i, nbv in enumerate(nbv_sel):
+                if nbv:
+                    const += 1
+                    weights.append(-1)
+                    variables.append(cpm_expr.args[i]._bv)
+                else:
+                    weights.append(1)
+                    variables.append(cpm_expr.args[i])
+            return Operator("wsum", [weights, variables]), const
+        else:
+            return cpm_expr, 0
+
+    elif cpm_expr.name == "wsum":
+        # indicator on arguments of the wsum variable being negboolviews
+        nbv_sel = [isinstance(a, NegBoolView) for a in cpm_expr.args[1]]
+        if any(nbv_sel):
+            # copy weights and variables
+            weights = [w for w in cpm_expr.args[0]]
+            variables = [v for v in cpm_expr.args[1]]
+            const = 0
+            for i, nbv in enumerate(nbv_sel):
+                if nbv:
+                    const += weights[i]
+                    weights[i] = -weights[i]
+                    variables[i] = variables[i]._bv
+            return Operator("wsum", [weights, variables]), const
+        else:
+            return cpm_expr, 0
+
+    else:
+        raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
+
 
 def canonical_comparison(lst_of_expr):
 
@@ -429,6 +558,8 @@ def canonical_comparison(lst_of_expr):
                 lhs2 = []
                 if isinstance(rhs, _NumVarImpl):
                     lhs2, rhs = [-1 * rhs], 0
+                elif isinstance(rhs, BoolVal):
+                    lhs2, rhs = [-1] if rhs.value() else [], 0 
                 elif isinstance(rhs, Operator) and rhs.name == "-":
                     lhs2, rhs = [rhs.args[0]], 0
                 elif isinstance(rhs, Operator) and rhs.name == "sum":
@@ -440,6 +571,7 @@ def canonical_comparison(lst_of_expr):
                                     if isinstance(b, _NumVarImpl)], \
                                     sum(-a * b for a, b in zip(rhs.args[0], rhs.args[1])
                                     if not isinstance(b, _NumVarImpl))
+                
                 # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
                     lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
@@ -486,9 +618,9 @@ def canonical_comparison(lst_of_expr):
 def only_positive_coefficients(lst_of_expr):
     """
         Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
-        This can simplify a wsum into sum.
-        cpm_expr is expected to be a canonical comparison.
-        Only apply after applying canonical_comparison(cpm_expr)
+        This can simplify a `wsum` into `sum`.
+        `cpm_expr` is expected to be a canonical comparison.
+        Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
 
         Resulting expression is linear.
     """
@@ -527,4 +659,3 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
-

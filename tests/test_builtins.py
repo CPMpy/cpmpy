@@ -1,6 +1,7 @@
 import unittest
 
 import cpmpy as cp
+from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any
 from cpmpy.exceptions import CPMpyException
 
 iv = cp.intvar(-8, 8, shape=5)
@@ -45,3 +46,84 @@ class TestBuiltin(unittest.TestCase):
         model = cp.Model(cp.abs(iv[0]).decompose_comparison('!=', 4))
         self.assertTrue(model.solve())
         self.assertNotEqual(str(cp.abs(iv[0].value())), '4')
+
+    # Boolean builtins
+    def test_all(self):
+        # edge-cases
+        # Only CPMpy expressions
+        x = [cp.boolvar(), cp.BoolVal(False), cp.boolvar()]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")        
+        x = [cp.BoolVal(True)]
+        self.assertEqual(str(cpm_all(x)), "boolval(True)")
+        x = [cp.BoolVal(False)]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+
+        # mix of Python and CPMpy expressions
+        x = [cp.boolvar(), False, cp.boolvar()]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+        x = [False, cp.BoolVal(False)]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+        x = [False, cp.BoolVal(True)]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+        x = [cp.BoolVal(False), False]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+        x = [cp.BoolVal(True), False]
+        self.assertEqual(str(cpm_all(x)), "boolval(False)")
+
+        # only Python constants, should override default
+        x = [False, True]
+        self.assertEqual(str(cpm_all(x)), "False")
+        x = []
+        self.assertEqual(str(cpm_all(x)), "True")
+
+        # should also work with overloaded operators
+        expr = cp.BoolVal(False) & cp.BoolVal(True)
+        self.assertEqual(str(expr), "boolval(False)")
+        expr = False & cp.BoolVal(True)
+        self.assertEqual(str(expr), "boolval(False)")
+        expr = cp.BoolVal(False) & True
+        self.assertEqual(str(expr), "boolval(False)")
+
+        # 1 and 0 are not Boolean
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) & 1)
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) & 0)
+
+    def test_any(self):
+        # edge-cases
+
+        # Only CPMpy expressions
+        x = [cp.boolvar(), cp.BoolVal(True), cp.boolvar()]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [cp.BoolVal(True)]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [cp.BoolVal(False)]
+        self.assertEqual(str(cpm_any(x)), "boolval(False)")
+        
+
+        # mix of Python and CPMpy expressions
+        x = [cp.boolvar(), True, cp.boolvar()]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [True, cp.BoolVal(True)]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        x = [False, cp.BoolVal(False)]
+        self.assertEqual(str(cpm_any(x)), "boolval(False)")
+        x = [cp.BoolVal(True), True]
+        self.assertEqual(str(cpm_any(x)), "boolval(True)")
+        
+        # only Python constants, should override default
+        x = [False, True]
+        self.assertEqual(str(cpm_any(x)), "True")
+        x = []
+        self.assertEqual(str(cpm_any(x)), "False")
+        
+        # should also work with overloaded operators
+        expr = cp.BoolVal(False) | cp.BoolVal(True)
+        self.assertEqual(str(expr), "boolval(True)")
+        expr = False | cp.BoolVal(True)
+        self.assertEqual(str(expr), "boolval(True)")
+        expr = cp.BoolVal(False) | True
+        self.assertEqual(str(expr), "boolval(True)")
+
+        # 1 and 0 are not Boolean
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) | 1)
+        self.assertRaises(ValueError, lambda : cp.BoolVal(False) | 0)
