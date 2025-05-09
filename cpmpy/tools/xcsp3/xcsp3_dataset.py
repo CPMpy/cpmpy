@@ -97,18 +97,14 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
     
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
-        Get a single XCSP3 instance.
+        Get a single XCSP3 instance filename and metadata.
 
-        Unlike in the machine learning case, we expect that each instance is only
-        needed once. Hence, we did not load all instances into memory in the constructor.
-        Instead, we decompress and load here only this instance.
-        
         Args:
             index (int): Index of the instance to retrieve
             
         Returns:
             Tuple[Any, Any]: A tuple containing:
-                - The parsed XML ElementTree of the instance file content
+                - The filename of the instance
                 - Metadata dictionary with file name, track, year etc.
         """
         if index < 0 or index >= len(self):
@@ -117,11 +113,6 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
         # Get all compressed XML files and sort for deterministic behavior
         files = sorted(list(self.track_dir.glob("*.xml.lzma")))
         file_path = files[index]
-
-        # Decompress the LZMA file and parse the XML
-        with lzma.open(file_path, 'rb') as f:
-            tree = ET.parse(f)
-        root = tree.getroot()
 
         # Basic metadata about the instance
         metadata = {
@@ -137,7 +128,7 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
         if self.target_transform:
             metadata = self.target_transform(metadata)
             
-        return tree, metadata
+        return str(file_path), metadata
 
 if __name__ == "__main__":
     dataset = XCSP3Dataset(year=2024, track="MiniCOP", download=True)
