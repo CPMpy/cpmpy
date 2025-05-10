@@ -9,6 +9,8 @@ from typing import Dict, Any, Tuple
 from io import StringIO
 import sys
 from datetime import datetime
+from tqdm import tqdm
+import concurrent.futures
 
 import cpmpy
 from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
@@ -42,7 +44,6 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
     result['track'] = metadata['track']
     result['instance'] = metadata['name'] 
     result['solver'] = solver
-    print(f"Running {solver} on {filename}...", flush=True)
 
     try:
         # Decompress the XZ file
@@ -182,11 +183,13 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
     
     # Process instances in parallel
     with ProcessPoolExecutor(max_workers=threads) as executor:
-        # Prepare arguments for parallel processing
-        exec_args = [(filename, metadata, solver, timeout, output_file, verbose) 
-                     for filename, metadata in dataset]
-        # Pass each arg list execute_instance, will write its own output to output_file
-        list(executor.map(execute_instance, exec_args))
+        # Submit all tasks and track their futures
+        futures = [executor.submit(execute_instance,  # below: args
+                                   (filename, metadata, solver, timeout, output_file, verbose))
+                   for filename, metadata in dataset]
+        # Process results as they complete
+        for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Running {solver}"):
+            pass
     
     return output_file
 
