@@ -35,7 +35,7 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
-                  'time_total', 'time_parse', 'time_model', 'time_solve',
+                  'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
                   'is_sat', 'objective_value', 'solution']
     result = dict.fromkeys(fieldnames)  # init all fields to None
     result['year'] = metadata['year']
@@ -65,14 +65,14 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
         
         try:
             # Call xcsp3_cpmpy with the solver and timeout
-            xcsp3_cpmpy(temp_file, solver=solver, time_limit=timeout)
+            xcsp3_cpmpy(temp_file, solver=solver, time_limit=timeout, cores=1)
             
             # Get the output and restore stdout if not verbose
             if not verbose:
                 output = captured_output.getvalue()
                 sys.stdout = original_stdout
                 
-                # Parse the output to get status and solution
+                # Parse the output to get status, solution and timings
                 status = None
                 solution = None
                 objective = None
@@ -84,6 +84,20 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
                         solution = line[2:].strip()
                     elif line.startswith('o '):
                         objective = int(line[2:].strip())
+                    elif line.startswith('c took '):
+                        # Parse timing information
+                        parts = line.split(' seconds to ')
+                        if len(parts) == 2:
+                            time_val = float(parts[0].replace('c took ', ''))
+                            action = parts[1].strip()
+                            if action.startswith('parse'):
+                                result['time_parse'] = time_val
+                            elif action.startswith('convert'):
+                                result['time_model'] = time_val
+                            elif action.startswith('post'):
+                                result['time_post'] = time_val
+                            elif action.startswith('solve'):
+                                result['time_solve'] = time_val
                 
                 # Map status to is_sat
                 if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
@@ -100,14 +114,13 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
                     result['objective_value'] = objective
                 
         finally:
+            result['time_total'] = time.time() - total_start
             # Restore stdout in case of exception
             if not verbose:
                 sys.stdout = original_stdout
             
         # Clean up temporary file
         os.remove(temp_file)
-        
-        result['time_total'] = time.time() - total_start
         
     except Exception as e:
         result['is_sat'] = False
