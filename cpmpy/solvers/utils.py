@@ -36,12 +36,12 @@ def param_combinations(all_params, remaining_keys=None, cur_params=None):
         For example usage, see `examples/advanced/hyperparameter_search.py`
         https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/hyperparameter_search.py
 
-        - all_params is a dict of {key: list} items, e.g.:
-          {'val': [1,2], 'opt': [True,False]}
+        - all_params is a dict of `{key: list}` items, e.g.:
+          ``{'val': [1,2], 'opt': [True,False]}``
 
-        - output is an generator over all {key:value} combinations
+        - output is an generator over all `{key:value}` combinations
           of the keys and values. For the example above:
-          generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])
+          ``generator([{'val':1,'opt':True},{'val':1,'opt':False},{'val':2,'opt':True},{'val':2,'opt':False}])``
     """
     if remaining_keys is None or cur_params is None:
         # init
@@ -82,7 +82,27 @@ class SolverLookup():
                ]
 
     @classmethod
-    def solvernames(cls):
+    def print_status(cls):
+        """
+            Print all CPMpy solvers and their installation status on this system.
+        """
+        for (basename, CPM_slv) in cls.base_solvers():
+            if CPM_slv.supported():
+                print(f"{basename}: Supported, ready to use.")
+            else:
+                print(f"{basename}: Not supported (missing Python package, binary or license).")
+
+    @classmethod
+    def supported(cls):
+        """
+            Return the list of names of all solvers (and subsolvers) supported on this system.
+
+            If a solver name is returned, it means that the solver's `.supported()` function returns True
+            and it is hence ready for immediate use
+            (e.g. any separate binaries are also installed if necessary, and licenses are active if needed).
+
+            Typical use case is to use these names in `SolverLookup.get(name)`.
+        """
         names = []
         for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
@@ -94,11 +114,21 @@ class SolverLookup():
         return names
 
     @classmethod
-    def get(cls, name=None, model=None):
+    def solvernames(cls):
+        # The older (more indirectly named) way to get the list of names of *supported* solvers.
+        # Will be deprecated at some point.
+        return cls.supported()
+
+    @classmethod
+    def get(cls, name=None, model=None, **init_kwargs):
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
             This is the preferred way to initialise a solver from its name
+
+            :param name: name of the solver to use
+            :param model: model to pass to the solver constructor
+            :param init_kwargs: additional keyword arguments to pass to the solver constructor
         """
         solver_cls = cls.lookup(name=name)
 
@@ -106,7 +136,7 @@ class SolverLookup():
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return solver_cls(model, subsolver=subname)
+        return solver_cls(model, subsolver=subname, **init_kwargs)
 
     @classmethod
     def lookup(cls, name=None):
@@ -139,8 +169,11 @@ builtin_solvers = [CPM_ortools, CPM_gurobi, CPM_minizinc, CPM_pysat, CPM_exact, 
 def get_supported_solvers():
     """
         Returns a list of solvers supported on this machine.
+       
+        .. deprecated:: 0.9.4
+            Please use :class:`SolverLookup` object instead.
 
-    :return: a list of SolverInterface sub-classes :list[SolverInterface]:
+        :return: a list of SolverInterface sub-classes :list[SolverInterface]:
     """
     warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
     return [sv for sv in builtin_solvers if sv.supported()]

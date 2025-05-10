@@ -1,18 +1,17 @@
 """
-  Transformations regarding Comparison constraints (originally).
-  Now, it is regarding numeric expressions in general, including nested ones.
+  Transforms non-equality comparisons into equality comparisons as needed.
   
-  Let with <op> one of == or !=,<,<=,>,>=
-  Numeric expressions in Flat Normal Form are of the kind
-    - NumExpr <op> IV
-    - BoolVar == NumExpr <op> IV
-    - BoolVar -> NumExpr <op> IV
-    - NumExpr <op> IV -> BoolVar
+  Let <op> be one of `==` or `!=`, `<`, `<=`, `>`, `>=`. Numeric expressions in **Flat Normal Form** are of the kind:
 
-  The NumExpr can be a sum, wsum or global function with a non-bool return type.
+    - `NumExpr <op> IV`
+    - `BoolVar == NumExpr <op> IV`
+    - `BoolVar -> NumExpr <op> IV`
+    - `NumExpr <op> IV -> BoolVar`
+
+  The `NumExpr` can be a sum, wsum or global function with a non-bool return type.
     
   This file implements:
-    - only_numexpr_equality():    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
+    - :func:`only_numexpr_equality()`:    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
 import copy
@@ -23,10 +22,10 @@ from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 def only_numexpr_equality(constraints, supported=frozenset()):
     """
-        transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
-        also for the reified uses of NumExpr
+        Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
+        Also for the reified uses of `NumExpr`
 
-        :param supported  a (frozen)set of expression names that supports all comparisons in the solver
+        :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
     """
 
     # shallow copy (could support inplace too this way...)

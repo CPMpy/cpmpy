@@ -1,3 +1,7 @@
+"""
+    Transforms partial functions into total functions.
+"""
+
 from copy import copy
 
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
@@ -12,27 +16,28 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         A partial function is a function whose output is not defined for all possible inputs.
 
         In CPMpy, this is the case for the following 3 numeric functions:
-            - (Integer) division 'x // y': undefined when y=0
-            - Modulo 'x mod y': undefined when y=0
-            - Element 'Arr[idx]': undefined when idx is not in the range of Arr
+
+        - (Integer) division ``x // y``: undefined when y=0
+        - Modulo ``x mod y``: undefined when y=0
+        - Element ``Arr[idx]``: undefined when idx is not in the range of Arr
 
         A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
         value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
-        expression like `b <-> (Arr[idx] == 5)` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
-        Should idx be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
+        expression like ``b <-> (Arr[idx] == 5)`` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
+        Should `idx` be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
 
         This transformation will transform a partial function (e.g. Arr[idx]) into a total function
         following the **relational semantics** as discussed in:
             Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
             constraint languages." International Conference on Principles and Practice of Constraint
-             Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
+            Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
 
         Under the relational semantic, an 'undefined' output for a (numerical) expression should
         propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
         be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
 
-        To enable this, we want to rewrite an expression like `b <-> (partial == 5)` to something like
-        `b <-> (is_defined & (total == 5))`. The key idea is to create a copy of the potentially unsafe
+        To enable this, we want to rewrite an expression like ``b <-> (partial == 5)`` to something like
+        ``b <-> (is_defined & (total == 5))``. The key idea is to create a copy of the potentially unsafe
         argument, that can only take 'safe' values. Using this new argument in the original expression results
         in a total function. We now have the original argument variable, which is decoupled from the expression,
         and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
@@ -40,9 +45,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
         argument remains decoupled (can take any value, as will the function's output).
 
-        WARNING! Under the relational semantics, `b <-> ~(partial==5)` and `b <-> (partial!=5) mean
-        different things! The second is `b <-> (is_defined & (total!=5))` the first is
-        `b <-> (~is_defined | (total!=5)).
+        .. warning::
+            Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
+            different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
+            ``b <-> (~is_defined | (total!=5))``.
 
 
         A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
@@ -52,10 +58,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         to know the specifics of the partial function being made total.
 
 
-        :param: list_of_expr: list of CPMpy expressions
-        :param: _toplevel: list of new expressions to put toplevel (used internally)
-        :param: _nbc: list of new expressions to put in nearest Boolean context (used internally)
-        :param: safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
+        :param list_of_expr: list of CPMpy expressions
+        :param _toplevel: list of new expressions to put toplevel (used internally)
+        :param _nbc: list of new expressions to put in nearest Boolean context (used internally)
+        :param safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
                                  a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
     """
 
@@ -200,7 +206,7 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
         Examples include `div` where 0 has to be removed from the denominator
 
         Constructs an expression for each interval of safe values, and
-            introduces a new `output_var` variable
+        introduces a new `output_var` variable
 
         :param cpm_expr: The numerical expression to safen
         :param exclude: The domain value to exclude

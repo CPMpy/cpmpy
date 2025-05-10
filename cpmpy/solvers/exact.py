@@ -4,7 +4,7 @@
 ## exact.py
 ##
 """
-    Interface to Exact
+    Interface to Exact's Python API
 
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
@@ -12,6 +12,26 @@
 
     The solver's git repository:
     https://gitlab.com/nonfiction-software/exact
+
+    Always use :func:`cp.SolverLookup.get("exact") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'exact' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install exact
+
+    .. warning::
+        Exact requires Python 3.10 or higher and the pip install only works on Linux and Windows.
+        On MacOS, you have to install the package from source.
+
+    See https://pypi.org/project/exact for more information.
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -34,12 +54,12 @@ from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
@@ -51,15 +71,15 @@ import numbers
 
 class CPM_exact(SolverInterface):
     """
-    Interface to the Python interface of Exact
-
-    Requires that the 'exact' python package is installed:
-    $ pip install exact
-    See https://pypi.org/project/exact for more information.
+    Interface to Exact's Python API
 
     Creates the following attributes (see parent constructor for more):
-        - xct_solver: the Exact instance used in solve() and solveAll()
-        - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+
+    - ``xct_solver`` : the Exact instance used in solve() and solveAll()
+    - ``assumption_dict`` : maps Exact variables to (Exact value, CPM assumption expression)
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
     @staticmethod
@@ -90,8 +110,8 @@ class CPM_exact(SolverInterface):
         Exact solver object xct_solver.
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -104,7 +124,6 @@ class CPM_exact(SolverInterface):
         assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
-
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
@@ -144,10 +163,10 @@ class CPM_exact(SolverInterface):
         """
             Call Exact
 
-            Overwrites self.cpm_status
+            Overwrites ``self.cpm_status``
 
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
+                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
             :type assumptions: list of CPMpy Boolean variables
 
@@ -159,10 +178,12 @@ class CPM_exact(SolverInterface):
                 - False     if no solution is found
         """
         from exact import Exact as xct
-
+ 
         # set additional keyword arguments
         if(len(kwargs.items())>0):
-            warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
+            wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
+            wrn_txt += "Use cp.SolverLookup.lookup('exact', **{parameter-with-hyphen: 42}) to set Exact parameters"
+            warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -177,10 +198,17 @@ class CPM_exact(SolverInterface):
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            timeout = time_limit
+        else:
+            timeout = 0
+            
         # call the solver, with parameters
         start = time.time()
-        my_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
-        #                                     timeout=time_limit if time_limit is not None else 0)
+        my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
         end = time.time()
 
         # new status, translate runtime
@@ -219,12 +247,12 @@ class CPM_exact(SolverInterface):
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """
@@ -323,19 +351,21 @@ class CPM_exact(SolverInterface):
 
     def objective(self, expr, minimize):
         """
-            Post the given expression to the solver as objective to minimize/maximize
+            Post the given expression to the solver as objective to minimize/maximize.
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
         self.objective_ = expr
         self.objective_is_min_ = minimize
 
-        # make objective function non-nested
+        # make objective function non-nested and with positive BoolVars only
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
+        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
+        self += flat_cons  # add potentially created constraints
 
         # make objective function or variable and post
         xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)
@@ -390,7 +420,7 @@ class CPM_exact(SolverInterface):
         Implemented through chaining multiple solver-independent **transformation functions** from
         the `cpmpy/transformations/` directory.
 
-        See the 'Adding a new solver' docs on readthedocs for more information.
+        See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -426,7 +456,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr): # helper function
         return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -521,6 +551,7 @@ class CPM_exact(SolverInterface):
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
             
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def get_core(self):
         from exact import Exact as xct
@@ -540,6 +571,7 @@ class CPM_exact(SolverInterface):
     def solution_hint(self, cpm_vars, vals):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
+
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
