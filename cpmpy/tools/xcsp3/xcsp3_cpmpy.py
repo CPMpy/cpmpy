@@ -29,6 +29,7 @@ from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 # PyCSP3
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
+from xml.etree.ElementTree import ParseError
 
 # Utils
 import os, pathlib
@@ -45,9 +46,29 @@ SUPPORTED_SUBSOLVERS = {
 DEFAULT_SOLVER = "ortools"
 TIME_BUFFER = 5 # seconds
 # TODO : see if good value
-MEMORY_BUFFER_SOFT = 2 # MB
-MEMORY_BUFFER_HARD = 2 # MMB
+MEMORY_BUFFER_SOFT = 2 # MiB
+MEMORY_BUFFER_HARD = 0 # MiB
 MEMORY_BUFFER_SOLVER = 20 # MB
+
+original_stdout = sys.stdout
+
+def sigterm_handler(_signo, _stack_frame):
+    """
+        Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
+    """
+    # Report that we haven't found a solution in time
+    sys.stdout = original_stdout
+    print_status(ExitStatus.unknown)
+    print_comment("SIGTERM raised.")
+    print(flush=True)
+    sys.exit(0)
+
+def memory_error_handler(mem_limit: int):
+    sys.stdout = original_stdout
+    print_status(ExitStatus.unknown)
+    print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(mem_limit)} MB / {bytes_as_gb_float(mem_limit)} GB")
+    print(flush=True)
+    sys.exit(0)
 
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
@@ -74,47 +95,17 @@ def bytes_as_gb_float(bytes: int) -> float:
 def remaining_memory(limit:int) -> int: # bytes
     return limit # - current_memory_usage()
 
-def get_subsolver(args:Args, model:cp.Model):
-    # Update subsolver in args
-    if args.solver == "z3":
+def get_subsolver(solver: str, model: cp.Model, subsolver: Optional[str] = None) -> Optional[str]:
+    # Update subsolver
+    if solver == "z3":
         if model.objective_ is not None:
-            args.subsolver = "opt"
+            return "opt"
         else:
-            args.subsolver = "sat"
-    elif args.subsolver == None:
-        if args.solver in SUPPORTED_SUBSOLVERS:
-            args.subsolver = SUPPORTED_SUBSOLVERS[args.solver][0]
-        else:
-            pass
-
-    return args.subsolver
-
-original_stdout = sys.stdout
-
-def sigterm_handler(_signo, _stack_frame):
-    """
-        Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
-    """
-    # Report that we haven't found a solution in time
-    sys.stdout = original_stdout
-    print_status(ExitStatus.unknown)
-    print_comment("SIGTERM raised.")
-    print(flush=True)
-    sys.exit(0)
-
-def memory_error_handler(args: Args):
-    sys.stdout = original_stdout
-    print_status(ExitStatus.unknown)
-    print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(args.mem_limit)} MB / {bytes_as_gb_float(args.mem_limit)} GB")
-    print(flush=True)
-    sys.exit(0)
-
-def error_handler(e: Exception):
-    sys.stdout = original_stdout
-    print_status(ExitStatus.unknown)
-    print_comment(f"An error got raised: {e}")
-    print(flush=True)
-    sys.exit(0)
+            return "sat"
+    elif subsolver is None:
+        if solver in SUPPORTED_SUBSOLVERS:
+            return SUPPORTED_SUBSOLVERS[solver][0]
+    return subsolver
 
 
 class Capturing(list):
@@ -223,193 +214,152 @@ def supported_solver(solver:Optional[str]):
 #                         Executable & Solver arguments                        #
 # ---------------------------------------------------------------------------- #
 
-@dataclass
-class Args:
-    benchpath:str
-    benchdir:str=None
-    benchname:str=None
-    seed:int=None
-    time_limit:int=None
-    mem_limit:int=None
-    cores:int=1
-    tmpdir:os.PathLike=None
-    dir:os.PathLike=None
-    solver:str=DEFAULT_SOLVER
-    subsolver:str=None
-    time_buffer:int=TIME_BUFFER
-    intermediate:bool=False
-    sat:bool=False
-    opt:bool=False
-    solve:bool=True
-    profiler:bool=False
-    throw:bool=False
-    solve_all:bool=False
+def ortools_arguments(model: cp.Model,
+                      cores: Optional[int] = None,
+                      seed: Optional[int] = None,
+                      intermediate: bool = False,
+                      **kwargs):
+    # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
+    res = dict()
+    if cores is not None:
+        res |= { "num_search_workers": cores }
+    if seed is not None: 
+        res |= { "random_seed": seed }
 
-    def __post_init__(self):
-        if self.dir is not None:
-            self.dir = dir_path(self.dir)
-        if not is_supported_solver(self.solver):
-            raise(ValueError(f"solver:{self.solver} is not a supported solver. Options are: {str(SUPPORTED_SOLVERS)}"))
-        # if self.subsolver is not None:
-        #     if not is_supported_subsolver(self.solver, self.subsolver):
-        #         raise(ValueError(f"subsolver:{self.subsolver} is not a supported subsolver for solver {self.solver}. Options are: {str(SUPPORTED_SUBSOLVERS[self.solver])}"))
-        self.benchdir = os.path.join(*(str(self.benchpath).split(os.path.sep)[:-1]))
-        self.benchname = str(self.benchpath).split(os.path.sep)[-1].split(".")[0]
+    if intermediate and model.has_objective():
+        # Define custom ORT solution callback, then register it
+        from ortools.sat.python import cp_model as ort
+        class OrtSolutionCallback(ort.CpSolverSolutionCallback):
+            """
+                For intermediate objective printing.
+            """
 
-    @staticmethod
-    def from_cli(args):
-        return Args(
-            benchpath = args.benchname,
-            seed = args.seed,
-            time_limit = args.time_limit if args.time_limit is not None else args.time_out,
-            mem_limit = mib_as_bytes(args.mem_limit) if args.mem_limit is not None else None, # MiB to bytes
-            cores = args.cores if args.cores is not None else 1,
-            tmpdir = args.tmpdir,
-            dir = args.dir,
-            solver = args.solver if args.solver is not None else DEFAULT_SOLVER,
-            subsolver = args.subsolver if args.subsolver is not None else None,
-            time_buffer = args.time_buffer if args.time_buffer is not None else TIME_BUFFER,
-            intermediate = args.intermediate if args.intermediate is not None else False,
-            solve = not args.only_transform,
-            profiler = args.profiler,
-            throw = args.throw,
-            solve_all = args.all,
-        )
-    
-    @property
-    def parallel(self) -> bool:
-        return self.cores > 1
+            def __init__(self):
+                super().__init__()
+                self.__start_time = time.time()
+                self.__solution_count = 1
 
-    def __str__(self):
-        return f"Args(benchname='{self.benchname}', seed={self.seed}, time_limit={self.time_limit}[s], mem_limit={self.mem_limit}[MiB], cores={self.cores}, tmpdir='{self.tmpdir}', dir='{self.dir}, solver='{self.solver}')"
+            def on_solution_callback(self):
+                """Called on each new solution."""
+                
+                current_time = time.time()
+                obj = int(self.ObjectiveValue())
+                print_comment('Solution %i, time = %0.2fs' % 
+                            (self.__solution_count, current_time - self.__start_time))
+                print_objective(obj)
+                self.__solution_count += 1
+            
 
-def choco_arguments(args: Args, model:cp.Model): 
+            def solution_count(self):
+                """Returns the number of solutions found."""
+                return self.__solution_count
+            
+        # Register the callback
+        res |= { "solution_callback": OrtSolutionCallback() }
+
+    return res
+
+def exact_arguments(seed: Optional[int] = None, **kwargs):
+    # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
+    res = dict()
+    if seed is not None: 
+        res |= { "seed": seed }
+
+    return res
+
+def choco_arguments(): 
     # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
     return {}
 
-def ortools_arguments(args: Args, model:cp.Model):
-
-    from ortools.sat.python import cp_model as ort
-    class OrtSolutionCallback(ort.CpSolverSolutionCallback):
-        """
-            For intermediate objective printing.
-        """
-
-        def __init__(self):
-            super().__init__()
-            self.__start_time = time.time()
-            self.__solution_count = 1
-
-        def on_solution_callback(self):
-            """Called on each new solution."""
-            
-            current_time = time.time()
-            obj = int(self.ObjectiveValue())
-            print_comment('Solution %i, time = %0.2fs' % 
-                        (self.__solution_count, current_time - self.__start_time))
-            print_objective(obj)
-            self.__solution_count += 1
-        
-
-        def solution_count(self):
-            """Returns the number of solutions found."""
-            return self.__solution_count
-        
-    # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
-    res = {
-        "num_search_workers": args.cores,
-    }
-    if args.seed is not None: 
-        res |= { "random_seed": args.seed }
-    if args.intermediate and args.opt:
-        # res |= { "solution_callback": Callback(model) }
-        res |= { "solution_callback": OrtSolutionCallback() }
-    return res
-        
-def exact_arguments(args: Args, model:cp.Model):
-    # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
-    res = {
-        "seed": args.seed,
-    }
-    return {k:v for (k,v) in res.items() if v is not None}
-
-def z3_arguments(args: Args, model:cp.Model):
+def z3_arguments(model: cp.Model,
+                 cores: int = 1,
+                 seed: Optional[int] = None,
+                 mem_limit: Optional[int] = None,
+                 **kwargs):
     # Documentation: https://microsoft.github.io/z3guide/programming/Parameters/
     # -> is outdated, just let it crash and z3 will report the available options
 
-    # Global parameters
-    res = {
-        
-    }
+    res = dict()
     
-    # Sat parameters
-    if args.sat:
-        res |= {
-            "random_seed": args.seed,
-            "threads": args.cores, # TODO what with hyperthreadding, when more threads than cores
-            "max_memory": bytes_as_mb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None, # hard upper limit, given in MB
-        }
-    # Opt parameters
-    if args.opt:
-        res |= {          
-            # opt does not seem to support setting max memory
-            # opt does also not allow setting the random seed
-        }
-
-    return {k:v for (k,v) in res.items() if v is not None}
-
-
-def minizinc_arguments(args: Args, model:cp.Model):
-
-    # Documentation: https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
-
-    res = {
-        "processes": args.cores,
-        "random_seed": args.seed,
-    } | subsolver_arguments(args, model)
-
-    return {k:v for (k,v) in res.items() if v is not None}
-
-def gecode_arguments(args: Args, model:cp.Model):
-    # Documentation: https://www.minizinc.org/doc-2.4.3/en/lib-gecode.html
-    return {}
-
-def chuffed_arguments(args:Args, model:cp.Model):
-    # Documentation: 
-    # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
-    # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
-    return {}
-
-def gurobi_arguments(args: Args, model:cp.Model):
-    # Documentation: https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
-    res = {
-        "MemLimit": bytes_as_gb(remaining_memory(args.mem_limit)) if args.mem_limit is not None else None,
-        "Seed": args.seed,
-        "Threads": args.cores,
-    }
-    if args.intermediate and args.opt:
-        res |= { "solution_callback": Callback(model).callback }
-    return {k:v for (k,v) in res.items() if v is not None}
-
-def solver_arguments(args: Args, model:cp.Model):
-
-    if model.objective_ is not None:
-        args.opt = True
+    if model.has_objective():
+        # Opt does not seem to support setting random seed or max memory
+        pass
     else:
-        args.sat = True
+        # Sat parameters
+        if cores is not None:
+            res |= { "threads": cores }  # TODO what with hyperthreadding, when more threads than cores
+        if seed is not None: 
+            res |= { "random_seed": seed }
+        if mem_limit is not None:
+            res |= { "max_memory": bytes_as_mb(mem_limit) }
 
-    if args.solver == "ortools": return ortools_arguments(args, model)
-    elif args.solver == "exact": return exact_arguments(args, model)
-    elif args.solver == "choco": return choco_arguments(args, model)
-    elif args.solver == "z3": return z3_arguments(args, model)
-    elif args.solver == "minizinc": return minizinc_arguments(args, model)
-    elif args.solver == "gurobi": return gurobi_arguments(args, model)
-    else: raise()
+    return res
 
-def subsolver_arguments(args: Args, model:cp.Model):
-    if args.subsolver == "gecode": return gecode_arguments(args, model)
-    elif args.subsolver == "chuffed": return choco_arguments(args, model)
-    else: return {}
+def minizinc_arguments(solver: str,
+                       cores: Optional[int] = None,
+                       seed: Optional[int] = None,
+                       **kwargs):
+    # Documentation: https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
+    res = dict()
+    if cores is not None:
+        res |= { "processes": cores }
+    if seed is not None: 
+        res |= { "random_seed": seed }
+
+    #if solver.endswith("gecode"):
+        # Documentation: https://www.minizinc.org/doc-2.4.3/en/lib-gecode.html
+    #elif solver.endswith("chuffed"):
+        # Documentation: 
+        # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
+        # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
+    
+    return res
+
+def gurobi_arguments(model: cp.Model,
+                     cores: Optional[int] = None,
+                     seed: Optional[int] = None,
+                     mem_limit: Optional[int] = None,
+                     intermediate: bool = False,
+                     **kwargs):
+    # Documentation: https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
+    res = dict()
+    if cores is not None:
+        res |= { "Threads": cores }
+    if seed is not None:
+        res |= { "Seed": seed }
+    if mem_limit is not None:
+        res |= { "MemLimit": bytes_as_gb(remaining_memory(mem_limit)) }
+
+    if intermediate and model.has_objective():
+        res |= { "solution_callback": Callback(model).callback }
+
+    return res
+
+def solver_arguments(solver: str, 
+                     model: cp.Model, 
+                     seed: Optional[int] = None,
+                     intermediate: bool = False,
+                     cores: int = 1,
+                     mem_limit: Optional[int] = None,
+                     **kwargs):
+    opt = model.objective_ is not None
+    sat = not opt
+
+    if solver == "ortools":
+        return ortools_arguments(model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+    elif solver == "exact":
+        return exact_arguments(seed=seed, **kwargs)
+    elif solver == "choco":
+        return choco_arguments()
+    elif solver == "z3":
+        return z3_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, **kwargs)
+    elif solver.startswith("minizinc"):  # also can have a subsolver
+        return minizinc_arguments(solver, cores=cores, seed=seed, **kwargs)
+    elif solver == "gurobi":
+        return gurobi_arguments(solver, model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
+    else:
+        print_comment(f"setting parameters of {solver} is not (yet) supported")
+        return dict()
 
 @contextmanager
 def prepend_print():
@@ -439,226 +389,120 @@ def prepend_print():
         # Restore the original stdout
         sys.stdout = original_stdout
 
-
-# ---------------------------------------------------------------------------- #
-#                                     Main                                     #
-# ---------------------------------------------------------------------------- #
-
-def main():
-
-    # ------------------------------ Argument parsing ------------------------------ #
-
-    parser = argparse.ArgumentParser(
-                        prog='CPMpy-XCSP-Executable',
-                        description='What the program does',
-                        epilog='Text at the bottom of help')
-    
-    # File containing the XCSP3 instance to solve
-    # - not clear if we only need to support one of these
-    parser.add_argument("benchname", type=dir_path) # BENCHNAME: Name of the file with path and extension
-    # parser.add_argument("benchnamenoext") # BENCHNAMENOEXT: Name of the file with path, but without extension
-    # parser.add_argument("benchnamenopath") # BENCHNAMENOPATH: Name of the file without path, but with extension
-    # parser.add_argument("namenppathnoext") # NAMENOPATHNOEXT: Name of the file without path and without extension
-    # RANDOMSEED: Seed between 0 and 4294967295
-    parser.add_argument("-s", "--seed", required=False, type=int)
-    # Total CPU time in seconds (before it gets killed)
-    parser.add_argument("-l", "--time-limit", required=False, type=int) # TIMELIMIT
-    parser.add_argument("-o", "--time-out", required=False, type=int) # TIMEOUT
-    # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
-    parser.add_argument("-m", "--mem-limit", required=False, type=int)
-    # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))
-    parser.add_argument("-c", "--cores", required=False, type=int)
-    # TMPDIR: Only location where temporary read/write is allowed
-    parser.add_argument("-t","--tmpdir", required=False, type=dir_path)
-    # DIR: Name of the directory where the solver files will be stored (where this script is located?)
-    parser.add_argument("-d", "--dir", required=False, type=dir_path)
-    # The underlying solver which should be used
-    parser.add_argument("--solver", required=False, type=supported_solver)
-    # The underlying subsolver which should be used
-    parser.add_argument("--subsolver", required=False, type=str)
-    # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
-    parser.add_argument("--time_buffer", required=False, type=int)
-    # If intermediate solutions should be printed (if the solver supports it)
-    parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
-    # Disable solving, only do transformation
-    parser.add_argument("--only-transform", action=argparse.BooleanOptionalAction)
-    # Enable profiling measurements
-    parser.add_argument("--profiler", action=argparse.BooleanOptionalAction)
-    # Whether the executable should throw an exception (instead of capturing it) (should be off during competition)
-    parser.add_argument("--throw", action=argparse.BooleanOptionalAction)
-    # SolveAll (instead of Solve)
-    parser.add_argument("--all", action=argparse.BooleanOptionalAction)
-
-    # Process cli arguments 
-    args = Args.from_cli(parser.parse_args())
-    print_comment(str(args))
-
+ 
+def xcsp3_cpmpy(benchname: str,
+                seed: Optional[int] = None,
+                time_limit: Optional[int] = None,
+                mem_limit: Optional[int] = None,  # MiB: 1024 * 1024 bytes
+                cores: int = 1,
+                solver: str = None,
+                time_buffer: int = 0,
+                intermediate: bool = False,
+                **kwargs,
+):
     try:
-        main_helper(args)
-    except Exception as e:
-        if args.throw:
-            raise e
+
+        # --------------------------- Global Configuration --------------------------- #
+
+        if seed is not None:
+            random.seed(seed)
+        if mem_limit is not None:
+            # TODO : validate if it works
+            soft = max(mem_limit - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
+            hard = max(mem_limit - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
+            print_comment(f"Setting memory limit: {soft}-{hard}")
+            resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+
+        sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
+
+        # ------------------------------ Parse instance ------------------------------ #
+
+        time_parse = time.time()
+        parser = ParserXCSP3(benchname)
+        time_parse = time.time() - time_parse
+        print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
+
+        # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
+        time_callback = time.time()
+        callbacks = CallbacksCPMPy()
+        callbacks.force_exit = True
+        callbacker = CallbackerXCSP3(parser, callbacks)
+        try:
+            callbacker.load_instance()
+            model = callbacks.cpm_model
+        except NotImplementedError as e:
+            print_status(ExitStatus.unsupported)
+            print_comment(str(e))
+            exit(1)
+        time_callback = time.time() - time_callback
+        print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
+        
+        # ------------------------ Post CPMpy model to solver ------------------------ #
+
+        solver_args = solver_arguments(solver, model=model, seed=seed,
+                                       intermediate=intermediate,
+                                       cores=cores, mem_limit=mem_limit,
+                                       **kwargs)
+        # time_limit is generic for all, done later
+
+        # Post model to solver
+        time_post = time.time()
+        with prepend_print():  # catch prints and prepend 'c' to each line (still needed?)
+            if solver == "exact": # Exact2 takes its options at creation time
+                s = cp.SolverLookup.get(solver, model, **solver_args)
+                solver_args = dict()  # no more solver args needed
+            else:
+                s = cp.SolverLookup.get(solver, model)
+        time_post = time.time() - time_post
+        print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
+
+        # ------------------------------- Solve model ------------------------------- #
+
+        if time_limit is not None:
+            time_limit = time_limit - (time.time() - time_parse) - time_buffer
+
+            if time_limit > 0:
+                print_comment(f"{time_limit}s left to solve")
+            else:
+                # Not enough time to start a solve call (we're already over the limit)
+                # We should never get in this situation, as a SIGTERM will be raised by the competition runner
+                #   if we get over time during the transformation
+                print_comment("Not enough time left to start solving")
+                print_status(ExitStatus.unknown)
+                return 
+        
+        time_solve = time.time()
+        is_sat = s.solve(time_limit=time_limit, **solver_args)
+        time_solve = time.time() - time_solve
+        print_comment(f"took {time_solve:.4f} seconds to solve")
+
+        # ------------------------------- Print result ------------------------------- #
+
+        if s.status().exitstatus == CPMStatus.OPTIMAL:
+            print_status(ExitStatus.optimal)
+            print_value(solution_xml(callbacks.cpm_variables, s))
+        elif s.status().exitstatus == CPMStatus.FEASIBLE:
+            print_status(ExitStatus.sat)
+            print_value(solution_xml(callbacks.cpm_variables, s))
+        elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
+            print_status(ExitStatus.unsat)
+        elif s.status().exitstatus == CPMStatus.UNKNOWN:
+            print_status(ExitStatus.unknown)
         else:
-            error_handler(e)
-
-def main_helper(args):
-    
-    from xml.etree.ElementTree import ParseError
-    try:
-        run(args)
+            print_status(ExitStatus.unknown)
+        
     except MemoryError as e:
-        memory_error_handler(args)
+        memory_error_handler(mem_limit or 0)
     except ParseError as e:
         if "out of memory" in e.msg:
-            memory_error_handler(args)
+            memory_error_handler(mem_limit or 0)
         else:
             raise e
     except Exception as e:
-        raise e
-
-def run(args: Args):
-    if args.profiler:
-        perf_dir = os.path.join(pathlib.Path(__file__).parent.resolve(), "perf_stats", args.solver)
-        if args.subsolver is not None:
-            perf_dir = os.path.join(perf_dir, args.subsolver)
-        Path(perf_dir).mkdir(parents=True, exist_ok=True)
-        path = os.path.join(perf_dir, args.benchname)
-    else:
-        path = None
-
-    # with PerfContext(path=path):
-    #     with TimerContext("total") as tc:
-
-    run_helper(args)
-    
-    # print_comment(f"Total time taken: {tc.time}")
-    
-
-def run_helper(args:Args):
-    import sys, os
-
-    # --------------------------- Global Configuration --------------------------- #
-
-    if args.seed is not None:
-        random.seed(args.seed)
-    if args.mem_limit is not None:
-        # TODO : validate if it works
-        soft = max(args.mem_limit - mb_as_bytes(MEMORY_BUFFER_SOFT), mb_as_bytes(MEMORY_BUFFER_SOFT))
-        hard = max(args.mem_limit - mb_as_bytes(MEMORY_BUFFER_HARD), mb_as_bytes(MEMORY_BUFFER_HARD))
-        print_comment(f"Setting memory limit: {soft}-{hard}")
-        resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
-
-    sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
-
-    # ------------------------------ Parse instance ------------------------------ #
-
-    parse_start = time.time()
-    parser = ParserXCSP3(args.benchpath)
-    print_comment(f"took {(time.time() - parse_start):.4f} seconds to parse XCSP3 model [{args.benchname}]")
-
-    # -------------------------- Configure XCSP3 parser callbacks -------------------------- #
-    start = time.time()
-    callbacks = CallbacksCPMPy()
-    callbacks.force_exit = True
-    callbacker = CallbackerXCSP3(parser, callbacks)
-
-    try:
-        callbacker.load_instance()
-    except NotImplementedError as e:
-        print_status(ExitStatus.unsupported)
-        print_comment(str(e))
-        exit(1)
-
-
-    print_comment(f"took {(time.time() - start):.4f} seconds to convert to CPMpy model")
-    
-    # ------------------------------ Solve instance ------------------------------ #
-
-    # CPMpy model
-    model = callbacks.cpm_model
-
-    # Subsolver
-    subsolver = get_subsolver(args, model)
-
-    # Transfer model to solver
-    with prepend_print():# as output: #TODO immediately print
-        # with TimerContext("transform") as tc:
-        if args.solver == "exact": # Exact2 takes its options at creation time
-            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model, **solver_arguments(args, model))
-        else:
-            s = cp.SolverLookup.get(args.solver + ((":" + subsolver) if subsolver is not None else ""), model)
-    # for o in output:
-    #     print_comment(o)
-    # print_comment(f"took {tc.time:.4f} seconds to transfer model to {args.solver}")
-
-    # Solve model
-    time_limit = args.time_limit - (time.time() - parse_start) - args.time_buffer if args.time_limit is not None else None
-    print_comment(f"{time_limit}s left to solve")
-
-    # If not time left
-    if time_limit is not None and time_limit <= 0:
-        # Not enough time to start a solve call (we're already over the limit)
-        # We should never get in this situation, as a SIGTERM will be raised by the competition runner
-        #   if we get over time during the transformation
-        print_comment("Giving up, not enough time to start solving.")
         print_status(ExitStatus.unknown)
-        return 
-    
-    if CPM_gurobi.installed():
-        from gurobipy import GurobiError
-    else:
-        class GurobiError(Exception):  # Define a dummy GurobiError
-            pass
-        
-    if args.solve:
-        try:
-            # with TimerContext("solve") as tc:
-            if args.solver == "exact": # Exact takes its options at creation time
-                if args.solve_all:
-                    nr_sols = s.solveAll(
-                        time_limit=time_limit
-                    )
-                    print_comment(f"Found {nr_sols} solutions.")
-                else:
-                    sat = s.solve(
-                        time_limit=time_limit
-                    )
-            else:
-                if args.solve_all:
-                    nr_sols = s.solveAll(
-                        time_limit=time_limit,
-                        **solver_arguments(args, model)
-                    ) 
-                    print_comment(f"Found {nr_sols} solutions.")
-                else:
-                    sat = s.solve(
-                        time_limit=time_limit,
-                        **solver_arguments(args, model)
-                    ) 
-            # print_comment(f"took {(tc.time):.4f} seconds to solve")
-        except MemoryError:
-            print_comment("Ran out of memory when trying to solve.")
-        except GurobiError as e:
-            print_comment("Error from Gurobi: " + str(e))
+        print_comment(f"An error got raised: {e}")
 
 
-    # ------------------------------- Print result ------------------------------- #
-
-    if s.status().exitstatus == CPMStatus.OPTIMAL:
-        print_status(ExitStatus.optimal)
-        print_value(solution_xml(callbacks.cpm_variables, s))
-    elif s.status().exitstatus == CPMStatus.FEASIBLE:
-        print_status(ExitStatus.sat)
-        print_value(solution_xml(callbacks.cpm_variables, s))
-    elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
-        print_status(ExitStatus.unsat)
-    elif s.status().exitstatus == CPMStatus.UNKNOWN:
-        print_status(ExitStatus.unknown)
-    else:
-        print_status(ExitStatus.unknown)
- 
-      
-    
 if __name__ == "__main__":
     # Configure signal handles
     # signal.signal(signal.SIGINT, sigterm_handler)
@@ -666,5 +510,34 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGABRT, sigterm_handler)
 
-    # Main program
-    main()
+    # ------------------------------ Argument parsing ------------------------------ #
+    parser = argparse.ArgumentParser("CPMpy XCSP3 executable")
+    
+    ## XCSP3 required arguments:
+    # BENCHNAME: Name of the XCSP3 XML file with path and extension
+    parser.add_argument("benchname", type=dir_path) 
+    # RANDOMSEED: Seed between 0 and 4294967295
+    parser.add_argument("-s", "--seed", required=False, type=int)
+    # TIMELIMIT: Total CPU time in seconds (before it gets killed)
+    parser.add_argument("-l", "--time-limit", required=False, type=int) # TIMELIMIT
+    # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
+    parser.add_argument("-m", "--mem-limit", required=False, type=int)
+    # TMPDIR: Only location where temporary read/write is allowed
+    parser.add_argument("-t","--tmpdir", required=False, type=dir_path)
+    # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))
+    parser.add_argument("-c", "--cores", required=False, type=int)
+    # DIR: not needed, e.g. we just import files
+
+    ## CPMpy optional arguments:
+    # The underlying solver which should be used (can also be "solver:subsolver")
+    parser.add_argument("--solver", required=False, type=supported_solver)
+    # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
+    parser.add_argument("--time_buffer", required=False, type=int)
+    # If intermediate solutions should be printed (if the solver supports it)
+    parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
+
+    # Process cli arguments 
+    args = parser.parse_args()
+    print_comment(f"Arguments: {args}")
+
+    xcsp3_cpmpy(**vars(args))
