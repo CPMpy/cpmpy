@@ -1,0 +1,3 @@
+pycsp3
+requests
+tqdm
