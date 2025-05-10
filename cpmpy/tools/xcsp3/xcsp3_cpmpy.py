@@ -459,7 +459,7 @@ def xcsp3_cpmpy(benchname: str,
         # ------------------------------- Solve model ------------------------------- #
 
         if time_limit is not None:
-            time_limit = time_limit - (time.time() - time_parse) - time_buffer
+            time_limit = time_limit - time_parse - time_buffer
 
             if time_limit > 0:
                 print_comment(f"{time_limit}s left to solve")

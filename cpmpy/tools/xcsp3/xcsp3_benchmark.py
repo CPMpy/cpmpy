@@ -6,6 +6,9 @@ import lzma
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, Any, Tuple
+from io import StringIO
+import sys
+from datetime import datetime
 
 import cpmpy
 from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
@@ -13,18 +16,23 @@ from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
 from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
+from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
 
-def solve_instance(filename: str, metadata: dict, solver: str, timeout: int, output_file: str) -> None:
+# exec_args = (filename, metadata, solver, timeout, output_file, verbose) 
+def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
-    Args:
+    Args is a list of:
         filename: Path to the XCSP3 instance file
         metadata: Dictionary containing instance metadata (year, track, name)
         solver: Name of the solver to use
         timeout: Timeout in seconds
         output_file: Path to the output CSV file
+        verbose: Whether to show solver output
     """
+    filename, metadata, solver, timeout, output_file, verbose = args
+
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
                   'time_total', 'time_parse', 'time_model', 'time_solve',
@@ -48,41 +56,56 @@ def solve_instance(filename: str, metadata: dict, solver: str, timeout: int, out
             
         # Start total timing
         total_start = time.time()
-    
-        # Parse the XCSP3 model
-        t_parse = time.time()
-        parser = ParserXCSP3(temp_file)
-        callbacks = CallbacksCPMPy()
-        callbacks.force_exit = True
-        callbacker = CallbackerXCSP3(parser, callbacks)
-        callbacker.load_instance()
         
+        # Capture stdout to prevent xcsp3_cpmpy from printing if not verbose
+        captured_output = StringIO()
+        original_stdout = sys.stdout
+        if not verbose:
+            sys.stdout = captured_output
+        
+        try:
+            # Call xcsp3_cpmpy with the solver and timeout
+            xcsp3_cpmpy(temp_file, solver=solver, time_limit=timeout)
+            
+            # Get the output and restore stdout if not verbose
+            if not verbose:
+                output = captured_output.getvalue()
+                sys.stdout = original_stdout
+                
+                # Parse the output to get status and solution
+                status = None
+                solution = None
+                objective = None
+                
+                for line in output.split('\n'):
+                    if line.startswith('s '):
+                        status = line[2:].strip()
+                    elif line.startswith('v '):
+                        solution = line[2:].strip()
+                    elif line.startswith('o '):
+                        objective = int(line[2:].strip())
+                
+                # Map status to is_sat
+                if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
+                    result['is_sat'] = True
+                elif status == ExitStatus.unsat.value:
+                    result['is_sat'] = False
+                else:
+                    result['is_sat'] = None
+                    
+                # Set solution and objective if found
+                if solution:
+                    result['solution'] = solution
+                if objective is not None:
+                    result['objective_value'] = objective
+                
+        finally:
+            # Restore stdout in case of exception
+            if not verbose:
+                sys.stdout = original_stdout
+            
         # Clean up temporary file
         os.remove(temp_file)
-        
-        result['time_parse'] = time.time() - t_parse
-
-        # Create the solver and post the constraints
-        t_model = time.time()
-        model = callbacks.cpm_model
-        s = cpmpy.SolverLookup.get(solver, model)
-        result['time_model'] = time.time() - t_model
-        
-        # Solve the model
-        t_solve = time.time()
-        if solver != "ortools":
-            result['is_sat'] = s.solve(time_limit=timeout)
-        else:
-            result['is_sat'] = s.solve(time_limit=timeout, num_search_workers=1)
-        result['time_solve'] = time.time() - t_solve
-        
-        if result['is_sat']:
-            # Get objective value if available
-            if model.objective_ is not None:
-                result['objective_value'] = model.objective_value()
-
-            # Get solution if found
-            result['solution'] = solution_xml(callbacks.cpm_variables, s).replace('\n', '  ')
         
         result['time_total'] = time.time() - total_start
         
@@ -113,12 +136,9 @@ def solve_instance(filename: str, metadata: dict, solver: str, timeout: int, out
         if os.path.exists(lock_file):
             os.remove(lock_file)
 
-def _solve_instance_wrapper(args):
-    """Wrapper function to unpack arguments for solve_instance."""
-    return solve_instance(**args)
-
 def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1, 
-                   timeout: int = 300, output_dir: str = 'results') -> str:
+                   timeout: int = 300, output_dir: str = 'results',
+                   verbose: bool = False) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -129,6 +149,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
         threads (int): Number of parallel threads
         timeout (int): Timeout in seconds per instance
         output_dir (str): Output directory for CSV files
+        verbose (bool): Whether to show solver output
         
     Returns:
         str: Path to the output CSV file
@@ -137,8 +158,11 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Define output file path
-    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}.csv")
+    # Get current timestamp in a filename-safe format
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Define output file path with timestamp
+    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{timestamp}.csv")
     
     # Initialize dataset
     dataset = XCSP3Dataset(year=year, track=track, download=True)
@@ -146,11 +170,10 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
     # Process instances in parallel
     with ProcessPoolExecutor(max_workers=threads) as executor:
         # Prepare arguments for parallel processing
-        solve_args = [{'filename': filename, 'metadata': metadata, 'solver': solver, 
-                      'timeout': timeout, 'output_file': output_file} 
+        exec_args = [(filename, metadata, solver, timeout, output_file, verbose) 
                      for filename, metadata in dataset]
-        # Pass each dictionary as a single argument to solve_instance and collect results
-        list(executor.map(_solve_instance_wrapper, solve_args))
+        # Pass each arg list execute_instance, will write its own output to output_file
+        list(executor.map(execute_instance, exec_args))
     
     return output_file
 
@@ -162,6 +185,7 @@ if __name__ == "__main__":
     parser.add_argument('--threads', type=int, default=1, help='Number of parallel threads')
     parser.add_argument('--timeout', type=int, default=300, help='Timeout in seconds per instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
+    parser.add_argument('--verbose', action='store_true', help='Show solver output')
     
     args = parser.parse_args()
     
