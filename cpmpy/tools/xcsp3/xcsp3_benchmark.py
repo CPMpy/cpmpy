@@ -20,8 +20,8 @@ from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
 
-# exec_args = (filename, metadata, solver, timeout, output_file, verbose) 
-def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
+# exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
+def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
@@ -29,11 +29,12 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
         filename: Path to the XCSP3 instance file
         metadata: Dictionary containing instance metadata (year, track, name)
         solver: Name of the solver to use
-        timeout: Timeout in seconds
+        time_limit: Time limit in seconds
+        mem_limit: Memory limit in MB
         output_file: Path to the output CSV file
         verbose: Whether to show solver output
     """
-    filename, metadata, solver, timeout, output_file, verbose = args
+    filename, metadata, solver, time_limit, mem_limit, output_file, verbose = args
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
@@ -65,8 +66,8 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
             sys.stdout = captured_output
         
         try:
-            # Call xcsp3_cpmpy with the solver and timeout
-            xcsp3_cpmpy(temp_file, solver=solver, time_limit=timeout, cores=1)
+            # Call xcsp3_cpmpy with the solver and limits
+            xcsp3_cpmpy(temp_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
             
             # Get the output and restore stdout if not verbose
             if not verbose:
@@ -150,8 +151,8 @@ def execute_instance(args: Tuple[str, dict, str, int, str, bool]) -> None:
         if os.path.exists(lock_file):
             os.remove(lock_file)
 
-def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1, 
-                   timeout: int = 300, output_dir: str = 'results',
+def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
+                   time_limit: int = 300, mem_limit: int = 4096, output_dir: str = 'results',
                    verbose: bool = False) -> str:
     """
     Benchmark a solver on XCSP3 instances.
@@ -160,8 +161,9 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
         year (int): Competition year (e.g., 2023)
         track (str): Track type (e.g., COP, CSP, MiniCOP)
         solver (str): Solver name (e.g., ortools, exact, choco, ...)
-        threads (int): Number of parallel threads
-        timeout (int): Timeout in seconds per instance
+        workers (int): Number of parallel workers
+        time_limit (int): Time limit in seconds per instance
+        mem_limit (int): Memory limit in MB per instance
         output_dir (str): Output directory for CSV files
         verbose (bool): Whether to show solver output
         
@@ -182,10 +184,10 @@ def xcsp3_benchmark(year: int, track: str, solver: str, threads: int = 1,
     dataset = XCSP3Dataset(year=year, track=track, download=True)
     
     # Process instances in parallel
-    with ProcessPoolExecutor(max_workers=threads) as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, timeout, output_file, verbose))
+                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
                    for filename, metadata in dataset]
         # Process results as they complete
         for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Running {solver}"):
@@ -198,8 +200,9 @@ if __name__ == "__main__":
     parser.add_argument('--year', type=int, required=True, help='Competition year (e.g., 2023)')
     parser.add_argument('--track', type=str, required=True, help='Track type (e.g., COP, CSP, MiniCOP)')
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
-    parser.add_argument('--threads', type=int, default=1, help='Number of parallel threads')
-    parser.add_argument('--timeout', type=int, default=300, help='Timeout in seconds per instance')
+    parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
+    parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
+    parser.add_argument('--mem-limit', type=int, default=4096, help='Memory limit in MB per instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     

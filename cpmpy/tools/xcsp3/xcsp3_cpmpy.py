@@ -50,23 +50,19 @@ MEMORY_BUFFER_SOFT = 2 # MiB
 MEMORY_BUFFER_HARD = 0 # MiB
 MEMORY_BUFFER_SOLVER = 20 # MB
 
-original_stdout = sys.stdout
-
 def sigterm_handler(_signo, _stack_frame):
     """
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
     """
     # Report that we haven't found a solution in time
-    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
     print(flush=True)
     sys.exit(0)
 
 def memory_error_handler(mem_limit: int):
-    sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
-    print_comment(f"MemoryError raised. Reached limit of {bytes_as_mb_float(mem_limit)} MB / {bytes_as_gb_float(mem_limit)} GB")
+    print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
     print(flush=True)
     sys.exit(0)
 
@@ -408,12 +404,14 @@ def xcsp3_cpmpy(benchname: str,
             random.seed(seed)
         if mem_limit is not None:
             # TODO : validate if it works
-            soft = max(mem_limit - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
-            hard = max(mem_limit - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
-            print_comment(f"Setting memory limit: {soft}-{hard}")
+            soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
+            hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
+            print_comment(f"Setting memory limit: {soft} -- {hard}")
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
 
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
+
+        time_start = time.time()
 
         # ------------------------------ Parse instance ------------------------------ #
 
@@ -421,6 +419,11 @@ def xcsp3_cpmpy(benchname: str,
         parser = ParserXCSP3(benchname)
         time_parse = time.time() - time_parse
         print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
+
+        if time_limit and time_limit < (time.time() - time_start):
+            print_comment("Time's up!")
+            print_status(ExitStatus.unknown)
+            return 
 
         # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
         time_callback = time.time()
@@ -437,6 +440,11 @@ def xcsp3_cpmpy(benchname: str,
         time_callback = time.time() - time_callback
         print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
         
+        if time_limit and time_limit < (time.time() - time_start):
+            print_comment("Time's up!")
+            print_status(ExitStatus.unknown)
+            return 
+
         # ------------------------ Post CPMpy model to solver ------------------------ #
 
         solver_args = solver_arguments(solver, model=model, seed=seed,
@@ -456,20 +464,18 @@ def xcsp3_cpmpy(benchname: str,
         time_post = time.time() - time_post
         print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 
+        if time_limit and time_limit < (time.time() - time_start):
+            print_comment("Time's up!")
+            print_status(ExitStatus.unknown)
+            return 
+
+
         # ------------------------------- Solve model ------------------------------- #
-
-        if time_limit is not None:
-            time_limit = time_limit - time_parse - time_buffer
-
-            if time_limit > 0:
-                print_comment(f"{time_limit}s left to solve")
-            else:
-                # Not enough time to start a solve call (we're already over the limit)
-                # We should never get in this situation, as a SIGTERM will be raised by the competition runner
-                #   if we get over time during the transformation
-                print_comment("Not enough time left to start solving")
-                print_status(ExitStatus.unknown)
-                return 
+        
+        if time_limit:
+            # give solver only the remaining time
+            time_limit = time_limit - (time.time() - time_start)
+            print_comment(f"{time_limit}s left to solve")
         
         time_solve = time.time()
         is_sat = s.solve(time_limit=time_limit, **solver_args)
