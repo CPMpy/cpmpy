@@ -21,6 +21,35 @@ from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
 
+class Tee:
+    """
+    A stream-like object that duplicates writes to multiple underlying streams.
+    """
+    def __init__(self, *streams):
+        """
+        Arguments:
+            *streams: Any number of file-like objects that implement a write() method,
+                      such as sys.stdout, sys.stderr, or StringIO.
+        """
+        self.streams = streams
+
+    def write(self, data):
+        """
+        Write data to all underlying streams.
+
+        Args:
+            data (str): The string to write.
+        """
+        for s in self.streams:
+            s.write(data)
+
+    def flush(self):
+        """
+        Flush all underlying streams to ensure all data is written out.
+        """
+        for s in self.streams:
+            s.flush()
+
 # exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
 def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     """
@@ -61,49 +90,50 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         original_stdout = sys.stdout
         if not verbose:
             sys.stdout = captured_output
+        else:
+            sys.stdout = Tee(original_stdout, captured_output)
         
         try:
             # Call xcsp3_cpmpy with the solver and limits
             xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
             
-            # Get the output and restore stdout if not verbose
-            if not verbose:
-                output = captured_output.getvalue()
-                sys.stdout = original_stdout
-                
-                # Parse the output to get status, solution and timings
-                status = None
-                
-                for line in output.split('\n'):
-                    if line.startswith('s '):
-                        status = line[2:].strip()
-                    elif line.startswith('v '):
-                        result['solution'] = line[2:].strip()
-                    elif line.startswith('o '):
-                        result['objective_value'] = int(line[2:].strip())
-                    elif line.startswith('c took '):
-                        # Parse timing information
-                        parts = line.split(' seconds to ')
-                        if len(parts) == 2:
-                            time_val = float(parts[0].replace('c took ', ''))
-                            action = parts[1].strip()
-                            if action.startswith('parse'):
-                                result['time_parse'] = time_val
-                            elif action.startswith('convert'):
-                                result['time_model'] = time_val
-                            elif action.startswith('post'):
-                                result['time_post'] = time_val
-                            elif action.startswith('solve'):
-                                result['time_solve'] = time_val
-                
-                # Map status to is_sat
-                # TODO: rename field to 'status' and use a str name of the status
-                if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
-                    result['is_sat'] = True
-                elif status == ExitStatus.unsat.value:
-                    result['is_sat'] = False
-                else:
-                    result['is_sat'] = None
+            # Get the output and restore stdout
+            output = captured_output.getvalue()
+            sys.stdout = original_stdout
+            
+            # Parse the output to get status, solution and timings
+            status = None
+            
+            for line in output.split('\n'):
+                if line.startswith('s '):
+                    status = line[2:].strip()
+                elif line.startswith('v '):
+                    result['solution'] = line[2:].strip()
+                elif line.startswith('o '):
+                    result['objective_value'] = int(line[2:].strip())
+                elif line.startswith('c took '):
+                    # Parse timing information
+                    parts = line.split(' seconds to ')
+                    if len(parts) == 2:
+                        time_val = float(parts[0].replace('c took ', ''))
+                        action = parts[1].strip()
+                        if action.startswith('parse'):
+                            result['time_parse'] = time_val
+                        elif action.startswith('convert'):
+                            result['time_model'] = time_val
+                        elif action.startswith('post'):
+                            result['time_post'] = time_val
+                        elif action.startswith('solve'):
+                            result['time_solve'] = time_val
+            
+            # Map status to is_sat
+            # TODO: rename field to 'status' and use a str name of the status
+            if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
+                result['is_sat'] = True
+            elif status == ExitStatus.unsat.value:
+                result['is_sat'] = False
+            else:
+                result['is_sat'] = None
                 
         finally:
             result['time_total'] = time.time() - total_start
