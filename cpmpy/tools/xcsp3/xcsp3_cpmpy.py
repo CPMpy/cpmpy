@@ -50,21 +50,18 @@ MEMORY_BUFFER_SOFT = 2 # MiB
 MEMORY_BUFFER_HARD = 0 # MiB
 MEMORY_BUFFER_SOLVER = 20 # MB
 
+original_stdout = sys.stdout
+
 def sigterm_handler(_signo, _stack_frame):
     """
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
     """
     # Report that we haven't found a solution in time
+    #sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
     print(flush=True)
-    sys.exit(0)
-
-def memory_error_handler(mem_limit: int):
-    print_status(ExitStatus.unknown)
-    print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
-    print(flush=True)
-    sys.exit(0)
+    raise SystemExit("SIGTERM received")
 
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
@@ -403,7 +400,6 @@ def xcsp3_cpmpy(benchname: str,
         if seed is not None:
             random.seed(seed)
         if mem_limit is not None:
-            # TODO : validate if it works
             soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
             hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
             print_comment(f"Setting memory limit: {soft} -- {hard}")
@@ -436,7 +432,8 @@ def xcsp3_cpmpy(benchname: str,
         except NotImplementedError as e:
             print_status(ExitStatus.unsupported)
             print_comment(str(e))
-            exit(1)
+            return
+            #exit(1)
         time_callback = time.time() - time_callback
         print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
         
@@ -485,6 +482,7 @@ def xcsp3_cpmpy(benchname: str,
         # ------------------------------- Print result ------------------------------- #
 
         if s.status().exitstatus == CPMStatus.OPTIMAL:
+            # TODO: simplify and let print_status take a CPMStatus?
             print_status(ExitStatus.optimal)
             print_value(solution_xml(callbacks.cpm_variables, s))
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
@@ -498,15 +496,24 @@ def xcsp3_cpmpy(benchname: str,
             print_status(ExitStatus.unknown)
         
     except MemoryError as e:
-        memory_error_handler(mem_limit or 0)
+        # TODO: simplify all error throwing/handling with a single outer catch here?
+        # everything inside would simply raise and nothing would be catched?
+        print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
+        print_status(ExitStatus.unknown)
     except ParseError as e:
         if "out of memory" in e.msg:
-            memory_error_handler(mem_limit or 0)
+            print_comment(f"MemoryError raised by parser. Reached limit of {mem_limit} MiB")
+            print_status(ExitStatus.unknown)
         else:
             raise e
     except Exception as e:
+        print_comment(f"An {type(e)} got raised: {e}")
+        import traceback
+        print_comment("Stack trace:")
+        for line in traceback.format_exc().split('\n'):
+            if line.strip():
+                print_comment(line)
         print_status(ExitStatus.unknown)
-        print_comment(f"An error got raised: {e}")
 
 
 if __name__ == "__main__":
@@ -536,9 +543,9 @@ if __name__ == "__main__":
 
     ## CPMpy optional arguments:
     # The underlying solver which should be used (can also be "solver:subsolver")
-    parser.add_argument("--solver", required=False, type=supported_solver)
+    parser.add_argument("--solver", required=True, type=str)
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
-    parser.add_argument("--time_buffer", required=False, type=int)
+    parser.add_argument("--time-buffer", required=False, type=int)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
 

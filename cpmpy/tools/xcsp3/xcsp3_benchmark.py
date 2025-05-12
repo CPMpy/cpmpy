@@ -3,7 +3,7 @@ import csv
 import os
 import time
 import lzma
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Any, Tuple
 from io import StringIO
@@ -45,6 +45,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     result['track'] = metadata['track']
     result['instance'] = metadata['name'] 
     result['solver'] = solver
+            
+    # Start total timing
+    total_start = time.time()
 
     try:
         # Decompress the XZ file
@@ -52,12 +55,10 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
             xml_content = f.read().decode('utf-8')
         
         # Create a temporary file with the decompressed content
+        # TODO: this can not be in the same dir... should be tmp file or in mem or?
         temp_file = filename + '.xml'
         with open(temp_file, 'w') as f:
             f.write(xml_content)
-            
-        # Start total timing
-        total_start = time.time()
         
         # Capture stdout to prevent xcsp3_cpmpy from printing if not verbose
         captured_output = StringIO()
@@ -76,16 +77,14 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                 
                 # Parse the output to get status, solution and timings
                 status = None
-                solution = None
-                objective = None
                 
                 for line in output.split('\n'):
                     if line.startswith('s '):
                         status = line[2:].strip()
                     elif line.startswith('v '):
-                        solution = line[2:].strip()
+                        result['solution'] = line[2:].strip()
                     elif line.startswith('o '):
-                        objective = int(line[2:].strip())
+                        result['objective_value'] = int(line[2:].strip())
                     elif line.startswith('c took '):
                         # Parse timing information
                         parts = line.split(' seconds to ')
@@ -102,18 +101,13 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                                 result['time_solve'] = time_val
                 
                 # Map status to is_sat
+                # TODO: rename field to 'status' and use a str name of the status
                 if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
                     result['is_sat'] = True
                 elif status == ExitStatus.unsat.value:
                     result['is_sat'] = False
                 else:
                     result['is_sat'] = None
-                    
-                # Set solution and objective if found
-                if solution:
-                    result['solution'] = solution
-                if objective is not None:
-                    result['objective_value'] = objective
                 
         finally:
             result['time_total'] = time.time() - total_start
@@ -190,8 +184,11 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                                    (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
                    for filename, metadata in dataset]
         # Process results as they complete
-        for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Running {solver}"):
-            pass
+        for future in tqdm(as_completed(futures), total=len(futures), desc=f"Running {solver}"):
+            try:
+                _ = future.result()  # for cleanliness sake, result is empty
+            except Exception as e:
+                print(f"ProcessPoolExecutor caught: {e}")
     
     return output_file
 
