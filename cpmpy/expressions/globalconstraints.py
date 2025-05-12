@@ -408,11 +408,14 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
                             f"{array}")
+        if isinstance(table, np.ndarray): # Ensure table is a list
+            table = table.tolist()
+        if not all(is_int(x) for row in table for x in row):
+            raise TypeError(f"the second argument of a Table constraint should only contain integers: "
+                            f"{table}")
         super().__init__("table", [array, table])
 
     def decompose(self):
@@ -432,11 +435,13 @@ class ShortTable(GlobalConstraint):
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if not all(is_int(x) or x == STAR for row in table for x in row):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        if isinstance(table, np.ndarray): # Ensure it is a list
+            raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: "
+                            f"{array}")
+        if isinstance(table, np.ndarray): # Ensure table is a list
             table = table.tolist()
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}: "
+                            f"{table}")
         super().__init__("short_table", [array, table])
 
     def decompose(self):
@@ -460,8 +465,13 @@ class NegativeTable(GlobalConstraint):
     def __init__(self, array, table):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
+            raise TypeError(f"The first argument of NegativeTable constraint should only contain variables/expressions: "
                             f"{array}")
+        if isinstance(table, np.ndarray): # Ensure table is a list
+            table = table.tolist()
+        if not all(is_int(x) for row in table for x in row):
+            raise TypeError(f"the second argument of NegativeTable constraint should only contain integers: "
+                            f"{table}")
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
@@ -516,6 +526,10 @@ class InDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
+        if not isinstance(expr, Expression):
+            raise TypeError(f"The first argument of InDomain should be an expression")
+        if not all(is_int(x) for x in arr):
+            raise TypeError(f"The second argument of InDomain should contain only integers")
         super().__init__("InDomain", [expr, arr])
 
     def decompose(self):
@@ -671,7 +685,7 @@ class Precedence(GlobalConstraint):
     """
     def __init__(self, vars, precedence):
         if not is_any_list(vars):
-            raise TypeError("Precedence expects a list of variables, but got", vars)
+            raise TypeError("Precedence expects a list as first argument, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
         super().__init__("precedence", [cpm_array(vars), precedence])
@@ -771,6 +785,8 @@ class Increasing(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("Increasing expects a list, but got", args)
         super().__init__("increasing", flatlist(args))
 
     def decompose(self):
@@ -793,6 +809,8 @@ class Decreasing(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("Decreasing expects a list, but got", args)
         super().__init__("decreasing", flatlist(args))
 
     def decompose(self):
@@ -815,6 +833,8 @@ class IncreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("IncreasingStrict expects a list, but got", args)
         super().__init__("strictly_increasing", flatlist(args))
 
     def decompose(self):
@@ -837,6 +857,8 @@ class DecreasingStrict(GlobalConstraint):
     """
 
     def __init__(self, *args):
+        if not is_any_list(args):
+            raise TypeError("DecreasingStrict expects a list, but got", args)
         super().__init__("strictly_decreasing", flatlist(args))
 
     def decompose(self):
