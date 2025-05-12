@@ -26,6 +26,7 @@ import json
 import cpmpy as cp
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
+from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
 
 # PyCSP3
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
@@ -412,7 +413,7 @@ def xcsp3_cpmpy(benchname: str,
         # ------------------------------ Parse instance ------------------------------ #
 
         time_parse = time.time()
-        parser = ParserXCSP3(benchname)
+        parser = _parse_xcsp3(benchname)
         time_parse = time.time() - time_parse
         print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
 
@@ -422,13 +423,10 @@ def xcsp3_cpmpy(benchname: str,
             return 
 
         # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
+
         time_callback = time.time()
-        callbacks = CallbacksCPMPy()
-        callbacks.force_exit = True
-        callbacker = CallbackerXCSP3(parser, callbacks)
         try:
-            callbacker.load_instance()
-            model = callbacks.cpm_model
+            model = _load_xcsp3(parser)
         except NotImplementedError as e:
             print_status(ExitStatus.unsupported)
             print_comment(str(e))
@@ -484,10 +482,10 @@ def xcsp3_cpmpy(benchname: str,
         if s.status().exitstatus == CPMStatus.OPTIMAL:
             # TODO: simplify and let print_status take a CPMStatus?
             print_status(ExitStatus.optimal)
-            print_value(solution_xml(callbacks.cpm_variables, s))
+            print_value(solution_xml(s))
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
             print_status(ExitStatus.sat)
-            print_value(solution_xml(callbacks.cpm_variables, s))
+            print_value(solution_xml(s))
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
             print_status(ExitStatus.unsat)
         elif s.status().exitstatus == CPMStatus.UNKNOWN:

@@ -1,7 +1,7 @@
 import xml.etree.cElementTree as ET
 import cpmpy as cp
 
-def solution_xml(variables, model, useless_style="*", boolean_style="int"):
+def solution_xml(model, useless_style="*", boolean_style="int"):
     """
         Formats a solution according to the XCSP3 specification.
     """
@@ -15,6 +15,7 @@ def solution_xml(variables, model, useless_style="*", boolean_style="int"):
 
     # How useless variables should be handled
     #    (variables which have value `None` in the solution)
+    variables = {var.name: var for var in model.user_vars}
     if useless_style == "*":
         variables = {k:(v.value() if v.value() is not None else "*") for k,v in variables.items()}
     elif useless_style == "drop":
