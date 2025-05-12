@@ -1,6 +1,7 @@
 import argparse
 import csv
 import os
+import io
 import time
 import lzma
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -51,15 +52,10 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
 
     try:
         # Decompress the XZ file
-        with lzma.open(filename, 'rb') as f:
-            xml_content = f.read().decode('utf-8')
-        
-        # Create a temporary file with the decompressed content
-        # TODO: this can not be in the same dir... should be tmp file or in mem or?
-        temp_file = filename + '.xml'
-        with open(temp_file, 'w') as f:
-            f.write(xml_content)
-        
+        # TODO: should be tmp file or in mem or?
+        with lzma.open(filename, 'rt', encoding='utf-8') as f:
+            xml_file = io.StringIO(f.read()) # read to memory-mapped file
+                
         # Capture stdout to prevent xcsp3_cpmpy from printing if not verbose
         captured_output = StringIO()
         original_stdout = sys.stdout
@@ -68,7 +64,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         
         try:
             # Call xcsp3_cpmpy with the solver and limits
-            xcsp3_cpmpy(temp_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
+            xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
             
             # Get the output and restore stdout if not verbose
             if not verbose:
@@ -114,9 +110,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
             # Restore stdout in case of exception
             if not verbose:
                 sys.stdout = original_stdout
-            
-        # Clean up temporary file
-        os.remove(temp_file)
         
     except Exception as e:
         result['is_sat'] = False
