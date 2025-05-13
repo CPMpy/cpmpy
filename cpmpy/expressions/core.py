@@ -592,6 +592,7 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
+    @profile
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
@@ -612,14 +613,26 @@ class Operator(Expression):
         #    and one of the args is a wsum,
         #                    or a product of a constant and an expression,
         # then create a wsum of weights,expressions over all
-        if name == 'sum' and \
-                all(not is_num(a) for a in arg_list) and \
-                any(_wsum_should(a) for a in arg_list):
-            we = [_wsum_make(a) for a in arg_list]
-            w = [wi for w, _ in we for wi in w]
-            e = [ei for _, e in we for ei in e]
-            name = 'wsum'
-            arg_list = [w, e]
+
+        if name == 'sum':
+            all_not_num = True
+            any_wsum = False
+            for a in arg_list:
+                if not isinstance(a, Expression):
+                    all_not_num = False
+                    break
+                if (not any_wsum) and _wsum_should(a):
+                    any_wsum = True
+            if all_not_num and any_wsum:
+
+        # if name == 'sum' and \
+        #         all(isinstance(a, Expression) for a in arg_list) and \
+        #         any(_wsum_should(a) for a in arg_list):
+                we = [_wsum_make(a) for a in arg_list]
+                w = [wi for w, _ in we for wi in w]
+                e = [ei for _, e in we for ei in e]
+                name = 'wsum'
+                arg_list = [w, e]
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
