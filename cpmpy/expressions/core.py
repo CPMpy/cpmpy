@@ -110,20 +110,21 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name, arg_list, check_args:bool=True):
         self.name = name
 
-        if isinstance(arg_list, (tuple, GeneratorType)):
-            arg_list = list(arg_list)
-        elif isinstance(arg_list, np.ndarray):
-            # must flatten
-            arg_list = arg_list.reshape(-1)
-        for i in range(len(arg_list)):
-            if isinstance(arg_list[i], np.ndarray):
+        if check_args: # skip checks (e.g. when a superclass already performed these)
+            if isinstance(arg_list, (tuple, GeneratorType)):
+                arg_list = list(arg_list)
+            elif isinstance(arg_list, np.ndarray):
                 # must flatten
-                arg_list[i] = arg_list[i].reshape(-1)
+                arg_list = arg_list.reshape(-1)
+            for i in range(len(arg_list)):
+                if isinstance(arg_list[i], np.ndarray):
+                    # must flatten
+                    arg_list[i] = arg_list[i].reshape(-1)
 
-        assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
+            assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self._args = arg_list
 
 
@@ -643,12 +644,12 @@ class Operator(Expression):
                 mul_args = arg_list[0].args
                 if is_num(mul_args[0]):
                     name = 'mul'
-                    arg_list = (-mul_args[0], mul_args[1])
+                    arg_list = [-mul_args[0], mul_args[1]]
                 elif is_num(mul_args[1]):
                     name = 'mul'
-                    arg_list = (mul_args[0], -mul_args[1])
+                    arg_list = [mul_args[0], -mul_args[1]]
 
-        super().__init__(name, arg_list)
+        super().__init__(name, arg_list, check_args=False)
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
