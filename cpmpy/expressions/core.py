@@ -592,7 +592,6 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
-    @profile
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
