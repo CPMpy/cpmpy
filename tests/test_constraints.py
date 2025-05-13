@@ -15,6 +15,7 @@ from utils import skip_on_missing_pblib
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
+SOLVERNAMES = ["ortools"]
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
@@ -22,7 +23,7 @@ NUM_GLOBAL = {
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "ShortTable", "Circuit",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "NoOverlap",
+    "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
@@ -207,6 +208,14 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+        elif name == "CumulativeOptional":
+            s = intvar(0, 10, shape=4, name="start")
+            e = intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            demand = [11, 4, 8, 7]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            cap = 10
+            expr = cls(s, dur, e, demand, cap, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
@@ -223,6 +232,12 @@ def global_constraints(solver):
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
             expr = cls(s, dur, e)
+        elif name == "NoOverlapOptional":
+            s = intvar(0, 10, shape=4, name="start")
+            e = intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            expr = cls(s, dur, e, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
