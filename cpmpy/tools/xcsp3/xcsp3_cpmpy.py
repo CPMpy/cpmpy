@@ -512,6 +512,7 @@ def xcsp3_cpmpy(benchname: str,
             if line.strip():
                 print_comment(line)
         print_status(ExitStatus.unknown)
+        raise e
 
 
 if __name__ == "__main__":

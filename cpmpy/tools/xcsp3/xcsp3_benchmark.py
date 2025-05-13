@@ -134,6 +134,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                 result['is_sat'] = False
             else:
                 result['is_sat'] = None
+
+        except Exception as e:
+            raise e
                 
         finally:
             result['time_total'] = time.time() - total_start

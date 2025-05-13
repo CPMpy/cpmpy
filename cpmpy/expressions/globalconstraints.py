@@ -127,6 +127,7 @@
 
 """
 import copy
+from numba import njit
 
 
 import cpmpy as cp
@@ -424,6 +425,14 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+@njit
+def check_table(table, star):
+    for row in table:
+        for x in row:
+            if not isinstance(x, int) and x != star:
+                return False
+    return True
+
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -433,7 +442,7 @@ class ShortTable(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if not all(is_int(x) or x == STAR for row in table for x in row):
+        if not check_table(table, STAR):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
         if isinstance(table, np.ndarray): # Ensure it is a list
             table = table.tolist()

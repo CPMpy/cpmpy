@@ -4,7 +4,7 @@ PyTorch-style Dataset for XCSP3 competition instances.
 
 import os
 import pathlib
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 import xml.etree.ElementTree as ET
 from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
@@ -12,7 +12,7 @@ import zipfile
 import lzma
 
 class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
-    def __init__(self, root: str = ".", year: int = 2023, track: str = None, transform=None, target_transform=None, download: bool = False):
+    def __init__(self, root: str = ".", year: int = 2023, track: Optional[str] = None, transform=None, target_transform=None, download: bool = False):
         """
         Initialize the XCSP3 Dataset.
         
