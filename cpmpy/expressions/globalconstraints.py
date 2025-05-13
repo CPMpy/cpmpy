@@ -112,8 +112,10 @@
         InDomain
         Xor
         Cumulative
+        CumulativeOptional
         Precedence
         NoOverlap
+        NoOverlapOptional
         GlobalCardinalityCount
         Increasing
         Decreasing
@@ -662,6 +664,86 @@ class Cumulative(GlobalConstraint):
 
         return True
 
+class CumulativeOptional(GlobalConstraint):
+    """
+        Generalization of the Cumulative constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+    """
+
+    def __init__(self, start, duration, end, demand, capacity, is_present):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(duration), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
+        end = flatlist(end)
+        is_present = [cp.BoolVal(x) if is_bool(x) else x for x in flatlist(is_present)] # normalize
+        assert len(start) == len(duration) == len(end) == len(is_present), "Start, duration, end and is_present should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
+
+        super().__init__("cumulative_optional", [start, duration, end, demand, capacity, is_present])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity, is_present = arr_args
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [is_present[t].implies(start[t] + duration[t] == end[t])]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
+        for t in range(lb,ub+1):
+            demand_at_t = 0
+            for job in range(len(start)):
+                if is_num(demand):
+                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]) & is_present[job])
+                else:
+                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]) & is_present[job])
+
+            cons += [demand_at_t <= capacity]
+
+        return cons, []
+    
+    def value(self):
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
+                    else argval(arg) for arg in self.args]
+
+        if any(a is None for a in arg_vals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, capacity, is_present = arg_vals
+        # start and end seperated by duration, if the tasks are present
+        if not (~is_present | (start + dur == end)).all():
+            return False
+
+        # demand of present tasks doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if capacity < sum(demand * ((start <= t) & (t < end) & is_present)):
+                return False
+
+        return True
+
 
 class Precedence(GlobalConstraint):
     """
@@ -738,6 +820,49 @@ class NoOverlap(GlobalConstraint):
             if e1 > s2 and e2 > s1:
                 return False
         return True
+    
+
+class NoOverlapOptional(GlobalConstraint):
+    """
+        Generalization of the NoOverlap constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+    """
+    
+    def __init__(self, start, dur, end, is_present):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+        assert is_any_list(is_present), "is_present should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        is_present = [cp.BoolVal(x) if is_bool(x) else x for x in flatlist(is_present)] # normalize
+        assert len(start) == len(dur) == len(end) == len(is_present), "Start, duration, end and is_present should have equal length " \
+                                                   "in NoOverlap constraint"
+
+        super().__init__("no_overlap_optional", [start, dur, end, is_present])
+
+    def decompose(self):
+        start, dur, end, is_present = self.args
+        cons = [p.implies(s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
+        for (s1, e1,p1), (s2, e2,p2) in all_pairs(zip(start, end, is_present)):
+            cons += [(p1 & p2).implies((e1 <= s2) | (e2 <= s1))]
+        return cons, []
+
+    def value(self):
+        start, dur, end, is_present = argvals(self.args)
+        start, dur, end, is_present = np.array(start), np.array(dur), np.array(end), np.array(is_present)
+        # filter to the tasks which are present
+        start, dur, end = start[is_present], dur[is_present], end[is_present]
+
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if e1 > s2 and e2 > s1:
+                return False
+        return True
+        
 
 
 class GlobalCardinalityCount(GlobalConstraint):
