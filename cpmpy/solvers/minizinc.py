@@ -54,6 +54,7 @@
     ==============
 """
 import re
+from typing import Dict
 import warnings
 import sys
 import os
@@ -155,7 +156,7 @@ class CPM_minizinc(SolverInterface):
     # variable names must have this pattern
     mzn_name_pattern = re.compile('^[A-Za-z][A-Za-z0-9_]*$')
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 
@@ -192,6 +193,8 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
+
+        self.added_natives = added_natives
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -486,7 +489,7 @@ class CPM_minizinc(SolverInterface):
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq", "among"}
+                     "lex_chain_lesseq", "among", *self.added_natives.keys()}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
 
     def add(self, cpm_expr):
@@ -703,6 +706,9 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
+        
+        elif expr.name in self.added_natives:
+                return self.added_natives[expr.name](self, expr)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple

@@ -39,6 +39,8 @@ from xcsp3_solution import solution_xml
 from parser_callbacks import CallbacksCPMPy
 # from xcsp3.perf_timer import PerfContext, TimerContext
 
+import xcsp3_natives
+
 # Configuration
 SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]
 SUPPORTED_SUBSOLVERS = {
@@ -448,14 +450,29 @@ def xcsp3_cpmpy(benchname: str,
                                        **kwargs)
         # time_limit is generic for all, done later
 
+        # Additional XCSP3-specific native transformations
+        added_natives = {
+            "ortools": {
+                "no_overlap2d": xcsp3_natives.ort_nooverlap2d,
+                "subcircuit": xcsp3_natives.ort_subcircuit,
+                "subcircuitwithstart": xcsp3_natives.ort_subcircuitwithstart,
+            },
+            "choco": {
+                "subcircuit": xcsp3_natives.choco_subcircuit,
+            },
+            "minizinc": {
+                "subcircuit": xcsp3_natives.minizinc_subcircuit,
+            },
+        }
+
         # Post model to solver
         time_post = time.time()
         with prepend_print():  # catch prints and prepend 'c' to each line (still needed?)
             if solver == "exact": # Exact2 takes its options at creation time
-                s = cp.SolverLookup.get(solver, model, **solver_args)
+                s = cp.SolverLookup.get(solver, model, **solver_args, added_natives=added_natives.get(solver, {}))
                 solver_args = dict()  # no more solver args needed
             else:
-                s = cp.SolverLookup.get(solver, model)
+                s = cp.SolverLookup.get(solver, model, added_natives=added_natives.get(solver, {}))
         time_post = time.time() - time_post
         print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 

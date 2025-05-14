@@ -43,7 +43,8 @@
     Module details
     ==============
 """
-import sys  # for stdout checking
+import sys
+from typing import Dict  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -89,7 +90,7 @@ class CPM_ortools(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 
@@ -117,6 +118,8 @@ class CPM_ortools(SolverInterface):
         # for solving with assumption variables,
         # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
+
+        self.added_natives = added_natives
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
@@ -379,7 +382,7 @@ class CPM_ortools(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", *self.added_natives.keys()}
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
@@ -567,6 +570,8 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name in self.added_natives:
+                return self.added_natives[cpm_expr.name](self, cpm_expr)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
                                           f"If you reach this, please report on github.")
