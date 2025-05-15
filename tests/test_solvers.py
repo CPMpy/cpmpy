@@ -811,6 +811,8 @@ class TestSupportedSolvers:
         s = cp.SolverLookup.get(solver)
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
+        if solver == "pysdd":
+            return # not implemented in pysdd
 
         s += x | y
         assert s.solve(assumptions=[x])
