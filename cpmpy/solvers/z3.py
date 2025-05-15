@@ -88,7 +88,7 @@ class CPM_z3(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver="sat", added_natives=Dict[str, callable]):
+    def __init__(self, cpm_model=None, subsolver="sat", added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 

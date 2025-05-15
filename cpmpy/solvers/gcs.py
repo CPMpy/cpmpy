@@ -100,7 +100,7 @@ class CPM_gcs(SolverInterface):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 
