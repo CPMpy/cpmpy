@@ -22,7 +22,6 @@ from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
 from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
-from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
 
 class Tee:
@@ -75,7 +74,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
-                  'is_sat', 'objective_value', 'solution']
+                  'status', 'objective_value', 'solution']
     result = dict.fromkeys(fieldnames)  # init all fields to None
     result['year'] = metadata['year']
     result['track'] = metadata['track']
@@ -87,32 +86,32 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
 
     try:
         # Decompress the XZ file
-        # TODO: should be tmp file or in mem or?
         with lzma.open(filename, 'rt', encoding='utf-8') as f:
             xml_file = io.StringIO(f.read()) # read to memory-mapped file
                 
-        # Capture stdout to prevent xcsp3_cpmpy from printing if not verbose
+        # Capture stdout for output extranction
         captured_output = StringIO()
         original_stdout = sys.stdout
         if not verbose:
+            # prevent xcsp3_cpmpy from printing if not verbose
             sys.stdout = captured_output
         else:
+            # print to original stdout and captured_output
             sys.stdout = Tee(original_stdout, captured_output)
         
         try:
             # Call xcsp3_cpmpy with the solver and limits
             xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
+            xml_file.close()  # Explicitly close the StringIO object
                             
             # Get the output and restore stdout
             output = captured_output.getvalue()
             sys.stdout = original_stdout
             
             # Parse the output to get status, solution and timings
-            status = None
-            
             for line in output.split('\n'):
                 if line.startswith('s '):
-                    status = line[2:].strip()
+                    result['status'] = line[2:].strip()
                 elif line.startswith('v '):
                     result['solution'] = line[2:].strip()
                 elif line.startswith('o '):
@@ -132,35 +131,25 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                         elif action.startswith('solve'):
                             result['time_solve'] = time_val
             
-            # Map status to is_sat
-            # TODO: rename field to 'status' and use a str name of the status
-            if status == ExitStatus.sat.value or status == ExitStatus.optimal.value:
-                result['is_sat'] = True
-            elif status == ExitStatus.unsat.value:
-                result['is_sat'] = False
-            else:
-                result['is_sat'] = None
-
         except Exception as e:
             raise e
                 
         finally:
-            result['time_total'] = time.time() - total_start
             # Restore stdout in case of exception
             if not verbose:
                 sys.stdout = original_stdout
+            captured_output.close()  # Close the captured output StringIO
         
     except Exception as e:
-        result['is_sat'] = False
+        result['status'] = ExitStatus.unknown
         result['solution'] = str(e)  # abuse solution field for error message
-        result['time_total'] = time.time() - total_start
+
+    result['time_total'] = time.time() - total_start
 
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"
     lock = FileLock(lock_file)
-
     try:
-
         with lock:
             # Pre-check if file exists to determine if we need to write header
             write_header = not os.path.exists(output_file)
@@ -170,7 +159,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                 if write_header:
                     writer.writeheader()
                 writer.writerow(result)
-
     finally:
         # Optional: cleanup if the lock file somehow persists
         if os.path.exists(lock_file):
@@ -206,7 +194,7 @@ def run_with_timeout(func, args, timeout):
 def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_file, verbose):
     return run_with_timeout(execute_instance, 
                             (filename, metadata, solver, time_limit, mem_limit, output_file, verbose),
-                            timeout=time_limit*2) # <- change limit as needed, now a very gracious doubling of the tilme
+                            timeout=time_limit*2) # <- change limit as needed, now a very gracious doubling of the time
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
@@ -251,9 +239,9 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
             try:
                 _ = future.result(timeout=10)  # for cleanliness sake, result is empty
             except TimeoutError:
-                print(f"Timeout on job {i}")
+                print(f"Timeout on job {i}: {dataset[i][1]['name']}")  # print the metadata
             except Exception as e:
-                print(f"ProcessPoolExecutor caught: {e}")
+                print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
     
     return output_file
 
