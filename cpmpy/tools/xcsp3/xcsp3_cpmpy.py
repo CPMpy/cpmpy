@@ -332,6 +332,19 @@ def gurobi_arguments(model: cp.Model,
 
     return res
 
+def cpo_arguments(cores: Optional[int] = None,
+                  seed: Optional[int] = None,
+                  **kwargs):
+    # Documentation: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
+    res = dict()
+    if cores is not None:
+        res |= { "Workers": cores }
+    if seed is not None:
+        res |= { "RandomSeed": seed }
+
+    return res
+
+
 def solver_arguments(solver: str, 
                      model: cp.Model, 
                      seed: Optional[int] = None,
@@ -354,6 +367,8 @@ def solver_arguments(solver: str,
         return minizinc_arguments(solver, cores=cores, seed=seed, **kwargs)
     elif solver == "gurobi":
         return gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
+    elif solver == "cpo":
+        return cpo_arguments(cores=cores, seed=seed, **kwargs)
     else:
         print_comment(f"setting parameters of {solver} is not (yet) supported")
         return dict()
