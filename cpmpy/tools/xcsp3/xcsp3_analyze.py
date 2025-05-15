@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 def xcsp3_plot(df, time_limit=None):
     # Get unique solvers
     solvers = df['solver'].unique()
+
+    # Determine the status to plot (Opt if at least one opt, otherwise sat)
+    statuses = df['status'].unique()
+    if 'OPTIMUM FOUND' in statuses:
+        status_filter = 'OPTIMUM FOUND'
+    else:
+        status_filter = 'SATISFIABLE'
+    df = df[df['status'] == status_filter]  # only those that reached the desired status
     
     # Create figure
     fig = plt.figure(figsize=(10, 6))
@@ -31,8 +39,11 @@ def xcsp3_plot(df, time_limit=None):
     
     # Set plot properties
     plt.xlabel('Time (seconds)')
-    plt.ylabel('Number of instances solved')
-    plt.title('Performance Plot')
+    plt.ylabel(f'Number of instances returning \'{status_filter}\'')
+    # Get unique year-track combinations
+    year_track_pairs = df[['year', 'track']].drop_duplicates()
+    datasets = ', '.join([f'{row.year}:{row.track}' for _, row in year_track_pairs.iterrows()])
+    plt.title(f'Performance Plot ({datasets})')
     plt.grid(True)
     plt.legend()
     
@@ -41,6 +52,12 @@ def xcsp3_plot(df, time_limit=None):
         plt.xlim(0, time_limit)
 
     return fig
+
+def xcsp3_stats(df):
+    for phase in ['parse', 'model', 'post']:
+        slowest_idx = df[f'time_{phase}'].idxmax()
+        print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']} ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
+    
     
 def main():
     # Set up argument parser
@@ -74,6 +91,9 @@ def main():
         dfs.append(df)
     
     merged_df = pd.concat(dfs, ignore_index=True)
+    
+    # Print some stats
+    xcsp3_stats(merged_df)
     
     # Create performance plot
     fig = xcsp3_plot(merged_df, args.time_limit)
