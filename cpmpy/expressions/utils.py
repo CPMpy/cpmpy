@@ -30,6 +30,7 @@ Internal utilities for expression handling.
 """
 import copy
 
+
 import cpmpy as cp
 import numpy as np
 import math
@@ -96,13 +97,6 @@ def is_any_list(arg):
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
-
-
-def is_transition(arg):
-    """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
-    a transition value and an ending node"""
-    return len(arg) == 3 and \
-        isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
 
 def flatlist(args):
     """ recursively flatten arguments into one single list
@@ -207,7 +201,7 @@ def implies(expr, other):
     elif is_true_cst(expr):
         return other
     elif is_false_cst(expr):
-        return BoolVal(True)
+        return cp.BoolVal(True)
     else:
         return expr.implies(other)
 
@@ -218,5 +212,3 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
-
-

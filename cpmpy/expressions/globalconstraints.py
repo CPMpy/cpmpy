@@ -108,6 +108,7 @@
         Table
         ShortTable
         NegativeTable
+        Regular
         IfThenElse
         InDomain
         Xor
@@ -473,6 +474,100 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+    
+
+class Regular(GlobalConstraint):
+    """
+    Regular-constraint (or Automaton-constraint)
+    Takes as input a sequence of variables and a automaton representation using a transition table.
+    The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
+    """
+    def __init__(self, array, transitions, start, accepting):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
+        
+        _node_type = type(transitions[0][0])
+        if not all(isinstance(t, tuple) and len(t) == 3 and isinstance(t[0], _node_type) and isinstance(t[1], int) and isinstance(t[2],_node_type) for t in transitions):
+            raise TypeError("The second argument of a regular constraint should be a collection of transitions (node, int, node)")
+        if not isinstance(start, _node_type):
+            raise TypeError("The third argument of a regular constraint should be a node id")
+        if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
+            raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
+        super().__init__("regular", [array, transitions, start, list(accepting)])
+
+        self.nodes = set()
+        self.trans_dict = {}
+        for s, v, e in transitions:
+            self.nodes.update([s,e])
+            self.trans_dict[(s, v)] = e
+        self.nodes = sorted(self.nodes)
+        # normalize node_ids to be 0..n-1, allows for smaller domains
+        self.node_map = {n: i for i, n in enumerate(self.nodes)}
+
+    def decompose(self):
+        # Decompose to transition table using Table constraints
+        
+        arr, transitions, start, accepting = self.args
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+        
+        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+
+        # add a sink node for transitions that are not defined
+        sink = len(self.nodes)
+        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
+        transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+
+        # keep track of current state when traversing the array
+        state_vars = intvar(0, sink, shape=len(arr))
+        id_start = self.node_map[start]
+        # optimization: we know the entry node of the automaton, results in smaller table
+        defining = [Table([arr[0], state_vars[0]], [t[1:] for t in transitions if t[0] == id_start])]        
+        # define the rest of the automaton using transition table
+        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        
+        # constraint is satisfied iff last state is accepting
+        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+
+    def value(self):
+        arr, transitions, start, accepting = self.args
+        arrval = [argval(a) for a in arr]
+        curr_node = start
+        for v in arrval:
+            if (curr_node, v) in self.trans_dict:
+                curr_node = self.trans_dict[curr_node, v]
+            else:
+                return False
+        return curr_node in accepting
+
+
+# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
+# same semantic as CPLEX IfThenElse constraint
+# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
+class IfThenElse(GlobalConstraint):
+    def __init__(self, condition, if_true, if_false):
+        if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
+            raise TypeError("only boolean expression allowed in IfThenElse")
+        super().__init__("ite", [condition, if_true, if_false])
+
+    def value(self):
+        condition, if_true, if_false = self.args
+        try:
+            if argval(condition):
+                return argval(if_true)
+            else:
+                return argval(if_false)
+        except IncompleteFunctionError:
+            return False
+
+    def decompose(self):
+        condition, if_true, if_false = self.args
+        return [condition.implies(if_true), (~condition).implies(if_false)], []
+
+    def __repr__(self):
+        condition, if_true, if_false = self.args
+        return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
