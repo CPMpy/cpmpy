@@ -1,7 +1,7 @@
-CPMpy choco interface (:mod:`cpmpy.solvers.choco`)
+CPMpy cpo interface (:mod:`cpmpy.solvers.cpo`)
 =====================================================
 
-.. automodule:: cpmpy.solvers.choco
+.. automodule:: cpmpy.solvers.cpo
     :members:
     :undoc-members:
     :inherited-members:
