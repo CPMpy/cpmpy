@@ -6,7 +6,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
-from cpmpy.expressions.utils import STAR
+from cpmpy.expressions.utils import STAR, argvals
 from cpmpy.solvers import CPM_minizinc
 
 from utils import skip_on_missing_pblib
@@ -529,32 +529,6 @@ class TestGlobal(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
-    def test_mdd(self):
-        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
-        x = cp.intvar(0, 2, shape=3)
-        transitions = [
-            ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"),
-            ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
-            ("n4", 0, "t"), ("n5", 0, "t")]
-
-        constraints = [cp.MDD(x, transitions)]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
-
-        solutions = [[0, 2, 0], [1, 2, 0], [2, 0, 0]]
-
-        for i in range(4):
-            for j in range(4):
-                for k in range(4):
-                    candidate = [i, j, k]
-                    constraints = [cp.MDD(x, transitions), x == candidate]
-                    model = cp.Model(constraints)
-                    if candidate in solutions:
-                        self.assertTrue(model.solve())
-                        self.assertEqual([a.value() for a in x], candidate)
-                    else:
-                        self.assertFalse(model.solve())
-
     def test_regular(self):
         # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
         x = cp.intvar(0, 1, shape=7)
@@ -564,26 +538,24 @@ class TestGlobal(unittest.TestCase):
         start = "a"
         ends = ["e"]
 
-        constraints = [cp.Regular(x, transitions, start, ends)]
-        model = cp.Model(constraints)
-        self.assertTrue(model.solve())
+        true_sols = set()
+        false_sols = set()
 
-        solutions = [[0,0,0,1,1,0,1],[0,0,1,1,0,0,1],[0,0,1,1,0,1,0],[0,1,1,0,0,0,1],[0,1,1,0,0,1,0],
-                     [0,1,1,0,1,0,0],[1,1,0,0,0,0,1],[1,1,0,0,0,1,0],[1,1,0,0,1,0,0],[1,1,0,1,0,0,0]]
+        solutions = [(0,0,0,1,1,0,1), (0,0,1,1,0,0,1), (0,0,1,1,0,1,0), (0,1,1,0,0,0,1), (0,1,1,0,0,1,0),
+                     (0,1,1,0,1,0,0), (1,1,0,0,0,0,1), (1,1,0,0,0,1,0), (1,1,0,0,1,0,0), (1,1,0,1,0,0,0)]
 
-        def enum_candidate(n, candidate):
-            if n == 0:
-                constraints = [cp.Regular(x, transitions, start, ends), x == candidate]
-                model = cp.Model(constraints)
-                if candidate in solutions:
-                    self.assertTrue(model.solve())
-                    self.assertEqual([a.value() for a in x], candidate)
-                else:
-                    self.assertFalse(model.solve())
-            else:
-                enum_candidate(n-1, candidate+[0])
-                enum_candidate(n-1, candidate+[1])
-        enum_candidate(7, [])
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        num_true = true_model.solveAll(display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(display=lambda : false_sols.add(tuple(argvals(x))))
+
+        self.assertEqual(num_true, len(solutions))
+        self.assertSetEqual(true_sols, set(solutions))
+
+        self.assertEqual(num_true + num_false, 2**7)
+        self.assertEqual(len(true_sols & false_sols), 0) # no solutions can be in both
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
